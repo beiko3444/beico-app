@@ -1,26 +1,63 @@
 @import "tailwindcss";
 
+@theme {
+  /* New Point Color: #d9361b */
+  --color-brand-blue: #d9361b;
+  --color-brand-light-blue: #d9361b;
+  /* Avoid other reds, reuse point color */
+  --color-brand-grey: #f0f0f0;
+  --color-brand-orange: #d9361b;
+  /* Using point color as primary accent */
+
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
 :root {
   --background: #ffffff;
-  --foreground: #171717;
-}
-
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  /* All white background */
+  --foreground: #0A2342;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans);
+}
+
+.glass-panel {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.glass-button {
+  background: rgba(217, 54, 27, 0.9);
+  color: white;
+}
+
+.glass-button:hover {
+  background: rgba(217, 54, 27, 1);
+  box-shadow: 0 4px 12px rgba(217, 54, 27, 0.3);
+}
+
+@keyframes gradient-move {
+  0% {
+    background-position: 0% 50%;
+  }
+
+  50% {
+    background-position: 100% 50%;
+  }
+
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+.bg-gradient-green-animated {
+  background: linear-gradient(-45deg, #059669, #10b981, #34d399, #059669);
+  background-size: 400% 400%;
+  animation: gradient-move 3s ease infinite;
 }

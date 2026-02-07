@@ -1,0 +1,153 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id             String          @id @default(uuid())
+  username       String          @unique
+  password       String
+  name           String
+  role           String          @default("PARTNER") // PARTNER, ADMIN
+  status         String          @default("PENDING") // PENDING, APPROVED, REJECTED
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  orders         Order[]
+  partnerProfile PartnerProfile?
+}
+
+model PartnerProfile {
+  id                 String  @id @default(uuid())
+  userId             String  @unique
+  contact            String?
+  fax                String? // Added fax
+  email              String?
+  businessName       String?
+  representativeName String?
+  businessRegNumber  String?
+  address            String?
+  businessRegistrationUrl String?
+  grade              String  @default("C")
+  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Product {
+  id          String      @id @default(uuid())
+  name        String
+  nameJP      String?
+  buyPrice    Float
+  sellPrice   Float
+  onlinePrice Float?      @default(0)
+  priceA      Float?
+  priceB      Float?
+  priceC      Float?
+  priceD      Float?
+  stock       Int         @default(0)
+  safetyStock Int         @default(0)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  barcode     String?
+  productCode String?
+  imageUrl    String?
+  sortOrder   Int         @default(0)
+  minOrderQuantity Int         @default(1)
+  orderItems       OrderItem[]
+}
+
+model Order {
+  id               String      @id @default(uuid())
+  userId           String
+  total            Float
+  createdAt        DateTime    @default(now())
+  status           String      @default("PENDING")
+  trackingNumber   String?
+  courier          String?
+  taxInvoiceIssued   Boolean     @default(false)
+  orderNumber        String?     @unique
+  depositConfirmedAt      DateTime?
+  adminDepositConfirmedAt DateTime?
+  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items            OrderItem[]
+}
+
+model OrderItem {
+  id        String  @id @default(uuid())
+  orderId   String
+  productId String
+  quantity  Int
+  price     Float
+  product   Product @relation(fields: [productId], references: [id])
+  order     Order   @relation(fields: [orderId], references: [id])
+}
+
+model ProductionBatch {
+  id                String   @id @default(uuid())
+  category          String   // e.g. 청갯지렁이, 홍갯지렁이...
+  productionDate    DateTime // Manually selected date
+  rawMaterialCost   Int      // 원재료비
+  depositDollar     Float?   // 입금달러 (선택)
+  electricityCost   Int      // 전기세
+  packagingCost     Int      // 포장비
+  warehouseCost     Int      @default(0) // 창고료
+  shippingCost      Int      @default(0) // 운송료
+  customsFee        Int      @default(0) // 관세사 수수료
+  customsDuty       Int      @default(0) // 관세
+  vat               Int      @default(0) // 부가세
+  quantity          Int
+  unitCost          Float?   // (Raw + Elec + Pack) / Qty
+  salesPrice        Int      // Linked from Product DB
+  wholesalePrice    Int      // Linked from Product DB (Price C)
+  memo              String?  // Renamed from remarks
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ElectricityUsage {
+  id        String   @id @default(uuid())
+  year      Int
+  month     Int
+  
+  // Bill Details
+  readingDate       String   // 검침일
+  usagePeriod       String   // 전기사용기간
+  meterCurrent      String   // Aggregated string (e.g. "123 / 456")
+  meterPrevious     String   // Aggregated string
+  
+  totalUsage        Int      // 당월 사용량
+  totalAmount       Int      // 청구금액
+  
+  // Raw Bill Data (JSON for flexibility in display)
+  rawBillData       String   // JSON string of all parsed fields
+
+  // Landlord Details
+  landlordMeterPrev Int?     // 전월 측정값
+  landlordMeterCurr Int?     // 월말 측정값
+  landlordUsage     Int?     // Calculated or manual
+  
+  waterHeaterKw     Float?   // 온수기 KW
+  outdoorLightKw    Float?   // 외등 KW
+  
+  meterPhotoUrl     String?
+  rawText           String?  // The text pasted in the textarea
+  extractionHistory String?  // JSON string for extraction logs
+  
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@unique([year, month])
+}
+
+model Task {
+  id          String   @id @default(uuid())
+  title       String
+  description String?  // Added description
+  fileUrl     String?  // Added file URL
+  completed   Boolean  @default(false)
+  date        DateTime
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
