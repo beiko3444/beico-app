@@ -19,7 +19,7 @@ export default function AdminNav({ counts }: { counts?: { pendingOrders: number,
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[100] px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-            <div className="max-w-7xl mx-auto flex justify-center">
+            <div className="max-w-7xl mx-auto relative flex items-center justify-center min-h-[40px]">
                 <nav className="flex items-center gap-1 overflow-x-auto scrollbar-hide">
                     {navItems.map((item) => {
                         const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
@@ -48,6 +48,13 @@ export default function AdminNav({ counts }: { counts?: { pendingOrders: number,
                         )
                     })}
                 </nav>
+
+                <button
+                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    className="absolute right-0 px-4 py-2 text-xs font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                >
+                    로그아웃
+                </button>
             </div>
         </div>
     )

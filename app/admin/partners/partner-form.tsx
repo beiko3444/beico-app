@@ -29,6 +29,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
         businessRegNumber: '',
         address: '',
         grade: 'C',
+        role: 'PARTNER',
         businessRegistrationUrl: ''
     })
 
@@ -44,6 +45,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 businessRegNumber: initialData.partnerProfile?.businessRegNumber || '',
                 address: initialData.partnerProfile?.address || '',
                 grade: initialData.partnerProfile?.grade || 'C',
+                role: initialData.role || 'PARTNER',
                 businessRegistrationUrl: initialData.partnerProfile?.businessRegistrationUrl || ''
             })
         } else if (isOpen && !initialData) {
@@ -57,6 +59,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 businessRegNumber: '',
                 address: '',
                 grade: 'C',
+                role: 'PARTNER',
                 businessRegistrationUrl: ''
             })
         }
@@ -96,7 +99,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 setIsOpen(false)
                 router.refresh()
                 if (!initialData) {
-                    setFormData({ username: '', password: '', name: '', contact: '', email: '', representativeName: '', businessRegNumber: '', address: '', grade: 'C', businessRegistrationUrl: '' })
+                    setFormData({ username: '', password: '', name: '', contact: '', email: '', representativeName: '', businessRegNumber: '', address: '', grade: 'C', role: 'PARTNER', businessRegistrationUrl: '' })
                 }
             } else {
                 const data = await res.json()
@@ -185,41 +188,53 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                             </select>
                         </div>
                         <div>
-                            <label className="block font-medium text-gray-700 mb-1">전화번호 (Mobile)</label>
-                            <input name="contact" type="text" value={formData.contact} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="010-0000-0000" />
+                            <label className="block font-medium text-gray-700 mb-1">계정 권한 (Role)</label>
+                            <select name="role" value={formData.role} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md bg-white font-bold text-xs">
+                                <option value="PARTNER">PARTNER (일반 파트너)</option>
+                                <option value="ADMIN">ADMIN (최고 관리자)</option>
+                            </select>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block font-medium text-gray-700 mb-1">이메일 주소</label>
-                        <input name="email" type="email" value={formData.email} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="example@email.com" />
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block font-medium text-gray-700 mb-1">전화번호 (Mobile)</label>
+                            <input name="contact" type="text" value={formData.contact} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="010-0000-0000" />
+                        </div>
+
+                        <div>
+                            <label className="block font-medium text-gray-700 mb-1">이메일 주소</label>
+                            <input name="email" type="email" value={formData.email} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="example@email.com" />
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="block font-medium text-gray-700 mb-1">사업자 등록 번호</label>
-                        <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="000-00-00000" />
-                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block font-medium text-gray-700 mb-1">사업자 등록 번호</label>
+                            <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="000-00-00000" />
+                        </div>
 
-                    <div>
-                        <label className="block font-medium text-gray-700 mb-1">사업자 등록증 (첨부)</label>
-                        <div className="flex items-center gap-4">
-                            <input
-                                type="file"
-                                accept="image/*,application/pdf"
-                                onChange={handleFileChange}
-                                className="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
-                            />
-                            {formData.businessRegistrationUrl && (
-                                <a
-                                    href={formData.businessRegistrationUrl}
-                                    download="business_registration"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center gap-1"
-                                >
-                                    <span>📄</span> 확인/다운로드
-                                </a>
-                            )}
+                        <div>
+                            <label className="block font-medium text-gray-700 mb-1">사업자 등록증 (첨부)</label>
+                            <div className="flex items-center gap-4">
+                                <input
+                                    type="file"
+                                    accept="image/*,application/pdf"
+                                    onChange={handleFileChange}
+                                    className="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                                />
+                                {formData.businessRegistrationUrl && (
+                                    <a
+                                        href={formData.businessRegistrationUrl}
+                                        download="business_registration"
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center gap-1"
+                                    >
+                                        <span>📄</span> 확인/다운로드
+                                    </a>
+                                )}
+                            </div>
                         </div>
                     </div>
 

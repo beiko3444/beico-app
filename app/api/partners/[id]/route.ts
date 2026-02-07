@@ -16,6 +16,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const updateData: any = {
             username,
             name,
+            role: body.role || 'PARTNER',
         }
 
         if (password && password.trim() !== '') {

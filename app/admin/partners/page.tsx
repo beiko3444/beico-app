@@ -9,9 +9,9 @@ export const dynamic = 'force-dynamic'
 
 export default async function PartnersPage() {
     const partners = await prisma.user.findMany({
-        where: { role: 'PARTNER' },
+        where: { role: { in: ['PARTNER', 'ADMIN'] } },
         include: { partnerProfile: true },
-        orderBy: { createdAt: 'desc' }
+        orderBy: [{ role: 'asc' }, { createdAt: 'desc' }]
     })
 
     return (
@@ -65,7 +65,12 @@ export default async function PartnersPage() {
                                             initialData={partner}
                                             trigger={
                                                 <button className="text-left hover:underline decoration-gray-400 underline-offset-4">
-                                                    <div className="font-bold text-gray-900 group-hover:text-[var(--color-brand-blue)] transition-colors text-sm">{partner.name}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="font-bold text-gray-900 group-hover:text-[var(--color-brand-blue)] transition-colors text-sm">{partner.name}</div>
+                                                        {partner.role === 'ADMIN' && (
+                                                            <span className="px-1 py-0.5 bg-gray-900 text-white text-[8px] font-black rounded uppercase">Admin</span>
+                                                        )}
+                                                    </div>
                                                     <div className="text-[10px] text-gray-400">담당자: {partner.partnerProfile?.representativeName || '-'}</div>
                                                 </button>
                                             }

@@ -32,7 +32,7 @@ export async function POST(request: Request) {
                 username,
                 password: hashedPassword, // Store hashed!
                 name,
-                role: 'PARTNER',
+                role: body.role || 'PARTNER',
                 status: 'APPROVED',
                 partnerProfile: {
                     create: {
