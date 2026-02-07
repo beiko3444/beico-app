@@ -14,12 +14,12 @@ export default function ChangePasswordForm() {
         setMessage({ type: '', text: '' })
 
         if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: 'New passwords do not match' })
+            setMessage({ type: 'error', text: '새 비밀번호가 일치하지 않습니다.' })
             return
         }
 
         if (newPassword.length < 6) {
-            setMessage({ type: 'error', text: 'New password must be at least 6 characters' })
+            setMessage({ type: 'error', text: '새 비밀번호는 최소 6자 이상이어야 합니다.' })
             return
         }
 
@@ -35,15 +35,15 @@ export default function ChangePasswordForm() {
             const data = await res.json()
 
             if (res.ok) {
-                setMessage({ type: 'success', text: 'Password updated successfully' })
+                setMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' })
                 setCurrentPassword('')
                 setNewPassword('')
                 setConfirmPassword('')
             } else {
-                setMessage({ type: 'error', text: data.error || 'Failed to update password' })
+                setMessage({ type: 'error', text: data.error === 'Invalid current password' ? '현재 비밀번호가 올바르지 않습니다.' : (data.error || '비밀번호 변경에 실패했습니다.') })
             }
         } catch (error) {
-            setMessage({ type: 'error', text: 'An error occurred' })
+            setMessage({ type: 'error', text: '오류가 발생했습니다.' })
         } finally {
             setLoading(false)
         }
@@ -64,17 +64,18 @@ export default function ChangePasswordForm() {
             className="space-y-4 max-w-md"
         >
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">현재 비밀번호</label>
                 <input
                     type="password"
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    placeholder="현재 비밀번호를 입력하세요"
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
                 <input
                     type="password"
                     required
@@ -82,10 +83,11 @@ export default function ChangePasswordForm() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     minLength={6}
+                    placeholder="새 비밀번호 (6자 이상)"
                 />
             </div>
             <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</label>
                 <input
                     type="password"
                     required
@@ -93,6 +95,7 @@ export default function ChangePasswordForm() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     minLength={6}
+                    placeholder="새 비밀번호를 다시 입력하세요"
                 />
             </div>
 
@@ -107,7 +110,7 @@ export default function ChangePasswordForm() {
                 disabled={loading}
                 className="w-full bg-[var(--color-brand-blue)] text-white py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
             >
-                {loading ? 'Updating...' : 'Change Password'}
+                {loading ? '변경 중...' : '비밀번호 변경'}
             </button>
         </form>
     )

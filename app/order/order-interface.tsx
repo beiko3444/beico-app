@@ -78,49 +78,62 @@ export default function OrderInterface({ products }: { products: Product[] }) {
 
     return (
         <div className="space-y-8">
-            <div className="glass-panel p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
-                <div className="space-y-4">
+            <div className="glass-panel p-2 md:p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
+                <div className="space-y-3 md:space-y-4">
                     {products.map((product, index) => {
                         const currentQty = quantities[product.id] || 0;
                         return (
-                            <div key={product.id} className="flex items-center bg-white border border-gray-100 rounded-2xl p-2 hover:shadow-md transition-all duration-300 group relative">
-                                <div className="text-xl font-black text-gray-300 pl-4 w-8 text-center tabular-nums">{index + 1}</div>
-                                {/* Product Image */}
-                                <div className="w-[60px] h-[60px] flex-shrink-0 bg-white relative overflow-hidden flex items-center justify-center p-1 rounded-xl border border-gray-50">
-                                    {product.imageUrl ? (
-                                        <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500" />
-                                    ) : (
-                                        <div className="text-gray-300 text-[9px]">No Image</div>
-                                    )}
-                                    {product.stock <= 0 && (
-                                        <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
-                                            <span className="text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full text-[9px]">품절</span>
+                            <div key={product.id} className="flex flex-col md:flex-row md:items-center bg-white border border-gray-100 rounded-2xl p-3 md:p-2 hover:shadow-md transition-all duration-300 group relative gap-3 md:gap-0">
+                                {/* Index - Hidden on mobile for more space */}
+                                <div className="hidden md:block text-xl font-black text-gray-300 pl-4 w-8 text-center tabular-nums">{index + 1}</div>
+
+                                <div className="flex items-center gap-4 flex-1">
+                                    {/* Product Image */}
+                                    <div className="w-[60px] h-[60px] md:w-[60px] md:h-[60px] flex-shrink-0 bg-white relative overflow-hidden flex items-center justify-center p-1 rounded-xl border border-gray-50">
+                                        {product.imageUrl ? (
+                                            <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500" />
+                                        ) : (
+                                            <div className="text-gray-300 text-[9px]">No Image</div>
+                                        )}
+                                        {product.stock <= 0 && (
+                                            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
+                                                <span className="text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full text-[9px]">품절</span>
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    {/* Product Info Section */}
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2">
+                                            <span className="md:hidden text-[10px] font-black text-gray-300 tabular-nums">#{index + 1}</span>
+                                            <h3 className="font-bold text-gray-900 group-hover:text-[var(--color-brand-blue)] transition-colors text-sm truncate">
+                                                {product.name}
+                                            </h3>
                                         </div>
-                                    )}
+                                        {product.nameJP && (
+                                            <p className="text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words">
+                                                {product.nameJP}
+                                            </p>
+                                        )}
+                                        {/* Mobile ID/Barcode display */}
+                                        <div className="flex md:hidden items-center gap-2 mt-1">
+                                            <span className="text-[9px] font-bold text-gray-400 font-mono">{product.productCode || '-'}</span>
+                                            <span className="text-[9px] text-gray-300">|</span>
+                                            <span className="text-[9px] font-bold text-gray-400 font-mono">{product.barcode || '-'}</span>
+                                        </div>
+                                    </div>
                                 </div>
 
-                                {/* Product Info Section */}
-                                <div className="flex-1 ml-4 min-w-0 pr-4">
-                                    <h3 className="font-bold text-gray-900 group-hover:text-[var(--color-brand-blue)] transition-colors text-sm truncate">
-                                        {product.name}
-                                    </h3>
-                                    {product.nameJP && (
-                                        <p className="text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words">
-                                            {product.nameJP}
-                                        </p>
-                                    )}
-                                </div>
-
-                                {/* Product ID Section - Aligned Column */}
-                                <div className="w-[100px] px-4 border-l border-gray-50 flex flex-col justify-center">
+                                {/* Desktop: Product ID Section */}
+                                <div className="hidden md:flex w-[100px] px-4 border-l border-gray-50 flex-col justify-center">
                                     <span className="text-[9px] text-gray-300 font-black uppercase tracking-widest mb-0.5">Product ID</span>
                                     <span className="text-[10px] font-bold text-gray-500 font-mono italic">
                                         {product.productCode || '-'}
                                     </span>
                                 </div>
 
-                                {/* Barcode Section - Aligned Column */}
-                                <div className="w-[110px] px-4 border-l border-gray-50 flex flex-col items-center justify-center shrink-0">
+                                {/* Desktop: Barcode Section */}
+                                <div className="hidden md:flex w-[110px] px-4 border-l border-gray-50 flex-col items-center justify-center shrink-0">
                                     {product.barcode ? (
                                         <>
                                             <div className="h-[14px] flex items-center overflow-hidden opacity-70">
@@ -142,25 +155,27 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     )}
                                 </div>
 
-                                {/* Price & Stock */}
-                                <div className="px-4 text-right border-l border-gray-100 min-w-[140px] flex flex-col justify-center h-[60px]">
-                                    <div className="text-sm font-bold text-[var(--color-brand-blue)]">
-                                        {product.sellPrice.toLocaleString()} <span className="text-[9px] font-normal text-gray-500">KRW</span>
+                                {/* Price & Stock - Redesigned for mobile */}
+                                <div className="flex md:flex-col justify-between md:justify-center items-center md:items-end px-0 md:px-4 md:border-l border-gray-100 min-w-0 md:min-w-[140px] md:h-[60px]">
+                                    <div className="text-base md:text-sm font-black text-[var(--color-brand-blue)]">
+                                        {product.sellPrice.toLocaleString()} <span className="text-[10px] md:text-[9px] font-normal text-gray-500">KRW</span>
                                     </div>
-                                    <div className={`text-[10px] mt-0.5 ${product.stock < 5 ? 'text-orange-500 font-bold' : 'text-gray-500'}`}>
-                                        재고: {product.stock.toLocaleString()}
-                                    </div>
-                                    <div className="text-[9px] mt-0.5 text-orange-600 font-bold bg-orange-50 px-1.5 py-0.5 rounded-full inline-block self-end">
-                                        최소: {product.minOrderQuantity || 1}
+                                    <div className="flex md:flex-col gap-2 md:gap-0 items-center md:items-end">
+                                        <div className={`text-[10px] ${product.stock < 5 ? 'text-orange-500 font-bold' : 'text-gray-500'}`}>
+                                            재고: {product.stock.toLocaleString()}
+                                        </div>
+                                        <div className="text-[9px] text-orange-600 font-black bg-orange-50 px-2 py-0.5 rounded-full">
+                                            최소: {product.minOrderQuantity || 1}
+                                        </div>
                                     </div>
                                 </div>
 
                                 {/* Order Control */}
-                                <div className="w-[120px] pl-4 flex-shrink-0">
-                                    <div className="flex items-center bg-gray-50 rounded-lg p-0.5 border border-gray-100">
+                                <div className="w-full md:w-[120px] md:pl-4 flex-shrink-0 mt-2 md:mt-0">
+                                    <div className="flex items-center bg-gray-50 rounded-xl p-1 md:p-0.5 border border-gray-100">
                                         <button
                                             onClick={() => handleQuantityChange(product.id, Math.max(0, currentQty - 1))}
-                                            className="w-8 h-8 flex items-center justify-center hover:bg-white hover:text-[var(--color-brand-blue)] hover:shadow-sm rounded-md transition-all text-gray-400 font-bold text-base"
+                                            className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center hover:bg-white hover:text-[var(--color-brand-blue)] hover:shadow-sm rounded-lg md:rounded-md transition-all text-gray-400 font-bold text-lg md:text-base"
                                         >
                                             -
                                         </button>
@@ -169,12 +184,12 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             min="0"
                                             value={currentQty === 0 ? '' : currentQty}
                                             onChange={(e) => handleQuantityChange(product.id, e.target.value)}
-                                            className="w-full bg-transparent text-center font-bold text-gray-900 text-sm outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                            className="w-full bg-transparent text-center font-black text-gray-900 text-base md:text-sm outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                                             placeholder="0"
                                         />
                                         <button
                                             onClick={() => handleQuantityChange(product.id, currentQty + 1)}
-                                            className="w-8 h-8 flex items-center justify-center bg-white text-[var(--color-brand-blue)] shadow-sm rounded-md hover:bg-[var(--color-brand-blue)] hover:text-white transition-all font-bold text-base"
+                                            className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center bg-white text-[var(--color-brand-blue)] shadow-sm rounded-lg md:rounded-md hover:bg-[var(--color-brand-blue)] hover:text-white transition-all font-bold text-lg md:text-base"
                                         >
                                             +
                                         </button>
@@ -186,25 +201,37 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                 </div>
             </div>
 
-            <div className="fixed bottom-0 left-0 w-full bg-white border-t border-gray-100 pt-6 px-6 pb-2 z-20 shadow-[0_15px_40px_-5px_rgba(0,0,0,0.15)]">
-                <div className="max-w-4xl mx-auto flex justify-between items-center">
-                    <div>
+            <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-gray-100 pt-4 md:pt-6 px-4 md:px-6 pb-4 md:pb-6 z-20 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.15)]">
+                <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div className="w-full md:w-auto flex justify-between md:block items-baseline">
                         <div className="flex flex-col">
-                            <p className="text-3xl font-bold text-[var(--color-brand-blue)] tabular-nums">
-                                {productTotal.toLocaleString()} <span className="text-lg font-normal text-gray-500">KRW</span>
+                            <p className="text-2xl md:text-3xl font-black text-[var(--color-brand-blue)] tabular-nums">
+                                {productTotal.toLocaleString()} <span className="text-base md:text-lg font-normal text-gray-500">KRW</span>
                             </p>
-                            <p className="text-xs text-gray-500 uppercase tracking-wide font-bold">Total Order Amount</p>
+                            <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest font-black">Total Order Amount</p>
+                        </div>
+                        <div className="md:hidden">
+                            {hasItems && (
+                                <button
+                                    onClick={handleOrderNow}
+                                    className="bg-[var(--color-brand-blue)] text-white px-6 py-2.5 rounded-xl font-black text-sm shadow-lg shadow-blue-100 active:scale-95 transition-all"
+                                >
+                                    주문하기
+                                </button>
+                            )}
                         </div>
                     </div>
 
-                    {hasItems && (
-                        <button
-                            onClick={handleOrderNow}
-                            className="bg-[var(--color-brand-blue)] text-white px-8 py-3 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl hover:scale-105 transition-all"
-                        >
-                            주문하기
-                        </button>
-                    )}
+                    <div className="hidden md:block">
+                        {hasItems && (
+                            <button
+                                onClick={handleOrderNow}
+                                className="bg-[var(--color-brand-blue)] text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-100 hover:shadow-2xl hover:-translate-y-1 transition-all"
+                            >
+                                바로 주문하기
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
 
