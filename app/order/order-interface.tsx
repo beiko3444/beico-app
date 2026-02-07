@@ -13,6 +13,7 @@ type Product = {
     barcode?: string | null
     nameJP?: string | null
     minOrderQuantity: number
+    appliedGrade?: string
 }
 
 // Hardcoded bank info for now as requested
@@ -117,17 +118,17 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         )}
                                         {/* Mobile ID/Barcode display */}
                                         <div className="flex md:hidden items-center gap-2 mt-1">
-                                            <span className="text-[9px] font-bold text-gray-400 font-mono">{product.productCode || '-'}</span>
+                                            <span className="text-[9px] font-bold text-gray-900">{product.productCode || '-'}</span>
                                             <span className="text-[9px] text-gray-300">|</span>
-                                            <span className="text-[9px] font-bold text-gray-400 font-mono">{product.barcode || '-'}</span>
+                                            <span className="text-[9px] font-bold text-gray-900">{product.barcode || '-'}</span>
                                         </div>
                                     </div>
                                 </div>
 
                                 {/* Desktop: Product ID Section */}
                                 <div className="hidden md:flex w-[100px] px-4 border-l border-gray-50 flex-col justify-center">
-                                    <span className="text-[9px] text-gray-300 font-black uppercase tracking-widest mb-0.5">Product ID</span>
-                                    <span className="text-[10px] font-bold text-gray-500 font-mono italic">
+                                    <span className="text-[9px] text-gray-900 font-black uppercase tracking-widest mb-0.5">상품번호</span>
+                                    <span className="text-xs font-bold text-gray-900">
                                         {product.productCode || '-'}
                                     </span>
                                 </div>
@@ -146,7 +147,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     margin={0}
                                                 />
                                             </div>
-                                            <p className="text-[10px] text-gray-400 font-mono tracking-tighter mt-1">
+                                            <p className="text-[10px] text-gray-900 font-bold tracking-tighter mt-1">
                                                 {product.barcode}
                                             </p>
                                         </>
@@ -158,7 +159,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                 {/* Price & Stock - Redesigned for mobile */}
                                 <div className="flex md:flex-col justify-between md:justify-center items-center md:items-end px-0 md:px-4 md:border-l border-gray-100 min-w-0 md:min-w-[140px] md:h-[60px]">
                                     <div className="text-base md:text-sm font-black text-[var(--color-brand-blue)]">
-                                        {product.sellPrice.toLocaleString()} <span className="text-[10px] md:text-[9px] font-normal text-gray-500">KRW</span>
+                                        {product.sellPrice.toLocaleString()} <span className="text-[10px] md:text-[9px] font-normal text-gray-500">원</span>
                                     </div>
                                     <div className="flex md:flex-col gap-2 md:gap-0 items-center md:items-end">
                                         <div className={`text-[10px] ${product.stock < 5 ? 'text-orange-500 font-bold' : 'text-gray-500'}`}>
@@ -206,9 +207,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     <div className="w-full md:w-auto flex justify-between md:block items-baseline">
                         <div className="flex flex-col">
                             <p className="text-2xl md:text-3xl font-black text-[var(--color-brand-blue)] tabular-nums">
-                                {productTotal.toLocaleString()} <span className="text-base md:text-lg font-normal text-gray-500">KRW</span>
+                                {productTotal.toLocaleString()} <span className="text-base md:text-lg font-normal text-gray-500">원</span>
                             </p>
-                            <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest font-black">Total Order Amount</p>
+                            <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest font-black">총 주문 금액</p>
                         </div>
                         <div className="md:hidden">
                             {hasItems && (
@@ -246,40 +247,40 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                 ✕
                             </button>
 
-                            <h3 className="text-2xl font-bold text-[var(--color-brand-blue)] mb-6">Order Summary</h3>
+                            <h3 className="text-2xl font-bold text-[var(--color-brand-blue)] mb-6">주문 요약</h3>
 
                             <div className="space-y-4 mb-4 max-h-[30vh] overflow-y-auto">
                                 {products.filter(p => (quantities[p.id] || 0) > 0).map(p => (
                                     <div key={p.id} className="flex justify-between text-sm">
                                         <span className="text-gray-600">{p.name} × {quantities[p.id]}</span>
-                                        <span className="font-semibold">{(p.sellPrice * quantities[p.id]).toLocaleString()} KRW</span>
+                                        <span className="font-semibold">{(p.sellPrice * quantities[p.id]).toLocaleString()} 원</span>
                                     </div>
                                 ))}
                                 {shippingFee > 0 && (
                                     <div className="flex justify-between text-sm border-t border-dashed pt-2">
-                                        <span className="text-gray-600 font-bold">📦 배송비 (Shipping Fee)</span>
-                                        <span className="font-bold">{shippingFee.toLocaleString()} KRW</span>
+                                        <span className="text-gray-600 font-bold">📦 배송비</span>
+                                        <span className="font-bold">{shippingFee.toLocaleString()} 원</span>
                                     </div>
                                 )}
                             </div>
 
                             <div className="border-t pt-4 space-y-2 mb-6">
                                 <div className="flex justify-between text-sm text-gray-500">
-                                    <span>공급가액 (Supply Total):</span>
-                                    <span>{supplyTotal.toLocaleString()} KRW</span>
+                                    <span>공급가액:</span>
+                                    <span>{supplyTotal.toLocaleString()} 원</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-gray-500">
-                                    <span>부가세 (VAT 10%):</span>
-                                    <span>{vat.toLocaleString()} KRW</span>
+                                    <span>부가세 (10%):</span>
+                                    <span>{vat.toLocaleString()} 원</span>
                                 </div>
                                 <div className="flex justify-between font-bold text-2xl text-[var(--color-brand-blue)] pt-2 border-t-2 border-dashed border-[var(--color-brand-blue)]">
                                     <span>총 합계:</span>
-                                    <span>{totalAmount.toLocaleString()} KRW</span>
+                                    <span>{totalAmount.toLocaleString()} 원</span>
                                 </div>
                             </div>
 
                             <div className="bg-white p-6 rounded-xl border border-gray-200 mb-8">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">Deposit Account Info</h4>
+                                <h4 className="text-sm font-semibold text-gray-700 mb-2">입금 계좌 정보</h4>
                                 <p className="text-xl font-bold text-[var(--color-brand-blue)] mb-1">{BANK_INFO.account}</p>
                                 <p className="text-sm text-gray-600">{BANK_INFO.bank} ({BANK_INFO.holder})</p>
                             </div>
@@ -302,22 +303,22 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         })
 
                                         if (res.ok) {
-                                            alert("Order placed successfully!");
+                                            alert("주문이 성공적으로 완료되었습니다!");
                                             setShowSummary(false);
                                             setQuantities({});
-                                            window.location.reload(); // Refresh to update stock in UI
+                                            window.location.reload();
                                         } else {
                                             const errorData = await res.json();
-                                            alert(`Failed to place order: ${errorData.error || 'Unknown error'}`);
+                                            alert(`주문 실패: ${errorData.error || '알 수 없는 오류'}`);
                                         }
                                     } catch (e) {
                                         console.error(e)
-                                        alert("An error occurred.");
+                                        alert("오류가 발생했습니다.");
                                     }
                                 }}
                                 className="w-full bg-[var(--color-brand-orange)] text-white py-4 rounded-xl font-bold text-lg hover:brightness-110 shadow-lg"
                             >
-                                Confirm Order
+                                주문 확정
                             </button>
                         </div>
                     </div>

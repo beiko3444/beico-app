@@ -169,10 +169,11 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 </h4>
 
                                 {/* Items Header - Desktop only */}
-                                <div className="hidden md:grid grid-cols-[40px_1fr_60px_100px_100px_140px] gap-2 pb-2 border-b-2 border-gray-900 text-[10px] uppercase tracking-widest text-gray-500 font-black px-2">
+                                <div className="hidden md:grid grid-cols-[40px_1fr_60px_80px_100px_100px_120px] gap-2 pb-2 border-b-2 border-gray-900 text-[10px] uppercase tracking-widest text-gray-500 font-black px-2">
                                     <div className="text-center">No.</div>
                                     <div className="px-2">상품명</div>
                                     <div className="text-center">수량</div>
+                                    <div className="text-right">단가</div>
                                     <div className="text-right pr-4">금액</div>
                                     <div className="px-2">상품번호</div>
                                     <div className="px-2">바코드</div>
@@ -180,12 +181,15 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
 
                                 <ul className="divide-y divide-dashed divide-gray-100 md:border-b-2 md:border-gray-900">
                                     {order.items.map((item: any, i: number) => (
-                                        <li key={item.id} className="flex flex-col md:grid md:grid-cols-[40px_1fr_60px_100px_100px_140px] items-start md:items-center text-[11px] py-4 md:py-2 gap-3 md:gap-2 border-gray-200 hover:bg-gray-50/50 transition-colors px-1 md:px-2 rounded-lg md:rounded-none">
+                                        <li key={item.id} className="flex flex-col md:grid md:grid-cols-[40px_1fr_60px_80px_100px_100px_120px] items-start md:items-center text-[11px] py-4 md:py-2 gap-3 md:gap-2 border-gray-200 hover:bg-gray-50/50 transition-colors px-1 md:px-2 rounded-lg md:rounded-none">
                                             {/* No. & Price/Qty for Mobile */}
                                             <div className="flex md:hidden justify-between items-center w-full border-b border-gray-50 pb-2">
                                                 <span className="text-[10px] font-black text-black tabular-nums">항목 #{String(i + 1).padStart(2, '0')}</span>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="text-gray-400 font-black">수량: <span className="text-gray-900">{item.quantity}</span></span>
+                                                <div className="flex flex-col items-end gap-1">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className="text-gray-400 font-black text-[10px]">단가: <span className="text-gray-900">{item.price.toLocaleString()}원</span></span>
+                                                        <span className="text-gray-400 font-black text-[10px]">수량: <span className="text-gray-900">{item.quantity}</span></span>
+                                                    </div>
                                                     <span className="text-[#d9361b] font-black">{(item.price * item.quantity).toLocaleString()}원</span>
                                                 </div>
                                             </div>
@@ -219,6 +223,11 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                 </span>
                                             </div>
 
+                                            {/* Unit Price - Desktop only */}
+                                            <span className="hidden md:flex font-black text-gray-900 text-right self-stretch items-center justify-end tabular-nums">
+                                                {item.price.toLocaleString()}
+                                            </span>
+
                                             {/* Price - Desktop only */}
                                             <span className="hidden md:flex font-black text-gray-900 text-right pr-4 self-stretch items-center justify-end tabular-nums">
                                                 {(item.price * item.quantity).toLocaleString()}
@@ -227,7 +236,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                             {/* Product Code */}
                                             <div className="flex md:flex-col items-center md:items-start gap-2 md:gap-0 w-full md:w-auto">
                                                 <span className="md:hidden text-[9px] text-gray-400 font-black uppercase">상품ID:</span>
-                                                <div className="text-gray-700 text-[10px] md:text-[11px] font-mono font-bold truncate flex-1 md:flex-none">
+                                                <div className="text-gray-900 text-[10px] md:text-[11px] font-bold truncate flex-1 md:flex-none">
                                                     {item.product.productCode || '-'}
                                                 </div>
                                             </div>
@@ -250,7 +259,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                 </div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="md:hidden text-[9px] text-gray-400 font-black uppercase tracking-tighter shrink-0">바코드:</span>
-                                                    <span className="text-gray-900 text-[10px] font-mono font-bold tabular-nums">
+                                                    <span className="text-gray-900 text-[10px] font-bold tabular-nums">
                                                         {item.product.barcode || '-'}
                                                     </span>
                                                 </div>
@@ -264,26 +273,29 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                         const shippingFee = totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0;
                                         if (shippingFee === 0) return null;
                                         return (
-                                            <li className="flex flex-col md:grid md:grid-cols-[40px_1fr_60px_100px_100px_140px] items-start md:items-center text-[11px] py-4 md:py-2 px-1 md:px-2 bg-red-50/30 md:bg-transparent rounded-lg md:rounded-none">
+                                            <li className="flex flex-col md:grid md:grid-cols-[40px_1fr_60px_80px_100px_100px_120px] items-start md:items-center text-[11px] py-4 md:py-2 px-1 md:px-2 bg-red-50/30 md:bg-transparent rounded-lg md:rounded-none">
                                                 <div className="flex md:hidden justify-between items-center w-full mb-2">
-                                                    <span className="text-[10px] font-black text-red-300">포장비</span>
-                                                    <span className="text-red-600 font-black">{shippingFee.toLocaleString()}원</span>
+                                                    <span className="text-[10px] font-black text-black">배송비</span>
+                                                    <span className="text-black font-black">{shippingFee.toLocaleString()}원</span>
                                                 </div>
-                                                <span className="hidden md:flex text-gray-400 font-black text-center self-stretch items-center justify-center italic">S</span>
-                                                <div className="min-w-0 flex items-center gap-3 flex-1">
-                                                    <div className="w-10 h-10 md:w-8 md:h-8 rounded-lg border border-red-50 overflow-hidden shrink-0 bg-red-50 flex items-center justify-center text-lg">
+                                                <span className="hidden md:flex text-gray-900 font-black text-center self-stretch items-center justify-center tabular-nums">{String(order.items.length + 1).padStart(2, '0')}</span>
+                                                <div className="min-w-0 flex items-center gap-3 flex-1 h-full">
+                                                    <div className="w-10 h-10 md:w-8 md:h-8 rounded-lg border border-gray-50 overflow-hidden shrink-0 bg-white flex items-center justify-center text-lg self-center">
                                                         📦
                                                     </div>
-                                                    <span className="text-red-900 font-black text-xs md:text-[11px]">배송비</span>
+                                                    <span className="text-gray-900 font-black text-xs md:text-[11px] self-center">배송비</span>
                                                 </div>
-                                                <div className="hidden md:block text-center tabular-nums font-black text-gray-400">1</div>
-                                                <span className="hidden md:flex font-black text-red-600 text-right pr-4 items-center justify-end tabular-nums">
+                                                <div className="hidden md:flex self-stretch items-center justify-center tabular-nums font-black text-gray-900">1</div>
+                                                <span className="hidden md:flex font-black text-gray-900 text-right self-stretch items-center justify-end tabular-nums">
                                                     {shippingFee.toLocaleString()}
                                                 </span>
-                                                <div className="hidden md:block px-2 text-red-200 font-black text-[9px] uppercase">배송</div>
+                                                <span className="hidden md:flex font-black text-gray-900 text-right pr-4 self-stretch items-center justify-end tabular-nums">
+                                                    {shippingFee.toLocaleString()}
+                                                </span>
+                                                <div className="hidden md:flex self-stretch items-center py-0.5 px-2 text-gray-900 font-black text-[9px] uppercase">배송</div>
                                                 <div className="md:hidden flex items-center gap-2 mt-1">
-                                                    <span className="text-[9px] text-red-300 font-black uppercase">유형:</span>
-                                                    <span className="text-red-600 text-[10px] font-bold">일반</span>
+                                                    <span className="text-[9px] text-gray-400 font-black uppercase">유형:</span>
+                                                    <span className="text-gray-900 text-[10px] font-bold">일반</span>
                                                 </div>
                                             </li>
                                         );
@@ -302,7 +314,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                 <span className="bg-orange-600 text-white text-[8px] px-1 rounded">BANK</span>
                                                 토스뱅크 (Toss Bank)
                                             </div>
-                                            <div className="text-xl md:text-2xl font-black text-gray-900 tracking-tight font-mono select-all">
+                                            <div className="text-xl md:text-2xl font-black text-gray-900 tracking-tight select-all">
                                                 1000-0918-2374
                                             </div>
                                             <div className="text-[11px] text-gray-500 font-medium">
@@ -323,7 +335,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                 return (
                                                     <div className="space-y-2">
                                                         <div className="flex justify-between items-center text-[11px] font-bold">
-                                                            <span className="text-gray-400">공급가액 <span className="text-[8px] opacity-60">공급가</span></span>
+                                                            <span className="text-gray-400">공급가액</span>
                                                             <span className="text-gray-900 tabular-nums">{supplyTotal.toLocaleString()}원</span>
                                                         </div>
                                                         <div className="flex justify-between items-center text-[11px] font-bold">
