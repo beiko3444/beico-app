@@ -246,21 +246,44 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
 
                         {/* Image Upload Row */}
                         <div className="flex gap-4 mb-4 items-start">
-                            <div className="w-20 h-20 bg-white border border-gray-400 flex items-center justify-center shrink-0">
+                            <div
+                                className="w-20 h-20 bg-white border border-gray-400 flex items-center justify-center shrink-0 cursor-pointer relative group"
+                                onClick={() => document.getElementById('image-upload-input')?.click()}
+                            >
                                 {imageUrl ? (
-                                    <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                                    <>
+                                        <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                                        <button
+                                            type="button"
+                                            onClick={(e) => { e.stopPropagation(); setImageUrl(null); }}
+                                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-md opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
+                                        >
+                                            ✕
+                                        </button>
+                                    </>
                                 ) : (
-                                    <span className="text-[10px] text-gray-400">No Image</span>
+                                    <div className="flex flex-col items-center">
+                                        <span className="text-[10px] text-gray-400">Click to</span>
+                                        <span className="text-[10px] text-gray-400">Upload</span>
+                                    </div>
                                 )}
                             </div>
                             <div className="flex-1">
                                 <label className="block text-[11px] font-bold text-gray-600 mb-1">상품 이미지 선택</label>
                                 <input
+                                    id="image-upload-input"
                                     type="file"
                                     accept="image/*"
                                     onChange={handleImageChange}
-                                    className="block w-full text-[11px] text-gray-700 bg-white border border-gray-300 px-1 py-1"
+                                    className="hidden"
                                 />
+                                <button
+                                    type="button"
+                                    onClick={() => document.getElementById('image-upload-input')?.click()}
+                                    className="text-[11px] bg-white border border-gray-300 px-3 py-1 hover:bg-gray-50 flex items-center gap-1 border-r-2 border-b-2 border-gray-500 active:border-none"
+                                >
+                                    파일 선택 (Search...)
+                                </button>
                             </div>
                         </div>
 

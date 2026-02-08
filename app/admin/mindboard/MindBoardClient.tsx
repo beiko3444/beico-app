@@ -339,6 +339,21 @@ export default function MindBoardClient() {
         ))
     }
 
+    const packGroup = (members: BoardItem[]) => {
+        if (members.length <= 1) return members;
+        const sortedInGroup = [...members].sort((a, b) => a.y - b.y || a.x - b.x);
+        let curX = 0;
+        let curY = 0;
+        let maxH = 0;
+        return sortedInGroup.map((m, idx) => {
+            const newItem = { ...m, x: curX, y: curY };
+            curX += m.w + 20;
+            maxH = Math.max(maxH, m.h);
+            if (idx % 2 === 1) { curX = 0; curY += maxH + 40; maxH = 0; }
+            return newItem;
+        });
+    }
+
     const autoArrange = () => {
         const container = containerRef.current
         if (!container || items.length === 0) return
@@ -774,27 +789,23 @@ export default function MindBoardClient() {
                 className="w-full h-full cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
                 onTouchStart={onTouchStart}
                 onMouseDown={(e: React.MouseEvent) => {
-                    const target = e.target as HTMLElement
-                    if (target.id === 'mind-board-bg') {
-                        if (e.shiftKey) {
-                            // Start selection box
-                            const rect = containerRef.current?.getBoundingClientRect()
-                            if (rect) {
-                                setSelectionBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top })
-                                // Don't pan
-                            }
-                        } else {
-                            startPan(e.clientX, e.clientY)
+                    if (e.shiftKey) {
+                        // Start selection box
+                        const rect = containerRef.current?.getBoundingClientRect()
+                        if (rect) {
+                            setSelectionBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top })
                         }
+                    } else {
+                        startPan(e.clientX, e.clientY)
                     }
                 }}
                 onDoubleClick={(e) => {
-                    if ((e.target as HTMLElement).id === 'mind-board-bg') handleCanvasClick(e)
+                    handleCanvasClick(e)
                 }}
                 onWheel={handleWheel}
             >
                 <div
-                    className="absolute shadow-inner pointer-events-none"
+                    className="absolute shadow-inner"
                     style={{
                         width: WORLD_SIZE,
                         height: WORLD_SIZE,
@@ -810,7 +821,7 @@ export default function MindBoardClient() {
                     {items.map((item) => (
                         <div
                             key={item.id}
-                            className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border transition-all overflow-hidden 
+                            className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border transition-all overflow-hidden pointer-events-auto
                                 ${item.completed ? 'opacity-60 scale-[0.98]' : ''} 
                                 ${selectedIds.has(item.id) ? 'ring-2 ring-blue-500 shadow-xl' : 'border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}`}
                             style={{
