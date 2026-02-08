@@ -671,109 +671,116 @@ export default function ProductionClient() {
             {/* Modal */}
             {
                 isCreating && mounted && createPortal(
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsCreating(false)}>
+                    <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsCreating(false)}>
                         <div
-                            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-gray-100 relative"
+                            className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-lg shadow-md animate-in fade-in duration-100 relative"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Receipt Top Header */}
-                            <div className="bg-[#fcfcfc] px-8 pt-8 pb-4 relative">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div>
-                                        <h3 className="font-black text-2xl text-gray-900 tracking-tighter">PRODUCTION</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{activeTab} RECORD</p>
-                                    </div>
-                                    <button onClick={() => setIsCreating(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">✕</button>
-                                </div>
-
-                                <div className="flex justify-between items-end border-b-2 border-dashed border-gray-100 pb-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-300 uppercase mb-1">Date of Entry</label>
-                                        <input
-                                            type="date"
-                                            required
-                                            className="bg-transparent font-mono text-sm font-bold text-gray-600 focus:outline-none focus:text-[var(--color-brand-blue)]"
-                                            value={formData.productionDate}
-                                            onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="block text-[10px] font-black text-gray-300 uppercase mb-1">Reference</span>
-                                        <span className="font-mono text-xs font-bold text-gray-400">#{isEditing ? isEditing.id.slice(-6).toUpperCase() : 'NEW_LOG'}</span>
-                                    </div>
-                                </div>
+                            {/* Classic Windows-style Header */}
+                            <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none">
+                                <h3 className="text-xs font-bold tracking-tight">
+                                    {isEditing ? `Production Record Entry - ID:${isEditing.id.slice(-6).toUpperCase()}` : 'New Production Record Entry'}
+                                </h3>
+                                <button
+                                    onClick={() => setIsCreating(false)}
+                                    className="bg-[#c0c0c0] text-black w-5 h-5 flex items-center justify-center text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none"
+                                >
+                                    ✕
+                                </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="px-8 py-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-                                {/* Cost Breakdown Section */}
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center group">
-                                        <label className="text-[11px] font-black text-gray-500 uppercase">Raw Material</label>
-                                        <div className="flex items-center gap-2">
+                            <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[85vh] overflow-y-auto scrollbar-hide">
+                                {/* Schedule Info */}
+                                <fieldset className="border border-gray-400 p-4 pt-2">
+                                    <legend className="px-2 text-xs font-bold text-gray-700">일정 및 생산 구분 (Schedule & Category)</legend>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 uppercase">Production Date</label>
                                             <input
-                                                type="text"
+                                                type="date"
                                                 required
-                                                placeholder="0"
-                                                className="w-32 text-right font-mono text-sm font-black text-gray-900 border-b border-gray-100 focus:border-[var(--color-brand-blue)] focus:outline-none transition-colors"
-                                                value={formatNumber(formData.rawMaterialCost)}
-                                                onChange={e => setFormData({ ...formData, rawMaterialCost: parseNumber(e.target.value) })}
+                                                className="w-full px-2 py-1 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-bold"
+                                                value={formData.productionDate}
+                                                onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
                                             />
-                                            <span className="text-[10px] font-bold text-gray-400 w-12 text-right">$ {formData.depositDollar || '0'}</span>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 uppercase">Category</label>
+                                            <div className="w-full px-2 py-1.5 bg-gray-100 border border-gray-400 text-sm font-bold text-gray-700">
+                                                {activeTab}
+                                            </div>
                                         </div>
                                     </div>
+                                </fieldset>
 
-                                    <div className="grid grid-cols-2 gap-x-8 gap-y-4">
-                                        {[
-                                            { label: 'Electricity', key: 'electricityCost' },
-                                            { label: 'Packaging', key: 'packagingCost' },
-                                            { label: 'Warehouse', key: 'warehouseCost' },
-                                            { label: 'Shipping', key: 'shippingCost' },
-                                            { label: 'Customs Duty', key: 'customsDuty' },
-                                            { label: 'Taxes (VAT)', key: 'vat' },
-                                            { label: 'Fees', key: 'customsFee' }
-                                        ].map((field) => (
-                                            <div key={field.key} className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">{field.label}</label>
+                                {/* Cost Details */}
+                                <fieldset className="border border-gray-400 p-4 pt-2">
+                                    <legend className="px-2 text-xs font-bold text-gray-700">비용 상세 (Cost Details)</legend>
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-gray-600">원재료비 (Raw Material)</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full font-mono text-xs font-bold text-gray-700 border-b border-gray-50 focus:border-[var(--color-brand-blue)] focus:outline-none transition-colors py-1"
-                                                    value={formatNumber(formData[field.key as keyof typeof formData])}
-                                                    onChange={e => setFormData({ ...formData, [field.key]: parseNumber(e.target.value) })}
+                                                    required
+                                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-mono"
+                                                    value={formatNumber(formData.rawMaterialCost)}
+                                                    onChange={e => setFormData({ ...formData, rawMaterialCost: parseNumber(e.target.value) })}
                                                 />
                                             </div>
-                                        ))}
-                                        <div className="flex flex-col gap-1">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">USD DEPOSIT</label>
-                                            <input
-                                                type="text"
-                                                placeholder="0.00"
-                                                className="w-full font-mono text-xs font-bold text-gray-400 border-b border-gray-50 focus:border-[var(--color-brand-blue)] focus:outline-none transition-colors py-1"
-                                                value={formData.depositDollar}
-                                                onChange={e => setFormData({ ...formData, depositDollar: e.target.value })}
-                                            />
+                                            <div className="space-y-1">
+                                                <label className="text-[11px] font-bold text-gray-400">송금액 ($ USD)</label>
+                                                <input
+                                                    type="text"
+                                                    placeholder="0.00"
+                                                    className="w-full px-2 py-1.5 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right font-mono text-gray-500"
+                                                    value={formData.depositDollar}
+                                                    onChange={e => setFormData({ ...formData, depositDollar: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-3 gap-2">
+                                            {[
+                                                { label: '전기세', key: 'electricityCost', small: 'Elec' },
+                                                { label: '포장비', key: 'packagingCost', small: 'Pack' },
+                                                { label: '창고료', key: 'warehouseCost', small: 'Whse' },
+                                                { label: '운송료', key: 'shippingCost', small: 'Ship' },
+                                                { label: '관세사비', key: 'customsFee', small: 'Fees' },
+                                                { label: '관세', key: 'customsDuty', small: 'Duty' },
+                                                { label: '부가세', key: 'vat', small: 'VAT' }
+                                            ].map((field) => (
+                                                <div key={field.key} className="space-y-1">
+                                                    <label className="text-[10px] font-bold text-gray-500">{field.label}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="w-full px-1.5 py-1 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right font-mono"
+                                                        value={formatNumber(formData[field.key as keyof typeof formData])}
+                                                        onChange={e => setFormData({ ...formData, [field.key]: parseNumber(e.target.value) })}
+                                                    />
+                                                </div>
+                                            ))}
                                         </div>
                                     </div>
-                                </div>
+                                </fieldset>
 
-                                {/* Divider */}
-                                <div className="border-b-2 border-dashed border-gray-100"></div>
-
-                                {/* Quantity & Calculation */}
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Total Quantity</label>
+                                {/* Production Result */}
+                                <fieldset className="border border-gray-400 p-4 pt-2 bg-white/30">
+                                    <legend className="px-2 text-xs font-bold text-gray-700">생산 결과 (Production Result)</legend>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-blue-700">생산 수량 (Total Qty)</label>
                                             <input
                                                 type="text"
                                                 required
-                                                className="bg-transparent font-mono text-xl font-black text-gray-900 focus:outline-none w-24"
+                                                className="w-full px-2 py-1.5 bg-[#f0f9ff] border border-blue-300 outline-none focus:border-blue-600 text-sm text-right font-black text-blue-900"
                                                 value={formatNumber(formData.quantity)}
                                                 onChange={e => setFormData({ ...formData, quantity: parseNumber(e.target.value) })}
                                             />
                                         </div>
-                                        <div className="text-right border-l border-gray-200 pl-4">
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Unit Cost</label>
-                                            <div className="font-mono text-xl font-black text-[var(--color-brand-blue)]">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-500">산출 단가 (Unit Cost)</label>
+                                            <div className="w-full px-2 py-1.5 bg-gray-100 border border-gray-400 text-sm text-right font-black text-gray-900">
                                                 {(
                                                     ((Number(parseNumber(formData.rawMaterialCost)) || 0) +
                                                         (Number(parseNumber(formData.electricityCost)) || 0) +
@@ -789,47 +796,46 @@ export default function ProductionClient() {
                                         </div>
                                     </div>
 
-                                    {/* Pricing Comparison */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="p-3 bg-gray-50 rounded-xl flex flex-col gap-1">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase">Wholesale Avg</span>
-                                            <span className="font-mono text-xs font-black text-gray-700">{currentPriceInfo.salesPrice.toLocaleString()}원</span>
+                                    {/* Pricing Ref */}
+                                    <div className="mt-4 grid grid-cols-2 gap-4 pointer-events-none opacity-60">
+                                        <div className="text-[10px] space-y-0.5">
+                                            <span className="block font-bold text-gray-400">REFERENCE: WHOLESALE</span>
+                                            <span className="block font-black text-gray-700">{currentPriceInfo.salesPrice.toLocaleString()}원</span>
                                         </div>
-                                        <div className="p-3 bg-gray-50 rounded-xl flex flex-col gap-1">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase">Retail Avg</span>
-                                            <span className="font-mono text-xs font-black text-gray-700">{currentPriceInfo.wholesalePrice.toLocaleString()}원</span>
+                                        <div className="text-[10px] space-y-0.5 text-right">
+                                            <span className="block font-bold text-gray-400">REFERENCE: RETAIL</span>
+                                            <span className="block font-black text-gray-700">{currentPriceInfo.wholesalePrice.toLocaleString()}원</span>
                                         </div>
                                     </div>
-                                </div>
+                                </fieldset>
 
                                 {/* Memo */}
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Memo/Notes</label>
-                                    <input
-                                        type="text"
-                                        placeholder="..."
-                                        className="w-full font-mono text-xs font-bold text-gray-500 border-b border-gray-50 focus:border-gray-200 focus:outline-none transition-colors py-1"
-                                        value={formData.memo}
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-600">특이사항 (Memo)</label>
+                                    <textarea
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-xs h-16 resize-none"
+                                        placeholder="Production notes..."
+                                        value={formData.memo || ''}
                                         onChange={e => setFormData({ ...formData, memo: e.target.value })}
                                     />
                                 </div>
-                            </form>
 
-                            {/* Footer - Submit Button as Receipt Tear-off */}
-                            <div className="p-8 pt-4">
-                                <button
-                                    type="submit"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        const form = (e.currentTarget as HTMLButtonElement).closest('form') as HTMLFormElement | null;
-                                        if (form) form.requestSubmit();
-                                        else handleSubmit(e as any); // Fallback
-                                    }}
-                                    className="w-full py-4 bg-gray-900 text-white font-black text-sm uppercase tracking-[0.3em] rounded-2xl hover:bg-black transition-all shadow-xl active:scale-[0.98]"
-                                >
-                                    Confirm Record
-                                </button>
-                            </div>
+                                <div className="flex gap-2 justify-end pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreating(false)}
+                                        className="px-4 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none"
+                                    >
+                                        CANCEL
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-10 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none"
+                                    >
+                                        {isEditing ? 'UPDATE RECORD' : 'SAVE RECORD'}
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>,
                     document.body

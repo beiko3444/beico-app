@@ -41,14 +41,22 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa] relative overflow-hidden font-sans">
-            {/* Background Accent - Red bar at the top half */}
-            <div className="absolute top-0 left-0 w-full h-[50vh] bg-[#d9361b] z-0">
-                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
+        <div className="min-h-screen flex items-center justify-center relative overflow-hidden font-sans bg-black">
+            {/* 3D Dashboard Background (Spline) */}
+            <div className="absolute inset-0 z-0">
+                <iframe
+                    src='https://my.spline.design/movin-EfB50Sgge6cvgQr4xwAKK2Ys/'
+                    frameBorder='0'
+                    width='100%'
+                    height='100%'
+                    className="w-full h-full scale-[1.02]"
+                ></iframe>
+                {/* Overlay to ensure readability and interactivity if needed */}
+                <div className="absolute inset-0 bg-black/10 pointer-events-none"></div>
             </div>
 
-            <div className="w-full max-w-[440px] px-6 z-10 animate-in fade-in zoom-in duration-500">
-                <div className="bg-white rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.12)] overflow-hidden border border-white/20">
+            <div className="w-full max-w-[440px] px-6 z-10 animate-in fade-in zoom-in duration-700">
+                <div className="bg-white/80 backdrop-blur-3xl rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.3)] overflow-hidden border border-white/40">
                     {/* Brand Header Section with White Logo */}
                     <div className="bg-[#d9361b] pt-14 pb-12 px-8 flex flex-col items-center relative overflow-hidden">
                         {/* Decorative subtle highlights */}
@@ -154,14 +162,16 @@ export default function LoginPage() {
                     </div>
                 </div>
 
-                <div className="flex flex-col items-center mt-12 space-y-4">
-                    <p className="text-gray-400 text-[10px] font-bold tracking-[0.3em] uppercase">
-                        &copy; {new Date().getFullYear()} Beico Ecosystem &bull; All Rights Reserved
-                    </p>
+                <div className="flex flex-col items-center mt-12 space-y-4 relative">
+                    <div className="px-4 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/10">
+                        <p className="text-white/60 text-[10px] font-black tracking-[0.3em] uppercase">
+                            &copy; {new Date().getFullYear()} Beico Ecosystem &bull; All Rights Reserved
+                        </p>
+                    </div>
                     <div className="flex gap-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
                         <div className="w-1.5 h-1.5 rounded-full bg-[#d9361b] animate-pulse"></div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-gray-200"></div>
+                        <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
                     </div>
                 </div>
             </div>

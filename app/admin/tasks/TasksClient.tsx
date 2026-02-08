@@ -398,36 +398,22 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 setEditingTask(null)
                 setIsModalOpen(true)
             }}
-            onClick={() => {
-                if (isSelected) {
-                    // Optional: deselect logic if desired, but user wants it to shrink
-                    // Let's use a separate state or just toggle selectedDate to a null-like or something if we want it to shrink totally
-                    // For now, let's keep it as is but handle the "shrink" by clicking again
-                    setSelectedDate(isSelected ? new Date(0) : date)
-                } else {
-                    setSelectedDate(date)
-                }
-            }}
-            className={`transition-all duration-300 flex flex-col group relative p-2 border-r border-b border-gray-100
+            onClick={() => setSelectedDate(date)}
+            className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-all flex flex-col group relative
                 ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
-                ${isSelected ? 'min-h-[350px] z-20 shadow-2xl' : 'min-h-[140px] hover:bg-gray-800 hover:text-white'}
+                ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50'}
                 ${isOver ? 'bg-blue-100/50 ring-2 ring-blue-400 ring-inset z-10' : ''}
             `}
         >
-            {/* Rounded Red Border for Selection */}
-            {isSelected && (
-                <div className="absolute inset-1 border-4 border-red-500 rounded-[2rem] pointer-events-none z-30 animate-in fade-in zoom-in-95 duration-200"></div>
-            )}
-
             <div className="flex justify-between items-start mb-2 relative z-10">
-                <span className={`text-sm font-black transition-all ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-red-500 scale-125' : ''}`}>
+                <span className={`text-sm font-black transition-all ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-emerald-600' : ''}`}>
                     {date.getDate()}
                 </span>
-                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-300 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
+                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
             </div>
 
-            <div className={`flex flex-col gap-1.5 overflow-y-auto scrollbar-hide h-full relative z-10 ${isSelected ? 'pb-4' : ''}`}>
-                {(isSelected ? dayTasks : dayTasks.slice(0, 4)).map((t: any) => (
+            <div className="flex flex-col gap-1 overflow-hidden h-full relative z-10">
+                {dayTasks.slice(0, 5).map((t: any) => (
                     <DraggableTaskItem
                         key={t.id}
                         task={t}
@@ -435,11 +421,11 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                         setEditingTask={setEditingTask}
                         setIsModalOpen={setIsModalOpen}
                         isDraggingAnything={isDraggingAnything}
-                        isExpanded={isSelected}
+                        isExpanded={false}
                     />
                 ))}
-                {!isSelected && dayTasks.length > 4 && (
-                    <div className="text-[9px] font-black text-gray-400 px-2 uppercase tracking-widest mt-auto">+ {dayTasks.length - 4} more</div>
+                {dayTasks.length > 5 && (
+                    <div className="text-[9px] font-black text-gray-300 px-2 uppercase tracking-widest mt-auto">+ {dayTasks.length - 5} more</div>
                 )}
             </div>
         </div>
