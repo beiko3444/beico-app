@@ -452,6 +452,28 @@ export default function MindBoardClient() {
         }
     }
 
+    const onTouchStart = (e: React.TouchEvent) => {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0]
+            const target = e.target as HTMLElement
+            if (!target.closest('.cursor-nwse-resize') && !target.closest('.cursor-grab') && !target.closest('button')) {
+                // if (e.cancelable) e.preventDefault() 
+                startPan(touch.clientX, touch.clientY)
+
+                const now = Date.now()
+                if (now - lastClickTime.current < 300) {
+                    handleCanvasClick(e)
+                }
+                lastClickTime.current = now
+            }
+        } else if (e.touches.length === 2) {
+            if (e.cancelable) e.preventDefault()
+            const dx = e.touches[0].clientX - e.touches[1].clientX
+            const dy = e.touches[0].clientY - e.touches[1].clientY
+            lastTouchDistance.current = Math.sqrt(dx * dx + dy * dy)
+        }
+    }
+
     // --- Interaction Loop ---
     const handleMove = useCallback((clientX: number, clientY: number) => {
         if (isPanning) {
@@ -750,6 +772,7 @@ export default function MindBoardClient() {
                 ref={containerRef}
                 id="mind-board-bg"
                 className="w-full h-full cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
+                onTouchStart={onTouchStart}
                 onMouseDown={(e: React.MouseEvent) => {
                     const target = e.target as HTMLElement
                     if (target.id === 'mind-board-bg') {
@@ -771,7 +794,7 @@ export default function MindBoardClient() {
                 onWheel={handleWheel}
             >
                 <div
-                    className="absolute shadow-inner"
+                    className="absolute shadow-inner pointer-events-none"
                     style={{
                         width: WORLD_SIZE,
                         height: WORLD_SIZE,
