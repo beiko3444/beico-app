@@ -26,9 +26,10 @@ interface ProductRowProps {
     product: any
     index: number
     onSortOrderChange: (productId: string, newOrder: number) => void
+    onDelete: (productId: string) => void
 }
 
-function SortableProductRow({ product, index, onSortOrderChange }: ProductRowProps) {
+function SortableProductRow({ product, index, onSortOrderChange, onDelete }: ProductRowProps) {
     const {
         attributes,
         listeners,
@@ -162,6 +163,12 @@ function SortableProductRow({ product, index, onSortOrderChange }: ProductRowPro
                             <button className="bg-gray-50 text-blue-600 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-blue-100 hover:border-transparent">복사</button>
                         }
                     />
+                    <button
+                        onClick={() => onDelete(product.id)}
+                        className="bg-gray-50 text-red-500 hover:bg-red-500 hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-red-100 hover:border-transparent"
+                    >
+                        삭제
+                    </button>
                 </div>
             </td>
         </tr>
@@ -219,15 +226,30 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
     }
 
     const onSortOrderChange = async (productId: string, newIndex: number) => {
-        // Clamp index
+        // ... (existing code)
         const clampedIndex = Math.max(0, Math.min(newIndex, products.length - 1))
-
         const oldIndex = products.findIndex(p => p.id === productId)
         if (oldIndex === clampedIndex) return
-
         const newItems = arrayMove(products, oldIndex, clampedIndex)
         setProducts(newItems)
         saveOrder(newItems.map(item => item.id))
+    }
+
+    const handleDelete = async (id: string) => {
+        if (!confirm('정말 삭제하시겠습니까? 관련 주문 데이터가 있을 경우 오류가 발생할 수 있습니다.')) return
+        try {
+            const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
+            if (res.ok) {
+                setProducts(prev => prev.filter(p => p.id !== id))
+                router.refresh()
+            } else {
+                const data = await res.json()
+                alert(data.error || '삭제 실패')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('삭제 중 오류 발생')
+        }
     }
 
     return (
@@ -271,6 +293,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                                     product={product}
                                     index={index}
                                     onSortOrderChange={onSortOrderChange}
+                                    onDelete={handleDelete}
                                 />
                             ))
                         )}

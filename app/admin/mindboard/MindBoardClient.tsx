@@ -427,28 +427,48 @@ export default function MindBoardClient() {
         setPan({ x: -100, y: -100 }) // Reset view
     }
 
-    const optimizeSize = () => {
-        setItems(prev => prev.map(item => {
-            const lines = item.content.split('\n').length
-            const length = item.content.length
-            let targetW = 240 // 3x
-            let targetH = 160 // 2x
+    const unGroup = (groupId: string) => {
+        if (!confirm('그룹을 해제하시겠습니까?')) return
+        setItems(prev => prev.map(item => item.groupId === groupId ? { ...item, groupId: undefined } : item))
+        setGroups(prev => prev.filter(g => g.id !== groupId))
+    }
 
-            if (length < 20 && lines <= 2) {
-                targetW = 160 // 2x
-                targetH = 160 // 2x
-            } else if (length > 100 || lines > 5) {
-                targetW = 320 // 4x
-                targetH = Math.max(160, Math.ceil((lines * 24 + 60) / GRID_SIZE) * GRID_SIZE)
-            }
-            return { ...item, w: targetW, h: targetH }
-        }))
-        // After toggle size, re-arrange GROUPS to ensure connectivity?
-        // User: "grouped boards must be connected". 
-        // Simple resizing might cause gaps or overlaps. fixing that is complex AUTO LAYOUT within group.
-        // Let's rely on manual fix or minimal auto-fix?
-        // Let's implement a simple "pull together" for groups?
-        // Skipping complex in-group layout for this iteration to avoid bugs.
+    const optimizeSize = () => {
+        setItems(prev => {
+            const nextItems = prev.map(item => {
+                const lines = item.content.split('\n').length
+                const length = item.content.length
+                let targetW = 240
+                let targetH = 160
+                if (length < 20 && lines <= 2) {
+                    targetW = 160
+                    targetH = 160
+                } else if (length > 100 || lines > 5) {
+                    targetW = 320
+                    targetH = Math.max(160, Math.ceil((lines * 24 + 60) / GRID_SIZE) * GRID_SIZE)
+                }
+                return { ...item, w: targetW, h: targetH }
+            })
+
+            // Pull group members together
+            const handledGroups = new Set<string>()
+            nextItems.forEach(item => {
+                if (item.groupId && !handledGroups.has(item.groupId)) {
+                    const members = nextItems.filter(i => i.groupId === item.groupId)
+                    const packed = packGroup(members)
+                    // Apply packed coords
+                    packed.forEach(p => {
+                        const idx = nextItems.findIndex(ni => ni.id === p.id)
+                        if (idx > -1) {
+                            nextItems[idx].x = item.x + p.x
+                            nextItems[idx].y = item.y + p.y
+                        }
+                    })
+                    handledGroups.add(item.groupId)
+                }
+            })
+            return nextItems
+        })
     }
 
     const handleDoubleTap = (id: string) => {
@@ -667,9 +687,28 @@ export default function MindBoardClient() {
         }
     }, [handleMove, finalizeInteraction])
 
+    const scrollToGroup = (groupId: string) => {
+        const members = items.filter(i => i.groupId === groupId)
+        if (members.length === 0) return
+        const minX = Math.min(...members.map(i => i.x))
+        const minY = Math.min(...members.map(i => i.y))
+        const maxX = Math.max(...members.map(i => i.x + i.w))
+        const maxY = Math.max(...members.map(i => i.y + i.h))
+
+        const container = containerRef.current
+        if (!container) return
+
+        const centerX = (minX + maxX) / 2
+        const centerY = (minY + maxY) / 2
+
+        setPan({
+            x: -centerX * scale + container.clientWidth / 2,
+            y: -centerY * scale + container.clientHeight / 2
+        })
+    }
+
     // Render Group Outlines/Names
     const renderGroups = () => {
-        // Collect group bounds
         const groupBounds = new Map<string, { minX: number, minY: number, maxX: number, maxY: number }>()
         items.forEach(i => {
             if (i.groupId) {
@@ -684,9 +723,6 @@ export default function MindBoardClient() {
         })
 
         return Array.from(groupBounds.entries()).map(([gid, bounds]) => {
-            // Count members >= 2 to allow "Single" items to not show group UI? 
-            // Default "groupId" might be unique for singles. 
-            // We should only show for real groups.
             if (items.filter(i => i.groupId === gid).length < 2) return null
 
             const groupName = groups.find(g => g.id === gid)?.name || "Group"
@@ -702,8 +738,9 @@ export default function MindBoardClient() {
                     }}
                 >
                     <div
-                        className="absolute -top-3 left-4 bg-white px-2 text-xs font-bold text-gray-400 cursor-pointer pointer-events-auto hover:text-blue-500 hover:bg-blue-50 rounded"
-                        onClick={() => renameGroup(gid)}
+                        className="absolute -top-3 left-4 bg-white px-2 py-0.5 text-[10px] font-bold text-gray-400 cursor-pointer pointer-events-auto hover:text-blue-600 hover:bg-blue-50 border border-gray-100 rounded shadow-sm select-none"
+                        onClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
+                        onDoubleClick={(e) => { e.stopPropagation(); unGroup(gid) }}
                         onMouseDown={e => e.stopPropagation()}
                     >
                         {groupName}
@@ -743,8 +780,26 @@ export default function MindBoardClient() {
                 </div>
             </div>
 
-            {/* Toolbar */}
-            <div className="absolute top-4 left-4 z-50 flex gap-4 items-start">
+            {/* Toolbar & Group Nav */}
+            <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 items-start max-w-[80%]">
+                {/* Group Navigator */}
+                {groups.length > 0 && (
+                    <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar max-w-full">
+                        {groups.map(g => (
+                            <div key={g.id} className="flex shrink-0">
+                                <button
+                                    onClick={() => scrollToGroup(g.id)}
+                                    onDoubleClick={() => unGroup(g.id)}
+                                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-2 group"
+                                >
+                                    <LayoutGrid size={10} className="group-hover:text-white" />
+                                    {g.name}
+                                </button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex items-center gap-1">
                     <button onClick={autoArrange} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Auto Arrange">
                         <LayoutGrid size={18} />
