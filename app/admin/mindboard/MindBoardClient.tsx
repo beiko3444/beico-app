@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, Trash2, GripHorizontal, X, CheckCircle2 } from 'lucide-react'
+import { Plus, Minus, Trash2, GripHorizontal, X, CheckCircle2, LayoutGrid } from 'lucide-react'
 
 // Types
 interface BoardItem {
@@ -145,8 +145,8 @@ export default function MindBoardClient() {
             id: Date.now().toString(),
             x: snappedX,
             y: snappedY,
-            w: 320,
-            h: 120,
+            w: 240, // 3x Grid (80 * 3)
+            h: 160, // 2x Grid (80 * 2)
             content: '',
             color: '#FFFFFF',
             zIndex: maxZIndex + 1,
@@ -237,6 +237,61 @@ export default function MindBoardClient() {
         ))
     }
 
+    const autoArrange = () => {
+        const container = containerRef.current
+        if (!container || items.length === 0) return
+
+        // Calculate available columns based on current view or fixed width?
+        // Let's do a simple wrap layout based on an arbitrary width or row count.
+        // Or simply stack them nicely.
+        const gap = 20
+        const cols = Math.ceil(Math.sqrt(items.length)) // Try to make a square-ish grid
+
+        // Sort by current position (reading order: top-left to bottom-right)
+        const sorted = [...items].sort((a, b) => {
+            const rowDiff = a.y - b.y
+            if (Math.abs(rowDiff) > 100) return rowDiff
+            return a.x - b.x
+        })
+
+        let currentX = 100
+        let currentY = 100
+        let maxHeightInRow = 0
+        let count = 0
+
+        const arranged = sorted.map((item, index) => {
+            // Simple grid layout
+            // Since items have variable sizes, a true masonry or packing algorithm is complex.
+            // We'll just reset positions to a clean grid for now, ignoring size variations or assuming standard size.
+            // User asked for "naturally attach and align".
+            // Let's place them in rows.
+
+            const newItem = {
+                ...item,
+                x: Math.round(currentX / GRID_SIZE) * GRID_SIZE,
+                y: Math.round(currentY / GRID_SIZE) * GRID_SIZE
+            }
+
+            // Update for next item
+            currentX += newItem.w + gap
+            maxHeightInRow = Math.max(maxHeightInRow, newItem.h)
+
+            count++
+            if (currentX > 100 + (newItem.w + gap) * 4) { // Max 4 columns roughly
+                currentX = 100
+                currentY += maxHeightInRow + gap
+                maxHeightInRow = 0
+                count = 0
+            }
+
+            return newItem
+        })
+
+        setItems(arranged)
+        // Center view on 0,0
+        setPan(prev => ({ x: 0, y: 0 }))
+    }
+
     // --- Touch Handlers ---
     const onTouchStart = (e: React.TouchEvent) => {
         if (e.touches.length === 1) {
@@ -282,8 +337,8 @@ export default function MindBoardClient() {
                 if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
                 setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === resizeItem.id ? {
                     ...item,
-                    w: Math.max(GRID_SIZE * 4, Math.round((resizeItem.initialW + dx) / GRID_SIZE) * GRID_SIZE),
-                    h: Math.max(GRID_SIZE * 2, Math.round((resizeItem.initialH + dy) / GRID_SIZE) * GRID_SIZE)
+                    w: Math.max(160, Math.round((resizeItem.initialW + dx) / GRID_SIZE) * GRID_SIZE), // Min 2x2 (160)
+                    h: Math.max(160, Math.round((resizeItem.initialH + dy) / GRID_SIZE) * GRID_SIZE)  // Min 2x2 (160)
                 } : item))
             }
         } else if (e.touches.length === 2) {
@@ -313,6 +368,10 @@ export default function MindBoardClient() {
         }
         setTimeout(() => { hasMoved.current = false }, 50)
     }, [])
+
+    const handleDoubleTap = (id: string) => {
+        setColorPaletteId(id)
+    }
 
     // --- Global Mouse Move / Up ---
     useEffect(() => {
@@ -368,9 +427,7 @@ export default function MindBoardClient() {
     }, [isPanning, dragItem, resizeItem, scale, onTouchMove, onTouchEnd, resolveCollision, clampPan])
 
     const startLongPress = (id: string) => {
-        longPressTimer.current = setTimeout(() => {
-            setColorPaletteId(id)
-        }, 500)
+        // Deprecated in favor of double click/tap
     }
 
     return (
@@ -412,6 +469,10 @@ export default function MindBoardClient() {
             {/* Toolbar */}
             <div className="absolute top-4 left-4 z-50 flex gap-4 items-start">
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex items-center gap-1">
+                    <button onClick={autoArrange} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Auto Arrange">
+                        <LayoutGrid size={18} />
+                    </button>
+                    <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
                     <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
@@ -427,6 +488,35 @@ export default function MindBoardClient() {
                     </button>
                 </div>
             </div>
+
+            {/* Right Side Color Palette Indicator */}
+            {colorPaletteId && (
+                <div className="absolute top-1/2 right-4 -translate-y-1/2 z-50 flex flex-col gap-2 bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl border border-gray-100 animate-in slide-in-from-right-10 overflow-hidden">
+                    <div className="text-[10px] font-bold text-center text-gray-400 mb-1">COLOR</div>
+                    {COLORS.map((c) => (
+                        <button
+                            key={c}
+                            onClick={() => {
+                                setItems((prev: BoardItem[]) => prev.map(i => i.id === colorPaletteId ? { ...i, color: c } : i))
+                                // Don't close immediately so user can preview, or close? User said "indicator to select".
+                                // Let's keep it open until click outside or deselect? 
+                                // Actually, typical behavior is select and done.
+                                // But if it acts as a "property panel", it stays. 
+                                // Let's close on select for efficiency.
+                                // setColorPaletteId(null) 
+                            }}
+                            className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${items.find(i => i.id === colorPaletteId)?.color === c ? 'border-black scale-110 shadow-md' : 'border-transparent'}`}
+                            style={{ backgroundColor: c }}
+                        />
+                    ))}
+                    <button
+                        onClick={() => setColorPaletteId(null)}
+                        className="mt-2 p-1 text-gray-400 hover:text-gray-600 text-[10px] font-bold text-center"
+                    >
+                        CLOSE
+                    </button>
+                </div>
+            )}
 
             <div
                 ref={containerRef}
@@ -480,31 +570,19 @@ export default function MindBoardClient() {
                                 }
                             }}
                         >
-                            {/* Color Palette Popover */}
-                            {colorPaletteId === item.id && (
-                                <div className="absolute top-0 left-0 w-full z-[100] p-2 bg-white/90 backdrop-blur-sm border-b border-gray-100 flex flex-wrap gap-1 items-center justify-center animate-in slide-in-from-top-full duration-200">
-                                    {COLORS.map((c: string) => (
-                                        <button
-                                            key={c}
-                                            onClick={(e: React.MouseEvent) => {
-                                                e.stopPropagation()
-                                                setItems((prev: BoardItem[]) => prev.map((i: BoardItem) => i.id === item.id ? { ...i, color: c } : i))
-                                                setColorPaletteId(null)
-                                            }}
-                                            className="w-5 h-5 rounded-full border border-black/10 transition-transform hover:scale-125"
-                                            style={{ backgroundColor: c }}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-
                             {/* Header / Top Handle */}
                             <div className="h-8 bg-black/5 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/10 transition-colors"
-                                onTouchStart={(e: React.TouchEvent) => {
-                                    // Header specific long press
-                                    if (e.touches.length === 1) {
-                                        startLongPress(item.id)
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDoubleTap(item.id)
+                                }}
+                                onTouchEnd={(e) => {
+                                    // Make double tap work for touch
+                                    const now = Date.now()
+                                    if (now - lastClickTime.current < 300) {
+                                        handleDoubleTap(item.id)
                                     }
+                                    lastClickTime.current = now
                                 }}
                             >
                                 <div className="flex items-center gap-2">
