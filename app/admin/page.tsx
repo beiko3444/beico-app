@@ -6,6 +6,8 @@ import { redirect } from "next/navigation"
 import DashboardStatistics from '@/components/DashboardStatistics'
 import DashboardCalendarWidget from '@/components/DashboardCalendarWidget'
 
+export const dynamic = 'force-dynamic'
+
 export default async function AdminDashboard() {
     const session = await getServerSession(authOptions)
 
