@@ -207,22 +207,24 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
     }
 
     const modalContent = (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsOpen(false)}>
             <div
-                className="bg-white p-8 rounded-2xl w-full max-w-2xl shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto relative border border-gray-100"
+                className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-2xl shadow-md animate-in fade-in duration-100 max-h-[95vh] overflow-y-auto relative"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="text-2xl font-black text-gray-900 tracking-tight">
-                        {initialData ? '상품 정보 수정' : '새 상품 등록'}
+                {/* Classic Windows-style Header */}
+                <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none sticky top-0 z-10">
+                    <h3 className="text-sm font-bold tracking-tight">
+                        {initialData ? 'Product Management - Edit Product' : 'Product Management - New Product Registration'}
                     </h3>
                     <button
                         onClick={() => setIsOpen(false)}
-                        className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
+                        className="bg-[#c0c0c0] text-black w-5 h-5 flex items-center justify-center text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none"
                     >
-                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                        ✕
                     </button>
                 </div>
+
                 <form
                     onSubmit={handleSubmit}
                     onKeyDown={(e) => {
@@ -234,197 +236,196 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
                             }
                         }
                     }}
-                    className="space-y-4"
+                    className="p-6 space-y-6"
                 >
-                    {/* Image Upload Section */}
-                    <div className="flex items-center gap-6 p-4 rounded-2xl bg-gray-50 border border-gray-100">
-                        <div className="w-24 h-24 bg-white rounded-xl overflow-hidden flex items-center justify-center border border-gray-100 shadow-inner">
-                            {imageUrl ? (
-                                <img src={imageUrl} alt="Preview" className="w-full h-full object-cover" />
-                            ) : (
-                                <span className="text-[10px] font-bold text-gray-300 text-center px-1 uppercase tracking-widest">이미지 없음</span>
-                            )}
-                        </div>
-                        <div className="flex-1">
-                            <label className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-2">상품 이미지 (500x500)</label>
-                            <input
-                                type="file"
-                                accept="image/*"
-                                onChange={handleImageChange}
-                                className="block w-full text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-[10px] file:font-black file:bg-gray-900 file:text-white hover:file:bg-black transition-all"
-                            />
-                        </div>
-                    </div>
+                    {/* Basic Info Group */}
+                    <fieldset className="border border-gray-400 p-4 pt-2">
+                        <legend className="px-2 text-xs font-bold text-gray-700">기본 정보 (General Info)</legend>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">상품명 (국문)</label>
-                            <input
-                                type="text"
-                                value={name}
-                                onChange={e => setName(e.target.value)}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-bold"
-                                required
-                            />
+                        {/* Image Upload Row */}
+                        <div className="flex gap-4 mb-4 items-start">
+                            <div className="w-20 h-20 bg-white border border-gray-400 flex items-center justify-center shrink-0">
+                                {imageUrl ? (
+                                    <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
+                                ) : (
+                                    <span className="text-[10px] text-gray-400">No Image</span>
+                                )}
+                            </div>
+                            <div className="flex-1">
+                                <label className="block text-[11px] font-bold text-gray-600 mb-1">상품 이미지 선택</label>
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    className="block w-full text-[11px] text-gray-700 bg-white border border-gray-300 px-1 py-1"
+                                />
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">상품명 (일문)</label>
-                            <input
-                                type="text"
-                                value={nameJP}
-                                onChange={e => setNameJP(e.target.value)}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-bold"
-                                placeholder="일본어 상품명 (선택사항)"
-                            />
-                        </div>
-                    </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">바코드 (Barcode)</label>
-                            <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">상품명 (국문)</label>
+                                <input
+                                    type="text"
+                                    value={name}
+                                    onChange={e => setName(e.target.value)}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">상품명 (일문)</label>
+                                <input
+                                    type="text"
+                                    value={nameJP}
+                                    onChange={e => setNameJP(e.target.value)}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
+                                    placeholder="JAPANESE NAME"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">상품 코드 (SKU)</label>
+                                <input
+                                    type="text"
+                                    value={productCode}
+                                    onChange={e => setProductCode(e.target.value)}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono uppercase"
+                                    placeholder="ITEM CODE"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">바코드 번호</label>
                                 <input
                                     type="text"
                                     value={barcode}
                                     onChange={e => setBarcode(e.target.value)}
-                                    className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-mono text-sm"
-                                    placeholder="바코드 번호 입력"
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
+                                    placeholder="BARCODE"
                                 />
-                                {barcode && (
-                                    <div className="flex justify-center bg-white p-3 border border-gray-100 rounded-xl shadow-sm">
-                                        <BarcodeDisplay value={barcode} width={1.8} height={50} fontSize={14} />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    {/* Inventory Group */}
+                    <fieldset className="border border-gray-400 p-4 pt-2">
+                        <legend className="px-2 text-xs font-bold text-gray-700">재고 및 주문 (Inventory)</legend>
+                        <div className="grid grid-cols-3 gap-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">현재고 수량</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={stock}
+                                    onChange={e => setStock(formatNumber(e.target.value))}
+                                    className={`w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold ${parseInt(parseNumber(stock)) <= 0 ? 'text-red-600' : 'text-black'}`}
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">안전재고 설정</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={safetyStock}
+                                    onChange={e => setSafetyStock(formatNumber(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-orange-700"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">최소 주문량</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={minOrderQuantity}
+                                    onChange={e => setMinOrderQuantity(formatNumber(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-blue-700"
+                                    required
+                                />
+                            </div>
+                        </div>
+                    </fieldset>
+
+                    {/* Pricing Group */}
+                    <fieldset className="border border-gray-400 p-4 pt-2">
+                        <legend className="px-2 text-xs font-bold text-gray-700">단가 설정 (Pricing)</legend>
+                        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">매입 단가 (Cost)</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={buyPrice}
+                                    onChange={e => setBuyPrice(formatNumber(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-red-700">도매 단가 (Wholesale)</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={sellPrice}
+                                    onChange={e => {
+                                        const val = formatNumber(e.target.value);
+                                        setSellPrice(val);
+                                        setPriceC(val);
+                                    }}
+                                    className="w-full px-2 py-1.5 bg-[#fff8f8] border border-red-300 outline-none focus:border-red-600 text-sm text-right font-bold text-red-700"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">소매 단가 (Retail)</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={onlinePrice}
+                                    onChange={e => setOnlinePrice(formatNumber(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                />
+                            </div>
+                        </div>
+
+                        <div className="mt-4 pt-4 border-t border-gray-300">
+                            <label className="block text-[10px] font-bold text-gray-500 mb-2">등급별 단가 (Special Pricing)</label>
+                            <div className="grid grid-cols-4 gap-2">
+                                {[
+                                    { label: 'A 등급', value: priceA, setter: setPriceA },
+                                    { label: 'B 등급', value: priceB, setter: setPriceB },
+                                    { label: 'C 등급', value: sellPrice, disabled: true },
+                                    { label: 'D 등급', value: priceD, setter: setPriceD },
+                                ].map((tier) => (
+                                    <div key={tier.label} className="space-y-1">
+                                        <label className="text-[10px] text-gray-600 block">{tier.label}</label>
+                                        <input
+                                            type="text"
+                                            inputMode="numeric"
+                                            value={tier.value}
+                                            disabled={tier.disabled}
+                                            onChange={e => tier.setter?.(formatNumber(e.target.value))}
+                                            className={`w-full px-1.5 py-1 text-xs text-right border ${tier.disabled ? 'bg-gray-100' : 'bg-white border-gray-300'}`}
+                                        />
                                     </div>
-                                )}
+                                ))}
                             </div>
                         </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">현재 재고</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={stock}
-                                onChange={e => setStock(formatNumber(e.target.value))}
-                                className={`w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-black text-lg ${parseInt(parseNumber(stock)) <= 0 ? 'text-red-500' : 'text-gray-900'}`}
-                                required
-                            />
-                        </div>
-                    </div>
+                    </fieldset>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">안전 재고</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={safetyStock}
-                                onChange={e => setSafetyStock(formatNumber(e.target.value))}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-orange-500 focus:bg-white outline-none transition-all font-bold text-orange-600"
-                                placeholder="0"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">최소 주문 수량</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={minOrderQuantity}
-                                onChange={e => setMinOrderQuantity(formatNumber(e.target.value))}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:bg-white outline-none transition-all font-bold text-emerald-600"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">상품 코드 (SKU)</label>
-                            <input
-                                type="text"
-                                value={productCode}
-                                onChange={e => setProductCode(e.target.value)}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-mono text-sm uppercase"
-                                placeholder="e.g. BEIKO-01"
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">매입 단가 (Purchase)</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={buyPrice}
-                                onChange={e => setBuyPrice(formatNumber(e.target.value))}
-                                className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-bold"
-                                required
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-[#d9361b] uppercase tracking-widest ml-1">도매 단가 (Wholesale)</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={sellPrice}
-                                onChange={e => {
-                                    const val = formatNumber(e.target.value);
-                                    setSellPrice(val);
-                                    setPriceC(val);
-                                }}
-                                className="w-full px-4 py-3 bg-red-50 border border-red-100 rounded-xl focus:ring-2 focus:ring-[#d9361b] focus:bg-white outline-none transition-all font-black text-lg text-[#d9361b]"
-                                required
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-1">소매 단가 (Retail)</label>
-                            <input
-                                type="text"
-                                inputMode="numeric"
-                                value={onlinePrice}
-                                onChange={e => setOnlinePrice(formatNumber(e.target.value))}
-                                className="w-full px-4 py-3 bg-gray-100 border border-gray-200 rounded-xl focus:ring-2 focus:ring-gray-900 focus:bg-white outline-none transition-all font-black text-lg text-gray-800"
-                                placeholder="소매가 입력"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Tiered Pricing */}
-                    <div className="p-6 rounded-[2rem] bg-gray-50 border border-gray-100 space-y-4">
-                        <label className="block text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">등급별 단가 정책 (Tiered Pricing)</label>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 uppercase ml-1">A 등급</label>
-                                <input type="text" inputMode="numeric" value={priceA} onChange={e => setPriceA(formatNumber(e.target.value))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#d9361b] transition-all font-bold text-sm" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 uppercase ml-1">B 등급</label>
-                                <input type="text" inputMode="numeric" value={priceB} onChange={e => setPriceB(formatNumber(e.target.value))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#d9361b] transition-all font-bold text-sm" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-300 uppercase ml-1">C 등급 (도매가 동기화)</label>
-                                <input type="text" disabled value={sellPrice} className="w-full px-3 py-2 bg-gray-100 border border-gray-100 rounded-xl font-bold text-sm text-gray-400" />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 uppercase ml-1">D 등급</label>
-                                <input type="text" inputMode="numeric" value={priceD} onChange={e => setPriceD(formatNumber(e.target.value))} className="w-full px-3 py-2 bg-white border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-[#d9361b] transition-all font-bold text-sm" />
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex gap-3 justify-end pt-6 border-t border-gray-100">
+                    <div className="flex gap-2 justify-end pt-4">
                         <button
                             type="button"
                             onClick={() => setIsOpen(false)}
-                            className="px-6 py-3 text-sm font-black text-gray-400 hover:text-gray-900 transition-colors uppercase tracking-widest"
+                            className="px-4 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none"
                         >
-                            취소
+                            CANCEL
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="bg-gray-900 text-white px-10 py-3 rounded-2xl font-black text-sm uppercase tracking-[0.2em] hover:bg-black disabled:opacity-50 transition-all shadow-xl active:scale-[0.98]"
+                            className="px-8 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none disabled:opacity-50"
                         >
-                            {loading ? '처리 중...' : initialData ? '정보 수정' : '상품 등록'}
+                            {loading ? 'WAIT...' : initialData ? 'UPDATE' : 'SAVE ITEM'}
                         </button>
                     </div>
                 </form>
