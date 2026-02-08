@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, Trash2, GripHorizontal } from 'lucide-react'
+import { Plus, Minus, Trash2, GripHorizontal, X, CheckCircle2 } from 'lucide-react'
 
 // Types
 interface BoardItem {
@@ -13,6 +13,7 @@ interface BoardItem {
     content: string
     color: string
     zIndex: number
+    completed?: boolean
 }
 
 const GRID_SIZE = 80
@@ -41,6 +42,7 @@ export default function MindBoardClient() {
     const lastTouchDistance = useRef<number | null>(null)
     const lastClickTime = useRef(0)
     const longPressTimer = useRef<any>(null)
+    const hasMoved = useRef(false) // Used to distinguish between click and drag
 
     // --- Persistence ---
     useEffect(() => {
@@ -147,7 +149,8 @@ export default function MindBoardClient() {
             h: 120,
             content: '',
             color: '#FFFFFF',
-            zIndex: maxZIndex + 1
+            zIndex: maxZIndex + 1,
+            completed: false
         }
 
         setMaxZIndex((prev: number) => prev + 1)
@@ -228,6 +231,12 @@ export default function MindBoardClient() {
         }
     }
 
+    const toggleComplete = (id: string) => {
+        setItems((prev: BoardItem[]) => prev.map((item: BoardItem) =>
+            item.id === id ? { ...item, completed: !item.completed } : item
+        ))
+    }
+
     // --- Touch Handlers ---
     const onTouchStart = (e: React.TouchEvent) => {
         if (e.touches.length === 1) {
@@ -252,10 +261,12 @@ export default function MindBoardClient() {
                 const dy = touch.clientY - lastPos.current.y
                 setPan((p: { x: number, y: number }) => clampPan(p.x + dx, p.y + dy, scale))
                 lastPos.current = { x: touch.clientX, y: touch.clientY }
+                hasMoved.current = true
             } else if (dragItem) {
                 if (e.cancelable) e.preventDefault()
                 const dx = (touch.clientX - dragItem.startX) / scale
                 const dy = (touch.clientY - dragItem.startY) / scale
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
                 setItems((prev: BoardItem[]) => {
                     const next = prev.map((item: BoardItem) => item.id === dragItem.id ? {
                         ...item,
@@ -268,6 +279,7 @@ export default function MindBoardClient() {
                 if (e.cancelable) e.preventDefault()
                 const dx = (touch.clientX - resizeItem.startX) / scale
                 const dy = (touch.clientY - resizeItem.startY) / scale
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
                 setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === resizeItem.id ? {
                     ...item,
                     w: Math.max(GRID_SIZE * 4, Math.round((resizeItem.initialW + dx) / GRID_SIZE) * GRID_SIZE),
@@ -299,6 +311,7 @@ export default function MindBoardClient() {
             clearTimeout(longPressTimer.current)
             longPressTimer.current = null
         }
+        setTimeout(() => { hasMoved.current = false }, 50)
     }, [])
 
     // --- Global Mouse Move / Up ---
@@ -309,9 +322,11 @@ export default function MindBoardClient() {
                 const dy = e.clientY - lastPos.current.y
                 setPan((p: { x: number, y: number }) => clampPan(p.x + dx, p.y + dy, scale))
                 lastPos.current = { x: e.clientX, y: e.clientY }
+                hasMoved.current = true
             } else if (dragItem) {
                 const dx = (e.clientX - dragItem.startX) / scale
                 const dy = (e.clientY - dragItem.startY) / scale
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
                 setItems((prev: BoardItem[]) => {
                     const next = prev.map((item: BoardItem) => item.id === dragItem.id ? {
                         ...item,
@@ -323,6 +338,7 @@ export default function MindBoardClient() {
             } else if (resizeItem) {
                 const dx = (e.clientX - resizeItem.startX) / scale
                 const dy = (e.clientY - resizeItem.startY) / scale
+                if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
                 setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === resizeItem.id ? {
                     ...item,
                     w: Math.max(GRID_SIZE * 4, Math.round((resizeItem.initialW + dx) / GRID_SIZE) * GRID_SIZE),
@@ -335,6 +351,7 @@ export default function MindBoardClient() {
             setIsPanning(false)
             setDragItem(null)
             setResizeItem(null)
+            setTimeout(() => { hasMoved.current = false }, 50)
         }
 
         window.addEventListener('mousemove', handleMouseMove)
@@ -440,14 +457,14 @@ export default function MindBoardClient() {
                     {items.map((item: BoardItem) => (
                         <div
                             key={item.id}
-                            className="absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border border-black/5 hover:border-black/10 transition-shadow hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden"
+                            className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border border-black/5 hover:border-black/10 transition-all hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden ${item.completed ? 'opacity-60 scale-[0.98]' : ''}`}
                             style={{
                                 left: item.x,
                                 top: item.y,
                                 width: item.w,
                                 height: item.h,
                                 zIndex: item.zIndex,
-                                backgroundColor: item.color
+                                backgroundColor: item.completed ? '#f3f4f6' : item.color
                             }}
                             onMouseDown={(e: React.MouseEvent) => {
                                 e.stopPropagation()
@@ -494,13 +511,20 @@ export default function MindBoardClient() {
                                     <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: item.color === '#FFFFFF' ? '#e5e5e5' : item.color }}></div>
                                     <GripHorizontal size={14} className="text-gray-400" />
                                 </div>
-                                <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                <div className="flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
+                                    <button
+                                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); toggleComplete(item.id) }}
+                                        onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
+                                        className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`}
+                                    >
+                                        <CheckCircle2 size={14} />
+                                    </button>
                                     <button
                                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); deleteItem(item.id) }}
                                         onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
-                                        className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600"
+                                        className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-800"
                                     >
-                                        <Trash2 size={12} />
+                                        <X size={14} />
                                     </button>
                                 </div>
                             </div>
@@ -525,15 +549,14 @@ export default function MindBoardClient() {
                                     />
                                 ) : (
                                     <div
-                                        className="w-full h-full text-sm font-medium text-gray-800 whitespace-pre-wrap leading-relaxed cursor-text"
-                                        onDoubleClick={() => setEditingId(item.id)}
-                                        onClick={(e: React.MouseEvent) => {
-                                            if (e.detail === 1) {
-                                                // Single tap on mobile
+                                        className={`w-full h-full text-sm font-medium whitespace-pre-wrap leading-relaxed cursor-text transition-all ${item.completed ? 'text-gray-400 line-through' : 'text-gray-800'}`}
+                                        onClick={() => {
+                                            if (!hasMoved.current && !item.completed) {
+                                                setEditingId(item.id)
                                             }
                                         }}
                                     >
-                                        {item.content || <span className="text-gray-300 italic">더블클릭하여 내용 입력...</span>}
+                                        {item.content || <span className="text-gray-300 italic">{item.completed ? '완료된 작업' : '클릭하여 내용 입력...'}</span>}
                                     </div>
                                 )}
                             </div>
