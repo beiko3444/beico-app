@@ -196,8 +196,8 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
 
                 {/* Weekdays */}
                 <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
-                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day, idx) => (
-                        <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
+                        <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
                             {day}
                         </div>
                     ))}
@@ -249,7 +249,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                 {selectedDate.getFullYear()}. {selectedDate.getMonth() + 1}
                             </h3>
                             <p className="text-xs font-bold text-gray-400 uppercase tracking-widest italic">
-                                {['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][selectedDate.getDay()]}
+                                {['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][selectedDate.getDay()]}
                             </p>
                         </div>
                     </div>
@@ -276,9 +276,9 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                 >
                                     {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
                                 </button>
-                                <div className="flex-1 min-w-0" onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}>
-                                    <h4 className={`text-xs font-black truncate ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900'}`}>{task.title}</h4>
-                                    {task.description && <p className="text-[10px] text-gray-400 truncate font-medium">{task.description}</p>}
+                                <div className="flex-1 min-w-0 flex items-center gap-6" onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}>
+                                    <h4 className={`text-sm font-black truncate max-w-[200px] ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900'}`}>{task.title}</h4>
+                                    {task.description && <p className="text-xs text-gray-400 truncate font-medium flex-1 pt-0.5">{task.description}</p>}
                                 </div>
                                 <div className="flex items-center gap-2">
                                     {task.fileUrl && <Paperclip className="w-3 h-3 text-blue-400" />}
@@ -392,6 +392,8 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
     const isToday = isSameDay(date, new Date())
     const dayTasks = tasks.filter((t: any) => isSameDay(t.date, date))
 
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6
+
     return (
         <div
             ref={setNodeRef}
@@ -401,9 +403,9 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 setIsModalOpen(true)
             }}
             onClick={() => setSelectedDate(date)}
-            className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-none flex flex-col group relative
-                ${current ? 'bg-white' : 'bg-gray-50/20 text-gray-300'}
-                ${isSelected ? 'bg-blue-50/30' : 'hover:bg-gray-50/50'}
+            className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-all flex flex-col group relative
+                ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
+                ${isSelected ? 'bg-blue-50/30' : 'hover:bg-gray-800 hover:text-white'}
                 ${isOver ? 'bg-blue-100/50 ring-2 ring-blue-400 ring-inset z-10' : ''}
             `}
         >

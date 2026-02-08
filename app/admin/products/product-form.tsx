@@ -27,9 +27,10 @@ type Product = {
 interface ProductFormProps {
     initialData?: Product
     trigger?: React.ReactNode
+    isCopy?: boolean
 }
 
-export default function ProductForm({ initialData, trigger }: ProductFormProps) {
+export default function ProductForm({ initialData, trigger, isCopy }: ProductFormProps) {
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
     const [isOpen, setIsOpen] = useState(false)
@@ -69,10 +70,10 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
     // Initialize form when opening if initialData exists
     useEffect(() => {
         if (isOpen && initialData) {
-            setName(initialData.name)
+            setName(isCopy ? `${initialData.name} (복사)` : initialData.name)
             setNameJP(initialData.nameJP || '')
-            setBarcode(initialData.barcode || '')
-            setProductCode(initialData.productCode || '')
+            setBarcode(isCopy ? '' : (initialData.barcode || ''))
+            setProductCode(isCopy ? '' : (initialData.productCode || ''))
             setBuyPrice(formatNumber(initialData.buyPrice))
             setSellPrice(formatNumber(initialData.sellPrice))
             setOnlinePrice(formatNumber(initialData.onlinePrice || 0))
@@ -132,8 +133,9 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
         setLoading(true)
 
         try {
-            const url = initialData ? `/api/products/${initialData.id}` : '/api/products'
-            const method = initialData ? 'PUT' : 'POST'
+            const isNew = !initialData || isCopy
+            const url = isNew ? '/api/products' : `/api/products/${initialData.id}`
+            const method = isNew ? 'POST' : 'PUT'
 
             // Prepare the body with numbers, ensuring we don't send NaN
             const productData = {
@@ -165,7 +167,7 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
             if (res.ok) {
                 setIsOpen(false)
                 router.refresh()
-                if (!initialData) {
+                if (isNew) {
                     setName('')
                     setNameJP('')
                     setBuyPrice('')
@@ -215,7 +217,7 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
                 {/* Classic Windows-style Header */}
                 <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none sticky top-0 z-10">
                     <h3 className="text-sm font-bold tracking-tight">
-                        {initialData ? 'Product Management - Edit Product' : 'Product Management - New Product Registration'}
+                        {isCopy ? 'Product Management - Copy & Register Product' : initialData ? 'Product Management - Edit Product' : 'Product Management - New Product Registration'}
                     </h3>
                     <button
                         onClick={() => setIsOpen(false)}
@@ -425,7 +427,7 @@ export default function ProductForm({ initialData, trigger }: ProductFormProps) 
                             disabled={loading}
                             className="px-8 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none disabled:opacity-50"
                         >
-                            {loading ? 'WAIT...' : initialData ? 'UPDATE' : 'SAVE ITEM'}
+                            {loading ? 'WAIT...' : isCopy ? 'SAVE COPY' : initialData ? 'UPDATE' : 'SAVE ITEM'}
                         </button>
                     </div>
                 </form>

@@ -317,27 +317,28 @@ export default function ProductionClient() {
     return (
         <div className="space-y-6">
             {/* Sticky Header with Title and Category Tabs */}
-            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 shadow-sm transition-all duration-300">
+            {/* Sticky Header with Title and Category Tabs */}
+            <div className="sticky top-0 z-40 bg-[#f0f0f0] pt-1 pb-1 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b-2 border-[#808080] shadow-sm transition-all duration-300">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#d9361b] transition-all" title="Dashboard">
+                        <div className="flex items-center gap-2">
+                            <Link href="/admin" className="p-1 hover:bg-gray-300 border border-transparent hover:border-[#808080] text-gray-500 transition-all" title="Dashboard">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight">생산 관리</h1>
+                            <h1 className="text-sm font-bold text-gray-900 tracking-tight uppercase">Production Management System</h1>
                         </div>
 
-                        <div className="h-4 w-px bg-gray-200"></div>
+                        <div className="h-6 w-px bg-gray-400"></div>
 
                         {/* Category Tabs */}
-                        <div className="flex bg-gray-100/50 p-1 rounded-lg overflow-x-auto scrollbar-hide">
+                        <div className="flex gap-1 overflow-x-auto scrollbar-hide">
                             {CATEGORIES.map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setActiveTab(cat)}
-                                    className={`px-3 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition-all ${activeTab === cat
-                                        ? 'bg-white text-[var(--color-brand-blue)] shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-600'
+                                    className={`px-4 py-1.5 text-xs font-bold whitespace-nowrap transition-all border-t-2 border-x-2 ${activeTab === cat
+                                        ? 'bg-white border-[#808080] border-b-white -mb-[2px] text-blue-800'
+                                        : 'bg-[#e0e0e0] border-transparent text-gray-500 hover:bg-gray-200'
                                         }`}
                                 >
                                     {cat}
@@ -349,10 +350,11 @@ export default function ProductionClient() {
             </div>
 
             {/* Action Bar */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            {/* Action Bar */}
+            <div className="flex justify-between items-center bg-[#f0f0f0] p-3 border-2 border-[#808080] shadow-sm">
                 <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[var(--color-brand-blue)]"></span>
-                    <span className="font-bold text-gray-700">{activeTab} 생산일지</span>
+                    <div className="w-3 h-3 bg-blue-800"></div>
+                    <span className="text-xs font-bold text-gray-700">{activeTab} PRODUCTION LOG</span>
                 </div>
                 <button
                     onClick={() => {
@@ -373,142 +375,86 @@ export default function ProductionClient() {
                         })
                         setIsCreating(true)
                     }}
-                    className="bg-[#d9361b] text-white px-5 py-2 rounded-lg font-bold hover:brightness-110 transition-all shadow-md hover:shadow-lg text-xs"
+                    className="bg-[#c0c0c0] text-black px-6 py-1.5 border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none text-xs font-bold hover:bg-[#d0d0d0]"
                 >
-                    ＋ 생산 기록
+                    ＋ NEW RECORD
                 </button>
             </div>
 
             {/* Statistics Dashboard */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {/* Statistics Dashboard */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-0 border-2 border-[#808080] bg-[#f0f0f0] divide-x divide-y lg:divide-y-0 divide-[#808080]">
                 {[
+                    { label: 'Total Qty', value: batches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + ' EA' },
+                    { label: 'Avg Qty', value: batches.length > 0 ? Math.round(batches.reduce((acc, b) => acc + b.quantity, 0) / batches.length).toLocaleString() + ' EA' : '0 EA' },
+                    { label: 'Avg Cost', value: batches.length > 0 ? Math.round(batches.reduce((acc, b) => acc + (b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)), 0) / batches.length).toLocaleString() + ' KRW' : '0 KRW' },
+                    { label: 'Avg Unit Price', value: batches.length > 0 ? Math.round(batches.reduce((acc, b) => acc + (b.unitCost || 0), 0) / batches.length).toLocaleString() + ' KRW' : '0 KRW' },
                     {
-                        label: '총 생산수량',
-                        value: batches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + '개'
-                    },
-                    {
-                        label: '평균 생산수량',
-                        value: batches.length > 0
-                            ? Math.round(batches.reduce((acc, b) => acc + b.quantity, 0) / batches.length).toLocaleString() + '개'
-                            : '0개'
-                    },
-                    {
-                        label: '평균 생산비용',
-                        value: batches.length > 0
-                            ? Math.round(batches.reduce((acc, b) => acc + (b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)), 0) / batches.length).toLocaleString() + '원'
-                            : '0원'
-                    },
-                    {
-                        label: '평균 생산단가',
-                        value: batches.length > 0
-                            ? Math.round(batches.reduce((acc, b) => acc + (b.unitCost || 0), 0) / batches.length).toLocaleString() + '원'
-                            : '0원'
-                    },
-                    {
-                        label: '평균 마진율',
-                        value: batches.length > 0
-                            ? (batches.reduce((acc, b) => {
-                                const margin = b.salesPrice > 0 ? ((b.salesPrice - (b.unitCost || 0)) / b.salesPrice) * 100 : 0
-                                return acc + margin
-                            }, 0) / batches.length).toFixed(1) + '%'
-                            : '0%'
+                        label: 'Avg Margin', value: batches.length > 0 ? (batches.reduce((acc, b) => {
+                            const margin = b.salesPrice > 0 ? ((b.salesPrice - (b.unitCost || 0)) / b.salesPrice) * 100 : 0
+                            return acc + margin
+                        }, 0) / batches.length).toFixed(1) + '%' : '0%'
                     }
                 ].map((stat, idx) => (
-                    <div key={idx} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-1 transition-transform hover:scale-[1.02]">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{stat.label}</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-black text-gray-900">{stat.value}</span>
-                        </div>
+                    <div key={idx} className="p-4 flex flex-col items-center justify-center bg-white shadow-inner">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase mb-1">{stat.label}</span>
+                        <span className="text-base font-bold text-blue-900">{stat.value}</span>
                     </div>
                 ))}
             </div>
 
             {/* Visual Insights Section */}
             {!loading && batches.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     {/* Total Production Cost Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                    <DollarSign className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">총 생산비용 추이</h3>
-                            </div>
-                            <Activity className="w-4 h-4 text-gray-300" />
+                    <div className="bg-white p-4 border-2 border-[#808080] shadow-sm flex flex-col gap-3">
+                        <div className="flex items-center justify-between border-b pb-1">
+                            <h3 className="text-xs font-bold text-gray-700">Cost Trend</h3>
                         </div>
-                        <div className="h-48 w-full">
+                        <div className="h-40 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <AreaChart data={areaChartData}>
-                                    <defs>
-                                        <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e0e0" />
+                                    <XAxis dataKey="date" fontSize={9} tickLine={false} axisLine={false} tick={{ fill: '#666' }} />
                                     <YAxis hide />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
-                                        formatter={(value: any) => [Number(value).toLocaleString() + '원', '비용']}
-                                    />
-                                    <Area type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" />
+                                    <Tooltip contentStyle={{ fontSize: '10px' }} />
+                                    <Area type="monotone" dataKey="cost" stroke="#000080" strokeWidth={2} fill="#00008033" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
                     {/* Production Quantity Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-                                    <Package className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">생산수량 변동</h3>
-                            </div>
-                            <TrendingUp className="w-4 h-4 text-gray-300" />
+                    <div className="bg-white p-4 border-2 border-[#808080] shadow-sm flex flex-col gap-3">
+                        <div className="flex items-center justify-between border-b pb-1">
+                            <h3 className="text-xs font-bold text-gray-700">Quantity Flow</h3>
                         </div>
-                        <div className="h-48 w-full">
+                        <div className="h-40 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <BarChart data={barChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e0e0" />
+                                    <XAxis dataKey="date" fontSize={9} tickLine={false} axisLine={false} tick={{ fill: '#666' }} />
                                     <YAxis hide />
-                                    <Tooltip
-                                        cursor={{ fill: '#f9fafb' }}
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
-                                        formatter={(value: any) => [Number(value).toLocaleString() + '개', '수량']}
-                                    />
-                                    <Bar dataKey="qty" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
+                                    <Tooltip contentStyle={{ fontSize: '10px' }} />
+                                    <Bar dataKey="qty" fill="#006400" barSize={15} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
 
                     {/* Unit Cost Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-                                    <Calculator className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">생산단가 추이</h3>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-gray-300" />
+                    <div className="bg-white p-4 border-2 border-[#808080] shadow-sm flex flex-col gap-3">
+                        <div className="flex items-center justify-between border-b pb-1">
+                            <h3 className="text-xs font-bold text-gray-700">Unit Cost Analysis</h3>
                         </div>
-                        <div className="h-48 w-full">
+                        <div className="h-40 w-full">
                             <ResponsiveContainer width="100%" height="100%">
                                 <LineChart data={lineChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e0e0e0" />
+                                    <XAxis dataKey="date" fontSize={9} tickLine={false} axisLine={false} tick={{ fill: '#666' }} />
                                     <YAxis hide />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
-                                        formatter={(value: any) => [Number(value).toLocaleString() + '원', '단가']}
-                                    />
-                                    <Line type="stepAfter" dataKey="unit" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                                    <Tooltip contentStyle={{ fontSize: '10px' }} />
+                                    <Line type="stepAfter" dataKey="unit" stroke="#b22222" strokeWidth={2} dot={{ r: 3 }} />
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
@@ -518,10 +464,10 @@ export default function ProductionClient() {
 
 
             {/* Table */}
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-visible shadow-sm">
-                <div className="overflow-visible">
-                    <table className="w-full text-xs text-left">
-                        <thead className="bg-gray-50 text-black font-black uppercase border-b border-gray-100">
+            <div className="bg-white border-2 border-[#808080] shadow-md">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left border-collapse">
+                        <thead className="bg-[#d0d0d0] text-black font-bold border-b-2 border-[#808080]">
                             <tr>
                                 <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('productionDate')}>
                                     No {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -671,58 +617,58 @@ export default function ProductionClient() {
             {/* Modal */}
             {
                 isCreating && mounted && createPortal(
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsCreating(false)}>
+                    <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsCreating(false)}>
                         <div
-                            className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-300 border border-gray-100 relative"
+                            className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-lg shadow-md animate-in fade-in duration-100 relative"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Receipt Top Header */}
-                            <div className="bg-[#fcfcfc] px-8 pt-8 pb-4 relative">
-                                <div className="flex justify-between items-start mb-6">
-                                    <div>
-                                        <h3 className="font-black text-2xl text-gray-900 tracking-tighter">PRODUCTION</h3>
-                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em]">{activeTab} RECORD</p>
-                                    </div>
-                                    <button onClick={() => setIsCreating(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors">✕</button>
-                                </div>
-
-                                <div className="flex justify-between items-end border-b-2 border-dashed border-gray-100 pb-4">
-                                    <div>
-                                        <label className="block text-[10px] font-black text-gray-300 uppercase mb-1">Date of Entry</label>
-                                        <input
-                                            type="date"
-                                            required
-                                            className="bg-transparent font-mono text-sm font-bold text-gray-600 focus:outline-none focus:text-[var(--color-brand-blue)]"
-                                            value={formData.productionDate}
-                                            onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
-                                        />
-                                    </div>
-                                    <div className="text-right">
-                                        <span className="block text-[10px] font-black text-gray-300 uppercase mb-1">Reference</span>
-                                        <span className="font-mono text-xs font-bold text-gray-400">#{isEditing ? isEditing.id.slice(-6).toUpperCase() : 'NEW_LOG'}</span>
-                                    </div>
-                                </div>
+                            {/* ERP style Header */}
+                            <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none">
+                                <h3 className="text-xs font-bold tracking-tight">
+                                    {isEditing ? `Production Record Entry - ID:${isEditing.id.slice(-6).toUpperCase()}` : 'New Production Record Entry'}
+                                </h3>
+                                <button onClick={() => setIsCreating(false)} className="bg-[#c0c0c0] text-black w-5 h-5 flex items-center justify-center text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none">✕</button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="px-8 py-6 space-y-6 max-h-[70vh] overflow-y-auto scrollbar-hide">
-                                {/* Cost Breakdown Section */}
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center group">
-                                        <label className="text-[11px] font-black text-gray-500 uppercase">Raw Material</label>
-                                        <div className="flex items-center gap-2">
+                            <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[85vh] overflow-y-auto">
+                                <fieldset className="border border-gray-400 p-4 pt-2">
+                                    <legend className="px-2 text-xs font-bold text-gray-700">Schedule & Identifiers</legend>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 block">Date of Entry</label>
+                                            <input
+                                                type="date"
+                                                required
+                                                className="w-full px-2 py-1 bg-white border border-gray-400 text-sm font-mono"
+                                                value={formData.productionDate}
+                                                onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 block">Category</label>
+                                            <input
+                                                type="text"
+                                                disabled
+                                                className="w-full px-2 py-1 bg-gray-200 border border-gray-400 text-sm"
+                                                value={activeTab}
+                                            />
+                                        </div>
+                                    </div>
+                                </fieldset>
+
+                                <fieldset className="border border-gray-400 p-4 pt-2">
+                                    <legend className="px-2 text-xs font-bold text-gray-700">Cost Breakdown (KRW)</legend>
+                                    <div className="grid grid-cols-2 gap-x-6 gap-y-3">
+                                        <div className="col-span-2 flex items-baseline justify-between gap-4 border-b pb-2 mb-2">
+                                            <label className="text-[11px] font-bold text-blue-900 min-w-fit">Raw Material Cost</label>
                                             <input
                                                 type="text"
                                                 required
-                                                placeholder="0"
-                                                className="w-32 text-right font-mono text-sm font-black text-gray-900 border-b border-gray-100 focus:border-[var(--color-brand-blue)] focus:outline-none transition-colors"
+                                                className="w-full text-right px-2 py-1 bg-white border border-gray-400 text-sm font-mono font-bold"
                                                 value={formatNumber(formData.rawMaterialCost)}
                                                 onChange={e => setFormData({ ...formData, rawMaterialCost: parseNumber(e.target.value) })}
                                             />
-                                            <span className="text-[10px] font-bold text-gray-400 w-12 text-right">$ {formData.depositDollar || '0'}</span>
                                         </div>
-                                    </div>
-
-                                    <div className="grid grid-cols-2 gap-x-8 gap-y-4">
                                         {[
                                             { label: 'Electricity', key: 'electricityCost' },
                                             { label: 'Packaging', key: 'packagingCost' },
@@ -730,50 +676,47 @@ export default function ProductionClient() {
                                             { label: 'Shipping', key: 'shippingCost' },
                                             { label: 'Customs Duty', key: 'customsDuty' },
                                             { label: 'Taxes (VAT)', key: 'vat' },
-                                            { label: 'Fees', key: 'customsFee' }
+                                            { label: 'Admin/Fees', key: 'customsFee' }
                                         ].map((field) => (
                                             <div key={field.key} className="flex flex-col gap-1">
-                                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">{field.label}</label>
+                                                <label className="text-[10px] font-bold text-gray-600">{field.label}</label>
                                                 <input
                                                     type="text"
-                                                    className="w-full font-mono text-xs font-bold text-gray-700 border-b border-gray-50 focus:border-[var(--color-brand-blue)] focus:outline-none transition-colors py-1"
+                                                    className="w-full px-2 py-1 bg-white border border-gray-400 text-xs text-right font-mono"
                                                     value={formatNumber(formData[field.key as keyof typeof formData])}
                                                     onChange={e => setFormData({ ...formData, [field.key]: parseNumber(e.target.value) })}
                                                 />
                                             </div>
                                         ))}
                                         <div className="flex flex-col gap-1">
-                                            <label className="text-[9px] font-black text-gray-400 uppercase tracking-wider">USD DEPOSIT</label>
+                                            <label className="text-[10px] font-bold text-gray-400">USD Deposit ($)</label>
                                             <input
                                                 type="text"
                                                 placeholder="0.00"
-                                                className="w-full font-mono text-xs font-bold text-gray-400 border-b border-gray-50 focus:border-[var(--color-brand-blue)] focus:outline-none transition-colors py-1"
+                                                className="w-full px-2 py-1 bg-white border border-gray-300 text-xs text-right font-mono text-gray-400"
                                                 value={formData.depositDollar}
                                                 onChange={e => setFormData({ ...formData, depositDollar: e.target.value })}
                                             />
                                         </div>
                                     </div>
-                                </div>
+                                </fieldset>
 
-                                {/* Divider */}
-                                <div className="border-b-2 border-dashed border-gray-100"></div>
-
-                                {/* Quantity & Calculation */}
-                                <div className="space-y-4">
-                                    <div className="flex justify-between items-center bg-gray-50/50 p-4 rounded-xl border border-gray-100">
-                                        <div>
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Total Quantity</label>
+                                <fieldset className="border border-gray-400 p-4 pt-2">
+                                    <legend className="px-2 text-xs font-bold text-gray-700">Production Results</legend>
+                                    <div className="grid grid-cols-2 gap-6">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-gray-600 block">Total Quantity (EA)</label>
                                             <input
                                                 type="text"
                                                 required
-                                                className="bg-transparent font-mono text-xl font-black text-gray-900 focus:outline-none w-24"
+                                                className="w-full px-2 py-1.5 bg-white border border-gray-400 text-lg font-mono font-bold text-right"
                                                 value={formatNumber(formData.quantity)}
                                                 onChange={e => setFormData({ ...formData, quantity: parseNumber(e.target.value) })}
                                             />
                                         </div>
-                                        <div className="text-right border-l border-gray-200 pl-4">
-                                            <label className="block text-[10px] font-black text-gray-400 uppercase mb-1">Unit Cost</label>
-                                            <div className="font-mono text-xl font-black text-[var(--color-brand-blue)]">
+                                        <div className="space-y-1">
+                                            <label className="text-[11px] font-bold text-blue-800 block">Calculated Unit Cost</label>
+                                            <div className="w-full px-2 py-1.5 bg-gray-100 border border-gray-400 text-lg font-mono font-bold text-right text-blue-900 shadow-inner">
                                                 {(
                                                     ((Number(parseNumber(formData.rawMaterialCost)) || 0) +
                                                         (Number(parseNumber(formData.electricityCost)) || 0) +
@@ -788,53 +731,39 @@ export default function ProductionClient() {
                                             </div>
                                         </div>
                                     </div>
+                                </fieldset>
 
-                                    {/* Pricing Comparison */}
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div className="p-3 bg-gray-50 rounded-xl flex flex-col gap-1">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase">Wholesale Avg</span>
-                                            <span className="font-mono text-xs font-black text-gray-700">{currentPriceInfo.salesPrice.toLocaleString()}원</span>
-                                        </div>
-                                        <div className="p-3 bg-gray-50 rounded-xl flex flex-col gap-1">
-                                            <span className="text-[9px] font-black text-gray-400 uppercase">Retail Avg</span>
-                                            <span className="font-mono text-xs font-black text-gray-700">{currentPriceInfo.wholesalePrice.toLocaleString()}원</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Memo */}
-                                <div className="flex flex-col gap-1">
-                                    <label className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Memo/Notes</label>
-                                    <input
-                                        type="text"
-                                        placeholder="..."
-                                        className="w-full font-mono text-xs font-bold text-gray-500 border-b border-gray-50 focus:border-gray-200 focus:outline-none transition-colors py-1"
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold text-gray-600">Notes / Remarks</label>
+                                    <textarea
+                                        rows={3}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 text-xs outline-none focus:border-blue-600"
                                         value={formData.memo}
                                         onChange={e => setFormData({ ...formData, memo: e.target.value })}
                                     />
                                 </div>
-                            </form>
 
-                            {/* Footer - Submit Button as Receipt Tear-off */}
-                            <div className="p-8 pt-4">
-                                <button
-                                    type="submit"
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        const form = (e.currentTarget as HTMLButtonElement).closest('form') as HTMLFormElement | null;
-                                        if (form) form.requestSubmit();
-                                        else handleSubmit(e as any); // Fallback
-                                    }}
-                                    className="w-full py-4 bg-gray-900 text-white font-black text-sm uppercase tracking-[0.3em] rounded-2xl hover:bg-black transition-all shadow-xl active:scale-[0.98]"
-                                >
-                                    Confirm Record
-                                </button>
-                            </div>
+                                <div className="flex gap-2 justify-end pt-4 border-t border-gray-300">
+                                    <button
+                                        type="button"
+                                        onClick={() => setIsCreating(false)}
+                                        className="px-6 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none uppercase"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="px-10 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold uppercase text-blue-900"
+                                    >
+                                        Execute Save
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>,
                     document.body
                 )
             }
-        </div >
+        </div>
     )
 }

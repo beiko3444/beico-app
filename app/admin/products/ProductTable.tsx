@@ -148,12 +148,21 @@ function SortableProductRow({ product, index, onSortOrderChange }: ProductRowPro
                 </div>
             </td>
             <td className="px-2 py-1.5 text-center whitespace-nowrap">
-                <ProductForm
-                    initialData={product}
-                    trigger={
-                        <button className="bg-gray-50 text-gray-500 hover:bg-[var(--color-brand-blue)] hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-gray-200 hover:border-transparent">수정</button>
-                    }
-                />
+                <div className="flex items-center justify-center gap-1">
+                    <ProductForm
+                        initialData={product}
+                        trigger={
+                            <button className="bg-gray-50 text-gray-500 hover:bg-[var(--color-brand-blue)] hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-gray-200 hover:border-transparent">수정</button>
+                        }
+                    />
+                    <ProductForm
+                        initialData={product}
+                        isCopy={true}
+                        trigger={
+                            <button className="bg-gray-50 text-blue-600 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-blue-100 hover:border-transparent">복사</button>
+                        }
+                    />
+                </div>
             </td>
         </tr>
     )

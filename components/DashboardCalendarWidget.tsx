@@ -138,8 +138,8 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
 
                 {/* Weekdays */}
                 <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
-                    {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day, idx) => (
-                        <div key={day} className={`py-3 text-center text-[10px] font-black tracking-widest ${idx === 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                    {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
+                        <div key={day} className={`py-3 text-center text-[10px] font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
                             {day}
                         </div>
                     ))}
@@ -152,6 +152,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                         const isSelected = isSameDay(date, selectedDate)
                         const isToday = isSameDay(date, new Date())
                         const dayTasks = parsedTasks.filter(t => isSameDay(t.date, date))
+                        const isWeekend = date.getDay() === 0 || date.getDay() === 6
 
                         return (
                             <div
@@ -163,8 +164,8 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                 }}
                                 onClick={() => setSelectedDate(date)}
                                 className={`min-h-[100px] p-1.5 border-r border-b border-gray-100 transition-all flex flex-col group relative
-                                    ${current ? 'bg-white' : 'bg-gray-50/20 text-gray-300'}
-                                    ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-gray-50/50'}
+                                    ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
+                                    ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-gray-800 hover:text-white'}
                                 `}
                             >
                                 <div className="flex justify-between items-start mb-1">
