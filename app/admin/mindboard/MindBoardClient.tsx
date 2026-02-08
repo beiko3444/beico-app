@@ -187,7 +187,7 @@ export default function MindBoardClient() {
 
     const handleCanvasClick = (e: React.MouseEvent | React.TouchEvent) => {
         const now = Date.now()
-        if (now - lastClickTime.current < 300) {
+        if (now - lastClickTime.current < 400) { // Increased to 400ms for better mobile feel
             const clientX = 'touches' in e ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX
             const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY
             const { x, y } = getWorldCoords(clientX, clientY)
@@ -232,12 +232,9 @@ export default function MindBoardClient() {
     const onTouchStart = (e: React.TouchEvent) => {
         if (e.touches.length === 1) {
             const touch = e.touches[0]
-            const target = touch.target as HTMLElement
-            if (target.id === 'mind-board-bg') {
-                if (e.cancelable) e.preventDefault()
-                startPan(touch.clientX, touch.clientY)
-                handleCanvasClick(e)
-            }
+            if (e.cancelable) e.preventDefault()
+            startPan(touch.clientX, touch.clientY)
+            handleCanvasClick(e)
         } else if (e.touches.length === 2) {
             if (e.cancelable) e.preventDefault()
             const dx = e.touches[0].clientX - e.touches[1].clientX
@@ -367,7 +364,7 @@ export default function MindBoardClient() {
                     {/* World Background */}
                     <div className="absolute inset-0 bg-gray-50 opacity-50" />
                     {/* Items on Minimap */}
-                    {items.map(item => (
+                    {items.map((item: BoardItem) => (
                         <div
                             key={`mini-${item.id}`}
                             className="absolute rounded-sm border border-black/10"
@@ -419,10 +416,8 @@ export default function MindBoardClient() {
                 id="mind-board-bg"
                 className="w-full h-full cursor-grab active:cursor-grabbing relative bg-white"
                 onMouseDown={(e: React.MouseEvent) => {
-                    if ((e.target as HTMLElement).id === 'mind-board-bg') {
-                        startPan(e.clientX, e.clientY)
-                        handleCanvasClick(e)
-                    }
+                    startPan(e.clientX, e.clientY)
+                    handleCanvasClick(e)
                 }}
                 onTouchStart={onTouchStart}
                 onWheel={handleWheel}
