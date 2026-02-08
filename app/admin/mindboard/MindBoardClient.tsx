@@ -81,7 +81,7 @@ export default function MindBoardClient() {
         )
     }
 
-    const resolveCollision = useCallback((movingId: string, newItems: BoardItem[]) => {
+    const resolveCollision = useCallback((movingId: string, newItems: BoardItem[]): BoardItem[] => {
         const movingItem = newItems.find(i => i.id === movingId)
         if (!movingItem) return newItems
 
