@@ -305,28 +305,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                 </div>
             </div>
 
-            {/* Task Hover Tooltip */}
-            {hoverTask && mounted && createPortal(
-                <div
-                    className="fixed z-[99999] pointer-events-none"
-                    style={{ left: hoverTask.x, top: hoverTask.y - 10, transform: 'translateY(-100%)' }}
-                >
-                    <div className="bg-gray-900 text-white p-4 rounded-2xl shadow-2xl border border-white/10 w-64 animate-in fade-in zoom-in-95 duration-200">
-                        <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Detailed View</div>
-                        <h4 className="text-sm font-black mb-2 tracking-tight">{hoverTask.task.title}</h4>
-                        {hoverTask.task.description && (
-                            <p className="text-[11px] text-gray-400 leading-relaxed font-medium mb-3">{hoverTask.task.description}</p>
-                        )}
-                        <div className="flex items-center justify-between border-t border-white/5 pt-2">
-                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${hoverTask.task.completed ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
-                                {hoverTask.task.completed ? '✓ COMPLETED' : '• PENDING'}
-                            </span>
-                            {hoverTask.task.fileUrl && <Paperclip className="w-3 h-3 text-gray-400" />}
-                        </div>
-                    </div>
-                </div>,
-                document.body
-            )}
+
 
             {/* Task Modal (Add/Edit) */}
             {isModalOpen && mounted && createPortal(
@@ -419,40 +398,36 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 setEditingTask(null)
                 setIsModalOpen(true)
             }}
-            onClick={() => setSelectedDate(date)}
-            className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-all flex flex-col group relative
+            onClick={() => {
+                if (isSelected) {
+                    // Optional: deselect logic if desired, but user wants it to shrink
+                    // Let's use a separate state or just toggle selectedDate to a null-like or something if we want it to shrink totally
+                    // For now, let's keep it as is but handle the "shrink" by clicking again
+                    setSelectedDate(isSelected ? new Date(0) : date)
+                } else {
+                    setSelectedDate(date)
+                }
+            }}
+            className={`transition-all duration-300 flex flex-col group relative p-2 border-r border-b border-gray-100
                 ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
-                ${isSelected ? 'bg-blue-50/30 ring-2 ring-red-500 ring-inset z-20' : 'hover:bg-gray-800 hover:text-white'}
+                ${isSelected ? 'min-h-[350px] z-20 shadow-2xl' : 'min-h-[140px] hover:bg-gray-800 hover:text-white'}
                 ${isOver ? 'bg-blue-100/50 ring-2 ring-blue-400 ring-inset z-10' : ''}
             `}
         >
-            {/* Hover Popover for all tasks */}
-            <div className="absolute hidden group-hover:block z-[100] top-0 left-full ml-1 w-64 bg-gray-900 text-white p-4 rounded-2xl shadow-2xl border border-white/10 pointer-events-none">
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 border-b border-white/5 pb-2">
-                    {date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 전체 일정 ({dayTasks.length})
-                </div>
-                <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
-                    {dayTasks.map((t: any) => (
-                        <div key={t.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-2 last:border-0">
-                            <div className="flex items-center gap-2">
-                                <span className={`w-1.5 h-1.5 rounded-full ${t.completed ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
-                                <span className={`text-[11px] font-black ${t.completed ? 'text-gray-400 line-through' : 'text-white'}`}>{t.title}</span>
-                            </div>
-                            {t.description && <p className="text-[10px] text-gray-500 font-medium truncate ml-3.5">{t.description}</p>}
-                        </div>
-                    ))}
-                    {dayTasks.length === 0 && <p className="text-[10px] text-gray-600 font-bold text-center py-4">등록된 일정이 없습니다</p>}
-                </div>
-            </div>
-            <div className="flex justify-between items-start mb-2">
-                <span className={`text-sm font-black ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-blue-600' : ''}`}>
+            {/* Rounded Red Border for Selection */}
+            {isSelected && (
+                <div className="absolute inset-1 border-4 border-red-500 rounded-[2rem] pointer-events-none z-30 animate-in fade-in zoom-in-95 duration-200"></div>
+            )}
+
+            <div className="flex justify-between items-start mb-2 relative z-10">
+                <span className={`text-sm font-black transition-all ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-red-500 scale-125' : ''}`}>
                     {date.getDate()}
                 </span>
-                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-300">{dayTasks.length} tasks</span>}
+                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-300 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
             </div>
 
-            <div className="flex flex-col gap-1 overflow-hidden h-full">
-                {dayTasks.slice(0, 5).map((t: any) => (
+            <div className={`flex flex-col gap-1.5 overflow-y-auto scrollbar-hide h-full relative z-10 ${isSelected ? 'pb-4' : ''}`}>
+                {(isSelected ? dayTasks : dayTasks.slice(0, 4)).map((t: any) => (
                     <DraggableTaskItem
                         key={t.id}
                         task={t}
@@ -460,17 +435,18 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                         setEditingTask={setEditingTask}
                         setIsModalOpen={setIsModalOpen}
                         isDraggingAnything={isDraggingAnything}
+                        isExpanded={isSelected}
                     />
                 ))}
-                {dayTasks.length > 5 && (
-                    <div className="text-[9px] font-bold text-gray-300 px-2">+ {dayTasks.length - 5} more</div>
+                {!isSelected && dayTasks.length > 4 && (
+                    <div className="text-[9px] font-black text-gray-400 px-2 uppercase tracking-widest mt-auto">+ {dayTasks.length - 4} more</div>
                 )}
             </div>
         </div>
     )
 }
 
-function DraggableTaskItem({ task, setHoverTask, setEditingTask, setIsModalOpen, isDraggingAnything }: any) {
+function DraggableTaskItem({ task, setHoverTask, setEditingTask, setIsModalOpen, isDraggingAnything, isExpanded }: any) {
     const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
         id: task.id,
     })
@@ -482,10 +458,10 @@ function DraggableTaskItem({ task, setHoverTask, setEditingTask, setIsModalOpen,
             isDragging={isDragging}
             attributes={attributes}
             listeners={listeners}
+            isExpanded={isExpanded}
             onMouseEnter={(e: any) => {
                 if (isDraggingAnything) return
-                const rect = e.currentTarget.getBoundingClientRect()
-                setHoverTask({ task, x: rect.left, y: rect.top })
+                // Hover tooltip functionality removed as per user request
             }}
             onMouseLeave={() => setHoverTask(null)}
             onClick={(e: any) => {
@@ -497,7 +473,7 @@ function DraggableTaskItem({ task, setHoverTask, setEditingTask, setIsModalOpen,
     )
 }
 
-const TaskItem = React.forwardRef(({ task, isDragging, isOverlay, attributes, listeners, onMouseEnter, onMouseLeave, onClick }: any, ref: any) => {
+const TaskItem = React.forwardRef(({ task, isDragging, isOverlay, attributes, listeners, onMouseEnter, onMouseLeave, onClick, isExpanded }: any, ref: any) => {
     return (
         <div
             ref={ref}
@@ -506,13 +482,20 @@ const TaskItem = React.forwardRef(({ task, isDragging, isOverlay, attributes, li
             onMouseEnter={onMouseEnter}
             onMouseLeave={onMouseLeave}
             onClick={onClick}
-            className={`text-[10px] px-2 py-1.5 rounded-lg truncate font-black tracking-tight cursor-grab active:cursor-grabbing transition-all
-                ${task.completed ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-red-50 text-red-600 border border-red-100'}
+            className={`text-[10px] px-2 py-1.5 rounded-xl font-black tracking-tight cursor-grab active:cursor-grabbing transition-all border
+                ${task.completed ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-red-50 text-red-600 border-red-100'}
                 ${isDragging ? 'opacity-0' : 'hover:scale-[1.02]'}
                 ${isOverlay ? 'shadow-2xl scale-105 opacity-100 w-[140px]' : ''}
+                ${isExpanded ? 'whitespace-normal break-all' : 'truncate'}
             `}
         >
-            {task.title}
+            <div className="flex items-center gap-1.5">
+                <span className={`w-1 h-1 rounded-full shrink-0 ${task.completed ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                <span>{task.title}</span>
+            </div>
+            {isExpanded && task.description && (
+                <p className="mt-1 text-[9px] text-gray-400 font-medium leading-tight opacity-70 px-2.5">{task.description}</p>
+            )}
         </div>
     )
 })
