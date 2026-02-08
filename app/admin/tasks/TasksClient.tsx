@@ -280,13 +280,19 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                     <h4 className={`text-sm font-black truncate max-w-[200px] ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900'}`}>{task.title}</h4>
                                     {task.description && <p className="text-xs text-gray-400 truncate font-medium flex-1 pt-0.5">{task.description}</p>}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                    {task.fileUrl && <Paperclip className="w-3 h-3 text-blue-400" />}
+                                <div className="flex items-center gap-3">
+                                    {task.fileUrl && <Paperclip className="w-4 h-4 text-blue-500" />}
+                                    <button
+                                        onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}
+                                        className="bg-gray-100 hover:bg-black hover:text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-sm"
+                                    >
+                                        수정
+                                    </button>
                                     <button
                                         onClick={() => handleDeleteTask(task.id)}
-                                        className="opacity-0 group-hover:opacity-100 p-2 text-gray-300 hover:text-red-500 transition-all"
+                                        className="bg-red-50 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black text-red-500 transition-all shadow-sm"
                                     >
-                                        <Trash2 className="w-4 h-4" />
+                                        삭제
                                     </button>
                                 </div>
                             </div>
@@ -360,13 +366,24 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                 />
                             </div>
 
-                            <button
-                                type="submit"
-                                disabled={isPending}
-                                className="w-full py-5 bg-black text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all shadow-xl active:scale-95 disabled:opacity-50"
-                            >
-                                {isPending ? '저장 중...' : editingTask ? '일정 수정하기' : '일정 등록하기'}
-                            </button>
+                            <div className="flex gap-4">
+                                {editingTask && (
+                                    <button
+                                        type="button"
+                                        onClick={() => handleDeleteTask(editingTask.id)}
+                                        className="flex-1 py-5 bg-red-50 text-red-600 rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-red-500 hover:text-white transition-all shadow-lg active:scale-95"
+                                    >
+                                        일정 삭제하기
+                                    </button>
+                                )}
+                                <button
+                                    type="submit"
+                                    disabled={isPending}
+                                    className={`${editingTask ? 'flex-[2]' : 'w-full'} py-5 bg-black text-white rounded-2xl font-black text-sm uppercase tracking-widest hover:bg-gray-800 transition-all shadow-xl active:scale-95 disabled:opacity-50`}
+                                >
+                                    {isPending ? '저장 중...' : editingTask ? '일정 수정하기' : '일정 등록하기'}
+                                </button>
+                            </div>
                         </form>
                     </div>
                 </div>,
@@ -405,10 +422,28 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
             onClick={() => setSelectedDate(date)}
             className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-all flex flex-col group relative
                 ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
-                ${isSelected ? 'bg-blue-50/30' : 'hover:bg-gray-800 hover:text-white'}
+                ${isSelected ? 'bg-blue-50/30 ring-2 ring-red-500 ring-inset z-20' : 'hover:bg-gray-800 hover:text-white'}
                 ${isOver ? 'bg-blue-100/50 ring-2 ring-blue-400 ring-inset z-10' : ''}
             `}
         >
+            {/* Hover Popover for all tasks */}
+            <div className="absolute hidden group-hover:block z-[100] top-0 left-full ml-1 w-64 bg-gray-900 text-white p-4 rounded-2xl shadow-2xl border border-white/10 pointer-events-none">
+                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 border-b border-white/5 pb-2">
+                    {date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' })} 전체 일정 ({dayTasks.length})
+                </div>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto scrollbar-hide">
+                    {dayTasks.map((t: any) => (
+                        <div key={t.id} className="flex flex-col gap-0.5 border-b border-white/5 pb-2 last:border-0">
+                            <div className="flex items-center gap-2">
+                                <span className={`w-1.5 h-1.5 rounded-full ${t.completed ? 'bg-emerald-500' : 'bg-red-500'}`}></span>
+                                <span className={`text-[11px] font-black ${t.completed ? 'text-gray-400 line-through' : 'text-white'}`}>{t.title}</span>
+                            </div>
+                            {t.description && <p className="text-[10px] text-gray-500 font-medium truncate ml-3.5">{t.description}</p>}
+                        </div>
+                    ))}
+                    {dayTasks.length === 0 && <p className="text-[10px] text-gray-600 font-bold text-center py-4">등록된 일정이 없습니다</p>}
+                </div>
+            </div>
             <div className="flex justify-between items-start mb-2">
                 <span className={`text-sm font-black ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-blue-600' : ''}`}>
                     {date.getDate()}
