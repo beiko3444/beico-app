@@ -153,6 +153,9 @@ export default function MindBoardClient() {
 
     // --- Touch Handlers ---
     const onTouchStart = (e: React.TouchEvent) => {
+        // Prevent default browser behavior (e.g. scroll/zoom)
+        if (e.cancelable) e.preventDefault()
+
         if (e.touches.length === 1) {
             const touch = e.touches[0]
             const target = touch.target as HTMLElement
@@ -168,6 +171,9 @@ export default function MindBoardClient() {
     }
 
     const onTouchMove = (e: TouchEvent) => {
+        // Prevent default browser behavior (native zoom/scroll)
+        if (e.cancelable) e.preventDefault()
+
         if (e.touches.length === 1) {
             const touch = e.touches[0]
             if (isPanning) {
@@ -256,7 +262,7 @@ export default function MindBoardClient() {
     }, [isPanning, dragItem, resizeItem, scale, onTouchMove, onTouchEnd])
 
     return (
-        <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-50 select-none">
+        <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-50 select-none touch-none">
             {/* Toolbar / Controls */}
             <div className="absolute top-4 left-4 z-50 flex gap-4 items-start">
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex items-center gap-1">
