@@ -230,6 +230,22 @@ export default function MindBoardClient() {
         setPan({ x: newPanX, y: newPanY })
     }, [pan, scale])
 
+    const handleWheel = (e: React.WheelEvent) => {
+        // e.preventDefault() // React SyntheticEvent doesn't support passive preventDefault well in some versions, but let's try
+        // Actually, for wheel zoom, we might not need preventDefault if we just handle zoom.
+        // But to stop page scroll, we need it. 
+        // Note: Passive event listeners are default in some browsers for wheel.
+        const zoomSensitivity = -0.001
+        handleZoom(e.deltaY * zoomSensitivity, e.clientX, e.clientY)
+    }
+
+    const handleCanvasClick = (e: React.MouseEvent | React.TouchEvent) => {
+        const clientX = 'touches' in e ? (e as any).touches[0].clientX : (e as any).clientX
+        const clientY = 'touches' in e ? (e as any).touches[0].clientY : (e as any).clientY
+        const { x, y } = getWorldCoords(clientX, clientY)
+        createMemo(x, y)
+    }
+
     const startPan = (clientX: number, clientY: number) => {
         setIsPanning(true)
         lastPos.current = { x: clientX, y: clientY }
@@ -315,6 +331,12 @@ export default function MindBoardClient() {
         if (confirm('정말 삭제하시겠습니까?')) {
             setItems((prev: BoardItem[]) => prev.filter((i: BoardItem) => i.id !== id))
         }
+    }
+
+    const toggleComplete = (id: string) => {
+        setItems((prev: BoardItem[]) => prev.map((item: BoardItem) =>
+            item.id === id ? { ...item, completed: !item.completed } : item
+        ))
     }
 
     const autoArrange = () => {
