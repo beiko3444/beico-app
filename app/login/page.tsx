@@ -25,7 +25,7 @@ export default function LoginPage() {
 
             if (result?.error) {
                 if (result.error === 'PENDING_APPROVAL') {
-                    setError('관리자 승인 대기 중입니다. (Approval Pending)')
+                    setError('관리자 승인 대기 중입니다.')
                     alert('관리자 승인 대기 중입니다. 승인 후 로그인이 가능합니다.')
                 } else {
                     setError('아이디 또는 비밀번호가 올바르지 않습니다.')
@@ -41,138 +41,75 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center relative overflow-hidden font-sans bg-black">
-            {/* 3D Dashboard Background (Spline) */}
+        <div className="min-h-screen flex items-center justify-end relative overflow-hidden font-sans bg-[#edeaf3]">
+            {/* 3D Dashboard Background (Spline) - Full Coverage */}
             <div className="absolute inset-0 z-0">
                 <iframe
                     src='https://my.spline.design/movin-EfB50Sgge6cvgQr4xwAKK2Ys/'
                     frameBorder='0'
                     width='100%'
                     height='100%'
-                    className="w-full h-full scale-[1.02]"
+                    className="w-full h-full scale-[1.1] pointer-events-none"
+                    style={{ background: 'transparent' }}
                 ></iframe>
-                {/* Overlay to ensure readability and interactivity if needed */}
-                <div className="absolute inset-0 bg-black/10 pointer-events-none"></div>
             </div>
 
-            <div className="w-full max-w-[440px] px-6 z-10 animate-in fade-in zoom-in duration-700">
-                <div className="bg-white/80 backdrop-blur-3xl rounded-[2.5rem] shadow-[0_30px_60px_rgba(0,0,0,0.3)] overflow-hidden border border-white/40">
-                    {/* Brand Header Section with White Logo */}
-                    <div className="bg-[#d9361b] pt-14 pb-12 px-8 flex flex-col items-center relative overflow-hidden">
-                        {/* Decorative subtle highlights */}
-                        <div className="absolute top-[-20%] right-[-10%] w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
-                        <div className="absolute bottom-[-20%] left-[-10%] w-32 h-32 bg-black/10 rounded-full blur-2xl"></div>
+            {/* Login Card - Positioned Right & Small */}
+            <div className="w-full max-w-[360px] mr-10 md:mr-32 lg:mr-48 z-10 animate-in fade-in slide-in-from-right-10 duration-1000">
+                <div className="bg-white/60 backdrop-blur-2xl rounded-3xl shadow-[0_25px_50px_-12px_rgba(0,0,0,0.1)] border border-white/40 p-10">
+                    <div className="mb-10 text-center">
+                        <h2 className="text-xl font-black text-gray-900 tracking-tight">Partner Login</h2>
+                    </div>
 
-                        <div className="w-48 mb-6 relative z-10 transition-transform hover:scale-105 duration-300">
-                            <img
-                                src="/bko_white.png"
-                                alt="Beiko Brand"
-                                className="w-full h-auto object-contain drop-shadow-2xl"
+                    {error && (
+                        <div className="bg-red-50/80 backdrop-blur-sm border-l-4 border-red-500 text-red-600 text-[11px] px-4 py-3 rounded-r-lg mb-6">
+                            <p className="font-bold">{error}</p>
+                        </div>
+                    )}
+
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Account ID</label>
+                            <input
+                                type="text"
+                                value={username}
+                                onChange={(e) => setUsername(e.target.value)}
+                                className="w-full px-5 py-3.5 rounded-xl bg-gray-50/50 border border-gray-100 focus:bg-white focus:border-red-500 outline-none transition-all duration-300 text-sm"
+                                placeholder="아이디"
+                                required
                             />
                         </div>
-                        <div className="relative z-10 text-center">
-                            <h2 className="text-white text-lg font-bold tracking-tight">Partner Access Portal</h2>
-                            <p className="text-white/60 text-xs mt-1 font-medium tracking-widest uppercase">Secure Authentication</p>
+
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Access Token</label>
+                            <input
+                                type="password"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                className="w-full px-5 py-3.5 rounded-xl bg-gray-50/50 border border-gray-100 focus:bg-white focus:border-red-500 outline-none transition-all duration-300 text-sm"
+                                placeholder="비밀번호"
+                                required
+                            />
                         </div>
-                    </div>
 
-                    <div className="px-10 py-12">
-                        {error && (
-                            <div className="bg-red-50 border-l-4 border-[#d9361b] text-[#d9361b] text-sm px-4 py-3 rounded-r-xl mb-8 animate-in slide-in-from-left-2 duration-300">
-                                <p className="font-bold flex items-center gap-2 text-xs">
-                                    <span>⚠️</span> {error}
-                                </p>
-                            </div>
-                        )}
-
-                        <form
-                            onSubmit={handleSubmit}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' && !e.shiftKey) {
-                                    const target = e.target as HTMLElement;
-                                    if (target.tagName === 'INPUT') {
-                                        e.preventDefault();
-                                        handleSubmit(e as any);
-                                    }
-                                }
-                            }}
-                            className="space-y-6"
+                        <button
+                            type="submit"
+                            disabled={loading}
+                            className="w-full mt-4 py-4 px-6 rounded-xl bg-red-600 text-white font-black text-sm shadow-xl shadow-red-600/20 hover:bg-red-700 hover:-translate-y-0.5 transition-all duration-300 disabled:opacity-50"
                         >
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Account ID</label>
-                                <div className="relative group">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#d9361b] transition-colors text-lg">
-                                        👤
-                                    </span>
-                                    <input
-                                        type="text"
-                                        value={username}
-                                        onChange={(e) => setUsername(e.target.value)}
-                                        className="w-full pl-11 pr-5 py-4.5 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-[#d9361b] outline-none transition-all duration-300 text-gray-800 placeholder-gray-300 shadow-sm"
-                                        placeholder="아이디를 입력하세요"
-                                        required
-                                    />
-                                </div>
-                            </div>
+                            {loading ? '인증 중...' : '시스템 접속하기'}
+                        </button>
 
-                            <div className="space-y-2">
-                                <label className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] ml-1">Access Token</label>
-                                <div className="relative group">
-                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-[#d9361b] transition-colors text-lg">
-                                        🔒
-                                    </span>
-                                    <input
-                                        type="password"
-                                        value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
-                                        className="w-full pl-11 pr-5 py-4.5 rounded-2xl bg-gray-50 border-2 border-transparent focus:bg-white focus:border-[#d9361b] outline-none transition-all duration-300 text-gray-800 placeholder-gray-300 shadow-sm"
-                                        placeholder="비밀번호를 입력하세요"
-                                        required
-                                    />
-                                </div>
-                            </div>
-
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="w-full mt-4 py-5 px-6 rounded-2xl bg-[#d9361b] text-white font-extrabold text-lg shadow-[0_12px_24px_rgba(217,54,27,0.25)] hover:shadow-[0_18px_32px_rgba(217,54,27,0.35)] hover:-translate-y-1 active:translate-y-0 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group overflow-hidden relative"
+                        <div className="pt-8 mt-4 border-t border-gray-100 text-center space-y-3">
+                            <p className="text-[10px] text-gray-400 font-bold">아직 계정이 없으신가요?</p>
+                            <a
+                                href="/signup"
+                                className="inline-block text-red-600 font-black text-xs hover:underline underline-offset-4"
                             >
-                                <div className="absolute inset-0 bg-white/20 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700 skew-x-[-20deg]"></div>
-                                {loading ? (
-                                    <span className="flex items-center justify-center gap-3">
-                                        <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                        인증 확인 중...
-                                    </span>
-                                ) : '시스템 접속하기'}
-                            </button>
-
-                            <div className="mt-6 text-center">
-                                <p className="text-xs text-gray-400 mb-3">아직 계정이 없으신가요?</p>
-                                <a
-                                    href="/signup"
-                                    className="block w-full py-4 rounded-2xl border-2 border-gray-200 text-gray-600 font-bold hover:border-[#d9361b] hover:text-[#d9361b] transition-all duration-300 text-sm"
-                                >
-                                    파트너 회원가입 (Register as Partner)
-                                </a>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <div className="flex flex-col items-center mt-12 space-y-4 relative">
-                    <div className="px-4 py-1.5 rounded-full bg-black/20 backdrop-blur-md border border-white/10">
-                        <p className="text-white/60 text-[10px] font-black tracking-[0.3em] uppercase">
-                            &copy; {new Date().getFullYear()} Beico Ecosystem &bull; All Rights Reserved
-                        </p>
-                    </div>
-                    <div className="flex gap-4">
-                        <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#d9361b] animate-pulse"></div>
-                        <div className="w-1.5 h-1.5 rounded-full bg-white/20"></div>
-                    </div>
+                                파트너 회원가입 (Register)
+                            </a>
+                        </div>
+                    </form>
                 </div>
             </div>
         </div>

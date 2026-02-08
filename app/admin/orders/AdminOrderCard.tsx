@@ -141,21 +141,22 @@ export default function AdminOrderCard({ order }: { order: any }) {
                             <div className="bg-gray-50 px-3 py-1.5 border-b border-gray-100 flex justify-between items-center">
                                 <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest">주문상세내역</h4>
                             </div>
-                            <div className="grid grid-cols-[30px_1fr_40px_70px_70px_80px_100px] gap-y-0 border-b border-gray-100 text-[9px] uppercase tracking-wider text-gray-400 font-bold px-0 bg-gray-50/30">
+                            <div className="grid grid-cols-[30px_1fr_60px_40px_70px_70px_80px_110px] gap-y-0 border-b border-gray-100 text-[9px] uppercase tracking-wider text-gray-400 font-bold px-0 bg-gray-50/30">
                                 <div className="text-center py-1">No</div>
                                 <div className="px-2 py-1">상품명</div>
+                                <div className="text-right pr-2 py-1">단가</div>
                                 <div className="text-center py-1">수량</div>
                                 <div className="text-right pr-2 py-1">공급가</div>
                                 <div className="text-right pr-2 py-1">부가세</div>
                                 <div className="px-2 py-1">코드</div>
-                                <div className="px-2 py-1">바코드</div>
+                                <div className="px-2 py-1 text-center">바코드</div>
                             </div>
                             <ul className="divide-y divide-gray-100">
                                 {order.items.map((item: any, i: number) => {
                                     const supplyPrice = item.price * item.quantity;
                                     const vat = Math.round(supplyPrice * 0.1);
                                     return (
-                                        <li key={item.id} className="grid grid-cols-[30px_1fr_40px_70px_70px_80px_100px] items-center text-[10px] py-1 hover:bg-gray-50/50 transition-colors">
+                                        <li key={item.id} className="grid grid-cols-[30px_1fr_60px_40px_70px_70px_80px_110px] items-center text-[10px] py-2 hover:bg-gray-50/50 transition-colors">
                                             <span className="text-gray-400 text-center">{i + 1}</span>
                                             <div className="px-2 min-w-0 flex items-center gap-2">
                                                 <div className="w-5 h-5 rounded border border-gray-100 overflow-hidden shrink-0 bg-gray-50 flex items-center justify-center">
@@ -166,25 +167,32 @@ export default function AdminOrderCard({ order }: { order: any }) {
                                                     )}
                                                 </div>
                                                 <div className="truncate">
-                                                    <span className="text-gray-900 font-bold truncate block">{item.product.name}</span>
+                                                    <span className="text-gray-900 font-bold truncate block tracking-tighter">{item.product.name}</span>
                                                     {item.product.nameJP && <span className="text-[9px] text-gray-400 truncate block">{item.product.nameJP}</span>}
                                                 </div>
                                             </div>
+                                            <div className="text-right pr-2 font-medium text-gray-600">{item.price.toLocaleString()}</div>
                                             <div className="text-center font-bold text-gray-900">{item.quantity}</div>
                                             <div className="text-right pr-2 font-medium text-gray-600">{supplyPrice.toLocaleString()}</div>
                                             <div className="text-right pr-2 text-gray-400">{vat.toLocaleString()}</div>
                                             <div className="px-2 text-[9px] text-gray-400 truncate font-mono">{item.product.productCode || '-'}</div>
-                                            <div className="px-2 truncate">
-                                                {item.product.barcode ? <BarcodeDisplay value={item.product.barcode} width={0.5} height={10} fontSize={0} displayValue={false} showDownload={false} /> : '-'}
+                                            <div className="px-2 flex flex-col items-center gap-1">
+                                                {item.product.barcode ? (
+                                                    <>
+                                                        <BarcodeDisplay value={item.product.barcode} width={0.5} height={10} fontSize={0} displayValue={false} showDownload={false} />
+                                                        <span className="text-[8px] font-bold text-gray-400 font-mono tracking-tighter">{item.product.barcode}</span>
+                                                    </>
+                                                ) : '-'}
                                             </div>
                                         </li>
                                     )
                                 })}
                                 {/* Shipping & Totals */}
                                 {shippingFee > 0 && (
-                                    <li className="grid grid-cols-[30px_1fr_40px_70px_70px_auto] items-center text-[10px] py-1 bg-blue-50/20">
+                                    <li className="grid grid-cols-[30px_1fr_60px_40px_70px_70px_auto] items-center text-[10px] py-1.5 bg-blue-50/20">
                                         <span className="text-center">-</span>
                                         <span className="px-2 font-bold text-gray-500">배송비 (Shipping)</span>
+                                        <span className="text-right pr-2">-</span>
                                         <span className="text-center">1</span>
                                         <span className="text-right pr-2 font-medium text-gray-600">{shippingFee.toLocaleString()}</span>
                                         <span className="text-right pr-2 text-gray-400">{shippingVat.toLocaleString()}</span>
