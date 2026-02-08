@@ -15,16 +15,18 @@ interface BoardItem {
     zIndex: number
 }
 
-const GRID_SIZE = 80 // Finer grid was requested to be reduced, so we make it sparser.
+const GRID_SIZE = 80
+const WORLD_SIZE = 4000 // Total canvas size
 const COLORS = [
+    '#FFFFFF', // White as default first
     '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF',
-    '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFFFFC', '#E5E5E5'
-] // 10 Pastel Colors
+    '#A0C4FF', '#BDB2FF', '#FFC6FF', '#E5E5E5'
+]
 
 export default function MindBoardClient() {
     // State
     const [items, setItems] = useState<BoardItem[]>([])
-    const [scale, setScale] = useState(1)
+    const [scale, setScale] = useState(0.5) // Start zoomed out a bit
     const [pan, setPan] = useState({ x: 0, y: 0 })
     const [isPanning, setIsPanning] = useState(false)
     const [dragItem, setDragItem] = useState<{ id: string, startX: number, startY: number, initialX: number, initialY: number } | null>(null)
@@ -32,7 +34,6 @@ export default function MindBoardClient() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [maxZIndex, setMaxZIndex] = useState(1)
     const [colorPaletteId, setColorPaletteId] = useState<string | null>(null)
-    const [memoResizeItem, setMemoResizeItem] = useState<{ id: string, startDist: number, initialW: number, initialH: number } | null>(null)
 
     // Refs
     const containerRef = useRef<HTMLDivElement>(null)
@@ -63,10 +64,32 @@ export default function MindBoardClient() {
     }, [items])
 
     // --- Helpers ---
+    const getBoundaries = useCallback((currentScale: number) => {
+        const container = containerRef.current
+        if (!container) return { minX: 0, maxX: 0, minY: 0, maxY: 0 }
+
+        const minX = container.clientWidth - WORLD_SIZE * currentScale
+        const minY = container.clientHeight - WORLD_SIZE * currentScale
+
+        return {
+            minX: Math.min(0, minX),
+            maxX: 0,
+            minY: Math.min(0, minY),
+            maxY: 0
+        }
+    }, [])
+
+    const clampPan = useCallback((x: number, y: number, currentScale: number) => {
+        const { minX, maxX, minY, maxY } = getBoundaries(currentScale)
+        return {
+            x: Math.max(minX, Math.min(maxX, x)),
+            y: Math.max(minY, Math.min(maxY, y))
+        }
+    }, [getBoundaries])
+
     const getWorldCoords = useCallback((clientX: number, clientY: number) => {
         const rect = containerRef.current?.getBoundingClientRect()
         if (!rect) return { x: 0, y: 0 }
-
         const xWorld = (clientX - rect.left - pan.x) / scale
         const yWorld = (clientY - rect.top - pan.y) / scale
         return { x: xWorld, y: yWorld }
@@ -123,7 +146,7 @@ export default function MindBoardClient() {
             w: 320,
             h: 120,
             content: '',
-            color: COLORS[0],
+            color: '#FFFFFF',
             zIndex: maxZIndex + 1
         }
 
@@ -132,12 +155,34 @@ export default function MindBoardClient() {
     }, [maxZIndex, resolveCollision])
 
     // --- Actions ---
+    const handleZoom = useCallback((delta: number, pivotX: number, pivotY: number) => {
+        const container = containerRef.current
+        if (!container) return
+
+        const rect = container.getBoundingClientRect()
+        const mouseX = pivotX - rect.left
+        const mouseY = pivotY - rect.top
+
+        const minScale = container.clientWidth / WORLD_SIZE
+        const newScale = Math.min(Math.max(minScale, scale * (1 + delta)), 3)
+
+        if (newScale === scale) return
+
+        const xWorld = (mouseX - pan.x) / scale
+        const yWorld = (mouseY - pan.y) / scale
+
+        const newPanX = mouseX - xWorld * newScale
+        const newPanY = mouseY - yWorld * newScale
+
+        const clamped = clampPan(newPanX, newPanY, newScale)
+        setScale(newScale)
+        setPan(clamped)
+    }, [pan, scale, clampPan])
+
     const handleWheel = (e: React.WheelEvent) => {
-        if (e.ctrlKey) {
-            e.preventDefault()
-            const zoomSensitivity = 0.01
-            setScale((s: number) => Math.min(Math.max(0.1, s - e.deltaY * zoomSensitivity), 3))
-        }
+        e.preventDefault()
+        const zoomSensitivity = -0.001
+        handleZoom(e.deltaY * zoomSensitivity, e.clientX, e.clientY)
     }
 
     const handleCanvasClick = (e: React.MouseEvent | React.TouchEvent) => {
@@ -208,7 +253,7 @@ export default function MindBoardClient() {
                 if (e.cancelable) e.preventDefault()
                 const dx = touch.clientX - lastPos.current.x
                 const dy = touch.clientY - lastPos.current.y
-                setPan((p: { x: number, y: number }) => ({ x: p.x + dx, y: p.y + dy }))
+                setPan((p: { x: number, y: number }) => clampPan(p.x + dx, p.y + dy, scale))
                 lastPos.current = { x: touch.clientX, y: touch.clientY }
             } else if (dragItem) {
                 if (e.cancelable) e.preventDefault()
@@ -238,26 +283,20 @@ export default function MindBoardClient() {
             const dy = e.touches[0].clientY - e.touches[1].clientY
             const distance = Math.sqrt(dx * dx + dy * dy)
 
-            if (memoResizeItem) {
-                const delta = (distance - memoResizeItem.startDist) / scale
-                setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === memoResizeItem.id ? {
-                    ...item,
-                    w: Math.max(GRID_SIZE * 4, Math.round((memoResizeItem.initialW + delta) / GRID_SIZE) * GRID_SIZE),
-                    h: Math.max(GRID_SIZE * 2, Math.round((memoResizeItem.initialH + delta * (memoResizeItem.initialH / memoResizeItem.initialW)) / GRID_SIZE) * GRID_SIZE)
-                } : item))
-            } else if (lastTouchDistance.current !== null) {
-                const delta = (distance - lastTouchDistance.current) * 0.01
-                setScale((s: number) => Math.min(Math.max(0.1, s + delta), 3))
+            if (lastTouchDistance.current !== null) {
+                const delta = (distance - lastTouchDistance.current) * 0.005
+                const midpointX = (e.touches[0].clientX + e.touches[1].clientX) / 2
+                const midpointY = (e.touches[0].clientY + e.touches[1].clientY) / 2
+                handleZoom(delta, midpointX, midpointY)
                 lastTouchDistance.current = distance
             }
         }
-    }, [isPanning, dragItem, resizeItem, scale, memoResizeItem, resolveCollision])
+    }, [isPanning, dragItem, resizeItem, scale, resolveCollision, clampPan, handleZoom])
 
     const onTouchEnd = useCallback(() => {
         setIsPanning(false)
         setDragItem(null)
         setResizeItem(null)
-        setMemoResizeItem(null)
         lastTouchDistance.current = null
         if (longPressTimer.current) {
             clearTimeout(longPressTimer.current)
@@ -271,7 +310,7 @@ export default function MindBoardClient() {
             if (isPanning) {
                 const dx = e.clientX - lastPos.current.x
                 const dy = e.clientY - lastPos.current.y
-                setPan((p: { x: number, y: number }) => ({ x: p.x + dx, y: p.y + dy }))
+                setPan((p: { x: number, y: number }) => clampPan(p.x + dx, p.y + dy, scale))
                 lastPos.current = { x: e.clientX, y: e.clientY }
             } else if (dragItem) {
                 const dx = (e.clientX - dragItem.startX) / scale
@@ -312,7 +351,7 @@ export default function MindBoardClient() {
             window.removeEventListener('touchmove', onTouchMove)
             window.removeEventListener('touchend', onTouchEnd)
         }
-    }, [isPanning, dragItem, resizeItem, scale, onTouchMove, onTouchEnd, resolveCollision])
+    }, [isPanning, dragItem, resizeItem, scale, onTouchMove, onTouchEnd, resolveCollision, clampPan])
 
     const startLongPress = (id: string) => {
         longPressTimer.current = setTimeout(() => {
@@ -321,25 +360,64 @@ export default function MindBoardClient() {
     }
 
     return (
-        <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-50 select-none touch-none">
-            {/* Toolbar / Controls */}
+        <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-100 select-none touch-none">
+            {/* minimap */}
+            <div className="absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden">
+                <div className="relative w-full h-full">
+                    {/* World Background */}
+                    <div className="absolute inset-0 bg-gray-50 opacity-50" />
+                    {/* Items on Minimap */}
+                    {items.map(item => (
+                        <div
+                            key={`mini-${item.id}`}
+                            className="absolute rounded-sm border border-black/10"
+                            style={{
+                                left: `${(item.x / WORLD_SIZE) * 100}%`,
+                                top: `${(item.y / WORLD_SIZE) * 100}%`,
+                                width: `${(item.w / WORLD_SIZE) * 100}%`,
+                                height: `${(item.h / WORLD_SIZE) * 100}%`,
+                                backgroundColor: item.color
+                            }}
+                        />
+                    ))}
+                    {/* Viewport Indicator */}
+                    {containerRef.current && (
+                        <div
+                            className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
+                            style={{
+                                left: `${(-pan.x / scale / WORLD_SIZE) * 100}%`,
+                                top: `${(-pan.y / scale / WORLD_SIZE) * 100}%`,
+                                width: `${(containerRef.current.clientWidth / scale / WORLD_SIZE) * 100}%`,
+                                height: `${(containerRef.current.clientHeight / scale / WORLD_SIZE) * 100}%`
+                            }}
+                        />
+                    )}
+                </div>
+            </div>
+
+            {/* Toolbar */}
             <div className="absolute top-4 left-4 z-50 flex gap-4 items-start">
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex items-center gap-1">
-                    <button onClick={() => setScale((s: number) => Math.min(s + 0.1, 3))} className="p-2 hover:bg-gray-100 rounded-md">
+                    <button onClick={() => {
+                        const container = containerRef.current
+                        if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
+                    }} className="p-2 hover:bg-gray-100 rounded-md">
                         <Plus size={18} />
                     </button>
                     <span className="w-12 text-center text-xs font-bold font-mono">{Math.round(scale * 100)}%</span>
-                    <button onClick={() => setScale((s: number) => Math.max(s - 0.1, 0.1))} className="p-2 hover:bg-gray-100 rounded-md">
+                    <button onClick={() => {
+                        const container = containerRef.current
+                        if (container) handleZoom(-0.1, container.clientWidth / 2, container.clientHeight / 2)
+                    }} className="p-2 hover:bg-gray-100 rounded-md">
                         <Minus size={18} />
                     </button>
                 </div>
             </div>
 
-            {/* Canvas Container */}
             <div
                 ref={containerRef}
                 id="mind-board-bg"
-                className="w-full h-full cursor-grab active:cursor-grabbing relative"
+                className="w-full h-full cursor-grab active:cursor-grabbing relative bg-white"
                 onMouseDown={(e: React.MouseEvent) => {
                     if ((e.target as HTMLElement).id === 'mind-board-bg') {
                         startPan(e.clientX, e.clientY)
@@ -348,21 +426,20 @@ export default function MindBoardClient() {
                 }}
                 onTouchStart={onTouchStart}
                 onWheel={handleWheel}
-                style={{
-                    backgroundImage: `
-                        linear-gradient(to right, #e5e7eb 1px, transparent 1px),
-                        linear-gradient(to bottom, #e5e7eb 1px, transparent 1px)
-                    `,
-                    backgroundSize: `${GRID_SIZE * scale}px ${GRID_SIZE * scale}px`,
-                    backgroundPosition: `${pan.x}px ${pan.y}px`
-                }}
             >
-                {/* World Transform Layer */}
                 <div
-                    className="absolute top-0 left-0 w-0 h-0"
+                    className="absolute shadow-inner"
                     style={{
+                        width: WORLD_SIZE,
+                        height: WORLD_SIZE,
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
-                        transformOrigin: '0 0'
+                        transformOrigin: '0 0',
+                        backgroundImage: `
+                            linear-gradient(to right, #f0f0f0 1px, transparent 1px),
+                            linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)
+                        `,
+                        backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
+                        backgroundColor: '#fdfdfd'
                     }}
                 >
                     {items.map((item: BoardItem) => (
@@ -388,11 +465,6 @@ export default function MindBoardClient() {
                                 if (e.touches.length === 1) {
                                     const touch = e.touches[0]
                                     startDrag(touch.clientX, touch.clientY, item.id)
-                                } else if (e.touches.length === 2) {
-                                    const dx = e.touches[0].clientX - e.touches[1].clientX
-                                    const dy = e.touches[0].clientY - e.touches[1].clientY
-                                    const dist = Math.sqrt(dx * dx + dy * dy)
-                                    setMemoResizeItem({ id: item.id, startDist: dist, initialW: item.w, initialH: item.h })
                                 }
                             }}
                         >
@@ -415,8 +487,7 @@ export default function MindBoardClient() {
                             )}
 
                             {/* Header / Top Handle */}
-                            <div
-                                className="h-8 bg-gray-50 border-b border-gray-100 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-gray-100 transition-colors"
+                            <div className="h-8 bg-black/5 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/10 transition-colors"
                                 onTouchStart={(e: React.TouchEvent) => {
                                     // Header specific long press
                                     if (e.touches.length === 1) {
@@ -425,8 +496,8 @@ export default function MindBoardClient() {
                                 }}
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: item.color }}></div>
-                                    <GripHorizontal size={14} className="text-gray-300" />
+                                    <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: item.color === '#FFFFFF' ? '#e5e5e5' : item.color }}></div>
+                                    <GripHorizontal size={14} className="text-gray-400" />
                                 </div>
                                 <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <button
