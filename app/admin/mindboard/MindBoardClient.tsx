@@ -810,27 +810,33 @@ export default function MindBoardClient() {
                     </div>
                 )}
 
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex items-center gap-1">
+            </div>
+
+            {/* Vertical Toolbar (Left) */}
+            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2">
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1.5 flex flex-col items-center gap-2">
                     <button onClick={autoArrange} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Auto Arrange">
-                        <LayoutGrid size={18} />
+                        <LayoutGrid size={20} />
                     </button>
-                    <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
                     <button onClick={optimizeSize} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Optimize Size">
-                        <Wand2 size={18} />
+                        <Wand2 size={20} />
                     </button>
-                    <div className="w-[1px] h-4 bg-gray-200 mx-1"></div>
+                    <div className="w-4 h-[1px] bg-gray-200 my-0.5"></div>
                     <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="p-2 hover:bg-gray-100 rounded-md">
-                        <Plus size={18} />
+                    }} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Zoom In">
+                        <Plus size={20} />
                     </button>
-                    <span className="w-12 text-center text-xs font-bold font-mono">{Math.round(scale * 100)}%</span>
+                    <span className="text-xs font-bold font-mono py-1">{Math.round(scale * 100)}%</span>
                     <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(-0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="p-2 hover:bg-gray-100 rounded-md">
-                        <Minus size={18} />
+                    }} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Zoom Out">
+                        <Minus size={20} />
+                    </button>
+                    <button onClick={() => setPan({ x: -2000, y: -2000 })} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Reset View">
+                        <MousePointer2 size={20} />
                     </button>
                 </div>
             </div>
