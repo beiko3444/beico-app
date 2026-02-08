@@ -15,7 +15,7 @@ interface BoardItem {
     zIndex: number
 }
 
-const GRID_SIZE = 40 // Grid snap size
+const GRID_SIZE = 80 // Finer grid was requested to be reduced, so we make it sparser.
 const COLORS = [
     '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF',
     '#A0C4FF', '#BDB2FF', '#FFC6FF', '#FFFFFC', '#E5E5E5'
@@ -32,12 +32,14 @@ export default function MindBoardClient() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [maxZIndex, setMaxZIndex] = useState(1)
     const [colorPaletteId, setColorPaletteId] = useState<string | null>(null)
+    const [memoResizeItem, setMemoResizeItem] = useState<{ id: string, startDist: number, initialW: number, initialH: number } | null>(null)
 
     // Refs
     const containerRef = useRef<HTMLDivElement>(null)
     const lastPos = useRef({ x: 0, y: 0 })
     const lastTouchDistance = useRef<number | null>(null)
     const lastClickTime = useRef(0)
+    const longPressTimer = useRef<any>(null)
 
     // --- Persistence ---
     useEffect(() => {
@@ -70,6 +72,46 @@ export default function MindBoardClient() {
         return { x: xWorld, y: yWorld }
     }, [pan, scale])
 
+    const isColliding = (a: { x: number, y: number, w: number, h: number }, b: { x: number, y: number, w: number, h: number }) => {
+        return (
+            a.x < b.x + b.w &&
+            a.x + a.w > b.x &&
+            a.y < b.y + b.h &&
+            a.y + a.h > b.y
+        )
+    }
+
+    const resolveCollision = useCallback((movingId: string, newItems: BoardItem[]) => {
+        const movingItem = newItems.find(i => i.id === movingId)
+        if (!movingItem) return newItems
+
+        let changed = false
+        const updated = newItems.map(item => {
+            if (item.id === movingId) return item
+            if (isColliding(movingItem, item)) {
+                changed = true
+                // Push logic: move 'item' away from 'movingItem'
+                // Simplest push: move in the direction of the overlap
+                const dx = (item.x + item.w / 2) - (movingItem.x + movingItem.w / 2)
+                const dy = (item.y + item.h / 2) - (movingItem.y + movingItem.h / 2)
+
+                let nx = item.x
+                let ny = item.y
+
+                if (Math.abs(dx) > Math.abs(dy)) {
+                    nx = dx > 0 ? movingItem.x + movingItem.w + 10 : movingItem.x - item.w - 10
+                } else {
+                    ny = dy > 0 ? movingItem.y + movingItem.h + 10 : movingItem.y - item.h - 10
+                }
+
+                return { ...item, x: Math.round(nx / GRID_SIZE) * GRID_SIZE, y: Math.round(ny / GRID_SIZE) * GRID_SIZE }
+            }
+            return item
+        })
+
+        return changed ? resolveCollision(movingId, updated) : updated // Recursive to handle chain collisions
+    }, [])
+
     const createMemo = useCallback((x: number, y: number) => {
         const snappedX = Math.round((x - 160) / GRID_SIZE) * GRID_SIZE
         const snappedY = Math.round((y - 60) / GRID_SIZE) * GRID_SIZE
@@ -86,26 +128,26 @@ export default function MindBoardClient() {
         }
 
         setMaxZIndex((prev: number) => prev + 1)
-        setItems((prev: BoardItem[]) => [...prev, newItem])
-    }, [maxZIndex])
+        setItems((prev: BoardItem[]) => resolveCollision(newItem.id, [...prev, newItem]))
+    }, [maxZIndex, resolveCollision])
 
     // --- Actions ---
     const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault()
-        const zoomSensitivity = 0.001
-        const newScale = Math.min(Math.max(0.1, scale - e.deltaY * zoomSensitivity), 3)
-        setScale(newScale)
+        if (e.ctrlKey) {
+            e.preventDefault()
+            const zoomSensitivity = 0.01
+            setScale((s: number) => Math.min(Math.max(0.1, s - e.deltaY * zoomSensitivity), 3))
+        }
     }
 
     const handleCanvasClick = (e: React.MouseEvent | React.TouchEvent) => {
         const now = Date.now()
         if (now - lastClickTime.current < 300) {
-            // Double click/tap detected
-            const clientX = 'touches' in e ? e.touches[0].clientX : (e as React.MouseEvent).clientX
-            const clientY = 'touches' in e ? e.touches[0].clientY : (e as React.MouseEvent).clientY
+            const clientX = 'touches' in e ? (e as React.TouchEvent).touches[0].clientX : (e as React.MouseEvent).clientX
+            const clientY = 'touches' in e ? (e as React.TouchEvent).touches[0].clientY : (e as React.MouseEvent).clientY
             const { x, y } = getWorldCoords(clientX, clientY)
             createMemo(x, y)
-            lastClickTime.current = 0 // Reset
+            lastClickTime.current = 0
         } else {
             lastClickTime.current = now
         }
@@ -141,55 +183,47 @@ export default function MindBoardClient() {
         }
     }
 
-    const toggleColorPalette = (id: string) => {
-        const now = Date.now()
-        if (now - lastClickTime.current < 300) {
-            setColorPaletteId((prev: string | null) => prev === id ? null : id)
-            lastClickTime.current = 0
-        } else {
-            lastClickTime.current = now
-        }
-    }
-
     // --- Touch Handlers ---
     const onTouchStart = (e: React.TouchEvent) => {
-        // Prevent default browser behavior (e.g. scroll/zoom)
-        if (e.cancelable) e.preventDefault()
-
         if (e.touches.length === 1) {
             const touch = e.touches[0]
             const target = touch.target as HTMLElement
             if (target.id === 'mind-board-bg') {
+                if (e.cancelable) e.preventDefault()
                 startPan(touch.clientX, touch.clientY)
                 handleCanvasClick(e)
             }
         } else if (e.touches.length === 2) {
+            if (e.cancelable) e.preventDefault()
             const dx = e.touches[0].clientX - e.touches[1].clientX
             const dy = e.touches[0].clientY - e.touches[1].clientY
             lastTouchDistance.current = Math.sqrt(dx * dx + dy * dy)
         }
     }
 
-    const onTouchMove = (e: TouchEvent) => {
-        // Prevent default browser behavior (native zoom/scroll)
-        if (e.cancelable) e.preventDefault()
-
+    const onTouchMove = useCallback((e: TouchEvent) => {
         if (e.touches.length === 1) {
             const touch = e.touches[0]
             if (isPanning) {
+                if (e.cancelable) e.preventDefault()
                 const dx = touch.clientX - lastPos.current.x
                 const dy = touch.clientY - lastPos.current.y
                 setPan((p: { x: number, y: number }) => ({ x: p.x + dx, y: p.y + dy }))
                 lastPos.current = { x: touch.clientX, y: touch.clientY }
             } else if (dragItem) {
+                if (e.cancelable) e.preventDefault()
                 const dx = (touch.clientX - dragItem.startX) / scale
                 const dy = (touch.clientY - dragItem.startY) / scale
-                setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === dragItem.id ? {
-                    ...item,
-                    x: Math.round((dragItem.initialX + dx) / GRID_SIZE) * GRID_SIZE,
-                    y: Math.round((dragItem.initialY + dy) / GRID_SIZE) * GRID_SIZE
-                } : item))
+                setItems((prev: BoardItem[]) => {
+                    const next = prev.map((item: BoardItem) => item.id === dragItem.id ? {
+                        ...item,
+                        x: Math.round((dragItem.initialX + dx) / GRID_SIZE) * GRID_SIZE,
+                        y: Math.round((dragItem.initialY + dy) / GRID_SIZE) * GRID_SIZE
+                    } : item)
+                    return resolveCollision(dragItem.id, next)
+                })
             } else if (resizeItem) {
+                if (e.cancelable) e.preventDefault()
                 const dx = (touch.clientX - resizeItem.startX) / scale
                 const dy = (touch.clientY - resizeItem.startY) / scale
                 setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === resizeItem.id ? {
@@ -198,22 +232,38 @@ export default function MindBoardClient() {
                     h: Math.max(GRID_SIZE * 2, Math.round((resizeItem.initialH + dy) / GRID_SIZE) * GRID_SIZE)
                 } : item))
             }
-        } else if (e.touches.length === 2 && lastTouchDistance.current !== null) {
+        } else if (e.touches.length === 2) {
+            if (e.cancelable) e.preventDefault()
             const dx = e.touches[0].clientX - e.touches[1].clientX
             const dy = e.touches[0].clientY - e.touches[1].clientY
             const distance = Math.sqrt(dx * dx + dy * dy)
-            const delta = (distance - lastTouchDistance.current) * 0.01
-            setScale((s: number) => Math.min(Math.max(0.1, s + delta), 3))
-            lastTouchDistance.current = distance
-        }
-    }
 
-    const onTouchEnd = () => {
+            if (memoResizeItem) {
+                const delta = (distance - memoResizeItem.startDist) / scale
+                setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === memoResizeItem.id ? {
+                    ...item,
+                    w: Math.max(GRID_SIZE * 4, Math.round((memoResizeItem.initialW + delta) / GRID_SIZE) * GRID_SIZE),
+                    h: Math.max(GRID_SIZE * 2, Math.round((memoResizeItem.initialH + delta * (memoResizeItem.initialH / memoResizeItem.initialW)) / GRID_SIZE) * GRID_SIZE)
+                } : item))
+            } else if (lastTouchDistance.current !== null) {
+                const delta = (distance - lastTouchDistance.current) * 0.01
+                setScale((s: number) => Math.min(Math.max(0.1, s + delta), 3))
+                lastTouchDistance.current = distance
+            }
+        }
+    }, [isPanning, dragItem, resizeItem, scale, memoResizeItem, resolveCollision])
+
+    const onTouchEnd = useCallback(() => {
         setIsPanning(false)
         setDragItem(null)
         setResizeItem(null)
+        setMemoResizeItem(null)
         lastTouchDistance.current = null
-    }
+        if (longPressTimer.current) {
+            clearTimeout(longPressTimer.current)
+            longPressTimer.current = null
+        }
+    }, [])
 
     // --- Global Mouse Move / Up ---
     useEffect(() => {
@@ -226,11 +276,14 @@ export default function MindBoardClient() {
             } else if (dragItem) {
                 const dx = (e.clientX - dragItem.startX) / scale
                 const dy = (e.clientY - dragItem.startY) / scale
-                setItems((prev: BoardItem[]) => prev.map((item: BoardItem) => item.id === dragItem.id ? {
-                    ...item,
-                    x: Math.round((dragItem.initialX + dx) / GRID_SIZE) * GRID_SIZE,
-                    y: Math.round((dragItem.initialY + dy) / GRID_SIZE) * GRID_SIZE
-                } : item))
+                setItems((prev: BoardItem[]) => {
+                    const next = prev.map((item: BoardItem) => item.id === dragItem.id ? {
+                        ...item,
+                        x: Math.round((dragItem.initialX + dx) / GRID_SIZE) * GRID_SIZE,
+                        y: Math.round((dragItem.initialY + dy) / GRID_SIZE) * GRID_SIZE
+                    } : item)
+                    return resolveCollision(dragItem.id, next)
+                })
             } else if (resizeItem) {
                 const dx = (e.clientX - resizeItem.startX) / scale
                 const dy = (e.clientY - resizeItem.startY) / scale
@@ -259,7 +312,13 @@ export default function MindBoardClient() {
             window.removeEventListener('touchmove', onTouchMove)
             window.removeEventListener('touchend', onTouchEnd)
         }
-    }, [isPanning, dragItem, resizeItem, scale, onTouchMove, onTouchEnd])
+    }, [isPanning, dragItem, resizeItem, scale, onTouchMove, onTouchEnd, resolveCollision])
+
+    const startLongPress = (id: string) => {
+        longPressTimer.current = setTimeout(() => {
+            setColorPaletteId(id)
+        }, 500)
+    }
 
     return (
         <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-50 select-none touch-none">
@@ -309,15 +368,33 @@ export default function MindBoardClient() {
                     {items.map((item: BoardItem) => (
                         <div
                             key={item.id}
-                            className="absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border border-black/5 hover:border-black/10 transition-shadow hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] bg-white overflow-hidden"
+                            className="absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border border-black/5 hover:border-black/10 transition-shadow hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)] overflow-hidden"
                             style={{
                                 left: item.x,
                                 top: item.y,
                                 width: item.w,
                                 height: item.h,
-                                zIndex: item.zIndex
+                                zIndex: item.zIndex,
+                                backgroundColor: item.color
                             }}
-                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                            onMouseDown={(e: React.MouseEvent) => {
+                                e.stopPropagation()
+                                if (editingId !== item.id) {
+                                    startDrag(e.clientX, e.clientY, item.id)
+                                }
+                            }}
+                            onTouchStart={(e: React.TouchEvent) => {
+                                e.stopPropagation()
+                                if (e.touches.length === 1) {
+                                    const touch = e.touches[0]
+                                    startDrag(touch.clientX, touch.clientY, item.id)
+                                } else if (e.touches.length === 2) {
+                                    const dx = e.touches[0].clientX - e.touches[1].clientX
+                                    const dy = e.touches[0].clientY - e.touches[1].clientY
+                                    const dist = Math.sqrt(dx * dx + dy * dy)
+                                    setMemoResizeItem({ id: item.id, startDist: dist, initialW: item.w, initialH: item.h })
+                                }
+                            }}
                         >
                             {/* Color Palette Popover */}
                             {colorPaletteId === item.id && (
@@ -325,7 +402,8 @@ export default function MindBoardClient() {
                                     {COLORS.map((c: string) => (
                                         <button
                                             key={c}
-                                            onClick={() => {
+                                            onClick={(e: React.MouseEvent) => {
+                                                e.stopPropagation()
                                                 setItems((prev: BoardItem[]) => prev.map((i: BoardItem) => i.id === item.id ? { ...i, color: c } : i))
                                                 setColorPaletteId(null)
                                             }}
@@ -336,19 +414,14 @@ export default function MindBoardClient() {
                                 </div>
                             )}
 
-                            {/* Header / Drag Handle */}
+                            {/* Header / Top Handle */}
                             <div
                                 className="h-8 bg-gray-50 border-b border-gray-100 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-gray-100 transition-colors"
-                                onMouseDown={(e: React.MouseEvent) => startDrag(e.clientX, e.clientY, item.id)}
                                 onTouchStart={(e: React.TouchEvent) => {
-                                    e.stopPropagation()
-                                    const touch = e.touches[0]
-                                    startDrag(touch.clientX, touch.clientY, item.id)
-                                    toggleColorPalette(item.id)
-                                }}
-                                onDoubleClick={(e: React.MouseEvent) => {
-                                    e.stopPropagation()
-                                    setColorPaletteId((prev: string | null) => prev === item.id ? null : item.id)
+                                    // Header specific long press
+                                    if (e.touches.length === 1) {
+                                        startLongPress(item.id)
+                                    }
                                 }}
                             >
                                 <div className="flex items-center gap-2">
@@ -358,6 +431,7 @@ export default function MindBoardClient() {
                                 <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
                                     <button
                                         onClick={(e: React.MouseEvent) => { e.stopPropagation(); deleteItem(item.id) }}
+                                        onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
                                         className="p-1 hover:bg-red-100 rounded text-red-400 hover:text-red-600"
                                     >
                                         <Trash2 size={12} />
@@ -366,7 +440,7 @@ export default function MindBoardClient() {
                             </div>
 
                             {/* Content */}
-                            <div className="flex-1 p-3 overflow-hidden relative bg-white">
+                            <div className="flex-1 p-3 overflow-hidden relative">
                                 {editingId === item.id ? (
                                     <textarea
                                         autoFocus
@@ -380,13 +454,20 @@ export default function MindBoardClient() {
                                                 setEditingId(null)
                                             }
                                         }}
+                                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                                        onTouchStart={(e: React.TouchEvent) => e.stopPropagation()}
                                     />
                                 ) : (
                                     <div
                                         className="w-full h-full text-sm font-medium text-gray-800 whitespace-pre-wrap leading-relaxed cursor-text"
-                                        onClick={() => setEditingId(item.id)}
+                                        onDoubleClick={() => setEditingId(item.id)}
+                                        onClick={(e: React.MouseEvent) => {
+                                            if (e.detail === 1) {
+                                                // Single tap on mobile
+                                            }
+                                        }}
                                     >
-                                        {item.content || <span className="text-gray-300 italic">내용을 입력하세요...</span>}
+                                        {item.content || <span className="text-gray-300 italic">더블클릭하여 내용 입력...</span>}
                                     </div>
                                 )}
                             </div>
@@ -394,7 +475,10 @@ export default function MindBoardClient() {
                             {/* Resize Handle */}
                             <div
                                 className="absolute bottom-0 right-0 w-8 h-8 cursor-nwse-resize flex items-end justify-end p-1 hover:bg-black/5 rounded-br-xl"
-                                onMouseDown={(e: React.MouseEvent) => startResize(e.clientX, e.clientY, item.id)}
+                                onMouseDown={(e: React.MouseEvent) => {
+                                    e.stopPropagation()
+                                    startResize(e.clientX, e.clientY, item.id)
+                                }}
                                 onTouchStart={(e: React.TouchEvent) => {
                                     e.stopPropagation()
                                     const touch = e.touches[0]
