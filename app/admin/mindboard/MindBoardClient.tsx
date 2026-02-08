@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type } from 'lucide-react'
+import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock } from 'lucide-react'
 
 // Types
 interface BoardItem {
@@ -525,17 +525,21 @@ export default function MindBoardClient() {
             const dy = (clientY - first.startY) / scale
             if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
 
-            setItems(prev => {
-                let nextItems = [...prev]
-                dragItems.forEach((state, id) => {
-                    nextItems = nextItems.map(item => item.id === id ? {
+            // Correct Grid Snapping: Snap the DELTA, not individual items, to keep relative positions
+            const snapDx = Math.round(dx / GRID_SIZE) * GRID_SIZE
+            const snapDy = Math.round(dy / GRID_SIZE) * GRID_SIZE
+
+            setItems(prev => prev.map(item => {
+                const state = dragItems.get(item.id)
+                if (state) {
+                    return {
                         ...item,
-                        x: Math.round((state.initialX + dx) / GRID_SIZE) * GRID_SIZE,
-                        y: Math.round((state.initialY + dy) / GRID_SIZE) * GRID_SIZE
-                    } : item)
-                })
-                return nextItems
-            })
+                        x: state.initialX + snapDx,
+                        y: state.initialY + snapDy
+                    }
+                }
+                return item
+            }))
         } else if (resizeItem) {
             const dx = (clientX - resizeItem.startX) / scale
             const dy = (clientY - resizeItem.startY) / scale
@@ -738,12 +742,18 @@ export default function MindBoardClient() {
                     }}
                 >
                     <div
-                        className="absolute -top-3 left-4 bg-white px-2 py-0.5 text-[10px] font-bold text-gray-400 cursor-pointer pointer-events-auto hover:text-blue-600 hover:bg-blue-50 border border-gray-100 rounded shadow-sm select-none"
+                        className="absolute -top-3 left-4 bg-white px-2 py-0.5 text-[10px] font-bold text-gray-400 cursor-pointer pointer-events-auto hover:text-blue-600 hover:bg-blue-50 border border-gray-100 rounded shadow-sm select-none flex items-center gap-1.5"
                         onClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
-                        onDoubleClick={(e) => { e.stopPropagation(); unGroup(gid) }}
                         onMouseDown={e => e.stopPropagation()}
                     >
-                        {groupName}
+                        <button
+                            onClick={(e) => { e.stopPropagation(); unGroup(gid); }}
+                            className="p-0.5 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
+                            title="Ungroup"
+                        >
+                            <Lock size={10} />
+                        </button>
+                        <span className="border-l border-gray-200 pl-1.5">{groupName}</span>
                     </div>
                 </div>
             )
