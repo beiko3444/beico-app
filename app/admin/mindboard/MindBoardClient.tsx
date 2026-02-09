@@ -24,11 +24,10 @@ interface GroupData {
 }
 
 const GRID_SIZE = 80
-const WORLD_SIZE = 8000 // Increased World Size for better panning experience
+
 const COLORS = [
-    '#FFFFFF', // White as default first
-    '#FFADAD', '#FFD6A5', '#FDFFB6', '#CAFFBF', '#9BF6FF',
-    '#A0C4FF', '#BDB2FF', '#FFC6FF', '#E5E5E5'
+    '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA',
+    '#F2D7EE', '#D3E0EA', '#F6F6EB', '#FDFFB6', '#E5E5E5'
 ]
 
 export default function MindBoardClient() {
@@ -40,7 +39,7 @@ export default function MindBoardClient() {
     const [groups, setGroups] = useState<GroupData[]>([])
 
     const [scale, setScale] = useState(0.5) // Start zoomed out a bit
-    const [pan, setPan] = useState({ x: -2000, y: -2000 }) // Start roughly centerish of 8000px world
+    const [pan, setPan] = useState({ x: 0, y: 0 }) // Start at 0,0
     const [isPanning, setIsPanning] = useState(false)
 
     // Selection
@@ -64,6 +63,9 @@ export default function MindBoardClient() {
     const hasMoved = useRef(false)
     const minimapTimeout = useRef<NodeJS.Timeout | null>(null)
     const [showMinimap, setShowMinimap] = useState(false)
+    const [isSpacePressed, setIsSpacePressed] = useState(false)
+    const [isMinimapDragging, setIsMinimapDragging] = useState(false)
+    const minimapDragState = useRef<{ startX: number, startY: number, startPan: { x: number, y: number }, worldWidth: number, worldHeight: number } | null>(null)
 
     // --- Persistence ---
     useEffect(() => {
@@ -100,22 +102,17 @@ export default function MindBoardClient() {
         // World is 0 to WORLD_SIZE.
         // Viewport sees [ -pan.x / scale, (-pan.x + width) / scale ]
         // We want -pan.x / scale to be >= -PADDING and <= WORLD_SIZE
+        // We want -pan.x / scale to be >= -PADDING and <= WORLD_SIZE
 
         // Let's implement a looser clamp roughly keeping content in view is preferred, 
         // but user asked to reach "ends".
         // If content is at 7000, and screen shows 1000px, we need pan.x to reach -7000*scale roughly.
 
-        const minX = -WORLD_SIZE * currentScale + container.clientWidth
-        const minY = -WORLD_SIZE * currentScale + container.clientHeight
-        const maxX = 0 // Can pan up to 0 (Showing start of world) -> Actually allow some positive margin? 
-        const maxY = 0
-
-        // Allow some overscroll
         return {
-            minX: minX - 500,
-            maxX: maxX + 500,
-            minY: minY - 500,
-            maxY: maxY + 500
+            minX: -Infinity,
+            maxX: Infinity,
+            minY: -Infinity,
+            maxY: Infinity
         }
     }, [])
 
@@ -185,9 +182,7 @@ export default function MindBoardClient() {
     }, [])
 
     const createMemo = useCallback((x: number, y: number, shouldEdit: boolean = false) => {
-        // Ensure x,y are within world
-        // x = Math.max(0, Math.min(WORLD_SIZE, x))
-        // y = Math.max(0, Math.min(WORLD_SIZE, y))
+
 
         const snappedX = Math.round((x - 120) / GRID_SIZE) * GRID_SIZE
         const snappedY = Math.round((y - 80) / GRID_SIZE) * GRID_SIZE
@@ -196,7 +191,7 @@ export default function MindBoardClient() {
             id: Date.now().toString(),
             x: snappedX,
             y: snappedY,
-            w: 240,
+            w: 160,
             h: 160,
             content: '',
             color: '#FFFFFF',
@@ -273,23 +268,36 @@ export default function MindBoardClient() {
         }))
     }
 
-    const startDrag = (clientX: number, clientY: number, id: string, shiftKey: boolean) => {
-        const item = items.find((i: BoardItem) => i.id === id)
-        if (!item) return
-
+    const startDrag = (clientX: number, clientY: number, id: string, shiftKey: boolean, isGroupDrag: boolean = false) => {
         // Selection Logic
         let newSelection = new Set(selectedIds)
-        if (shiftKey) {
-            if (newSelection.has(id)) newSelection.delete(id)
-            else newSelection.add(id)
+
+        if (isGroupDrag) {
+            // If group drag, we select ALL members of the group
+            const groupMembers = items.filter(i => i.groupId === id)
+            const memberIds = groupMembers.map(i => i.id)
+            // Clear previous selection if not shift? Or just add?
+            // "Group drag" usually implies moving the group.
+            if (!shiftKey) newSelection.clear()
+            memberIds.forEach(mid => newSelection.add(mid))
             setSelectedIds(newSelection)
         } else {
-            // If dragging something NOT in selection, clear selection and select IT
-            if (!newSelection.has(id)) {
-                newSelection = new Set([id])
+            // Item Drag
+            const item = items.find((i: BoardItem) => i.id === id)
+            if (!item) return
+
+            if (shiftKey) {
+                if (newSelection.has(id)) newSelection.delete(id)
+                else newSelection.add(id)
                 setSelectedIds(newSelection)
+            } else {
+                // If dragging something NOT in selection, clear selection and select IT
+                if (!newSelection.has(id)) {
+                    newSelection = new Set([id])
+                    setSelectedIds(newSelection)
+                }
+                // If dragging something IN selection, keep selection
             }
-            // If dragging something IN selection, keep selection
         }
 
         // Determine all items to drag
@@ -298,24 +306,21 @@ export default function MindBoardClient() {
         // 1. Add all selected items
         newSelection.forEach(sid => itemsToDragIds.add(sid))
 
-        // 2. Add all group members of any item in the drag set
-        // (If I select one member of a group, I should drag the whole group? Usually yes)
-        // User said: "grouped boards... move together"
-        // So iterate until stable
-        let size = 0
-        do {
-            size = itemsToDragIds.size
-            items.forEach(i => {
-                if (i.groupId && Array.from(itemsToDragIds).some(dragId => {
-                    const dItem = items.find(x => x.id === dragId)
-                    return dItem && dItem.groupId === i.groupId
-                })) {
-                    itemsToDragIds.add(i.id)
-                }
-            })
-        } while (itemsToDragIds.size > size)
+        // 2. Add all group members --> REMOVED for Item Drag
+        // Only if isGroupDrag is true, we already selected them.
+        // If I drag a single item in a group, it should move ALONE now.
+        // So we DON'T auto-expand to group members unless they are selected.
 
-        bringToFront(id) // Bring just the clicked one? Or all? Let's just bring clicked one's group
+        // However, if we move a group header (isGroupDrag), we selected all members, so they are in itemsToDragIds.
+
+        if (isGroupDrag) {
+            // Ensure all group members are dragged
+            // (Already handled by selection above)
+        }
+
+        if (!isGroupDrag) {
+            bringToFront(id)
+        }
 
         const newMap = new Map()
         itemsToDragIds.forEach(dragId => {
@@ -445,10 +450,70 @@ export default function MindBoardClient() {
         setGroups(prev => prev.filter(g => g.id !== groupId))
     }
 
+    const arrangeGroup = (groupId: string) => {
+        setItems(prev => {
+            const members = prev.filter(i => i.groupId === groupId)
+            const otherItems = prev.filter(i => i.groupId !== groupId)
+            if (members.length === 0) return prev
+
+            // Find top-left of group
+            const minX = Math.min(...members.map(i => i.x))
+            const minY = Math.min(...members.map(i => i.y))
+
+            const packed = packGroup(members)
+
+            const updatedMembers = members.map(m => {
+                const p = packed.find(p => p.id === m.id)
+                if (p) return { ...m, x: minX + p.x, y: minY + p.y }
+                return m
+            })
+
+            return [...otherItems, ...updatedMembers]
+        })
+    }
+
+    const optimizeGroup = (groupId: string) => {
+        setItems(prev => {
+            const members = prev.filter(i => i.groupId === groupId)
+            const otherItems = prev.filter(i => i.groupId !== groupId)
+            if (members.length === 0) return prev
+
+            // 1. Resize members
+            const resisedMembers = members.map(item => {
+                const lines = item.content.split('\n').length
+                const length = item.content.length
+                let targetW = 240
+                let targetH = 160
+                if (length < 20 && lines <= 2) {
+                    targetW = 160
+                    targetH = 160
+                } else if (length > 100 || lines > 5) {
+                    targetW = 320
+                    targetH = Math.max(160, Math.ceil((lines * 24 + 60) / GRID_SIZE) * GRID_SIZE)
+                }
+                return { ...item, w: targetW, h: targetH }
+            })
+
+            // 2. Arrange
+            // Find top-left of group
+            const minX = Math.min(...resisedMembers.map(i => i.x))
+            const minY = Math.min(...resisedMembers.map(i => i.y))
+
+            const packed = packGroup(resisedMembers)
+            const updatedMembers = resisedMembers.map(m => {
+                const p = packed.find(p => p.id === m.id)
+                if (p) return { ...m, x: minX + p.x, y: minY + p.y }
+                return m
+            })
+
+            return [...otherItems, ...updatedMembers]
+        })
+    }
+
     const optimizeSize = () => {
         setItems(prev => {
             const nextItems = prev.map(item => {
-                const lines = item.content.split('\n').length
+                const lines = item.content.split('\\n').length
                 const length = item.content.length
                 let targetW = 240
                 let targetH = 160
@@ -534,6 +599,29 @@ export default function MindBoardClient() {
             setShowMinimap(true)
             if (minimapTimeout.current) clearTimeout(minimapTimeout.current)
             minimapTimeout.current = setTimeout(() => setShowMinimap(false), 2000)
+        } else if (isMinimapDragging && minimapDragState.current) {
+            const state = minimapDragState.current
+            const dx = clientX - state.startX
+            const dy = clientY - state.startY
+
+            // Minimap width is fixed at 192px (w-48 = 12rem = 192px)
+            // Minimap height is fixed at 144px (h-36 = 9rem = 144px)
+            const minimapW = 192
+            const minimapH = 144
+
+            // Delta World = (Delta Pixel / Minimap Size) * World Size
+            const dWorldX = (dx / minimapW) * state.worldWidth
+            const dWorldY = (dy / minimapH) * state.worldHeight
+
+            // Pan = -World * Scale
+            // New Pan = StartPan - (dWorld * Scale)
+
+            setPan({
+                x: state.startPan.x - dWorldX * scale,
+                y: state.startPan.y - dWorldY * scale
+            })
+
+            setShowMinimap(true) // Keep showing
         } else if (dragItems.size > 0) {
             const firstEntry = dragItems.values().next()
             if (firstEntry.done) return
@@ -727,7 +815,12 @@ export default function MindBoardClient() {
     // --- Events Sync ---
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => handleMove(e.clientX, e.clientY)
-        const handleMouseUp = () => finalizeInteraction()
+        // Global mouse up to catch drops outside
+        const handleMouseUp = () => {
+            finalizeInteraction()
+            setIsMinimapDragging(false)
+            minimapDragState.current = null
+        }
 
         window.addEventListener('mousemove', handleMouseMove)
         window.addEventListener('mouseup', handleMouseUp)
@@ -741,6 +834,25 @@ export default function MindBoardClient() {
     // Detect Double Enter
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.code === 'Space' && !e.repeat) {
+                const target = e.target as HTMLElement
+                if (target.tagName !== 'INPUT' && target.tagName !== 'TEXTAREA') {
+                    // e.preventDefault() // prevent scroll?
+                    setIsSpacePressed(true)
+                }
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === '0') {
+                e.preventDefault()
+                // Reset View
+                // Calculate bounds to fit? Or just reset to 0,0?
+                // Plan: Reset to 0,0 and scale 1?
+                // Better: Auto-arrange view to fit content?
+                // Let's just reset to origin for now as per "Ctrl+0" standard, or fit content if possible.
+                // Simple: scale 1, pan 0,0
+                setPan({ x: 0, y: 0 })
+                setScale(1)
+            }
+
             if (e.key === 'Enter') {
                 const target = e.target as HTMLElement
                 // Ignore if typing in an input or textarea
@@ -763,8 +875,17 @@ export default function MindBoardClient() {
                 }
             }
         }
+        const handleKeyUp = (e: KeyboardEvent) => {
+            if (e.code === 'Space') {
+                setIsSpacePressed(false)
+            }
+        }
         window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
+        window.addEventListener('keyup', handleKeyUp)
+        return () => {
+            window.removeEventListener('keydown', handleKeyDown)
+            window.removeEventListener('keyup', handleKeyUp)
+        }
     }, [createMemo, getWorldCoords])
 
     const scrollToGroup = (groupId: string) => {
@@ -808,7 +929,7 @@ export default function MindBoardClient() {
             const groupName = groups.find(g => g.id === gid)?.name || "Group"
             return (
                 <div key={gid}
-                    className="absolute border-2 border-dashed border-gray-300/50 rounded-2xl pointer-events-none transition-all"
+                    className="absolute border-2 border-dashed border-sky-300 rounded-2xl pointer-events-none transition-all"
                     style={{
                         left: bounds.minX - 20,
                         top: bounds.minY - 40,
@@ -818,18 +939,28 @@ export default function MindBoardClient() {
                     }}
                 >
                     <div
-                        className="absolute -top-3 left-4 bg-white px-2 py-0.5 text-[10px] font-bold text-gray-400 cursor-pointer pointer-events-auto hover:text-blue-600 hover:bg-blue-50 border border-gray-100 rounded shadow-sm select-none flex items-center gap-1.5"
-                        onClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
-                        onMouseDown={e => e.stopPropagation()}
+                        className="absolute -top-3 left-4 bg-white px-2 py-0.5 text-[10px] font-bold text-gray-500 cursor-grab active:cursor-grabbing hover:text-blue-600 hover:bg-blue-50 border border-gray-100 rounded shadow-sm select-none flex items-center gap-1.5 pointer-events-auto"
+                        onMouseDown={e => { e.stopPropagation(); startDrag(e.clientX, e.clientY, gid, e.shiftKey, true) }}
                     >
                         <button
                             onClick={(e) => { e.stopPropagation(); unGroup(gid); }}
                             className="p-0.5 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
                             title="Ungroup"
+                            onMouseDown={e => e.stopPropagation()}
                         >
-                            <Lock size={10} />
+                            <Unlock size={10} />
                         </button>
-                        <span className="border-l border-gray-200 pl-1.5">{groupName}</span>
+                        <span className="border-l border-gray-200 pl-1.5 pr-1.5"
+                            onDoubleClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
+                        >{groupName}</span>
+                        <div className="flex gap-0.5 border-l border-gray-200 pl-1.5">
+                            <button onClick={(e) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Optimize" onMouseDown={e => e.stopPropagation()}>
+                                <Wand2 size={10} />
+                            </button>
+                            <button onClick={(e) => { e.stopPropagation(); arrangeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Arrange" onMouseDown={e => e.stopPropagation()}>
+                                <LayoutGrid size={10} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             )
@@ -842,27 +973,85 @@ export default function MindBoardClient() {
             <div className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <div className="relative w-full h-full">
                     <div className="absolute inset-0 bg-gray-50 opacity-50" />
-                    {items.map((item) => (
-                        <div key={`mini-${item.id}`} className="absolute rounded-sm border border-black/10"
-                            style={{
-                                left: `${((item.x) / WORLD_SIZE + 0.5) * 100}%`, // Approximate centering
-                                top: `${((item.y) / WORLD_SIZE + 0.5) * 100}%`,
-                                width: `${(item.w / WORLD_SIZE) * 100}%`,
-                                height: `${(item.h / WORLD_SIZE) * 100}%`,
-                                backgroundColor: item.color
-                            }}
-                        />
-                    ))}
-                    {containerRef.current && (
-                        <div className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
-                            style={{
-                                left: `${((-pan.x / scale) / WORLD_SIZE + 0.5) * 100}%`,
-                                top: `${((-pan.y / scale) / WORLD_SIZE + 0.5) * 100}%`,
-                                width: `${(containerRef.current.clientWidth / scale / WORLD_SIZE) * 100}%`,
-                                height: `${(containerRef.current.clientHeight / scale / WORLD_SIZE) * 100}%`
-                            }}
-                        />
-                    )}
+                    {(() => {
+                        // Dynamic Minimap calculation
+                        // 1. Calculate bounding box of all items
+                        if (items.length === 0) return null
+
+                        let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+                        items.forEach(i => {
+                            minX = Math.min(minX, i.x)
+                            minY = Math.min(minY, i.y)
+                            maxX = Math.max(maxX, i.x + i.w)
+                            maxY = Math.max(maxY, i.y + i.h)
+                        })
+
+                        // Include current view in bounds?
+                        if (containerRef.current) {
+                            const container = containerRef.current
+                            // Viewport in world coords:
+                            // xWorld = (0 - pan.x) / scale
+                            const viewX = -pan.x / scale
+                            const viewY = -pan.y / scale
+                            const viewW = container.clientWidth / scale
+                            const viewH = container.clientHeight / scale
+
+                            minX = Math.min(minX, viewX)
+                            minY = Math.min(minY, viewY)
+                            maxX = Math.max(maxX, viewX + viewW)
+                            maxY = Math.max(maxY, viewY + viewH)
+                        }
+
+                        // Add padding
+                        const padding = 2000
+                        minX -= padding
+                        minY -= padding
+                        maxX += padding
+                        maxY += padding
+
+                        const width = maxX - minX
+                        const height = maxY - minY
+
+                        // Protect against 0 size
+                        if (width <= 0 || height <= 0) return null
+
+                        return (
+                            <>
+                                {items.map((item) => (
+                                    <div key={`mini-${item.id}`} className="absolute rounded-sm border border-black/10"
+                                        style={{
+                                            left: `${((item.x - minX) / width) * 100}%`,
+                                            top: `${((item.y - minY) / height) * 100}%`,
+                                            width: `${(item.w / width) * 100}%`,
+                                            height: `${(item.h / height) * 100}%`,
+                                            backgroundColor: item.color
+                                        }}
+                                    />
+                                ))}
+                                {containerRef.current && (
+                                    <div className="absolute border-2 border-blue-500 bg-blue-500/10 cursor-move pointer-events-auto"
+                                        onMouseDown={(e: React.MouseEvent) => {
+                                            e.stopPropagation()
+                                            setIsMinimapDragging(true)
+                                            minimapDragState.current = {
+                                                startX: e.clientX,
+                                                startY: e.clientY,
+                                                startPan: { ...pan },
+                                                worldWidth: width,
+                                                worldHeight: height
+                                            }
+                                        }}
+                                        style={{
+                                            left: `${((-pan.x / scale - minX) / width) * 100}%`,
+                                            top: `${((-pan.y / scale - minY) / height) * 100}%`,
+                                            width: `${(containerRef.current.clientWidth / scale / width) * 100}%`,
+                                            height: `${(containerRef.current.clientHeight / scale / height) * 100}%`
+                                        }}
+                                    />
+                                )}
+                            </>
+                        )
+                    })()}
                 </div>
             </div>
 
@@ -914,32 +1103,38 @@ export default function MindBoardClient() {
                         <MousePointer2 size={20} />
                     </button>
                 </div>
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1.5 flex flex-col items-center gap-2 pointer-events-auto">
+                    <div className="flex flex-col gap-1 p-1">
+                        {COLORS.map((c) => (
+                            <button key={c}
+                                onClick={() => {
+                                    if (selectedIds.size > 0) {
+                                        setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, color: c } : i))
+                                    }
+                                }}
+                                className={`w-4 h-4 rounded-full border border-black/10 transition-transform hover:scale-125 ${selectedIds.size > 0 && items.find(i => selectedIds.has(i.id))?.color === c ? 'ring-1 ring-offset-1 ring-black/20' : ''}`}
+                                style={{ backgroundColor: c }} />
+                        ))}
+                    </div>
+                </div>
             </div>
 
-            {/* Color Palette */}
-            {colorPaletteId && (
-                <div className="absolute top-1/2 right-4 -translate-y-1/2 z-50 flex flex-col gap-2 bg-white/90 backdrop-blur p-3 rounded-2xl shadow-xl border border-gray-100 animate-in slide-in-from-right-10 overflow-hidden">
-                    <div className="text-[10px] font-bold text-center text-gray-400 mb-1">COLOR</div>
-                    {COLORS.map((c) => (
-                        <button key={c} onClick={() => setItems(prev => prev.map(i => i.id === colorPaletteId ? { ...i, color: c } : i))}
-                            className={`w-8 h-8 rounded-full border-2 transition-transform hover:scale-110 ${items.find(i => i.id === colorPaletteId)?.color === c ? 'border-black scale-110 shadow-md' : 'border-transparent'}`}
-                            style={{ backgroundColor: c }} />
-                    ))}
-                    <button onClick={() => setColorPaletteId(null)} className="mt-2 p-1 text-gray-400 hover:text-gray-600 text-[10px] font-bold text-center">CLOSE</button>
-                </div>
-            )}
 
             <div
                 ref={containerRef}
                 id="mind-board-bg"
-                className="w-full h-full cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
+                className="w-full h-screen cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
                 onTouchStart={onTouchStart}
                 onMouseDown={(e: React.MouseEvent) => {
-                    if (e.shiftKey) {
-                        // Start selection box
-                        const rect = containerRef.current?.getBoundingClientRect()
-                        if (rect) {
-                            setSelectionBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top })
+                    if (isSpacePressed || e.shiftKey || e.button === 1) { // Middle click or Space
+                        if (e.shiftKey && !isSpacePressed) {
+                            // Start selection box
+                            const rect = containerRef.current?.getBoundingClientRect()
+                            if (rect) {
+                                setSelectionBox({ startX: e.clientX - rect.left, startY: e.clientY - rect.top, currentX: e.clientX - rect.left, currentY: e.clientY - rect.top })
+                            }
+                        } else {
+                            startPan(e.clientX, e.clientY)
                         }
                     } else {
                         startPan(e.clientX, e.clientY)
@@ -949,6 +1144,7 @@ export default function MindBoardClient() {
                     handleCanvasClick(e)
                 }}
                 onWheel={handleWheel}
+                style={{ cursor: isSpacePressed ? 'grab' : 'default' }}
             >
                 {/* Infinite Background Layer */}
                 <div className="absolute inset-0 pointer-events-none z-0"
@@ -975,8 +1171,8 @@ export default function MindBoardClient() {
                         <div
                             key={item.id}
                             className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border transition-all overflow-hidden pointer-events-auto
-                                ${item.completed ? 'opacity-60 scale-[0.98]' : ''} 
-                                ${selectedIds.has(item.id) ? 'ring-2 ring-blue-500 shadow-xl' : 'border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}`}
+                                    ${item.completed ? 'opacity-60 scale-[0.98]' : ''} 
+                                    ${selectedIds.has(item.id) ? 'ring-2 ring-blue-500 shadow-xl' : 'border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}`}
                             style={{
                                 left: item.x,
                                 top: item.y,
@@ -986,6 +1182,7 @@ export default function MindBoardClient() {
                                 backgroundColor: item.completed ? '#f3f4f6' : item.color
                             }}
                             onMouseDown={(e) => {
+                                if (isSpacePressed) return // Allow bubble to container for panning
                                 e.stopPropagation()
                                 if (editingId !== item.id) startDrag(e.clientX, e.clientY, item.id, e.shiftKey)
                             }}
@@ -1007,13 +1204,26 @@ export default function MindBoardClient() {
                                 </div>
                             </div>
 
-                            <div className="flex-1 p-3 overflow-hidden relative">
+                            <div className="flex-1 p-3 overflow-hidden relative" onDoubleClick={e => e.stopPropagation()}>
                                 {editingId === item.id ? (
                                     <textarea autoFocus className="w-full h-full bg-transparent resize-none outline-none text-sm font-medium text-gray-800 leading-relaxed p-0"
                                         value={item.content}
                                         onChange={(e) => setItems(prev => prev.map(i => i.id === item.id ? { ...i, content: e.target.value } : i))}
-                                        onBlur={() => setEditingId(null)}
-                                        onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); setEditingId(null) } }}
+                                        onBlur={() => {
+                                            setEditingId(null)
+                                            if (!item.content.trim()) {
+                                                setItems(prev => prev.filter(i => i.id !== item.id))
+                                            }
+                                        }}
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' && !e.shiftKey) {
+                                                e.preventDefault();
+                                                setEditingId(null)
+                                                if (!item.content.trim()) {
+                                                    setItems(prev => prev.filter(i => i.id !== item.id))
+                                                }
+                                            }
+                                        }}
                                         onMouseDown={e => e.stopPropagation()}
                                     />
                                 ) : (
