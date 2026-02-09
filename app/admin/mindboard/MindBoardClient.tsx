@@ -1072,7 +1072,7 @@ export default function MindBoardClient() {
                                 <span className="text-gray-400">#</span>
                                 <span>{groups.find((g: GroupData) => g.id === gid)?.columns || 2}</span>
                             </button>
-                            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg p-1 hidden group-hover/cols:grid grid-cols-3 gap-1 z-50">
+                            <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded shadow-lg p-1 hidden group-hover/cols:grid grid-cols-3 gap-1 z-50">
                                 {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
                                     <button
                                         key={n}
@@ -1202,11 +1202,18 @@ export default function MindBoardClient() {
                             <div key={g.id} className="flex shrink-0">
                                 <button
                                     onClick={() => scrollToGroup(g.id)}
-                                    onDoubleClick={() => unGroup(g.id)}
-                                    className="w-full text-left px-2 py-1 bg-white border border-gray-200 rounded text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-1.5 group"
+                                    // onDoubleClick={() => unGroup(g.id)} // Removed per request, used separate button
+                                    className="w-full text-left px-2 py-1 bg-white border border-gray-200 rounded-l text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-1.5 group"
                                 >
                                     <LayoutGrid size={10} className="group-hover:text-white" />
-                                    <span className="truncate">{g.name}</span>
+                                    <span className="truncate flex-1">{g.name}</span>
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); unGroup(g.id) }}
+                                    className="px-1.5 py-1 bg-white border border-l-0 border-gray-200 rounded-r text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
+                                    title="Ungroup"
+                                >
+                                    <X size={10} />
                                 </button>
                             </div>
                         ))}
@@ -1328,7 +1335,34 @@ export default function MindBoardClient() {
                             }}
                         >
                             <div className="h-8 bg-black/5 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/10 transition-colors"
-                                onDoubleClick={(e) => { e.stopPropagation(); handleDoubleTap(item.id) }}
+                                onDoubleClick={(e) => {
+                                    e.stopPropagation();
+                                    if (item.groupId) {
+                                        // Eject Item
+                                        const groupMembers = items.filter(i => i.groupId === item.groupId)
+                                        const maxX = Math.max(...groupMembers.map(i => i.x + i.w))
+                                        const minY = Math.min(...groupMembers.map(i => i.y))
+
+                                        // Update state
+                                        setItems(prev => {
+                                            // Remove groupId
+                                            // Set position to right of group
+                                            // Handle potential collision?
+                                            // Simple placement first.
+                                            return prev.map(i => {
+                                                if (i.id === item.id) {
+                                                    return { ...i, groupId: undefined, x: maxX + 20, y: minY }
+                                                }
+                                                return i
+                                            })
+                                        })
+
+                                        // Trigger arrange on group? 
+                                        setTimeout(() => arrangeGroup(item.groupId!), 0)
+                                    } else {
+                                        handleDoubleTap(item.id)
+                                    }
+                                }}
                             >
                                 <div className="flex items-center gap-2">
                                     {/* <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: item.color === '#FFFFFF' ? '#e5e5e5' : item.color }}></div> */}
@@ -1396,7 +1430,7 @@ export default function MindBoardClient() {
             </div>
 
             {/* Floating Group Button */}
-            {selectedIds.size > 1 && (
+            {selectedIds.size > 1 && !Array.from(selectedIds).every(id => items.find((i: BoardItem) => i.id === id)?.groupId) && (
                 <div className="absolute z-[200] pointer-events-none"
                     style={{
                         left: (() => {
