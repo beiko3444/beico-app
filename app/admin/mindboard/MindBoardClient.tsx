@@ -1295,11 +1295,11 @@ export default function MindBoardClient() {
 
             if (e.key === 'Escape') {
                 if (editingId) {
-                    // Check if empty, delete if so
-                    setItems((prev: BoardItem[]) => prev.filter((i: BoardItem) => {
-                        if (i.id === editingId && !i.content.trim()) return false
-                        return true
-                    }))
+                    // Check if empty, delete if so? User requested to keeping it.
+                    // setItems((prev: BoardItem[]) => prev.filter((i: BoardItem) => {
+                    //     if (i.id === editingId && !i.content.trim()) return false
+                    //     return true
+                    // }))
                     // If we deleted empty item, we should have saved history before creation.
                     // If we just cancelled edit, no change.
                     setEditingId(null)
@@ -1729,6 +1729,7 @@ export default function MindBoardClient() {
                             <div className="h-8 bg-black/5 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/10 transition-colors"
                                 onDoubleClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
+                                    saveHistory(); // Save history for both actions
                                     if (item.groupId) {
                                         // Eject Item
                                         const groupMembers = items.filter((i: BoardItem) => i.groupId === item.groupId)
@@ -1737,10 +1738,6 @@ export default function MindBoardClient() {
 
                                         // Update state
                                         setItems((prev: BoardItem[]) => {
-                                            // Remove groupId
-                                            // Set position to right of group
-                                            // Handle potential collision?
-                                            // Simple placement first.
                                             return prev.map((i: BoardItem) => {
                                                 if (i.id === item.id) {
                                                     return { ...i, groupId: undefined, x: maxX + 20, y: minY }
@@ -1749,10 +1746,11 @@ export default function MindBoardClient() {
                                             })
                                         })
 
-                                        // Trigger arrange on group? 
+                                        // Trigger arrange on group
                                         setTimeout(() => arrangeGroup(item.groupId!), 0)
                                     } else {
-                                        handleDoubleTap(item.id)
+                                        // Immediately delete item (Undo available)
+                                        setItems(prev => prev.filter(i => i.id !== item.id))
                                     }
                                 }}
                             >
@@ -1787,17 +1785,17 @@ export default function MindBoardClient() {
                                         onChange={(e) => setItems(prev => prev.map(i => i.id === item.id ? { ...i, content: e.target.value } : i))}
                                         onBlur={() => {
                                             setEditingId(null)
-                                            if (!item.content.trim()) {
-                                                setItems(prev => prev.filter(i => i.id !== item.id))
-                                            }
+                                            // if (!item.content.trim()) {
+                                            //    setItems(prev => prev.filter(i => i.id !== item.id))
+                                            // }
                                         }}
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter' && !e.shiftKey) {
                                                 e.preventDefault();
                                                 setEditingId(null)
-                                                if (!item.content.trim()) {
-                                                    setItems(prev => prev.filter(i => i.id !== item.id))
-                                                }
+                                                // if (!item.content.trim()) {
+                                                //     setItems(prev => prev.filter(i => i.id !== item.id))
+                                                // }
                                             }
                                         }}
                                         onMouseDown={e => e.stopPropagation()}
