@@ -21,6 +21,7 @@ interface BoardItem {
 interface GroupData {
     id: string
     name: string
+    columns?: number
 }
 
 const GRID_SIZE = 80
@@ -250,7 +251,7 @@ export default function MindBoardClient() {
         const clientX = 'touches' in e ? (e as any).touches[0].clientX : (e as any).clientX
         const clientY = 'touches' in e ? (e as any).touches[0].clientY : (e as any).clientY
         const { x, y } = getWorldCoords(clientX, clientY)
-        createMemo(x, y)
+        createMemo(x, y, true) // Enable editing immediately
     }
 
     const startPan = (clientX: number, clientY: number) => {
@@ -452,6 +453,9 @@ export default function MindBoardClient() {
 
     const arrangeGroup = (groupId: string) => {
         setItems(prev => {
+            const group = groups.find((g: GroupData) => g.id === groupId)
+            const cols = group?.columns || 2
+
             const members = prev.filter(i => i.groupId === groupId)
             const otherItems = prev.filter(i => i.groupId !== groupId)
             if (members.length === 0) return prev
@@ -460,12 +464,35 @@ export default function MindBoardClient() {
             const minX = Math.min(...members.map(i => i.x))
             const minY = Math.min(...members.map(i => i.y))
 
-            const packed = packGroup(members)
+            // Sort members by position (reading order) to maintain stability
+            // OR depend on current array order if we want reordering to stick
+            // For "Just Arrange", let's sort by current position to be deterministic
+            // BUT: If we dragged and dropped, we want THAT order.
+            // Drag logic should have already updated the array order.
+            // So we just iterate 'members' in order.
+            // However, members is filtered from 'prev', which might be arbitrary if not sorted.
+            // Let's assume 'prev' (items) order is the truth.
 
-            const updatedMembers = members.map(m => {
-                const p = packed.find(p => p.id === m.id)
-                if (p) return { ...m, x: minX + p.x, y: minY + p.y }
-                return m
+            // Layout based on grid
+            const updatedMembers = members.map((m: BoardItem, idx: number) => {
+                const col = idx % cols
+                const row = Math.floor(idx / cols)
+
+                // Fixed size cells? Or dynamic?
+                // User said "2x2" memos.
+                // Let's assume max width in the column.
+                // For simplicity, fixed grid slots based on 2x2 memos (160x160) + gap (20)
+                // Or use actual item sizes?
+                // "Sort like number 2... 2 items horizontally"
+
+                const offsetX = col * (160 + 20) // 160 is default memo width
+                const offsetY = row * (160 + 40) // 160 + gap
+
+                // If items have variable height, this is tricky.
+                // Let's use max height of the row logic for true grid?
+                // Or simplified fixed grid. User asked for 2x2.
+
+                return { ...m, x: minX + offsetX, y: minY + offsetY }
             })
 
             return [...otherItems, ...updatedMembers]
@@ -496,8 +523,8 @@ export default function MindBoardClient() {
 
             // 2. Arrange
             // Find top-left of group
-            const minX = Math.min(...resisedMembers.map(i => i.x))
-            const minY = Math.min(...resisedMembers.map(i => i.y))
+            const minX = Math.min(...resisedMembers.map((i: BoardItem) => i.x))
+            const minY = Math.min(...resisedMembers.map((i: BoardItem) => i.y))
 
             const packed = packGroup(resisedMembers)
             const updatedMembers = resisedMembers.map(m => {
@@ -510,9 +537,25 @@ export default function MindBoardClient() {
         })
     }
 
+    const groupSelectedItems = () => {
+        if (selectedIds.size < 2) return
+
+        const newGroupId = Date.now().toString()
+        const members = items.filter(i => selectedIds.has(i.id))
+
+        // Calculate bounds to position the group header properly?
+        // Not strictly needed as header is rendered based on bounds.
+
+        setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, groupId: newGroupId } : i))
+        setGroups(prev => [...prev, { id: newGroupId, name: "New Group", columns: 2 }])
+
+        // Optional: Auto-arrange them immediately?
+        // Let's just wrap them. User can arrange later.
+    }
+
     const optimizeSize = () => {
         setItems(prev => {
-            const nextItems = prev.map(item => {
+            const nextItems = prev.map((item: BoardItem) => {
                 const lines = item.content.split('\\n').length
                 const length = item.content.length
                 let targetW = 240
@@ -529,7 +572,7 @@ export default function MindBoardClient() {
 
             // Pull group members together
             const handledGroups = new Set<string>()
-            nextItems.forEach(item => {
+            nextItems.forEach((item: BoardItem) => {
                 if (item.groupId && !handledGroups.has(item.groupId)) {
                     const members = nextItems.filter(i => i.groupId === item.groupId)
                     const packed = packGroup(members)
@@ -730,37 +773,93 @@ export default function MindBoardClient() {
 
                         // 2. Identify incoming items
                         // draggedIds are the ones moving.
-                        // Also include any members of primaryGroupId if we are merging that whole group in, 
-                        // but Drag Logic already selected all group members if shift not pressed? 
-                        // Our startDrag logic selects all group members. So draggedIds contains all of them.
+
+                        // Merge all items into one list
+                        // Determine order:
+                        // If we dropped *onto* a specific item, we might want to insert there?
+                        // For now, simple append or re-arrange.
+
+                        // To allow "Dragging reorders them within this grid", we need to know WHERE we dropped.
+                        // We dropped 'primaryItem' at (primaryItem.x, primaryItem.y).
+
+                        const incomingIds = draggedIds
+                        const existingMembers = currentMembersOfDestination.filter(m => !incomingIds.includes(m.id))
+                        const incomingItems = newItems.filter(i => incomingIds.includes(i.id))
+
+                        // We want to insert incomingItems into existingMembers based on position.
+                        // Sort existingMembers by their current "Index" in the grid?
+                        // Or just simplistic:
+
+                        const allGroupItems = [...existingMembers, ...incomingItems]
+
+                        // Sort by Y then X to determine reading order?
+                        // NO, the User wants to Reorder by Drag.
+                        // If I drag Item A to the middle of the group, it should stay there.
+                        // But here we are in "Grouping Logic" (merging/joining).
+                        // If just dragging WITHIN a group, we handle it separately?
+
+                        // "Drag Logic" above handles position.
+                        // If we are just moving within the same group, 'finalizeInteraction' sees them as collisions?
+                        // If moving within same group, `target` might be another member.
+                        // If so, `destinationGroupId` === `primaryGroupId`.
+
+                        // If destination === source group:
+                        if (destinationGroupId === primaryGroupId) {
+                            // Reordering within group
+                            // We need to insert keys based on visual position.
+                            // Sort all items by (y, x).
+                            allGroupItems.sort((a, b) => (a.y - b.y) || (a.x - b.x))
+                        } else {
+                            // Merging groups: just append? or sort?
+                            allGroupItems.sort((a, b) => (a.y - b.y) || (a.x - b.x))
+                        }
 
                         // 3. Update groupId for all dragged items
                         const updatedItems = newItems.map(i => {
                             if (draggedIds.includes(i.id)) return { ...i, groupId: destinationGroupId }
-                            if (!targetGroupId && i.id === target.id) return { ...i, groupId: destinationGroupId } // Promote target to group
-                            // If we are merging a target GROUP (and we aren't using its ID for some reason), update them too?
-                            // Logic above picked targetGroupId as first choice, so target's group is already the destination.
+                            if (!targetGroupId && i.id === target.id) return { ...i, groupId: destinationGroupId }
                             return i
                         })
 
+                        // Ensure 'groups' state has the destination group (create if needed)
+                        if (destinationGroupId && !groups.find(g => g.id === destinationGroupId)) {
+                            // This is a side-effect in render/callback phase - safe enough here?
+                            // Better to schedule it or do it.
+                            // setGroups is async.
+                            // We should update it.
+                            setGroups(prev => [...prev, { id: destinationGroupId!, name: "New Group", columns: 2 }])
+                        }
+
                         // 4. Re-pack (Auto-arrange) the ENTIRE destination group
-                        const allMembers = updatedItems.filter(i => i.groupId === destinationGroupId)
+                        // We need to apply the layout logic.
+                        // We can't call 'arrangeGroup' directly because it sets state.
+                        // We need to do the logic HERE on 'updatedItems'.
 
-                        // Determine Top-Left of the group to keep it roughly in place?
-                        // Or just sort and pack.
-                        // Use Top-Left of the TARGET as the anchor? Or the average/min?
-                        // Let's use the Minimum X,Y of the combined group as the start point.
-                        const minX = Math.min(...allMembers.map(i => i.x))
-                        const minY = Math.min(...allMembers.map(i => i.y))
+                        const finalGroupMembers = updatedItems.filter(i => i.groupId === destinationGroupId)
 
-                        const packed = packGroup(allMembers)
+                        // Sort by Y/X to enforce the drop order?
+                        // If we truly want "insert at drop", we need to key off the drop coordinates vs item centers.
+                        // But `allGroupItems` sort above approximates it.
 
-                        // Apply packed positions relative to minX, minY
-                        packed.forEach(p => {
-                            const idx = updatedItems.findIndex(x => x.id === p.id)
-                            if (idx > -1) {
-                                updatedItems[idx].x = minX + p.x
-                                updatedItems[idx].y = minY + p.y
+                        finalGroupMembers.sort((a, b) => (a.y - b.y) || (a.x - b.x))
+
+                        const groupConfig = groups.find(g => g.id === destinationGroupId)
+                        const cols = groupConfig?.columns || 2
+
+                        const gMinX = Math.min(...finalGroupMembers.map(i => i.x))
+                        const gMinY = Math.min(...finalGroupMembers.map(i => i.y))
+
+                        finalGroupMembers.forEach((m: BoardItem, idx: number) => {
+                            const col = idx % cols
+                            const row = Math.floor(idx / cols)
+                            const offsetX = col * (160 + 20)
+                            const offsetY = row * (160 + 40)
+
+                            // Find index in updatedItems
+                            const uIdx = updatedItems.findIndex(u => u.id === m.id)
+                            if (uIdx > -1) {
+                                updatedItems[uIdx].x = gMinX + offsetX
+                                updatedItems[uIdx].y = gMinY + offsetY
                             }
                         })
 
@@ -794,7 +893,7 @@ export default function MindBoardClient() {
                 const wy2 = y2 / scale - pan.y / scale
 
                 const newSelected = new Set(selectedIds)
-                items.forEach(item => {
+                items.forEach((item: BoardItem) => {
                     // Check intersection
                     if (item.x < wx2 && item.x + item.w > wx1 && item.y < wy2 && item.y + item.h > wy1) {
                         newSelected.add(item.id)
@@ -874,6 +973,19 @@ export default function MindBoardClient() {
                     lastEnterTime.current = now
                 }
             }
+
+            if (e.key === 'Escape') {
+                if (editingId) {
+                    // Check if empty, delete if so
+                    setItems(prev => prev.filter(i => {
+                        if (i.id === editingId && !i.content.trim()) return false
+                        return true
+                    }))
+                    setEditingId(null)
+                } else if (selectedIds.size > 0) {
+                    setSelectedIds(new Set())
+                }
+            }
         }
         const handleKeyUp = (e: KeyboardEvent) => {
             if (e.code === 'Space') {
@@ -943,21 +1055,44 @@ export default function MindBoardClient() {
                         onMouseDown={e => { e.stopPropagation(); startDrag(e.clientX, e.clientY, gid, e.shiftKey, true) }}
                     >
                         <button
-                            onClick={(e) => { e.stopPropagation(); unGroup(gid); }}
+                            onClick={(e: React.MouseEvent) => { e.stopPropagation(); unGroup(gid); }}
                             className="p-0.5 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
                             title="Ungroup"
-                            onMouseDown={e => e.stopPropagation()}
+                            onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                         >
                             <Unlock size={10} />
                         </button>
                         <span className="border-l border-gray-200 pl-1.5 pr-1.5"
                             onDoubleClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
                         >{groupName}</span>
+
+                        {/* Column Control */}
+                        <div className="relative group/cols border-l border-gray-200 pl-1.5 flex items-center">
+                            <button className="hover:bg-gray-100 rounded px-1 flex items-center gap-0.5" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
+                                <span className="text-gray-400">#</span>
+                                <span>{groups.find((g: GroupData) => g.id === gid)?.columns || 2}</span>
+                            </button>
+                            <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded shadow-lg p-1 hidden group-hover/cols:grid grid-cols-3 gap-1 z-50">
+                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                                    <button
+                                        key={n}
+                                        onClick={(e) => {
+                                            e.stopPropagation()
+                                            setGroups((prev: GroupData[]) => prev.map((g: GroupData) => g.id === gid ? { ...g, columns: n } : g))
+                                            setTimeout(() => arrangeGroup(gid), 0) // Trigger rearrange
+                                        }}
+                                        className={`w-4 h-4 text-[10px] flex items-center justify-center rounded hover:bg-blue-100 ${groups.find(g => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-600'}`}
+                                    >
+                                        {n}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
                         <div className="flex gap-0.5 border-l border-gray-200 pl-1.5">
-                            <button onClick={(e) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Optimize" onMouseDown={e => e.stopPropagation()}>
+                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Optimize" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
                                 <Wand2 size={10} />
                             </button>
-                            <button onClick={(e) => { e.stopPropagation(); arrangeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Arrange" onMouseDown={e => e.stopPropagation()}>
+                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); arrangeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Arrange" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
                                 <LayoutGrid size={10} />
                             </button>
                         </div>
@@ -979,7 +1114,7 @@ export default function MindBoardClient() {
                         if (items.length === 0) return null
 
                         let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
-                        items.forEach(i => {
+                        items.forEach((i: BoardItem) => {
                             minX = Math.min(minX, i.x)
                             minY = Math.min(minY, i.y)
                             maxX = Math.max(maxX, i.x + i.w)
@@ -1017,7 +1152,7 @@ export default function MindBoardClient() {
 
                         return (
                             <>
-                                {items.map((item) => (
+                                {items.map((item: BoardItem) => (
                                     <div key={`mini-${item.id}`} className="absolute rounded-sm border border-black/10"
                                         style={{
                                             left: `${((item.x - minX) / width) * 100}%`,
@@ -1059,52 +1194,52 @@ export default function MindBoardClient() {
 
 
             {/* Vertical Toolbar (Left) */}
-            <div className="absolute left-4 top-20 z-50 flex flex-col gap-4 max-h-[calc(100vh-100px)]">
+            <div className="absolute left-2 top-20 z-50 flex flex-col gap-4 max-h-[calc(100vh-100px)]">
                 {/* Group Navigator */}
                 {groups.length > 0 && (
-                    <div className="flex flex-col gap-1 overflow-y-auto no-scrollbar pb-1 pointer-events-auto bg-white/50 backdrop-blur-sm p-1 rounded-lg">
-                        {groups.map(g => (
+                    <div className="flex flex-col gap-1 overflow-y-auto no-scrollbar pb-1 pointer-events-auto bg-white/50 backdrop-blur-sm p-1 rounded-lg w-32">
+                        {groups.map((g: GroupData) => (
                             <div key={g.id} className="flex shrink-0">
                                 <button
                                     onClick={() => scrollToGroup(g.id)}
                                     onDoubleClick={() => unGroup(g.id)}
-                                    className="w-full text-left px-3 py-1.5 bg-white border border-gray-200 rounded-md text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-2 group"
+                                    className="w-full text-left px-2 py-1 bg-white border border-gray-200 rounded text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-1.5 group"
                                 >
                                     <LayoutGrid size={10} className="group-hover:text-white" />
-                                    <span className="truncate max-w-[100px]">{g.name}</span>
+                                    <span className="truncate">{g.name}</span>
                                 </button>
                             </div>
                         ))}
                     </div>
                 )}
 
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1.5 flex flex-col items-center gap-2 pointer-events-auto">
-                    <button onClick={autoArrange} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Auto Arrange">
-                        <LayoutGrid size={20} />
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
+                    <button onClick={autoArrange} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Auto Arrange">
+                        <LayoutGrid size={18} />
                     </button>
-                    <button onClick={optimizeSize} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Optimize Size">
-                        <Wand2 size={20} />
+                    <button onClick={optimizeSize} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Optimize Size">
+                        <Wand2 size={18} />
                     </button>
-                    <div className="w-4 h-[1px] bg-gray-200 my-0.5"></div>
+                    <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
                     <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Zoom In">
-                        <Plus size={20} />
+                    }} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Zoom In">
+                        <Plus size={18} />
                     </button>
-                    <span className="text-xs font-bold font-mono py-1">{Math.round(scale * 100)}%</span>
+                    <span className="text-[10px] font-bold font-mono py-0.5">{Math.round(scale * 100)}%</span>
                     <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(-0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Zoom Out">
-                        <Minus size={20} />
+                    }} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Zoom Out">
+                        <Minus size={18} />
                     </button>
-                    <button onClick={() => setPan({ x: -2000, y: -2000 })} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Reset View">
-                        <MousePointer2 size={20} />
+                    <button onClick={() => setPan({ x: -2000, y: -2000 })} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Reset View">
+                        <MousePointer2 size={18} />
                     </button>
                 </div>
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1.5 flex flex-col items-center gap-2 pointer-events-auto">
-                    <div className="flex flex-col gap-1 p-1">
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
+                    <div className="flex flex-col gap-1 p-0.5">
                         {COLORS.map((c) => (
                             <button key={c}
                                 onClick={() => {
@@ -1112,7 +1247,7 @@ export default function MindBoardClient() {
                                         setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, color: c } : i))
                                     }
                                 }}
-                                className={`w-4 h-4 rounded-full border border-black/10 transition-transform hover:scale-125 ${selectedIds.size > 0 && items.find(i => selectedIds.has(i.id))?.color === c ? 'ring-1 ring-offset-1 ring-black/20' : ''}`}
+                                className={`w-3.5 h-3.5 rounded-full border border-black/10 transition-transform hover:scale-125 ${selectedIds.size > 0 && items.find(i => selectedIds.has(i.id))?.color === c ? 'ring-1 ring-offset-1 ring-black/20' : ''}`}
                                 style={{ backgroundColor: c }} />
                         ))}
                     </div>
@@ -1126,6 +1261,11 @@ export default function MindBoardClient() {
                 className="w-full h-screen cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
                 onTouchStart={onTouchStart}
                 onMouseDown={(e: React.MouseEvent) => {
+                    // Background Deselect
+                    if (e.target === e.currentTarget && !isSpacePressed && !e.shiftKey) {
+                        setSelectedIds(new Set())
+                    }
+
                     if (isSpacePressed || e.shiftKey || e.button === 1) { // Middle click or Space
                         if (e.shiftKey && !isSpacePressed) {
                             // Start selection box
@@ -1254,6 +1394,37 @@ export default function MindBoardClient() {
                     />
                 )}
             </div>
+
+            {/* Floating Group Button */}
+            {selectedIds.size > 1 && (
+                <div className="absolute z-[200] pointer-events-none"
+                    style={{
+                        left: (() => {
+                            const selectedItems = items.filter(i => selectedIds.has(i.id))
+                            if (selectedItems.length === 0) return 0
+                            const minX = Math.min(...selectedItems.map((i: BoardItem) => i.x))
+                            const maxX = Math.max(...selectedItems.map((i: BoardItem) => i.x + i.w))
+                            const centerX = (minX + maxX) / 2
+                            return centerX * scale + pan.x
+                        })(),
+                        top: (() => {
+                            const selectedItems = items.filter(i => selectedIds.has(i.id))
+                            if (selectedItems.length === 0) return 0
+                            const minY = Math.min(...selectedItems.map((i: BoardItem) => i.y))
+                            return minY * scale + pan.y - 50
+                        })()
+                    }}
+                >
+                    <button
+                        onClick={(e: React.MouseEvent) => { e.stopPropagation(); groupSelectedItems() }}
+                        className="bg-blue-600 text-white px-3 py-1.5 rounded-full shadow-lg font-bold text-sm hover:bg-blue-700 hover:scale-105 transition-all flex items-center gap-1.5 pointer-events-auto -translate-x-1/2"
+                        onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                    >
+                        <LayoutGrid size={14} />
+                        Group
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
