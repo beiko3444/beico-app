@@ -3,6 +3,23 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock, AlertCircle } from 'lucide-react'
 
+// Add styles/keyframes for the gradient border
+const styles = `
+@keyframes gradient-border {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+`
+
+
+
 // Types
 interface BoardItem {
     id: string
@@ -1431,19 +1448,26 @@ export default function MindBoardClient() {
                     {items.map((item) => (
                         <div
                             key={item.id}
-                            className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border transition-all overflow-hidden pointer-events-auto
+                            className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group transition-all overflow-hidden pointer-events-auto
                                     ${item.completed ? 'opacity-60 scale-[0.98]' : ''} 
                                     ${selectedIds.has(item.id) ? 'ring-2 ring-blue-500 shadow-xl' :
-                                    item.isUrgent ? 'ring-4 ring-amber-400 ring-offset-2 shadow-[0_0_20px_rgba(251,191,36,0.8)] z-50' :
-                                        'border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}
-                                    ${item.isUrgent ? 'animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]' : ''}`}
+                                    item.isUrgent ? 'shadow-[0_0_15px_rgba(255,0,0,0.3)] z-50' :
+                                        'border border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}`}
                             style={{
                                 left: item.x,
                                 top: item.y,
                                 width: item.w,
                                 height: item.h,
                                 zIndex: item.zIndex,
-                                backgroundColor: item.completed ? '#f3f4f6' : item.color
+                                backgroundColor: item.completed ? '#f3f4f6' : item.color,
+                                ...(item.isUrgent ? {
+                                    backgroundImage: `linear-gradient(${item.completed ? '#f3f4f6' : item.color}, ${item.completed ? '#f3f4f6' : item.color}), linear-gradient(45deg, #ff0000, #ffcccc, #ff0000)`,
+                                    backgroundOrigin: 'border-box',
+                                    backgroundClip: 'padding-box, border-box',
+                                    border: '4px solid transparent',
+                                    backgroundSize: '200% 200%',
+                                    animation: 'gradient-border 2s linear infinite'
+                                } : {})
                             }}
                             onMouseDown={(e) => {
                                 if (isSpacePressed) return // Allow bubble to container for panning
