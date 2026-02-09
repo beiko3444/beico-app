@@ -1208,7 +1208,7 @@ export default function MindBoardClient() {
     }
 
     return (
-        <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-100 select-none touch-none">
+        <div className="fixed left-0 right-0 bottom-0 top-[60px] z-10 bg-gray-100 select-none touch-none overflow-hidden">
             {/* minimap */}
             <div className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <div className="relative w-full h-full">
