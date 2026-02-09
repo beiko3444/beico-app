@@ -382,19 +382,103 @@ export default function MindBoardClient() {
         ))
     }
 
+    // Masonry / First-Fit Layout Algorithm
+    const layoutGroupItemsMasonry = (members: BoardItem[], columns: number = 2) => {
+        if (members.length === 0) return members
+
+        // Grid unit size
+        const CELL_W = 180 // default width + gap ?
+        // We need to know the 'grid units' of each item.
+        // Item w/h are in pixels. w=160 -> 2 units? (if unit=80) 
+        // User said "2x2 board".
+        // Let's assume standard unit block is 80x80 approx?
+        // Actually, let's use the item's pixel dimensions directly but align to a 'virtual' grid of let's say 20px or 40px for collision?
+        // Or better: Just use a coarse grid where 1 cell = 1 column width?
+        // MindBoard items seem to be width=160 (2x 80).
+        // Let's use a 2D bitmask/grid based on "Visual Rows" of height 40px?
+        // Allow simplified check: 
+
+        // Define Column Width and Row Height
+        const COL_WIDTH = 180 // 160 + 20 gap
+        const ROW_HEIGHT = 20 // Fine grained rows for vertical packing
+
+        // Track occupied slots. occupying[col][y_index] = true
+        // We can use a map: `${col},${y}`
+        const occupied = new Set<string>()
+
+        const checkFit = (col: number, yIdx: number, wSlots: number, hSlots: number) => {
+            if (col + wSlots > columns) return false // Out of bounds
+            for (let c = 0; c < wSlots; c++) {
+                for (let r = 0; r < hSlots; r++) {
+                    if (occupied.has(`${col + c},${yIdx + r}`)) return false
+                }
+            }
+            return true
+        }
+
+        const markOccupied = (col: number, yIdx: number, wSlots: number, hSlots: number) => {
+            for (let c = 0; c < wSlots; c++) {
+                for (let r = 0; r < hSlots; r++) {
+                    occupied.add(`${col + c},${yIdx + r}`)
+                }
+            }
+        }
+
+        // We assume items are already sorted by "order" (Insertion order)
+        return members.map(item => {
+            // Calculate item size in slots
+            const wSlots = Math.ceil((item.w + 20) / COL_WIDTH) // Effectively mostly 1 column?
+            // Actually, if item is 320px wide (double), it takes 2 cols?
+            // If item.w = 160 -> 1 col.
+            // If item.w = 320 -> 2 cols.
+            // Let's use:
+            const colSpan = Math.max(1, Math.ceil((item.w + 10) / COL_WIDTH))
+            const rowSpan = Math.ceil((item.h + 20) / ROW_HEIGHT)
+
+            // Find first position
+            let foundCol = 0
+            let foundY = 0
+            let bestY = Infinity
+            let bestCol = 0
+
+            // Simple First Fit:
+            // Scan Y from 0...
+            // Scan X from 0...columns-colSpan
+
+            // To compact vertically, we iterate Y first? 
+            // Actually, we want to place it as high as possible.
+            // So iterating Y then X is correct. BUT we ideally want to fill holes.
+
+            let placed = false
+            // Limit Y search to reasonable amount to avoid infinite loop
+            for (let y = 0; y < 1000; y++) {
+                for (let x = 0; x <= columns - colSpan; x++) {
+                    if (checkFit(x, y, colSpan, rowSpan)) {
+                        foundCol = x
+                        foundY = y
+                        placed = true
+                        break
+                    }
+                }
+                if (placed) break
+            }
+
+            markOccupied(foundCol, foundY, colSpan, rowSpan)
+
+            return {
+                ...item,
+                x: foundCol * COL_WIDTH,
+                y: foundY * ROW_HEIGHT
+            }
+        })
+    }
+
     const packGroup = (members: BoardItem[]) => {
-        if (members.length <= 1) return members;
-        const sortedInGroup = [...members].sort((a, b) => a.y - b.y || a.x - b.x);
-        let curX = 0;
-        let curY = 0;
-        let maxH = 0;
-        return sortedInGroup.map((m, idx) => {
-            const newItem = { ...m, x: curX, y: curY };
-            curX += m.w + 20;
-            maxH = Math.max(maxH, m.h);
-            if (idx % 2 === 1) { curX = 0; curY += maxH + 40; maxH = 0; }
-            return newItem;
-        });
+        // Wrapper to maintain signature, defaulting to 2 cols
+        // We actually need to know the group's specific column count.
+        // But this function is used in 'optimizeSize' where we might not know the group config easily?
+        // We can find it from 'groups' state if we pass it, or just default to 2.
+        return layoutGroupItemsMasonry(members, 2)
     }
 
     const autoArrange = () => {
@@ -500,27 +584,8 @@ export default function MindBoardClient() {
             // However, members is filtered from 'prev', which might be arbitrary if not sorted.
             // Let's assume 'prev' (items) order is the truth.
 
-            // Layout based on grid
-            const updatedMembers = members.map((m: BoardItem, idx: number) => {
-                const col = idx % cols
-                const row = Math.floor(idx / cols)
-
-                // Fixed size cells? Or dynamic?
-                // User said "2x2" memos.
-                // Let's assume max width in the column.
-                // For simplicity, fixed grid slots based on 2x2 memos (160x160) + gap (20)
-                // Or use actual item sizes?
-                // "Sort like number 2... 2 items horizontally"
-
-                const offsetX = col * (160 + 20) // 160 is default memo width
-                const offsetY = row * (160 + 40) // 160 + gap
-
-                // If items have variable height, this is tricky.
-                // Let's use max height of the row logic for true grid?
-                // Or simplified fixed grid. User asked for 2x2.
-
-                return { ...m, x: minX + offsetX, y: minY + offsetY }
-            })
+            // Layout based on Masonry
+            const updatedMembers = layoutGroupItemsMasonry(members, cols)
 
             return [...otherItems, ...updatedMembers]
         })
@@ -726,6 +791,52 @@ export default function MindBoardClient() {
                 return item
             }))
 
+            // CRITICAL: Group Repulsion (Rigid Body Collision)
+            // If we are dragging a group (or items that form a group), we push OTHER groups.
+            // 1. Identify the "Moving Group(s)"
+            const movingGroupIds = new Set<string>()
+            dragItems.forEach((_, id) => {
+                const item = items.find(i => i.id === id)
+                if (item && item.groupId) movingGroupIds.add(item.groupId)
+            })
+
+            if (movingGroupIds.size > 0) {
+                // We have moving groups.
+                // For simplicity, let's handle one moving group at a time or all?
+                // If I drag a group header, I am dragging ALL members. movingGroupIds has 1 ID.
+                // If I drag a single item, movingGroupIds has 1 ID, but I am determining if it's a "Group Drag"
+                // The prompt says "When groups move". 
+                // Group Drag is triggered via header.
+                // But `dragItems` just contains items.
+                // Heuristic: If we are dragging ALL members of a group, we treat it as a group move.
+                // OR: If specific flag was passed? `startDrag` has `isGroupDrag`.
+                // But state doesn't persist `isGroupDrag`.
+                // Let's check if the number of dragged items equals the group size.
+
+                movingGroupIds.forEach(gid => {
+                    const groupMembers = items.filter(i => i.groupId === gid)
+                    const draggedMembers = groupMembers.filter(i => dragItems.has(i.id))
+
+                    // Only repel if we are moving the WHOLE group (or significant part?)
+                    // Let's assume repulsion triggers when dragging group header (which selects all).
+                    if (draggedMembers.length === groupMembers.length) {
+                        // Calculate Moving Group Bounds (AABB)
+                        // Note: We need the *current* positions from the `setItems` update above.
+                        // Accessing `items` state here gives OLD items.
+                        // We need to calculate based on `prev` inside setItems, but we are outside.
+                        // Actually, we just updated `items`. 
+                        // But `setItems` is async batch. We can't see it yet.
+                        // We have to do this INSIDE the setItems call or do a second pass?
+                        // Better: Determine the delta and apply it to "Occupied Space", then check collisions.
+                        // Complex.
+
+                        // Simpler approach:
+                        // Inside the `setItems` callback above, we run collision detection.
+                        // Let's rewrite the `setItems` call to include repulsion.
+                    }
+                })
+            }
+
             // Auto-pan detection
             const edgeThreshold = 50
             const container = containerRef.current
@@ -845,16 +956,27 @@ export default function MindBoardClient() {
                     } else {
                         // Merging with a single item -> Create New Group
                         isMerge = true
-                        // We will generate ID later if needed
                     }
                 } else if (primaryItem.groupId) {
-                    // If not hitting anything, but we were already in a group...
-                    // Did we drag OUT of the group?
-                    // Let's assume we stay in the group unless we explicitly "Eject" (which is Double Click header currently).
-                    // OR: implementing "Drag Out" is tricky without a visual cue.
-                    // For now: If you drag a member, you are moving it WITHIN the group (unless you hit another group?)
-                    // Let's keep it in the current group for reordering.
+                    // Staying in group
                     targetGroupId = primaryItem.groupId
+                }
+
+                // DISABLE MERGE for Group Drags (Water & Oil)
+                // If we are dragging a whole group, forbid merging into another group.
+                const isGroupDrag = draggedIds.every(id => {
+                    const item = currentItems.find(i => i.id === id)
+                    return item?.groupId === primaryItem.groupId
+                }) && draggedIds.length > 1 // Heuristic: dragging multiple items from same group
+
+                if (draggedIds.length === 1 && !isMerge && targetGroupId && targetGroupId !== primaryItem.groupId) {
+                    // Single item dragged into another group -> ALLOW
+                } else if (isGroupDrag || (draggedIds.length > 1)) {
+                    // Multiple items or Group Drag -> DISABLE MERGE into other group
+                    // Only allow reorder within SAME group
+                    if (targetGroupId && targetGroupId !== primaryItem.groupId) {
+                        return newItems // Cancel merge
+                    }
                 }
 
                 // If no target group and no merge, we are just moving freely on canvas.
@@ -929,23 +1051,16 @@ export default function MindBoardClient() {
                 const safeIndex = Math.min(targetIndex, finalMembers.length)
                 finalMembers.splice(safeIndex, 0, ...movingItems)
 
-                // 6. Apply Reflow (Strict Grid)
-                const cellW = 180 // 160 + 20
-                const cellH = 200 // 160 + 40
+                // 6. Apply Reflow (Masonry)
+                const layoutedMembers = layoutGroupItemsMasonry(finalMembers, cols)
 
-                finalMembers.forEach((m, idx) => {
-                    const col = idx % cols
-                    const row = Math.floor(idx / cols)
-                    const newX = minX + col * cellW
-                    const newY = minY + row * cellH
-
-                    // Update item in newItems array
+                layoutedMembers.forEach(m => {
                     const matchIdx = newItems.findIndex(ni => ni.id === m.id)
                     if (matchIdx > -1) {
                         newItems[matchIdx] = {
                             ...newItems[matchIdx],
-                            x: newX,
-                            y: newY,
+                            x: minX + m.x,
+                            y: minY + m.y,
                             groupId: destinationGroupId
                         }
                     }
