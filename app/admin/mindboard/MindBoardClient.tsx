@@ -54,6 +54,7 @@ export default function MindBoardClient() {
     const [editingId, setEditingId] = useState<string | null>(null)
     const [maxZIndex, setMaxZIndex] = useState(1)
     const [colorPaletteId, setColorPaletteId] = useState<string | null>(null)
+    const [activeColumnDropdown, setActiveColumnDropdown] = useState<string | null>(null)
 
     // Refs
     const containerRef = useRef<HTMLDivElement>(null)
@@ -118,15 +119,6 @@ export default function MindBoardClient() {
     }, [])
 
     const clampPan = useCallback((x: number, y: number, currentScale: number) => {
-        // For now, let's DISABLE strict clamping to solve "cannot move to left/right end"
-        // User likely feels constrained.
-        // Or implement very loose clamping.
-        // const { minX, maxX, minY, maxY } = getBoundaries(currentScale)
-        // return {
-        //    x: Math.max(minX, Math.min(maxX, x)),
-        //    y: Math.max(minY, Math.min(maxY, y))
-        // }
-        // Simple unclamped for freedom (or very large bounds)
         return { x, y }
     }, [])
 
@@ -248,6 +240,12 @@ export default function MindBoardClient() {
     }
 
     const handleCanvasClick = (e: React.MouseEvent | React.TouchEvent) => {
+        // Close dropdown if clicked outside
+        if (activeColumnDropdown) {
+            setActiveColumnDropdown(null)
+            return
+        }
+
         const clientX = 'touches' in e ? (e as any).touches[0].clientX : (e as any).clientX
         const clientY = 'touches' in e ? (e as any).touches[0].clientY : (e as any).clientY
         const { x, y } = getWorldCoords(clientX, clientY)
@@ -869,6 +867,31 @@ export default function MindBoardClient() {
                 }
                 return newItems
             })
+
+            // Trigger auto-arrange for any touched groups
+            // We need to do this OUTSIDE the setItems reducer if we want to call arrangeGroup (which calls setItems)
+            // But arrangeGroup rearranges based on CURRENT state.
+            // If we just updated state, we might have a race condition if we call it immediately?
+            // `arrangeGroup` uses `setItems(prev => ...)` so it should queue correctly if we do it in setTimeout.
+
+            const draggedIds = Array.from(dragItems.keys())
+            // Find groups involved
+            // We can't easily know the *final* groups from here without peering into the result of the previous setItems.
+            // But we can approximate:
+            // 1. Groups of dragged items (before move - valid if they stayed in group)
+            // 2. Target group (if merge)
+
+            // Let's rely on the fact that if we just dropped something, we want to arrange its group.
+            // But we don't know the NEW group ID easily here outside of the reducer.
+
+            // Hack: trigger arrange for ALL groups that contain any of the dragged items?
+            // But we need the NEW state.
+
+            // Alternative: Move the arrange logic INTO the reducer above?
+            // The reducer above already does "Re-pack" for merges (Step 4 in code).
+            // But what if NO merge? (The case where I just moved an item inside its group).
+            // We need to handle that in the reducer too.
+
         }
 
         // Selection Box Finalize
@@ -1066,27 +1089,36 @@ export default function MindBoardClient() {
                             onDoubleClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
                         >{groupName}</span>
 
-                        {/* Column Control */}
                         <div className="relative group/cols border-l border-gray-200 pl-1.5 flex items-center">
-                            <button className="hover:bg-gray-100 rounded px-1 flex items-center gap-0.5" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
+                            <button
+                                onClick={(e) => {
+                                    e.stopPropagation()
+                                    setActiveColumnDropdown(activeColumnDropdown === gid ? null : gid)
+                                }}
+                                className="hover:bg-gray-100 rounded px-1 flex items-center gap-0.5"
+                                onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
+                            >
                                 <span className="text-gray-400">#</span>
                                 <span>{groups.find((g: GroupData) => g.id === gid)?.columns || 2}</span>
                             </button>
-                            <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded shadow-lg p-1 hidden group-hover/cols:grid grid-cols-3 gap-1 z-50">
-                                {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
-                                    <button
-                                        key={n}
-                                        onClick={(e) => {
-                                            e.stopPropagation()
-                                            setGroups((prev: GroupData[]) => prev.map((g: GroupData) => g.id === gid ? { ...g, columns: n } : g))
-                                            setTimeout(() => arrangeGroup(gid), 0) // Trigger rearrange
-                                        }}
-                                        className={`w-4 h-4 text-[10px] flex items-center justify-center rounded hover:bg-blue-100 ${groups.find(g => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-600'}`}
-                                    >
-                                        {n}
-                                    </button>
-                                ))}
-                            </div>
+                            {activeColumnDropdown === gid && (
+                                <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded shadow-lg p-1 grid grid-cols-3 gap-1 z-50">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                                        <button
+                                            key={n}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setGroups((prev: GroupData[]) => prev.map((g: GroupData) => g.id === gid ? { ...g, columns: n } : g))
+                                                setTimeout(() => arrangeGroup(gid), 0) // Trigger rearrange
+                                                setActiveColumnDropdown(null)
+                                            }}
+                                            className={`w-6 h-6 text-xs flex items-center justify-center rounded hover:bg-blue-100 ${groups.find(g => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-600'}`}
+                                        >
+                                            {n}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
                         <div className="flex gap-0.5 border-l border-gray-200 pl-1.5">
                             <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Optimize" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
