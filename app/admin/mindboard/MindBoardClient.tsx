@@ -562,7 +562,7 @@ export default function MindBoardClient() {
         setGroups(prev => prev.filter(g => g.id !== groupId))
     }
 
-    const arrangeGroup = (groupId: string) => {
+    const arrangeGroup = useCallback((groupId: string) => {
         setItems(prev => {
             const group = groups.find((g: GroupData) => g.id === groupId)
             const cols = group?.columns || 2
@@ -589,7 +589,7 @@ export default function MindBoardClient() {
 
             return [...otherItems, ...updatedMembers]
         })
-    }
+    }, [groups])
 
     const optimizeGroup = (groupId: string) => {
         setItems(prev => {
@@ -1224,6 +1224,31 @@ export default function MindBoardClient() {
                     }
                 }
             }
+
+            // Group Column Shortcuts (1-9, 0)
+            if (!editingId && selectedIds.size > 0) {
+                const key = parseInt(e.key)
+                if (!isNaN(key) && ((key >= 1 && key <= 9) || key === 0)) {
+                    const cols = key === 0 ? 10 : key
+
+                    const affectedGroupIds = new Set<string>()
+                    selectedIds.forEach(id => {
+                        const item = items.find(i => i.id === id)
+                        if (item && item.groupId) affectedGroupIds.add(item.groupId)
+                    })
+
+                    if (affectedGroupIds.size > 0) {
+                        setGroups(prev => prev.map(g => {
+                            if (affectedGroupIds.has(g.id)) {
+                                // Schedule arrange
+                                setTimeout(() => arrangeGroup(g.id), 0)
+                                return { ...g, columns: cols }
+                            }
+                            return g
+                        }))
+                    }
+                }
+            }
         }
         const handleKeyUp = (e: KeyboardEvent) => {
             if (e.code === 'Space') {
@@ -1236,7 +1261,7 @@ export default function MindBoardClient() {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [createMemo, getWorldCoords])
+    }, [createMemo, getWorldCoords, editingId, selectedIds, items, groups, arrangeGroup])
 
     const scrollToGroup = (groupId: string) => {
         const members = items.filter(i => i.groupId === groupId)
@@ -1289,36 +1314,36 @@ export default function MindBoardClient() {
                     }}
                 >
                     <div
-                        className="absolute -top-3 left-4 bg-white px-2 py-0.5 text-[10px] font-bold text-gray-500 cursor-grab active:cursor-grabbing hover:text-blue-600 hover:bg-blue-50 border border-gray-100 rounded shadow-sm select-none flex items-center gap-1.5 pointer-events-auto"
+                        className="absolute -top-4 left-4 bg-white px-3 py-1.5 text-sm font-bold text-gray-600 cursor-grab active:cursor-grabbing hover:text-blue-600 hover:bg-blue-50 border border-gray-200 rounded-lg shadow-sm select-none flex items-center gap-2 pointer-events-auto transition-all"
                         onMouseDown={e => { e.stopPropagation(); startDrag(e.clientX, e.clientY, gid, e.shiftKey, true) }}
                     >
                         <button
                             onClick={(e: React.MouseEvent) => { e.stopPropagation(); unGroup(gid); }}
-                            className="p-0.5 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
+                            className="p-1 hover:bg-red-50 hover:text-red-500 rounded transition-colors"
                             title="Ungroup"
                             onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                         >
-                            <Unlock size={10} />
+                            <Unlock size={14} />
                         </button>
-                        <span className="border-l border-gray-200 pl-1.5 pr-1.5"
+                        <span className="border-l border-gray-200 pl-2 pr-2"
                             onDoubleClick={(e) => { e.stopPropagation(); renameGroup(gid) }}
                         >{groupName}</span>
 
-                        <div className="relative group/cols border-l border-gray-200 pl-1.5 flex items-center">
+                        <div className="relative group/cols border-l border-gray-200 pl-2 flex items-center">
                             <button
                                 onClick={(e) => {
                                     e.stopPropagation()
                                     setActiveColumnDropdown(activeColumnDropdown === gid ? null : gid)
                                 }}
-                                className="hover:bg-gray-100 rounded px-1 flex items-center gap-0.5"
+                                className="hover:bg-gray-100 rounded px-1.5 py-0.5 flex items-center gap-1 transition-colors"
                                 onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                             >
-                                <span className="text-gray-400">#</span>
-                                <span>{groups.find((g: GroupData) => g.id === gid)?.columns || 2}</span>
+                                <span className="text-gray-400 text-xs">#</span>
+                                <span className="text-base">{groups.find((g: GroupData) => g.id === gid)?.columns || 2}</span>
                             </button>
                             {activeColumnDropdown === gid && (
-                                <div className="absolute bottom-full left-0 mb-1 bg-white border border-gray-200 rounded shadow-lg p-1 grid grid-cols-3 gap-1 z-50">
-                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9].map(n => (
+                                <div className="absolute bottom-full left-0 mb-2 bg-white border border-gray-200 rounded-lg shadow-xl p-1 flex flex-col-reverse gap-1 z-50 animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                    {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                                         <button
                                             key={n}
                                             onClick={(e) => {
@@ -1327,7 +1352,7 @@ export default function MindBoardClient() {
                                                 setTimeout(() => arrangeGroup(gid), 0) // Trigger rearrange
                                                 setActiveColumnDropdown(null)
                                             }}
-                                            className={`w-6 h-6 text-xs flex items-center justify-center rounded hover:bg-blue-100 ${groups.find(g => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-600'}`}
+                                            className={`w-8 h-8 text-sm font-medium flex items-center justify-center rounded hover:bg-blue-100 transition-colors ${groups.find(g => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-700'}`}
                                         >
                                             {n}
                                         </button>
@@ -1335,12 +1360,12 @@ export default function MindBoardClient() {
                                 </div>
                             )}
                         </div>
-                        <div className="flex gap-0.5 border-l border-gray-200 pl-1.5">
-                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Optimize" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
-                                <Wand2 size={10} />
+                        <div className="flex gap-1 border-l border-gray-200 pl-2">
+                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors" title="Optimize" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
+                                <Wand2 size={14} />
                             </button>
-                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); arrangeGroup(gid) }} className="p-0.5 hover:bg-sky-100 rounded text-sky-500" title="Arrange" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
-                                <LayoutGrid size={10} />
+                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); arrangeGroup(gid) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors" title="Arrange" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
+                                <LayoutGrid size={14} />
                             </button>
                         </div>
                     </div>
