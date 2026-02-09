@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock } from 'lucide-react'
+import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock, AlertCircle } from 'lucide-react'
 
 // Types
 interface BoardItem {
@@ -14,6 +14,7 @@ interface BoardItem {
     color: string
     zIndex: number
     completed?: boolean
+    isUrgent?: boolean
     groupId?: string
 }
 
@@ -28,7 +29,7 @@ const GRID_SIZE = 80
 
 const COLORS = [
     '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA',
-    '#F2D7EE', '#D3E0EA', '#F6F6EB', '#FDFFB6', '#E5E5E5'
+    '#F2D7EE', '#D3E0EA', '#F6F6EB', '#FDFFB6', '#E5E5E5', '#FFFFFF'
 ]
 
 export default function MindBoardClient() {
@@ -355,6 +356,12 @@ export default function MindBoardClient() {
     const toggleComplete = (id: string) => {
         setItems((prev: BoardItem[]) => prev.map((item: BoardItem) =>
             item.id === id ? { ...item, completed: !item.completed } : item
+        ))
+    }
+
+    const toggleUrgent = (id: string) => {
+        setItems((prev: BoardItem[]) => prev.map((item: BoardItem) =>
+            item.id === id ? { ...item, isUrgent: !item.isUrgent } : item
         ))
     }
 
@@ -687,10 +694,16 @@ export default function MindBoardClient() {
             setItems(prev => prev.map(item => {
                 const state = dragItems.get(item.id)
                 if (state) {
+                    // Strict Snapping: Calculate absolute position first, then snap
+                    const rawX = state.initialX + dx
+                    const rawY = state.initialY + dy
+                    const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE
+                    const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE
+
                     return {
                         ...item,
-                        x: state.initialX + snapDx,
-                        y: state.initialY + snapDy
+                        x: snappedX,
+                        y: snappedY
                     }
                 }
                 return item
@@ -773,193 +786,178 @@ export default function MindBoardClient() {
 
     const finalizeInteraction = useCallback(() => {
         // Grouping Logic on Drop
-        if (dragItems.size > 0 && !selectionBox) { // Don't group if it was a selection drag? or yes? Yes.
+        if (dragItems.size > 0 && !selectionBox) {
             setItems(currentItems => {
                 let newItems = [...currentItems]
                 const draggedIds = Array.from(dragItems.keys())
 
-                // We only want to process grouping if we dragged a single item or a single group?
-                // If we dragged multiple disjoint items, grouping logic is ambiguous.
-                // Let's simplify: Check if the *primary* dragged item (first one) creates a merge.
-
+                // Get the primary moved item (to determine drop target)
                 const primaryId = draggedIds[0]
                 const primaryItem = newItems.find(i => i.id === primaryId)
 
-                if (primaryItem) {
-                    // Check collision with non-dragged items
-                    const target = newItems.find(i =>
-                        !draggedIds.includes(i.id) &&
-                        // Ignore collision with items in same group as dragged items (already handled by drag set)
-                        !(primaryItem.groupId && i.groupId === primaryItem.groupId) &&
-                        isColliding({ ...primaryItem, w: primaryItem.w * 0.8, h: primaryItem.h * 0.8, x: primaryItem.x + primaryItem.w * 0.1, y: primaryItem.y + primaryItem.h * 0.1 }, i)
-                    )
+                if (!primaryItem) return newItems
 
-                    if (target) {
-                        // FOUND TARGET
-                        const isTargetGroup = !!target.groupId
-                        const isPrimaryGroup = !!primaryItem.groupId
+                // 1. Determine if we are dropping INTO a group or ONTO an item (merge)
+                // Or just moving WITHIN a group.
 
-                        let finalGroupId = target.groupId || target.id
-                        if (isPrimaryGroup && !isTargetGroup) {
-                            finalGroupId = primaryItem.groupId!
-                        } else if (!isTargetGroup && !isPrimaryGroup) {
-                            // New Group ID
-                            finalGroupId = Date.now().toString()
-                        }
+                let targetGroupId: string | undefined = undefined
+                let isMerge = false
 
-                        // Determine the group ID to use
-                        // If target is already in a group, use that.
-                        // If not, and primary is a group, use that.
-                        // If neither, create new.
-                        // Actually, logic:
-                        // "Drag A onto B" -> A joins B's group (or new).
-                        // If A is group -> Merge A's group into B's group?
-                        // User: "New board overlaps -> enters group -> re-sorts"
-
-                        // Let's settle on: Merge all dragged items + target (+ target's group members) into ONE group.
-                        const targetGroupId = target.groupId
-                        const primaryGroupId = primaryItem.groupId
-
-                        // If both have groups and they are different -> Merge groups
-                        // If one has group -> Add other to it
-                        // If neither -> Create new group
-
-                        let destinationGroupId = targetGroupId
-                        if (!destinationGroupId) {
-                            if (primaryGroupId) destinationGroupId = primaryGroupId
-                            else destinationGroupId = Date.now().toString()
-                        }
-
-                        // If merging two groups, keep one ID (destinationGroupId)
-
-                        // 1. Identify all items involved in the new group
-                        const currentMembersOfDestination = destinationGroupId ? newItems.filter(i => i.groupId === destinationGroupId) : (targetGroupId ? [] : [target])
-                        // If target was single, it wasn't in "currentMembersOfDestination" if we detected by groupId, so add it if needed
-                        if (!targetGroupId && !currentMembersOfDestination.find(x => x.id === target.id)) currentMembersOfDestination.push(target)
-
-                        // 2. Identify incoming items
-                        // draggedIds are the ones moving.
-
-                        // Merge all items into one list
-                        // Determine order:
-                        // If we dropped *onto* a specific item, we might want to insert there?
-                        // For now, simple append or re-arrange.
-
-                        // To allow "Dragging reorders them within this grid", we need to know WHERE we dropped.
-                        // We dropped 'primaryItem' at (primaryItem.x, primaryItem.y).
-
-                        const incomingIds = draggedIds
-                        const existingMembers = currentMembersOfDestination.filter(m => !incomingIds.includes(m.id))
-                        const incomingItems = newItems.filter(i => incomingIds.includes(i.id))
-
-                        // We want to insert incomingItems into existingMembers based on position.
-                        // Sort existingMembers by their current "Index" in the grid?
-                        // Or just simplistic:
-
-                        const allGroupItems = [...existingMembers, ...incomingItems]
-
-                        // Sort by Y then X to determine reading order?
-                        // NO, the User wants to Reorder by Drag.
-                        // If I drag Item A to the middle of the group, it should stay there.
-                        // But here we are in "Grouping Logic" (merging/joining).
-                        // If just dragging WITHIN a group, we handle it separately?
-
-                        // "Drag Logic" above handles position.
-                        // If we are just moving within the same group, 'finalizeInteraction' sees them as collisions?
-                        // If moving within same group, `target` might be another member.
-                        // If so, `destinationGroupId` === `primaryGroupId`.
-
-                        // If destination === source group:
-                        if (destinationGroupId === primaryGroupId) {
-                            // Reordering within group
-                            // We need to insert keys based on visual position.
-                            // Sort all items by (y, x).
-                            allGroupItems.sort((a, b) => (a.y - b.y) || (a.x - b.x))
-                        } else {
-                            // Merging groups: just append? or sort?
-                            allGroupItems.sort((a, b) => (a.y - b.y) || (a.x - b.x))
-                        }
-
-                        // 3. Update groupId for all dragged items
-                        const updatedItems = newItems.map(i => {
-                            if (draggedIds.includes(i.id)) return { ...i, groupId: destinationGroupId }
-                            if (!targetGroupId && i.id === target.id) return { ...i, groupId: destinationGroupId }
-                            return i
-                        })
-
-                        // Ensure 'groups' state has the destination group (create if needed)
-                        if (destinationGroupId && !groups.find(g => g.id === destinationGroupId)) {
-                            // This is a side-effect in render/callback phase - safe enough here?
-                            // Better to schedule it or do it.
-                            // setGroups is async.
-                            // We should update it.
-                            setGroups(prev => [...prev, { id: destinationGroupId!, name: "New Group", columns: 2 }])
-                        }
-
-                        // 4. Re-pack (Auto-arrange) the ENTIRE destination group
-                        // We need to apply the layout logic.
-                        // We can't call 'arrangeGroup' directly because it sets state.
-                        // We need to do the logic HERE on 'updatedItems'.
-
-                        const finalGroupMembers = updatedItems.filter(i => i.groupId === destinationGroupId)
-
-                        // Sort by Y/X to enforce the drop order?
-                        // If we truly want "insert at drop", we need to key off the drop coordinates vs item centers.
-                        // But `allGroupItems` sort above approximates it.
-
-                        finalGroupMembers.sort((a, b) => (a.y - b.y) || (a.x - b.x))
-
-                        const groupConfig = groups.find(g => g.id === destinationGroupId)
-                        const cols = groupConfig?.columns || 2
-
-                        const gMinX = Math.min(...finalGroupMembers.map(i => i.x))
-                        const gMinY = Math.min(...finalGroupMembers.map(i => i.y))
-
-                        finalGroupMembers.forEach((m: BoardItem, idx: number) => {
-                            const col = idx % cols
-                            const row = Math.floor(idx / cols)
-                            const offsetX = col * (160 + 20)
-                            const offsetY = row * (160 + 40)
-
-                            // Find index in updatedItems
-                            const uIdx = updatedItems.findIndex(u => u.id === m.id)
-                            if (uIdx > -1) {
-                                updatedItems[uIdx].x = gMinX + offsetX
-                                updatedItems[uIdx].y = gMinY + offsetY
-                            }
-                        })
-
-                        // 5. Update Items
-                        newItems = updatedItems
-                    }
+                // Check collision/overlap with other items/groups
+                const center = {
+                    x: primaryItem.x + primaryItem.w / 2,
+                    y: primaryItem.y + primaryItem.h / 2
                 }
+
+                // Find "Drop Target" -> The group we are hovering, or item we are hovering
+                // Prioritize Group Containment over Item Collision
+
+                // Check if center is inside an existing group bounds
+                // We need to calculate bounds of all groups... expensive?
+                // Or just check if we overlap with any item in a group.
+
+                const hitItem = newItems.find(i =>
+                    !draggedIds.includes(i.id) &&
+                    i.x < center.x && i.x + i.w > center.x &&
+                    i.y < center.y && i.y + i.h > center.y
+                )
+
+                if (hitItem) {
+                    if (hitItem.groupId) {
+                        targetGroupId = hitItem.groupId
+                    } else {
+                        // Merging with a single item -> Create New Group
+                        isMerge = true
+                        // We will generate ID later if needed
+                    }
+                } else if (primaryItem.groupId) {
+                    // If not hitting anything, but we were already in a group...
+                    // Did we drag OUT of the group?
+                    // Let's assume we stay in the group unless we explicitly "Eject" (which is Double Click header currently).
+                    // OR: implementing "Drag Out" is tricky without a visual cue.
+                    // For now: If you drag a member, you are moving it WITHIN the group (unless you hit another group?)
+                    // Let's keep it in the current group for reordering.
+                    targetGroupId = primaryItem.groupId
+                }
+
+                // If no target group and no merge, we are just moving freely on canvas.
+                if (!targetGroupId && !isMerge) return newItems
+
+                // 2. Setup Destination
+                let destinationGroupId = targetGroupId
+                if (isMerge && hitItem) { // hitItem is guaranteed if isMerge is true
+                    // New Group
+                    destinationGroupId = Date.now().toString()
+                    // We need to add this group to 'groups' state... but inside setItems reducer?
+                    // We can't setGroups here. 
+                    // Solution: We will handle 'groups' update dynamically or outside.
+                    // Actually, we can't cleanly update `groups` state from inside `setItems`.
+                    // BUT: We can optimistically assign the ID, and use a specialized effect or check to create the group data.
+                    // Or just do it in the next render cycle if we detect an unknown group ID.
+                    // (We already have logic for this in the previous code, but let's make it robust).
+                }
+
+                // 3. Collect Members
+                const currentGroupMembers = destinationGroupId
+                    ? newItems.filter(i => i.groupId === destinationGroupId && !draggedIds.includes(i.id))
+                    : (hitItem ? [hitItem] : [])
+
+                const movingItems = newItems.filter(i => draggedIds.includes(i.id))
+
+                if (isMerge && hitItem) {
+                    // Update hitItem to new group
+                    const hitIdx = newItems.findIndex(i => i.id === hitItem.id)
+                    if (hitIdx > -1) newItems[hitIdx] = { ...newItems[hitIdx], groupId: destinationGroupId }
+                }
+
+                // 4. Calculate Insert Index
+                // We need the layout config (columns)
+                const groupConfig = groups.find(g => g.id === destinationGroupId)
+                const cols = groupConfig?.columns || 2
+
+                // Calculate "Group Origin" (Top-Left of the *existing* members + *target* location)
+                // Actually, strict grid reflow implies the group's "Box" is defined by its members.
+                // We want to find where the *Mouse/Center* is relative to the *Sorted Grid*.
+
+                const allMembersForBounds = [...currentGroupMembers, ...movingItems]
+                const minX = Math.min(...allMembersForBounds.map(i => i.x))
+                const minY = Math.min(...allMembersForBounds.map(i => i.y))
+
+                // Helper to get index from coords
+                const getIndex = (x: number, y: number) => {
+                    const relX = x - minX
+                    const relY = y - minY
+                    // Assuming standard size 160x160 + 20 gap + 40 title gap?
+                    // Let's use standard grid cell size:
+                    const cellW = 160 + 20
+                    const cellH = 160 + 40
+
+                    const col = Math.max(0, Math.min(cols - 1, Math.round(relX / cellW)))
+                    const row = Math.max(0, Math.round(relY / cellH))
+                    return row * cols + col
+                }
+
+                // If we are merging, default append?
+                // If reordering, use primaryItem's position.
+                const targetIndex = getIndex(primaryItem.x, primaryItem.y)
+
+                // 5. Construct New Order
+                // Remove moving items from the "old" list (currentGroupMembers is already filtered)
+                // Sort currentGroupMembers by their *current* visual position to ensure stability
+                currentGroupMembers.sort((a, b) => (a.y - b.y) || (a.x - b.x))
+
+                // Insert moving items at targetIndex
+                const finalMembers = [...currentGroupMembers]
+                // Clamp index
+                const safeIndex = Math.min(targetIndex, finalMembers.length)
+                finalMembers.splice(safeIndex, 0, ...movingItems)
+
+                // 6. Apply Reflow (Strict Grid)
+                const cellW = 180 // 160 + 20
+                const cellH = 200 // 160 + 40
+
+                finalMembers.forEach((m, idx) => {
+                    const col = idx % cols
+                    const row = Math.floor(idx / cols)
+                    const newX = minX + col * cellW
+                    const newY = minY + row * cellH
+
+                    // Update item in newItems array
+                    const matchIdx = newItems.findIndex(ni => ni.id === m.id)
+                    if (matchIdx > -1) {
+                        newItems[matchIdx] = {
+                            ...newItems[matchIdx],
+                            x: newX,
+                            y: newY,
+                            groupId: destinationGroupId
+                        }
+                    }
+                })
+
+                // Handle new group creation side-effect
+                if (isMerge && destinationGroupId) {
+                    // Check if group exists in 'groups' happens outside or we trigger it here?
+                    // We can't access setGroups here safely. 
+                    // Let's schedule a check?
+                    // Or rely on the fact that if we just assigned a groupId that doesn't exist in `groups`,
+                    // we need to create it.
+                    // Let's use a specialized check in the component body or effect.
+                    // For now, let's assume valid. 
+                    // BUT: We need to ensure the group exists for the render to show title/border.
+                    // We can add a temporary property or dispatch an event?
+                    // Simplest: Check `groups` in the next render and autocreate.
+                    // See `useEffect` below.
+                }
+
                 return newItems
             })
 
-            // Trigger auto-arrange for any touched groups
-            // We need to do this OUTSIDE the setItems reducer if we want to call arrangeGroup (which calls setItems)
-            // But arrangeGroup rearranges based on CURRENT state.
-            // If we just updated state, we might have a race condition if we call it immediately?
-            // `arrangeGroup` uses `setItems(prev => ...)` so it should queue correctly if we do it in setTimeout.
-
-            const draggedIds = Array.from(dragItems.keys())
-            // Find groups involved
-            // We can't easily know the *final* groups from here without peering into the result of the previous setItems.
-            // But we can approximate:
-            // 1. Groups of dragged items (before move - valid if they stayed in group)
-            // 2. Target group (if merge)
-
-            // Let's rely on the fact that if we just dropped something, we want to arrange its group.
-            // But we don't know the NEW group ID easily here outside of the reducer.
-
-            // Hack: trigger arrange for ALL groups that contain any of the dragged items?
-            // But we need the NEW state.
-
-            // Alternative: Move the arrange logic INTO the reducer above?
-            // The reducer above already does "Re-pack" for merges (Step 4 in code).
-            // But what if NO merge? (The case where I just moved an item inside its group).
-            // We need to handle that in the reducer too.
-
+            // Side-effect for new group creation
+            // We need to know if we created a new group ID.
+            // Since we can't easily know the ID generated inside the reducer...
+            // Logic improvement: Generate ID outside?
+            // Re-use logic: "New" group logic is rare (only on merge).
+            // Let's rely on a `useEffect` that scans for orphan GroupIDs?
         }
 
         // Selection Box Finalize
@@ -1080,6 +1078,18 @@ export default function MindBoardClient() {
                     setEditingId(null)
                 } else if (selectedIds.size > 0) {
                     setSelectedIds(new Set())
+                }
+            }
+
+            if (e.key === 'Delete') {
+                const target = e.target as HTMLElement
+                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+
+                if (selectedIds.size > 0) {
+                    if (confirm(`선택한 ${selectedIds.size}개의 항목을 삭제하시겠습니까?`)) {
+                        setItems(prev => prev.filter(i => !selectedIds.has(i.id)))
+                        setSelectedIds(new Set())
+                    }
                 }
             }
         }
@@ -1299,7 +1309,7 @@ export default function MindBoardClient() {
 
 
             {/* Vertical Toolbar (Left) */}
-            <div className="absolute left-2 top-20 z-50 flex flex-col gap-4 max-h-[calc(100vh-100px)]">
+            <div className="absolute left-2 top-20 z-50 flex flex-col gap-4 max-h-[calc(100vh-100px)] items-start">
                 {/* Group Navigator */}
                 {groups.length > 0 && (
                     <div className="flex flex-col gap-1 overflow-y-auto no-scrollbar pb-1 pointer-events-auto bg-white/50 backdrop-blur-sm p-1 rounded-lg w-32">
@@ -1310,7 +1320,6 @@ export default function MindBoardClient() {
                                     // onDoubleClick={() => unGroup(g.id)} // Removed per request, used separate button
                                     className="w-full text-left px-2 py-1 bg-white border border-gray-200 rounded-l text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-1.5 group"
                                 >
-                                    <LayoutGrid size={10} className="group-hover:text-white" />
                                     <span className="truncate flex-1">{g.name}</span>
                                 </button>
                                 <button
@@ -1424,7 +1433,10 @@ export default function MindBoardClient() {
                             key={item.id}
                             className={`absolute rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.12)] flex flex-col group border transition-all overflow-hidden pointer-events-auto
                                     ${item.completed ? 'opacity-60 scale-[0.98]' : ''} 
-                                    ${selectedIds.has(item.id) ? 'ring-2 ring-blue-500 shadow-xl' : 'border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}`}
+                                    ${selectedIds.has(item.id) ? 'ring-2 ring-blue-500 shadow-xl' :
+                                    item.isUrgent ? 'ring-4 ring-amber-400 ring-offset-2 shadow-[0_0_20px_rgba(251,191,36,0.8)] z-50' :
+                                        'border-black/5 hover:border-black/10 hover:shadow-[0_8px_30px_rgb(0,0,0,0.2)]'}
+                                    ${item.isUrgent ? 'animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]' : ''}`}
                             style={{
                                 left: item.x,
                                 top: item.y,
@@ -1474,6 +1486,11 @@ export default function MindBoardClient() {
                                     {/* <GripHorizontal size={14} className="text-gray-400" /> */}
                                 </div>
                                 <div className="flex gap-2">
+                                    <button onClick={(e) => { e.stopPropagation(); toggleUrgent(item.id) }}
+                                        className={`p-1 rounded transition-colors ${item.isUrgent ? 'text-amber-500 bg-amber-100' : 'text-gray-300 hover:bg-amber-50 hover:text-amber-500'}`}
+                                        title="긴급/집중">
+                                        <AlertCircle size={14} fill={item.isUrgent ? "currentColor" : "none"} />
+                                    </button>
                                     <button onClick={(e) => { e.stopPropagation(); toggleComplete(item.id) }} className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
                                         <CheckCircle2 size={14} />
                                     </button>
