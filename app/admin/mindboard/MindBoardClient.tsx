@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock, AlertCircle } from 'lucide-react'
+import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock, AlertCircle, Undo2, Redo2 } from 'lucide-react'
 
 // Add styles/keyframes for the gradient border
 const styles = `
@@ -57,6 +57,47 @@ export default function MindBoardClient() {
     // Let's store group names in a separate state, persisted.
     const [groups, setGroups] = useState<GroupData[]>([])
 
+    // History State
+    const [past, setPast] = useState<{ items: BoardItem[], groups: GroupData[] }[]>([])
+    const [future, setFuture] = useState<{ items: BoardItem[], groups: GroupData[] }[]>([])
+
+    const saveHistory = useCallback(() => {
+        setPast((prev: { items: BoardItem[], groups: GroupData[] }[]) => {
+            const newPast = [...prev, { items, groups }]
+            if (newPast.length > 50) newPast.shift() // Limit history
+            return newPast
+        })
+        setFuture([])
+    }, [items, groups])
+
+    const undo = useCallback(() => {
+        setPast((prev: { items: BoardItem[], groups: GroupData[] }[]) => {
+            if (prev.length === 0) return prev
+            const previous = prev[prev.length - 1]
+            const newPast = prev.slice(0, -1)
+
+            setFuture(f => [{ items, groups }, ...f])
+            setItems(previous.items)
+            setGroups(previous.groups)
+
+            return newPast
+        })
+    }, [items, groups])
+
+    const redo = useCallback(() => {
+        setFuture((prev: { items: BoardItem[], groups: GroupData[] }[]) => {
+            if (prev.length === 0) return prev
+            const next = prev[0]
+            const newFuture = prev.slice(1)
+
+            setPast(p => [...p, { items, groups }])
+            setItems(next.items)
+            setGroups(next.groups)
+
+            return newFuture
+        })
+    }, [items, groups])
+
     const [scale, setScale] = useState(0.5) // Start zoomed out a bit
     const [pan, setPan] = useState({ x: 0, y: 0 }) // Start at 0,0
     const [isPanning, setIsPanning] = useState(false)
@@ -81,7 +122,7 @@ export default function MindBoardClient() {
     const lastClickTime = useRef(0)
     const lastEnterTime = useRef(0) // For double enter detection
     const hasMoved = useRef(false)
-    const minimapTimeout = useRef<NodeJS.Timeout | null>(null)
+    const minimapTimeout = useRef<ReturnType<typeof setTimeout> | null>(null)
     const [showMinimap, setShowMinimap] = useState(false)
     const [isSpacePressed, setIsSpacePressed] = useState(false)
     const [isMinimapDragging, setIsMinimapDragging] = useState(false)
@@ -196,6 +237,7 @@ export default function MindBoardClient() {
     }, [])
 
     const createMemo = useCallback((x: number, y: number, shouldEdit: boolean = false) => {
+        saveHistory()
 
 
         const snappedX = Math.round((x - 120) / GRID_SIZE) * GRID_SIZE
@@ -289,6 +331,7 @@ export default function MindBoardClient() {
     }
 
     const startDrag = (clientX: number, clientY: number, id: string, shiftKey: boolean, isGroupDrag: boolean = false) => {
+        saveHistory() // Save state before dragging starts
         // Selection Logic
         let newSelection = new Set(selectedIds)
 
@@ -358,6 +401,7 @@ export default function MindBoardClient() {
     }
 
     const startResize = (clientX: number, clientY: number, id: string) => {
+        saveHistory() // Save before resize
         const item = items.find((i: BoardItem) => i.id === id)
         if (!item) return
         bringToFront(id)
@@ -366,17 +410,20 @@ export default function MindBoardClient() {
 
     const deleteItem = (id: string) => {
         if (confirm('정말 삭제하시겠습니까?')) {
+            saveHistory()
             setItems((prev: BoardItem[]) => prev.filter((i: BoardItem) => i.id !== id))
         }
     }
 
     const toggleComplete = (id: string) => {
+        saveHistory()
         setItems((prev: BoardItem[]) => prev.map((item: BoardItem) =>
             item.id === id ? { ...item, completed: !item.completed } : item
         ))
     }
 
     const toggleUrgent = (id: string) => {
+        saveHistory()
         setItems((prev: BoardItem[]) => prev.map((item: BoardItem) =>
             item.id === id ? { ...item, isUrgent: !item.isUrgent } : item
         ))
@@ -558,11 +605,24 @@ export default function MindBoardClient() {
 
     const unGroup = (groupId: string) => {
         if (!confirm('그룹을 해제하시겠습니까?')) return
+        saveHistory()
         setItems(prev => prev.map(item => item.groupId === groupId ? { ...item, groupId: undefined } : item))
         setGroups(prev => prev.filter(g => g.id !== groupId))
     }
 
     const arrangeGroup = useCallback((groupId: string) => {
+        // saveHistory is called by the caller (button click) usually? 
+        // But if called programmatically? 
+        // In JSX we added it to onClick.
+        // But auto-arrange might call it? 
+        // Let's rely on caller for this one to avoid double save if we chain it?
+        // Actually, better to safe guard here.
+        // BUT verify if we already added it in JSX.
+        // In JSX: onClick={(e) => { e.stopPropagation(); saveHistory(); arrangeGroup(gid) }}
+        // So we don't need it here if strictly UI triggered.
+        // But safe to have it? If trigger twice, we get duplicate state in history.
+        // Duplicate state is fine (no change).
+        // Let's just keep it in JSX for now as per plan.
         setItems(prev => {
             const group = groups.find((g: GroupData) => g.id === groupId)
             const cols = group?.columns || 2
@@ -598,7 +658,9 @@ export default function MindBoardClient() {
             if (members.length === 0) return prev
 
             // 1. Resize members
-            const resisedMembers = members.map(item => {
+            const resisedMembers = members.map((item: BoardItem) => {
+                // Optimization: If Undo triggers this, we don't want to saveHistory inside? 
+                // optimizeGroup is called manually.
                 const lines = item.content.split('\n').length
                 const length = item.content.length
                 let targetW = 240
@@ -619,7 +681,7 @@ export default function MindBoardClient() {
             const minY = Math.min(...resisedMembers.map((i: BoardItem) => i.y))
 
             const packed = packGroup(resisedMembers)
-            const updatedMembers = resisedMembers.map(m => {
+            const updatedMembers = resisedMembers.map((m: BoardItem) => {
                 const p = packed.find(p => p.id === m.id)
                 if (p) return { ...m, x: minX + p.x, y: minY + p.y }
                 return m
@@ -631,14 +693,14 @@ export default function MindBoardClient() {
 
     const groupSelectedItems = () => {
         if (selectedIds.size < 2) return
-
+        saveHistory()
         const newGroupId = Date.now().toString()
         const members = items.filter(i => selectedIds.has(i.id))
 
         // Calculate bounds to position the group header properly?
         // Not strictly needed as header is rendered based on bounds.
 
-        setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, groupId: newGroupId } : i))
+        setItems((prev: BoardItem[]) => prev.map((i: BoardItem) => selectedIds.has(i.id) ? { ...i, groupId: newGroupId } : i))
         setGroups(prev => [...prev, { id: newGroupId, name: "New Group", columns: 2 }])
 
         // Optional: Auto-arrange them immediately?
@@ -691,6 +753,7 @@ export default function MindBoardClient() {
         const group = groups.find(g => g.id === groupId)
         const newName = prompt("Enter Group Name", group?.name || "New Group")
         if (newName) {
+            saveHistory()
             setGroups(prev => {
                 const existing = prev.find(g => g.id === groupId)
                 if (existing) return prev.map(g => g.id === groupId ? { ...g, name: newName } : g)
@@ -795,8 +858,8 @@ export default function MindBoardClient() {
             // If we are dragging a group (or items that form a group), we push OTHER groups.
             // 1. Identify the "Moving Group(s)"
             const movingGroupIds = new Set<string>()
-            dragItems.forEach((_, id) => {
-                const item = items.find(i => i.id === id)
+            dragItems.forEach((_, id: string) => {
+                const item = items.find((i: BoardItem) => i.id === id)
                 if (item && item.groupId) movingGroupIds.add(item.groupId)
             })
 
@@ -814,8 +877,8 @@ export default function MindBoardClient() {
                 // Let's check if the number of dragged items equals the group size.
 
                 movingGroupIds.forEach(gid => {
-                    const groupMembers = items.filter(i => i.groupId === gid)
-                    const draggedMembers = groupMembers.filter(i => dragItems.has(i.id))
+                    const groupMembers = items.filter((i: BoardItem) => i.groupId === gid)
+                    const draggedMembers = groupMembers.filter((i: BoardItem) => dragItems.has(i.id))
 
                     // Only repel if we are moving the WHOLE group (or significant part?)
                     // Let's assume repulsion triggers when dragging group header (which selects all).
@@ -913,6 +976,11 @@ export default function MindBoardClient() {
     }, [])
 
     const finalizeInteraction = useCallback(() => {
+        if (dragItems.size > 0 || resizeItem) {
+            // We should have saved history at startDrag/startResize.
+            // But valid drag check?
+        }
+
         // Grouping Logic on Drop
         if (dragItems.size > 0 && !selectionBox) {
             setItems(currentItems => {
@@ -965,7 +1033,7 @@ export default function MindBoardClient() {
                 // DISABLE MERGE for Group Drags (Water & Oil)
                 // If we are dragging a whole group, forbid merging into another group.
                 const isGroupDrag = draggedIds.every(id => {
-                    const item = currentItems.find(i => i.id === id)
+                    const item = currentItems.find((i: BoardItem) => i.id === id)
                     return item?.groupId === primaryItem.groupId
                 }) && draggedIds.length > 1 // Heuristic: dragging multiple items from same group
 
@@ -1011,7 +1079,7 @@ export default function MindBoardClient() {
 
                 // 4. Calculate Insert Index
                 // We need the layout config (columns)
-                const groupConfig = groups.find(g => g.id === destinationGroupId)
+                const groupConfig = groups.find((g: GroupData) => g.id === destinationGroupId)
                 const cols = groupConfig?.columns || 2
 
                 // Calculate "Group Origin" (Top-Left of the *existing* members + *target* location)
@@ -1156,6 +1224,30 @@ export default function MindBoardClient() {
         }
     }, [handleMove, finalizeInteraction])
 
+    // Undo/Redo Shortcuts
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'z') {
+                e.preventDefault()
+                // Stop propagation to prevent browser undo if focused in textarea?
+                // Actually, if in textarea, standard undo might be desired for text.
+                // But user wants app-level undo.
+                // If editingId is set, maybe let browser handle text undo?
+                if (!editingId) {
+                    undo()
+                }
+            }
+            if ((e.metaKey || e.ctrlKey) && e.key === 'y') {
+                e.preventDefault()
+                if (!editingId) {
+                    redo()
+                }
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [undo, redo, editingId])
+
     // Detect Double Enter
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -1192,6 +1284,7 @@ export default function MindBoardClient() {
                         const centerX = container.clientWidth / 2
                         const centerY = container.clientHeight / 2
                         const { x, y } = getWorldCoords(centerX, centerY)
+                        saveHistory() // Save before creation
                         createMemo(x, y, true)
                     }
                     lastEnterTime.current = 0
@@ -1203,12 +1296,15 @@ export default function MindBoardClient() {
             if (e.key === 'Escape') {
                 if (editingId) {
                     // Check if empty, delete if so
-                    setItems(prev => prev.filter(i => {
+                    setItems((prev: BoardItem[]) => prev.filter((i: BoardItem) => {
                         if (i.id === editingId && !i.content.trim()) return false
                         return true
                     }))
+                    // If we deleted empty item, we should have saved history before creation.
+                    // If we just cancelled edit, no change.
                     setEditingId(null)
                 } else if (selectedIds.size > 0) {
+                    // Deselect
                     setSelectedIds(new Set())
                 }
             }
@@ -1219,7 +1315,8 @@ export default function MindBoardClient() {
 
                 if (selectedIds.size > 0) {
                     if (confirm(`선택한 ${selectedIds.size}개의 항목을 삭제하시겠습니까?`)) {
-                        setItems(prev => prev.filter(i => !selectedIds.has(i.id)))
+                        saveHistory() // Save before delete
+                        setItems((prev: BoardItem[]) => prev.filter((i: BoardItem) => !selectedIds.has(i.id)))
                         setSelectedIds(new Set())
                     }
                 }
@@ -1238,7 +1335,8 @@ export default function MindBoardClient() {
                     })
 
                     if (affectedGroupIds.size > 0) {
-                        setGroups(prev => prev.map(g => {
+                        saveHistory() // Save before column change
+                        setGroups((prev: GroupData[]) => prev.map((g: GroupData) => {
                             if (affectedGroupIds.has(g.id)) {
                                 // Schedule arrange
                                 setTimeout(() => arrangeGroup(g.id), 0)
@@ -1261,7 +1359,7 @@ export default function MindBoardClient() {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [createMemo, getWorldCoords, editingId, selectedIds, items, groups, arrangeGroup])
+    }, [createMemo, getWorldCoords, editingId, selectedIds, items, groups, arrangeGroup, undo, redo])
 
     const scrollToGroup = (groupId: string) => {
         const members = items.filter(i => i.groupId === groupId)
@@ -1315,7 +1413,7 @@ export default function MindBoardClient() {
                 >
                     <div
                         className="absolute -top-4 left-4 bg-white px-3 py-1.5 text-sm font-bold text-gray-600 cursor-grab active:cursor-grabbing hover:text-blue-600 hover:bg-blue-50 border border-gray-200 rounded-lg shadow-sm select-none flex items-center gap-2 pointer-events-auto transition-all"
-                        onMouseDown={e => { e.stopPropagation(); startDrag(e.clientX, e.clientY, gid, e.shiftKey, true) }}
+                        onMouseDown={(e: React.MouseEvent) => { e.stopPropagation(); startDrag(e.clientX, e.clientY, gid, e.shiftKey, true) }}
                     >
                         <button
                             onClick={(e: React.MouseEvent) => { e.stopPropagation(); unGroup(gid); }}
@@ -1331,7 +1429,7 @@ export default function MindBoardClient() {
 
                         <div className="relative group/cols border-l border-gray-200 pl-2 flex items-center">
                             <button
-                                onClick={(e) => {
+                                onClick={(e: React.MouseEvent) => {
                                     e.stopPropagation()
                                     setActiveColumnDropdown(activeColumnDropdown === gid ? null : gid)
                                 }}
@@ -1346,13 +1444,14 @@ export default function MindBoardClient() {
                                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => (
                                         <button
                                             key={n}
-                                            onClick={(e) => {
+                                            onClick={(e: React.MouseEvent) => {
                                                 e.stopPropagation()
+                                                saveHistory()
                                                 setGroups((prev: GroupData[]) => prev.map((g: GroupData) => g.id === gid ? { ...g, columns: n } : g))
                                                 setTimeout(() => arrangeGroup(gid), 0) // Trigger rearrange
                                                 setActiveColumnDropdown(null)
                                             }}
-                                            className={`w-8 h-8 text-sm font-medium flex items-center justify-center rounded hover:bg-blue-100 transition-colors ${groups.find(g => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-700'}`}
+                                            className={`w-8 h-8 text-sm font-medium flex items-center justify-center rounded hover:bg-blue-100 transition-colors ${groups.find((g: GroupData) => g.id === gid)?.columns === n ? 'bg-blue-500 text-white' : 'text-gray-700'}`}
                                         >
                                             {n}
                                         </button>
@@ -1361,10 +1460,10 @@ export default function MindBoardClient() {
                             )}
                         </div>
                         <div className="flex gap-1 border-l border-gray-200 pl-2">
-                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); optimizeGroup(gid) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors" title="Optimize" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
+                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); saveHistory(); optimizeGroup(gid) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors" title="Optimize" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
                                 <Wand2 size={14} />
                             </button>
-                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); arrangeGroup(gid) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors" title="Arrange" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
+                            <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); saveHistory(); arrangeGroup(gid) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors" title="Arrange" onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}>
                                 <LayoutGrid size={14} />
                             </button>
                         </div>
@@ -1480,7 +1579,11 @@ export default function MindBoardClient() {
                                     <span className="truncate flex-1">{g.name}</span>
                                 </button>
                                 <button
-                                    onClick={(e) => { e.stopPropagation(); unGroup(g.id) }}
+                                    onClick={(e: React.MouseEvent) => {
+                                        e.stopPropagation();
+                                        saveHistory();
+                                        unGroup(g.id);
+                                    }}
                                     className="px-1.5 py-1 bg-white border border-l-0 border-gray-200 rounded-r text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors shadow-sm"
                                     title="Ungroup"
                                 >
@@ -1515,6 +1618,13 @@ export default function MindBoardClient() {
                     <button onClick={() => setPan({ x: -2000, y: -2000 })} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Reset View">
                         <MousePointer2 size={18} />
                     </button>
+                    <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
+                    <button onClick={undo} disabled={past.length === 0} className={`p-1.5 rounded transition-colors ${past.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="Undo (Ctrl+Z)">
+                        <Undo2 size={18} />
+                    </button>
+                    <button onClick={redo} disabled={future.length === 0} className={`p-1.5 rounded transition-colors ${future.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="Redo (Ctrl+Y)">
+                        <Redo2 size={18} />
+                    </button>
                 </div>
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
                     <div className="flex flex-col gap-1 p-0.5">
@@ -1522,6 +1632,7 @@ export default function MindBoardClient() {
                             <button key={c}
                                 onClick={() => {
                                     if (selectedIds.size > 0) {
+                                        saveHistory()
                                         setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, color: c } : i))
                                     }
                                 }}
@@ -1616,21 +1727,21 @@ export default function MindBoardClient() {
                             }}
                         >
                             <div className="h-8 bg-black/5 flex items-center justify-between px-2 cursor-grab active:cursor-grabbing hover:bg-black/10 transition-colors"
-                                onDoubleClick={(e) => {
+                                onDoubleClick={(e: React.MouseEvent) => {
                                     e.stopPropagation();
                                     if (item.groupId) {
                                         // Eject Item
-                                        const groupMembers = items.filter(i => i.groupId === item.groupId)
-                                        const maxX = Math.max(...groupMembers.map(i => i.x + i.w))
+                                        const groupMembers = items.filter((i: BoardItem) => i.groupId === item.groupId)
+                                        const maxX = Math.max(...groupMembers.map((i: BoardItem) => i.x + i.w))
                                         const minY = Math.min(...groupMembers.map(i => i.y))
 
                                         // Update state
-                                        setItems(prev => {
+                                        setItems((prev: BoardItem[]) => {
                                             // Remove groupId
                                             // Set position to right of group
                                             // Handle potential collision?
                                             // Simple placement first.
-                                            return prev.map(i => {
+                                            return prev.map((i: BoardItem) => {
                                                 if (i.id === item.id) {
                                                     return { ...i, groupId: undefined, x: maxX + 20, y: minY }
                                                 }
@@ -1650,15 +1761,15 @@ export default function MindBoardClient() {
                                     {/* <GripHorizontal size={14} className="text-gray-400" /> */}
                                 </div>
                                 <div className="flex gap-2">
-                                    <button onClick={(e) => { e.stopPropagation(); toggleUrgent(item.id) }}
+                                    <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); saveHistory(); toggleUrgent(item.id) }}
                                         className={`p-1 rounded transition-colors ${item.isUrgent ? 'text-amber-500 bg-amber-100' : 'text-gray-300 hover:bg-amber-50 hover:text-amber-500'}`}
                                         title="긴급/집중">
                                         <AlertCircle size={14} fill={item.isUrgent ? "currentColor" : "none"} />
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); toggleComplete(item.id) }} className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
+                                    <button onClick={(e) => { e.stopPropagation(); saveHistory(); toggleComplete(item.id) }} className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
                                         <CheckCircle2 size={14} />
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); deleteItem(item.id) }} className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-800">
+                                    <button onClick={(e) => { e.stopPropagation(); saveHistory(); deleteItem(item.id) }} className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-800">
                                         <X size={14} />
                                     </button>
                                 </div>
@@ -1668,6 +1779,11 @@ export default function MindBoardClient() {
                                 {editingId === item.id ? (
                                     <textarea autoFocus className="w-full h-full bg-transparent resize-none outline-none text-sm font-medium text-gray-800 leading-relaxed p-0"
                                         value={item.content}
+                                        onFocus={() => {
+                                            // Save history on focus? No, on blur/change completion.
+                                            // Actually, saving on Start means we save "Pre-edit" state.
+                                            saveHistory()
+                                        }}
                                         onChange={(e) => setItems(prev => prev.map(i => i.id === item.id ? { ...i, content: e.target.value } : i))}
                                         onBlur={() => {
                                             setEditingId(null)
