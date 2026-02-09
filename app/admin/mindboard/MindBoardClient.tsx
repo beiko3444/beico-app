@@ -67,7 +67,10 @@ export default function MindBoardClient() {
     const [showMinimap, setShowMinimap] = useState(false)
     const [isSpacePressed, setIsSpacePressed] = useState(false)
     const [isMinimapDragging, setIsMinimapDragging] = useState(false)
+
     const minimapDragState = useRef<{ startX: number, startY: number, startPan: { x: number, y: number }, worldWidth: number, worldHeight: number } | null>(null)
+    const autoPanVelocity = useRef({ x: 0, y: 0 })
+    const autoPanFrame = useRef<number>(0)
 
     // --- Persistence ---
     useEffect(() => {
@@ -432,7 +435,9 @@ export default function MindBoardClient() {
             currentX += obj.w + gap
             maxHeightInRow = Math.max(maxHeightInRow, obj.h)
 
-            if (currentX > 2000) { // Wrap width
+            const maxW = containerRef.current ? Math.max(2000, containerRef.current.clientWidth - 200) : 2000
+
+            if (currentX > maxW) { // Dynamic Wrap width
                 currentX = 100
                 currentY += maxHeightInRow + gap
                 maxHeightInRow = 0
@@ -634,7 +639,11 @@ export default function MindBoardClient() {
             const dy = clientY - lastPos.current.y
             setPan(p => ({ x: p.x + dx, y: p.y + dy })) // Unclamped for now
             lastPos.current = { x: clientX, y: clientY }
+
             hasMoved.current = true
+
+            // Stop auto-pan if manual panning
+            autoPanVelocity.current = { x: 0, y: 0 }
 
             // Show minimap
             setShowMinimap(true)
@@ -686,6 +695,33 @@ export default function MindBoardClient() {
                 }
                 return item
             }))
+
+            // Auto-pan detection
+            const edgeThreshold = 50
+            const container = containerRef.current
+            if (container) {
+                const rect = container.getBoundingClientRect()
+                let vx = 0
+                let vy = 0
+
+                if (clientX < rect.left + edgeThreshold) vx = 5 // Pan Right (move view left means pan increases? No, Pan is offset. If we want to see left, we move pan +?)
+                // Pan logic: pan.x is the offset of the world.
+                // If I drag left, I want to see more left. So pan.x should Increase?
+                // World 0 is at screen `pan.x`.
+                // If pan.x = 100, World 0 is at 100.
+                // If I want to see -100, pan.x needs to be 200? yes.
+                // So dragging left -> increase pan.x
+                else if (clientX > rect.right - edgeThreshold) vx = -5
+
+                if (clientY < rect.top + edgeThreshold) vy = 5
+                else if (clientY > rect.bottom - edgeThreshold) vy = -5
+
+                autoPanVelocity.current = { x: vx, y: vy }
+                if (vx !== 0 || vy !== 0) {
+                    if (!autoPanFrame.current) autoPanFrame.current = requestAnimationFrame(updateAutoPan)
+                }
+            }
+
         } else if (resizeItem) {
             const dx = (clientX - resizeItem.startX) / scale
             const dy = (clientY - resizeItem.startY) / scale
@@ -702,6 +738,38 @@ export default function MindBoardClient() {
             }
         }
     }, [isPanning, dragItems, resizeItem, selectionBox, scale])
+
+    const updateAutoPan = useCallback(() => {
+        if (autoPanVelocity.current.x === 0 && autoPanVelocity.current.y === 0) {
+            if (autoPanFrame.current) {
+                cancelAnimationFrame(autoPanFrame.current)
+                autoPanFrame.current = 0
+            }
+            return
+        }
+
+        setPan(prev => ({
+            x: prev.x + autoPanVelocity.current.x,
+            y: prev.y + autoPanVelocity.current.y
+        }))
+
+        autoPanFrame.current = requestAnimationFrame(updateAutoPan)
+    }, [])
+
+    useEffect(() => {
+        if (autoPanVelocity.current.x !== 0 || autoPanVelocity.current.y !== 0) {
+            if (!autoPanFrame.current) {
+                autoPanFrame.current = requestAnimationFrame(updateAutoPan)
+            }
+        }
+    }, [updateAutoPan])
+
+    // Auto-pan logic in handleMove
+    useEffect(() => {
+        // We need to hook into the existing handleMove or just add a side-effect?
+        // handleMove is a callback, complex to inject.
+        // Let's modify handleMove directly in the next chunk.
+    }, [])
 
     const finalizeInteraction = useCallback(() => {
         // Grouping Logic on Drop
@@ -932,7 +1000,12 @@ export default function MindBoardClient() {
         setSelectionBox(null)
         lastTouchDistance.current = null
         setTimeout(() => { hasMoved.current = false }, 50)
-    }, [dragItems, selectionBox, items, pan, scale, selectedIds])
+        if (autoPanFrame.current) {
+            cancelAnimationFrame(autoPanFrame.current)
+            autoPanFrame.current = 0
+        }
+        autoPanVelocity.current = { x: 0, y: 0 }
+    }, [dragItems, selectionBox, items, pan, scale, selectedIds, updateAutoPan])
 
     // --- Events Sync ---
     useEffect(() => {
