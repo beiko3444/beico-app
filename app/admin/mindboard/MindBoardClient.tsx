@@ -60,7 +60,10 @@ export default function MindBoardClient() {
     const lastPos = useRef({ x: 0, y: 0 })
     const lastTouchDistance = useRef<number | null>(null)
     const lastClickTime = useRef(0)
+    const lastEnterTime = useRef(0) // For double enter detection
     const hasMoved = useRef(false)
+    const minimapTimeout = useRef<NodeJS.Timeout | null>(null)
+    const [showMinimap, setShowMinimap] = useState(false)
 
     // --- Persistence ---
     useEffect(() => {
@@ -181,7 +184,7 @@ export default function MindBoardClient() {
         return changed ? resolveCollision(movingId, updated) : updated
     }, [])
 
-    const createMemo = useCallback((x: number, y: number) => {
+    const createMemo = useCallback((x: number, y: number, shouldEdit: boolean = false) => {
         // Ensure x,y are within world
         // x = Math.max(0, Math.min(WORLD_SIZE, x))
         // y = Math.max(0, Math.min(WORLD_SIZE, y))
@@ -204,6 +207,10 @@ export default function MindBoardClient() {
 
         setMaxZIndex((prev: number) => prev + 1)
         setItems((prev: BoardItem[]) => resolveCollision(newItem.id, [...prev, newItem]))
+
+        if (shouldEdit) {
+            setEditingId(newItem.id)
+        }
     }, [maxZIndex, resolveCollision])
 
     // --- Actions ---
@@ -228,6 +235,11 @@ export default function MindBoardClient() {
 
         setScale(newScale)
         setPan({ x: newPanX, y: newPanY })
+
+        // Show minimap
+        setShowMinimap(true)
+        if (minimapTimeout.current) clearTimeout(minimapTimeout.current)
+        minimapTimeout.current = setTimeout(() => setShowMinimap(false), 2000)
     }, [pan, scale])
 
     const handleWheel = (e: React.WheelEvent) => {
@@ -517,6 +529,11 @@ export default function MindBoardClient() {
             setPan(p => ({ x: p.x + dx, y: p.y + dy })) // Unclamped for now
             lastPos.current = { x: clientX, y: clientY }
             hasMoved.current = true
+
+            // Show minimap
+            setShowMinimap(true)
+            if (minimapTimeout.current) clearTimeout(minimapTimeout.current)
+            minimapTimeout.current = setTimeout(() => setShowMinimap(false), 2000)
         } else if (dragItems.size > 0) {
             const firstEntry = dragItems.values().next()
             if (firstEntry.done) return
@@ -582,55 +599,85 @@ export default function MindBoardClient() {
 
                     if (target) {
                         // FOUND TARGET
-                        // Rules:
-                        // 1. If Target is Group & Primary is Group -> DENY (No group-group merge)
-                        // 2. If Target is Group & Primary is Single -> JOIN
-                        // 3. If Target is Single & Primary is Group -> DENY (No group-group merge, technically target joins group? But let's say "No") -> Actually user said "Group and Group cannot". Single and Group is OK.
-                        //    Let's allow Single joining Group.
-                        // 4. Single & Single -> NEW GROUP
+                        const isTargetGroup = !!target.groupId
+                        const isPrimaryGroup = !!primaryItem.groupId
 
-                        const isTargetGroup = !!target.groupId && newItems.filter(x => x.groupId === target.groupId).length > 1
-                        const isPrimaryGroup = !!primaryItem.groupId && newItems.filter(x => x.groupId === primaryItem.groupId).length > 1
-
-                        if (isTargetGroup && isPrimaryGroup) {
-                            // Deny - Revert position? Or just don't merge (stay collidable/overlapping or push away?)
-                            // Current resolveCollision logic handles overlaps lightly.
-                            // User said: "Grouped boards cannot overlap."
-                            // We should probably push them apart here.
-                        } else {
-                            // Proceed to Merge
-                            let finalGroupId = target.groupId || target.id
-                            if (isPrimaryGroup && !isTargetGroup) {
-                                finalGroupId = primaryItem.groupId!
-                            } else if (!isTargetGroup && !isPrimaryGroup) {
-                                // New Group ID
-                                finalGroupId = Date.now().toString()
-                            }
-
-                            // Assign Group IDs
-                            newItems = newItems.map(i => {
-                                if (draggedIds.includes(i.id) || i.id === target.id || i.groupId === target.groupId) {
-                                    // Also check if we are merging a group into single..
-                                    return { ...i, groupId: finalGroupId }
-                                }
-                                return i
-                            })
-
-                            // Resolve Overlap visually: Place Primary NEXT to Target
-                            // Simple Grid placement: Right or Bottom
-                            let refX = target.x
-                            let refY = target.y
-                            // Find free spot? 
-                            // Simplest: Place to the right of target's bounding box
-                            if (isTargetGroup) {
-                                // ... logic to find bounds ...
-                            }
-
-                            // For now, rely on manual adjustment or existing 'resolveCollision'?
-                            // User explicitly asked "Grouped boards cannot overlap".
-                            // Let's force a no-overlap pass on the NEW group members
-                            // Simple: Re-layout the group
+                        let finalGroupId = target.groupId || target.id
+                        if (isPrimaryGroup && !isTargetGroup) {
+                            finalGroupId = primaryItem.groupId!
+                        } else if (!isTargetGroup && !isPrimaryGroup) {
+                            // New Group ID
+                            finalGroupId = Date.now().toString()
                         }
+
+                        // Determine the group ID to use
+                        // If target is already in a group, use that.
+                        // If not, and primary is a group, use that.
+                        // If neither, create new.
+                        // Actually, logic:
+                        // "Drag A onto B" -> A joins B's group (or new).
+                        // If A is group -> Merge A's group into B's group?
+                        // User: "New board overlaps -> enters group -> re-sorts"
+
+                        // Let's settle on: Merge all dragged items + target (+ target's group members) into ONE group.
+                        const targetGroupId = target.groupId
+                        const primaryGroupId = primaryItem.groupId
+
+                        // If both have groups and they are different -> Merge groups
+                        // If one has group -> Add other to it
+                        // If neither -> Create new group
+
+                        let destinationGroupId = targetGroupId
+                        if (!destinationGroupId) {
+                            if (primaryGroupId) destinationGroupId = primaryGroupId
+                            else destinationGroupId = Date.now().toString()
+                        }
+
+                        // If merging two groups, keep one ID (destinationGroupId)
+
+                        // 1. Identify all items involved in the new group
+                        const currentMembersOfDestination = destinationGroupId ? newItems.filter(i => i.groupId === destinationGroupId) : (targetGroupId ? [] : [target])
+                        // If target was single, it wasn't in "currentMembersOfDestination" if we detected by groupId, so add it if needed
+                        if (!targetGroupId && !currentMembersOfDestination.find(x => x.id === target.id)) currentMembersOfDestination.push(target)
+
+                        // 2. Identify incoming items
+                        // draggedIds are the ones moving.
+                        // Also include any members of primaryGroupId if we are merging that whole group in, 
+                        // but Drag Logic already selected all group members if shift not pressed? 
+                        // Our startDrag logic selects all group members. So draggedIds contains all of them.
+
+                        // 3. Update groupId for all dragged items
+                        const updatedItems = newItems.map(i => {
+                            if (draggedIds.includes(i.id)) return { ...i, groupId: destinationGroupId }
+                            if (!targetGroupId && i.id === target.id) return { ...i, groupId: destinationGroupId } // Promote target to group
+                            // If we are merging a target GROUP (and we aren't using its ID for some reason), update them too?
+                            // Logic above picked targetGroupId as first choice, so target's group is already the destination.
+                            return i
+                        })
+
+                        // 4. Re-pack (Auto-arrange) the ENTIRE destination group
+                        const allMembers = updatedItems.filter(i => i.groupId === destinationGroupId)
+
+                        // Determine Top-Left of the group to keep it roughly in place?
+                        // Or just sort and pack.
+                        // Use Top-Left of the TARGET as the anchor? Or the average/min?
+                        // Let's use the Minimum X,Y of the combined group as the start point.
+                        const minX = Math.min(...allMembers.map(i => i.x))
+                        const minY = Math.min(...allMembers.map(i => i.y))
+
+                        const packed = packGroup(allMembers)
+
+                        // Apply packed positions relative to minX, minY
+                        packed.forEach(p => {
+                            const idx = updatedItems.findIndex(x => x.id === p.id)
+                            if (idx > -1) {
+                                updatedItems[idx].x = minX + p.x
+                                updatedItems[idx].y = minY + p.y
+                            }
+                        })
+
+                        // 5. Update Items
+                        newItems = updatedItems
                     }
                 }
                 return newItems
@@ -690,6 +737,35 @@ export default function MindBoardClient() {
             window.removeEventListener('mouseup', handleMouseUp)
         }
     }, [handleMove, finalizeInteraction])
+
+    // Detect Double Enter
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Enter') {
+                const target = e.target as HTMLElement
+                // Ignore if typing in an input or textarea
+                if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+
+                const now = Date.now()
+                if (now - lastEnterTime.current < 300) {
+                    e.preventDefault()
+                    // Create memo at center of screen
+                    const container = containerRef.current
+                    if (container) {
+                        const centerX = container.clientWidth / 2
+                        const centerY = container.clientHeight / 2
+                        const { x, y } = getWorldCoords(centerX, centerY)
+                        createMemo(x, y, true)
+                    }
+                    lastEnterTime.current = 0
+                } else {
+                    lastEnterTime.current = now
+                }
+            }
+        }
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [createMemo, getWorldCoords])
 
     const scrollToGroup = (groupId: string) => {
         const members = items.filter(i => i.groupId === groupId)
@@ -763,14 +839,14 @@ export default function MindBoardClient() {
     return (
         <div className="w-full h-[calc(100vh-60px)] relative overflow-hidden bg-gray-100 select-none touch-none">
             {/* minimap */}
-            <div className="absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden">
+            <div className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${showMinimap ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <div className="relative w-full h-full">
                     <div className="absolute inset-0 bg-gray-50 opacity-50" />
                     {items.map((item) => (
                         <div key={`mini-${item.id}`} className="absolute rounded-sm border border-black/10"
                             style={{
-                                left: `${(item.x / WORLD_SIZE) * 100}%`,
-                                top: `${(item.y / WORLD_SIZE) * 100}%`,
+                                left: `${((item.x) / WORLD_SIZE + 0.5) * 100}%`, // Approximate centering
+                                top: `${((item.y) / WORLD_SIZE + 0.5) * 100}%`,
                                 width: `${(item.w / WORLD_SIZE) * 100}%`,
                                 height: `${(item.h / WORLD_SIZE) * 100}%`,
                                 backgroundColor: item.color
@@ -780,8 +856,8 @@ export default function MindBoardClient() {
                     {containerRef.current && (
                         <div className="absolute border-2 border-blue-500 bg-blue-500/10 pointer-events-none"
                             style={{
-                                left: `${(-pan.x / scale / WORLD_SIZE) * 100}%`,
-                                top: `${(-pan.y / scale / WORLD_SIZE) * 100}%`,
+                                left: `${((-pan.x / scale) / WORLD_SIZE + 0.5) * 100}%`,
+                                top: `${((-pan.y / scale) / WORLD_SIZE + 0.5) * 100}%`,
                                 width: `${(containerRef.current.clientWidth / scale / WORLD_SIZE) * 100}%`,
                                 height: `${(containerRef.current.clientHeight / scale / WORLD_SIZE) * 100}%`
                             }}
@@ -791,30 +867,29 @@ export default function MindBoardClient() {
             </div>
 
             {/* Toolbar & Group Nav */}
-            <div className="absolute top-4 left-4 z-50 flex flex-col gap-2 items-start max-w-[80%]">
+
+
+            {/* Vertical Toolbar (Left) */}
+            <div className="absolute left-4 top-20 z-50 flex flex-col gap-4 max-h-[calc(100vh-100px)]">
                 {/* Group Navigator */}
                 {groups.length > 0 && (
-                    <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar max-w-full">
+                    <div className="flex flex-col gap-1 overflow-y-auto no-scrollbar pb-1 pointer-events-auto bg-white/50 backdrop-blur-sm p-1 rounded-lg">
                         {groups.map(g => (
                             <div key={g.id} className="flex shrink-0">
                                 <button
                                     onClick={() => scrollToGroup(g.id)}
                                     onDoubleClick={() => unGroup(g.id)}
-                                    className="px-3 py-1.5 bg-white border border-gray-200 rounded-full text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-2 group"
+                                    className="w-full text-left px-3 py-1.5 bg-white border border-gray-200 rounded-md text-[10px] font-bold text-gray-600 hover:bg-blue-600 hover:text-white hover:border-blue-600 transition-all shadow-sm flex items-center gap-2 group"
                                 >
                                     <LayoutGrid size={10} className="group-hover:text-white" />
-                                    {g.name}
+                                    <span className="truncate max-w-[100px]">{g.name}</span>
                                 </button>
                             </div>
                         ))}
                     </div>
                 )}
 
-            </div>
-
-            {/* Vertical Toolbar (Left) */}
-            <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 flex flex-col gap-2">
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1.5 flex flex-col items-center gap-2">
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1.5 flex flex-col items-center gap-2 pointer-events-auto">
                     <button onClick={autoArrange} className="p-2 hover:bg-gray-100 rounded-md text-gray-600" title="Auto Arrange">
                         <LayoutGrid size={20} />
                     </button>
@@ -875,16 +950,23 @@ export default function MindBoardClient() {
                 }}
                 onWheel={handleWheel}
             >
+                {/* Infinite Background Layer */}
+                <div className="absolute inset-0 pointer-events-none z-0"
+                    style={{
+                        backgroundImage: `linear-gradient(to right, #f0f0f0 1px, transparent 1px), linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)`,
+                        backgroundSize: `${GRID_SIZE * scale}px ${GRID_SIZE * scale}px`,
+                        backgroundPosition: `${pan.x}px ${pan.y}px`,
+                        backgroundColor: '#fdfdfd'
+                    }}
+                />
+
                 <div
                     className="absolute shadow-inner"
                     style={{
-                        width: WORLD_SIZE,
-                        height: WORLD_SIZE,
+                        width: 0,
+                        height: 0, // Zero size container that just holds the transforms
                         transform: `translate(${pan.x}px, ${pan.y}px) scale(${scale})`,
                         transformOrigin: '0 0',
-                        backgroundImage: `linear-gradient(to right, #f0f0f0 1px, transparent 1px), linear-gradient(to bottom, #f0f0f0 1px, transparent 1px)`,
-                        backgroundSize: `${GRID_SIZE}px ${GRID_SIZE}px`,
-                        backgroundColor: '#fdfdfd'
                     }}
                 >
                     {renderGroups()}
@@ -912,8 +994,8 @@ export default function MindBoardClient() {
                                 onDoubleClick={(e) => { e.stopPropagation(); handleDoubleTap(item.id) }}
                             >
                                 <div className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: item.color === '#FFFFFF' ? '#e5e5e5' : item.color }}></div>
-                                    <GripHorizontal size={14} className="text-gray-400" />
+                                    {/* <div className="w-3 h-3 rounded-full border border-black/10" style={{ backgroundColor: item.color === '#FFFFFF' ? '#e5e5e5' : item.color }}></div> */}
+                                    {/* <GripHorizontal size={14} className="text-gray-400" /> */}
                                 </div>
                                 <div className="flex gap-2">
                                     <button onClick={(e) => { e.stopPropagation(); toggleComplete(item.id) }} className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
