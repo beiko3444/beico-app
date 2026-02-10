@@ -130,31 +130,54 @@ export default function MindBoardClient() {
     const minimapDragState = useRef<{ startX: number, startY: number, startPan: { x: number, y: number }, worldWidth: number, worldHeight: number } | null>(null)
     const autoPanVelocity = useRef({ x: 0, y: 0 })
     const autoPanFrame = useRef<number>(0)
+    const [isLoaded, setIsLoaded] = useState(false)
 
     // --- Persistence ---
     useEffect(() => {
-        const savedItems = localStorage.getItem('mindboard-items')
-        const savedGroups = localStorage.getItem('mindboard-groups')
-        if (savedItems) {
+        const load = async () => {
             try {
-                const parsed = JSON.parse(savedItems)
-                setItems(parsed)
-                const maxZ = parsed.reduce((max: number, item: any) => Math.max(max, item.zIndex || 1), 1)
-                setMaxZIndex(maxZ)
-            } catch (e) {
-                console.error("Failed to load items", e)
+                const res = await fetch('/api/mindboard')
+                if (res.ok) {
+                    const data = await res.json()
+                    if (data.items && data.items.length > 0) {
+                        setItems(data.items)
+                        const maxZ = data.items.reduce((max: number, item: any) => Math.max(max, item.zIndex || 1), 1)
+                        setMaxZIndex(maxZ)
+                        if (data.groups) setGroups(data.groups)
+                    } else {
+                        // Fallback to localStorage for migration
+                        const localItems = localStorage.getItem('mindboard-items')
+                        const localGroups = localStorage.getItem('mindboard-groups')
+                        if (localItems) {
+                            const parsed = JSON.parse(localItems)
+                            setItems(parsed)
+                            const maxZ = parsed.reduce((max: number, item: any) => Math.max(max, item.zIndex || 1), 1)
+                            setMaxZIndex(maxZ)
+                        }
+                        if (localGroups) setGroups(JSON.parse(localGroups))
+                    }
+                }
+            } catch (e) { console.error("Failed to load mindboard", e) }
+            finally {
+                setIsLoaded(true)
             }
         }
-        if (savedGroups) {
-            try {
-                setGroups(JSON.parse(savedGroups))
-            } catch (e) { console.error(e) }
-        }
+        load()
     }, [])
 
     useEffect(() => {
-        if (items.length > 0) localStorage.setItem('mindboard-items', JSON.stringify(items))
-        localStorage.setItem('mindboard-groups', JSON.stringify(groups))
+        if (!isLoaded) return
+        const save = async () => {
+            try {
+                await fetch('/api/mindboard', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items, groups })
+                })
+            } catch (e) { console.error("Failed to save mindboard", e) }
+        }
+        const timeout = setTimeout(save, 2000) // 2s debounce for DB saves
+        return () => clearTimeout(timeout)
     }, [items, groups])
 
     // --- Helpers ---

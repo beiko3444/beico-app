@@ -4,9 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider  = "postgresql"
-  url       = env("DATABASE_URL")
-  directUrl = env("DIRECT_URL")
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -152,4 +151,11 @@ model Task {
   date        DateTime
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+}
+
+model MindBoard {
+  id        String   @id @default("default")
+  items     String
+  groups    String
+  updatedAt DateTime @updatedAt
 }
