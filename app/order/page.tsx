@@ -58,7 +58,8 @@ export default async function NewOrderPage() {
             barcode: p.barcode,
             nameJP: p.nameJP,
             minOrderQuantity: p.minOrderQuantity,
-            originalSellPrice: p.sellPrice, // Keep for reference if needed
+            buyPrice: p.buyPrice,
+            onlinePrice: p.onlinePrice || 0,
             appliedGrade: userGrade
         }
     })
