@@ -98,9 +98,9 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#Fdfdfd] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-12">
+        <div className="min-h-screen bg-[#Fdfdfd] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-6">
 
-            <div className="w-full max-w-[500px] mb-10">
+            <div className="w-full max-w-[500px] mb-5">
                 <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="w-[77px] h-auto relative shrink-0">
                         <img
@@ -132,7 +132,7 @@ export default function SignupPage() {
                     {/* User ID */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            ユーザーID / User ID <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> ユーザーID / User ID
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -153,7 +153,7 @@ export default function SignupPage() {
                     {/* Password */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            パスワード / Password <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> パスワード / Password
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -181,7 +181,7 @@ export default function SignupPage() {
                     {/* Company Name */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            商号 / Company Name <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> 商号 / Company Name
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -202,7 +202,7 @@ export default function SignupPage() {
                     {/* Contact Person */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            担当者名 / Contact Person <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> 担当者名 / Contact Person
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -223,7 +223,7 @@ export default function SignupPage() {
                     {/* Business Reg Number */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            事業者登録番号 / Business Registration Number <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> 事業者登録番号 / Business Registration Number
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -245,7 +245,7 @@ export default function SignupPage() {
                     {/* Email */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            メールアドレス / Email <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> メールアドレス / Email
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -268,7 +268,7 @@ export default function SignupPage() {
                         {/* Phone */}
                         <div className="space-y-1.5">
                             <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                                電話번호 / Phone <span className="text-[#e34219]">*</span>
+                                <span className="text-[#e34219]">*</span> 電話번호 / Phone
                             </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -309,7 +309,7 @@ export default function SignupPage() {
                     {/* Address 1 */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            住所1 / Address 1 <span className="text-[#e34219]">*</span>
+                            <span className="text-[#e34219]">*</span> 住所1 / Address 1
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
