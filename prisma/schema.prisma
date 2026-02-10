@@ -155,7 +155,8 @@ model Task {
 }
 
 model MindBoard {
-  id        String   @id @default("default")
+  id        String   @id @default(uuid())
+  title     String   @default("New Board")
   items     String   @db.Text
   groups    String   @db.Text
   updatedAt DateTime @updatedAt

@@ -1,47 +1,46 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
+// Get List of Boards
 export async function GET() {
     try {
-        const board = await prisma.mindBoard.findUnique({
-            where: { id: "default" }
+        const boards = await prisma.mindBoard.findMany({
+            select: {
+                id: true,
+                title: true,
+                updatedAt: true
+            },
+            orderBy: {
+                updatedAt: 'desc'
+            }
         })
 
-        if (!board) {
-            return NextResponse.json({ items: [], groups: [] })
-        }
+        // If no boards exist, create a default one if needed? 
+        // Or client handles it.Client handles it.
 
-        return NextResponse.json({
-            items: JSON.parse(board.items),
-            groups: JSON.parse(board.groups),
-            updatedAt: board.updatedAt
-        })
+        return NextResponse.json(boards)
     } catch (error) {
-        console.error("[MINDBOARD_GET]", error)
+        console.error("[MINDBOARD_LIST_GET]", error)
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
     }
 }
 
+// Create New Board
 export async function POST(request: Request) {
     try {
-        const { items, groups } = await request.json()
+        const { title } = await request.json()
 
-        const board = await prisma.mindBoard.upsert({
-            where: { id: "default" },
-            update: {
-                items: JSON.stringify(items),
-                groups: JSON.stringify(groups)
-            },
-            create: {
-                id: "default",
-                items: JSON.stringify(items),
-                groups: JSON.stringify(groups)
+        const board = await prisma.mindBoard.create({
+            data: {
+                title: title || "New Board",
+                items: "[]",
+                groups: "[]"
             }
         })
 
         return NextResponse.json(board)
     } catch (error) {
-        console.error("[MINDBOARD_POST]", error)
+        console.error("[MINDBOARD_CREATE]", error)
         return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
     }
 }
