@@ -63,7 +63,7 @@ export default function LoginPage() {
 
             {/* Logo Section */}
             <div className="mb-5 flex flex-col items-center">
-                <div className="w-[156px] h-auto mb-4 relative">
+                <div className="w-[110px] h-auto mb-4 relative">
                     <img
                         src="/logo.png"
                         alt="BEIKO BAIT"
@@ -72,8 +72,11 @@ export default function LoginPage() {
                 </div>
 
                 <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">卸売専用ポータル</h1>
-                <p className="text-xs text-gray-500 font-medium mb-2 tracking-wide">Wholesale Portal</p>
-                <p className="text-[10px] font-bold text-[#e34219] tracking-[0.2em] uppercase">Professional Bait Solutions</p>
+                <p className="text-[10px] font-bold tracking-tight uppercase">
+                    <span className="text-gray-500">Wholesale Portal</span>
+                    <span className="mx-1 text-gray-300">:</span>
+                    <span className="text-[#e34219]">Professional Bait Solutions</span>
+                </p>
             </div>
 
             {/* Login Form */}

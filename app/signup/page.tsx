@@ -102,23 +102,26 @@ export default function SignupPage() {
 
             {/* Logo Section */}
             <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="w-24 h-24 mb-6 relative">
+                <div className="w-[110px] h-auto mb-5 relative">
                     <img
-                        src="/bko_white.png"
-                        alt="BEIKO NATURAL"
+                        src="/logo.png"
+                        alt="BEIKO BAIT"
                         className="w-full h-full object-contain"
                     />
                 </div>
 
-                <h1 className="text-2xl font-extrabold text-gray-900 tracking-wide mb-1">新規会員登録</h1>
-                <p className="text-xs text-gray-500 font-bold tracking-wide mb-3">Wholesale Registration</p>
-                <p className="text-[10px] font-bold text-[#ea4318] tracking-[0.2em] uppercase">Professional Bait Solutions</p>
+                <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">新規会員登録</h1>
+                <p className="text-[10px] font-bold tracking-tight uppercase">
+                    <span className="text-gray-500">Wholesale Registration</span>
+                    <span className="mx-1 text-gray-300">:</span>
+                    <span className="text-[#e34219]">Professional Bait Solutions</span>
+                </p>
             </div>
 
             <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-500 delay-100">
 
                 {error && (
-                    <div className="mb-6 bg-red-50 border-l-4 border-[#ea4318] text-[#ea4318] px-4 py-3 rounded-r-lg text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                    <div className="mb-6 bg-red-50 border-l-4 border-[#e34219] text-[#e34219] px-4 py-3 rounded-r-lg text-sm font-medium animate-in fade-in slide-in-from-top-2">
                         ⚠️ {error}
                     </div>
                 )}
@@ -130,7 +133,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">ユーザーID / User ID</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <User size={18} strokeWidth={2.5} />
+                                <User size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type="text"
@@ -149,7 +152,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">パスワード / Password</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Lock size={18} strokeWidth={2.5} />
+                                <Lock size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type={showPassword ? "text" : "password"}
@@ -175,7 +178,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">商号 / Company Name</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Building2 size={18} strokeWidth={2.5} />
+                                <Building2 size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type="text"
@@ -194,7 +197,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">担当者名 / Contact Person</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <User size={18} strokeWidth={2.5} />
+                                <User size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type="text"
@@ -233,7 +236,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">メールアドレス / Email</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Mail size={18} strokeWidth={2.5} />
+                                <Mail size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type="email"
@@ -254,7 +257,7 @@ export default function SignupPage() {
                             <label className="text-xs font-bold text-gray-800 tracking-wide block">電話番号 / Phone</label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Phone size={18} strokeWidth={2.5} />
+                                    <Phone size={18} strokeWidth={1.5} />
                                 </div>
                                 <input
                                     type="text"
@@ -274,7 +277,7 @@ export default function SignupPage() {
                             <label className="text-xs font-bold text-gray-800 tracking-wide block">ファックス / Fax</label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Printer size={18} strokeWidth={2.5} />
+                                    <Printer size={18} strokeWidth={1.5} />
                                 </div>
                                 <input
                                     type="text"
@@ -293,7 +296,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">住所1 / Address 1</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <MapPin size={18} strokeWidth={2.5} />
+                                <MapPin size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type="text"
@@ -312,7 +315,7 @@ export default function SignupPage() {
                         <label className="text-xs font-bold text-gray-800 tracking-wide block">住所2 / Address 2</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Home size={18} strokeWidth={2.5} />
+                                <Home size={18} strokeWidth={1.5} />
                             </div>
                             <input
                                 type="text"
@@ -331,7 +334,7 @@ export default function SignupPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-14 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-xl shadow-[0_4px_14px_0_rgba(227,66,25,0.39)] transition-all transform active:scale-[0.98] flex flex-col items-center justify-center font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
+                            className="w-full h-14 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-xl shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all transform active:scale-[0.98] flex flex-col items-center justify-center font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
                         >
                             <span className="text-lg leading-none mb-1">会員登録を申請する</span>
                             <span className="text-[10px] font-medium opacity-90 tracking-widest uppercase">Apply for Membership</span>
@@ -346,7 +349,7 @@ export default function SignupPage() {
                 {/* Footer */}
                 <div className="mt-8 text-center">
                     <p className="text-xs text-gray-500 font-medium tracking-wide">
-                        すでにアカウントをお持ちですか？ <Link href="/login" className="text-[#ea4318] hover:underline font-bold ml-1">ログイン Login</Link>
+                        すでにアカウントをお持ちですか？ <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">ログイン Login</Link>
                     </p>
                 </div>
             </div>
