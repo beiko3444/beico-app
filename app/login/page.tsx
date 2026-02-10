@@ -62,8 +62,8 @@ export default function LoginPage() {
         <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center p-4 font-sans text-[#333]">
 
             {/* Logo Section */}
-            <div className="mb-8 flex flex-col items-center">
-                <div className="w-[173px] h-auto mb-5 relative">
+            <div className="mb-5 flex flex-col items-center">
+                <div className="w-[156px] h-auto mb-4 relative">
                     <img
                         src="/logo.png"
                         alt="BEIKO BAIT"
@@ -71,8 +71,8 @@ export default function LoginPage() {
                     />
                 </div>
 
-                <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-0.5">卸売専用ポータル</h1>
-                <p className="text-xs text-gray-500 font-medium mb-1.5 tracking-wide">Wholesale Portal</p>
+                <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">卸売専用ポータル</h1>
+                <p className="text-xs text-gray-500 font-medium mb-2 tracking-wide">Wholesale Portal</p>
                 <p className="text-[10px] font-bold text-[#e34219] tracking-[0.2em] uppercase">Professional Bait Solutions</p>
             </div>
 
@@ -151,7 +151,7 @@ export default function LoginPage() {
                     </button>
                 </form>
 
-                <div className="mt-6 text-center">
+                <div className="mt-3 text-center">
                     <button type="button" className="text-[13px] font-bold text-[#e34219] hover:underline tracking-tight">
                         パスワードをお忘れですか？ / Forgot Password?
                     </button>
@@ -159,11 +159,11 @@ export default function LoginPage() {
             </div>
 
             {/* New Partners Section */}
-            <div className="mt-6 w-full max-w-[360px] text-center">
-                <div className="border-t border-gray-200 pt-6 mb-4 w-full"></div>
+            <div className="mt-4 w-full max-w-[360px] text-center">
+                <div className="border-t border-gray-200 pt-2 mb-1 w-full"></div>
 
-                <h3 className="text-[19px] font-black text-[#111827] mb-2 tracking-tight">新規パートナー様 / New Partners</h3>
-                <p className="text-[13px] text-gray-500 leading-normal mb-5 font-medium px-4">
+                <h3 className="text-[19px] font-black text-[#111827] mb-1 tracking-tight">新規パートナー様 / New Partners</h3>
+                <p className="text-[13px] text-gray-500 leading-normal mb-4 font-medium px-4">
                     Partner with BEIKO for professional-grade tackle & bait solutions.
                 </p>
 
