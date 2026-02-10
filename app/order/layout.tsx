@@ -6,6 +6,7 @@ import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
 import { Building2 } from 'lucide-react'
+import Clock from '@/components/Clock'
 
 export default async function OrderLayout({
     children,
@@ -39,17 +40,19 @@ export default async function OrderLayout({
                 {/* Main White Header */}
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                     <div className="h-20 flex justify-between items-center">
-                        {/* Logo & Brand Identity */}
-                        {/* Logo & Brand Identity */}
-                        <Link href="/order" className="flex items-center group">
-                            <div className="w-20 h-auto transition-all duration-300 group-hover:scale-105">
-                                <img
-                                    src="/bko.png"
-                                    alt="BEIKO BAIT"
-                                    className="w-full h-full object-contain"
-                                />
-                            </div>
-                        </Link>
+                        <div className="flex items-center gap-8">
+                            <Link href="/order" className="flex items-center group">
+                                <div className="w-20 h-auto transition-all duration-300 group-hover:scale-105">
+                                    <img
+                                        src="/logo.png"
+                                        alt="BEIKO BAIT"
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                            </Link>
+
+                            <Clock />
+                        </div>
 
                         {/* Navigation Tabs */}
                         <div className="flex items-center">

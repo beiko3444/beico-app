@@ -17,6 +17,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const updateData: any = {
             name: String(name).trim(),
             nameJP: body.nameJP ? String(body.nameJP).trim() : null,
+            nameEN: body.nameEN ? String(body.nameEN).trim() : null,
             barcode: body.barcode ? String(body.barcode).trim() : null,
             productCode: body.productCode ? String(body.productCode).trim() : null,
             buyPrice: Math.round(Number(buyPrice)),

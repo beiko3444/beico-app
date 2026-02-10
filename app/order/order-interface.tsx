@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Barcode from 'react-barcode'
+import { Minus, Plus } from 'lucide-react'
 
 type Product = {
     id: string
@@ -12,6 +13,7 @@ type Product = {
     productCode?: string | null
     barcode?: string | null
     nameJP?: string | null
+    nameEN?: string | null
     minOrderQuantity: number
     appliedGrade?: string
     buyPrice: number
@@ -80,19 +82,18 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     const hasItems = productTotal > 0
 
     return (
-        <div className="pb-32 space-y-8">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="pb-32 space-y-4">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {products.map((product) => {
                     const qty = quantities[product.id] || 0
-                    const wholesaleMargin = product.sellPrice > 0 ? ((product.sellPrice - product.buyPrice) / product.sellPrice * 100).toFixed(1) : 0
-                    const retailMargin = product.onlinePrice > 0 ? ((product.onlinePrice - product.buyPrice) / product.onlinePrice * 100).toFixed(1) : 0
+                    const marginPercent = product.onlinePrice > 0 ? ((product.onlinePrice - product.sellPrice) / product.onlinePrice * 100).toFixed(1) : 0
 
                     return (
-                        <div key={product.id} className="bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-all duration-300">
-                            <div className="p-8 flex-1">
+                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-all duration-300">
+                            <div className="px-8 pt-8 flex-1">
                                 <div className="flex gap-6 mb-6">
                                     {/* Image Container */}
-                                    <div className="w-[120px] h-[120px] bg-gray-50 rounded-[24px] flex-shrink-0 p-3 flex items-center justify-center border border-gray-100/50 relative overflow-hidden">
+                                    <div className="w-[120px] h-[120px] bg-gray-50 rounded-xl flex-shrink-0 p-1 flex items-center justify-center border border-gray-100/50 relative overflow-hidden">
                                         {product.imageUrl ? (
                                             <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110" />
                                         ) : (
@@ -106,103 +107,119 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     </div>
 
                                     {/* Header Info */}
-                                    <div className="min-w-0 flex-1 pt-1">
-                                        <h3 className="text-xl font-black text-gray-900 leading-[1.2] mb-1.5 truncate">
-                                            {product.name}
+                                    <div className="min-w-0 flex-1 pt-1 space-y-1">
+                                        <h3 className="text-lg font-black text-black leading-tight truncate tracking-tight">
+                                            {product.nameJP || product.name}
                                         </h3>
-                                        {product.nameJP && (
-                                            <p className="text-base font-bold text-gray-400 mb-2 truncate">
-                                                {product.nameJP}
-                                            </p>
-                                        )}
-                                        <div className="flex items-center gap-2 mb-4">
-                                            <span className="text-[11px] font-bold text-gray-300 uppercase tracking-wider">Product Code:</span>
-                                            <span className="text-[11px] font-black text-gray-500 uppercase tracking-wide">{product.productCode || '-'}</span>
+                                        <p className="text-[13px] font-medium text-black uppercase tracking-normal truncate">
+                                            {product.nameEN || product.name}
+                                        </p>
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[11px] font-bold text-black uppercase tracking-normal">Product Code:</span>
+                                            <span className="text-[11px] font-medium text-black uppercase tracking-tighter font-inter">{product.productCode || '-'}</span>
                                         </div>
+
+                                        {/* Barcode Section with Download Buttons */}
+                                        {product.barcode ? (
+                                            <div className="pt-0.5 flex items-end justify-between">
+                                                <div className="flex-1">
+                                                    <div className="opacity-80 h-8 flex items-center overflow-hidden">
+                                                        <Barcode value={product.barcode} width={1.0} height={24} displayValue={false} margin={0} background="transparent" />
+                                                    </div>
+                                                    <p className="text-[10px] font-medium text-black font-inter">{product.barcode}</p>
+                                                </div>
+                                                <div className="flex gap-1.5 pb-0.5">
+                                                    <button className="px-2 py-1 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">PNG</button>
+                                                    <button className="px-2 py-1 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">SVG</button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="pt-0.5">
+                                                <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">No Barcode</span>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
 
                                 {/* Info Grid */}
-                                <div className="bg-[#f8f9fa] rounded-[24px] overflow-hidden mb-6 border border-[#f1f3f5]">
-                                    <div className="grid grid-cols-2 border-b border-[#f1f3f5]">
-                                        <div className="p-4 border-r border-[#f1f3f5]">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Wholesale Price</p>
-                                            <p className="text-2xl font-black text-gray-900 leading-none tabular-nums">
-                                                {product.sellPrice.toLocaleString()}<span className="text-[10px] font-bold text-gray-400 ml-1">円</span>
+                                <div className="bg-[#f1f3f5] rounded-md overflow-hidden mb-4 border border-gray-300">
+                                    <div className="grid grid-cols-2 border-b border-gray-300">
+                                        <div className="py-1.5 px-4 border-r border-gray-300">
+                                            <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-[#1e293b] leading-tight">卸売価格</span>
+                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Wholesale Price</span>
+                                            </div>
+                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                ¥{product.sellPrice.toLocaleString()}
                                             </p>
                                         </div>
-                                        <div className="p-4">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Retail Price</p>
-                                            <p className="text-2xl font-black text-gray-900 leading-none tabular-nums">
-                                                {product.onlinePrice.toLocaleString()}<span className="text-[10px] font-bold text-gray-400 ml-1">円</span>
+                                        <div className="py-1.5 px-4">
+                                            <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-black leading-tight">小売価格</span>
+                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Retail Price</span>
+                                            </div>
+                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                ¥{product.onlinePrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="grid grid-cols-2">
-                                        <div className="p-4 border-r border-[#f1f3f5]">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Stock</p>
-                                            <p className="text-2xl font-black text-gray-900 leading-none tabular-nums">
+                                        <div className="py-1.5 px-4 border-r border-gray-300">
+                                            <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-[#1e293b] leading-tight">在庫</span>
+                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Stock</span>
+                                            </div>
+                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 {product.stock.toLocaleString()}
                                             </p>
                                         </div>
-                                        <div className="p-4">
-                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Margin%</p>
-                                            <p className="text-base font-black text-gray-900 leading-none tabular-nums flex flex-col md:flex-row gap-x-3 gap-y-1">
-                                                <span>W:<span className="text-[#e34219]">{wholesaleMargin}%</span></span>
-                                                <span>R:<span className="text-[#e34219]">{retailMargin}%</span></span>
+                                        <div className="py-1.5 px-4">
+                                            <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-[#1e293b] leading-tight">マージン</span>
+                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Margin%</span>
+                                            </div>
+                                            <p className="text-2xl font-medium text-[#e34219] leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                {marginPercent}%
                                             </p>
                                         </div>
-                                    </div>
-                                </div>
-
-                                {/* Barcode Section */}
-                                <div className="flex items-end justify-between">
-                                    {product.barcode ? (
-                                        <div className="flex flex-col gap-2">
-                                            <div className="ml-[-10px] opacity-80 h-12 flex items-center overflow-hidden">
-                                                <Barcode value={product.barcode} width={1.2} height={40} displayValue={false} margin={0} background="transparent" />
-                                            </div>
-                                            <p className="text-[10px] font-black text-gray-400 font-mono tracking-widest">{product.barcode}</p>
-                                        </div>
-                                    ) : (
-                                        <div className="h-12 bg-gray-50 px-4 rounded-xl flex items-center justify-center border border-dashed border-gray-200">
-                                            <span className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">No Barcode</span>
-                                        </div>
-                                    )}
-
-                                    <div className="flex gap-2">
-                                        <button className="px-3 py-1.5 bg-gray-50 text-[10px] font-black text-gray-400 rounded-lg hover:bg-gray-100 transition-colors uppercase tracking-widest">PNG</button>
-                                        <button className="px-3 py-1.5 bg-gray-50 text-[10px] font-black text-gray-400 rounded-lg hover:bg-gray-100 transition-colors uppercase tracking-widest">SVG</button>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Order Control Area (Replacin admin buttons) */}
-                            <div className="px-8 pb-8 flex items-center justify-between gap-6 border-t border-gray-50 pt-6">
-                                <div className={`text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-widest ${qty > 0 ? 'bg-orange-50 text-[#e34219]' : 'bg-gray-50 text-gray-300'}`}>
-                                    {qty > 0 ? `Selected: ${qty}` : 'Not Selected'}
+                            {/* Order Control Area */}
+                            <div className="px-8 pb-8 flex items-center justify-between gap-6 pt-0">
+                                <div className="flex flex-col">
+                                    <span className="text-[11px] font-black text-[#e34219] uppercase tracking-widest leading-tight">最小注文数量</span>
+                                    <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest leading-none mt-1">Min Order: {product.minOrderQuantity}ea</span>
                                 </div>
 
-                                <div className="flex items-center bg-white border border-gray-200 rounded-full h-12 w-[160px] px-1 shadow-sm overflow-hidden group">
-                                    <button
-                                        onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
-                                        className="w-12 h-10 flex items-center justify-center text-gray-400 hover:text-gray-900 transition-colors"
-                                    >
-                                        <span className="text-2xl font-light mb-1">-</span>
-                                    </button>
-                                    <input
-                                        type="number"
-                                        value={qty === 0 ? '' : qty}
-                                        onChange={(e) => handleQuantityChange(product.id, e.target.value)}
-                                        className="flex-1 text-center font-black text-gray-900 outline-none bg-transparent text-sm"
-                                        placeholder="0"
-                                    />
-                                    <button
-                                        onClick={() => handleQuantityChange(product.id, qty + 1)}
-                                        className="w-12 h-10 flex items-center justify-center text-[#e34219] hover:text-[#ff5c35] transition-colors"
-                                    >
-                                        <span className="text-2xl font-light mb-1">+</span>
-                                    </button>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className="flex items-center bg-white border border-gray-200 rounded-md overflow-hidden shadow-sm">
+                                        <button
+                                            onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
+                                            className="w-9 h-9 flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
+                                        >
+                                            <Minus size={14} strokeWidth={2.5} />
+                                        </button>
+                                        <input
+                                            type="text"
+                                            value={qty === 0 ? '' : qty.toLocaleString()}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/,/g, '')
+                                                if (/^\d*$/.test(val)) {
+                                                    handleQuantityChange(product.id, val)
+                                                }
+                                            }}
+                                            className="w-16 h-9 text-center font-medium text-[#1e293b] text-lg bg-transparent outline-none font-inter"
+                                            placeholder="0"
+                                        />
+                                        <button
+                                            onClick={() => handleQuantityChange(product.id, qty + 1)}
+                                            className="w-9 h-9 flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -220,8 +237,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     </svg>
                 </div>
                 <div className="flex-1">
-                    <h3 className="text-lg font-bold text-gray-900">配送料</h3>
-                    <p className="text-sm text-gray-500 font-medium">Shipping Fee</p>
+                    <h3 className="text-[13px] font-black text-[#1e293b] leading-tight">配送料</h3>
+                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none">Shipping Fee</p>
                 </div>
                 <div className="text-right">
                     {shippingFee > 0 ? (
@@ -236,9 +253,12 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-center gap-4 md:gap-12">
                     <div className="text-right flex flex-col items-end">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total (Excl. Tax)</p>
-                        <p className="text-4xl font-black text-[#111827] leading-none">
-                            合計 {productTotal.toLocaleString()}円 <span className="text-sm font-bold text-gray-500 ml-1">(税別)</span>
+                        <div className="flex flex-col items-end mb-1">
+                            <span className="text-[10px] font-black text-[#1e293b] leading-tight">合計金額 (税抜)</span>
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
+                        </div>
+                        <p className="text-4xl font-medium text-[#111827] leading-none font-inter tracking-tighter">
+                            ¥{productTotal.toLocaleString()}
                         </p>
                     </div>
 
@@ -273,14 +293,14 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             </button>
 
                             <h3 className="text-2xl font-black text-gray-900 mb-2">注文内容の確認</h3>
-                            <p className="text-xs text-gray-500 mb-8 font-medium">Order Summary</p>
+                            <p className="text-xs text-gray-500 mb-8 font-medium uppercase tracking-widest">Order Summary</p>
 
                             <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
                                 {products.filter(p => (quantities[p.id] || 0) > 0).map(p => (
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50">
                                         <div>
                                             <p className="text-sm font-bold text-gray-800">{p.nameJP || p.name}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">{p.name} × {quantities[p.id]}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">{p.nameEN || p.name} × {quantities[p.id]}</p>
                                         </div>
                                         <span className="font-bold text-gray-900">{(p.sellPrice * quantities[p.id]).toLocaleString()}円</span>
                                     </div>

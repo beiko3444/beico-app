@@ -10,6 +10,8 @@
   /* Using point color as primary accent */
 
   --font-sans: var(--font-geist-sans), var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-noto: var(--font-noto-sans-jp);
+  --font-inter: var(--font-inter);
 }
 
 :root {
@@ -60,4 +62,16 @@ body {
   background: linear-gradient(-45deg, #059669, #10b981, #34d399, #059669);
   background-size: 400% 400%;
   animation: gradient-move 3s ease infinite;
+}
+
+/* Hide number input arrows */
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  -moz-appearance: textfield;
 }

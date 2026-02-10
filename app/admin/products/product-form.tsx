@@ -9,6 +9,7 @@ type Product = {
     id: string
     name: string
     nameJP?: string | null
+    nameEN?: string | null
     barcode?: string | null
     productCode?: string | null
     buyPrice: number
@@ -40,6 +41,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     }, [])
     const [name, setName] = useState('')
     const [nameJP, setNameJP] = useState('')
+    const [nameEN, setNameEN] = useState('')
     const [barcode, setBarcode] = useState('')
     const [productCode, setProductCode] = useState('')
     const [buyPrice, setBuyPrice] = useState('')
@@ -72,6 +74,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
         if (isOpen && initialData) {
             setName(isCopy ? `${initialData.name} (복사)` : initialData.name)
             setNameJP(initialData.nameJP || '')
+            setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode(isCopy ? '' : (initialData.productCode || ''))
             setBuyPrice(formatNumber(initialData.buyPrice))
@@ -89,6 +92,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             // Reset for create mode
             setName('')
             setNameJP('')
+            setNameEN('')
             setBarcode('')
             setProductCode('')
             setBuyPrice('')
@@ -141,6 +145,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             const productData = {
                 name: name.trim(),
                 nameJP: nameJP.trim(),
+                nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
                 productCode: productCode.trim(),
                 buyPrice: parseInt(parseNumber(buyPrice)) || 0,
@@ -170,6 +175,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 if (isNew) {
                     setName('')
                     setNameJP('')
+                    setNameEN('')
                     setBuyPrice('')
                     setSellPrice('')
                     setOnlinePrice('')
@@ -306,6 +312,16 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     onChange={e => setNameJP(e.target.value)}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
                                     placeholder="JAPANESE NAME"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">상품명 (영문)</label>
+                                <input
+                                    type="text"
+                                    value={nameEN}
+                                    onChange={e => setNameEN(e.target.value)}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
+                                    placeholder="ENGLISH NAME"
                                 />
                             </div>
                             <div className="space-y-1">

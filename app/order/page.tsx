@@ -58,6 +58,7 @@ export default async function NewOrderPage() {
             productCode: p.productCode,
             barcode: p.barcode,
             nameJP: p.nameJP,
+            nameEN: p.nameEN,
             minOrderQuantity: p.minOrderQuantity,
             buyPrice: p.buyPrice,
             onlinePrice: p.onlinePrice || 0,
@@ -66,18 +67,13 @@ export default async function NewOrderPage() {
     })
 
     return (
-        <div className="space-y-6">
-            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div className="flex items-baseline gap-3">
+        <div className="space-y-4">
+            <div className="mb-2 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="flex items-baseline gap-3 text-left">
                     <h2 className="text-4xl font-black text-[#111827] tracking-tight">
-                        Order List
+                        商品リスト
                     </h2>
-                    <p className="text-xl font-bold text-gray-400 tracking-wide">注文リスト</p>
-                </div>
-
-                <div className="flex items-center gap-2 text-[#e34219] font-bold bg-white px-5 py-2.5 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
-                    <Filter size={20} strokeWidth={2.5} />
-                    <span className="text-sm">Filter</span>
+                    <p className="text-sm font-normal text-gray-400 tracking-wide uppercase">Product List</p>
                 </div>
             </div>
             <OrderInterface products={productsWithTieredPrice} />

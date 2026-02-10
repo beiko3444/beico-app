@@ -41,6 +41,7 @@ model Product {
   id          String      @id @default(uuid())
   name        String
   nameJP      String?
+  nameEN      String?
   buyPrice    Float
   sellPrice   Float
   onlinePrice Float?      @default(0)
