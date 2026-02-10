@@ -8,7 +8,7 @@ export async function GET() {
         })
 
         if (!board) {
-            return NextResponse.json({ items: "[]", groups: "[]" })
+            return NextResponse.json({ items: [], groups: [] })
         }
 
         return NextResponse.json({
