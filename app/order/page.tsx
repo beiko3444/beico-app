@@ -65,11 +65,11 @@ export default async function NewOrderPage() {
 
     return (
         <div className="space-y-6">
-            <div className="mb-8">
-                <h2 className="text-3xl font-extrabold text-[#111827] tracking-tight">
+            <div className="mb-10">
+                <h2 className="text-4xl font-black text-[#111827] tracking-tight">
                     注文リスト
                 </h2>
-                <p className="text-sm font-medium text-gray-500 mt-1 tracking-wide">Order List</p>
+                <p className="text-base font-semibold text-gray-400 mt-2 tracking-wide">Order List</p>
             </div>
             <OrderInterface products={productsWithTieredPrice} />
         </div>

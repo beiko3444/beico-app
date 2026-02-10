@@ -24,21 +24,13 @@ export default async function OrderLayout({
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                     <div className="h-20 flex justify-between items-center">
                         {/* Logo & Brand Identity */}
-                        <Link href="/order" className="flex items-center gap-3.5 group">
-                            <div className="w-11 h-11 relative shadow-lg shadow-red-100 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300">
+                        <Link href="/order" className="flex items-center group">
+                            <div className="w-14 h-14 relative transition-all duration-300 group-hover:scale-105">
                                 <img
-                                    src="/bko_white.png"
-                                    alt="BEIKO Logo"
+                                    src="/bko.png"
+                                    alt="BEIKO BAIT"
                                     className="w-full h-full object-contain"
                                 />
-                            </div>
-                            <div className="flex flex-col">
-                                <span className="text-xl font-black tracking-tighter text-gray-900 leading-none group-hover:text-[var(--color-brand-blue)] transition-colors">
-                                    BEIKO
-                                </span>
-                                <span className="text-[9px] font-black text-gray-400 tracking-[0.3em] mt-1.5 uppercase opacity-70">
-                                    주문 시스템
-                                </span>
                             </div>
                         </Link>
 

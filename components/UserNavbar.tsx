@@ -26,10 +26,10 @@ export default function UserNavbar() {
                             ${isActive ? 'text-[#e34219]' : 'text-gray-400 hover:text-gray-600'}
                         `}
                     >
-                        <span className="text-sm font-bold leading-none mb-0.5">
+                        <span className="text-[15px] font-black leading-none mb-1">
                             {item.label}
                         </span>
-                        <span className="text-[10px] font-medium opacity-80 leading-none">
+                        <span className="text-[10px] font-bold opacity-70 leading-none uppercase tracking-wider">
                             {item.subLabel}
                         </span>
                     </Link>
