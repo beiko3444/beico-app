@@ -3,6 +3,20 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import {
+    User,
+    Lock,
+    Building2,
+    FileText,
+    Mail,
+    Phone,
+    Printer,
+    MapPin,
+    Home,
+    ArrowRight,
+    Eye,
+    EyeOff
+} from 'lucide-react'
 
 export default function SignupPage() {
     const router = useRouter()
@@ -18,6 +32,7 @@ export default function SignupPage() {
         address: '',
         addressDetail: ''
     })
+    const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
@@ -83,172 +98,266 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-[#f8f9fa] relative overflow-hidden font-sans py-12">
-            {/* Background Accent */}
-            <div className="absolute top-0 left-0 w-full h-[40vh] bg-[#d9361b] z-0">
-                <div className="absolute inset-0 opacity-10 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
+        <div className="min-h-screen bg-[#FAFAFA] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-12">
+
+            {/* Logo Section */}
+            <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="w-24 h-24 bg-[#395c46] flex flex-col items-center justify-center text-white mb-6 shadow-sm">
+                    <span className="text-lg font-bold tracking-[0.2em] leading-none mb-1">BEIKO</span>
+                    <span className="text-[0.5em] tracking-[0.3em] font-light opacity-80">NATURAL</span>
+                </div>
+
+                <h1 className="text-xl font-bold text-gray-900 tracking-wide mb-1">新規会員登録</h1>
+                <p className="text-sm text-gray-500 font-medium mb-2 tracking-wide">Wholesale Registration</p>
+                <p className="text-[10px] font-bold text-[#ea4318] tracking-[0.2em] uppercase">Professional Bait Solutions</p>
             </div>
 
-            <div className="w-full max-w-[600px] px-6 z-10 animate-in fade-in zoom-in duration-500">
-                <div className="bg-white rounded-[2rem] shadow-[0_30px_60px_rgba(0,0,0,0.12)] overflow-hidden border border-white/20">
-                    {/* Header */}
-                    <div className="bg-[#d9361b] pt-10 pb-8 px-8 flex flex-col items-center relative overflow-hidden">
-                        <div className="relative z-10 text-center">
-                            <h2 className="text-white text-2xl font-bold tracking-tight">Partner Registration</h2>
-                            <p className="text-white/60 text-xs mt-1 font-medium tracking-widest uppercase">Join the Beico Ecosystem</p>
+            <div className="w-full max-w-[640px] animate-in fade-in zoom-in duration-500 delay-100">
+                <div className="bg-white rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 p-8">
+
+                    {error && (
+                        <div className="mb-6 bg-red-50 border-l-4 border-[#ea4318] text-[#ea4318] px-4 py-3 rounded-r-lg text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                            ⚠️ {error}
                         </div>
-                    </div>
+                    )}
 
-                    <div className="px-8 py-10">
-                        {error && (
-                            <div className="bg-red-50 border-l-4 border-[#d9361b] text-[#d9361b] text-sm px-4 py-3 rounded-r-xl mb-6">
-                                <p className="font-bold flex items-center gap-2 text-xs">⚠️ {error}</p>
-                            </div>
-                        )}
+                    <form onSubmit={handleSubmit} className="space-y-6">
 
-                        <form onSubmit={handleSubmit} className="space-y-5">
+                        {/* Account Info Section */}
+                        <div className="space-y-5">
+                            <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2 mb-4">계정 정보 (Account Info)</h3>
+
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">아이디 (ID) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        name="username"
-                                        value={formData.username}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="User ID"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">비밀번호 (Password) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="password"
-                                        name="password"
-                                        value={formData.password}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="Password"
-                                    />
+                                {/* ID */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">아이디 / User ID <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <User size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="username"
+                                            value={formData.username}
+                                            onChange={handleChange}
+                                            required
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="User ID"
+                                        />
+                                    </div>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">상호명 (Business Name) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        name="businessName"
-                                        value={formData.businessName}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="Company Name"
-                                    />
+                                {/* Password */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">비밀번호 / Password <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <Lock size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type={showPassword ? "text" : "password"}
+                                            name="password"
+                                            value={formData.password}
+                                            onChange={handleChange}
+                                            required
+                                            className="w-full h-11 pl-11 pr-11 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400 tracking-widest"
+                                            placeholder="••••••••"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                        </button>
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">담당자명 (Representative) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        name="representativeName"
-                                        value={formData.representativeName}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="Name"
-                                    />
+                            </div>
+                        </div>
+
+                        {/* Company Info Section */}
+                        <div className="space-y-5 pt-2">
+                            <h3 className="text-sm font-bold text-gray-900 border-b border-gray-100 pb-2 mb-4">사업자 정보 (Company Info)</h3>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                {/* Company Name */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">상호명 / Company Name <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <Building2 size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="businessName"
+                                            value={formData.businessName}
+                                            onChange={handleChange}
+                                            required
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="Company Name"
+                                        />
+                                    </div>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">사업자등록번호 (Biz Reg #) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        name="businessRegNumber"
-                                        value={formData.businessRegNumber}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="000-00-00000"
-                                        maxLength={12}
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">이메일 (Email) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="email"
-                                        name="email"
-                                        value={formData.email}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="email@example.com"
-                                    />
+                                {/* Representative */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">대표자명 / Representative <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <User size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="representativeName"
+                                            value={formData.representativeName}
+                                            onChange={handleChange}
+                                            required
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="Name"
+                                        />
+                                    </div>
                                 </div>
 
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">전화번호 (Phone) <span className="text-red-500">*</span></label>
-                                    <input
-                                        type="text"
-                                        name="contact"
-                                        value={formData.contact}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="010-0000-0000"
-                                        maxLength={13}
-                                    />
+                                {/* Business Reg Number */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">사업자등록번호 / Biz Reg # <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <FileText size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="businessRegNumber"
+                                            value={formData.businessRegNumber}
+                                            onChange={handleChange}
+                                            required
+                                            maxLength={12}
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="000-00-00000"
+                                        />
+                                    </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">팩스 (Fax) <span className="text-gray-400 font-normal normal-case">(Optional)</span></label>
-                                    <input
-                                        type="text"
-                                        name="fax"
-                                        value={formData.fax}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="Fax Number"
-                                    />
+
+                                {/* Email */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">이메일 / Email <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <Mail size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="email"
+                                            name="email"
+                                            value={formData.email}
+                                            onChange={handleChange}
+                                            required
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="email@example.com"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Phone */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">전화번호 / Phone <span className="text-[#ea4318]">*</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <Phone size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="contact"
+                                            value={formData.contact}
+                                            onChange={handleChange}
+                                            required
+                                            maxLength={13}
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="010-0000-0000"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* Fax */}
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-bold text-gray-700 tracking-wide ml-1">팩스 / Fax <span className="text-gray-400 font-normal text-[0.8em]">(Optional)</span></label>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <Printer size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="fax"
+                                            value={formData.fax}
+                                            onChange={handleChange}
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="Fax Number"
+                                        />
+                                    </div>
                                 </div>
                             </div>
 
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider ml-1">주소 (Address) <span className="text-red-500">*</span></label>
+                            {/* Address Section */}
+                            <div className="pt-2">
+                                <label className="text-xs font-bold text-gray-700 tracking-wide ml-1 mb-1.5 block">주소 / Address <span className="text-[#ea4318]">*</span></label>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <input
-                                        type="text"
-                                        name="address"
-                                        value={formData.address}
-                                        onChange={handleChange}
-                                        required
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="Basic Address"
-                                    />
-                                    <input
-                                        type="text"
-                                        name="addressDetail"
-                                        value={formData.addressDetail}
-                                        onChange={handleChange}
-                                        className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-100 focus:bg-white focus:border-[#d9361b] outline-none transition-all text-sm"
-                                        placeholder="Detailed Address (Optional)"
-                                    />
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <MapPin size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="address"
+                                            value={formData.address}
+                                            onChange={handleChange}
+                                            required
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="Basic Address"
+                                        />
+                                    </div>
+                                    <div className="relative group">
+                                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                            <Home size={18} strokeWidth={2.5} />
+                                        </div>
+                                        <input
+                                            type="text"
+                                            name="addressDetail"
+                                            value={formData.addressDetail}
+                                            onChange={handleChange}
+                                            className="w-full h-11 pl-11 pr-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:bg-white focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-400"
+                                            placeholder="Detailed Address (Optional)"
+                                        />
+                                    </div>
                                 </div>
                             </div>
+                        </div>
 
-                            <div className="pt-4">
-                                <button
-                                    type="submit"
-                                    disabled={loading}
-                                    className="w-full py-4 rounded-xl bg-[#d9361b] text-white font-bold shadow-lg hover:shadow-xl hover:-translate-y-0.5 active:translate-y-0 transition-all disabled:opacity-50"
-                                >
-                                    {loading ? '처리 중...' : '회원가입 요청 (Submit Registration)'}
-                                </button>
-                                <div className="text-center mt-4">
-                                    <Link href="/login" className="text-xs text-gray-500 hover:text-[#d9361b] font-medium transition-colors">
-                                        이미 계정이 있으신가요? 로그인하기
-                                    </Link>
-                                </div>
+                        {/* Submit Button */}
+                        <div className="pt-6">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full h-14 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-xl shadow-[0_4px_14px_0_rgba(227,66,25,0.39)] transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-base tracking-wide disabled:opacity-70 disabled:cursor-not-allowed"
+                            >
+                                {loading ? '처리 중...' : (
+                                    <>
+                                        회원가입 신청 / Apply <ArrowRight size={20} strokeWidth={2.5} />
+                                    </>
+                                )}
+                            </button>
+                            <div className="text-center mt-6">
+                                <Link href="/login" className="text-xs font-bold text-gray-500 hover:text-[#ea4318] transition-colors tracking-wide">
+                                    이미 계정이 있으신가요? 로그인하기
+                                </Link>
                             </div>
-                        </form>
-                    </div>
+                        </div>
+                    </form>
+                </div>
+
+                {/* Footer */}
+                <div className="mt-8 text-center">
+                    <p className="text-[10px] text-gray-400 font-medium tracking-wide">
+                        &copy; BEIKO NATURAL. All rights reserved.
+                    </p>
                 </div>
             </div>
         </div>
