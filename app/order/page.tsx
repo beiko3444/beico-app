@@ -65,12 +65,11 @@ export default async function NewOrderPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-black text-gray-900 flex items-center gap-3">
-                    <span className="w-2 h-8 bg-[var(--color-brand-blue)] rounded-full"></span>
-                    주문하기
+            <div className="mb-8">
+                <h2 className="text-3xl font-extrabold text-[#111827] tracking-tight">
+                    注文リスト
                 </h2>
-                <p className="text-sm text-gray-500 mt-1 font-medium">실시간 재고 상태에 따라 발주가 가능합니다.</p>
+                <p className="text-sm font-medium text-gray-500 mt-1 tracking-wide">Order List</p>
             </div>
             <OrderInterface products={productsWithTieredPrice} />
         </div>

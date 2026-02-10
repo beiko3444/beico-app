@@ -88,7 +88,7 @@ export default function SignupPage() {
                 throw new Error(data.error || '회원가입 처리 중 오류가 발생했습니다.')
             }
 
-            alert('회원가입이 완료되었습니다. 관리자 승인 후 이용 가능합니다.')
+            alert('会員登録が完了しました。管理者の承認をお待ちください。\nRegistration complete. Please wait for admin approval.')
             router.push('/login')
         } catch (err: any) {
             setError(err.message)

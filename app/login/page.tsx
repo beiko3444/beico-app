@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { User, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
@@ -14,6 +14,14 @@ export default function LoginPage() {
     const [rememberMe, setRememberMe] = useState(false)
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+
+    useEffect(() => {
+        const savedUsername = localStorage.getItem('savedUsername')
+        if (savedUsername) {
+            setUsername(savedUsername)
+            setRememberMe(true)
+        }
+    }, [])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -36,6 +44,11 @@ export default function LoginPage() {
                     setError('Login failed. Please try again.')
                 }
             } else {
+                if (rememberMe) {
+                    localStorage.setItem('savedUsername', username)
+                } else {
+                    localStorage.removeItem('savedUsername')
+                }
                 router.push('/')
             }
         } catch (err) {

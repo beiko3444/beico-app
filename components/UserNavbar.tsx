@@ -4,16 +4,16 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
 const NAV_ITEMS = [
-    { href: '/order', label: '주문하기', icon: '🛒' },
-    { href: '/order/history', label: '주문내역', icon: '📋' },
-    { href: '/order/profile', label: '마이페이지', icon: '👤' },
+    { href: '/order', label: '注文', subLabel: 'Order' },
+    { href: '/order/history', label: '注文履歴', subLabel: 'History' },
+    { href: '/order/profile', label: 'マイページ', subLabel: 'My Page' },
 ]
 
 export default function UserNavbar() {
     const pathname = usePathname()
 
     return (
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-6">
             {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
 
@@ -22,16 +22,16 @@ export default function UserNavbar() {
                         key={item.href}
                         href={item.href}
                         className={`
-                            px-5 py-2 rounded-xl text-sm font-bold transition-all duration-300 flex items-center gap-2
-                            ${isActive
-                                ? 'bg-white text-[var(--color-brand-blue)] shadow-sm'
-                                : 'text-gray-500 hover:text-gray-900 hover:bg-white/50'}
+                            flex flex-col items-center group transition-colors duration-200
+                            ${isActive ? 'text-[#e34219]' : 'text-gray-400 hover:text-gray-600'}
                         `}
                     >
-                        <span className={`text-base ${isActive ? 'opacity-100' : 'opacity-40'}`}>
-                            {item.icon}
+                        <span className="text-sm font-bold leading-none mb-0.5">
+                            {item.label}
                         </span>
-                        {item.label}
+                        <span className="text-[10px] font-medium opacity-80 leading-none">
+                            {item.subLabel}
+                        </span>
                     </Link>
                 )
             })}

@@ -78,255 +78,215 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     const hasItems = productTotal > 0
 
     return (
-        <div className="space-y-8">
-            <div className="glass-panel p-2 md:p-6 rounded-2xl bg-white shadow-sm border border-gray-100">
-                <div className="space-y-3 md:space-y-4">
-                    {products.map((product, index) => {
-                        const currentQty = quantities[product.id] || 0;
-                        return (
-                            <div key={product.id} className="flex flex-col md:flex-row md:items-center bg-white border border-gray-100 rounded-2xl p-3 md:p-2 hover:shadow-md transition-all duration-300 group relative gap-3 md:gap-0">
-                                {/* Index - Hidden on mobile for more space */}
-                                <div className="hidden md:block text-xl font-black text-gray-300 pl-4 w-8 text-center tabular-nums">{index + 1}</div>
-
-                                <div className="flex items-center gap-4 flex-1">
-                                    {/* Product Image */}
-                                    <div className="w-[60px] h-[60px] md:w-[60px] md:h-[60px] flex-shrink-0 bg-white relative overflow-hidden flex items-center justify-center p-1 rounded-xl border border-gray-50">
-                                        {product.imageUrl ? (
-                                            <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500" />
-                                        ) : (
-                                            <div className="text-gray-300 text-[9px]">No Image</div>
-                                        )}
-                                        {product.stock <= 0 && (
-                                            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center rounded-xl">
-                                                <span className="text-white font-bold bg-black/60 px-1.5 py-0.5 rounded-full text-[9px]">품절</span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Product Info Section */}
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2">
-                                            <span className="md:hidden text-[10px] font-black text-gray-300 tabular-nums">#{index + 1}</span>
-                                            <h3 className="font-bold text-gray-900 group-hover:text-[var(--color-brand-blue)] transition-colors text-sm truncate">
-                                                {product.name}
-                                            </h3>
-                                        </div>
-                                        {product.nameJP && (
-                                            <p className="text-[10px] text-gray-400 font-medium leading-tight mt-0.5 break-words">
-                                                {product.nameJP}
-                                            </p>
-                                        )}
-                                        {/* Mobile ID/Barcode display */}
-                                        <div className="flex md:hidden items-center gap-2 mt-1">
-                                            <span className="text-[9px] font-bold text-gray-900">{product.productCode || '-'}</span>
-                                            <span className="text-[9px] text-gray-300">|</span>
-                                            <span className="text-[9px] font-bold text-gray-900">{product.barcode || '-'}</span>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Desktop: Product ID Section */}
-                                <div className="hidden md:flex w-[100px] px-4 border-l border-gray-50 flex-col justify-center">
-                                    <span className="text-[9px] text-gray-900 font-black uppercase tracking-widest mb-0.5">상품번호</span>
-                                    <span className="text-xs font-bold text-gray-900">
-                                        {product.productCode || '-'}
-                                    </span>
-                                </div>
-
-                                {/* Desktop: Barcode Section */}
-                                <div className="hidden md:flex w-[110px] px-4 border-l border-gray-50 flex-col items-center justify-center shrink-0">
-                                    {product.barcode ? (
-                                        <>
-                                            <div className="h-[14px] flex items-center overflow-hidden opacity-70">
-                                                <Barcode
-                                                    value={product.barcode}
-                                                    width={0.6}
-                                                    height={14}
-                                                    fontSize={10}
-                                                    displayValue={false}
-                                                    margin={0}
-                                                />
-                                            </div>
-                                            <p className="text-[10px] text-gray-900 font-bold tracking-tighter mt-1">
-                                                {product.barcode}
-                                            </p>
-                                        </>
-                                    ) : (
-                                        <span className="text-[10px] text-gray-300">-</span>
-                                    )}
-                                </div>
-
-                                {/* Price & Stock - Redesigned for mobile */}
-                                <div className="flex md:flex-col justify-between md:justify-center items-center md:items-end px-0 md:px-4 md:border-l border-gray-100 min-w-0 md:min-w-[140px] md:h-[60px]">
-                                    <div className="text-base md:text-sm font-black text-[var(--color-brand-blue)]">
-                                        {product.sellPrice.toLocaleString()} <span className="text-[10px] md:text-[9px] font-normal text-gray-500">원</span>
-                                    </div>
-                                    <div className="flex md:flex-col gap-2 md:gap-0 items-center md:items-end">
-                                        <div className={`text-[10px] ${product.stock < 5 ? 'text-orange-500 font-bold' : 'text-gray-500'}`}>
-                                            재고: {product.stock.toLocaleString()}
-                                        </div>
-                                        <div className="text-[9px] text-orange-600 font-black bg-orange-50 px-2 py-0.5 rounded-full">
-                                            최소: {product.minOrderQuantity || 1}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* Order Control */}
-                                <div className="w-full md:w-[120px] md:pl-4 flex-shrink-0 mt-2 md:mt-0">
-                                    <div className="flex items-center bg-gray-50 rounded-xl p-1 md:p-0.5 border border-gray-100">
-                                        <button
-                                            onClick={() => handleQuantityChange(product.id, Math.max(0, currentQty - 1))}
-                                            className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center hover:bg-white hover:text-[var(--color-brand-blue)] hover:shadow-sm rounded-lg md:rounded-md transition-all text-gray-400 font-bold text-lg md:text-base"
-                                        >
-                                            -
-                                        </button>
-                                        <input
-                                            type="number"
-                                            min="0"
-                                            value={currentQty === 0 ? '' : currentQty}
-                                            onChange={(e) => handleQuantityChange(product.id, e.target.value)}
-                                            className="w-full bg-transparent text-center font-black text-gray-900 text-base md:text-sm outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                            placeholder="0"
-                                        />
-                                        <button
-                                            onClick={() => handleQuantityChange(product.id, currentQty + 1)}
-                                            className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center bg-white text-[var(--color-brand-blue)] shadow-sm rounded-lg md:rounded-md hover:bg-[var(--color-brand-blue)] hover:text-white transition-all font-bold text-lg md:text-base"
-                                        >
-                                            +
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )
-                    })}
-                </div>
-            </div>
-
-            <div className="fixed bottom-0 left-0 w-full bg-white/90 backdrop-blur-xl border-t border-gray-100 pt-4 md:pt-6 px-4 md:px-6 pb-4 md:pb-6 z-20 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.15)]">
-                <div className="max-w-4xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
-                    <div className="w-full md:w-auto flex justify-between md:block items-baseline">
-                        <div className="flex flex-col">
-                            <p className="text-2xl md:text-3xl font-black text-[var(--color-brand-blue)] tabular-nums">
-                                {productTotal.toLocaleString()} <span className="text-base md:text-lg font-normal text-gray-500">원</span>
-                            </p>
-                            <p className="text-[10px] md:text-xs text-gray-400 uppercase tracking-widest font-black">총 주문 금액</p>
-                        </div>
-                        <div className="md:hidden">
-                            {hasItems && (
-                                <button
-                                    onClick={handleOrderNow}
-                                    className="bg-[var(--color-brand-blue)] text-white px-6 py-2.5 rounded-xl font-black text-sm shadow-lg shadow-blue-100 active:scale-95 transition-all"
-                                >
-                                    주문하기
-                                </button>
+        <div className="pb-32 space-y-4">
+            {products.map((product) => {
+                const qty = quantities[product.id] || 0
+                return (
+                    <div key={product.id} className="bg-white rounded-[24px] p-6 shadow-sm border border-gray-100 flex flex-col md:flex-row gap-6 items-start md:items-center">
+                        {/* Image */}
+                        <div className="w-24 h-24 bg-gray-50 rounded-2xl flex-shrink-0 p-2 flex items-center justify-center">
+                            {product.imageUrl ? (
+                                <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain mix-blend-multiply" />
+                            ) : (
+                                <div className="text-xs text-gray-300">No Image</div>
                             )}
                         </div>
-                    </div>
 
-                    <div className="hidden md:block">
-                        {hasItems && (
-                            <button
-                                onClick={handleOrderNow}
-                                className="bg-[var(--color-brand-blue)] text-white px-10 py-4 rounded-2xl font-black text-lg shadow-xl shadow-blue-100 hover:shadow-2xl hover:-translate-y-1 transition-all"
-                            >
-                                바로 주문하기
-                            </button>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {
-                showSummary && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-in fade-in duration-200">
-                        <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-8 relative animate-in zoom-in-95 duration-200">
-                            <button
-                                onClick={() => setShowSummary(false)}
-                                className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
-                            >
-                                ✕
-                            </button>
-
-                            <h3 className="text-2xl font-bold text-[var(--color-brand-blue)] mb-6">주문 요약</h3>
-
-                            <div className="space-y-4 mb-4 max-h-[30vh] overflow-y-auto">
-                                {products.filter(p => (quantities[p.id] || 0) > 0).map(p => (
-                                    <div key={p.id} className="flex justify-between text-sm">
-                                        <span className="text-gray-600">{p.name} × {quantities[p.id]}</span>
-                                        <span className="font-semibold">{(p.sellPrice * quantities[p.id]).toLocaleString()} 원</span>
-                                    </div>
-                                ))}
-                                {shippingFee > 0 && (
-                                    <div className="flex justify-between text-sm border-t border-dashed pt-2">
-                                        <span className="text-gray-600 font-bold">📦 배송비</span>
-                                        <span className="font-bold">{shippingFee.toLocaleString()} 원</span>
+                        {/* Content */}
+                        <div className="flex-1 min-w-0">
+                            <h3 className="text-lg font-bold text-gray-900 leading-tight">
+                                {product.nameJP || product.name}
+                            </h3>
+                            <p className="text-sm text-gray-500 mt-0.5 font-medium">
+                                {product.name}
+                            </p>
+                            <div className="flex flex-col gap-1 mt-2.5">
+                                <p className="text-[10px] text-gray-400 font-mono tracking-wide">
+                                    SKU: <span className="text-gray-500">{product.productCode || '-'}</span>
+                                </p>
+                                {product.barcode && (
+                                    <div className="flex items-center gap-2">
+                                        <div className="opacity-40 grayscale">
+                                            <Barcode value={product.barcode} width={1} height={15} displayValue={false} margin={0} background="transparent" />
+                                        </div>
+                                        <span className="text-[10px] text-gray-400 font-mono">{product.barcode}</span>
                                     </div>
                                 )}
                             </div>
+                        </div>
 
-                            <div className="border-t pt-4 space-y-2 mb-6">
-                                <div className="flex justify-between text-sm text-gray-500">
-                                    <span>공급가액:</span>
-                                    <span>{supplyTotal.toLocaleString()} 원</span>
-                                </div>
-                                <div className="flex justify-between text-sm text-gray-500">
-                                    <span>부가세 (10%):</span>
-                                    <span>{vat.toLocaleString()} 원</span>
-                                </div>
-                                <div className="flex justify-between font-bold text-2xl text-[var(--color-brand-blue)] pt-2 border-t-2 border-dashed border-[var(--color-brand-blue)]">
-                                    <span>총 합계:</span>
-                                    <span>{totalAmount.toLocaleString()} 원</span>
-                                </div>
-                            </div>
+                        {/* Price & Stock */}
+                        <div className="text-right min-w-[120px] pt-2 md:pt-0">
+                            <p className="text-2xl font-bold text-gray-900 tabular-nums tracking-tight">
+                                {product.sellPrice.toLocaleString()}円
+                            </p>
+                            <p className="text-xs text-gray-400 mt-1 font-medium">
+                                在庫: {product.stock.toLocaleString()}
+                            </p>
+                        </div>
 
-                            <div className="bg-white p-6 rounded-xl border border-gray-200 mb-8">
-                                <h4 className="text-sm font-semibold text-gray-700 mb-2">입금 계좌 정보</h4>
-                                <p className="text-xl font-bold text-[var(--color-brand-blue)] mb-1">{BANK_INFO.account}</p>
-                                <p className="text-sm text-gray-600">{BANK_INFO.bank} ({BANK_INFO.holder})</p>
-                            </div>
-
+                        {/* Quantity Control */}
+                        <div className="flex items-center border border-gray-200 rounded-full h-12 w-[140px] px-1 bg-white shadow-sm">
                             <button
-                                onClick={async () => {
-                                    try {
-                                        const items = products
-                                            .filter(p => (quantities[p.id] || 0) > 0)
-                                            .map(p => ({
-                                                productId: p.id,
-                                                quantity: quantities[p.id],
-                                                price: p.sellPrice
-                                            }))
-
-                                        const res = await fetch('/api/orders', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ items, total: totalAmount })
-                                        })
-
-                                        if (res.ok) {
-                                            alert("주문이 성공적으로 완료되었습니다!");
-                                            setShowSummary(false);
-                                            setQuantities({});
-                                            window.location.reload();
-                                        } else {
-                                            const errorData = await res.json();
-                                            alert(`주문 실패: ${errorData.error || '알 수 없는 오류'}`);
-                                        }
-                                    } catch (e) {
-                                        console.error(e)
-                                        alert("오류가 발생했습니다.");
-                                    }
-                                }}
-                                className="w-full bg-[var(--color-brand-orange)] text-white py-4 rounded-xl font-bold text-lg hover:brightness-110 shadow-lg"
+                                onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
+                                className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-gray-600 transition-colors"
                             >
-                                주문 확정
+                                <span className="text-2xl leading-none mb-1">-</span>
+                            </button>
+                            <input
+                                type="number"
+                                value={qty === 0 ? '' : qty}
+                                onChange={(e) => handleQuantityChange(product.id, e.target.value)}
+                                className="flex-1 text-center font-bold text-gray-900 outline-none bg-transparent"
+                                placeholder="0"
+                            />
+                            <button
+                                onClick={() => handleQuantityChange(product.id, qty + 1)}
+                                className="w-10 h-10 flex items-center justify-center text-[#e34219] hover:text-[#c03512] transition-colors"
+                            >
+                                <span className="text-2xl leading-none mb-1">+</span>
                             </button>
                         </div>
                     </div>
                 )
-            }
+            })}
 
-            {/* Spacer for fixed bottom bar */}
-            <div className="h-24"></div>
-        </div >
+            {/* Shipping Card */}
+            <div className="bg-white rounded-[24px] p-6 shadow-sm border-2 border-dashed border-gray-200 flex items-center gap-6 mt-4">
+                <div className="w-24 h-24 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="1" y="3" width="15" height="13"></rect>
+                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
+                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
+                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
+                    </svg>
+                </div>
+                <div className="flex-1">
+                    <h3 className="text-lg font-bold text-gray-900">配送料</h3>
+                    <p className="text-sm text-gray-500 font-medium">Shipping Fee</p>
+                </div>
+                <div className="text-right">
+                    {shippingFee > 0 ? (
+                        <p className="text-xl font-bold text-gray-900 tabular-nums">{shippingFee.toLocaleString()}円</p>
+                    ) : (
+                        <p className="text-sm text-gray-400">배송비 별도 / Extra</p>
+                    )}
+                </div>
+            </div>
+
+            {/* Sticky Footer */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-center gap-4 md:gap-12">
+                    <div className="text-right flex flex-col items-end">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Total (Excl. Tax)</p>
+                        <p className="text-4xl font-black text-[#111827] leading-none">
+                            合計 {productTotal.toLocaleString()}円 <span className="text-sm font-bold text-gray-500 ml-1">(税別)</span>
+                        </p>
+                    </div>
+
+                    {hasItems && (
+                        <button
+                            onClick={handleOrderNow}
+                            className="bg-[#e34219] hover:bg-[#c03512] text-white pl-8 pr-6 py-4 rounded-full font-bold text-lg shadow-lg shadow-orange-200/50 hover:shadow-orange-200 transition-all flex items-center gap-3 active:scale-[0.98] w-full md:w-auto justify-center group"
+                        >
+                            <div className="flex flex-col items-start leading-none">
+                                <span>今すぐ注文する</span>
+                                <span className="text-[9px] opacity-80 font-medium tracking-widest mt-1">ORDER NOW</span>
+                            </div>
+                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:translate-x-1 transition-transform">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M5 12h14M12 5l7 7-7 7" />
+                                </svg>
+                            </div>
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {showSummary && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                    <div className="bg-white rounded-[32px] shadow-2xl max-w-md w-full p-8 relative animate-in zoom-in-95 duration-200 overflow-hidden">
+                        <button
+                            onClick={() => setShowSummary(false)}
+                            className="absolute top-6 right-6 text-gray-400 hover:text-gray-600 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 transition-colors"
+                        >
+                            ✕
+                        </button>
+
+                        <h3 className="text-2xl font-black text-gray-900 mb-2">注文内容の確認</h3>
+                        <p className="text-xs text-gray-500 mb-8 font-medium">Order Summary</p>
+
+                        <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200">
+                            {products.filter(p => (quantities[p.id] || 0) > 0).map(p => (
+                                <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50">
+                                    <div>
+                                        <p className="text-sm font-bold text-gray-800">{p.nameJP || p.name}</p>
+                                        <p className="text-[10px] text-gray-400 mt-0.5">{p.name} × {quantities[p.id]}</p>
+                                    </div>
+                                    <span className="font-bold text-gray-900">{(p.sellPrice * quantities[p.id]).toLocaleString()}円</span>
+                                </div>
+                            ))}
+                            {shippingFee > 0 && (
+                                <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 mt-2">
+                                    <span className="text-sm font-bold text-gray-600">配送料 (Shipping)</span>
+                                    <span className="font-bold text-gray-900">{shippingFee.toLocaleString()}円</span>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="bg-gray-50 rounded-2xl p-6 space-y-3 mb-8">
+                            <div className="flex justify-between text-sm text-gray-500 font-medium">
+                                <span>供給価額 (Supply)</span>
+                                <span>{supplyTotal.toLocaleString()}円</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-gray-500 font-medium">
+                                <span>消費税 (10%)</span>
+                                <span>{vat.toLocaleString()}円</span>
+                            </div>
+                            <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 mt-2">
+                                <span className="font-bold text-lg text-gray-900">合計金額</span>
+                                <span className="text-3xl font-black text-[#e34219]">{totalAmount.toLocaleString()}円</span>
+                            </div>
+                        </div>
+
+                        <button
+                            onClick={async () => {
+                                try {
+                                    const items = products
+                                        .filter(p => (quantities[p.id] || 0) > 0)
+                                        .map(p => ({
+                                            productId: p.id,
+                                            quantity: quantities[p.id],
+                                            price: p.sellPrice
+                                        }))
+
+                                    const res = await fetch('/api/orders', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ items, total: totalAmount })
+                                    })
+
+                                    if (res.ok) {
+                                        alert("ご注文ありがとうございます！\nThank you for your order!");
+                                        setShowSummary(false);
+                                        setQuantities({});
+                                        window.location.reload();
+                                    } else {
+                                        const errorData = await res.json();
+                                        alert(`Order Failed: ${errorData.error}`);
+                                    }
+                                } catch (e) {
+                                    console.error(e)
+                                    alert("Error occurred.");
+                                }
+                            }}
+                            className="w-full bg-[#111827] text-white py-4 rounded-xl font-bold text-lg hover:bg-black transition-colors shadow-xl"
+                        >
+                            注文を確定する
+                        </button>
+                    </div>
+                </div>
+            )}
+        </div>
     )
 }
