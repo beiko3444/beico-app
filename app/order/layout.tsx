@@ -34,7 +34,7 @@ export default async function OrderLayout({
     }
 
     return (
-        <div className="min-h-screen bg-gray-50/50">
+        <div className="min-h-screen bg-[#F5F7FA]">
             {/* Sophisticated Top Navigation Bar */}
             <header className="sticky top-0 z-50 bg-white shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
                 {/* Main White Header */}

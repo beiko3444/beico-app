@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Barcode from 'react-barcode'
-import { Minus, Plus } from 'lucide-react'
+import { Minus, Plus, ArrowRight } from 'lucide-react'
 
 type Product = {
     id: string
@@ -89,11 +89,11 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     const marginPercent = product.onlinePrice > 0 ? ((product.onlinePrice - product.sellPrice) / product.onlinePrice * 100).toFixed(1) : 0
 
                     return (
-                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-sm border border-gray-100 flex flex-col h-full hover:shadow-md transition-all duration-300">
+                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full hover:shadow-xl transition-all duration-300">
                             <div className="px-8 pt-8 flex-1">
                                 <div className="flex gap-6 mb-6">
                                     {/* Image Container */}
-                                    <div className="w-[120px] h-[120px] bg-gray-50 rounded-xl flex-shrink-0 p-1 flex items-center justify-center border border-gray-100/50 relative overflow-hidden">
+                                    <div className="w-[120px] h-[120px] bg-[#f1f3f5] rounded-xl flex-shrink-0 p-1 flex items-center justify-center border border-gray-300 relative overflow-hidden">
                                         {product.imageUrl ? (
                                             <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110" />
                                         ) : (
@@ -265,17 +265,13 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     {hasItems && (
                         <button
                             onClick={handleOrderNow}
-                            className="bg-[#e34219] hover:bg-[#c03512] text-white pl-8 pr-6 py-4 rounded-full font-bold text-lg shadow-lg shadow-orange-200/50 hover:shadow-orange-200 transition-all flex items-center gap-3 active:scale-[0.98] w-full md:w-auto justify-center group"
+                            className="h-14 px-10 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-3 font-bold text-[15px] tracking-wide group w-full md:w-auto"
                         >
                             <div className="flex flex-col items-start leading-none">
-                                <span>今すぐ注文する</span>
-                                <span className="text-[9px] opacity-80 font-medium tracking-widest mt-1">ORDER NOW</span>
+                                <span className="text-lg">今すぐ注文する</span>
+                                <span className="text-[9px] opacity-70 font-bold tracking-[0.2em] -mt-0.5">ORDER NOW</span>
                             </div>
-                            <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center group-hover:translate-x-1 transition-transform">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M5 12h14M12 5l7 7-7 7" />
-                                </svg>
-                            </div>
+                            <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
                         </button>
                     )}
                 </div>
