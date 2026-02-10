@@ -20,7 +20,7 @@ export async function POST(req: Request) {
         // Basic validation
         if (!username || !password || !businessName || !representativeName || !contact || !email || !businessRegNumber || !address) {
             return NextResponse.json(
-                { error: '필수 항목을 모두 입력해주세요.' },
+                { error: '必須項目をすべて入力してください。 / Please fill in all required fields.' },
                 { status: 400 }
             )
         }
@@ -32,7 +32,7 @@ export async function POST(req: Request) {
 
         if (existingUser) {
             return NextResponse.json(
-                { error: '이미 존재하는 아이디입니다.' },
+                { error: 'このユーザーIDは既に存在します。 / This User ID already exists.' },
                 { status: 409 }
             )
         }
@@ -64,14 +64,14 @@ export async function POST(req: Request) {
         })
 
         return NextResponse.json({
-            message: '회원가입이 완료되었습니다. 관리자 승인 후 이용 가능합니다.',
+            message: '登録が完了しました。管理者の承認をお待ちください。 / Registration complete. Please wait for admin approval.',
             user: { username: user.username }
         })
 
     } catch (error) {
         console.error('Signup error:', error)
         return NextResponse.json(
-            { error: '회원가입 처리 중 오류가 발생했습니다.' },
+            { error: '登録中にエラーが発生しました。 / An error occurred during registration.' },
             { status: 500 }
         )
     }

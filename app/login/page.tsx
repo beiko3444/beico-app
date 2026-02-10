@@ -57,11 +57,11 @@ export default function LoginPage() {
 
             if (result?.error) {
                 if (result.error === 'CredentialsSignin') {
-                    setError('Invalid ID or Password')
+                    setError('ユーザーIDまたはパスワードが正しくありません。 / Invalid ID or Password')
                 } else if (result.error === 'PENDING_APPROVAL') {
-                    setError('Account is pending approval.')
+                    setError('アカウントの承認待ちです。 / Account is pending approval.')
                 } else {
-                    setError('Login failed. Please try again.')
+                    setError('ログインに失敗しました。 / Login failed. Please try again.')
                 }
             } else {
                 if (rememberMe) {
@@ -72,7 +72,7 @@ export default function LoginPage() {
                 router.push('/')
             }
         } catch (err) {
-            setError('An error occurred during login.')
+            setError('ログイン中にエラーが発生しました。 / An error occurred during login.')
         } finally {
             setLoading(false)
         }
@@ -193,7 +193,7 @@ export default function LoginPage() {
                 <div className="border-t border-gray-200 pt-2 mb-1 w-full"></div>
 
                 <h3 className="text-[19px] font-black text-[#111827] mb-1 tracking-tight">新規パートナー様 / New Partners</h3>
-                <p className="text-[13px] text-gray-500 leading-normal mb-4 font-medium px-4">
+                <p className="text-[10.5px] text-gray-400 leading-normal mb-4 font-medium px-6">
                     Partner with BEIKO for professional-grade tackle & bait solutions.
                 </p>
 

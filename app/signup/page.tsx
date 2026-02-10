@@ -85,7 +85,7 @@ export default function SignupPage() {
             const data = await res.json()
 
             if (!res.ok) {
-                throw new Error(data.error || '회원가입 처리 중 오류가 발생했습니다.')
+                throw new Error(data.error || '登録中にエラーが発生しました。 / An error occurred during registration.')
             }
 
             alert('会員登録が完了しました。管理者の承認をお待ちください。\nRegistration complete. Please wait for admin approval.')
@@ -268,7 +268,7 @@ export default function SignupPage() {
                         {/* Phone */}
                         <div className="space-y-1.5">
                             <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> 電話번호 / Phone
+                                <span className="text-[#e34219]">*</span> 電話番号 / Phone
                             </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -351,14 +351,16 @@ export default function SignupPage() {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-14 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-xl shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all transform active:scale-[0.98] flex flex-col items-center justify-center font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
+                            className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight disabled:opacity-70 disabled:cursor-not-allowed group"
                         >
-                            <span className="text-lg leading-none mb-1">業者向け会員登録</span>
-                            <span className="text-[10px] font-medium opacity-90 tracking-widest uppercase">WHOLESALE ACCOUNT REGISTRATION</span>
-
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 p-1.5 rounded-full group-hover:bg-white/30 transition-colors">
-                                <ArrowRight size={18} strokeWidth={3} />
-                            </div>
+                            {loading ? (
+                                <span className="animate-pulse">Processing...</span>
+                            ) : (
+                                <>
+                                    <span>業者向け会員登録 / Register</span>
+                                    <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>
