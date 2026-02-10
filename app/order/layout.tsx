@@ -7,6 +7,7 @@ import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
 import { Building2 } from 'lucide-react'
 import Clock from '@/components/Clock'
+import MobileBottomNav from '@/components/MobileBottomNav'
 
 export default async function OrderLayout({
     children,
@@ -34,7 +35,7 @@ export default async function OrderLayout({
     }
 
     return (
-        <div className="min-h-screen bg-[#F5F7FA]">
+        <div className="min-h-screen bg-white">
             {/* Sophisticated Top Navigation Bar */}
             <header className="sticky top-0 z-50 bg-white shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
                 {/* Main White Header */}
@@ -80,11 +81,13 @@ export default async function OrderLayout({
             </header>
 
             {/* Main Content Area */}
-            <main className="max-w-6xl mx-auto py-8 px-4 md:px-8">
+            <main className="max-w-6xl mx-auto py-8 px-4 md:px-8 pb-24 md:pb-8">
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {children}
                 </div>
             </main>
+
+            <MobileBottomNav />
         </div>
     )
 }

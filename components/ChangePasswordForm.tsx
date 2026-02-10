@@ -61,46 +61,48 @@ export default function ChangePasswordForm() {
                     }
                 }
             }}
-            className="space-y-4 max-w-md"
+            className="space-y-6"
         >
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">현재 비밀번호</label>
+            <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">현재의 패스워드 / Current Password</label>
                 <input
                     type="password"
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    placeholder="현재 비밀번호를 입력하세요"
+                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 shadow-sm"
+                    placeholder="현재의 패스워드를 입력해 주세요"
                 />
             </div>
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호</label>
+
+            <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">새로운 패스워드 / New Password</label>
                 <input
                     type="password"
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 shadow-sm"
                     minLength={6}
-                    placeholder="새 비밀번호 (6자 이상)"
+                    placeholder="새로운 패스워드 (6자 이상)"
                 />
             </div>
-            <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">새 비밀번호 확인</label>
+
+            <div className="space-y-1.5">
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">패스워드 확인 / Confirm Password</label>
                 <input
                     type="password"
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 shadow-sm"
                     minLength={6}
-                    placeholder="새 비밀번호를 다시 입력하세요"
+                    placeholder="새로운 패스워드를 다시 입력해 주세요"
                 />
             </div>
 
             {message.text && (
-                <div className={`p-3 rounded-lg text-sm ${message.type === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                <div className={`p-4 rounded-xl text-xs font-bold ${message.type === 'success' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
                     {message.text}
                 </div>
             )}
@@ -108,9 +110,9 @@ export default function ChangePasswordForm() {
             <button
                 type="submit"
                 disabled={loading}
-                className="w-full bg-[var(--color-brand-blue)] text-white py-2 rounded-lg font-semibold hover:opacity-90 transition-opacity disabled:opacity-50"
+                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center font-bold text-[15px] tracking-wide disabled:opacity-70 mt-2"
             >
-                {loading ? '변경 중...' : '비밀번호 변경'}
+                {loading ? 'Processing...' : '패스워드 변경 / Change Password'}
             </button>
         </form>
     )

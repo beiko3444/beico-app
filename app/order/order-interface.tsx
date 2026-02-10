@@ -93,7 +93,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <div className="px-8 pt-8 flex-1">
                                 <div className="flex gap-6 mb-6">
                                     {/* Image Container */}
-                                    <div className="w-[120px] h-[120px] bg-[#f1f3f5] rounded-xl flex-shrink-0 p-1 flex items-center justify-center border border-gray-300 relative overflow-hidden">
+                                    <div className="w-[120px] h-[120px] bg-[#f1f3f5] rounded-xl flex-shrink-0 p-1 flex items-center justify-center relative overflow-hidden">
                                         {product.imageUrl ? (
                                             <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110" />
                                         ) : (
@@ -203,7 +203,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         </button>
                                         <input
                                             type="text"
-                                            value={qty === 0 ? '' : qty.toLocaleString()}
+                                            value={qty.toLocaleString()}
                                             onChange={(e) => {
                                                 const val = e.target.value.replace(/,/g, '')
                                                 if (/^\d*$/.test(val)) {
@@ -211,7 +211,6 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 }
                                             }}
                                             className="w-16 h-9 text-center font-medium text-[#1e293b] text-lg bg-transparent outline-none font-inter"
-                                            placeholder="0"
                                         />
                                         <button
                                             onClick={() => handleQuantityChange(product.id, qty + 1)}
@@ -250,7 +249,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             </div>
 
             {/* Sticky Footer */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+            <div className="fixed bottom-[64px] md:bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-center gap-4 md:gap-12">
                     <div className="text-right flex flex-col items-end">
                         <div className="flex flex-col items-end mb-1">

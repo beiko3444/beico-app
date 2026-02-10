@@ -98,7 +98,7 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#Fdfdfd] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-6">
+        <div className="min-h-screen bg-[#f9f9f9] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-6">
 
             <div className="w-full max-w-[500px] mb-5">
                 <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
