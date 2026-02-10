@@ -100,22 +100,23 @@ export default function SignupPage() {
     return (
         <div className="min-h-screen bg-[#Fdfdfd] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-12">
 
-            {/* Logo Section */}
-            <div className="mb-8 flex flex-col items-center animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="w-[110px] h-auto mb-5 relative">
-                    <img
-                        src="/logo.png"
-                        alt="BEIKO BAIT"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
+            <div className="w-full max-w-[500px] mb-10">
+                <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                    <div className="w-[110px] h-auto relative shrink-0">
+                        <img
+                            src="/logo.png"
+                            alt="BEIKO BAIT"
+                            className="w-full h-full object-contain"
+                        />
+                    </div>
 
-                <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">新規会員登録</h1>
-                <p className="text-[10px] font-bold tracking-tight uppercase">
-                    <span className="text-gray-500">Wholesale Registration</span>
-                    <span className="mx-1 text-gray-300">:</span>
-                    <span className="text-[#e34219]">Professional Bait Solutions</span>
-                </p>
+                    <div className="flex flex-col justify-center">
+                        <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">新規会員登録</h1>
+                        <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 whitespace-nowrap">
+                            Wholesale Registration
+                        </p>
+                    </div>
+                </div>
             </div>
 
             <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-500 delay-100">
@@ -336,8 +337,8 @@ export default function SignupPage() {
                             disabled={loading}
                             className="w-full h-14 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-xl shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all transform active:scale-[0.98] flex flex-col items-center justify-center font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
                         >
-                            <span className="text-lg leading-none mb-1">会員登録を申請する</span>
-                            <span className="text-[10px] font-medium opacity-90 tracking-widest uppercase">Apply for Membership</span>
+                            <span className="text-lg leading-none mb-1">卸売会員登録</span>
+                            <span className="text-[10px] font-medium opacity-90 tracking-widest uppercase">WHOLESALE ACCOUNT REGISTRATION</span>
 
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 p-1.5 rounded-full group-hover:bg-white/30 transition-colors">
                                 <ArrowRight size={18} strokeWidth={3} />
