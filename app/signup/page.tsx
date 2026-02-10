@@ -102,7 +102,7 @@ export default function SignupPage() {
 
             <div className="w-full max-w-[500px] mb-10">
                 <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
-                    <div className="w-[110px] h-auto relative shrink-0">
+                    <div className="w-[77px] h-auto relative shrink-0">
                         <img
                             src="/logo.png"
                             alt="BEIKO BAIT"
@@ -110,8 +110,8 @@ export default function SignupPage() {
                         />
                     </div>
 
-                    <div className="flex flex-col justify-center">
-                        <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">新規会員登録</h1>
+                    <div className="flex flex-col justify-center mt-2">
+                        <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">業者向け会員登録</h1>
                         <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 whitespace-nowrap">
                             Wholesale Registration
                         </p>
@@ -131,7 +131,9 @@ export default function SignupPage() {
 
                     {/* User ID */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">ユーザーID / User ID</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            ユーザーID / User ID <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <User size={18} strokeWidth={1.5} />
@@ -150,7 +152,9 @@ export default function SignupPage() {
 
                     {/* Password */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">パスワード / Password</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            パスワード / Password <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <Lock size={18} strokeWidth={1.5} />
@@ -176,7 +180,9 @@ export default function SignupPage() {
 
                     {/* Company Name */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">商号 / Company Name</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            商号 / Company Name <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <Building2 size={18} strokeWidth={1.5} />
@@ -195,7 +201,9 @@ export default function SignupPage() {
 
                     {/* Contact Person */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">担当者名 / Contact Person</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            担当者名 / Contact Person <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <User size={18} strokeWidth={1.5} />
@@ -214,7 +222,9 @@ export default function SignupPage() {
 
                     {/* Business Reg Number */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">事業者登録番号 / Business Registration Number</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            事業者登録番号 / Business Registration Number <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <span className="text-lg font-bold">#</span>
@@ -227,14 +237,16 @@ export default function SignupPage() {
                                 required
                                 maxLength={13}
                                 className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="1234567890123"
+                                placeholder="123-45-67890"
                             />
                         </div>
                     </div>
 
                     {/* Email */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">メールアドレス / Email</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            メールアドレス / Email <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <Mail size={18} strokeWidth={1.5} />
@@ -255,7 +267,9 @@ export default function SignupPage() {
                     <div className="grid grid-cols-2 gap-3">
                         {/* Phone */}
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-800 tracking-wide block">電話番号 / Phone</label>
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                電話번호 / Phone <span className="text-[#e34219]">*</span>
+                            </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                     <Phone size={18} strokeWidth={1.5} />
@@ -275,7 +289,7 @@ export default function SignupPage() {
 
                         {/* Fax */}
                         <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-gray-800 tracking-wide block">ファックス / Fax</label>
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">ファックス / Fax</label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                     <Printer size={18} strokeWidth={1.5} />
@@ -294,7 +308,9 @@ export default function SignupPage() {
 
                     {/* Address 1 */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">住所1 / Address 1</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            住所1 / Address 1 <span className="text-[#e34219]">*</span>
+                        </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <MapPin size={18} strokeWidth={1.5} />
@@ -313,7 +329,7 @@ export default function SignupPage() {
 
                     {/* Address 2 */}
                     <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-gray-800 tracking-wide block">住所2 / Address 2</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">住所2 / Address 2</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                 <Home size={18} strokeWidth={1.5} />
@@ -337,7 +353,7 @@ export default function SignupPage() {
                             disabled={loading}
                             className="w-full h-14 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-xl shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all transform active:scale-[0.98] flex flex-col items-center justify-center font-bold tracking-wide disabled:opacity-70 disabled:cursor-not-allowed group relative overflow-hidden"
                         >
-                            <span className="text-lg leading-none mb-1">卸売会員登録</span>
+                            <span className="text-lg leading-none mb-1">業者向け会員登録</span>
                             <span className="text-[10px] font-medium opacity-90 tracking-widest uppercase">WHOLESALE ACCOUNT REGISTRATION</span>
 
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/20 p-1.5 rounded-full group-hover:bg-white/30 transition-colors">
