@@ -25,8 +25,12 @@ export default async function OrderLayout({
                     <div className="h-20 flex justify-between items-center">
                         {/* Logo & Brand Identity */}
                         <Link href="/order" className="flex items-center gap-3.5 group">
-                            <div className="w-11 h-11 bg-gradient-to-br from-[var(--color-brand-blue)] to-[#ff5d42] rounded-2xl flex items-center justify-center text-white font-black text-2xl shadow-lg shadow-red-100 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300">
-                                B
+                            <div className="w-11 h-11 relative shadow-lg shadow-red-100 group-hover:scale-105 group-hover:rotate-3 transition-all duration-300">
+                                <img
+                                    src="/bko_white.png"
+                                    alt="BEIKO Logo"
+                                    className="w-full h-full object-contain"
+                                />
                             </div>
                             <div className="flex flex-col">
                                 <span className="text-xl font-black tracking-tighter text-gray-900 leading-none group-hover:text-[var(--color-brand-blue)] transition-colors">

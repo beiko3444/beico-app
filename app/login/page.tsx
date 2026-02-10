@@ -50,9 +50,12 @@ export default function LoginPage() {
 
             {/* Logo Section */}
             <div className="mb-6 flex flex-col items-center">
-                <div className="w-24 h-24 bg-[#395c46] flex flex-col items-center justify-center text-white mb-6 shadow-sm">
-                    <span className="text-lg font-bold tracking-[0.2em] leading-none mb-1">BEIKO</span>
-                    <span className="text-[0.5em] tracking-[0.3em] font-light opacity-80">NATURAL</span>
+                <div className="w-24 h-24 mb-6 relative">
+                    <img
+                        src="/bko_white.png"
+                        alt="BEIKO NATURAL"
+                        className="w-full h-full object-contain"
+                    />
                 </div>
 
                 <h1 className="text-xl font-bold text-gray-900 tracking-wide mb-1">卸売専用ポータル</h1>
