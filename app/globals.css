@@ -9,7 +9,7 @@
   --color-brand-orange: #d9361b;
   /* Using point color as primary accent */
 
-  --font-sans: var(--font-montserrat), var(--font-noto-sans-jp), var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: var(--font-geist-sans), var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
 }
 
 :root {
