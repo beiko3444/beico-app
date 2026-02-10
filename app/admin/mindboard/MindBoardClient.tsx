@@ -1117,11 +1117,12 @@ export default function MindBoardClient() {
                     return item
                 })
             })
-        } else if (isMinimapDragging && minimapDragState.current && containerRef.current) {
-            const state = minimapDragState.current
-            const rect = containerRef.current.parentElement?.querySelector('.bg-white\\/80')?.getBoundingClientRect()
+        } else if (isMinimapDragging && minimapDragState.current) {
+            const container = document.getElementById('minimap-border-box')
+            if (container) {
+                const rect = container.getBoundingClientRect()
+                const state = minimapDragState.current
 
-            if (rect) {
                 // Calculate drag delta on screen
                 const dx = clientX - state.startX
                 const dy = clientY - state.startY
@@ -1142,19 +1143,12 @@ export default function MindBoardClient() {
                 const worldDx = dx * ratioX
                 const worldDy = dy * ratioY
 
-                // New Pan = StartPan - (Delta * Scale) ??
-                // Pan represents offset.
-                // If I move minimap box RIGHT, I am moving Viewport RIGHT.
-                // Viewport Right means I am viewing more Right content.
-                // xWorld = (0 - pan.x) / scale.
-                // If xWorld increases, -pan.x must increase => pan.x must DECREASE.
-                // So pan.x = startPan.x - worldDx * scale
-
                 setPan({
                     x: state.startPan.x - worldDx * scale,
                     y: state.startPan.y - worldDy * scale
                 })
             }
+
         } else if (selectionBox) {
             const rect = containerRef.current?.getBoundingClientRect()
             if (rect) {
@@ -1644,20 +1638,15 @@ export default function MindBoardClient() {
                             </div>
                         )}
 
-                        <div className="flex gap-1">
-                            <button onClick={(e) => { e.stopPropagation(); saveHistory(); optimizeGroup(group.id) }} className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors">
-                                <Wand2 size={14} />
-                            </button>
-                            <button
-                                className="p-1 hover:bg-red-100 text-red-400 rounded transition-colors"
-                                onClick={(e) => {
-                                    e.stopPropagation()
-                                    unGroup(group.id)
-                                }}
-                            >
-                                <X size={14} />
-                            </button>
-                        </div>
+                        <button
+                            className="p-1 hover:bg-red-100 text-red-400 rounded transition-colors"
+                            onClick={(e) => {
+                                e.stopPropagation()
+                                unGroup(group.id)
+                            }}
+                        >
+                            <X size={14} />
+                        </button>
                     </div>
 
                     {/* Resize Handle */}
@@ -1677,8 +1666,9 @@ export default function MindBoardClient() {
 
     return (
         <div className="fixed left-0 right-0 bottom-0 top-[60px] z-10 bg-gray-100 select-none touch-none overflow-hidden">
+            <style dangerouslySetInnerHTML={{ __html: styles }} />
             {/* minimap */}
-            <div className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${items.length > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+            <div id="minimap-container" className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${items.length > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
                 <div className="relative w-full h-full">
                     <div className="absolute inset-0 bg-gray-50 opacity-50" />
                     {(() => {
@@ -1758,6 +1748,8 @@ export default function MindBoardClient() {
                         )
                     })()}
                 </div>
+                {/* ID for Drag Logic */}
+                <div id="minimap-border-box" className="absolute inset-0 pointer-events-none" />
             </div>
 
             {/* Toolbar & Group Nav */}
@@ -1765,41 +1757,20 @@ export default function MindBoardClient() {
 
             {/* Left Toolbar */}
             <div className="absolute left-4 top-4 z-50 flex flex-col gap-2 pointer-events-auto">
-                <div className="bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-white/20 flex flex-col gap-2 w-52">
-                    <div className="flex gap-2">
-                        <input
-                            className="text-sm border rounded px-2 py-1.5 w-full focus:ring-2 ring-blue-500 outline-none bg-white/50"
-                            placeholder="New Board..."
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    const val = e.currentTarget.value.trim()
-                                    if (val) {
-                                        createBoard(val)
-                                        e.currentTarget.value = ""
-                                    }
-                                }
-                            }}
-                        />
-                        <button
-                            className="bg-blue-500 text-white rounded px-2 py-1.5 hover:bg-blue-600 transition-colors shadow-sm"
-                            onClick={(e) => {
-                                const input = e.currentTarget.parentElement?.querySelector('input') as HTMLInputElement | null
-                                const val = input?.value.trim()
-                                if (val && input) {
-                                    createBoard(val)
-                                    input.value = ""
-                                }
-                            }}
-                        >
-                            <Plus size={16} />
-                        </button>
-                    </div>
+                <div className="bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-white/20 flex flex-col gap-2 w-auto">
+                    <button
+                        onClick={() => {
+                            const title = prompt("Enter Board Name")
+                            if (title) createBoard(title)
+                        }}
+                        className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-lg flex items-center justify-center gap-2 shadow-sm transition-colors"
+                    >
+                        <Plus size={14} /> New Board
+                    </button>
                 </div>
 
                 <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
-                    <button onClick={autoArrange} className="p-1.5 hover:bg-gray-100 rounded text-gray-600" title="Auto Arrange">
-                        <LayoutGrid size={18} />
-                    </button>
+                    {/* Removed Auto Arrange */}
                     <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
                     <button onClick={() => {
                         const container = containerRef.current
@@ -1941,13 +1912,30 @@ export default function MindBoardClient() {
                                 height: item.h,
                                 backgroundColor: item.color,
                                 borderRadius: '16px',
-                                zIndex: item.zIndex || 1
+                                zIndex: item.zIndex || 1,
+                                ...(item.isUrgent ? {
+                                    boxShadow: '0 0 15px rgba(255, 69, 0, 0.4)',
+                                    animation: 'burning 1.5s infinite alternate',
+                                    border: '2px solid #ff4500' // Ensure border matches fire
+                                } : {})
                             }}
                             onMouseDown={(e) => {
                                 if (isSpacePressed) return
                                 startDrag(e.clientX, e.clientY, item.id, e.shiftKey)
                             }}
                         >
+                            {/* Calendar Icon - Top Left */}
+                            <div className="absolute top-2 left-2 z-10 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); setTargetDateItemId(item.id); setTimeout(() => dateInputRef.current?.showPicker(), 0) }}
+                                    className={`p-1.5 rounded-full transition-colors shadow-sm ${item.dueDate ? 'bg-blue-100 text-blue-600' : 'bg-white text-gray-400 hover:text-blue-500 hover:bg-blue-50'}`}
+                                    title={item.dueDate ? `Due: ${item.dueDate}` : "Set Date"}
+                                >
+                                    <Calendar size={14} />
+                                </button>
+                            </div>
+
+
                             <div className="flex-1 p-5 flex flex-col overflow-hidden relative" onDoubleClick={(e) => { e.stopPropagation(); setEditingId(item.id) }}>
                                 {editingId === item.id ? (
                                     <textarea
@@ -1973,9 +1961,7 @@ export default function MindBoardClient() {
                             {/* Item Controls */}
                             <div className="h-10 px-4 border-t border-black/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 rounded-b-2xl">
                                 <div className="flex gap-2">
-                                    <button onClick={(e) => { e.stopPropagation(); setTargetDateItemId(item.id); setTimeout(() => dateInputRef.current?.showPicker(), 0) }} className={`p-1 rounded transition-colors ${item.dueDate ? 'text-blue-500 bg-blue-100' : 'text-gray-300 hover:bg-blue-50 hover:text-blue-500'}`} title="Set Date">
-                                        <Calendar size={14} />
-                                    </button>
+                                    {/* Removed Calendar from bottom */}
                                     <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); saveHistory(); toggleUrgent(item.id) }}
                                         className={`p-1 rounded transition-colors ${item.isUrgent ? 'text-amber-500 bg-amber-100' : 'text-gray-300 hover:bg-amber-50 hover:text-amber-500'}`}
                                         title="긴급/집중">
