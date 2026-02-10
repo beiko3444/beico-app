@@ -3,7 +3,11 @@ import { PrismaClient } from '@prisma/client'
 
 const prisma = new PrismaClient()
 
-export async function PUT(req: Request, { params }: { params: { id: string } }) {
+export async function PUT(
+    req: Request,
+    props: { params: Promise<{ id: string }> }
+) {
+    const params = await props.params;
     try {
         const { id } = params
         const { completed, title, date } = await req.json()
@@ -23,7 +27,11 @@ export async function PUT(req: Request, { params }: { params: { id: string } }) 
     }
 }
 
-export async function DELETE(req: Request, { params }: { params: { id: string } }) {
+export async function DELETE(
+    req: Request,
+    props: { params: Promise<{ id: string }> }
+) {
+    const params = await props.params;
     try {
         const { id } = params
         await prisma.task.delete({ where: { id } })

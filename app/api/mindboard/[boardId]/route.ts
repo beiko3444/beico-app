@@ -1,13 +1,14 @@
-import { NextResponse } from "next/server"
+import { NextResponse, NextRequest } from "next/server"
 import { prisma } from "@/lib/prisma"
 
 export async function GET(
-    request: Request,
-    { params }: { params: { boardId: string } }
+    request: NextRequest,
+    { params }: { params: Promise<{ boardId: string }> }
 ) {
+    const { boardId } = await params;
     try {
         const board = await prisma.mindBoard.findUnique({
-            where: { id: params.boardId }
+            where: { id: boardId }
         })
 
         if (!board) {
@@ -27,9 +28,10 @@ export async function GET(
 }
 
 export async function PUT(
-    request: Request,
-    { params }: { params: { boardId: string } }
+    request: NextRequest,
+    { params }: { params: Promise<{ boardId: string }> }
 ) {
+    const { boardId } = await params;
     try {
         const body = await request.json()
         const { items, groups, title } = body
@@ -41,7 +43,7 @@ export async function PUT(
         if (title) data.title = title
 
         const board = await prisma.mindBoard.update({
-            where: { id: params.boardId },
+            where: { id: boardId },
             data
         })
 
@@ -53,12 +55,13 @@ export async function PUT(
 }
 
 export async function DELETE(
-    request: Request,
-    { params }: { params: { boardId: string } }
+    request: NextRequest,
+    { params }: { params: Promise<{ boardId: string }> }
 ) {
+    const { boardId } = await params;
     try {
         await prisma.mindBoard.delete({
-            where: { id: params.boardId }
+            where: { id: boardId }
         })
 
         return new NextResponse(null, { status: 204 })
