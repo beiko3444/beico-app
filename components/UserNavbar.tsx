@@ -2,34 +2,37 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { ShoppingCart, History, User } from 'lucide-react'
 
 const NAV_ITEMS = [
-    { href: '/order', label: '注文', subLabel: 'Order' },
-    { href: '/order/history', label: '注文履歴', subLabel: 'History' },
-    { href: '/order/profile', label: 'マイページ', subLabel: 'My Page' },
+    { href: '/order', label: 'Order', subLabel: '注文', icon: ShoppingCart },
+    { href: '/order/history', label: 'History', subLabel: '履歴', icon: History },
+    { href: '/order/profile', label: 'My Page', subLabel: 'マイページ', icon: User },
 ]
 
 export default function UserNavbar() {
     const pathname = usePathname()
 
     return (
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-2 md:gap-8">
             {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
+                const Icon = item.icon
 
                 return (
                     <Link
                         key={item.href}
                         href={item.href}
                         className={`
-                            flex flex-col items-center group transition-colors duration-200
+                            flex flex-col items-center group transition-colors duration-200 min-w-[60px]
                             ${isActive ? 'text-[#e34219]' : 'text-gray-400 hover:text-gray-600'}
                         `}
                     >
-                        <span className="text-[15px] font-black leading-none mb-1">
+                        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-1.5" />
+                        <span className={`text-[13px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400'}`}>
                             {item.label}
                         </span>
-                        <span className="text-[10px] font-bold opacity-70 leading-none uppercase tracking-wider">
+                        <span className="text-[10px] font-bold opacity-70 leading-none">
                             {item.subLabel}
                         </span>
                     </Link>

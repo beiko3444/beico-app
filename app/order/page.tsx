@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import OrderInterface from "./order-interface"
+import { Filter } from 'lucide-react'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,11 +67,18 @@ export default async function NewOrderPage() {
 
     return (
         <div className="space-y-6">
-            <div className="mb-10">
-                <h2 className="text-4xl font-black text-[#111827] tracking-tight">
-                    注文リスト
-                </h2>
-                <p className="text-base font-semibold text-gray-400 mt-2 tracking-wide">Order List</p>
+            <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+                <div className="flex items-baseline gap-3">
+                    <h2 className="text-4xl font-black text-[#111827] tracking-tight">
+                        Order List
+                    </h2>
+                    <p className="text-xl font-bold text-gray-400 tracking-wide">注文リスト</p>
+                </div>
+
+                <div className="flex items-center gap-2 text-[#e34219] font-bold bg-white px-5 py-2.5 rounded-xl shadow-sm border border-gray-200 cursor-pointer hover:bg-gray-50 transition-colors">
+                    <Filter size={20} strokeWidth={2.5} />
+                    <span className="text-sm">Filter</span>
+                </div>
             </div>
             <OrderInterface products={productsWithTieredPrice} />
         </div>
