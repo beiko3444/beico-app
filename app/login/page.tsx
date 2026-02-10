@@ -63,11 +63,11 @@ export default function LoginPage() {
 
             {/* Logo Section */}
             <div className="mb-10 flex flex-col items-center">
-                <div className="w-32 h-32 bg-[#3c5a45] flex items-center justify-center shadow-xl mb-6 relative">
+                <div className="w-64 h-auto mb-4 relative drop-shadow-sm">
                     <img
-                        src="/bko_white.png"
+                        src="/bko.png"
                         alt="BEIKO BAIT"
-                        className="w-20 h-auto object-contain"
+                        className="w-full h-full object-contain"
                     />
                 </div>
 
@@ -81,17 +81,17 @@ export default function LoginPage() {
                 <form onSubmit={handleSubmit} className="flex flex-col gap-6">
 
                     {/* User ID Input */}
-                    <div className="flex flex-col gap-2">
-                        <label className="text-[13px] font-semibold text-gray-700 tracking-tight ml-1">ユーザーID / User ID</label>
+                    <div className="flex flex-col gap-2.5">
+                        <label className="text-[14px] font-bold text-[#1e293b] tracking-tight ml-1">ユーザーID / User ID</label>
                         <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <User size={20} />
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
+                                <User size={22} />
                             </div>
                             <input
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full h-14 pl-12 pr-4 bg-white border border-gray-200 rounded-2xl outline-none focus:border-gray-400 focus:shadow-sm transition-all text-base font-medium placeholder:text-gray-300"
+                                className="w-full h-[60px] pl-14 pr-4 bg-white border border-gray-100 rounded-[22px] outline-none focus:border-gray-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all text-base font-medium placeholder:text-gray-300"
                                 placeholder="Enter ID"
                                 required
                             />
@@ -99,36 +99,36 @@ export default function LoginPage() {
                     </div>
 
                     {/* Password Input */}
-                    <div className="flex flex-col gap-2">
-                        <label className="text-[13px] font-semibold text-gray-700 tracking-tight ml-1">パスワード / Password</label>
+                    <div className="flex flex-col gap-2.5">
+                        <label className="text-[14px] font-bold text-[#1e293b] tracking-tight ml-1">パスワード / Password</label>
                         <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Lock size={20} />
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400">
+                                <Lock size={22} />
                             </div>
                             <input
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full h-14 pl-12 pr-12 bg-white border border-gray-200 rounded-2xl outline-none focus:border-gray-400 focus:shadow-sm transition-all text-base font-medium placeholder:text-gray-300 tracking-wider"
+                                className="w-full h-[60px] pl-14 pr-16 bg-white border border-gray-100 rounded-[22px] outline-none focus:border-gray-300 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-all text-base font-medium placeholder:text-gray-300 tracking-wider"
                                 placeholder="••••••••"
                                 required
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
+                                className="absolute right-6 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
                             >
-                                {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                                {showPassword ? <EyeOff size={22} /> : <Eye size={22} />}
                             </button>
                         </div>
                     </div>
 
                     {/* Remember Me */}
-                    <div className="flex items-center gap-3 cursor-pointer group px-1 mt-1" onClick={() => setRememberMe(!rememberMe)}>
-                        <div className={`w-5 h-5 border-2 rounded flex items-center justify-center transition-all ${rememberMe ? 'bg-white border-gray-300' : 'bg-white border-gray-200 group-hover:border-gray-300'}`}>
-                            {rememberMe && <ArrowRight size={12} className="text-[#333] rotate-[-45deg]" strokeWidth={3} />}
+                    <div className="flex items-center gap-3 cursor-pointer group px-2 mt-2" onClick={() => setRememberMe(!rememberMe)}>
+                        <div className={`w-6 h-6 border-2 rounded-lg flex items-center justify-center transition-all ${rememberMe ? 'bg-white border-gray-300' : 'bg-white border-gray-200 group-hover:border-gray-300'}`}>
+                            {rememberMe && <ArrowRight size={14} className="text-[#333] rotate-[-45deg]" strokeWidth={3} />}
                         </div>
-                        <span className="text-xs font-semibold text-gray-600 tracking-tight transition-colors group-hover:text-gray-800">ログイン状態を保持 / Remember Me</span>
+                        <span className="text-[13px] font-bold text-gray-500 tracking-tight transition-colors group-hover:text-gray-800">ログイン状態을 保持 / Remember Me</span>
                     </div>
 
                     {error && (
@@ -141,18 +141,18 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-14 mt-2 bg-gradient-to-r from-[#e34219] to-[#d03a15] hover:from-[#c03512] hover:to-[#e34219] text-white rounded-2xl shadow-xl shadow-orange-200/50 transition-all active:scale-[0.98] flex items-center justify-center gap-3 font-bold text-lg tracking-wide disabled:opacity-70"
+                        className="w-full h-[64px] mt-4 bg-[#e8431e] hover:bg-[#d03a15] text-white rounded-[22px] shadow-[0_15px_40px_-5px_rgba(232,67,30,0.4)] transition-all active:scale-[0.98] flex items-center justify-center gap-3 font-bold text-[19px] tracking-wide disabled:opacity-70"
                     >
                         {loading ? 'Processing...' : (
                             <>
-                                ログイン / Login <ArrowRight size={22} strokeWidth={2.5} />
+                                ログイン / Login <ArrowRight size={24} strokeWidth={2.5} />
                             </>
                         )}
                     </button>
                 </form>
 
-                <div className="mt-8 text-center">
-                    <button type="button" className="text-xs font-bold text-[#e34219] hover:text-[#c03512] tracking-tight transition-colors">
+                <div className="mt-10 text-center">
+                    <button type="button" className="text-[14px] font-bold text-[#e34219] hover:underline tracking-tight">
                         パスワードをお忘れですか？ / Forgot Password?
                     </button>
                 </div>

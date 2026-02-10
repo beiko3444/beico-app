@@ -42,11 +42,11 @@ export default async function OrderLayout({
                         {/* Logo & Brand Identity */}
                         {/* Logo & Brand Identity */}
                         <Link href="/order" className="flex items-center group">
-                            <div className="w-14 h-14 bg-[#3c5a45] flex items-center justify-center shadow-md transition-all duration-300 group-hover:scale-105">
+                            <div className="w-20 h-auto transition-all duration-300 group-hover:scale-105">
                                 <img
-                                    src="/bko_white.png"
+                                    src="/bko.png"
                                     alt="BEIKO BAIT"
-                                    className="w-10 h-10 object-contain"
+                                    className="w-full h-full object-contain"
                                 />
                             </div>
                         </Link>
