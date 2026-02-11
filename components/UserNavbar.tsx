@@ -6,7 +6,7 @@ import { ShoppingCart, History, User } from 'lucide-react'
 
 const NAV_ITEMS = [
     { href: '/order', label: 'Order', subLabel: '注文', icon: ShoppingCart },
-    { href: '/order/history', label: 'History', subLabel: '履歴', icon: History },
+    { href: '/order/history', label: 'History', subLabel: '注文履歴', icon: History },
     { href: '/order/profile', label: 'My Page', subLabel: 'マイページ', icon: User },
 ]
 

@@ -192,7 +192,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">在庫</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Stock</span>
                                             </div>
-                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                            <p className={`text-2xl font-medium leading-none tabular-nums font-inter tracking-tighter text-right ${product.stock <= 0 ? 'text-[#e34219]' : 'text-gray-900'}`}>
                                                 {product.stock.toLocaleString()}
                                             </p>
                                         </div>
