@@ -14,12 +14,12 @@ export default function ChangePasswordForm() {
         setMessage({ type: '', text: '' })
 
         if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: '새 비밀번호가 일치하지 않습니다.' })
+            setMessage({ type: 'error', text: '新しいパスワード가一致しません。' })
             return
         }
 
         if (newPassword.length < 6) {
-            setMessage({ type: 'error', text: '새 비밀번호는 최소 6자 이상이어야 합니다.' })
+            setMessage({ type: 'error', text: '新しいパスワードは少なくとも6文字以上である必要があります。' })
             return
         }
 
@@ -35,15 +35,15 @@ export default function ChangePasswordForm() {
             const data = await res.json()
 
             if (res.ok) {
-                setMessage({ type: 'success', text: '비밀번호가 성공적으로 변경되었습니다.' })
+                setMessage({ type: 'success', text: 'パスワードが正常に変更されました。' })
                 setCurrentPassword('')
                 setNewPassword('')
                 setConfirmPassword('')
             } else {
-                setMessage({ type: 'error', text: data.error === 'Invalid current password' ? '현재 비밀번호가 올바르지 않습니다.' : (data.error || '비밀번호 변경에 실패했습니다.') })
+                setMessage({ type: 'error', text: data.error === 'Invalid current password' ? '現在のパスワードが正しくありません。' : (data.error || 'パスワードの変更に失敗しました。') })
             }
         } catch (error) {
-            setMessage({ type: 'error', text: '오류가 발생했습니다.' })
+            setMessage({ type: 'error', text: 'エラーが発生しました。' })
         } finally {
             setLoading(false)
         }
@@ -64,40 +64,40 @@ export default function ChangePasswordForm() {
             className="space-y-6"
         >
             <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">현재의 패스워드 / Current Password</label>
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">現在のパスワード / Current Password</label>
                 <input
                     type="password"
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 shadow-sm"
-                    placeholder="현재의 패스워드를 입력해 주세요"
+                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
+                    placeholder="現在のパスワードを入力してください。"
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">새로운 패스워드 / New Password</label>
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">新しいパスワード / New Password</label>
                 <input
                     type="password"
                     required
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 shadow-sm"
+                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     minLength={6}
-                    placeholder="새로운 패스워드 (6자 이상)"
+                    placeholder="新しいパスワード（6文字以上）"
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">패스워드 확인 / Confirm Password</label>
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">パスワード確認 / Confirm Password</label>
                 <input
                     type="password"
                     required
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 shadow-sm"
+                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     minLength={6}
-                    placeholder="새로운 패스워드를 다시 입력해 주세요"
+                    placeholder="新しいパスワードをもう一度入力してください。"
                 />
             </div>
 
@@ -112,7 +112,7 @@ export default function ChangePasswordForm() {
                 disabled={loading}
                 className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center font-bold text-[15px] tracking-wide disabled:opacity-70 mt-2"
             >
-                {loading ? 'Processing...' : '패스워드 변경 / Change Password'}
+                {loading ? 'Processing...' : 'パスワード変更 / Change Password'}
             </button>
         </form>
     )

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 
-export default function Clock() {
+export default function Clock({ className }: { className?: string }) {
     const [time, setTime] = useState<Date | null>(null)
 
     useEffect(() => {
@@ -28,7 +28,7 @@ export default function Clock() {
     }
 
     return (
-        <div className="text-[11px] font-bold text-gray-800 tracking-widest">
+        <div className={`text-[11px] font-bold tracking-widest ${className || 'text-gray-800'}`}>
             {formatJapaneseDate(time)}
         </div>
     )

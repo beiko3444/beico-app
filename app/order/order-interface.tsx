@@ -225,28 +225,6 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     )
                 })}
             </div>
-            {/* Shipping Card */}
-            <div className="bg-white rounded-[24px] p-6 shadow-sm border-2 border-dashed border-gray-200 flex items-center gap-6 mt-4">
-                <div className="w-24 h-24 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-300">
-                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                        <rect x="1" y="3" width="15" height="13"></rect>
-                        <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon>
-                        <circle cx="5.5" cy="18.5" r="2.5"></circle>
-                        <circle cx="18.5" cy="18.5" r="2.5"></circle>
-                    </svg>
-                </div>
-                <div className="flex-1">
-                    <h3 className="text-[13px] font-black text-[#1e293b] leading-tight">配送料</h3>
-                    <p className="text-[9px] text-gray-400 font-bold uppercase tracking-widest leading-none">Shipping Fee</p>
-                </div>
-                <div className="text-right">
-                    {shippingFee > 0 ? (
-                        <p className="text-xl font-bold text-gray-900 tabular-nums">{shippingFee.toLocaleString()}円</p>
-                    ) : (
-                        <p className="text-sm text-gray-400">배송비 별도 / Extra</p>
-                    )}
-                </div>
-            </div>
 
             {/* Sticky Footer */}
             <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">

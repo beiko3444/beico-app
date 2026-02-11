@@ -44,6 +44,12 @@ model Product {
   nameEN      String?
   buyPrice    Float
   sellPrice   Float
+  jpBuyPrice  Float?      @default(0)
+  jpSellPrice Float?      @default(0)
+  krBuyPrice  Float?      @default(0)
+  krSellPrice Float?      @default(0)
+  usBuyPrice  Float?      @default(0)
+  usSellPrice Float?      @default(0)
   onlinePrice Float?      @default(0)
   priceA      Float?
   priceB      Float?

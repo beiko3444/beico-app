@@ -15,6 +15,12 @@ type Product = {
     buyPrice: number
     sellPrice: number
     onlinePrice?: number | null
+    jpBuyPrice?: number | null
+    jpSellPrice?: number | null
+    krBuyPrice?: number | null
+    krSellPrice?: number | null
+    usBuyPrice?: number | null
+    usSellPrice?: number | null
     priceA?: number | null
     priceB?: number | null
     priceC?: number | null
@@ -47,6 +53,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [buyPrice, setBuyPrice] = useState('')
     const [sellPrice, setSellPrice] = useState('')
     const [onlinePrice, setOnlinePrice] = useState('')
+    const [jpBuyPrice, setJpBuyPrice] = useState('')
+    const [jpSellPrice, setJpSellPrice] = useState('')
+    const [krBuyPrice, setKrBuyPrice] = useState('')
+    const [krSellPrice, setKrSellPrice] = useState('')
+    const [usBuyPrice, setUsBuyPrice] = useState('')
+    const [usSellPrice, setUsSellPrice] = useState('')
     const [stock, setStock] = useState('')
     const [safetyStock, setSafetyStock] = useState('')
     const [priceA, setPriceA] = useState('')
@@ -80,6 +92,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setBuyPrice(formatNumber(initialData.buyPrice))
             setSellPrice(formatNumber(initialData.sellPrice))
             setOnlinePrice(formatNumber(initialData.onlinePrice || 0))
+            setJpBuyPrice(formatNumber(initialData.jpBuyPrice || 0))
+            setJpSellPrice(formatNumber(initialData.jpSellPrice || 0))
+            setKrBuyPrice(formatNumber(initialData.krBuyPrice || 0))
+            setKrSellPrice(formatNumber(initialData.krSellPrice || 0))
+            setUsBuyPrice(formatNumber(initialData.usBuyPrice || 0))
+            setUsSellPrice(formatNumber(initialData.usSellPrice || 0))
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
             setPriceA(formatNumber(initialData.priceA ?? ""))
@@ -98,6 +116,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setBuyPrice('')
             setSellPrice('')
             setOnlinePrice('')
+            setJpBuyPrice('')
+            setJpSellPrice('')
+            setKrBuyPrice('')
+            setKrSellPrice('')
+            setUsBuyPrice('')
+            setUsSellPrice('')
             setStock('0')
             setSafetyStock('0')
             setPriceA('')
@@ -151,6 +175,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 buyPrice: parseInt(parseNumber(buyPrice)) || 0,
                 sellPrice: parseInt(parseNumber(sellPrice)) || 0,
                 onlinePrice: parseInt(parseNumber(onlinePrice)) || 0,
+                jpBuyPrice: parseInt(parseNumber(jpBuyPrice)) || 0,
+                jpSellPrice: parseInt(parseNumber(jpSellPrice)) || 0,
+                krBuyPrice: parseInt(parseNumber(krBuyPrice)) || 0,
+                krSellPrice: parseInt(parseNumber(krSellPrice)) || 0,
+                usBuyPrice: parseInt(parseNumber(usBuyPrice)) || 0,
+                usSellPrice: parseInt(parseNumber(usSellPrice)) || 0,
                 stock: parseInt(parseNumber(stock)) || 0,
                 safetyStock: parseInt(parseNumber(safetyStock)) || 0,
                 priceA: priceA === "" ? null : parseInt(parseNumber(priceA)),
@@ -179,6 +209,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setBuyPrice('')
                     setSellPrice('')
                     setOnlinePrice('')
+                    setJpBuyPrice('')
+                    setJpSellPrice('')
+                    setKrBuyPrice('')
+                    setKrSellPrice('')
+                    setUsBuyPrice('')
+                    setUsSellPrice('')
                     setStock('0')
                     setSafetyStock('0')
                     setPriceA('')
@@ -425,6 +461,83 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     onChange={e => setOnlinePrice(formatNumber(e.target.value))}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
                                 />
+                            </div>
+                        </div>
+
+                        {/* Regional Prices Sub-group */}
+                        <div className="mt-4 pt-4 border-t border-gray-300">
+                            <label className="block text-[10px] font-bold text-gray-500 mb-2">지역별 단가 (Regional Pricing)</label>
+
+                            {/* Japan Pricing */}
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium text-gray-600">일본 도매가 (JP Wholesale)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={jpBuyPrice}
+                                        onChange={e => setJpBuyPrice(formatNumber(e.target.value))}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium text-gray-600">일본 판매가 (JP Retail)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={jpSellPrice}
+                                        onChange={e => setJpSellPrice(formatNumber(e.target.value))}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Korea Pricing */}
+                            <div className="grid grid-cols-2 gap-4 mb-4">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium text-gray-600">한국 도매가 (KR Wholesale)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={krBuyPrice}
+                                        onChange={e => setKrBuyPrice(formatNumber(e.target.value))}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium text-gray-600">한국 판매가 (KR Retail)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={krSellPrice}
+                                        onChange={e => setKrSellPrice(formatNumber(e.target.value))}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* US Pricing */}
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium text-gray-600">미국 도매가 (US Wholesale)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={usBuyPrice}
+                                        onChange={e => setUsBuyPrice(formatNumber(e.target.value))}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-medium text-gray-600">미국 판매가 (US Retail)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={usSellPrice}
+                                        onChange={e => setUsSellPrice(formatNumber(e.target.value))}
+                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
+                                    />
+                                </div>
                             </div>
                         </div>
 
