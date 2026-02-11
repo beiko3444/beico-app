@@ -28,11 +28,11 @@ export default function UserNavbar() {
                             ${isActive ? 'text-[#e34219]' : 'text-gray-400 hover:text-gray-600'}
                         `}
                     >
-                        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-2" />
-                        <span className={`text-[12.5px] font-black leading-none mb-1.5 ${isActive ? 'text-[#e34219]' : 'text-[#1e293b]'}`}>
+                        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
+                        <span className={`text-[12.5px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400'}`}>
                             {item.subLabel}
                         </span>
-                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]/80' : 'text-gray-400'}`}>
+                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]' : 'text-gray-400'}`}>
                             {item.label}
                         </span>
                     </Link>

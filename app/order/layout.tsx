@@ -41,9 +41,9 @@ export default async function OrderLayout({
                 {/* Main White Header */}
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                     <div className="h-20 flex justify-between items-center">
-                        <div className="flex items-center gap-8">
+                        <div className="flex items-center gap-2">
                             <Link href="/order" className="flex items-center group">
-                                <div className="w-20 h-auto transition-all duration-300 group-hover:scale-105">
+                                <div className="w-16 h-auto transition-all duration-300 group-hover:scale-105">
                                     <img
                                         src="/logo.png"
                                         alt="BEIKO BAIT"
@@ -69,9 +69,9 @@ export default async function OrderLayout({
                             <div className="p-1.5 bg-white/10 rounded-md">
                                 <Building2 size={16} className="text-white" />
                             </div>
-                            <div className="flex flex-col leading-[1.1]">
-                                <span className="text-[13px] text-gray-300 font-medium">Logged in as: <span className="text-white font-black">{businessName}</span></span>
-                                <span className="text-[10px] text-gray-400">ログイン中: {businessNameJP}</span>
+                            <div className="flex flex-col gap-1">
+                                <span className="text-[13px] text-gray-300 font-medium leading-none">Logged in as: <span className="text-white font-black">{businessName}</span></span>
+                                <span className="text-[10px] text-gray-400 font-bold leading-none">ログイン中: {businessNameJP}</span>
                             </div>
                         </div>
 
