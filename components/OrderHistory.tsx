@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, ShoppingBag, CreditCard, X, Info, Truck, FileText, Banknote, Landmark } from 'lucide-react'
+import { Check, ShoppingBag, CreditCard, X, Info, Truck, FileText, Banknote, Landmark, Package } from 'lucide-react'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 
 export default function OrderHistory({ orders }: { orders: any[] }) {
@@ -101,12 +101,18 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                             <div className="flex flex-col text-sm">
                                 <span className="text-gray-400 mb-0.5 text-xs">注文日時 / 주문일시</span>
                                 <span className="font-bold text-gray-700" suppressHydrationWarning>
-                                    {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                    {(() => {
+                                        const d = new Date(order.createdAt);
+                                        const datePart = d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+                                        const dayPart = d.toLocaleDateString('ja-JP', { weekday: 'short' });
+                                        const timePart = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
+                                        return `${datePart}(${dayPart}) ${timePart}`;
+                                    })()}
                                 </span>
                             </div>
                             <div className="flex flex-col text-right text-sm">
                                 <span className="text-gray-400 mb-0.5 text-xs">注文番号 / 주문번호</span>
-                                <span className="font-bold text-gray-900 font-inter tracking-widest">{order.orderNumber || order.id.slice(0, 12)}</span>
+                                <span className="font-bold text-gray-900 font-inter tracking-[0.01em]">{order.orderNumber || order.id.slice(0, 12)}</span>
                             </div>
                         </div>
                         <div className="border-t border-gray-100 mx-5 my-1" />
@@ -115,7 +121,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         <div className="bg-white rounded-xl py-1 px-6 mb-1 mx-4 md:mx-0">
                             <div className="relative flex justify-between items-start overflow-hidden pt-2">
                                 {/* Connecting Line Container (Grey Background) */}
-                                <div className="absolute top-[26px] left-[10%] right-[10%] h-[1px] bg-gray-200 -z-10">
+                                <div className="absolute top-[26px] left-[10%] right-[10%] h-[2px] bg-gray-100 z-0">
                                     {/* Active Progress Line (Red) */}
                                     <div
                                         className="h-full bg-[#e34219] transition-all duration-500"
@@ -134,10 +140,10 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                 {isActive ? <step.icon size={16} strokeWidth={3} /> : idx + 1}
                                             </div>
                                             <div className="text-center">
-                                                <div className={`text-[10px] md:text-xs font-bold mb-0.5 whitespace-nowrap ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                <div className={`text-[11px] md:text-sm font-bold mb-0.5 whitespace-nowrap ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
                                                     {step.label}
                                                 </div>
-                                                <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                                                <div className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">
                                                     {step.sub}
                                                 </div>
                                             </div>
@@ -148,7 +154,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         </div>
 
                         {/* Payment Information & Totals Summary */}
-                        <div className="bg-white rounded-xl p-5 mb-3 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl pt-5 px-5 pb-2 mb-1 mx-4 md:mx-0">
                             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
                                 <Landmark size={14} className="text-[#e34219]" />
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">お支払い情報 / 입금정보</h3>
@@ -176,35 +182,48 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 </div>
                                 <div className="flex justify-between text-xs text-gray-400">
                                     <span>供給価額 / 공급가액</span>
-                                    <span className="font-medium font-inter">₩{supplyPrice.toLocaleString()}</span>
+                                    <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">₩</span>{supplyPrice.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-gray-400">
                                     <span>消費税 / 부가세 (10%)</span>
-                                    <span className="font-medium font-inter">₩{vat.toLocaleString()}</span>
+                                    <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">₩</span>{vat.toLocaleString()}</span>
                                 </div>
                             </div>
                         </div>
 
+                        {order.status !== 'DEPOSIT_COMPLETED' && (
+                            <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-5 flex items-start gap-3 mb-4 mx-4 md:mx-0">
+                                <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
+                                <div className="text-xs leading-relaxed text-gray-600">
+                                    <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください。入金確認後の注文キャンセルはできません。
+                                    <span className="text-gray-400 block font-medium">합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.</span>
+                                </div>
+                            </div>
+                        )}
+
                         {/* Action Buttons */}
-                        <div className="bg-white rounded-xl mb-1 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl mb-4 mx-4 md:mx-0">
                             <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                                 <button
                                     onClick={() => order.status !== 'DEPOSIT_COMPLETED' && toggleDeposit(order.id, order.status)}
                                     disabled={loadingMap[order.id] || order.status === 'DEPOSIT_COMPLETED'}
-                                    className={`h-13 border-2 rounded-lg font-bold transition-all flex items-center justify-center gap-2
+                                    className={`h-13 border-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center leading-tight
                                         ${order.status === 'DEPOSIT_COMPLETED'
                                             ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
-                                            : 'border-[#e34219] text-[#e34219] bg-white hover:bg-orange-50'
+                                            : 'border-[#e34219] text-white bg-[#e34219] hover:bg-[#cc3b16]'
                                         }`}
                                 >
                                     {loadingMap[order.id] ? 'Processing...' : (
                                         order.status === 'DEPOSIT_COMPLETED' ? (
-                                            <div className="flex flex-col items-center leading-tight py-1">
-                                                <span className="text-sm md:text-base font-bold">ご入金を確認後、商品を発送いたします。</span>
-                                                <span className="text-[11px] md:text-sm font-medium opacity-80">입금확인 후 제품이 발송됩니다.</span>
-                                            </div>
+                                            <>
+                                                <span className="text-sm md:text-base font-bold">ご入金を確認後、商品を発送いたします.</span>
+                                                <span className="text-[10px] md:text-[11px] font-medium opacity-80">입금확인 후 제품이 발송됩니다.</span>
+                                            </>
                                         ) : (
-                                            <span className="text-sm">入金確認の要請 (Confirm Deposit)</span>
+                                            <>
+                                                <span className="text-sm font-bold">入金確認の要請</span>
+                                                <span className="text-[10px] md:text-[11px] font-medium opacity-80">(Confirm Deposit)</span>
+                                            </>
                                         )
                                     )}
                                 </button>
@@ -212,34 +231,26 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                     <button
                                         onClick={() => handleDelete(order.id)}
                                         disabled={loadingMap[order.id]}
-                                        className="h-12 border border-gray-200 text-gray-400 bg-white rounded-lg font-bold text-sm hover:bg-gray-50 transition-all font-bold"
+                                        className="h-13 border-2 border-gray-200 text-gray-400 bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight"
                                     >
-                                        注文キャンセル (Cancel)
+                                        <span className="text-sm font-bold">注文キャンセル</span>
+                                        <span className="text-[10px] md:text-[11px] font-medium opacity-80">(Cancel)</span>
                                     </button>
                                 )}
                             </div>
                         </div>
-
-                        {/* Alert Box */}
-                        {order.status !== 'DEPOSIT_COMPLETED' && (
-                            <div className="bg-[#f0ebeb] border border-[#ead7d3] rounded-xl p-5 flex items-start gap-4 mb-4 mx-4 md:mx-0">
-                                <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
-                                <div className="text-xs leading-relaxed text-gray-600">
-                                    <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入금 후、「入金確認의 요성」보턴을 눌러주세요. 입금확인 후 주문취소는 불가능합니다.
-                                    <span className="text-gray-400 mt-1 block font-medium">합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.</span>
-                                </div>
-                            </div>
-                        )}
+                        <div className="border-t border-gray-200 mx-5 my-3" />
 
                         {/* Order Items List */}
                         <div className="mt-8 mx-4 md:mx-0">
-                            <div className="flex items-center gap-2 mb-4 border-b border-gray-100 pb-3">
+                            <div className="flex items-center gap-2 mb-4 border-b border-gray-200 pb-3">
+                                <Package size={17} className="text-[#e34219]" />
                                 <h3 className="text-base font-extrabold text-gray-900 tracking-tight">注文商品リスト <span className="text-gray-400 font-medium ml-1">/ 주문상품목록</span></h3>
                             </div>
 
                             <div className="space-y-3">
                                 {order.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
+                                    <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
                                         <div className="flex flex-col items-center gap-1.5 shrink-0">
                                             <span className="text-[10px] font-extrabold text-gray-900 uppercase tracking-tighter">No. {idx + 1}</span>
                                             <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-gray-200 rounded-lg flex items-center justify-center shrink-0 p-1">
