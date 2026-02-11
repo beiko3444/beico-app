@@ -33,8 +33,12 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ status: 'DEPOSIT_COMPLETED' })
             })
-            if (!res.ok) alert("エラーが発生しました / 오류가 발생했습니다.")
-            else router.refresh()
+            if (!res.ok) {
+                const data = await res.json()
+                alert(`오류가 발생했습니다: ${data.error || 'Unknown error'}`)
+            } else {
+                router.refresh()
+            }
         } catch (e) {
             alert("通信エラー / 통신 오류")
         } finally {
@@ -54,9 +58,9 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
     }
 
     return (
-        <div className="space-y-8">
+        <div className="space-y-6">
             {/* Header Title Layer */}
-            <div className="mb-4 md:mb-8 flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 md:px-0 pt-6 md:pt-0">
+            <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 md:px-0 pt-2 md:pt-0">
                 <div className="flex items-baseline gap-3 text-left">
                     <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">
                         注文履歴
@@ -115,7 +119,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 <span className="font-bold text-gray-900 font-inter tracking-[0.01em]">{order.orderNumber || order.id.slice(0, 12)}</span>
                             </div>
                         </div>
-                        <div className="border-t border-gray-100 mx-5 my-1" />
+                        <div className="border-t border-gray-100 mx-5 my-0.5" />
 
                         {/* Progress Stepper moved under Order No */}
                         <div className="bg-white rounded-xl py-1 px-6 mb-1 mx-4 md:mx-0">
@@ -154,7 +158,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         </div>
 
                         {/* Payment Information & Totals Summary */}
-                        <div className="bg-white rounded-xl pt-5 px-5 pb-2 mb-1 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl pt-4 px-5 pb-2 mb-1 mx-4 md:mx-0">
                             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
                                 <Landmark size={14} className="text-[#e34219]" />
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">お支払い情報 / 입금정보</h3>

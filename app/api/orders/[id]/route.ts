@@ -49,9 +49,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                     return NextResponse.json({ error: "Cannot cancel approved order" }, { status: 400 })
                 }
             } else if (status === 'DEPOSIT_COMPLETED') {
-                // Allow moving to DEPOSIT_COMPLETED from PENDING/PENDING_DEPOSIT
-                if (order.status !== 'PENDING' && order.status !== 'PENDING_DEPOSIT') {
-                    return NextResponse.json({ error: "Invalid status transition" }, { status: 403 })
+                // Allow moving to DEPOSIT_COMPLETED from PENDING/PENDING_DEPOSIT, or if already DEPOSIT_COMPLETED (idempotency)
+                if (order.status !== 'PENDING' && order.status !== 'PENDING_DEPOSIT' && order.status !== 'DEPOSIT_COMPLETED') {
+                    console.log(`Forbidden transition attempt from ${order.status} to DEPOSIT_COMPLETED`)
+                    return NextResponse.json({ error: `Invalid status transition from ${order.status}` }, { status: 403 })
                 }
             } else if (status === 'PENDING') {
                 // Allow moving back to PENDING from DEPOSIT_COMPLETED (Deposit Cancellation)

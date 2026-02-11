@@ -91,7 +91,7 @@ export default async function OrderLayout({
             </header>
 
             {/* Main Content Area */}
-            <main className="max-w-6xl mx-auto py-8 px-4 md:px-8">
+            <main className="max-w-6xl mx-auto pt-3 pb-8 px-4 md:px-8">
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {children}
                 </div>
