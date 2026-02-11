@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import Barcode from 'react-barcode'
+import BarcodeDisplay from '@/components/BarcodeDisplay'
 import { Minus, Plus, ArrowRight } from 'lucide-react'
 
 type Product = {
@@ -124,17 +124,16 @@ export default function OrderInterface({ products }: { products: Product[] }) {
 
                                         {/* Barcode Section with Download Buttons */}
                                         {product.barcode ? (
-                                            <div className="pt-0.5 flex items-end justify-between">
-                                                <div className="flex-1">
-                                                    <div className="opacity-80 h-8 flex items-center overflow-hidden">
-                                                        <Barcode value={product.barcode} width={1.0} height={24} displayValue={false} margin={0} background="transparent" />
-                                                    </div>
-                                                    <p className="text-[10px] font-medium text-black font-inter">{product.barcode}</p>
-                                                </div>
-                                                <div className="flex flex-col gap-1 pb-0.5">
-                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase">PNG</button>
-                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase">SVG</button>
-                                                </div>
+                                            <div className="pt-0.5">
+                                                <BarcodeDisplay
+                                                    value={product.barcode}
+                                                    width={0.8}
+                                                    height={24}
+                                                    displayValue={false}
+                                                    containerClassName="justify-between w-full"
+                                                    buttonClassName="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase"
+                                                />
+                                                <p className="text-[10px] font-medium text-black font-inter mt-0.5">{product.barcode}</p>
                                             </div>
                                         ) : (
                                             <div className="pt-0.5">
@@ -216,53 +215,59 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <span className="text-[10px] font-medium text-gray-400 uppercase tracking-widest leading-none mt-1">Min Order: {product.minOrderQuantity}ea</span>
                                 </div>
 
-                                <div className="flex flex-col items-end gap-2">
-                                    <div className={`flex items-center border rounded-md overflow-hidden shadow-sm transition-all duration-300 ${qty === 0
-                                        ? 'bg-white border-gray-200'
-                                        : qty < product.minOrderQuantity
-                                            ? 'bg-[#fff5f5] border-[#e34219]'
-                                            : 'bg-blue-50 border-blue-600'
-                                        }`}>
-                                        <button
-                                            onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
-                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
-                                                ? 'text-black hover:bg-gray-50'
-                                                : qty < product.minOrderQuantity
-                                                    ? 'text-[#e34219] hover:bg-[#ffebeb]'
-                                                    : 'text-blue-600 hover:bg-blue-100'
-                                                }`}
-                                        >
-                                            <Minus size={14} strokeWidth={2.5} />
-                                        </button>
-                                        <input
-                                            type="text"
-                                            value={qty.toLocaleString()}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/,/g, '')
-                                                if (/^\d*$/.test(val)) {
-                                                    handleQuantityChange(product.id, val)
-                                                }
-                                            }}
-                                            className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
-                                                ? 'text-[#1e293b]'
-                                                : qty < product.minOrderQuantity
-                                                    ? 'text-[#e34219]'
-                                                    : 'text-blue-600'
-                                                }`}
-                                        />
-                                        <button
-                                            onClick={() => handleQuantityChange(product.id, qty + 1)}
-                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
-                                                ? 'text-black hover:bg-gray-50'
-                                                : qty < product.minOrderQuantity
-                                                    ? 'text-[#e34219] hover:bg-[#ffebeb]'
-                                                    : 'text-blue-600 hover:bg-blue-100'
-                                                }`}
-                                        >
-                                            <Plus size={14} strokeWidth={2.5} />
-                                        </button>
+                                {product.stock > 0 ? (
+                                    <div className="flex flex-col items-end gap-2">
+                                        <div className={`flex items-center border rounded-md overflow-hidden shadow-sm transition-all duration-300 ${qty === 0
+                                            ? 'bg-white border-gray-200'
+                                            : qty < product.minOrderQuantity
+                                                ? 'bg-[#fff5f5] border-[#e34219]'
+                                                : 'bg-blue-50 border-blue-600'
+                                            }`}>
+                                            <button
+                                                onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
+                                                className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
+                                                    ? 'text-black hover:bg-gray-50'
+                                                    : qty < product.minOrderQuantity
+                                                        ? 'text-[#e34219] hover:bg-[#ffebeb]'
+                                                        : 'text-blue-600 hover:bg-blue-100'
+                                                    }`}
+                                            >
+                                                <Minus size={14} strokeWidth={2.5} />
+                                            </button>
+                                            <input
+                                                type="text"
+                                                value={qty.toLocaleString()}
+                                                onChange={(e) => {
+                                                    const val = e.target.value.replace(/,/g, '')
+                                                    if (/^\d*$/.test(val)) {
+                                                        handleQuantityChange(product.id, val)
+                                                    }
+                                                }}
+                                                className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
+                                                    ? 'text-[#1e293b]'
+                                                    : qty < product.minOrderQuantity
+                                                        ? 'text-[#e34219]'
+                                                        : 'text-blue-600'
+                                                    }`}
+                                            />
+                                            <button
+                                                onClick={() => handleQuantityChange(product.id, qty + 1)}
+                                                className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
+                                                    ? 'text-black hover:bg-gray-50'
+                                                    : qty < product.minOrderQuantity
+                                                        ? 'text-[#e34219] hover:bg-[#ffebeb]'
+                                                        : 'text-blue-600 hover:bg-blue-100'
+                                                    }`}
+                                            >
+                                                <Plus size={14} strokeWidth={2.5} />
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="flex items-center text-[13px] font-bold text-[#e34219] bg-[#fff5f5] px-4 py-2 rounded-lg border border-red-100">
+                                        こちらの商品は品切れとなりました。
+                                    </div>
+                                )}
                             </div>
                         </div>
                     )
