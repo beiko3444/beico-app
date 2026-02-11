@@ -24,19 +24,23 @@ export default async function OrderLayout({
 
     let businessRegNumber = ""
     let address = ""
+    let country = ""
 
     if (session?.user?.id) {
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
             include: { partnerProfile: true }
-        })
+        }) as any
         if (user) {
             businessName = user.partnerProfile?.businessName || user.name
             businessNameJP = user.name
             businessRegNumber = user.partnerProfile?.businessRegNumber || ""
             address = user.partnerProfile?.address || ""
+            country = user.country || ""
         }
     }
+
+    const countryJP = country === 'Korea' ? '韓国' : country === 'Japan' ? '日本' : country === 'USA' ? '米国' : country
 
     return (
         <div className="min-h-screen bg-[#f9f9f9]">
@@ -86,7 +90,14 @@ export default async function OrderLayout({
                         <div className="flex items-center">
                             <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-[1px]">
                                 <span className="text-[9px] text-white/70 font-bold leading-none uppercase tracking-wider">ログイン中:</span>
-                                <span className="text-[17px] text-white font-black leading-none mt-1">{businessNameJP}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                    {countryJP && (
+                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold text-white/90">
+                                            {countryJP}
+                                        </span>
+                                    )}
+                                    <span className="text-[17px] text-white font-black leading-none">{businessNameJP}</span>
+                                </div>
                             </div>
                             <div className="pl-5">
                                 <LogoutButton vertical className="text-white hover:text-white" />
