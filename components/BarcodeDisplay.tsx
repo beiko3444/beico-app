@@ -89,7 +89,7 @@ export default function BarcodeDisplay({
     };
 
     return (
-        <div className="flex flex-col items-center group">
+        <div className="flex flex-col items-start group">
             <div ref={barcodeRef}>
                 <Barcode
                     value={value}

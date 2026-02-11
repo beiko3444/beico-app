@@ -20,11 +20,9 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
     }
 
     const toggleDeposit = async (orderId: string, currentStatus: string) => {
-        const isCompleted = currentStatus === 'DEPOSIT_COMPLETED'
-        const targetStatus = isCompleted ? 'PENDING' : 'DEPOSIT_COMPLETED'
-        const confirmMsg = isCompleted
-            ? "入金確認をキャンセルしますか？ / 입금 확인을 취소하시겠습니까?"
-            : "管理者に完了を通知しますか？ / 입금 완료 사실을 관리자에게 알리시겠습니까?"
+        if (currentStatus === 'DEPOSIT_COMPLETED') return
+
+        const confirmMsg = "관리자에 완료를 통지하시겠습니까? / 입금 완료 사실을 관리자에게 알리시겠습니까?"
 
         if (!confirm(confirmMsg)) return
 
@@ -33,7 +31,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
             const res = await fetch(`/api/orders/${orderId}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ status: targetStatus })
+                body: JSON.stringify({ status: 'DEPOSIT_COMPLETED' })
             })
             if (!res.ok) alert("エラーが発生しました / 오류가 발생했습니다.")
             else router.refresh()
@@ -68,7 +66,11 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
             </div>
 
             {orders.map(order => {
-                const totalAmount = Math.round(order.total * 1.1)
+                const supplyPrice = order.items.reduce((sum: number, item: any) => sum + (item.price * (item.quantity || 0)), 0);
+                const vat = Math.round(supplyPrice * 0.1);
+                const totalAmount = supplyPrice + vat;
+                const totalQuantity = order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+                const shippingFee = Math.floor(totalQuantity / 100) * 3000;
 
                 // Stepper Logic
                 // Steps: Ordered -> Payment -> Paid -> Shipped -> Invoice
@@ -83,168 +85,218 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                 // If cancelled (not in standard flow), handle gracefully (maybe show as step 0 or error state)
 
                 const steps = [
-                    { label: "注文完了", sub: "Ordered", icon: Check },
-                    { label: "入金待ち", sub: "Payment", icon: Banknote },
-                    { label: "入金完了", sub: "Paid", icon: Check },
-                    { label: "出荷完了", sub: "Shipped", icon: Truck },
-                    { label: "請求書\n発行完了", sub: "Invoice", icon: FileText },
+                    { label: "注文完了", sub: "주문완료", icon: Check },
+                    { label: "入金待ち", sub: "입금대기중", icon: Banknote },
+                    { label: "入金完了", sub: "입금완료", icon: Check },
+                    { label: "出荷完了", sub: "배송중", icon: Truck },
+                    { label: "請求書発行完了", sub: "계산서발급완료", icon: FileText },
                 ];
 
                 return (
-                    <div key={order.id} className="bg-white rounded-none md:rounded-2xl pb-8 md:p-6 border-b-8 border-gray-100 md:border md:shadow-sm last:border-0">
+                    <div key={order.id} className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow-md border border-gray-100 mb-6 mx-4 md:mx-0 last:mb-0">
                         {/* Order No & Date Box */}
-                        <div className="bg-[#f8f9fa] rounded-xl p-5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl py-2 px-5 flex flex-row justify-between items-center gap-4 mb-0 mx-4 md:mx-0">
                             <div className="flex flex-col text-sm">
-                                <span className="text-gray-400 mb-1 text-xs">注文番号 / 주문번호</span>
-                                <span className="font-extrabold text-xl text-gray-900 tracking-tight">{order.orderNumber || order.id.slice(0, 12)}</span>
-                            </div>
-                            <div className="flex flex-col text-sm md:text-right">
-                                <span className="text-gray-400 mb-1 text-xs">注文日時 / 주문일시</span>
-                                <span className="font-bold text-gray-700">
+                                <span className="text-gray-400 mb-0.5 text-xs">注文日時 / 주문일시</span>
+                                <span className="font-bold text-gray-700" suppressHydrationWarning>
                                     {new Date(order.createdAt).toLocaleDateString()} {new Date(order.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                 </span>
+                            </div>
+                            <div className="flex flex-col text-right text-sm">
+                                <span className="text-gray-400 mb-0.5 text-xs">注文番号 / 주문번호</span>
+                                <span className="font-bold text-gray-700 font-inter tracking-widest">{order.orderNumber || order.id.slice(0, 12)}</span>
+                            </div>
+                        </div>
+                        <div className="border-t border-gray-100 mx-5 my-1" />
+
+                        {/* Progress Stepper moved under Order No */}
+                        <div className="bg-white rounded-xl py-1 px-6 mb-1 mx-4 md:mx-0">
+                            <div className="relative flex justify-between items-start overflow-hidden pt-2">
+                                {/* Connecting Line Container (Grey Background) */}
+                                <div className="absolute top-[26px] left-[10%] right-[10%] h-[1px] bg-gray-200 -z-10">
+                                    {/* Active Progress Line (Red) */}
+                                    <div
+                                        className="h-full bg-[#e34219] transition-all duration-500"
+                                        style={{ width: `${(activeStep / (steps.length - 1)) * 100}%` }}
+                                    />
+                                </div>
+
+                                {steps.map((step, idx) => {
+                                    const isActive = idx <= activeStep;
+
+                                    return (
+                                        <div key={idx} className="flex-1 flex flex-col items-center gap-2 focus:outline-none relative z-10">
+                                            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs transition-all duration-300
+                                                ${isActive ? 'bg-[#e34219] shadow-[0_0_0_4px_rgba(227,66,25,0.1)]' : 'bg-gray-200 text-gray-400'}
+                                            `}>
+                                                {isActive ? <step.icon size={16} strokeWidth={3} /> : idx + 1}
+                                            </div>
+                                            <div className="text-center">
+                                                <div className={`text-[10px] md:text-xs font-bold mb-0.5 whitespace-nowrap ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                    {step.label}
+                                                </div>
+                                                <div className="text-[9px] font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                                                    {step.sub}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Payment Information & Totals Summary */}
+                        <div className="bg-white rounded-xl p-5 mb-3 mx-4 md:mx-0">
+                            <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                                <Landmark size={14} className="text-[#e34219]" />
+                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">お支払い情報 / 입금정보</h3>
+                            </div>
+
+                            <div className="flex flex-col gap-0.5 tracking-tight">
+                                {/* Bank Details */}
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-900 text-xs min-w-[100px]">銀行名 / 은행</span>
+                                    <span className="font-bold text-gray-900">Woori Bank (우리은행)</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-900 text-xs min-w-[100px]">口座番号 / 계좌</span>
+                                    <span className="font-bold text-gray-900 font-inter">1005-704-096332</span>
+                                </div>
+                                <div className="flex justify-between items-center text-sm">
+                                    <span className="text-gray-900 text-xs min-w-[100px]">名義人 / 예금주</span>
+                                    <span className="font-bold text-gray-900 uppercase">XTRACKER</span>
+                                </div>
+
+                                {/* Separator & Total Amount Details */}
+                                <div className="flex justify-between items-center py-1.5 mt-1 border-t border-gray-100">
+                                    <span className="font-bold text-sm text-gray-900 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / 총 합계금액</span>
+                                    <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-sm mr-0.5">₩</span>{totalAmount.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400">
+                                    <span>供給価額 / 공급가액</span>
+                                    <span className="font-medium font-inter">₩{supplyPrice.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400">
+                                    <span>消費税 / 부가세 (10%)</span>
+                                    <span className="font-medium font-inter">₩{vat.toLocaleString()}</span>
+                                </div>
                             </div>
                         </div>
 
                         {/* Action Buttons */}
-                        <div className="grid grid-cols-2 gap-3 mb-6 px-4 md:px-0">
-                            <button
-                                onClick={() => toggleDeposit(order.id, order.status)}
-                                disabled={loadingMap[order.id]}
-                                className={`h-12 border-2 rounded-lg font-bold text-sm transition-all flex items-center justify-center gap-2
-                                    ${order.status === 'DEPOSIT_COMPLETED'
-                                        ? 'border-gray-300 text-gray-400 bg-gray-50'
-                                        : 'border-[#e34219] text-[#e34219] bg-white hover:bg-orange-50'
-                                    }`}
-                            >
-                                {loadingMap[order.id] ? 'Processing...' : (
-                                    order.status === 'DEPOSIT_COMPLETED' ? '入金確認完了 (Confirmed)' : '入金確認の要請 (Confirm)'
+                        <div className="bg-white rounded-xl mb-1 mx-4 md:mx-0">
+                            <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                                <button
+                                    onClick={() => order.status !== 'DEPOSIT_COMPLETED' && toggleDeposit(order.id, order.status)}
+                                    disabled={loadingMap[order.id] || order.status === 'DEPOSIT_COMPLETED'}
+                                    className={`h-13 border-2 rounded-lg font-bold transition-all flex items-center justify-center gap-2
+                                        ${order.status === 'DEPOSIT_COMPLETED'
+                                            ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                                            : 'border-[#e34219] text-[#e34219] bg-white hover:bg-orange-50'
+                                        }`}
+                                >
+                                    {loadingMap[order.id] ? 'Processing...' : (
+                                        order.status === 'DEPOSIT_COMPLETED' ? (
+                                            <div className="flex flex-col items-center leading-tight py-1">
+                                                <span className="text-sm md:text-base font-bold">ご入金を確認後、商品を発送いたします。</span>
+                                                <span className="text-[11px] md:text-sm font-medium opacity-80">입금확인 후 제품이 발송됩니다.</span>
+                                            </div>
+                                        ) : (
+                                            <span className="text-sm">入金確認の要請 (Confirm Deposit)</span>
+                                        )
+                                    )}
+                                </button>
+                                {order.status !== 'DEPOSIT_COMPLETED' && (
+                                    <button
+                                        onClick={() => handleDelete(order.id)}
+                                        disabled={loadingMap[order.id]}
+                                        className="h-12 border border-gray-200 text-gray-400 bg-white rounded-lg font-bold text-sm hover:bg-gray-50 transition-all font-bold"
+                                    >
+                                        注文キャンセル (Cancel)
+                                    </button>
                                 )}
-                            </button>
-                            <button
-                                onClick={() => handleDelete(order.id)}
-                                disabled={loadingMap[order.id]}
-                                className="h-12 border border-gray-200 text-gray-400 bg-white rounded-lg font-bold text-sm hover:bg-gray-50 transition-all"
-                            >
-                                注文キャンセル (Cancel)
-                            </button>
-                        </div>
-
-                        {/* Alert Box */}
-                        <div className="bg-[#fef2f2] rounded-xl p-5 flex items-start gap-4 mb-8 mx-4 md:mx-0">
-                            <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-xs font-serif">i</div>
-                            <div className="text-xs leading-relaxed text-gray-600">
-                                <span className="font-bold text-[#e34219]">{totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください。入金確認後の注文キャンセルはできません。<br />
-                                <span className="text-gray-400 mt-1 block font-medium">합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.</span>
                             </div>
                         </div>
 
-                        {/* Progress Stepper */}
-                        <div className="relative flex justify-between items-start px-2 md:px-12 mb-10 overflow-hidden mx-4 md:mx-0">
-                            {/* Connecting Line */}
-                            <div className="absolute top-[18px] left-0 right-0 h-[2px] bg-gray-100 -z-10" />
-                            <div
-                                className="absolute top-[18px] left-0 h-[2px] bg-[#e34219] -z-10 transition-all duration-500"
-                                style={{ width: `${(activeStep / (steps.length - 1)) * 100}%` }}
-                            />
-
-                            {steps.map((step, idx) => {
-                                const isActive = idx <= activeStep;
-                                const isCurrent = idx === activeStep;
-
-                                return (
-                                    <div key={idx} className="flex flex-col items-center gap-2 bg-white px-1">
-                                        <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs transition-all duration-300
-                                            ${isActive ? 'bg-[#e34219] shadow-[0_0_0_4px_rgba(227,66,25,0.1)]' : 'bg-gray-100 text-gray-400'}
-                                        `}>
-                                            {isActive ? <step.icon size={16} strokeWidth={3} /> : idx + 1}
-                                        </div>
-                                        <div className="text-center">
-                                            <div className={`text-[10px] md:text-xs font-bold mb-0.5 whitespace-pre-line ${isActive ? 'text-gray-900' : 'text-gray-300'}`}>
-                                                {step.label}
-                                            </div>
-                                            <div className="text-[9px] font-bold text-gray-300 uppercase tracking-wide">
-                                                {step.sub}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )
-                            })}
-                        </div>
+                        {/* Alert Box */}
+                        {order.status !== 'DEPOSIT_COMPLETED' && (
+                            <div className="bg-[#f0ebeb] border border-[#ead7d3] rounded-xl p-5 flex items-start gap-4 mb-4 mx-4 md:mx-0">
+                                <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
+                                <div className="text-xs leading-relaxed text-gray-600">
+                                    <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入금 후、「入金確認의 요성」보턴을 눌러주세요. 입금확인 후 주문취소는 불가능합니다.
+                                    <span className="text-gray-400 mt-1 block font-medium">합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.</span>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Order Items List */}
                         <div className="mt-8 mx-4 md:mx-0">
-                            <div className="flex items-center gap-2 mb-4">
-                                <ShoppingBag className="text-[#e34219]" size={20} fill="#e34219" />
-                                <h3 className="text-base font-bold text-gray-900">注文商品リスト <span className="text-gray-400 font-normal ml-1">/ 주문 상품 목록</span></h3>
+                            <div className="flex items-center gap-2 mb-4 border-b border-gray-100 pb-3">
+                                <h3 className="text-base font-extrabold text-gray-900 tracking-tight">注文商品リスト <span className="text-gray-400 font-medium ml-1">/ 주문상품목록</span></h3>
                             </div>
 
                             <div className="space-y-3">
                                 {order.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 flex gap-4 md:items-center">
-                                        <div className="w-16 h-16 md:w-20 md:h-20 bg-gray-50 border border-gray-100 rounded-lg flex items-center justify-center shrink-0 p-1">
-                                            {item.product.imageUrl ? (
-                                                <img src={item.product.imageUrl} alt="" className="w-full h-full object-contain" />
-                                            ) : (
-                                                <span className="text-xs text-gray-300">No Img</span>
-                                            )}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                            <h4 className="font-bold text-sm text-gray-900 truncate">{item.product.nameJP || item.product.name}</h4>
-                                            <p className="text-xs text-gray-400 font-medium mb-1">{item.product.nameEN || item.product.name}</p>
-                                            <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500 mt-2">
-                                                <span className="text-blue-400 font-medium">Code: {item.product.productCode || '-'}</span>
-                                                <span className="font-bold text-gray-900">₩{item.price.toLocaleString()}</span>
-                                                <span className="text-gray-400">x {item.quantity}ea</span>
+                                    <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
+                                        <div className="flex flex-col items-center gap-1.5 shrink-0">
+                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">No. {idx + 1}</span>
+                                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-gray-100 rounded-lg flex items-center justify-center shrink-0 p-1">
+                                                {item.product.imageUrl ? (
+                                                    <img src={item.product.imageUrl} alt="" className="w-full h-full object-contain" />
+                                                ) : (
+                                                    <span className="text-xs text-gray-300">No Img</span>
+                                                )}
                                             </div>
                                         </div>
-                                        <div className="text-right shrink-0">
-                                            <span className="block font-bold text-base md:text-lg text-gray-900">₩{(item.price * item.quantity).toLocaleString()}</span>
+                                        <div className="flex-1 min-w-0 flex flex-col gap-0.5">
+                                            <h4 className="font-bold text-sm text-gray-900 truncate leading-tight">{item.product.nameJP || item.product.name}</h4>
+                                            <p className="text-xs text-gray-900 font-medium leading-tight">{item.product.nameEN || item.product.name}</p>
+                                            <div className="text-[10px] text-blue-400 font-medium font-inter leading-tight">
+                                                Code: {item.product.productCode || '-'}
+                                            </div>
+                                            {item.product.barcode && (
+                                                <div className="mt-1 flex justify-start">
+                                                    <BarcodeDisplay
+                                                        value={item.product.barcode}
+                                                        height={12}
+                                                        width={0.8}
+                                                        fontSize={10}
+                                                        showDownload={false}
+                                                        displayValue={true}
+                                                    />
+                                                </div>
+                                            )}
+                                            <div className="flex items-end justify-between mt-1">
+                                                <div className="flex items-center gap-2 text-xs leading-tight">
+                                                    <span className="font-bold text-gray-900 font-inter">₩{item.price.toLocaleString()}</span>
+                                                    <span className="text-gray-900 font-inter font-medium">x {item.quantity}ea</span>
+                                                </div>
+                                                <span className="font-bold text-base md:text-lg text-gray-900 font-inter leading-none">
+                                                    ₩{(item.price * item.quantity).toLocaleString()}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
                                 ))}
-                            </div>
-                        </div>
 
-                        {/* Payment Information */}
-                        <div className="mt-8 bg-[#f8f9fa] rounded-xl p-6 mx-4 md:mx-0">
-                            <div className="flex items-center gap-2 mb-6 border-b border-gray-200 pb-2">
-                                <Landmark size={16} className="text-gray-500" />
-                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest">お支払い情報 / PAYMENT INFORMATION</h3>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-y-4 text-sm">
-                                <div className="flex justify-between md:justify-start md:gap-8">
-                                    <span className="text-gray-500 min-w-[140px]">銀行名 / Bank Name</span>
-                                    <span className="font-bold text-gray-900">ウリ銀行 (Woori Bank)</span>
-                                </div>
-                                <div className="flex justify-between md:justify-start md:gap-8 md:col-start-2 md:justify-end md:text-right">
-                                    {/* Empty or additional info */}
-                                </div>
-                                <div className="flex justify-between md:justify-start md:gap-8">
-                                    <span className="text-gray-500 min-w-[140px]">口座番号 / Account No.</span>
-                                    <span className="font-bold text-gray-900 tracking-wide font-mono">1002-445-88822</span>
-                                </div>
-                                <div className="flex justify-between md:justify-start md:gap-8">
-                                    <span className="text-gray-500 min-w-[140px]">名義人 / Account Holder</span>
-                                    <span className="font-bold text-gray-900">Beiko Co., Ltd.</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Footer Totals */}
-                        <div className="mt-6 flex flex-col gap-2 m-4 md:mx-0">
-                            <div className="flex justify-between text-xs text-gray-500">
-                                <span>供給価額 / 공급가액</span>
-                                <span className="font-medium">₩{order.total.toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between text-xs text-gray-500">
-                                <span>消費税 / 부가세 (10%)</span>
-                                <span className="font-medium">₩{Math.round(order.total * 0.1).toLocaleString()}</span>
-                            </div>
-                            <div className="flex justify-between items-center mt-2 pt-4 border-t border-gray-100">
-                                <span className="font-bold text-base text-gray-900">合計金額 / 총 합계금액</span>
-                                <span className="font-black text-2xl text-[#e34219]">₩{totalAmount.toLocaleString()}</span>
+                                {shippingFee > 0 && (
+                                    <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm">
+                                        <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-orange-100 rounded-lg flex items-center justify-center shrink-0">
+                                            <Truck className="text-[#e34219]" size={24} />
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex justify-between items-center">
+                                                <div>
+                                                    <h4 className="font-bold text-sm text-gray-900">送料 <span className="text-gray-400 font-normal">/ 배송비</span></h4>
+                                                    <p className="text-[10px] text-gray-500 mt-0.5">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
+                                                </div>
+                                                <span className="font-bold text-base md:text-lg text-[#e34219] font-inter">
+                                                    ₩{shippingFee.toLocaleString()}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
