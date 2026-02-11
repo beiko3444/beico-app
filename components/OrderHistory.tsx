@@ -176,8 +176,8 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 </div>
 
                                 {/* Separator & Total Amount Details */}
-                                <div className="flex justify-between items-center py-1.5 mt-1 border-t border-gray-100">
-                                    <span className="font-bold text-sm text-gray-900 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / 총 합계금액</span>
+                                <div className="flex justify-between items-center pt-1.5 pb-0 mt-1 border-t border-gray-100">
+                                    <span className="font-bold text-sm text-gray-900 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / 総 合計金額</span>
                                     <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-sm mr-0.5">₩</span>{totalAmount.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-gray-400">
@@ -194,9 +194,13 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         {order.status !== 'DEPOSIT_COMPLETED' && (
                             <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-5 flex items-start gap-3 mb-4 mx-4 md:mx-0">
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
-                                <div className="text-xs leading-relaxed text-gray-600">
-                                    <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください。入金確認後の注文キャンセルはできません。
-                                    <span className="text-gray-400 block font-medium">합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.</span>
+                                <div className="text-xs text-gray-600 flex flex-col gap-1.5">
+                                    <p className="leading-relaxed">
+                                        <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください。入金確認後の注文キャンセルはできません。
+                                    </p>
+                                    <p className="font-medium leading-relaxed">
+                                        합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.
+                                    </p>
                                 </div>
                             </div>
                         )}
@@ -239,18 +243,18 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 )}
                             </div>
                         </div>
-                        <div className="border-t border-gray-200 mx-5 my-3" />
+                        <div className="border-t border-gray-100 mx-5 mt-4 mb-3" />
 
                         {/* Order Items List */}
                         <div className="mt-8 mx-4 md:mx-0">
-                            <div className="flex items-center gap-2 mb-4 border-b border-gray-200 pb-3">
+                            <div className="flex items-center gap-2 mb-4">
                                 <Package size={17} className="text-[#e34219]" />
                                 <h3 className="text-base font-extrabold text-gray-900 tracking-tight">注文商品リスト <span className="text-gray-400 font-medium ml-1">/ 주문상품목록</span></h3>
                             </div>
 
                             <div className="space-y-3">
                                 {order.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="bg-white border border-gray-200 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
+                                    <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
                                         <div className="flex flex-col items-center gap-1.5 shrink-0">
                                             <span className="text-[10px] font-extrabold text-gray-900 uppercase tracking-tighter">No. {idx + 1}</span>
                                             <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-gray-200 rounded-lg flex items-center justify-center shrink-0 p-1">
