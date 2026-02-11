@@ -40,7 +40,7 @@ export default async function OrderLayout({
         }
     }
 
-    const countryJP = country === 'Korea' ? '韓国' : country === 'Japan' ? '日本' : country === 'USA' ? '米国' : country
+    const countryDisplay = country === 'Korea' ? '韓国 KR' : country === 'Japan' ? '日本 JP' : country === 'USA' ? '米国 US' : country
 
     return (
         <div className="min-h-screen bg-[#f9f9f9]">
@@ -49,21 +49,15 @@ export default async function OrderLayout({
                 {/* Main White Header */}
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                     <div className="h-20 flex justify-between items-center">
-                        <div className="flex items-center gap-5">
-                            <Link href="/order" className="flex items-center group">
-                                <div className="w-16 h-auto transition-all duration-300 group-hover:scale-105">
-                                    <img
-                                        src="/logo.png"
-                                        alt="BEIKO BAIT"
-                                        className="w-full h-full object-contain"
-                                    />
-                                </div>
-                            </Link>
-                            <div className="flex flex-col text-[#e34219] leading-[1.1] font-black tracking-tighter">
-                                <span className="text-[18px]">釣りは手軽に、</span>
-                                <span className="text-[18px]">釣果はしっかり</span>
+                        <Link href="/order" className="flex items-center group">
+                            <div className="w-16 h-auto transition-all duration-300 group-hover:scale-105">
+                                <img
+                                    src="/logo.png"
+                                    alt="BEIKO BAIT"
+                                    className="w-full h-full object-contain"
+                                />
                             </div>
-                        </div>
+                        </Link>
 
                         {/* Navigation Tabs */}
                         <div className="flex items-center">
@@ -91,9 +85,9 @@ export default async function OrderLayout({
                             <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-[1px]">
                                 <span className="text-[9px] text-white/70 font-bold leading-none uppercase tracking-wider">ログイン中:</span>
                                 <div className="flex items-center gap-2 mt-1">
-                                    {countryJP && (
-                                        <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold text-white/90">
-                                            {countryJP}
+                                    {countryDisplay && (
+                                        <span className="bg-white px-2 py-0.5 rounded text-[10px] font-black text-[#e34219] shadow-sm">
+                                            {countryDisplay}
                                         </span>
                                     )}
                                     <span className="text-[17px] text-white font-black leading-none">{businessNameJP}</span>
