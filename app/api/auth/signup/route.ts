@@ -14,11 +14,12 @@ export async function POST(req: Request) {
             fax,
             email,
             businessRegNumber,
-            address
+            address,
+            country
         } = body
 
         // Basic validation
-        if (!username || !password || !businessName || !representativeName || !contact || !email || !businessRegNumber || !address) {
+        if (!username || !password || !businessName || !representativeName || !contact || !email || !businessRegNumber || !address || !country) {
             return NextResponse.json(
                 { error: '必須項目をすべて入力してください。 / Please fill in all required fields.' },
                 { status: 400 }
@@ -48,6 +49,7 @@ export async function POST(req: Request) {
                 name: businessName, // Using business name as display name
                 role: 'PARTNER',
                 status: 'PENDING',
+                country,
                 partnerProfile: {
                     create: {
                         businessName,

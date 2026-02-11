@@ -125,6 +125,16 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 updateData.depositConfirmedAt = null
             }
 
+            // If admin is confirming deposit, also ensure status is DEPOSIT_COMPLETED if currently PENDING
+            if (adminDepositConfirmedAt && !status) {
+                if (order.status === 'PENDING' || order.status === 'PENDING_DEPOSIT') {
+                    updateData.status = 'DEPOSIT_COMPLETED'
+                    if (!updateData.depositConfirmedAt) {
+                        updateData.depositConfirmedAt = new Date()
+                    }
+                }
+            }
+
             const updatedOrder = await tx.order.update({
                 where: { id },
                 data: updateData

@@ -15,7 +15,8 @@ import {
     Home,
     ArrowRight,
     Eye,
-    EyeOff
+    EyeOff,
+    Globe
 } from 'lucide-react'
 
 export default function SignupPage() {
@@ -30,7 +31,8 @@ export default function SignupPage() {
         email: '',
         businessRegNumber: '',
         address: '',
-        addressDetail: ''
+        addressDetail: '',
+        country: ''
     })
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -217,6 +219,33 @@ export default function SignupPage() {
                                 className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
                                 placeholder="Full Name"
                             />
+                        </div>
+                    </div>
+
+                    {/* Nationality Selection */}
+                    <div className="space-y-1.5">
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <span className="text-[#e34219]">*</span> 国籍 / Nationality
+                        </label>
+                        <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors pointer-events-none">
+                                <Globe size={18} strokeWidth={1.5} />
+                            </div>
+                            <select
+                                name="country"
+                                value={formData.country}
+                                onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
+                                required
+                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium shadow-sm appearance-none cursor-pointer"
+                            >
+                                <option value="" disabled>Select Nationality</option>
+                                <option value="Japan">日本 / Japan</option>
+                                <option value="Korea">韓国 / Korea</option>
+                                <option value="USA">米国 / USA</option>
+                            </select>
+                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                <ArrowRight size={14} className="rotate-90" />
+                            </div>
                         </div>
                     </div>
 

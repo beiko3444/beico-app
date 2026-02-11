@@ -92,7 +92,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     const marginPercent = product.onlinePrice > 0 ? ((product.onlinePrice - product.sellPrice) / product.onlinePrice * 100).toFixed(1) : 0
 
                     return (
-                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full hover:shadow-xl transition-all duration-300">
+                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full transition-all duration-300">
                             <div className="px-8 pt-8 flex-1">
                                 <div className="flex gap-6 mb-6">
                                     {/* Image Container */}
@@ -217,10 +217,20 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                 </div>
 
                                 <div className="flex flex-col items-end gap-2">
-                                    <div className={`flex items-center border rounded-md overflow-hidden shadow-sm transition-all duration-300 ${qty > 0 ? 'bg-[#fff5f5] border-[#e34219]' : 'bg-white border-gray-200'}`}>
+                                    <div className={`flex items-center border rounded-md overflow-hidden shadow-sm transition-all duration-300 ${qty === 0
+                                        ? 'bg-white border-gray-200'
+                                        : qty < product.minOrderQuantity
+                                            ? 'bg-[#fff5f5] border-[#e34219]'
+                                            : 'bg-blue-50 border-blue-600'
+                                        }`}>
                                         <button
                                             onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
-                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty > 0 ? 'text-[#e34219] hover:bg-[#ffebeb]' : 'text-black hover:bg-gray-50'}`}
+                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
+                                                ? 'text-black hover:bg-gray-50'
+                                                : qty < product.minOrderQuantity
+                                                    ? 'text-[#e34219] hover:bg-[#ffebeb]'
+                                                    : 'text-blue-600 hover:bg-blue-100'
+                                                }`}
                                         >
                                             <Minus size={14} strokeWidth={2.5} />
                                         </button>
@@ -233,11 +243,21 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     handleQuantityChange(product.id, val)
                                                 }
                                             }}
-                                            className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty > 0 ? 'text-[#e34219]' : 'text-[#1e293b]'}`}
+                                            className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
+                                                ? 'text-[#1e293b]'
+                                                : qty < product.minOrderQuantity
+                                                    ? 'text-[#e34219]'
+                                                    : 'text-blue-600'
+                                                }`}
                                         />
                                         <button
                                             onClick={() => handleQuantityChange(product.id, qty + 1)}
-                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty > 0 ? 'text-[#e34219] hover:bg-[#ffebeb]' : 'text-black hover:bg-gray-50'}`}
+                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
+                                                ? 'text-black hover:bg-gray-50'
+                                                : qty < product.minOrderQuantity
+                                                    ? 'text-[#e34219] hover:bg-[#ffebeb]'
+                                                    : 'text-blue-600 hover:bg-blue-100'
+                                                }`}
                                         >
                                             <Plus size={14} strokeWidth={2.5} />
                                         </button>
@@ -253,12 +273,12 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
                 <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
                     <div className="text-right flex flex-col items-end">
-                        <div className="flex flex-col items-end mb-1">
-                            <span className="text-[10px] font-black text-[#1e293b] leading-tight">合計金額 (税抜)</span>
-                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
+                        <div className="flex flex-col items-end mb-1 text-gray-400 gap-0.5">
+                            <span className="text-[10px] font-black leading-tight">合計金額 (税抜)</span>
+                            <span className="text-[8px] font-bold uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
                         </div>
                         <p className="text-4xl font-medium text-[#111827] leading-none font-inter tracking-tighter">
-                            ¥{productTotal.toLocaleString()}
+                            ₩{productTotal.toLocaleString()}
                         </p>
                     </div>
 

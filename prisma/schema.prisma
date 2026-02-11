@@ -16,6 +16,7 @@ model User {
   name           String
   role           String          @default("PARTNER") // PARTNER, ADMIN
   status         String          @default("PENDING") // PENDING, APPROVED, REJECTED
+  country        String?         // Added country
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
   orders         Order[]

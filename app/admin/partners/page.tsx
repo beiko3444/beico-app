@@ -43,6 +43,7 @@ export default async function PartnersPage() {
                             <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">상호명</th>
                             <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap w-16">등급</th>
                             <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap">사업자번호</th>
+                            <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap w-20">국가</th>
                             <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">주소</th>
                             <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">연락처</th>
                             <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">이메일</th>
@@ -86,6 +87,18 @@ export default async function PartnersPage() {
                                         </span>
                                     </td>
                                     <td className="px-3 py-1.5 text-center text-gray-600 font-mono tracking-tight">{partner.partnerProfile?.businessRegNumber || '-'}</td>
+                                    <td className="px-3 py-1.5 text-center">
+                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${partner.country === 'Korea' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
+                                            partner.country === 'Japan' ? 'bg-red-50 text-red-600 border border-red-100' :
+                                                partner.country === 'USA' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
+                                                    'bg-gray-50 text-gray-500 border border-gray-100'
+                                            }`}>
+                                            {partner.country === 'Korea' ? '🇰🇷 한국' :
+                                                partner.country === 'Japan' ? '🇯🇵 일본' :
+                                                    partner.country === 'USA' ? '🇺🇸 미국' :
+                                                        partner.country || '-'}
+                                        </span>
+                                    </td>
                                     <td className="px-3 py-1.5 text-left text-gray-600 truncate max-w-[200px]" title={partner.partnerProfile?.address || ''}>{partner.partnerProfile?.address || '-'}</td>
                                     <td className="px-3 py-1.5 text-left text-gray-700 font-medium">{partner.partnerProfile?.contact || '-'}</td>
                                     <td className="px-3 py-1.5 text-left text-gray-500 font-mono text-[10px]">{partner.partnerProfile?.email || '-'}</td>

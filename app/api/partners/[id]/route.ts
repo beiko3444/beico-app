@@ -6,7 +6,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     try {
         const { id } = await context.params
         const body = await request.json()
-        const { username, password, name, contact, email, businessRegNumber, address, grade, representativeName } = body
+        const { username, password, name, contact, email, businessRegNumber, address, grade, representativeName, country } = body
 
         // Validation
         if (!username || !name) {
@@ -17,6 +17,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             username,
             name,
             role: body.role || 'PARTNER',
+            country,
         }
 
         if (password && password.trim() !== '') {

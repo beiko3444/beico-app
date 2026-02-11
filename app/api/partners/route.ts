@@ -18,7 +18,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { username, password, name, contact, email, representativeName } = body
+        const { username, password, name, contact, email, representativeName, country } = body
 
         // Validation
         if (!username || !password || !name) {
@@ -34,6 +34,7 @@ export async function POST(request: Request) {
                 name,
                 role: body.role || 'PARTNER',
                 status: 'APPROVED',
+                country,
                 partnerProfile: {
                     create: {
                         contact,

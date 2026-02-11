@@ -30,6 +30,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
         address: '',
         grade: 'C',
         role: 'PARTNER',
+        country: '',
         businessRegistrationUrl: ''
     })
 
@@ -46,6 +47,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 address: initialData.partnerProfile?.address || '',
                 grade: initialData.partnerProfile?.grade || 'C',
                 role: initialData.role || 'PARTNER',
+                country: initialData.country || '',
                 businessRegistrationUrl: initialData.partnerProfile?.businessRegistrationUrl || ''
             })
         } else if (isOpen && !initialData) {
@@ -60,6 +62,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 address: '',
                 grade: 'C',
                 role: 'PARTNER',
+                country: '',
                 businessRegistrationUrl: ''
             })
         }
@@ -99,7 +102,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 setIsOpen(false)
                 router.refresh()
                 if (!initialData) {
-                    setFormData({ username: '', password: '', name: '', contact: '', email: '', representativeName: '', businessRegNumber: '', address: '', grade: 'C', role: 'PARTNER', businessRegistrationUrl: '' })
+                    setFormData({ username: '', password: '', name: '', contact: '', email: '', representativeName: '', businessRegNumber: '', address: '', grade: 'C', role: 'PARTNER', country: '', businessRegistrationUrl: '' })
                 }
             } else {
                 const data = await res.json()
@@ -210,31 +213,40 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
+                            <label className="block font-medium text-gray-700 mb-1">국적 / Nationality</label>
+                            <select name="country" value={formData.country} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md bg-white font-bold text-xs" required>
+                                <option value="">국적 선택</option>
+                                <option value="Japan">일본 (Japan)</option>
+                                <option value="Korea">한국 (Korea)</option>
+                                <option value="USA">미국 (USA)</option>
+                            </select>
+                        </div>
+                        <div>
                             <label className="block font-medium text-gray-700 mb-1">사업자 등록 번호</label>
                             <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="000-00-00000" />
                         </div>
+                    </div>
 
-                        <div>
-                            <label className="block font-medium text-gray-700 mb-1">사업자 등록증 (첨부)</label>
-                            <div className="flex items-center gap-4">
-                                <input
-                                    type="file"
-                                    accept="image/*,application/pdf"
-                                    onChange={handleFileChange}
-                                    className="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
-                                />
-                                {formData.businessRegistrationUrl && (
-                                    <a
-                                        href={formData.businessRegistrationUrl}
-                                        download="business_registration"
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center gap-1"
-                                    >
-                                        <span>📄</span> 확인/다운로드
-                                    </a>
-                                )}
-                            </div>
+                    <div>
+                        <label className="block font-medium text-gray-700 mb-1">사업자 등록증 (첨부)</label>
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="file"
+                                accept="image/*,application/pdf"
+                                onChange={handleFileChange}
+                                className="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
+                            />
+                            {formData.businessRegistrationUrl && (
+                                <a
+                                    href={formData.businessRegistrationUrl}
+                                    download="business_registration"
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center gap-1"
+                                >
+                                    <span>📄</span> 확인/다운로드
+                                </a>
+                            )}
                         </div>
                     </div>
 
