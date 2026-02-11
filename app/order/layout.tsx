@@ -40,7 +40,7 @@ export default async function OrderLayout({
         }
     }
 
-    const countryDisplay = country === 'Korea' ? '韓国 KR' : country === 'Japan' ? '日本 JP' : country === 'USA' ? '米国 US' : country
+    const countryDisplay = country === 'Korea' ? '🇰🇷 韓国 KR' : country === 'Japan' ? '🇯🇵 日本 JP' : country === 'USA' ? '🇺🇸 米国 US' : country
 
     return (
         <div className="min-h-screen bg-[#f9f9f9]">
@@ -82,13 +82,13 @@ export default async function OrderLayout({
 
                         {/* RIGHT: User Information & Logout */}
                         <div className="flex items-center">
-                            <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-1.5">
-                                <span className="text-[9px] text-white/70 font-bold leading-none uppercase tracking-wider">ログイン中:</span>
-                                <span className="text-[17px] text-white font-black leading-none">{businessNameJP}</span>
+                            <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-1">
+                                <span className="text-[8.5px] text-white/70 font-bold leading-none uppercase tracking-wider mb-0.5">ログイン中:</span>
+                                <span className="text-[17px] text-white font-black leading-none mb-0.5">{businessNameJP}</span>
                                 {countryDisplay && (
-                                    <span className="bg-white px-2 py-0.5 rounded text-[10px] font-black text-[#e34219] shadow-sm">
+                                    <div className="bg-white px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-black text-[#e34219] shadow-sm flex items-center leading-none">
                                         {countryDisplay}
-                                    </span>
+                                    </div>
                                 )}
                             </div>
                             <div className="pl-5">
