@@ -99,9 +99,9 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                 ];
 
                 return (
-                    <div key={order.id} className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 pb-10 md:pb-12 shadow-md border border-gray-100 mb-10 mx-4 md:mx-0 last:mb-0">
+                    <div key={order.id} className="bg-white rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md border border-gray-100 mb-8 mx-4 md:mx-0 last:mb-0">
                         {/* Order No & Date Box */}
-                        <div className="bg-white rounded-xl py-2 px-5 flex flex-row justify-between items-center gap-4 mb-0 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
                             <div className="flex flex-col text-sm">
                                 <span className="text-gray-400 mb-0.5 text-xs">注文日時 / 주문일시</span>
                                 <span className="font-bold text-gray-700" suppressHydrationWarning>
@@ -122,7 +122,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         <div className="border-t border-gray-100 mx-5 my-0.5" />
 
                         {/* Progress Stepper moved under Order No */}
-                        <div className="bg-white rounded-xl py-1 px-6 mb-1 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl py-1 px-1 mb-1">
                             <div className="relative flex justify-between items-start overflow-hidden pt-2">
                                 {/* Connecting Line Container (Grey Background) */}
                                 <div className="absolute top-[26px] left-[10%] right-[10%] h-[2px] bg-gray-100 z-0">
@@ -158,7 +158,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         </div>
 
                         {/* Payment Information & Totals Summary */}
-                        <div className="bg-white rounded-xl pt-4 px-5 pb-2 mb-1 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl pt-4 px-2 pb-2 mb-1">
                             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
                                 <Landmark size={14} className="text-[#e34219]" />
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">お支払い情報 / 입금정보</h3>
@@ -196,7 +196,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         </div>
 
                         {order.status !== 'DEPOSIT_COMPLETED' && (
-                            <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-5 flex items-start gap-3 mb-4 mx-4 md:mx-0">
+                            <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-3 flex items-start gap-3 mb-4 mx-1">
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
                                 <div className="text-xs text-gray-600 flex flex-col gap-1.5">
                                     <p className="leading-relaxed">
@@ -210,7 +210,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         )}
 
                         {/* Action Buttons */}
-                        <div className="bg-white rounded-xl mb-4 mx-4 md:mx-0">
+                        <div className="bg-white rounded-xl mb-4 px-1">
                             <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                                 <button
                                     onClick={() => order.status !== 'DEPOSIT_COMPLETED' && toggleDeposit(order.id, order.status)}
@@ -250,7 +250,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                         <div className="border-t border-gray-100 mx-5 mt-4 mb-3" />
 
                         {/* Order Items List */}
-                        <div className="mt-8 mx-4 md:mx-0">
+                        <div className="mt-8 px-1">
                             <div className="flex items-center gap-2 mb-4">
                                 <Package size={17} className="text-[#e34219]" />
                                 <h3 className="text-base font-extrabold text-gray-900 tracking-tight">注文商品リスト <span className="text-gray-400 font-medium ml-1">/ 주문상품목록</span></h3>
