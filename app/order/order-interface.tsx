@@ -104,7 +104,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         )}
                                         {product.stock <= 0 && (
                                             <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
-                                                <span className="bg-white/90 text-black px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">Sold Out</span>
+                                                <span className="bg-white/90 text-black px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">売り切れ</span>
                                             </div>
                                         )}
                                     </div>

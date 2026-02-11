@@ -45,15 +45,21 @@ export default async function OrderLayout({
                 {/* Main White Header */}
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                     <div className="h-20 flex justify-between items-center">
-                        <Link href="/order" className="flex items-center group">
-                            <div className="w-16 h-auto transition-all duration-300 group-hover:scale-105">
-                                <img
-                                    src="/logo.png"
-                                    alt="BEIKO BAIT"
-                                    className="w-full h-full object-contain"
-                                />
+                        <div className="flex items-center gap-5">
+                            <Link href="/order" className="flex items-center group">
+                                <div className="w-16 h-auto transition-all duration-300 group-hover:scale-105">
+                                    <img
+                                        src="/logo.png"
+                                        alt="BEIKO BAIT"
+                                        className="w-full h-full object-contain"
+                                    />
+                                </div>
+                            </Link>
+                            <div className="flex flex-col text-[#e34219] leading-[1.1] font-black tracking-tighter">
+                                <span className="text-[18px]">釣りは手軽に、</span>
+                                <span className="text-[18px]">釣果はしっかり</span>
                             </div>
-                        </Link>
+                        </div>
 
                         {/* Navigation Tabs */}
                         <div className="flex items-center">
