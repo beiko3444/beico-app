@@ -132,8 +132,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <p className="text-[10px] font-medium text-black font-inter">{product.barcode}</p>
                                                 </div>
                                                 <div className="flex flex-col gap-1 pb-0.5">
-                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">PNG</button>
-                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">SVG</button>
+                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase">PNG</button>
+                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase">SVG</button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -217,10 +217,10 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                 </div>
 
                                 <div className="flex flex-col items-end gap-2">
-                                    <div className="flex items-center bg-white border border-gray-200 rounded-md overflow-hidden shadow-sm">
+                                    <div className={`flex items-center border rounded-md overflow-hidden shadow-sm transition-all duration-300 ${qty > 0 ? 'bg-[#fff5f5] border-[#e34219]' : 'bg-white border-gray-200'}`}>
                                         <button
                                             onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
-                                            className="w-9 h-9 flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
+                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty > 0 ? 'text-[#e34219] hover:bg-[#ffebeb]' : 'text-black hover:bg-gray-50'}`}
                                         >
                                             <Minus size={14} strokeWidth={2.5} />
                                         </button>
@@ -233,11 +233,11 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     handleQuantityChange(product.id, val)
                                                 }
                                             }}
-                                            className="w-16 h-9 text-center font-medium text-[#1e293b] text-lg bg-transparent outline-none font-inter"
+                                            className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty > 0 ? 'text-[#e34219]' : 'text-[#1e293b]'}`}
                                         />
                                         <button
                                             onClick={() => handleQuantityChange(product.id, qty + 1)}
-                                            className="w-9 h-9 flex items-center justify-center text-black hover:bg-gray-50 transition-colors"
+                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty > 0 ? 'text-[#e34219] hover:bg-[#ffebeb]' : 'text-black hover:bg-gray-50'}`}
                                         >
                                             <Plus size={14} strokeWidth={2.5} />
                                         </button>
