@@ -82,16 +82,14 @@ export default async function OrderLayout({
 
                         {/* RIGHT: User Information & Logout */}
                         <div className="flex items-center">
-                            <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-[1px]">
+                            <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-1.5">
                                 <span className="text-[9px] text-white/70 font-bold leading-none uppercase tracking-wider">ログイン中:</span>
-                                <div className="flex items-center gap-2 mt-1">
-                                    {countryDisplay && (
-                                        <span className="bg-white px-2 py-0.5 rounded text-[10px] font-black text-[#e34219] shadow-sm">
-                                            {countryDisplay}
-                                        </span>
-                                    )}
-                                    <span className="text-[17px] text-white font-black leading-none">{businessNameJP}</span>
-                                </div>
+                                <span className="text-[17px] text-white font-black leading-none">{businessNameJP}</span>
+                                {countryDisplay && (
+                                    <span className="bg-white px-2 py-0.5 rounded text-[10px] font-black text-[#e34219] shadow-sm">
+                                        {countryDisplay}
+                                    </span>
+                                )}
                             </div>
                             <div className="pl-5">
                                 <LogoutButton vertical className="text-white hover:text-white" />
