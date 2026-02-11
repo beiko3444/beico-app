@@ -31,10 +31,10 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: "ベイコ・ベイトルアー | 小売店・卸売業者向け",
+  title: "ベイコ・ベ이트ルアー | 小売店・卸売業者向け",
   description: "ベイコ・ベ이트ルアー 小売店・卸売業者向け For retailers & distributors",
   openGraph: {
-    title: "ベイコ・ベייטルアー",
+    title: "ベイコ・ベ이트ルアー",
     description: "小売店・卸売業者向け | For retailers & distributors",
     images: [
       {
