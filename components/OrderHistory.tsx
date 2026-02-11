@@ -66,11 +66,13 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
             </div>
 
             {orders.map(order => {
-                const supplyPrice = order.items.reduce((sum: number, item: any) => sum + (item.price * (item.quantity || 0)), 0);
-                const vat = Math.round(supplyPrice * 0.1);
-                const totalAmount = supplyPrice + vat;
+                const productSum = order.items.reduce((sum: number, item: any) => sum + (item.price * (item.quantity || 0)), 0);
                 const totalQuantity = order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
                 const shippingFee = Math.floor(totalQuantity / 100) * 3000;
+
+                const supplyPrice = productSum + shippingFee;
+                const vat = Math.round(supplyPrice * 0.1);
+                const totalAmount = supplyPrice + vat;
 
                 // Stepper Logic
                 // Steps: Ordered -> Payment -> Paid -> Shipped -> Invoice
@@ -93,7 +95,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                 ];
 
                 return (
-                    <div key={order.id} className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 shadow-md border border-gray-100 mb-6 mx-4 md:mx-0 last:mb-0">
+                    <div key={order.id} className="bg-white rounded-xl md:rounded-2xl p-4 md:p-6 pb-10 md:pb-12 shadow-md border border-gray-100 mb-10 mx-4 md:mx-0 last:mb-0">
                         {/* Order No & Date Box */}
                         <div className="bg-white rounded-xl py-2 px-5 flex flex-row justify-between items-center gap-4 mb-0 mx-4 md:mx-0">
                             <div className="flex flex-col text-sm">
@@ -104,7 +106,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                             </div>
                             <div className="flex flex-col text-right text-sm">
                                 <span className="text-gray-400 mb-0.5 text-xs">注文番号 / 주문번호</span>
-                                <span className="font-bold text-gray-700 font-inter tracking-widest">{order.orderNumber || order.id.slice(0, 12)}</span>
+                                <span className="font-bold text-gray-900 font-inter tracking-widest">{order.orderNumber || order.id.slice(0, 12)}</span>
                             </div>
                         </div>
                         <div className="border-t border-gray-100 mx-5 my-1" />
@@ -239,8 +241,8 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 {order.items.map((item: any, idx: number) => (
                                     <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
                                         <div className="flex flex-col items-center gap-1.5 shrink-0">
-                                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">No. {idx + 1}</span>
-                                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-gray-100 rounded-lg flex items-center justify-center shrink-0 p-1">
+                                            <span className="text-[10px] font-extrabold text-gray-900 uppercase tracking-tighter">No. {idx + 1}</span>
+                                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-gray-200 rounded-lg flex items-center justify-center shrink-0 p-1">
                                                 {item.product.imageUrl ? (
                                                     <img src={item.product.imageUrl} alt="" className="w-full h-full object-contain" />
                                                 ) : (
@@ -280,17 +282,17 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 ))}
 
                                 {shippingFee > 0 && (
-                                    <div className="bg-orange-50/50 border border-orange-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm">
-                                        <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-orange-100 rounded-lg flex items-center justify-center shrink-0">
-                                            <Truck className="text-[#e34219]" size={24} />
+                                    <div className="bg-white border border-gray-100 rounded-xl px-4 py-2 flex gap-4 items-start shadow-sm">
+                                        <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center shrink-0 mt-1">
+                                            <Truck className="text-[#e34219]" size={20} />
                                         </div>
-                                        <div className="flex-1">
-                                            <div className="flex justify-between items-center">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex justify-between items-center h-full py-0.5">
                                                 <div>
-                                                    <h4 className="font-bold text-sm text-gray-900">送料 <span className="text-gray-400 font-normal">/ 배송비</span></h4>
-                                                    <p className="text-[10px] text-gray-500 mt-0.5">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
+                                                    <h4 className="font-bold text-sm text-gray-900 leading-tight">送料 <span className="text-gray-400 font-normal text-xs">/ 배송비</span></h4>
+                                                    <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
                                                 </div>
-                                                <span className="font-bold text-base md:text-lg text-[#e34219] font-inter">
+                                                <span className="font-bold text-base md:text-lg text-gray-900 font-inter">
                                                     ₩{shippingFee.toLocaleString()}
                                                 </span>
                                             </div>
