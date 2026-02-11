@@ -7,7 +7,6 @@ import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
 import { Building2 } from 'lucide-react'
 import Clock from '@/components/Clock'
-import MobileBottomNav from '@/components/MobileBottomNav'
 
 export default async function OrderLayout({
     children,
@@ -52,7 +51,13 @@ export default async function OrderLayout({
                                 </div>
                             </Link>
 
-                            <Clock />
+                            <div className="flex flex-col justify-center ml-3 gap-[2px] mt-2.5">
+                                <div className="flex flex-col gap-[5px]">
+                                    <span className="text-[17px] font-bold text-black tracking-tight leading-none">小売店・卸売業者向け</span>
+                                    <span className="text-[7.5px] font-bold text-black uppercase tracking-[0.12em] leading-none">For retailers & distributors</span>
+                                </div>
+                                <Clock />
+                            </div>
                         </div>
 
                         {/* Navigation Tabs */}
@@ -66,9 +71,6 @@ export default async function OrderLayout({
                 <div className="bg-[#1e293b] text-white/90 border-t border-[#334155]">
                     <div className="max-w-6xl mx-auto px-4 md:px-8 h-12 flex items-center justify-between">
                         <div className="flex items-center gap-4">
-                            <div className="p-1.5 bg-white/10 rounded-md">
-                                <Building2 size={16} className="text-white" />
-                            </div>
                             <div className="flex flex-col gap-1">
                                 <span className="text-[13px] text-gray-300 font-medium leading-none">Logged in as: <span className="text-white font-black">{businessName}</span></span>
                                 <span className="text-[10px] text-gray-400 font-bold leading-none">ログイン中: {businessNameJP}</span>
@@ -81,13 +83,12 @@ export default async function OrderLayout({
             </header>
 
             {/* Main Content Area */}
-            <main className="max-w-6xl mx-auto py-8 px-4 md:px-8 pb-24 md:pb-8">
+            <main className="max-w-6xl mx-auto py-8 px-4 md:px-8">
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
                     {children}
                 </div>
             </main>
 
-            <MobileBottomNav />
         </div>
     )
 }

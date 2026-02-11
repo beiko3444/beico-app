@@ -128,9 +128,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     </div>
                                                     <p className="text-[10px] font-medium text-black font-inter">{product.barcode}</p>
                                                 </div>
-                                                <div className="flex gap-1.5 pb-0.5">
-                                                    <button className="px-2 py-1 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">PNG</button>
-                                                    <button className="px-2 py-1 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">SVG</button>
+                                                <div className="flex flex-col gap-1 pb-0.5">
+                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">PNG</button>
+                                                    <button className="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-gray-100 border border-gray-200 transition-colors uppercase">SVG</button>
                                                 </div>
                                             </div>
                                         ) : (
@@ -146,8 +146,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <div className="grid grid-cols-2 border-b border-gray-300">
                                         <div className="py-1.5 px-4 border-r border-gray-300">
                                             <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-[#1e293b] leading-tight">卸売価格</span>
-                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Wholesale Price</span>
+                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Wholesale Price</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 ¥{product.sellPrice.toLocaleString()}
@@ -156,7 +156,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         <div className="py-1.5 px-4">
                                             <div className="flex flex-col mb-0.5">
                                                 <span className="text-[11px] font-black text-black leading-tight">小売価格</span>
-                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Retail Price</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 ¥{product.onlinePrice.toLocaleString()}
@@ -166,8 +166,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <div className="grid grid-cols-2">
                                         <div className="py-1.5 px-4 border-r border-gray-300">
                                             <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-[#1e293b] leading-tight">在庫</span>
-                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Stock</span>
+                                                <span className="text-[11px] font-black text-black leading-tight">在庫</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Stock</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 {product.stock.toLocaleString()}
@@ -175,8 +175,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         </div>
                                         <div className="py-1.5 px-4">
                                             <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-[#1e293b] leading-tight">マージン</span>
-                                                <span className="text-[8px] font-bold text-gray-600 uppercase tracking-widest leading-none">Margin%</span>
+                                                <span className="text-[11px] font-black text-black leading-tight">マージン</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Margin%</span>
                                             </div>
                                             <p className="text-2xl font-medium text-[#e34219] leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 {marginPercent}%
@@ -249,8 +249,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             </div>
 
             {/* Sticky Footer */}
-            <div className="fixed bottom-[64px] md:bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-center gap-4 md:gap-12">
+            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
+                <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
                     <div className="text-right flex flex-col items-end">
                         <div className="flex flex-col items-end mb-1">
                             <span className="text-[10px] font-black text-[#1e293b] leading-tight">合計金額 (税抜)</span>
@@ -264,9 +264,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     {hasItems && (
                         <button
                             onClick={handleOrderNow}
-                            className="h-14 px-10 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-3 font-bold text-[15px] tracking-wide group w-full md:w-auto"
+                            className="h-14 px-10 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-end md:justify-center gap-3 font-bold text-[15px] tracking-wide group w-full md:w-auto"
                         >
-                            <div className="flex flex-col items-start leading-none">
+                            <div className="flex flex-col items-end md:items-start leading-none">
                                 <span className="text-lg">今すぐ注文する</span>
                                 <span className="text-[9px] opacity-70 font-bold tracking-[0.2em] -mt-0.5">ORDER NOW</span>
                             </div>

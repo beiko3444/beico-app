@@ -28,7 +28,7 @@ export default function Clock() {
     }
 
     return (
-        <div className="text-[11px] font-bold text-gray-800 tracking-widest ml-2">
+        <div className="text-[11px] font-bold text-gray-800 tracking-widest">
             {formatJapaneseDate(time)}
         </div>
     )
