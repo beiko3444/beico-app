@@ -62,6 +62,10 @@ export default async function NewOrderPage() {
             minOrderQuantity: p.minOrderQuantity,
             buyPrice: p.buyPrice,
             onlinePrice: p.onlinePrice || 0,
+            jpBuyPrice: p.jpBuyPrice || 0,
+            jpSellPrice: p.jpSellPrice || 0,
+            krBuyPrice: p.krBuyPrice || 0,
+            krSellPrice: p.krSellPrice || 0,
             appliedGrade: userGrade
         }
     })

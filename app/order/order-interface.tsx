@@ -16,8 +16,11 @@ type Product = {
     nameEN?: string | null
     minOrderQuantity: number
     appliedGrade?: string
-    buyPrice: number
     onlinePrice: number
+    jpBuyPrice: number
+    jpSellPrice: number
+    krBuyPrice: number
+    krSellPrice: number
 }
 
 // Hardcoded bank info for now as requested
@@ -146,20 +149,40 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <div className="grid grid-cols-2 border-b border-gray-300">
                                         <div className="py-1.5 px-4 border-r border-gray-300">
                                             <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Wholesale Price</span>
+                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格 日本</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale JP</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                ¥{product.sellPrice.toLocaleString()}
+                                                ¥{product.jpBuyPrice.toLocaleString()}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
                                             <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">小売価格</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price</span>
+                                                <span className="text-[11px] font-black text-black leading-tight">小売価格 日本</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price JP</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                ¥{product.onlinePrice.toLocaleString()}
+                                                ¥{product.jpSellPrice.toLocaleString()}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-2 border-b border-gray-300">
+                                        <div className="py-1.5 px-4 border-r border-gray-300">
+                                            <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格 韓国</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale KR</span>
+                                            </div>
+                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                ₩{product.krBuyPrice.toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="py-1.5 px-4">
+                                            <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-black leading-tight">小売価格 韓国</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price KR</span>
+                                            </div>
+                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                ₩{product.krSellPrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
