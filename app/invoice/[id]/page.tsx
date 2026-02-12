@@ -75,7 +75,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 .print\\:p-0 { padding: 0 !important; }
             `}</style>
 
-            <div id="invoice-content" className="w-[210mm] min-h-[297mm] mx-auto bg-white p-[15mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
+            <div id="invoice-content" className="w-[210mm] min-h-[297mm] mx-auto bg-white p-[15mm] pb-[5mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
 
                 {/* Formal Header */}
                 <div className="text-center mb-1 border-b-4 border-black pb-2">
@@ -135,9 +135,9 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                 <span className="text-[10px] font-bold text-gray-500 leading-none">供給者</span>
                                 <div className="flex items-center gap-1 relative">
                                     <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급자</span>
-                                    {/* Seal overlapping title */}
-                                    <div className="absolute left-[30px] -top-2 pointer-events-none z-10">
-                                        <img src="/bko.png" alt="Seal" className="w-[38px] h-auto opacity-100 contrast-125 select-none mix-blend-multiply" />
+                                    {/* Seal overlapping title - Increased size & moved right */}
+                                    <div className="absolute left-[80px] -top-12 pointer-events-none z-10">
+                                        <img src="/bko.png" alt="Seal" className="w-[182px] h-auto opacity-100 contrast-125 select-none mix-blend-multiply" />
                                     </div>
                                 </div>
                             </div>
@@ -249,7 +249,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                     </table>
 
                     {/* Total Summary Bar - Moved Below Table */}
-                    <div className="flex border-4 border-black mt-10 items-center">
+                    <div className="flex border-4 border-black mt-4 items-center">
                         <div className="text-black border-r-4 border-black px-6 py-3 font-extrabold text-center w-48 text-sm leading-tight">
                             合計金額<br />합계금액
                         </div>
@@ -260,7 +260,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 </div>
 
                 {/* Footer Section */}
-                <div className="mt-4 border-t border-black pt-4 flex justify-between items-start">
+                <div className="mt-2 border-t border-black pt-2 flex justify-between items-start">
                     <div className="space-y-4">
                         <div>
                             <p className="font-bold text-xs mb-2 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">お支払い情報 / 입금 계좌 정보</p>
