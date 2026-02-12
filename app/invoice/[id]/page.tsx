@@ -75,7 +75,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 .print\\:p-0 { padding: 0 !important; }
             `}</style>
 
-            <div className="w-[210mm] min-h-[297mm] mx-auto bg-white p-[15mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black">
+            <div id="invoice-content" className="w-[210mm] min-h-[297mm] mx-auto bg-white p-[15mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black">
 
                 {/* Formal Header */}
                 <div className="text-center mb-10 border-b-4 border-black pb-4">
@@ -272,7 +272,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
             </div>
 
             {/* Interactive Buttons - Outside A4 container */}
-            <InvoiceButtons />
+            <InvoiceButtons orderNumber={displayOrderNumber} />
         </InvoiceWrapper>
     )
 }

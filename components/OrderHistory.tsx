@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { Check, ShoppingBag, CreditCard, X, Info, Truck, FileText, Banknote, Landmark, Package } from 'lucide-react'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 
@@ -47,12 +48,12 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
     }
 
     const handleDelete = async (orderId: string) => {
-        if (!confirm("注文を完全に削除しますか？ (復元不可) / 주문을 완전히 삭제하시겠습니까? (복구 불가능)")) return
+        if (!confirm("注文을 완전히 삭제하시겠습니까? (復元不可) / 주문을 완전히 삭제하시겠습니까? (복구 불가능)")) return
         setLoadingMap(prev => ({ ...prev, [orderId]: true }))
         try {
             const res = await fetch(`/api/orders/${orderId}`, { method: 'DELETE' })
             if (res.ok) router.refresh()
-            else alert("削除中にエラーが発生しました / 삭제 중 오류가 발생했습니다.")
+            else alert("削除中にエラーが発生했습니다 / 삭제 중 오류가 발생했습니다.")
         } catch (e) { alert("通信エラー / 통신 오류") }
         finally { setLoadingMap(prev => ({ ...prev, [orderId]: false })) }
     }
@@ -92,8 +93,8 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
 
                 const steps = [
                     { label: "注文完了", sub: "주문완료", icon: Check },
-                    { label: "入金待ち", sub: "입금대기중", icon: Banknote },
-                    { label: "入金完了", sub: "입금완료", icon: Check },
+                    { label: "入금대기", sub: "입금대기중", icon: Banknote },
+                    { label: "入금완료", sub: "입금완료", icon: Check },
                     { label: "出荷完了", sub: "배송중", icon: Truck },
                     { label: "請求書発行完了", sub: "계산서발급완료", icon: FileText },
                 ];
@@ -200,7 +201,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
                                 <div className="text-xs text-gray-600 flex flex-col gap-1.5">
                                     <p className="leading-relaxed">
-                                        <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください。入金確認後の注文キャンセルはできません。
+                                        <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください.入金確認後の注文キャンセルはできません.
                                     </p>
                                     <p className="font-medium leading-relaxed">
                                         합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.
@@ -246,6 +247,15 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                     </button>
                                 )}
                             </div>
+
+                            <Link
+                                href={`/invoice/${order.id}`}
+                                target="_blank"
+                                className="w-full h-12 border-2 border-[#111827] text-[#111827] bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight mt-2"
+                            >
+                                <span className="text-[13px] font-bold">取引明細書を確認する</span>
+                                <span className="text-[10px] font-black opacity-60">거래명세표 확인하기</span>
+                            </Link>
                         </div>
                         <div className="border-t border-gray-100 mx-5 mt-4 mb-3" />
 
