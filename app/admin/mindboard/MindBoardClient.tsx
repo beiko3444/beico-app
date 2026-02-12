@@ -308,8 +308,9 @@ export default function MindBoardClient() {
         )
     }
 
-    const resolveCollision = useCallback((movingId: string, newItems: BoardItem[]): BoardItem[] => {
-        // Recursive collision resolution for ALL items? Expensive.
+    const resolveCollision = useCallback((movingId: string, newItems: BoardItem[], depth: number = 0): BoardItem[] => {
+        if (depth > 5) return newItems // Prevent infinite recursion
+
         // Simplified: Move 'movingId' out of others.
         const movingItem = newItems.find(i => i.id === movingId)
         if (!movingItem) return newItems
@@ -319,7 +320,10 @@ export default function MindBoardClient() {
             if (item.id === movingId) return item
 
             // Ignore if in same group
-            if (movingItem.groupId && movingItem.groupId === item.groupId) return item
+            if (movingItem.groupId && movingItem.groupId === item.groupId && movingItem.groupId !== undefined) return item
+
+            // Ignore if one is in a group and other is not? Maybe.
+            // But if untethered item overlaps group item, move untethered?
 
             if (isColliding(movingItem, item)) {
                 changed = true
@@ -340,7 +344,7 @@ export default function MindBoardClient() {
             return item
         })
 
-        return changed ? resolveCollision(movingId, updated) : updated
+        return changed ? resolveCollision(movingId, updated, depth + 1) : updated
     }, [])
 
     const createMemo = useCallback((x: number, y: number, shouldEdit: boolean = false) => {
@@ -716,6 +720,7 @@ export default function MindBoardClient() {
         // Helper to get group bounds
         const getGroupBounds = (groupId: string) => {
             const members = items.filter(i => i.groupId === groupId)
+            if (members.length === 0) return { x: 0, y: 0, w: 0, h: 0, items: [] }
             const minX = Math.min(...members.map(i => i.x))
             const minY = Math.min(...members.map(i => i.y))
             const maxX = Math.max(...members.map(i => i.x + i.w))
@@ -747,31 +752,34 @@ export default function MindBoardClient() {
         let maxHeightInRow = 0
         let newItems: BoardItem[] = []
 
+        const maxW = containerRef.current ? Math.max(2000, containerRef.current.clientWidth - 200) : 2000
+
         layoutObjects.forEach(obj => {
-            // Calculate offset to move object to currentX, currentY
-            const dx = currentX - obj.x
-            const dy = currentY - obj.y
-
-            // Move all items in this object
-            obj.items.forEach(i => {
-                newItems.push({
-                    ...i,
-                    x: i.x + dx,
-                    y: i.y + dy
-                })
-            })
-
-            // Update cursor
-            currentX += obj.w + gap
-            maxHeightInRow = Math.max(maxHeightInRow, obj.h)
-
-            const maxW = containerRef.current ? Math.max(2000, containerRef.current.clientWidth - 200) : 2000
-
-            if (currentX > maxW) { // Dynamic Wrap width
+            // Check wrap
+            if (currentX + obj.w > maxW) {
                 currentX = 100
                 currentY += maxHeightInRow + gap
                 maxHeightInRow = 0
             }
+
+            // Calculate offset to move object to currentX, currentY
+            // We want top-left of object (obj.x, obj.y) to handle move to (currentX, currentY).
+            // Actually, we want to place it AT currentX, currentY.
+
+            // Move item relative to group origin (obj.x, obj.y)
+            obj.items.forEach(i => {
+                const relX = i.x - obj.x
+                const relY = i.y - obj.y
+                newItems.push({
+                    ...i,
+                    x: currentX + relX,
+                    y: currentY + relY
+                })
+            })
+
+            // Update wrapping variables
+            currentX += obj.w + gap
+            maxHeightInRow = Math.max(maxHeightInRow, obj.h)
         })
 
         setItems(newItems)
@@ -817,8 +825,6 @@ export default function MindBoardClient() {
 
             // 1. Resize members
             const resisedMembers = members.map((item: BoardItem) => {
-                // Optimization: If Undo triggers this, we don't want to saveHistory inside? 
-                // optimizeGroup is called manually.
                 const lines = item.content.split('\n').length
                 const length = item.content.length
                 let targetW = 240
@@ -834,11 +840,11 @@ export default function MindBoardClient() {
             })
 
             // 2. Arrange
-            // Find top-left of group
-            const minX = Math.min(...resisedMembers.map((i: BoardItem) => i.x))
-            const minY = Math.min(...resisedMembers.map((i: BoardItem) => i.y))
+            const minX = Math.min(...members.map((i: BoardItem) => i.x))
+            const minY = Math.min(...members.map((i: BoardItem) => i.y))
 
-            const packed = packGroup(resisedMembers)
+            const packed = packGroup(resisedMembers, groupId)
+
             const updatedMembers = resisedMembers.map((m: BoardItem) => {
                 const p = packed.find(p => p.id === m.id)
                 if (p) return { ...m, x: minX + p.x, y: minY + p.y }
@@ -866,8 +872,9 @@ export default function MindBoardClient() {
 
     const optimizeSize = () => {
         setItems(prev => {
+            // 1. Resize based on content
             const nextItems = prev.map((item: BoardItem) => {
-                const lines = item.content.split('\\n').length
+                const lines = item.content.split('\n').length
                 const length = item.content.length
                 let targetW = 240
                 let targetH = 160
@@ -881,24 +888,39 @@ export default function MindBoardClient() {
                 return { ...item, w: targetW, h: targetH }
             })
 
-            // Pull group members together
+            // 2. Repack Groups
             const handledGroups = new Set<string>()
+            let finalItems = [...nextItems]
+
             nextItems.forEach((item: BoardItem) => {
                 if (item.groupId && !handledGroups.has(item.groupId)) {
+                    handledGroups.add(item.groupId)
+
                     const members = nextItems.filter(i => i.groupId === item.groupId)
-                    const packed = packGroup(members)
-                    // Apply packed coords
+                    if (members.length === 0) return
+
+                    // Find current top-left of the group to maintain position
+                    const minX = Math.min(...members.map(i => i.x))
+                    const minY = Math.min(...members.map(i => i.y))
+
+                    // Pack logic returns local coordinates (starting at 0,0)
+                    const packed = packGroup(members, item.groupId)
+
+                    // Update members in finalItems
                     packed.forEach(p => {
-                        const idx = nextItems.findIndex(ni => ni.id === p.id)
+                        const idx = finalItems.findIndex(fi => fi.id === p.id)
                         if (idx > -1) {
-                            nextItems[idx].x = item.x + p.x
-                            nextItems[idx].y = item.y + p.y
+                            finalItems[idx] = {
+                                ...finalItems[idx],
+                                x: minX + p.x,
+                                y: minY + p.y
+                            }
                         }
                     })
-                    handledGroups.add(item.groupId)
                 }
             })
-            return nextItems
+
+            return finalItems
         })
     }
 
