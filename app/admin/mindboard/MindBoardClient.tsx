@@ -64,6 +64,8 @@ interface BoardData {
 }
 
 const GRID_SIZE = 80
+const HEADER_HEIGHT = 80
+const PADDING = 20
 
 const COLORS = [
     '#FFB7B2', '#FFDAC1', '#E2F0CB', '#B5EAD7', '#C7CEEA',
@@ -160,7 +162,6 @@ export default function MindBoardClient() {
     const [boards, setBoards] = useState<BoardData[]>([])
     const [currentBoardId, setCurrentBoardId] = useState<string | null>(null)
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
-    const [resizeGroup, setResizeGroup] = useState<{ id: string, startX: number, startY: number, initialW: number, initialH: number, groupX: number, groupY: number } | null>(null)
     const dateInputRef = useRef<HTMLInputElement>(null)
     const [targetDateItemId, setTargetDateItemId] = useState<string | null>(null)
 
@@ -180,17 +181,28 @@ export default function MindBoardClient() {
 
                 const minX = Math.min(...members.map(i => i.x))
                 const minY = Math.min(...members.map(i => i.y))
+                const maxX = Math.max(...members.map(i => i.x + i.w))
+                const maxY = Math.max(...members.map(i => i.y + i.h))
 
-                const targetX = minX - 20
-                const targetY = minY - 50
+                const targetX = minX - PADDING
+                const targetY = minY - HEADER_HEIGHT
+                const targetW = maxX - minX + (PADDING * 2)
+                const targetH = maxY - minY + HEADER_HEIGHT + PADDING
 
-                // Fix potential undefined x/y
+                // Fix potential undefined x/y/w/h
                 const currentX = g.x ?? 0
                 const currentY = g.y ?? 0
+                const currentW = g.w || 360
+                const currentH = g.h || 200
 
-                if (Math.abs(currentX - targetX) > 1 || Math.abs(currentY - targetY) > 1) {
+                const xDiff = Math.abs(currentX - targetX)
+                const yDiff = Math.abs(currentY - targetY)
+                const wDiff = Math.abs(currentW - targetW)
+                const hDiff = Math.abs(currentH - targetH)
+
+                if (xDiff > 1 || yDiff > 1 || wDiff > 1 || hDiff > 1) {
                     changed = true
-                    return { ...g, x: targetX, y: targetY }
+                    return { ...g, x: targetX, y: targetY, w: targetW, h: targetH }
                 }
                 return g
             })
@@ -554,32 +566,6 @@ export default function MindBoardClient() {
         setResizeItem({ id, startX: clientX, startY: clientY, initialW: item.w, initialH: item.h })
     }
 
-    const startGroupResize = (clientX: number, clientY: number, groupId: string) => {
-        saveHistory()
-        const group = groups.find(g => g.id === groupId)
-        if (!group) return
-
-        const groupItems = items.filter(i => i.groupId === groupId)
-        let minX = group.x
-        let minY = group.y
-
-        if (minX === undefined && groupItems.length > 0) minX = Math.min(...groupItems.map(i => i.x))
-        if (minY === undefined && groupItems.length > 0) minY = Math.min(...groupItems.map(i => i.y))
-
-        // If still undefined (empty group), infer from client or keep current
-        if (minX === undefined) minX = items.length > 0 ? 0 : 0
-        if (minY === undefined) minY = items.length > 0 ? 0 : 0
-
-        setResizeGroup({
-            id: groupId,
-            startX: clientX,
-            startY: clientY,
-            initialW: group.w || 360,
-            initialH: group.h || 200,
-            groupX: minX,
-            groupY: minY
-        })
-    }
 
     const handleDateSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const date = e.target.value
@@ -1358,44 +1344,6 @@ export default function MindBoardClient() {
                 }
                 return item
             }))
-        } else if (resizeGroup) {
-            const dx = (clientX - resizeGroup.startX) / scale
-            const dy = (clientY - resizeGroup.startY) / scale
-
-            const members = items.filter(i => i.groupId === resizeGroup.id)
-            let minReqW = 360
-            let minReqH = 200
-
-            if (members.length > 0) {
-                const maxX = Math.max(...members.map(i => i.x + i.w))
-                const maxY = Math.max(...members.map(i => i.y + i.h))
-                // The group's x/y are fixed during resize (resizing from nwse / bottom-right)
-                // So min width is (furthest item right edge) - (group left edge) + padding
-                minReqW = (maxX - resizeGroup.groupX) + 20
-                minReqH = (maxY - resizeGroup.groupY) + 20
-            }
-
-            const newW = Math.max(minReqW, resizeGroup.initialW + dx)
-            const newH = Math.max(minReqH, resizeGroup.initialH + dy)
-
-            setGroups(prev => prev.map(g => g.id === resizeGroup.id ? { ...g, w: newW, h: newH, x: resizeGroup.groupX, y: resizeGroup.groupY } : g))
-
-            // Real-time layout
-            setItems(prev => {
-                const members = prev.filter(i => i.groupId === resizeGroup.id)
-                // Sort by current visual order
-                members.sort((a, b) => (a.y - b.y) || (a.x - b.x))
-
-                const updatedMembers = layoutGroupItemsMasonry(members, newW)
-
-                return prev.map(item => {
-                    const m = updatedMembers.find(um => um.id === item.id)
-                    if (m) {
-                        return { ...item, x: resizeGroup.groupX + m.x, y: resizeGroup.groupY + m.y }
-                    }
-                    return item
-                })
-            })
         } else if (isMinimapDragging && minimapDragState.current) {
             const state = minimapDragState.current
             const dx = clientX - state.startX
@@ -1433,7 +1381,7 @@ export default function MindBoardClient() {
                 setSelectionBox(prev => prev ? ({ ...prev, currentX: clientX - rect.left, currentY: clientY - rect.top }) : null)
             }
         }
-    }, [isPanning, dragItems, resizeItem, resizeGroup, selectionBox, scale, isMinimapDragging, draggingGroup, groups, items, pan])
+    }, [isPanning, dragItems, resizeItem, selectionBox, scale, isMinimapDragging, draggingGroup, groups, items, pan])
 
     const updateAutoPan = useCallback(() => {
         if (autoPanVelocity.current.x === 0 && autoPanVelocity.current.y === 0) {
@@ -1489,31 +1437,17 @@ export default function MindBoardClient() {
             setItems(currentItems => {
                 let newItems = [...currentItems]
                 const draggedIds = Array.from(dragItems.keys())
-
-                // Get the primary moved item (to determine drop target)
                 const primaryId = draggedIds[0]
                 const primaryItem = newItems.find(i => i.id === primaryId)
-
                 if (!primaryItem) return newItems
-
-                // 1. Determine if we are dropping INTO a group or ONTO an item (merge)
-                // Or just moving WITHIN a group.
 
                 let targetGroupId: string | undefined = undefined
                 let isMerge = false
 
-                // Check collision/overlap with other items/groups
                 const center = {
                     x: primaryItem.x + primaryItem.w / 2,
                     y: primaryItem.y + primaryItem.h / 2
                 }
-
-                // Find "Drop Target" -> The group we are hovering, or item we are hovering
-                // Prioritize Group Containment over Item Collision
-
-                // Check if center is inside an existing group bounds
-                // We need to calculate bounds of all groups... expensive?
-                // Or just check if we overlap with any item in a group.
 
                 const hitItem = newItems.find(i =>
                     !draggedIds.includes(i.id) &&
@@ -1525,225 +1459,128 @@ export default function MindBoardClient() {
                     if (hitItem.groupId) {
                         targetGroupId = hitItem.groupId
                     } else {
-                        // Merging with a single item -> Create New Group
                         isMerge = true
                     }
                 } else if (primaryItem.groupId) {
-                    // Staying in group
                     targetGroupId = primaryItem.groupId
                 }
 
-                // DISABLE MERGE for Group Drags (Water & Oil)
-                // If we are dragging a whole group, forbid merging into another group.
                 const isGroupDrag = draggedIds.every(id => {
-                    const item = currentItems.find((i: BoardItem) => i.id === id)
+                    const item = currentItems.find((i) => i.id === id)
                     return item?.groupId === primaryItem.groupId
-                }) && draggedIds.length > 1 // Heuristic: dragging multiple items from same group
+                }) && draggedIds.length > 1
 
                 if (draggedIds.length === 1 && !isMerge && targetGroupId && targetGroupId !== primaryItem.groupId) {
-                    // Single item dragged into another group -> ALLOW
+                    // Allowed
                 } else if (isGroupDrag || (draggedIds.length > 1)) {
-                    // Multiple items or Group Drag -> DISABLE MERGE into other group
-                    // Only allow reorder within SAME group
                     if (targetGroupId && targetGroupId !== primaryItem.groupId) {
-                        return newItems // Cancel merge
+                        return newItems
                     }
                 }
 
-                // If no target group and no merge, we are just moving freely on canvas.
                 if (!targetGroupId && !isMerge) return newItems
 
-                // 3. Setup Destination
                 let destinationGroupId = targetGroupId
                 if (isMerge && hitItem) {
-                    // DISABLE MERGE
                     destinationGroupId = undefined
                 }
 
-                // 3. Collect Members
                 const currentGroupMembers = destinationGroupId
                     ? newItems.filter(i => i.groupId === destinationGroupId && !draggedIds.includes(i.id))
                     : (hitItem ? [hitItem] : [])
 
                 const movingItems = newItems.filter(i => draggedIds.includes(i.id))
 
-                if (isMerge && hitItem) {
-                    // Update hitItem to new group
-                    // DISABLE MERGE (Auto-Create Group) as per user request
-                    // const hitIdx = newItems.findIndex(i => i.id === hitItem.id)
-                    // if (hitIdx > -1) newItems[hitIdx] = { ...newItems[hitIdx], groupId: destinationGroupId }
-                }
-
-                // 4. Calculate Insert Index
-                // We need the layout config (width -> columns)
-                const groupConfig = groups.find((g: GroupData) => g.id === destinationGroupId)
+                const groupConfig = groups.find((g) => g.id === destinationGroupId)
                 const groupW = groupConfig?.w || 360
-                const COL_WIDTH = 180 // Must match layoutGroupItemsMasonry constant
-                const cols = Math.max(1, Math.floor(groupW / COL_WIDTH))
-
-                // Calculate "Group Origin" (Top-Left of the *existing* members + *target* location)
-                // Actually, strict grid reflow implies the group's "Box" is defined by its members.
-                // We want to find where the *Mouse/Center* is relative to the *Sorted Grid*.
+                const cols = Math.max(1, Math.floor(groupW / 180))
 
                 const allMembersForBounds = [...currentGroupMembers, ...movingItems]
                 const minX = Math.min(...allMembersForBounds.map(i => i.x))
                 const minY = Math.min(...allMembersForBounds.map(i => i.y))
 
-                // Helper to get index from coords
                 const getIndex = (x: number, y: number) => {
-                    const relX = x - minX
-                    const relY = y - minY
-                    // Assuming standard size 160x160 + 20 gap + 40 title gap?
-                    // Let's use standard grid cell size:
-                    const cellW = 160 + 20
-                    const cellH = 160 + 40
-
-                    const col = Math.max(0, Math.min(cols - 1, Math.round(relX / cellW)))
-                    const row = Math.max(0, Math.round(relY / cellH))
+                    const cellW = 180
+                    const cellH = 200
+                    const col = Math.max(0, Math.min(cols - 1, Math.round((x - minX) / cellW)))
+                    const row = Math.max(0, Math.round((y - minY) / cellH))
                     return row * cols + col
                 }
 
-                // If we are merging, default append?
-                // If reordering, use primaryItem's position.
                 const targetIndex = getIndex(primaryItem.x, primaryItem.y)
-
-                // 5. Construct New Order
-                // Remove moving items from the "old" list (currentGroupMembers is already filtered)
-                // Sort currentGroupMembers by their *current* visual position to ensure stability
                 currentGroupMembers.sort((a, b) => (a.y - b.y) || (a.x - b.x))
-
-                // Insert moving items at targetIndex
                 const finalMembers = [...currentGroupMembers]
-                // Clamp index
                 const safeIndex = Math.min(targetIndex, finalMembers.length)
                 finalMembers.splice(safeIndex, 0, ...movingItems)
 
-                // 6. Apply Reflow (Masonry)
-                const groupX = groupConfig?.x ?? (minX - 20) // Use existing group X or derived
-                const groupY = groupConfig?.y ?? (minY - 50)
+                const groupX = groupConfig?.x ?? (minX - PADDING)
+                const groupY = groupConfig?.y ?? (minY - HEADER_HEIGHT)
                 const currentGroupW = groupConfig?.w || 360
 
                 const layoutedMembers = layoutGroupItemsMasonry(finalMembers, currentGroupW)
 
-                // Update items with absolute coordinates relative to Group Origin
                 layoutedMembers.forEach(m => {
                     const matchIdx = newItems.findIndex(ni => ni.id === m.id)
                     if (matchIdx > -1) {
                         newItems[matchIdx] = {
                             ...newItems[matchIdx],
-                            x: groupX + 20 + m.x, // Offset from border
-                            y: groupY + 50 + m.y, // Offset from header
+                            x: groupX + PADDING + m.x,
+                            y: groupY + HEADER_HEIGHT + m.y,
                             groupId: destinationGroupId
                         }
                     }
                 })
 
-                // Update Group Position/Size if needed (e.g. height auto-expand?)
-                // For now, fixed width, auto height?
-                // The prompt says "Group border is resizable". So we respect W/H.
-                // But if items overflow?
-                // Let's just layout.
+                const sourceGroupIds = new Set()
+                currentItems.forEach(i => {
+                    if (draggedIds.includes(i.id) && i.groupId) {
+                        sourceGroupIds.add(i.groupId)
+                    }
+                })
+                if (destinationGroupId) sourceGroupIds.add(destinationGroupId)
 
-                // Sync Group Logic: If we moved items, we need to ensure the Group Object (in 'groups' state)
-                // has the correct X/Y if we want the border to follow.
-                // But here we set items relative to `groupX`. 
-                // If `groupConfig` existed, `groupX` is its `x`. So items snap to Group.
-                // If `groupConfig` didn't exist (New Group), we derived `groupX`.
-
-                return newItems
+                let itemsWithReflow = [...newItems]
+                sourceGroupIds.forEach(gid => {
+                    const group = groups.find(g => g.id === gid)
+                    const members = itemsWithReflow.filter(i => i.groupId === gid)
+                    if (members.length > 0) {
+                        const width = group?.w || 360
+                        const packed = layoutGroupItemsMasonry(members, width)
+                        const gX = group?.x ?? 0
+                        const gY = group?.y ?? 0
+                        packed.forEach(p => {
+                            const idx = itemsWithReflow.findIndex(n => n.id === p.id)
+                            if (idx > -1) {
+                                itemsWithReflow[idx] = {
+                                    ...itemsWithReflow[idx],
+                                    x: gX + PADDING + p.x,
+                                    y: gY + HEADER_HEIGHT + p.y
+                                }
+                            }
+                        })
+                    }
+                })
+                return itemsWithReflow
             })
+
+            setTimeout(() => { syncGroupBounds() }, 50)
         }
 
-        if (dragItems.size > 0) {
-            const movedGroups = new Set<string>()
-            dragItems.forEach((_, id) => {
-                const item = items.find(i => i.id === id)
-                if (item?.groupId) movedGroups.add(item.groupId)
-            })
-
-            if (movedGroups.size > 0) {
-                // Calculate new bounds for affected groups
-                // We need to access the NEW items state. 
-                // We can't access it synchronously here after setItems.
-                // But we know the delta? Or we can use functional update.
-                // Functional update on `setGroups`?
-                // But we need `items` from `setItems` result.
-                // This is tricky.
-
-                // Alternative: Run a separate useEffect or timeout?
-                // Let's use setTimeout to allow state to settle, then sync groups.
-
-                setTimeout(() => {
-                    setGroups(prevGroups => prevGroups.map(g => {
-                        if (movedGroups.has(g.id)) {
-                            // Find current items for this group (from REF or by reading state if updated?)
-                            // State might not be updated yet in this closure?
-                            // But inside setTimeout/setGroups functional update, we can't access *new* items easily.
-                            // Actually, let's use the `items` Ref if we had one.
-
-                            // Better: In `setItems` above, we calculated everything.
-                            // We just need to know the bounds.
-                        }
-                        return g
-                    }))
-
-                    // Force re-sync of all groups bounds based on items
-                    setGroups(currentGroups => currentGroups.map(g => {
-                        // This relies on `items` potentially being stale in this closure?
-                        // No, we need fresh items.
-
-                        // We can't easily get fresh items here.
-                        // Let's trigger a re-sync via a flag?
-                        return g
-                    }))
-                }, 0)
-
-                // Revised approach:
-                // We just rely on the existing "Auto-Create/Update" logic? 
-                // Or we manually calculate delta and apply to group.
-
-                const firstId = Array.from(dragItems.keys())[0]
-                const firstItem = items.find(i => i.id === firstId)
-                const draggingState = dragItems.get(firstId)
-
-                if (firstItem && draggingState && firstItem.groupId) {
-                    const dx = (lastPos.current.x - draggingState.startX) / scale // Approximate? No.
-                    // We don't have accurate total delta here easily except via Item comparison.
-                }
-            }
-        }
-
-        // Final Fix:
-        // We will add a `useEffect` that updates Group Bounds whenever Items change?
-        // But we don't want to loop/jitter.
-        // Only if we detect a discrepancy?
-        // Let's add a "Sync Groups" function that we call here.
-        setTimeout(syncGroupBounds, 50)
-
-        // Selection Box Finalize
         if (selectionBox) {
             const container = containerRef.current
             if (container) {
-                // Calc intersection
-                const rect = container.getBoundingClientRect()
-                // Convert selection box to world coords
-                const sbX = (selectionBox.startX - pan.x) / scale // World X start ?? No.
-                // selectionBox stores client relative to container
-                // We need world coords of the box
                 const x1 = Math.min(selectionBox.startX, selectionBox.currentX)
                 const x2 = Math.max(selectionBox.startX, selectionBox.currentX)
                 const y1 = Math.min(selectionBox.startY, selectionBox.currentY)
                 const y2 = Math.max(selectionBox.startY, selectionBox.currentY)
 
-                // World bounds
                 const wx1 = x1 / scale - pan.x / scale
                 const wx2 = x2 / scale - pan.x / scale
                 const wy1 = y1 / scale - pan.y / scale
                 const wy2 = y2 / scale - pan.y / scale
 
                 const newSelected = new Set(selectedIds)
-                items.forEach((item: BoardItem) => {
-                    // Check intersection
+                items.forEach((item) => {
                     if (item.x < wx2 && item.x + item.w > wx1 && item.y < wy2 && item.y + item.h > wy1) {
                         newSelected.add(item.id)
                     }
@@ -1755,18 +1592,18 @@ export default function MindBoardClient() {
         setIsPanning(false)
         isPanningRef.current = false
         setDragItems(new Map())
-        setDraggingGroup(null) // Reset dragging group state
+        setDraggingGroup(null)
         setResizeItem(null)
         setSelectionBox(null)
         lastTouchDistance.current = null
         setTimeout(() => { hasMoved.current = false }, 50)
+
         if (autoPanFrame.current) {
             cancelAnimationFrame(autoPanFrame.current)
             autoPanFrame.current = 0
         }
         autoPanVelocity.current = { x: 0, y: 0 }
-    }, [dragItems, selectionBox, items, pan, scale, selectedIds, updateAutoPan, draggingGroup])
-
+    }, [dragItems, selectionBox, items, pan, scale, selectedIds, updateAutoPan, draggingGroup, groups, syncGroupBounds])
     // --- Events Sync ---
     useEffect(() => {
         const handleMouseMove = (e: MouseEvent) => handleMove(e)
@@ -1776,13 +1613,11 @@ export default function MindBoardClient() {
             finalizeInteraction()
             setIsMinimapDragging(false)
             minimapDragState.current = null
-            setResizeGroup(null) // End group resize
         }
         const handleTouchEnd = () => {
             finalizeInteraction()
             setIsMinimapDragging(false)
             minimapDragState.current = null
-            setResizeGroup(null) // End group resize
         }
 
         window.addEventListener('mousemove', handleMouseMove)
@@ -2113,16 +1948,6 @@ export default function MindBoardClient() {
                         </div>
                     </div>
 
-                    {/* Resize Handle */}
-                    <div
-                        className="absolute bottom-0 right-0 w-6 h-6 cursor-nwse-resize pointer-events-auto flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                        onMouseDown={(e) => {
-                            e.stopPropagation()
-                            startGroupResize(e.clientX, e.clientY, group.id)
-                        }}
-                    >
-                        <div className="w-3 h-3 border-r-2 border-b-2 border-slate-400"></div>
-                    </div>
                 </div>
             )
         })
