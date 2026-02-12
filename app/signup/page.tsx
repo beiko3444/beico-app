@@ -167,7 +167,7 @@ export default function SignupPage() {
                     {/* Password */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> パ스워드 / Password
+                            <span className="text-[#e34219]">*</span> パスワード / Password
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
