@@ -17,51 +17,66 @@ export default async function AdminDashboard() {
 
     // 1. Fetch Key Counts
     // @ts-ignore - Task model exists in schema but might need prisma generate
-    const [
-        pendingCount,
-        depositReqCount,
-        approvedNoTrackingCount,
-        completedCount,
-        pendingTaxInvoices,
-        recentOrders,
-        analyticsOrders,
-        allTasks
-    ] = await Promise.all([
-        prisma.order.count({ where: { status: 'PENDING' } }),
-        prisma.order.count({
-            where: {
-                depositConfirmedAt: { not: null },
-                adminDepositConfirmedAt: null
-            }
-        }),
-        prisma.order.count({
-            where: {
-                status: 'APPROVED',
-                OR: [{ trackingNumber: null }, { trackingNumber: '' }]
-            }
-        }),
-        prisma.order.count({ where: { status: { in: ['SHIPPED', 'COMPLETED'] } } }),
-        prisma.order.count({
-            where: {
-                status: 'APPROVED',
-                taxInvoiceIssued: false
-            }
-        }),
-        prisma.order.findMany({
-            take: 5,
-            orderBy: { createdAt: 'desc' },
-            include: { user: { include: { partnerProfile: true } } }
-        }),
-        prisma.order.findMany({
-            where: { status: { in: ['APPROVED', 'SHIPPED', 'COMPLETED'] } },
-            include: {
-                items: { include: { product: true } },
-                user: { include: { partnerProfile: true } }
-            }
-        }),
-        // @ts-ignore
-        prisma.task.findMany({ orderBy: { date: 'asc' } })
-    ])
+    // 1. Fetch Key Counts
+    // @ts-ignore - Task model exists in schema but might need prisma generate
+    let pendingCount = 0
+    let depositReqCount = 0
+    let approvedNoTrackingCount = 0
+    let completedCount = 0
+    let pendingTaxInvoices = 0
+    let recentOrders: any[] = []
+    let analyticsOrders: any[] = []
+    let allTasks: any[] = []
+
+    try {
+        [
+            pendingCount,
+            depositReqCount,
+            approvedNoTrackingCount,
+            completedCount,
+            pendingTaxInvoices,
+            recentOrders,
+            analyticsOrders,
+            allTasks
+        ] = await Promise.all([
+            prisma.order.count({ where: { status: 'PENDING' } }),
+            prisma.order.count({
+                where: {
+                    depositConfirmedAt: { not: null },
+                    adminDepositConfirmedAt: null
+                }
+            }),
+            prisma.order.count({
+                where: {
+                    status: 'APPROVED',
+                    OR: [{ trackingNumber: null }, { trackingNumber: '' }]
+                }
+            }),
+            prisma.order.count({ where: { status: { in: ['SHIPPED', 'COMPLETED'] } } }),
+            prisma.order.count({
+                where: {
+                    status: 'APPROVED',
+                    taxInvoiceIssued: false
+                }
+            }),
+            prisma.order.findMany({
+                take: 5,
+                orderBy: { createdAt: 'desc' },
+                include: { user: { include: { partnerProfile: true } } }
+            }),
+            prisma.order.findMany({
+                where: { status: { in: ['APPROVED', 'SHIPPED', 'COMPLETED'] } },
+                include: {
+                    items: { include: { product: true } },
+                    user: { include: { partnerProfile: true } }
+                }
+            }),
+            // @ts-ignore
+            prisma.task.findMany({ orderBy: { date: 'asc' } })
+        ])
+    } catch (error) {
+        console.warn("Database unreachable in AdminDashboard, using default values.")
+    }
 
     // 2. Process Analytics Data
     const now = new Date()

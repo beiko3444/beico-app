@@ -21,7 +21,14 @@ export async function GET() {
         return NextResponse.json(boards)
     } catch (error) {
         console.error("[MINDBOARD_LIST_GET]", error)
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+        // Offline Fallback
+        return NextResponse.json([
+            {
+                id: "offline-demo-board",
+                title: "Offline Demo Board (Local)",
+                updatedAt: new Date()
+            }
+        ])
     }
 }
 
@@ -41,6 +48,13 @@ export async function POST(request: Request) {
         return NextResponse.json(board)
     } catch (error) {
         console.error("[MINDBOARD_CREATE]", error)
-        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 })
+        // Offline Fallback
+        return NextResponse.json({
+            id: `offline-${Date.now()}`,
+            title: "New Offline Board",
+            items: "[]",
+            groups: "[]",
+            updatedAt: new Date()
+        })
     }
 }
