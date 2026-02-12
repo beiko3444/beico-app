@@ -18,25 +18,36 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
 
     const handleDownloadJPG = async () => {
         const element = document.getElementById('invoice-content')
-        if (!element) return
+        if (!element) {
+            alert('Cannot find invoice content.')
+            return
+        }
 
         setIsDownloading(true)
         try {
-            const canvas = await html2canvas(element, {
-                scale: 2,
-                useCORS: true,
-                logging: false,
-                backgroundColor: '#ffffff'
+            // Dynamic import to ensure client-side execution
+            const { toPng } = await import('html-to-image')
+
+            // Use toPng first as it handles transparency and blend modes better
+            const dataUrl = await toPng(element, {
+                quality: 1.0,
+                backgroundColor: '#ffffff',
+                width: element.offsetWidth,
+                height: element.offsetHeight,
+                style: {
+                    margin: '0',
+                    transform: 'none',
+                    boxShadow: 'none'
+                }
             })
 
-            const dataUrl = canvas.toDataURL('image/jpeg', 0.9)
             const link = document.createElement('a')
-            link.download = `Invoice_${orderNumber}.jpg`
+            link.download = `Invoice_${orderNumber}.png` // Changed to PNG for better quality
             link.href = dataUrl
             link.click()
         } catch (error) {
             console.error('Download failed:', error)
-            alert('Download failed.')
+            alert('Failed to download JPG. Please check console for details.')
         } finally {
             setIsDownloading(false)
         }

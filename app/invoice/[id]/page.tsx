@@ -61,7 +61,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
             <style type="text/css" media="print">{`
                 @page { 
                     size: A4; 
-                    margin: 15mm; 
+                    margin: 0; 
                 }
                 body { 
                     margin: 0px; 
@@ -75,10 +75,10 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 .print\\:p-0 { padding: 0 !important; }
             `}</style>
 
-            <div id="invoice-content" className="w-[210mm] min-h-[297mm] mx-auto bg-white p-[15mm] pb-[5mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
+            <div id="invoice-content" className="w-[210mm] h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[5mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
 
                 {/* Formal Header */}
-                <div className="text-center mb-1 border-b-4 border-black pb-2">
+                <div className="text-center mb-4 border-b-4 border-black pb-2">
                     <h1 className="text-2xl font-extrabold tracking-[0.2em] mb-1 uppercase">取引明細書 / 거 래 명 세 표</h1>
                     <div className="flex justify-between items-end mt-2 text-xs">
                         <div className="text-left space-y-1">
@@ -93,7 +93,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 </div>
 
                 {/* Info Section - Traditional Box Style */}
-                <div className="grid grid-cols-2 gap-0 mb-1">
+                <div className="grid grid-cols-2 gap-0 mb-2">
                     {/* Recipient Side */}
                     <div className="border-r border-black p-4 py-1">
                         <div className="mb-2 flex justify-between items-center">
@@ -109,20 +109,20 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">商号<br />상 호</td>
-                                    <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.businessName || order.user.name} 殿/귀하</td>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold">{order.user.partnerProfile?.businessName || order.user.name} 殿/귀하</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">代表者<br />대 표 자</td>
-                                    <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.representativeName || order.user.name}</td>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表자<br />대 표 자</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold">{order.user.partnerProfile?.representativeName || order.user.name}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">住所<br />주 소</td>
-                                    <td className="py-1.5 px-2 text-xs leading-tight">{order.user.partnerProfile?.address || '-'}</td>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td className="py-1.5 px-2 text-xs leading-tight font-bold">{order.user.partnerProfile?.address || '-'}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">電話番号<br />전화번호</td>
-                                    <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.contact || '-'}</td>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold">{order.user.partnerProfile?.contact || '-'}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -135,10 +135,6 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                 <span className="text-[10px] font-bold text-gray-500 leading-none">供給者</span>
                                 <div className="flex items-center gap-1 relative">
                                     <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급자</span>
-                                    {/* Seal overlapping title - Increased size & moved right */}
-                                    <div className="absolute left-[80px] -top-12 pointer-events-none z-10">
-                                        <img src="/bko.png" alt="Seal" className="w-[182px] h-auto opacity-100 contrast-125 select-none mix-blend-multiply" />
-                                    </div>
                                 </div>
                             </div>
                             <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold">
@@ -149,30 +145,38 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">商号<br />상 호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold">엑스트래커</td>
-                                </tr>
-                                <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">代表者<br />대 표 자</td>
-                                    <td className="py-1.5 px-2 text-xs relative font-bold">
-                                        이다빈
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold border-r border-black">엑스트래커</td>
+                                    <td rowSpan={2} className="w-20 relative p-0 overflow-hidden text-center align-middle bg-white">
+                                        {/* Background text (underneath) */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <span className="text-[14px] text-gray-300 font-black opacity-30">(印)</span>
+                                        </div>
+                                        {/* Seal image (on top) */}
+                                        <div className="absolute inset-0 flex items-center justify-center z-10">
+                                            <img src="/bko.png" alt="Seal" style={{ width: '60px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
+                                        </div>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">住所<br />주 소</td>
-                                    <td className="py-1.5 px-2 text-[10px] leading-tight font-medium">부산시 강서구 낙동남로 1013번길 35</td>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold border-r border-black">이다빈</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">電話番号<br />전화번호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold">010-8119-3313</td>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td colSpan={2} className="py-1.5 px-2 text-xs leading-tight font-bold">부산시 강서구 낙동남로 1013번길 35</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
+                                    <td colSpan={2} className="py-1.5 px-2 text-xs font-bold">010-8119-3313</td>
                                 </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* Item List Table & Total Summary Container */}
-                <div className="flex-grow">
+                {/* Item List Table & Total Summary Container - Removed flex-grow to close gap */}
+                <div className="">
                     <table className="w-full border-collapse border-y-2 border-black text-[10px]">
                         <thead className="bg-gray-100 border-b border-black">
                             <tr className="text-center font-bold text-[10px]">
@@ -193,16 +197,16 @@ export default async function InvoicePage({ params }: { params: { id: string } }
 
                                 return (
                                     <tr key={item.id} className="text-center h-7 text-[9px]">
-                                        <td className="border-x border-black py-0.5 text-gray-500">{index + 1}</td>
+                                        <td className="border-x border-black py-0.5 text-gray-500 font-inter">{index + 1}</td>
                                         <td className="border-x border-black py-0.5 px-2 text-left leading-tight">
                                             <span className="font-bold text-[10px] block">{item.product.nameJP || item.product.name}</span>
                                             <span className="text-[9px] text-gray-600 block">{item.product.name}</span>
                                         </td>
-                                        <td className="border-x border-black py-0.5">{item.quantity.toLocaleString()}</td>
-                                        <td className="border-x border-black py-0.5 px-1 text-right">{item.price.toLocaleString()}</td>
-                                        <td className="border-x border-black py-0.5 px-1 text-right">{itemSupply.toLocaleString()}</td>
-                                        <td className="border-x border-black py-0.5 px-1 text-right">{itemTax.toLocaleString()}</td>
-                                        <td className="border-x border-black py-0.5 px-1 text-right font-bold bg-gray-50/30">{itemTotal.toLocaleString()}</td>
+                                        <td className="border-x border-black py-0.5 font-inter">{item.quantity.toLocaleString()}</td>
+                                        <td className="border-x border-black py-0.5 px-1 text-right font-inter">{item.price.toLocaleString()}</td>
+                                        <td className="border-x border-black py-0.5 px-1 text-right font-inter">{itemSupply.toLocaleString()}</td>
+                                        <td className="border-x border-black py-0.5 px-1 text-right font-inter">{itemTax.toLocaleString()}</td>
+                                        <td className="border-x border-black py-0.5 px-1 text-right font-bold bg-gray-50/30 font-inter">{itemTotal.toLocaleString()}</td>
                                     </tr>
                                 )
                             })}
@@ -210,29 +214,29 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                             {/* Shipping Fee */}
                             {shippingFee > 0 && (
                                 <tr className="text-center h-7 text-[9px]">
-                                    <td className="border-x border-black py-0.5 text-gray-500">-</td>
+                                    <td className="border-x border-black py-0.5 text-gray-500 font-inter">-</td>
                                     <td className="border-x border-black py-0.5 px-2 text-left">
                                         <span className="font-bold text-[10px] block">送料</span>
                                         <span className="text-[9px] text-gray-600 block">배송비 (Shipping)</span>
                                     </td>
-                                    <td className="border-x border-black py-0.5">{Math.ceil(totalQuantity / 100)}</td>
-                                    <td className="border-x border-black py-0.5 px-1 text-right">3,000</td>
-                                    <td className="border-x border-black py-0.5 px-1 text-right">{shippingFee.toLocaleString()}</td>
-                                    <td className="border-x border-black py-0.5 px-1 text-right">{Math.round(shippingFee * 0.1).toLocaleString()}</td>
-                                    <td className="border-x border-black py-0.5 px-1 text-right font-bold bg-gray-50/30">{Math.round(shippingFee * 1.1).toLocaleString()}</td>
+                                    <td className="border-x border-black py-0.5 font-inter">{Math.ceil(totalQuantity / 100)}</td>
+                                    <td className="border-x border-black py-0.5 px-1 text-right font-inter">3,000</td>
+                                    <td className="border-x border-black py-0.5 px-1 text-right font-inter">{shippingFee.toLocaleString()}</td>
+                                    <td className="border-x border-black py-0.5 px-1 text-right font-inter">{Math.round(shippingFee * 0.1).toLocaleString()}</td>
+                                    <td className="border-x border-black py-0.5 px-1 text-right font-bold bg-gray-50/30 font-inter">{Math.round(shippingFee * 1.1).toLocaleString()}</td>
                                 </tr>
                             )}
 
-                            {/* Blank Rows */}
-                            {[...Array(Math.max(0, 10 - order.items.length - (shippingFee > 0 ? 1 : 0)))].map((_, i) => (
-                                <tr key={`blank-${i}`} className="h-8">
-                                    <td className="border-x border-black p-2"></td>
-                                    <td className="border-x border-black p-2"></td>
-                                    <td className="border-x border-black p-2"></td>
-                                    <td className="border-x border-black p-2"></td>
-                                    <td className="border-x border-black p-2"></td>
-                                    <td className="border-x border-black p-2"></td>
-                                    <td className="border-x border-black p-2 font-bold bg-gray-50/30"></td>
+                            {/* Blank Rows - Reduced count and height to fit 1 page */}
+                            {[...Array(Math.max(0, 5 - order.items.length - (shippingFee > 0 ? 1 : 0)))].map((_, i) => (
+                                <tr key={`blank-${i}`} className="h-3">
+                                    <td className="border-x border-black py-0.5"></td>
+                                    <td className="border-x border-black py-0.5"></td>
+                                    <td className="border-x border-black py-0.5"></td>
+                                    <td className="border-x border-black py-0.5"></td>
+                                    <td className="border-x border-black py-0.5"></td>
+                                    <td className="border-x border-black py-0.5"></td>
+                                    <td className="border-x border-black py-0.5 font-bold bg-gray-50/30"></td>
                                 </tr>
                             ))}
                         </tbody>
@@ -248,8 +252,8 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         </tfoot>
                     </table>
 
-                    {/* Total Summary Bar - Moved Below Table */}
-                    <div className="flex border-4 border-black mt-4 items-center">
+                    {/* Total Summary Bar - Reduced margin */}
+                    <div className="flex border-4 border-black mt-2 items-center">
                         <div className="text-black border-r-4 border-black px-6 py-3 font-extrabold text-center w-48 text-sm leading-tight">
                             合計金額<br />합계금액
                         </div>
@@ -259,8 +263,8 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                     </div>
                 </div>
 
-                {/* Footer Section */}
-                <div className="mt-2 border-t border-black pt-2 flex justify-between items-start">
+                {/* Footer Section - Removed margin */}
+                <div className="border-t border-black pt-2 flex justify-between items-start">
                     <div className="space-y-4">
                         <div>
                             <p className="font-bold text-xs mb-2 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">お支払い情報 / 입금 계좌 정보</p>
