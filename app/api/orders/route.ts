@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { sendOrderNotification } from "@/lib/notification"
 
 export async function POST(request: Request) {
     try {
@@ -18,7 +19,7 @@ export async function POST(request: Request) {
         }
 
         // Transaction to create order and update stock
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: any) => {
             // 1. Verify stock for all items first
             for (const item of items) {
                 const product = await tx.product.findUnique({ where: { id: item.productId } })
@@ -82,6 +83,14 @@ export async function POST(request: Request) {
                 },
                 include: { items: true }
             })
+
+            // 5. Trigger Notification (Async, don't block response)
+            sendOrderNotification({
+                orderNumber: order.orderNumber,
+                total: order.total,
+                itemsCount: order.items.length,
+                customerName: session.user.name || session.user.email || '고객'
+            }).catch(err => console.error("Notification trigger error:", err));
 
             return order
         })
