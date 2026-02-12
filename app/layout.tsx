@@ -53,7 +53,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="ja" suppressHydrationWarning>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${notoSansJP.variable} ${inter.variable} font-sans antialiased`}
         suppressHydrationWarning
@@ -62,4 +62,4 @@ export default function RootLayout({
       </body>
     </html>
   );
-}
+}\n
