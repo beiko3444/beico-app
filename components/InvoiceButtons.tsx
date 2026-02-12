@@ -47,10 +47,13 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
             if (e.key === 'Enter') {
                 handlePrint()
             }
+            if (e.key === 'Escape') {
+                router.back()
+            }
         };
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, []);
+    }, [router]);
 
     return (
         <div className="mt-8 mb-20 text-center flex flex-col items-center gap-4 print:hidden">
