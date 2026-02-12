@@ -989,23 +989,19 @@ export default function MindBoardClient() {
             const dy = (clientY - first.startY) / scale
             if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
 
-            // Correct Grid Snapping: Snap the DELTA, not individual items, to keep relative positions
-            const snapDx = Math.round(dx / GRID_SIZE) * GRID_SIZE
-            const snapDy = Math.round(dy / GRID_SIZE) * GRID_SIZE
+            if (Math.abs(dx) > 2 || Math.abs(dy) > 2) hasMoved.current = true
 
+            // Smooth Drag: Do NOT snap to grid during move. Snap only on drop.
             setItems(prev => prev.map(item => {
                 const state = dragItems.get(item.id)
                 if (state) {
-                    // Strict Snapping: Calculate absolute position first, then snap
                     const rawX = state.initialX + dx
                     const rawY = state.initialY + dy
-                    const snappedX = Math.round(rawX / GRID_SIZE) * GRID_SIZE
-                    const snappedY = Math.round(rawY / GRID_SIZE) * GRID_SIZE
 
                     return {
                         ...item,
-                        x: snappedX,
-                        y: snappedY
+                        x: rawX, // Smooth movement
+                        y: rawY
                     }
                 }
                 return item
@@ -1190,8 +1186,19 @@ export default function MindBoardClient() {
 
     const finalizeInteraction = useCallback(() => {
         if (dragItems.size > 0 || resizeItem) {
-            // We should have saved history at startDrag/startResize.
-            // But valid drag check?
+            // Snap to Grid on Drop
+            setItems(prev => prev.map(item => {
+                if (dragItems.has(item.id) || (resizeItem && resizeItem.id === item.id)) {
+                    return {
+                        ...item,
+                        x: Math.round(item.x / GRID_SIZE) * GRID_SIZE,
+                        y: Math.round(item.y / GRID_SIZE) * GRID_SIZE,
+                        w: Math.round(item.w / GRID_SIZE) * GRID_SIZE,
+                        h: Math.round(item.h / GRID_SIZE) * GRID_SIZE
+                    }
+                }
+                return item
+            }))
         }
 
         // Grouping Logic on Drop
@@ -1959,29 +1966,7 @@ export default function MindBoardClient() {
                             {/* Calendar Icon - Top Left - REMOVED */}
 
 
-                            <div className="flex-1 p-5 flex flex-col overflow-hidden relative" onDoubleClick={(e) => { e.stopPropagation(); setEditingId(item.id) }}>
-                                {editingId === item.id ? (
-                                    <textarea
-                                        autoFocus
-                                        className="w-full h-full bg-transparent resize-none outline-none text-slate-800 font-medium text-lg leading-relaxed placeholder-slate-400"
-                                        value={item.content}
-                                        onChange={(e) => {
-                                            const val = e.target.value
-                                            setItems(prev => prev.map(i => i.id === item.id ? { ...i, content: val } : i))
-                                        }}
-                                        onBlur={() => setEditingId(null)}
-                                        onKeyDown={(e) => e.stopPropagation()}
-                                        placeholder="Type something..."
-                                    />
-                                ) : (
-                                    <div className="whitespace-pre-wrap text-slate-800 font-medium text-lg leading-relaxed break-words select-none">
-                                        {item.content || <span className="text-slate-400 italic">Empty note...</span>}
-                                        {item.completed && <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl"><CheckCircle2 className="text-green-500 w-12 h-12" /></div>}
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="h-10 px-4 border-t border-black/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 rounded-b-2xl">
+                            <div className="h-10 px-4 border-b border-black/5 flex items-center justify-between bg-black/5 rounded-t-2xl">
                                 <div className="flex gap-2">
                                     <button
                                         onClick={(e) => {
@@ -2006,6 +1991,28 @@ export default function MindBoardClient() {
                                         <X size={14} />
                                     </button>
                                 </div>
+                            </div>
+
+                            <div className="flex-1 p-5 flex flex-col overflow-hidden relative" onDoubleClick={(e) => { e.stopPropagation(); setEditingId(item.id) }}>
+                                {editingId === item.id ? (
+                                    <textarea
+                                        autoFocus
+                                        className="w-full h-full bg-transparent resize-none outline-none text-slate-800 font-medium text-lg leading-relaxed placeholder-slate-400"
+                                        value={item.content}
+                                        onChange={(e) => {
+                                            const val = e.target.value
+                                            setItems(prev => prev.map(i => i.id === item.id ? { ...i, content: val } : i))
+                                        }}
+                                        onBlur={() => setEditingId(null)}
+                                        onKeyDown={(e) => e.stopPropagation()}
+                                        placeholder="Type something..."
+                                    />
+                                ) : (
+                                    <div className="whitespace-pre-wrap text-slate-800 font-medium text-lg leading-relaxed break-words select-none">
+                                        {item.content || <span className="text-slate-400 italic">Empty note...</span>}
+                                        {item.completed && <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl"><CheckCircle2 className="text-green-500 w-12 h-12" /></div>}
+                                    </div>
+                                )}
                             </div>
 
                             {/* Color Palette Popover */}
