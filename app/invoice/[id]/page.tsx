@@ -82,10 +82,11 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                     <h1 className="text-2xl font-extrabold tracking-[0.2em] mb-2 uppercase">取引明細書 / 거 래 명 세 표</h1>
                     <div className="flex justify-between items-end mt-6 text-xs">
                         <div className="text-left space-y-1">
-                            <p>주문번호: <span className="font-bold">{displayOrderNumber}</span></p>
-                            <p>발행일자: <span className="font-bold">{formattedDate.split(' ')[0]} {formattedDate.split(' ')[1]} {formattedDate.split(' ')[2]}</span></p>
+                            <p>注文番号 (주문번호): <span className="font-bold">{displayOrderNumber}</span></p>
+                            <p>発行日 (발행일자): <span className="font-bold">{formattedDate.split(' ')[0]} {formattedDate.split(' ')[1]} {formattedDate.split(' ')[2]}</span></p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right font-medium">
+                            <p className="text-xs text-gray-500">(貴社の益々のご清栄をお祈り申し上げます)</p>
                             <p className="text-xs text-gray-500">(귀하의 일익 번창을 기원합니다)</p>
                         </div>
                     </div>
@@ -96,28 +97,31 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                     {/* Recipient Side */}
                     <div className="border-r border-black p-4">
                         <div className="mb-4 flex justify-between items-center">
-                            <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급받는자</span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-500 leading-none">供給先</span>
+                                <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급받는자</span>
+                            </div>
                             <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold">
-                                <span>등록번호:</span>
+                                <span>登録番号 / 등록번호:</span>
                                 <span>{order.user.partnerProfile?.businessRegNumber || '-'}</span>
                             </div>
                         </div>
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">상 호</td>
-                                    <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.businessName || order.user.name} 귀하</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">商号<br />상 호</td>
+                                    <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.businessName || order.user.name} 殿/귀하</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">대 표 자</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">代表者<br />대 표 자</td>
                                     <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.representativeName || order.user.name}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">주 소</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">住所<br />주 소</td>
                                     <td className="py-1.5 px-2 text-xs leading-tight">{order.user.partnerProfile?.address || '-'}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">전화번호</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">電話番号<br />전화번호</td>
                                     <td className="py-1.5 px-2 text-xs">{order.user.partnerProfile?.contact || '-'}</td>
                                 </tr>
                             </tbody>
@@ -127,31 +131,34 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                     {/* Supplier Side */}
                     <div className="p-4 bg-gray-50/50">
                         <div className="mb-4 flex justify-between items-center">
-                            <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급자</span>
-                            <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold">
-                                <span>등록번호:</span>
-                                <span>123-45-67890</span>
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-500 leading-none">供給者</span>
+                                <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급자</span>
+                            </div>
+                            <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold font-inter">
+                                <span>登録番号 / 등록번호:</span>
+                                <span>329-03-01798</span>
                             </div>
                         </div>
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">상 호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold">XTracker (엑스트래커)</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">商号<br />상 호</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold">엑스트래커</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">대 표 자</td>
-                                    <td className="py-1.5 px-2 text-xs relative">
-                                        Idabin (이다빈)
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">代表者<br />대 표 자</td>
+                                    <td className="py-1.5 px-2 text-xs relative font-bold">
+                                        이다빈
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">주 소</td>
-                                    <td className="py-1.5 px-2 text-xs leading-tight">부산시 강서구 낙동남로 1013번길 35</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">住所<br />주 소</td>
+                                    <td className="py-1.5 px-2 text-[10px] leading-tight font-medium">부산시 강서구 낙동남로 1013번길 35</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">전화번호</td>
-                                    <td className="py-1.5 px-2 text-xs">010-8119-3313</td>
+                                    <td className="py-1.5 px-2 font-bold w-20 border-r border-black text-[10px] leading-tight text-center">電話番号<br />전화번호</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold font-inter">010-8119-3313</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -162,14 +169,14 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 <div className="flex-grow">
                     <table className="w-full border-collapse border-y-2 border-black text-xs">
                         <thead className="bg-gray-100 border-b border-black">
-                            <tr className="text-center font-bold">
-                                <th className="border-x border-black p-2 w-10">No</th>
-                                <th className="border-x border-black p-2">품 명 및 규 격</th>
-                                <th className="border-x border-black p-2 w-16">수량</th>
-                                <th className="border-x border-black p-2 w-24">단 가</th>
-                                <th className="border-x border-black p-2 w-24">공급가액</th>
-                                <th className="border-x border-black p-2 w-20">세 액</th>
-                                <th className="border-x border-black p-2 w-24 font-black">합 계</th>
+                            <tr className="text-center font-bold text-[10px]">
+                                <th className="border-x border-black p-2 w-10">No.</th>
+                                <th className="border-x border-black p-2">品名及び規格<br />품 명 및 규 격</th>
+                                <th className="border-x border-black p-2 w-16">数量<br />수량</th>
+                                <th className="border-x border-black p-2 w-24">単価<br />단 가</th>
+                                <th className="border-x border-black p-2 w-24">供給価額<br />공급가액</th>
+                                <th className="border-x border-black p-2 w-20">税額<br />세 액</th>
+                                <th className="border-x border-black p-2 w-24 font-black">合計<br />합 계</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-300">
@@ -180,16 +187,16 @@ export default async function InvoicePage({ params }: { params: { id: string } }
 
                                 return (
                                     <tr key={item.id} className="text-center h-10">
-                                        <td className="border-x border-black p-2 text-gray-500 font-mono">{index + 1}</td>
+                                        <td className="border-x border-black p-2 text-gray-500 font-inter">{index + 1}</td>
                                         <td className="border-x border-black p-2 text-left px-4">
-                                            <span className="font-bold block">{item.product.name}</span>
-                                            {item.product.nameJP && <span className="text-[10px] text-gray-500 block leading-tight">{item.product.nameJP}</span>}
+                                            <span className="font-bold block">{item.product.nameJP || item.product.name}</span>
+                                            {item.product.nameEN && <span className="text-[10px] text-gray-500 block leading-tight">{item.product.nameEN}</span>}
                                         </td>
-                                        <td className="border-x border-black p-2">{item.quantity.toLocaleString()}</td>
-                                        <td className="border-x border-black p-2 text-right">{item.price.toLocaleString()}</td>
-                                        <td className="border-x border-black p-2 text-right">{itemSupply.toLocaleString()}</td>
-                                        <td className="border-x border-black p-2 text-right">{itemTax.toLocaleString()}</td>
-                                        <td className="border-x border-black p-2 text-right font-bold bg-gray-50/30">{itemTotal.toLocaleString()}</td>
+                                        <td className="border-x border-black p-2 font-inter">{item.quantity.toLocaleString()}</td>
+                                        <td className="border-x border-black p-2 text-right font-inter">{item.price.toLocaleString()}</td>
+                                        <td className="border-x border-black p-2 text-right font-inter">{itemSupply.toLocaleString()}</td>
+                                        <td className="border-x border-black p-2 text-right font-inter">{itemTax.toLocaleString()}</td>
+                                        <td className="border-x border-black p-2 text-right font-bold bg-gray-50/30 font-inter">{itemTotal.toLocaleString()}</td>
                                     </tr>
                                 )
                             })}
@@ -199,13 +206,13 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                 <tr className="text-center h-10">
                                     <td className="border-x border-black p-2 text-gray-500">-</td>
                                     <td className="border-x border-black p-2 text-left px-4">
-                                        <span className="text-gray-600">배송비 (Shipping Fee)</span>
+                                        <span className="text-gray-600 font-bold">送料 / 배송비 (Shipping)</span>
                                     </td>
-                                    <td className="border-x border-black p-2">1</td>
-                                    <td className="border-x border-black p-2 text-right">{shippingFee.toLocaleString()}</td>
-                                    <td className="border-x border-black p-2 text-right">{shippingFee.toLocaleString()}</td>
-                                    <td className="border-x border-black p-2 text-right">{Math.round(shippingFee * 0.1).toLocaleString()}</td>
-                                    <td className="border-x border-black p-2 text-right font-bold bg-gray-50/30">{Math.round(shippingFee * 1.1).toLocaleString()}</td>
+                                    <td className="border-x border-black p-2 font-inter">{Math.ceil(totalQuantity / 100)}</td>
+                                    <td className="border-x border-black p-2 text-right font-inter">3,000</td>
+                                    <td className="border-x border-black p-2 text-right font-inter">{shippingFee.toLocaleString()}</td>
+                                    <td className="border-x border-black p-2 text-right font-inter">{Math.round(shippingFee * 0.1).toLocaleString()}</td>
+                                    <td className="border-x border-black p-2 text-right font-bold bg-gray-50/30 font-inter">{Math.round(shippingFee * 1.1).toLocaleString()}</td>
                                 </tr>
                             )}
 
@@ -224,23 +231,23 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         </tbody>
                         <tfoot className="bg-gray-100 border-t-2 border-black font-bold text-center">
                             <tr>
-                                <td colSpan={2} className="border-x border-black p-3">합 계 (TOTAL)</td>
-                                <td className="border-x border-black p-3">{totalQuantity.toLocaleString()}</td>
+                                <td colSpan={2} className="border-x border-black p-3 text-[11px]">合計 (TOTAL / 합 계)</td>
+                                <td className="border-x border-black p-3 font-inter">{totalQuantity.toLocaleString()}</td>
                                 <td className="border-x border-black p-3 bg-gray-200">-</td>
-                                <td className="border-x border-black p-3 text-right">{supplyTotal.toLocaleString()}</td>
-                                <td className="border-x border-black p-3 text-right">{taxTotal.toLocaleString()}</td>
-                                <td className="border-x border-black p-3 text-right bg-gray-200">₩ {grandTotal.toLocaleString()}</td>
+                                <td className="border-x border-black p-3 text-right font-inter">{supplyTotal.toLocaleString()}</td>
+                                <td className="border-x border-black p-3 text-right font-inter">{taxTotal.toLocaleString()}</td>
+                                <td className="border-x border-black p-3 text-right bg-gray-200 font-inter whitespace-nowrap">₩ {grandTotal.toLocaleString()}</td>
                             </tr>
                         </tfoot>
                     </table>
 
                     {/* Total Summary Bar - Moved Below Table */}
                     <div className="flex border-4 border-black mt-10 items-center">
-                        <div className="text-black border-r-4 border-black px-6 py-3 font-extrabold text-center w-40 text-base">
-                            합계금액
+                        <div className="text-black border-r-4 border-black px-6 py-3 font-extrabold text-center w-48 text-sm leading-tight">
+                            合計金額<br />합계금액
                         </div>
-                        <div className="flex-grow px-8 py-3 text-2xl font-black text-right tracking-tight text-black">
-                            ₩ {grandTotal.toLocaleString()} <span className="text-sm font-normal ml-2">(VAT 포함)</span>
+                        <div className="flex-grow px-8 py-3 text-2xl font-black text-right tracking-tight text-black font-inter">
+                            ₩ {grandTotal.toLocaleString()} <span className="text-xs font-normal ml-2 tracking-normal">(VAT 含む / 포함)</span>
                         </div>
                     </div>
                 </div>
@@ -256,16 +263,15 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                 <p><span className="text-gray-500 mr-2 font-normal">名義人 / 예금주:</span> XTRACKER</p>
                             </div>
                         </div>
-                        <div className="text-xs text-gray-500 italic">
-                            * 본 거래명세표는 인장 생략 시에도 유효한 문서입니다.
+                        <div className="text-[10px] text-gray-500 italic">
+                            * 本取引明細書は印影省略時にも有効な文書です. / 본 거래명세표는 인장 생략 시에도 유효한 문서입니다.
                         </div>
                     </div>
-                    <div className="text-right flex flex-col items-end gap-1 relative mt-8">
-                        <div className="absolute right-0 bottom-0 pointer-events-none translate-x-[-100px] translate-y-[25px]">
+                    <div className="text-right flex flex-col items-end gap-1 relative mt-4">
+                        <div className="absolute right-0 bottom-0 pointer-events-none translate-x-[-110px] translate-y-[20px]">
                             <img src="/bko.png" alt="Seal" className="w-[100px] h-auto opacity-100 contrast-125 select-none mix-blend-multiply" />
                         </div>
-                        <p className="text-sm font-bold">엑스트래커 (XTRACKER)</p>
-                        <p className="text-[10px] text-gray-400">Owner: Idabin</p>
+                        <p className="text-sm font-bold">주식회사 베이코</p>
                     </div>
                 </div>
 
