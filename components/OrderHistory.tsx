@@ -225,8 +225,21 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                     {loadingMap[order.id] ? 'Processing...' : (
                                         order.status === 'DEPOSIT_COMPLETED' ? (
                                             <>
-                                                <span className="text-sm md:text-base font-bold">ご入金を確認後、商品を発送いたします.</span>
-                                                <span className="text-[10px] md:text-[11px] font-medium opacity-80">입금확인 후 제품이 발송됩니다.</span>
+                                                {order.trackingNumber ? (
+                                                    <div className="flex flex-col items-center">
+                                                        <span className="text-sm font-black text-[#e34219]">
+                                                            {order.courier === 'Rosen' ? 'Rosen (로젠택배)' :
+                                                                order.courier === 'CJ' ? 'CJ Logistics (CJ대한통운)' :
+                                                                    order.courier === 'Lotte' ? 'Lotte (롯데택배)' : (order.courier || '배송중')}
+                                                        </span>
+                                                        <span className="text-[11px] font-inter font-bold mt-0.5">송장번호: {order.trackingNumber}</span>
+                                                    </div>
+                                                ) : (
+                                                    <>
+                                                        <span className="text-sm md:text-base font-bold">ご入金を確認後、商品を発送いたします.</span>
+                                                        <span className="text-[10px] md:text-[11px] font-medium opacity-80">입금확인 후 제품이 발송됩니다.</span>
+                                                    </>
+                                                )}
                                             </>
                                         ) : (
                                             <>
