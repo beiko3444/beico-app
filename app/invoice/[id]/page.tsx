@@ -79,7 +79,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
 
                 {/* Formal Header */}
                 <div className="text-center mb-10 border-b-4 border-black pb-4">
-                    <h1 className="text-3xl font-extrabold tracking-[0.5em] mb-2 uppercase">거 래 명 세 표</h1>
+                    <h1 className="text-2xl font-extrabold tracking-[0.2em] mb-2 uppercase">取引明細書 / 거 래 명 세 표</h1>
                     <div className="flex justify-between items-end mt-6 text-xs">
                         <div className="text-left space-y-1">
                             <p>주문번호: <span className="font-bold">{displayOrderNumber}</span></p>
@@ -137,21 +137,21 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                             <tbody className="divide-y divide-black">
                                 <tr>
                                     <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">상 호</td>
-                                    <td className="py-1.5 px-2 text-xs">Beico (베이코)</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold">XTracker (엑스트래커)</td>
                                 </tr>
                                 <tr>
                                     <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">대 표 자</td>
                                     <td className="py-1.5 px-2 text-xs relative">
-                                        Kim Beico
+                                        Idabin (이다빈)
                                     </td>
                                 </tr>
                                 <tr>
                                     <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">주 소</td>
-                                    <td className="py-1.5 px-2 text-xs leading-tight">Seoul, Gangnam-gu, Teheran-ro 123</td>
+                                    <td className="py-1.5 px-2 text-xs leading-tight">부산시 강서구 낙동남로 1013번길 35</td>
                                 </tr>
                                 <tr>
                                     <td className="py-1.5 px-2 font-bold w-16 border-r border-black text-xs">전화번호</td>
-                                    <td className="py-1.5 px-2 text-xs">02-1234-5678</td>
+                                    <td className="py-1.5 px-2 text-xs">010-8119-3313</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -249,11 +249,11 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 <div className="mt-10 border-t border-black pt-6 flex justify-between items-start">
                     <div className="space-y-4">
                         <div>
-                            <p className="font-bold text-xs mb-2 underline undecoration-2 underline-offset-4">입금 계좌 정보</p>
-                            <div className="text-xs font-medium">
-                                <p><span className="text-gray-500 mr-2">은행명:</span> 토스뱅크 (Toss Bank)</p>
-                                <p><span className="text-gray-500 mr-2">계좌번호:</span> 1000-0918-2374</p>
-                                <p><span className="text-gray-500 mr-2">예금주:</span> BEIKO (베이코)</p>
+                            <p className="font-bold text-xs mb-2 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">お支払い情報 / 입금 계좌 정보</p>
+                            <div className="text-[11px] font-bold space-y-1">
+                                <p><span className="text-gray-500 mr-2 font-normal">銀行名 / 은행:</span> Woori Bank (우리은행)</p>
+                                <p><span className="text-gray-500 mr-2 font-normal">口座番号 / 계좌:</span> 1005-704-096332</p>
+                                <p><span className="text-gray-500 mr-2 font-normal">名義人 / 예금주:</span> XTRACKER</p>
                             </div>
                         </div>
                         <div className="text-xs text-gray-500 italic">
@@ -264,8 +264,8 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         <div className="absolute right-0 bottom-0 pointer-events-none translate-x-[-100px] translate-y-[25px]">
                             <img src="/bko.png" alt="Seal" className="w-[100px] h-auto opacity-100 contrast-125 select-none mix-blend-multiply" />
                         </div>
-                        <p className="text-sm font-bold">주식회사 베이코</p>
-                        <p className="text-[10px] text-gray-400">BEIKO CORPORATION</p>
+                        <p className="text-sm font-bold">엑스트래커 (XTRACKER)</p>
+                        <p className="text-[10px] text-gray-400">Owner: Idabin</p>
                     </div>
                 </div>
 

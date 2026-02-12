@@ -45,18 +45,25 @@ export async function POST(request: Request) {
             const dd = String(now.getDate()).padStart(2, '0')
             const datePrefix = `${yyyy}${mm}${dd}`
 
-            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
-            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999)
-
-            const countToday = await tx.order.count({
+            const lastOrder = await tx.order.findFirst({
                 where: {
-                    createdAt: {
-                        gte: startOfDay,
-                        lte: endOfDay
+                    orderNumber: {
+                        startsWith: datePrefix
                     }
+                },
+                orderBy: {
+                    orderNumber: 'desc'
                 }
             })
-            const sequence = String(countToday + 1).padStart(3, '0')
+
+            let sequenceNum = 1
+            if (lastOrder && lastOrder.orderNumber) {
+                const lastSeq = parseInt(lastOrder.orderNumber.slice(-3))
+                if (!isNaN(lastSeq)) {
+                    sequenceNum = lastSeq + 1
+                }
+            }
+            const sequence = String(sequenceNum).padStart(3, '0')
             const orderNumber = `${datePrefix}${sequence}`
 
             // 4. Create Order
