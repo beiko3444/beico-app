@@ -93,8 +93,8 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
 
                 const steps = [
                     { label: "注文完了", sub: "주문완료", icon: Check },
-                    { label: "入금대기", sub: "입금대기중", icon: Banknote },
-                    { label: "入금완료", sub: "입금완료", icon: Check },
+                    { label: "入金待ち", sub: "입금대기중", icon: Banknote },
+                    { label: "入金完了", sub: "입금완료", icon: Check },
                     { label: "出荷完了", sub: "배송중", icon: Truck },
                     { label: "請求書発行完了", sub: "계산서발급완료", icon: FileText },
                 ];

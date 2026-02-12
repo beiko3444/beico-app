@@ -82,6 +82,12 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
                 >
                     {isDownloading ? 'Saving...' : 'JPGで保存 / JPG 다운로드'}
                 </button>
+                <button
+                    onClick={() => router.back()}
+                    className="bg-white text-gray-700 border-2 border-gray-200 px-8 py-3 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95"
+                >
+                    閉じる / 닫기
+                </button>
             </div>
             <button
                 onClick={() => router.back()}

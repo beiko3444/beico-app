@@ -96,7 +96,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 <div className="grid grid-cols-2 gap-0 mb-2">
                     {/* Recipient Side */}
                     <div className="border-r border-black p-4 py-1">
-                        <div className="mb-2 flex justify-between items-center">
+                        <div className="mb-1 flex justify-between items-center">
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-bold text-gray-500 leading-none">供給先</span>
                                 <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급받는자</span>
