@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 import { Minus, Plus, ArrowRight } from 'lucide-react'
 
@@ -31,6 +32,7 @@ const BANK_INFO = {
 }
 
 export default function OrderInterface({ products }: { products: Product[] }) {
+    const router = useRouter()
     const [quantities, setQuantities] = useState<Record<string, number>>({})
     const [showSummary, setShowSummary] = useState(false)
 
@@ -323,13 +325,13 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             <p className="text-sm font-bold text-gray-800">{p.nameJP || p.name}</p>
                                             <p className="text-[10px] text-gray-400 mt-0.5">{p.nameEN || p.name} × {quantities[p.id]}</p>
                                         </div>
-                                        <span className="font-bold text-gray-900">{(p.sellPrice * quantities[p.id]).toLocaleString()}円</span>
+                                        <span className="font-bold text-gray-900">₩{(p.sellPrice * quantities[p.id]).toLocaleString()}</span>
                                     </div>
                                 ))}
                                 {shippingFee > 0 && (
                                     <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 mt-2">
                                         <span className="text-sm font-bold text-gray-600">配送料 (Shipping)</span>
-                                        <span className="font-bold text-gray-900">{shippingFee.toLocaleString()}円</span>
+                                        <span className="font-bold text-gray-900">₩{shippingFee.toLocaleString()}</span>
                                     </div>
                                 )}
                             </div>
@@ -337,15 +339,15 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <div className="bg-gray-50 rounded-2xl p-6 space-y-3 mb-8">
                                 <div className="flex justify-between text-sm text-gray-500 font-medium">
                                     <span>供給価額 (Supply)</span>
-                                    <span>{supplyTotal.toLocaleString()}円</span>
+                                    <span>₩{supplyTotal.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-gray-500 font-medium">
                                     <span>消費税 (10%)</span>
-                                    <span>{vat.toLocaleString()}円</span>
+                                    <span>₩{vat.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 mt-2">
                                     <span className="font-bold text-lg text-gray-900">合計金額</span>
-                                    <span className="text-3xl font-black text-[#e34219]">{totalAmount.toLocaleString()}円</span>
+                                    <span className="text-3xl font-black text-[#e34219]">₩{totalAmount.toLocaleString()}</span>
                                 </div>
                             </div>
 
@@ -370,7 +372,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             alert("ご注文ありがとうございます！\nThank you for your order!");
                                             setShowSummary(false);
                                             setQuantities({});
-                                            window.location.reload();
+                                            router.push('/order/history');
                                         } else {
                                             const errorData = await res.json();
                                             alert(`Order Failed: ${errorData.error}`);
