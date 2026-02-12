@@ -32,7 +32,8 @@ export default function SignupPage() {
         businessRegNumber: '',
         address: '',
         addressDetail: '',
-        country: ''
+        country: '',
+        confirmPassword: ''
     })
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -41,6 +42,11 @@ export default function SignupPage() {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target
         let finalValue = value
+
+        // Password matching validation error reset
+        if (name === 'password' || name === 'confirmPassword') {
+            setError('')
+        }
 
         // Auto-format phone number
         if (name === 'contact') {
@@ -70,6 +76,12 @@ export default function SignupPage() {
         e.preventDefault()
         setLoading(true)
         setError('')
+
+        if (formData.password !== formData.confirmPassword) {
+            setError('パスワードが一致しません。 / Passwords do not match.')
+            setLoading(false)
+            return
+        }
 
         try {
             // Combine address and detail address
@@ -155,7 +167,7 @@ export default function SignupPage() {
                     {/* Password */}
                     <div className="space-y-1.5">
                         <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> パスワード / Password
+                            <span className="text-[#e34219]">*</span> パ스워드 / Password
                         </label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
@@ -178,6 +190,35 @@ export default function SignupPage() {
                                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
                         </div>
+                    </div>
+
+                    {/* Confirm Password */}
+                    <div className="space-y-1.5">
+                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <span className="text-[#e34219]">*</span> パスワードの確認 / Confirm Password
+                        </label>
+                        <div className="relative group">
+                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                <Lock size={18} strokeWidth={1.5} />
+                            </div>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                name="confirmPassword"
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                                required
+                                className={`w-full h-12 pl-11 pr-11 bg-white border rounded-lg outline-none transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm ${formData.confirmPassword && formData.password !== formData.confirmPassword
+                                    ? 'border-red-300 focus:border-red-400'
+                                    : 'border-gray-200 focus:border-gray-400'
+                                    }`}
+                                placeholder="••••••••"
+                            />
+                        </div>
+                        {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                            <p className="text-[10px] text-[#e34219] font-bold ml-1 transition-all animate-in fade-in slide-in-from-top-1">
+                                パスワードが一致しません。 / Passwords do not match.
+                            </p>
+                        )}
                     </div>
 
                     {/* Company Name */}

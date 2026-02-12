@@ -198,7 +198,7 @@ export default function LoginPage() {
                 </p>
 
                 <Link href="/signup" className="block w-full">
-                    <button className="w-full h-12 bg-white border-2 border-[#111827] text-[#111827] rounded-lg font-bold text-[14px] hover:bg-[#111827] hover:text-white transition-all tracking-tight shadow-sm leading-normal">
+                    <button className="w-full h-12 bg-[#111827] border-2 border-[#111827] text-white rounded-lg font-bold text-[14px] hover:bg-white hover:text-[#111827] transition-all tracking-tight shadow-sm leading-normal">
                         卸売アカウントの申請 / Apply for Wholesale Account
                     </button>
                 </Link>
