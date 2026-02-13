@@ -100,7 +100,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                 ];
 
                 return (
-                    <div key={order.id} className="bg-white rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md border border-gray-100 mb-8 mx-4 md:mx-0 last:mb-0">
+                    <div key={order.id} className={`bg-white rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md border border-gray-100 mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${order.taxInvoiceIssued ? 'opacity-70 brightness-[0.8] grayscale-[0.2]' : ''}`}>
                         {/* Order No & Date Box */}
                         <div className="bg-white rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
                             <div className="flex flex-col text-sm">
@@ -196,12 +196,12 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                             </div>
                         </div>
 
-                        {order.status !== 'DEPOSIT_COMPLETED' && (
+                        {order.status !== 'DEPOSIT_COMPLETED' && order.status !== 'SHIPPED' && (
                             <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-3 flex items-start gap-3 mb-4 mx-1">
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
                                 <div className="text-xs text-gray-600 flex flex-col gap-1.5">
                                     <p className="leading-relaxed">
-                                        <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください.入金確認後の注文キャンセルはできません.
+                                        <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString()}ウォン</span>を入金後、「入金確認の要請」ボタンを押してください.入金確認後の注文キャンセル는 できません.
                                     </p>
                                     <p className="font-medium leading-relaxed">
                                         합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다.
