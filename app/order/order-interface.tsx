@@ -154,7 +154,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale JP</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                ¥{product.jpBuyPrice.toLocaleString()}
+                                                <span className="text-[0.6em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -163,7 +163,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price JP</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                ¥{product.jpSellPrice.toLocaleString()}
+                                                <span className="text-[0.6em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -174,7 +174,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale KR</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                ₩{product.krBuyPrice.toLocaleString()}
+                                                <span className="text-[0.6em] mr-0.5">₩</span>{product.krBuyPrice.toLocaleString()}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -183,7 +183,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price KR</span>
                                             </div>
                                             <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                ₩{product.krSellPrice.toLocaleString()}
+                                                <span className="text-[0.6em] mr-0.5">₩</span>{product.krSellPrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -285,7 +285,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <span className="text-[8px] font-bold uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
                         </div>
                         <p className="text-4xl font-medium text-[#111827] leading-none font-inter tracking-tighter">
-                            ₩{productTotal.toLocaleString()}
+                            <span className="text-[0.5em] mr-1">₩</span>{productTotal.toLocaleString()}
                         </p>
                     </div>
 
@@ -325,13 +325,13 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             <p className="text-sm font-bold text-gray-800">{p.nameJP || p.name}</p>
                                             <p className="text-[10px] text-gray-400 mt-0.5">{p.nameEN || p.name} × {quantities[p.id]}</p>
                                         </div>
-                                        <span className="font-bold text-gray-900">₩{(p.sellPrice * quantities[p.id]).toLocaleString()}</span>
+                                        <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">₩</span>{(p.sellPrice * quantities[p.id]).toLocaleString()}</span>
                                     </div>
                                 ))}
                                 {shippingFee > 0 && (
                                     <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 mt-2">
                                         <span className="text-sm font-bold text-gray-600">配送料 (Shipping)</span>
-                                        <span className="font-bold text-gray-900">₩{shippingFee.toLocaleString()}</span>
+                                        <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">₩</span>{shippingFee.toLocaleString()}</span>
                                     </div>
                                 )}
                             </div>
@@ -339,15 +339,15 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <div className="bg-gray-50 rounded-2xl p-6 space-y-3 mb-8">
                                 <div className="flex justify-between text-sm text-gray-500 font-medium">
                                     <span>供給価額 (Supply)</span>
-                                    <span>₩{supplyTotal.toLocaleString()}</span>
+                                    <span><span className="text-[0.8em] mr-0.5">₩</span>{supplyTotal.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-gray-500 font-medium">
                                     <span>消費税 (10%)</span>
-                                    <span>₩{vat.toLocaleString()}</span>
+                                    <span><span className="text-[0.8em] mr-0.5">₩</span>{vat.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 mt-2">
                                     <span className="font-bold text-lg text-gray-900">合計金額</span>
-                                    <span className="text-3xl font-black text-[#e34219]">₩{totalAmount.toLocaleString()}</span>
+                                    <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">₩</span>{totalAmount.toLocaleString()}</span>
                                 </div>
                             </div>
 

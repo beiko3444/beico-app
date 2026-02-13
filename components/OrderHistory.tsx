@@ -183,7 +183,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 {/* Separator & Total Amount Details */}
                                 <div className="flex justify-between items-center pt-1.5 pb-0 mt-1 border-t border-gray-100">
                                     <span className="font-bold text-sm text-gray-900 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / 総 合計金額</span>
-                                    <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-sm mr-0.5">₩</span>{totalAmount.toLocaleString()}</span>
+                                    <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-[0.7em] mr-0.5">₩</span>{totalAmount.toLocaleString()}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-gray-400">
                                     <span>供給価額 / 공급가액</span>
@@ -312,11 +312,11 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                             )}
                                             <div className="flex items-end justify-between mt-1">
                                                 <div className="flex items-center gap-2 text-xs leading-tight">
-                                                    <span className="font-bold text-gray-900 font-inter">₩{item.price.toLocaleString()}</span>
+                                                    <span className="font-bold text-gray-900 font-inter"><span className="text-[0.8em] mr-0.5">₩</span>{item.price.toLocaleString()}</span>
                                                     <span className="text-gray-900 font-inter font-medium">x {item.quantity}ea</span>
                                                 </div>
                                                 <span className="font-bold text-base md:text-lg text-gray-900 font-inter leading-none">
-                                                    ₩{(item.price * item.quantity).toLocaleString()}
+                                                    <span className="text-[0.8em] mr-0.5">₩</span>{(item.price * item.quantity).toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
@@ -335,7 +335,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                     <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
                                                 </div>
                                                 <span className="font-bold text-base md:text-lg text-gray-900 font-inter">
-                                                    ₩{shippingFee.toLocaleString()}
+                                                    <span className="text-[0.8em] mr-0.5">₩</span>{shippingFee.toLocaleString()}
                                                 </span>
                                             </div>
                                         </div>
