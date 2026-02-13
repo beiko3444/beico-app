@@ -212,18 +212,18 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
 
                         {/* Action Buttons */}
                         <div className="bg-white rounded-xl mb-4 px-1">
-                            <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                            <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                                 <button
-                                    onClick={() => order.status !== 'DEPOSIT_COMPLETED' && toggleDeposit(order.id, order.status)}
-                                    disabled={loadingMap[order.id] || order.status === 'DEPOSIT_COMPLETED'}
+                                    onClick={() => order.status !== 'DEPOSIT_COMPLETED' && !order.trackingNumber && toggleDeposit(order.id, order.status)}
+                                    disabled={loadingMap[order.id] || order.status === 'DEPOSIT_COMPLETED' || !!order.trackingNumber}
                                     className={`h-13 border-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center leading-tight
-                                        ${order.status === 'DEPOSIT_COMPLETED'
+                                        ${order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber
                                             ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
                                             : 'border-[#e34219] text-white bg-[#e34219] hover:bg-[#cc3b16]'
                                         }`}
                                 >
                                     {loadingMap[order.id] ? 'Processing...' : (
-                                        order.status === 'DEPOSIT_COMPLETED' ? (
+                                        order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber ? (
                                             <>
                                                 {order.trackingNumber ? (
                                                     <div className="flex flex-col items-center">
@@ -249,7 +249,7 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                         )
                                     )}
                                 </button>
-                                {order.status !== 'DEPOSIT_COMPLETED' && (
+                                {order.status !== 'DEPOSIT_COMPLETED' && !order.trackingNumber && (
                                     <button
                                         onClick={() => handleDelete(order.id)}
                                         disabled={loadingMap[order.id]}
