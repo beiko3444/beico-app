@@ -228,9 +228,9 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                                 {order.trackingNumber ? (
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-sm font-black text-[#e34219]">
-                                                            {order.courier === 'Rosen' ? 'Rosen (로젠택배)' :
-                                                                order.courier === 'CJ' ? 'CJ Logistics (CJ대한통운)' :
-                                                                    order.courier === 'Lotte' ? 'Lotte (롯데택배)' : (order.courier || '배송중')}
+                                                            {order.courier === 'Rosen' ? '로젠택배' :
+                                                                order.courier === 'CJ' ? 'CJ대한통운' :
+                                                                    order.courier === 'Lotte' ? '롯데택배' : (order.courier || '배송중')}
                                                         </span>
                                                         <span className="text-[11px] font-inter font-bold mt-0.5">송장번호: {order.trackingNumber}</span>
                                                     </div>
@@ -264,10 +264,10 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                             <Link
                                 href={`/invoice/${order.id}`}
                                 target="_blank"
-                                className="w-full h-12 border-2 border-[#111827] text-[#111827] bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight mt-2"
+                                className="w-full h-14 border-2 border-[#111827] text-[#111827] bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight mt-2 pb-1"
                             >
                                 <span className="text-[13px] font-bold">取引明細書を確認する</span>
-                                <span className="text-[10px] font-black opacity-60">거래명세표 확인하기</span>
+                                <span className="text-[10px] font-bold opacity-60">거래명세표 확인하기</span>
                             </Link>
                         </div>
                         <div className="border-t border-gray-100 mx-5 mt-4 mb-3" />
