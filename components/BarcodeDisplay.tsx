@@ -93,7 +93,7 @@ export default function BarcodeDisplay({
     };
 
     return (
-        <div className={`flex items-start group ${containerClassName}`}>
+        <div className={`flex items-center group ${containerClassName}`}>
             <div className="flex flex-col items-start">
                 <div ref={barcodeRef}>
                     <Barcode

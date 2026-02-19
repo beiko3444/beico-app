@@ -132,10 +132,10 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     width={0.8}
                                                     height={24}
                                                     displayValue={false}
-                                                    containerClassName="justify-between w-full"
+                                                    containerClassName="gap-3"
                                                     buttonClassName="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase"
                                                 />
-                                                <p className="text-[10px] font-medium text-black font-inter mt-0.5">{product.barcode}</p>
+                                                <p className="text-[10px] font-medium text-black font-inter mt-[-4px]">{product.barcode}</p>
                                             </div>
                                         ) : (
                                             <div className="pt-0.5">
