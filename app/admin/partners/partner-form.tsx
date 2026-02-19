@@ -216,9 +216,12 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                             <label className="block font-medium text-gray-700 mb-1">국적 / Nationality</label>
                             <select name="country" value={formData.country} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md bg-white font-bold text-xs" required>
                                 <option value="">국적 선택</option>
-                                <option value="Japan">일본 (Japan)</option>
-                                <option value="Korea">한국 (Korea)</option>
-                                <option value="USA">미국 (USA)</option>
+                                <option value="Japan">🇯🇵 일본 (Japan)</option>
+                                <option value="Korea">🇰🇷 한국 (Korea)</option>
+                                <option value="USA">🇺🇸 미국 (USA)</option>
+                                <option value="China">🇨🇳 중국 (China)</option>
+                                <option value="Turkey">🇹🇷 土耳其 (Turkey)</option>
+                                <option value="Indonesia">🇮🇩 印度尼西亜 (Indonesia)</option>
                             </select>
                         </div>
                         <div>
