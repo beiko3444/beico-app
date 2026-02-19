@@ -89,12 +89,16 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     return (
         <div className="pb-32 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {products.map((product) => {
+                {products.map((product, index) => {
                     const qty = quantities[product.id] || 0
                     const marginPercent = product.onlinePrice > 0 ? ((product.onlinePrice - product.sellPrice) / product.onlinePrice * 100).toFixed(1) : 0
 
                     return (
-                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full transition-all duration-300">
+                        <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full transition-all duration-300 relative">
+                            {/* Product Index Number */}
+                            <div className="absolute top-2 left-3 text-[10px] font-bold text-gray-300 font-inter">
+                                {String(index + 1).padStart(3, '0')}
+                            </div>
                             <div className="px-8 pt-8 flex-1">
                                 <div className="flex gap-6 mb-6">
                                     {/* Image Container */}
