@@ -34,7 +34,7 @@ export const metadata: Metadata = {
   title: "ベイコ・ベイトルアー | 小売店・卸売業者向け",
   description: "ベイコ・ベイトルアー 小売店・卸売業者向け For retailers & distributors",
   icons: {
-    icon: "/pavicon.png",
+    icon: "/favicon.png",
   },
   openGraph: {
     title: "ベイコ・ベイトルアー",
