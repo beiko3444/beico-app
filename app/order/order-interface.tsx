@@ -153,8 +153,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">卸売価格 日本</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale JP</span>
                                             </div>
-                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.6em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
+                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                <span className="text-[0.85em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -162,8 +162,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">小売価格 日本</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price JP</span>
                                             </div>
-                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.6em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
+                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                <span className="text-[0.85em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -173,8 +173,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">卸売価格 韓国</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale KR</span>
                                             </div>
-                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.6em] mr-0.5">₩</span>{product.krBuyPrice.toLocaleString()}
+                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                <span className="text-[0.7em] mr-0.5">₩</span>{product.krBuyPrice.toLocaleString()}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -182,8 +182,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">小売価格 韓国</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price KR</span>
                                             </div>
-                                            <p className="text-2xl font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.6em] mr-0.5">₩</span>{product.krSellPrice.toLocaleString()}
+                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                <span className="text-[0.7em] mr-0.5">₩</span>{product.krSellPrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
@@ -193,7 +193,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">在庫</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Stock</span>
                                             </div>
-                                            <p className={`text-2xl font-medium leading-none tabular-nums font-inter tracking-tighter text-right ${product.stock <= 0 ? 'text-[#e34219]' : 'text-gray-900'}`}>
+                                            <p className={`text-[22px] font-medium leading-none tabular-nums font-inter tracking-tighter text-right ${product.stock <= 0 ? 'text-[#e34219]' : 'text-gray-900'}`}>
                                                 {product.stock.toLocaleString()}
                                             </p>
                                         </div>
@@ -202,7 +202,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[11px] font-black text-black leading-tight">マージン</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Margin%</span>
                                             </div>
-                                            <p className="text-2xl font-medium text-[#e34219] leading-none tabular-nums font-inter tracking-tighter text-right">
+                                            <p className="text-[22px] font-medium text-[#e34219] leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 {marginPercent}%
                                             </p>
                                         </div>
