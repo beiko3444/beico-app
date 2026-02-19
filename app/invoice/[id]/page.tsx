@@ -139,7 +139,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                             </div>
                             <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold">
                                 <span>登録番号 / 등록번호:</span>
-                                <span>329-03-01798</span>
+                                <span>881-88-03836</span>
                             </div>
                         </div>
                         <table className="w-full text-sm border-collapse border border-black">
