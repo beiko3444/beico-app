@@ -1047,7 +1047,7 @@ export default function ElectricityClient() {
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">입금 계좌</td>
-                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">토스뱅크 1000-0918-2374 / 이다빈</td>
+                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">기업은행 656-045236-01-013 / 주식회사 베이코</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -1058,7 +1058,7 @@ export default function ElectricityClient() {
                                                         <tr>
                                                             <td rowSpan={5} className="border border-black bg-gray-50 p-0.5 w-8 font-bold text-center leading-none text-[9px]">청<br />구<br />자</td>
                                                             <td className="border border-black bg-gray-50 p-0.5 w-16 text-center font-bold">상 호</td>
-                                                            <td className="border border-black p-0.5 font-bold">엑스트래커</td>
+                                                            <td className="border border-black p-0.5 font-bold">주식회사 베이코</td>
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">대 표</td>

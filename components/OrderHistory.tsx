@@ -169,15 +169,15 @@ export default function OrderHistory({ orders }: { orders: any[] }) {
                                 {/* Bank Details */}
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-900 text-xs min-w-[100px]">銀行名 / 은행</span>
-                                    <span className="font-bold text-gray-900">Woori Bank (우리은행)</span>
+                                    <span className="font-bold text-gray-900">IBK Industrial Bank of Korea (기업은행)</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-900 text-xs min-w-[100px]">口座番号 / 계좌</span>
-                                    <span className="font-bold text-gray-900 font-inter">1005-704-096332</span>
+                                    <span className="font-bold text-gray-900 font-inter">656-045236-01-013</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
                                     <span className="text-gray-900 text-xs min-w-[100px]">名義人 / 예금주</span>
-                                    <span className="font-bold text-gray-900 uppercase">XTRACKER</span>
+                                    <span className="font-bold text-gray-900 uppercase">주식회사 베이코</span>
                                 </div>
 
                                 {/* Separator & Total Amount Details */}

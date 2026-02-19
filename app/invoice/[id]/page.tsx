@@ -146,7 +146,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                             <tbody className="divide-y divide-black">
                                 <tr>
                                     <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold border-r border-black">엑스트래커</td>
+                                    <td className="py-1.5 px-2 text-xs font-bold border-r border-black">주식회사 베이코</td>
                                     <td rowSpan={2} className="w-20 relative p-0 overflow-hidden text-center align-middle bg-white">
                                         {/* Background text (underneath) */}
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -269,9 +269,9 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         <div>
                             <p className="font-bold text-xs mb-2 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">お支払い情報 / 입금 계좌 정보</p>
                             <div className="text-[11px] font-bold space-y-1">
-                                <p><span className="text-gray-500 mr-2 font-normal">銀行名 / 은행:</span> Woori Bank (우리은행)</p>
-                                <p><span className="text-gray-500 mr-2 font-normal">口座番号 / 계좌:</span> 1005-704-096332</p>
-                                <p><span className="text-gray-500 mr-2 font-normal">名義人 / 예금주:</span> XTRACKER</p>
+                                <p><span className="text-gray-500 mr-2 font-normal">銀行名 / 은행:</span> IBK Industrial Bank of Korea (기업은행)</p>
+                                <p><span className="text-gray-500 mr-2 font-normal">口座番号 / 계좌:</span> 656-045236-01-013</p>
+                                <p><span className="text-gray-500 mr-2 font-normal">名義人 / 예금주:</span> 주식회사 베이코</p>
                             </div>
                         </div>
                         <div className="text-[10px] text-gray-500 italic">
