@@ -39,6 +39,7 @@ export default async function NewOrderPage() {
         let krBuy = p.buyPrice, krSell = p.krSellPrice || 0;
         let jpBuy = p.jpBuyPrice || 0, jpSell = p.jpSellPrice || 0;
         let usBuy = p.usBuyPrice || 0, usSell = p.usSellPrice || 0;
+        let currentMoq = p.minOrderQuantity || 1;
 
         const parsePrices = (gradeData: any) => {
             krBuy = Number(String(gradeData.KR?.wholesale || '0').replace(/,/g, ''));
@@ -47,6 +48,15 @@ export default async function NewOrderPage() {
             jpSell = Number(String(gradeData.JP?.retail || '0').replace(/,/g, ''));
             usBuy = Number(String(gradeData.US?.wholesale || '0').replace(/,/g, ''));
             usSell = Number(String(gradeData.US?.retail || '0').replace(/,/g, ''));
+
+            // Set regional MOQ
+            if (user?.country === 'Korea') {
+                currentMoq = Number(String(gradeData.KR?.moq || p.minOrderQuantity || '1').replace(/,/g, ''));
+            } else if (user?.country === 'Japan') {
+                currentMoq = Number(String(gradeData.JP?.moq || p.minOrderQuantity || '1').replace(/,/g, ''));
+            } else {
+                currentMoq = Number(String(gradeData.US?.moq || p.minOrderQuantity || '1').replace(/,/g, ''));
+            }
 
             // Set final checkout price based on the user's country
             if (user?.country === 'Korea' && krBuy > 0) finalPrice = krBuy;
@@ -87,7 +97,7 @@ export default async function NewOrderPage() {
             barcode: p.barcode,
             nameJP: p.nameJP,
             nameEN: p.nameEN,
-            minOrderQuantity: p.minOrderQuantity,
+            minOrderQuantity: currentMoq,
             buyPrice: p.buyPrice,
             onlinePrice: p.onlinePrice || 0,
             jpBuyPrice: jpBuy,

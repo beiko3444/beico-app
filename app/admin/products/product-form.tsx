@@ -70,12 +70,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
     const [loading, setLoading] = useState(false)
 
-    type CountryPrice = { cost: string, wholesale: string, retail: string };
+    type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string };
     type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice };
     const defaultGradePricing = (): GradePricing => ({
-        KR: { cost: '', wholesale: '', retail: '' },
-        JP: { cost: '', wholesale: '', retail: '' },
-        US: { cost: '', wholesale: '', retail: '' }
+        KR: { cost: '', wholesale: '', retail: '', moq: '1' },
+        JP: { cost: '', wholesale: '', retail: '', moq: '1' },
+        US: { cost: '', wholesale: '', retail: '', moq: '1' }
     });
 
     const [regionalPrices, setRegionalPrices] = useState<{ [grade: string]: GradePricing }>({
@@ -129,6 +129,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                         formattedPrices[g][c].cost = formatNumber(formattedPrices[g][c].cost);
                         formattedPrices[g][c].wholesale = formatNumber(formattedPrices[g][c].wholesale);
                         formattedPrices[g][c].retail = formatNumber(formattedPrices[g][c].retail);
+                        formattedPrices[g][c].moq = formatNumber(formattedPrices[g][c].moq || 1);
                     });
                 });
                 setRegionalPrices(formattedPrices);
@@ -145,14 +146,17 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 fallback['C'].KR.cost = formatNumber(initialData.buyPrice || '');
                 fallback['C'].KR.wholesale = formatNumber(initialData.krBuyPrice || initialData.sellPrice || '');
                 fallback['C'].KR.retail = formatNumber(initialData.krSellPrice || initialData.onlinePrice || '');
+                fallback['C'].KR.moq = formatNumber(initialData.minOrderQuantity || 1);
 
                 fallback['C'].JP.cost = formatNumber(initialData.buyPrice || '');
                 fallback['C'].JP.wholesale = formatNumber(initialData.jpBuyPrice || '');
                 fallback['C'].JP.retail = formatNumber(initialData.jpSellPrice || '');
+                fallback['C'].JP.moq = formatNumber(initialData.minOrderQuantity || 1);
 
                 fallback['C'].US.cost = formatNumber(initialData.buyPrice || '');
                 fallback['C'].US.wholesale = formatNumber(initialData.usBuyPrice || '');
                 fallback['C'].US.retail = formatNumber(initialData.usSellPrice || '');
+                fallback['C'].US.moq = formatNumber(initialData.minOrderQuantity || 1);
 
                 setRegionalPrices(fallback);
             }
@@ -488,7 +492,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         <div className="absolute top-0 left-0 bg-gray-200 text-gray-700 text-[10px] font-black px-2 py-0.5 border-b border-r border-gray-300">
                                             {labels[country]}
                                         </div>
-                                        <div className="grid grid-cols-5 gap-3 mt-4">
+                                        <div className="grid grid-cols-6 gap-3 mt-4">
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-bold text-gray-600 block">매입단가 (Cost)</label>
                                                 <div className="relative">
@@ -535,6 +539,19 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         className="w-full pl-6 pr-2 py-1.5 bg-[#f8faff] border border-blue-300 outline-none focus:border-blue-600 text-xs text-right font-bold text-blue-700"
                                                     />
                                                 </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-gray-600 block">최소수량 (MOQ)</label>
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={curPrices.moq}
+                                                    onChange={e => setRegionalPrices(prev => ({
+                                                        ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], moq: formatNumber(e.target.value) } }
+                                                    }))}
+                                                    className="w-full px-2 py-1.5 bg-[#f8f8f8] border border-gray-300 outline-none focus:border-gray-500 text-xs text-right font-bold"
+                                                />
                                             </div>
 
                                             <div className="space-y-1 bg-gray-100 p-1.5 border border-gray-200 text-right flex flex-col justify-center">
