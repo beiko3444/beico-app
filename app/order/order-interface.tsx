@@ -94,7 +94,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {products.map((product, index) => {
                     const qty = quantities[product.id] || 0
-                    const marginPercent = product.onlinePrice > 0 ? ((product.onlinePrice - product.sellPrice) / product.onlinePrice * 100).toFixed(1) : 0
+                    const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice;
+                    const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice;
+                    const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : 0;
 
                     return (
                         <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full transition-all duration-300 relative">
@@ -154,12 +156,12 @@ export default function OrderInterface({ products }: { products: Product[] }) {
 
                                 {/* Info Grid - Conditional Display by Country */}
                                 <div className="bg-[#f1f3f5] rounded-md overflow-hidden mb-4 border border-gray-300">
-                                    {/* US Pricing - Shown for "Other" countries or non-KR/JP */}
-                                    {(!product.country || (product.country !== 'KR' && product.country !== 'JP')) && (
+                                    {/* US Pricing - Shown for "Other" countries or non-Korea/Japan */}
+                                    {(!product.country || (product.country !== 'Korea' && product.country !== 'Japan')) && (
                                         <div className="grid grid-cols-2 border-b border-gray-300">
                                             <div className="py-1.5 px-4 border-r border-gray-300">
                                                 <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black leading-tight">卸売価格 米국</span>
+                                                    <span className="text-[11px] font-black text-black leading-tight">卸売価格 米国</span>
                                                     <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale US</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
@@ -168,7 +170,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             </div>
                                             <div className="py-1.5 px-4">
                                                 <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black leading-tight">小売価格 米국</span>
+                                                    <span className="text-[11px] font-black text-black leading-tight">小売価格 米国</span>
                                                     <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price US</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
@@ -179,7 +181,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     )}
 
                                     {/* JP Pricing - Shown only for JP users */}
-                                    {product.country === 'JP' && (
+                                    {product.country === 'Japan' && (
                                         <div className="grid grid-cols-2 border-b border-gray-300">
                                             <div className="py-1.5 px-4 border-r border-gray-300">
                                                 <div className="flex flex-col mb-0.5">
@@ -203,7 +205,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     )}
 
                                     {/* KR Pricing - Shown only for KR users */}
-                                    {product.country === 'KR' && (
+                                    {product.country === 'Korea' && (
                                         <div className="grid grid-cols-2 border-b border-gray-300">
                                             <div className="py-1.5 px-4 border-r border-gray-300">
                                                 <div className="flex flex-col mb-0.5">

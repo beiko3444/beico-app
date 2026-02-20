@@ -29,25 +29,52 @@ export default async function NewOrderPage() {
 
     // Map products to apply correct price based on grade
     const productsWithTieredPrice = products.map(p => {
-        let finalPrice = p.sellPrice
+        let finalPrice = p.sellPrice;
 
-        // We use priceC as a secondary fallback if the specific grade price is null
-        // before falling back to the consumer sellPrice
-        const gradePriceMap: Record<string, number | null | undefined> = {
-            'A': p.priceA,
-            'B': p.priceB,
-            'C': p.priceC,
-            'D': p.priceD
-        }
+        let regional = (p as any).regionalPrices as any;
+        const validGrades = ['A', 'B', 'C', 'D'];
+        let gradeToUse = userGrade.toUpperCase();
+        if (!validGrades.includes(gradeToUse)) gradeToUse = 'C';
 
-        const selectedPrice = gradePriceMap[userGrade.toUpperCase()]
-        if (selectedPrice !== null && selectedPrice !== undefined && selectedPrice > 0) {
-            finalPrice = selectedPrice
-        } else if (p.priceC && p.priceC > 0) {
-            // Default to C grade price if the user's specific grade price isn't set
-            finalPrice = p.priceC
+        let krBuy = p.buyPrice, krSell = p.krSellPrice || 0;
+        let jpBuy = p.jpBuyPrice || 0, jpSell = p.jpSellPrice || 0;
+        let usBuy = p.usBuyPrice || 0, usSell = p.usSellPrice || 0;
+
+        const parsePrices = (gradeData: any) => {
+            krBuy = Number(String(gradeData.KR?.wholesale || '0').replace(/,/g, ''));
+            krSell = Number(String(gradeData.KR?.retail || '0').replace(/,/g, ''));
+            jpBuy = Number(String(gradeData.JP?.wholesale || '0').replace(/,/g, ''));
+            jpSell = Number(String(gradeData.JP?.retail || '0').replace(/,/g, ''));
+            usBuy = Number(String(gradeData.US?.wholesale || '0').replace(/,/g, ''));
+            usSell = Number(String(gradeData.US?.retail || '0').replace(/,/g, ''));
+
+            // Set final checkout price based on the user's country
+            if (user?.country === 'Korea' && krBuy > 0) finalPrice = krBuy;
+            else if (user?.country === 'Japan' && jpBuy > 0) finalPrice = jpBuy;
+            else if (usBuy > 0) finalPrice = usBuy;
+            else if (krBuy > 0) finalPrice = krBuy; // fallback to KR if US missing
+        };
+
+        if (regional && typeof regional === 'object' && regional[gradeToUse]) {
+            parsePrices(regional[gradeToUse]);
+        } else if (regional && typeof regional === 'object' && regional['C']) {
+            parsePrices(regional['C']);
         } else {
-            finalPrice = p.sellPrice
+            // Old fallback logic
+            const gradePriceMap: Record<string, number | null | undefined> = {
+                'A': p.priceA,
+                'B': p.priceB,
+                'C': p.priceC,
+                'D': p.priceD
+            }
+
+            const selectedPrice = gradePriceMap[gradeToUse]
+            if (selectedPrice !== null && selectedPrice !== undefined && selectedPrice > 0) {
+                finalPrice = selectedPrice
+            } else if (p.priceC && p.priceC > 0) {
+                finalPrice = p.priceC
+            }
+            krBuy = finalPrice;
         }
 
         return {
@@ -63,13 +90,13 @@ export default async function NewOrderPage() {
             minOrderQuantity: p.minOrderQuantity,
             buyPrice: p.buyPrice,
             onlinePrice: p.onlinePrice || 0,
-            jpBuyPrice: p.jpBuyPrice || 0,
-            jpSellPrice: p.jpSellPrice || 0,
-            krBuyPrice: finalPrice,
-            krSellPrice: p.krSellPrice || 0,
-            usBuyPrice: p.usBuyPrice || 0,
-            usSellPrice: p.usSellPrice || 0,
-            appliedGrade: userGrade,
+            jpBuyPrice: jpBuy,
+            jpSellPrice: jpSell,
+            krBuyPrice: krBuy,
+            krSellPrice: krSell,
+            usBuyPrice: usBuy,
+            usSellPrice: usSell,
+            appliedGrade: gradeToUse,
             country: user?.country
         }
     })

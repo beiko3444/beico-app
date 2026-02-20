@@ -64,7 +64,8 @@ model Product {
   productCode String?
   imageUrl    String?
   sortOrder   Int         @default(0)
-  minOrderQuantity Int         @default(1)
+  minOrderQuantity Int    @default(1)
+  regionalPrices Json?    @default("{}")
   orderItems       OrderItem[]
 }
 

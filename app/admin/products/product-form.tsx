@@ -28,6 +28,7 @@ type Product = {
     stock: number
     safetyStock?: number
     imageUrl?: string | null
+    regionalPrices?: any
     minOrderQuantity: number
 }
 
@@ -69,6 +70,22 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
     const [loading, setLoading] = useState(false)
 
+    type CountryPrice = { cost: string, wholesale: string, retail: string };
+    type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice };
+    const defaultGradePricing = (): GradePricing => ({
+        KR: { cost: '', wholesale: '', retail: '' },
+        JP: { cost: '', wholesale: '', retail: '' },
+        US: { cost: '', wholesale: '', retail: '' }
+    });
+
+    const [regionalPrices, setRegionalPrices] = useState<{ [grade: string]: GradePricing }>({
+        A: defaultGradePricing(),
+        B: defaultGradePricing(),
+        C: defaultGradePricing(),
+        D: defaultGradePricing()
+    });
+    const [activeGradeTab, setActiveGradeTab] = useState('C');
+
     // Helper for formatting number with commas
     const formatNumber = (val: string | number) => {
         if (val === "" || val === null || val === undefined) return "";
@@ -99,23 +116,37 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode(isCopy ? '' : (initialData.productCode || ''))
-            setBuyPrice(formatNumber(initialData.buyPrice))
-            setSellPrice(formatNumber(initialData.sellPrice))
-            setOnlinePrice(formatNumber(initialData.onlinePrice || 0))
-            setJpBuyPrice(formatNumber(initialData.jpBuyPrice || 0))
-            setJpSellPrice(formatNumber(initialData.jpSellPrice || 0))
-            setKrBuyPrice(formatNumber(initialData.krBuyPrice || 0))
-            setKrSellPrice(formatNumber(initialData.krSellPrice || 0))
-            setUsBuyPrice(formatNumber(initialData.usBuyPrice || 0))
-            setUsSellPrice(formatNumber(initialData.usSellPrice || 0))
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
-            setPriceA(formatNumber(initialData.priceA ?? ""))
-            setPriceB(formatNumber(initialData.priceB ?? ""))
-            setPriceC(formatNumber(initialData.priceC ?? ""))
-            setPriceD(formatNumber(initialData.priceD ?? ""))
             setImageUrl(initialData.imageUrl || null)
             setMinOrderQuantity(formatNumber(initialData.minOrderQuantity || 1))
+
+            if (initialData.regionalPrices && Object.keys(initialData.regionalPrices).length > 0) {
+                setRegionalPrices(initialData.regionalPrices);
+            } else {
+                // Fallback from old schema data or defaults
+                const fallback = {
+                    A: defaultGradePricing(),
+                    B: defaultGradePricing(),
+                    C: defaultGradePricing(),
+                    D: defaultGradePricing()
+                };
+
+                // Try to infer old data to C grade
+                fallback['C'].KR.cost = String(initialData.buyPrice || '');
+                fallback['C'].KR.wholesale = String(initialData.krBuyPrice || initialData.sellPrice || '');
+                fallback['C'].KR.retail = String(initialData.krSellPrice || initialData.onlinePrice || '');
+
+                fallback['C'].JP.cost = String(initialData.buyPrice || '');
+                fallback['C'].JP.wholesale = String(initialData.jpBuyPrice || '');
+                fallback['C'].JP.retail = String(initialData.jpSellPrice || '');
+
+                fallback['C'].US.cost = String(initialData.buyPrice || '');
+                fallback['C'].US.wholesale = String(initialData.usBuyPrice || '');
+                fallback['C'].US.retail = String(initialData.usSellPrice || '');
+
+                setRegionalPrices(fallback);
+            }
         } else if (isOpen && !initialData) {
             // Reset for create mode
             setName('')
@@ -123,25 +154,19 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN('')
             setBarcode('')
             setProductCode('')
-            setBuyPrice('')
-            setSellPrice('')
-            setOnlinePrice('')
-            setJpBuyPrice('')
-            setJpSellPrice('')
-            setKrBuyPrice('')
-            setKrSellPrice('')
-            setUsBuyPrice('')
-            setUsSellPrice('')
             setStock('0')
             setSafetyStock('0')
-            setPriceA('')
-            setPriceB('')
-            setPriceC('')
-            setPriceD('')
             setImageUrl(null)
             setMinOrderQuantity('1')
+            setRegionalPrices({
+                A: defaultGradePricing(),
+                B: defaultGradePricing(),
+                C: defaultGradePricing(),
+                D: defaultGradePricing()
+            });
+            setActiveGradeTab('C');
         }
-    }, [isOpen, initialData])
+    }, [isOpen, initialData, isCopy])
 
     const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
@@ -182,23 +207,13 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
                 productCode: productCode.trim(),
-                buyPrice: parseFloat(parseNumber(buyPrice)) || 0,
-                sellPrice: parseFloat(parseNumber(sellPrice)) || 0,
-                onlinePrice: parseFloat(parseNumber(onlinePrice)) || 0,
-                jpBuyPrice: parseFloat(parseNumber(jpBuyPrice)) || 0,
-                jpSellPrice: parseFloat(parseNumber(jpSellPrice)) || 0,
-                krBuyPrice: parseFloat(parseNumber(krBuyPrice)) || 0,
-                krSellPrice: parseFloat(parseNumber(krSellPrice)) || 0,
-                usBuyPrice: parseFloat(parseNumber(usBuyPrice)) || 0,
-                usSellPrice: parseFloat(parseNumber(usSellPrice)) || 0,
+                buyPrice: parseFloat(parseNumber(regionalPrices['C'].KR.cost)) || 0,
+                sellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.wholesale)) || 0,
                 stock: parseInt(parseNumber(stock)) || 0,
                 safetyStock: parseInt(parseNumber(safetyStock)) || 0,
-                priceA: priceA === "" ? null : parseFloat(parseNumber(priceA)),
-                priceB: priceB === "" ? null : parseFloat(parseNumber(priceB)),
-                priceC: parseFloat(parseNumber(sellPrice)) || 0, // Always sync C with Wholesale (sellPrice)
-                priceD: priceD === "" ? null : parseFloat(parseNumber(priceD)),
                 imageUrl: imageUrl,
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
+                regionalPrices: regionalPrices,
             }
 
             console.log("Submitting product data:", productData);
@@ -216,23 +231,19 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setName('')
                     setNameJP('')
                     setNameEN('')
-                    setBuyPrice('')
-                    setSellPrice('')
-                    setOnlinePrice('')
-                    setJpBuyPrice('')
-                    setJpSellPrice('')
-                    setKrBuyPrice('')
-                    setKrSellPrice('')
-                    setUsBuyPrice('')
-                    setUsSellPrice('')
+                    setBarcode('')
+                    setProductCode('')
                     setStock('0')
                     setSafetyStock('0')
-                    setPriceA('')
-                    setPriceB('')
-                    setPriceC('')
-                    setPriceD('')
                     setImageUrl(null)
                     setMinOrderQuantity('1')
+                    setRegionalPrices({
+                        A: defaultGradePricing(),
+                        B: defaultGradePricing(),
+                        C: defaultGradePricing(),
+                        D: defaultGradePricing()
+                    });
+                    setActiveGradeTab('C');
                 }
             } else {
                 const data = await res.json()
@@ -432,147 +443,104 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                         </div>
                     </fieldset>
 
-                    {/* Pricing Group */}
-                    <fieldset className="border border-gray-400 p-4 pt-2">
-                        <legend className="px-2 text-xs font-bold text-gray-700">단가 설정 (Pricing)</legend>
-                        <div className="grid grid-cols-2 gap-x-6 gap-y-4">
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">매입 단가 (Cost)</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={buyPrice}
-                                    onChange={e => setBuyPrice(formatNumber(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-red-700">도매 단가 (Wholesale)</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={sellPrice}
-                                    onChange={e => {
-                                        const val = formatNumber(e.target.value);
-                                        setSellPrice(val);
-                                        setPriceC(val);
-                                    }}
-                                    className="w-full px-2 py-1.5 bg-[#fff8f8] border border-red-300 outline-none focus:border-red-600 text-sm text-right font-bold text-red-700"
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">소매 단가 (Retail)</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={onlinePrice}
-                                    onChange={e => setOnlinePrice(formatNumber(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                />
-                            </div>
+                    {/* Regional Pricing Group */}
+                    <fieldset className="border border-gray-400 p-4 pt-2 mb-4">
+                        <legend className="px-2 text-xs font-bold text-gray-700">지역별 & 등급별 단가 설정 (Regional & Tier Pricing)</legend>
+
+                        {/* Grade Tabs */}
+                        <div className="flex gap-2 mb-4">
+                            {['A', 'B', 'C', 'D'].map(grade => (
+                                <button
+                                    key={grade}
+                                    type="button"
+                                    onClick={() => setActiveGradeTab(grade)}
+                                    className={`px-4 py-1.5 text-xs font-bold border ${activeGradeTab === grade ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
+                                >
+                                    {grade} 등급
+                                </button>
+                            ))}
                         </div>
 
-                        {/* Regional Prices Sub-group */}
-                        <div className="mt-4 pt-4 border-t border-gray-300">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-2">지역별 단가 (Regional Pricing)</label>
+                        <div className="space-y-6">
+                            {(['KR', 'JP', 'US'] as const).map(country => {
+                                const labels: Record<string, string> = { KR: '한국 (KR)', JP: '일본 (JP)', US: '미국 (US)' };
+                                const prefix: Record<string, string> = { KR: '₩ ', JP: '¥ ', US: '$ ' };
+                                const curPrices = regionalPrices[activeGradeTab][country];
 
-                            {/* Japan Pricing */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-gray-600">일본 도매가 (JP Wholesale)</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={jpBuyPrice}
-                                        onChange={e => setJpBuyPrice(formatNumber(e.target.value))}
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-gray-600">일본 판매가 (JP Retail)</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={jpSellPrice}
-                                        onChange={e => setJpSellPrice(formatNumber(e.target.value))}
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    />
-                                </div>
-                            </div>
+                                const costNum = parseFloat(parseNumber(curPrices.cost)) || 0;
+                                const wholesaleNum = parseFloat(parseNumber(curPrices.wholesale)) || 0;
+                                const retailNum = parseFloat(parseNumber(curPrices.retail)) || 0;
 
-                            {/* Korea Pricing */}
-                            <div className="grid grid-cols-2 gap-4 mb-4">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-gray-600">한국 도매가 (KR Wholesale)</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={krBuyPrice}
-                                        onChange={e => setKrBuyPrice(formatNumber(e.target.value))}
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-gray-600">한국 판매가 (KR Retail)</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={krSellPrice}
-                                        onChange={e => setKrSellPrice(formatNumber(e.target.value))}
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    />
-                                </div>
-                            </div>
+                                const beicoMargin = costNum === 0 && wholesaleNum === 0 ? 0 : wholesaleNum > 0 ? ((wholesaleNum - costNum) / wholesaleNum * 100).toFixed(1) : 0;
+                                const wholesalerMargin = wholesaleNum === 0 && retailNum === 0 ? 0 : retailNum > 0 ? ((retailNum - wholesaleNum) / retailNum * 100).toFixed(1) : 0;
 
-                            {/* US Pricing */}
-                            <div className="grid grid-cols-2 gap-4">
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-gray-600">미국 도매가 (US Wholesale)</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={usBuyPrice}
-                                        onChange={e => setUsBuyPrice(formatNumber(e.target.value))}
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-medium text-gray-600">미국 판매가 (US Retail)</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={usSellPrice}
-                                        onChange={e => setUsSellPrice(formatNumber(e.target.value))}
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right"
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                                return (
+                                    <div key={country} className="border border-gray-200 p-3 bg-gray-50 relative">
+                                        <div className="absolute top-0 left-0 bg-gray-200 text-gray-700 text-[10px] font-black px-2 py-0.5 border-b border-r border-gray-300">
+                                            {labels[country]}
+                                        </div>
+                                        <div className="grid grid-cols-5 gap-3 mt-4">
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-gray-600 block">매입단가 (Cost)</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={curPrices.cost}
+                                                        onChange={e => setRegionalPrices(prev => ({
+                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], cost: formatNumber(e.target.value) } }
+                                                        }))}
+                                                        className="w-full pl-6 pr-2 py-1.5 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right"
+                                                    />
+                                                </div>
+                                            </div>
 
-                        <div className="mt-4 pt-4 border-t border-gray-300">
-                            <label className="block text-[10px] font-bold text-gray-500 mb-2">등급별 단가 (Special Pricing)</label>
-                            <div className="grid grid-cols-4 gap-2">
-                                {[
-                                    { label: 'A 등급', value: priceA, setter: setPriceA },
-                                    { label: 'B 등급', value: priceB, setter: setPriceB },
-                                    { label: 'C 등급', value: sellPrice, disabled: true },
-                                    { label: 'D 등급', value: priceD, setter: setPriceD },
-                                ].map((tier) => (
-                                    <div key={tier.label} className="space-y-1">
-                                        <label className="text-[10px] text-gray-600 block">{tier.label}</label>
-                                        <input
-                                            type="text"
-                                            inputMode="numeric"
-                                            value={tier.value}
-                                            disabled={tier.disabled}
-                                            onChange={e => tier.setter?.(formatNumber(e.target.value))}
-                                            className={`w-full px-1.5 py-1 text-xs text-right border ${tier.disabled ? 'bg-gray-100' : 'bg-white border-gray-300'}`}
-                                        />
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-red-700 block">도매가 (Wholesale)</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={curPrices.wholesale}
+                                                        onChange={e => setRegionalPrices(prev => ({
+                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], wholesale: formatNumber(e.target.value) } }
+                                                        }))}
+                                                        className="w-full pl-6 pr-2 py-1.5 bg-[#fff8f8] border border-red-300 outline-none focus:border-red-600 text-xs text-right font-bold text-red-700"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-blue-700 block">판매가 (Retail)</label>
+                                                <div className="relative">
+                                                    <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        value={curPrices.retail}
+                                                        onChange={e => setRegionalPrices(prev => ({
+                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], retail: formatNumber(e.target.value) } }
+                                                        }))}
+                                                        className="w-full pl-6 pr-2 py-1.5 bg-[#f8faff] border border-blue-300 outline-none focus:border-blue-600 text-xs text-right font-bold text-blue-700"
+                                                    />
+                                                </div>
+                                            </div>
+
+                                            <div className="space-y-1 bg-gray-100 p-1.5 border border-gray-200 text-right flex flex-col justify-center">
+                                                <label className="text-[9px] font-bold text-gray-500 block mb-0.5">베이코 마진율</label>
+                                                <span className={`text-xs font-black ${Number(beicoMargin) < 0 ? 'text-red-500' : 'text-gray-800'}`}>{beicoMargin}%</span>
+                                            </div>
+
+                                            <div className="space-y-1 bg-gray-100 p-1.5 border border-gray-200 text-right flex flex-col justify-center">
+                                                <label className="text-[9px] font-bold text-gray-500 block mb-0.5">도매상 마진율</label>
+                                                <span className={`text-xs font-black ${Number(wholesalerMargin) < 0 ? 'text-red-500' : 'text-gray-800'}`}>{wholesalerMargin}%</span>
+                                            </div>
+                                        </div>
                                     </div>
-                                ))}
-                            </div>
+                                );
+                            })}
                         </div>
                     </fieldset>
 
