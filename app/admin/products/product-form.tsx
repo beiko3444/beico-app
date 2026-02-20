@@ -137,7 +137,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameJP(initialData.nameJP || '')
             setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
-            setProductCode(isCopy ? '' : (initialData.productCode || ''))
+            setProductCode(initialData.productCode || '')
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
             setImageUrl(initialData.imageUrl || null)
