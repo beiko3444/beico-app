@@ -285,7 +285,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     }
 
     const modalContent = (
-        <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsOpen(false)}>
+        <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden">
             <div
                 className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-2xl shadow-md animate-in fade-in duration-100 max-h-[95vh] overflow-y-auto relative"
                 onClick={(e) => e.stopPropagation()}
