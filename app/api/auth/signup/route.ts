@@ -1,6 +1,17 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import nodemailer from 'nodemailer'
+
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: process.env.SMTP_PORT === '465' || !process.env.SMTP_PORT, // true for 465, false for other ports
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+})
 
 export async function POST(req: Request) {
     try {
@@ -64,6 +75,38 @@ export async function POST(req: Request) {
                 }
             }
         })
+
+        // Send email notification to contact@beiko.co.kr
+        try {
+            if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+                await transporter.sendMail({
+                    from: `"Beiko Admin" <${process.env.SMTP_USER}>`,
+                    to: 'contact@beiko.co.kr',
+                    subject: `[신규 파트너 가입] ${businessName} (${representativeName})`,
+                    html: `
+                        <h2>새로운 파트너(회원) 가입이 접수되었습니다.</h2>
+                        <hr />
+                        <ul>
+                            <li><strong>아이디:</strong> ${username}</li>
+                            <li><strong>회사명(상호명):</strong> ${businessName}</li>
+                            <li><strong>대표자명:</strong> ${representativeName}</li>
+                            <li><strong>국가:</strong> ${country}</li>
+                            <li><strong>전화번호:</strong> ${contact}</li>
+                            <li><strong>이메일:</strong> ${email}</li>
+                            <li><strong>사업자등록번호:</strong> ${businessRegNumber}</li>
+                            <li><strong>주소:</strong> ${address}</li>
+                        </ul>
+                        <br />
+                        <p>관리자 페이지에서 확인 후 승인 처리를 진행해주세요.</p>
+                    `
+                })
+            } else {
+                console.warn('SMTP credentials not configured in .env. Email notification skipped.')
+            }
+        } catch (emailError) {
+            console.error('Failed to send notification email:', emailError)
+            // Error logged, but don't fail the registration process
+        }
 
         return NextResponse.json({
             message: '登録が完了しました。管理者の承認をお待ちください。 / Registration complete. Please wait for admin approval.',
