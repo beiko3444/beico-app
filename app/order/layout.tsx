@@ -40,7 +40,14 @@ export default async function OrderLayout({
         }
     }
 
-    const countryDisplay = country === 'Korea' ? '🇰🇷 韓国 KR' : country === 'Japan' ? '🇯🇵 日本 JP' : country === 'USA' ? '🇺🇸 米国 US' : country
+    const countryDisplay =
+        country === 'Korea' ? '🇰🇷 韓国 KR' :
+            country === 'Japan' ? '🇯🇵 日本 JP' :
+                country === 'USA' ? '🇺🇸 米国 US' :
+                    country === 'China' ? '🇨🇳 中国 CN' :
+                        country === 'Turkey' ? '🇹🇷 Türkiye TR' :
+                            country === 'Indonesia' ? '🇮🇩 ID' :
+                                country
 
     return (
         <div className="min-h-screen bg-[#f9f9f9]">
