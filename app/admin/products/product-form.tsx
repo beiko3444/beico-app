@@ -494,7 +494,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         </div>
                                         <div className="grid grid-cols-6 gap-3 mt-4">
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-gray-600 block">매입단가 (Cost)</label>
+                                                <label className="text-[10px] font-bold text-gray-600 block h-[15px]">매입단가</label>
                                                 <div className="relative">
                                                     <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
                                                     <input
@@ -510,7 +510,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                             </div>
 
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-red-700 block">도매가 (Wholesale)</label>
+                                                <label className="text-[10px] font-bold text-red-700 block h-[15px]">도매가</label>
                                                 <div className="relative">
                                                     <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
                                                     <input
@@ -526,7 +526,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                             </div>
 
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-blue-700 block">판매가 (Retail)</label>
+                                                <label className="text-[10px] font-bold text-blue-700 block h-[15px]">판매가</label>
                                                 <div className="relative">
                                                     <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
                                                     <input
@@ -542,7 +542,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                             </div>
 
                                             <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-gray-600 block">최소수량 (MOQ)</label>
+                                                <label className="text-[10px] font-bold text-gray-600 block h-[15px]">최소수량 (MOQ)</label>
                                                 <input
                                                     type="text"
                                                     inputMode="numeric"
