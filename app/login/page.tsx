@@ -81,8 +81,8 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen bg-[#f9f9f9] flex flex-col items-center justify-center p-4 font-sans text-[#333] relative">
             {/* Real-time Japanese Clock */}
-            <div className="absolute top-8 text-[11px] font-bold text-gray-800 tracking-widest">
-                {formatJapaneseDate(time)}
+            <div className="absolute top-8 text-[11px] font-bold text-gray-800 tracking-widest" suppressHydrationWarning>
+                {time ? formatJapaneseDate(time) : ''}
             </div>
 
             {/* Logo Section */}

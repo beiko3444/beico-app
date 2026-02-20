@@ -93,7 +93,7 @@ export default function BarcodeDisplay({
     };
 
     return (
-        <div className={`flex items-start group ${containerClassName}`}>
+        <div className={`flex items-center group ${containerClassName}`}>
             <div className="flex flex-col items-start">
                 <div ref={barcodeRef}>
                     <Barcode
@@ -109,7 +109,7 @@ export default function BarcodeDisplay({
                 </div>
             </div>
             {showDownload && (
-                <div className="flex flex-col gap-1 ml-2">
+                <div className="flex flex-row gap-1 ml-2">
                     <button
                         onClick={downloadPNG}
                         className={buttonClassName || "text-[10px] text-gray-500 hover:text-[var(--color-brand-blue)] flex items-center gap-1 border border-gray-200 rounded px-1.5 py-0.5 bg-white shadow-sm hover:bg-gray-50 transition-colors"}

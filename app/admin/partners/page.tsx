@@ -96,7 +96,10 @@ export default async function PartnersPage() {
                                             {partner.country === 'Korea' ? '🇰🇷 한국' :
                                                 partner.country === 'Japan' ? '🇯🇵 일본' :
                                                     partner.country === 'USA' ? '🇺🇸 미국' :
-                                                        partner.country || '-'}
+                                                        partner.country === 'China' ? '🇨🇳 중국' :
+                                                            partner.country === 'Turkey' ? '🇹🇷 터키' :
+                                                                partner.country === 'Indonesia' ? '🇮🇩 인도네시아' :
+                                                                    partner.country || '-'}
                                         </span>
                                     </td>
                                     <td className="px-3 py-1.5 text-left text-gray-600 truncate max-w-[200px]" title={partner.partnerProfile?.address || ''}>{partner.partnerProfile?.address || '-'}</td>

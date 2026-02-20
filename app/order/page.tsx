@@ -64,7 +64,7 @@ export default async function NewOrderPage() {
             onlinePrice: p.onlinePrice || 0,
             jpBuyPrice: p.jpBuyPrice || 0,
             jpSellPrice: p.jpSellPrice || 0,
-            krBuyPrice: p.krBuyPrice || 0,
+            krBuyPrice: finalPrice,
             krSellPrice: p.krSellPrice || 0,
             appliedGrade: userGrade
         }

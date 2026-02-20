@@ -79,22 +79,31 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
             <div className="flex gap-4">
                 <button
                     onClick={handlePrint}
-                    className="bg-gray-800 text-white px-8 py-3 rounded-xl font-bold hover:bg-black transition-all shadow-lg active:scale-95"
+                    className="bg-gray-800 text-white px-8 h-16 rounded-xl font-bold hover:bg-black transition-all shadow-lg active:scale-95 flex flex-col items-center justify-center leading-tight"
                 >
-                    取引明細書を印刷する / 인쇄하기
+                    <span className="text-[14px]">取引明細書を印刷する</span>
+                    <span className="text-[11px] font-medium opacity-80">인쇄하기</span>
                 </button>
                 <button
                     onClick={handleDownloadJPG}
                     disabled={isDownloading}
-                    className="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50"
+                    className="bg-blue-600 text-white px-8 h-16 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center leading-tight"
                 >
-                    {isDownloading ? 'Saving...' : 'JPGで保存 / JPG 다운로드'}
+                    {isDownloading ? (
+                        'Saving...'
+                    ) : (
+                        <>
+                            <span className="text-[14px]">JPGで保存</span>
+                            <span className="text-[11px] font-medium opacity-80">JPG 다운로드</span>
+                        </>
+                    )}
                 </button>
                 <button
                     onClick={handleClose}
-                    className="bg-white text-gray-700 border-2 border-gray-200 px-8 py-3 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95"
+                    className="bg-white text-gray-700 border-2 border-gray-200 px-8 h-16 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95 flex flex-col items-center justify-center leading-tight"
                 >
-                    閉じる / 닫기
+                    <span className="text-[14px]">閉じる</span>
+                    <span className="text-[11px] font-medium opacity-80">닫기</span>
                 </button>
             </div>
         </div>

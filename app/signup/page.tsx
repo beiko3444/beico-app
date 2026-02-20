@@ -280,9 +280,12 @@ export default function SignupPage() {
                                 className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium shadow-sm appearance-none cursor-pointer"
                             >
                                 <option value="" disabled>Select Nationality</option>
-                                <option value="Japan">日本 / Japan</option>
-                                <option value="Korea">韓国 / Korea</option>
-                                <option value="USA">米国 / USA</option>
+                                <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
+                                <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
+                                <option value="USA">🇺🇸 米国 / USA / 미국</option>
+                                <option value="China">🇨🇳 中国 / China / 중국</option>
+                                <option value="Turkey">🇹🇷 土耳其 / Turkey / 터키</option>
+                                <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
                             </select>
                             <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                                 <ArrowRight size={14} className="rotate-90" />

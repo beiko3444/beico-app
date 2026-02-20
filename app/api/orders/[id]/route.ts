@@ -78,7 +78,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         if (depositConfirmedAt !== undefined) updateData.depositConfirmedAt = depositConfirmedAt ? new Date(depositConfirmedAt) : null
 
         // Transaction to update order and restore stock if canceled
-        const result = await prisma.$transaction(async (tx) => {
+        const result = await prisma.$transaction(async (tx: any) => {
             // Restore stock if being canceled from non-canceled state
             if (status === 'CANCELED' && order.status !== 'CANCELED') {
                 const orderItems = await tx.orderItem.findMany({
@@ -119,19 +119,25 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 }
             }
 
-            if (status === 'DEPOSIT_COMPLETED') {
-                updateData.depositConfirmedAt = new Date()
-            } else if (status === 'PENDING') {
-                updateData.depositConfirmedAt = null
-            }
-
-            // If admin is confirming deposit, also ensure status is DEPOSIT_COMPLETED if currently PENDING
-            if (adminDepositConfirmedAt && !status) {
-                if (order.status === 'PENDING' || order.status === 'PENDING_DEPOSIT') {
+            // Synchronize deposit confirmations for Admin actions
+            if (session.user.role === 'ADMIN') {
+                if (status === 'DEPOSIT_COMPLETED') {
+                    if (!updateData.depositConfirmedAt) updateData.depositConfirmedAt = new Date()
+                    if (!updateData.adminDepositConfirmedAt) updateData.adminDepositConfirmedAt = new Date()
+                } else if (adminDepositConfirmedAt) {
+                    // If specifically setting admin confirmation, ensure user confirmation and status are also set
                     updateData.status = 'DEPOSIT_COMPLETED'
-                    if (!updateData.depositConfirmedAt) {
-                        updateData.depositConfirmedAt = new Date()
-                    }
+                    if (!updateData.depositConfirmedAt) updateData.depositConfirmedAt = new Date()
+                    updateData.adminDepositConfirmedAt = new Date(adminDepositConfirmedAt)
+                }
+            } else {
+                // Partner (Customer) action
+                if (status === 'DEPOSIT_COMPLETED') {
+                    updateData.depositConfirmedAt = new Date()
+                } else if (status === 'PENDING') {
+                    // Reverting to PENDING clears user confirmation (but not necessarily admin's if already done, 
+                    // though usually admin wouldn't have confirmed if it's PENDING)
+                    updateData.depositConfirmedAt = null
                 }
             }
 
@@ -179,7 +185,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
             }
         }
 
-        await prisma.$transaction(async (tx) => {
+        await prisma.$transaction(async (tx: any) => {
             // Restore stock if order wasn't already canceled (stock held)
             if (order.status !== 'CANCELED') {
                 for (const item of order.items) {
