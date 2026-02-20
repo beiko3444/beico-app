@@ -10,14 +10,15 @@ import { authOptions } from "@/lib/auth"
 export default async function NewOrderPage() {
     const session = await getServerSession(authOptions)
 
-    // Fetch User Grade & Name
+    // Fetch User Info
     let userGrade = 'C'
     let userName = ''
-    if (session?.user?.id) {
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            include: { partnerProfile: true }
-        })
+    const user = session?.user?.id ? await prisma.user.findUnique({
+        where: { id: session.user.id },
+        include: { partnerProfile: true }
+    }) : null
+
+    if (user) {
         userGrade = user?.partnerProfile?.grade || 'C'
         userName = user?.name || ''
     }
@@ -68,7 +69,8 @@ export default async function NewOrderPage() {
             krSellPrice: p.krSellPrice || 0,
             usBuyPrice: p.usBuyPrice || 0,
             usSellPrice: p.usSellPrice || 0,
-            appliedGrade: userGrade
+            appliedGrade: userGrade,
+            country: user?.country
         }
     })
 

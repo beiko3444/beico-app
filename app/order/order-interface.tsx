@@ -24,6 +24,7 @@ type Product = {
     krSellPrice: number
     usBuyPrice: number
     usSellPrice: number
+    country?: string | null
 }
 
 // Hardcoded bank info for now as requested
@@ -151,73 +152,79 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     </div>
                                 </div>
 
-                                {/* Info Grid */}
+                                {/* Info Grid - Conditional Display by Country */}
                                 <div className="bg-[#f1f3f5] rounded-md overflow-hidden mb-4 border border-gray-300">
-                                    {/* US Pricing */}
-                                    <div className="grid grid-cols-2 border-b border-gray-300">
-                                        <div className="py-1.5 px-4 border-r border-gray-300">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格 米国</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale US</span>
+                                    {/* US Pricing - Shown for "Other" countries or non-KR/JP */}
+                                    {(!product.country || (product.country !== 'KR' && product.country !== 'JP')) && (
+                                        <div className="grid grid-cols-2 border-b border-gray-300">
+                                            <div className="py-1.5 px-4 border-r border-gray-300">
+                                                <div className="flex flex-col mb-0.5">
+                                                    <span className="text-[11px] font-black text-black leading-tight">卸売価格 米국</span>
+                                                    <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale US</span>
+                                                </div>
+                                                <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                    <span className="text-[0.85em] mr-0.5">$</span>{product.usBuyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
                                             </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.85em] mr-0.5">$</span>{product.usBuyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </p>
-                                        </div>
-                                        <div className="py-1.5 px-4 border-r border-gray-300">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">小売価格 米国</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price US</span>
+                                            <div className="py-1.5 px-4">
+                                                <div className="flex flex-col mb-0.5">
+                                                    <span className="text-[11px] font-black text-black leading-tight">小売価格 米국</span>
+                                                    <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price US</span>
+                                                </div>
+                                                <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                    <span className="text-[0.85em] mr-0.5">$</span>{product.usSellPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                </p>
                                             </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.85em] mr-0.5">$</span>{product.usSellPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </p>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    {/* JP Pricing */}
-                                    <div className="grid grid-cols-2 border-b border-gray-300">
-                                        <div className="py-1.5 px-4 border-r border-gray-300">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格 日本</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale JP</span>
+                                    {/* JP Pricing - Shown only for JP users */}
+                                    {product.country === 'JP' && (
+                                        <div className="grid grid-cols-2 border-b border-gray-300">
+                                            <div className="py-1.5 px-4 border-r border-gray-300">
+                                                <div className="flex flex-col mb-0.5">
+                                                    <span className="text-[11px] font-black text-black leading-tight">卸売価格 日本</span>
+                                                    <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale JP</span>
+                                                </div>
+                                                <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                    <span className="text-[0.85em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
+                                                </p>
                                             </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.85em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="py-1.5 px-4 border-r border-gray-300">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">小売価格 日本</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price JP</span>
+                                            <div className="py-1.5 px-4">
+                                                <div className="flex flex-col mb-0.5">
+                                                    <span className="text-[11px] font-black text-black leading-tight">小売価格 日本</span>
+                                                    <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price JP</span>
+                                                </div>
+                                                <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                    <span className="text-[0.85em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
+                                                </p>
                                             </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.85em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
-                                            </p>
                                         </div>
-                                    </div>
+                                    )}
 
-                                    {/* KR Pricing */}
-                                    <div className="grid grid-cols-2 border-b border-gray-300">
-                                        <div className="py-1.5 px-4 border-r border-gray-300">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格 韓国</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale KR</span>
+                                    {/* KR Pricing - Shown only for KR users */}
+                                    {product.country === 'KR' && (
+                                        <div className="grid grid-cols-2 border-b border-gray-300">
+                                            <div className="py-1.5 px-4 border-r border-gray-300">
+                                                <div className="flex flex-col mb-0.5">
+                                                    <span className="text-[11px] font-black text-black leading-tight">卸売価格 韓国</span>
+                                                    <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale KR</span>
+                                                </div>
+                                                <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                    <span className="text-[0.7em] mr-0.5">₩</span>{product.krBuyPrice.toLocaleString()}
+                                                </p>
                                             </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.7em] mr-0.5">₩</span>{product.krBuyPrice.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="py-1.5 px-4">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">小売価格 韓国</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price KR</span>
+                                            <div className="py-1.5 px-4">
+                                                <div className="flex flex-col mb-0.5">
+                                                    <span className="text-[11px] font-black text-black leading-tight">小売가격 韓国</span>
+                                                    <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price KR</span>
+                                                </div>
+                                                <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                    <span className="text-[0.7em] mr-0.5">₩</span>{product.krSellPrice.toLocaleString()}
+                                                </p>
                                             </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.7em] mr-0.5">₩</span>{product.krSellPrice.toLocaleString()}
-                                            </p>
                                         </div>
-                                    </div>
+                                    )}
 
                                     {/* Stock & Margin */}
                                     <div className="grid grid-cols-2">
