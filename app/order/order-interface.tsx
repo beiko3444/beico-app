@@ -79,9 +79,13 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     }, 0)
 
     const totalQuantity = Object.values(quantities).reduce((sum, q) => sum + q, 0)
+    const userCountry = products[0]?.country
+    const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
+    const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
 
     // Shipping: 3000 base + 3000 extra for every 100 items starting from 101
-    const shippingFee = totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0
+    // Disabled for US pricing users as requested
+    const shippingFee = (totalQuantity > 0 && !isUSD) ? Math.ceil(totalQuantity / 100) * 3000 : 0
 
     const supplyTotal = productTotal + shippingFee
     const vat = Math.round(supplyTotal * 0.1)
@@ -89,9 +93,6 @@ export default function OrderInterface({ products }: { products: Product[] }) {
 
     const hasItems = productTotal > 0
 
-    const userCountry = products[0]?.country
-    const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
-    const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
 
     return (
         <div className="pb-32 space-y-4">
