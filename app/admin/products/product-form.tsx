@@ -69,6 +69,28 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
     const [loading, setLoading] = useState(false)
+    const [exchangeRates, setExchangeRates] = useState<{ USD: number, JPY: number, CNY: number } | null>(null);
+
+    useEffect(() => {
+        // Fetch exchange rates
+        fetch('https://open.er-api.com/v6/latest/USD')
+            .then(res => res.json())
+            .then(data => {
+                if (data && data.rates) {
+                    const krw = data.rates.KRW;
+                    const jpy = data.rates.JPY;
+                    const cny = data.rates.CNY;
+                    if (krw && jpy && cny) {
+                        setExchangeRates({
+                            USD: krw,
+                            JPY: krw / jpy,
+                            CNY: krw / cny
+                        });
+                    }
+                }
+            })
+            .catch(err => console.error("Failed to fetch exchange rates", err));
+    }, []);
 
     type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string };
     type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice };
@@ -460,18 +482,28 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     <fieldset className="border border-gray-400 p-4 pt-2 mb-4">
                         <legend className="px-2 text-xs font-bold text-gray-700">지역별 & 등급별 단가 설정 (Regional & Tier Pricing)</legend>
 
-                        {/* Grade Tabs */}
-                        <div className="flex gap-2 mb-4">
-                            {['A', 'B', 'C', 'D'].map(grade => (
-                                <button
-                                    key={grade}
-                                    type="button"
-                                    onClick={() => setActiveGradeTab(grade)}
-                                    className={`px-4 py-1.5 text-xs font-bold border ${activeGradeTab === grade ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
-                                >
-                                    {grade} 등급
-                                </button>
-                            ))}
+                        {/* Grade Tabs & Real-time Exchange Rates */}
+                        <div className="flex gap-2 mb-4 items-center flex-wrap">
+                            <div className="flex gap-2">
+                                {['A', 'B', 'C', 'D'].map(grade => (
+                                    <button
+                                        key={grade}
+                                        type="button"
+                                        onClick={() => setActiveGradeTab(grade)}
+                                        className={`px-4 py-1.5 text-xs font-bold border ${activeGradeTab === grade ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
+                                    >
+                                        {grade} 등급
+                                    </button>
+                                ))}
+                            </div>
+                            {exchangeRates && (
+                                <div className="ml-auto flex items-center gap-3 text-[11px] bg-[#fff8e7] border border-[#ffcc00] px-3 py-1 rounded-sm shadow-sm border-b-2 border-r-2">
+                                    <span className="font-bold text-gray-700">🔴 실시간 환율:</span>
+                                    <span className="text-blue-700 font-bold">🇺🇸 ${Number(exchangeRates.USD).toFixed(0)}</span>
+                                    <span className="text-red-600 font-bold">🇯🇵(100¥) ₩{Number(exchangeRates.JPY * 100).toFixed(0)}</span>
+                                    <span className="text-red-700 font-bold">🇨🇳 ¥{Number(exchangeRates.CNY).toFixed(0)}</span>
+                                </div>
+                            )}
                         </div>
 
                         <div className="space-y-6">
@@ -507,6 +539,11 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         className="w-full pl-6 pr-2 py-1.5 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right"
                                                     />
                                                 </div>
+                                                {country !== 'KR' && exchangeRates && curPrices.cost && (
+                                                    <div className="text-[10px] text-gray-500 font-bold mt-0.5 text-right tracking-tighter">
+                                                        ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="space-y-1">
@@ -523,6 +560,11 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         className="w-full pl-6 pr-2 py-1.5 bg-[#fff8f8] border border-red-300 outline-none focus:border-red-600 text-xs text-right font-bold text-red-700"
                                                     />
                                                 </div>
+                                                {country !== 'KR' && exchangeRates && curPrices.wholesale && (
+                                                    <div className="text-[10px] text-red-400 font-bold mt-0.5 text-right tracking-tighter">
+                                                        ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="space-y-1">
@@ -539,6 +581,11 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         className="w-full pl-6 pr-2 py-1.5 bg-[#f8faff] border border-blue-300 outline-none focus:border-blue-600 text-xs text-right font-bold text-blue-700"
                                                     />
                                                 </div>
+                                                {country !== 'KR' && exchangeRates && curPrices.retail && (
+                                                    <div className="text-[10px] text-blue-400 font-bold mt-0.5 text-right tracking-tighter">
+                                                        ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="space-y-1">
