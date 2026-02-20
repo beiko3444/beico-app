@@ -12,7 +12,7 @@ export default function LoginPage() {
     const [password, setPassword] = useState('')
     const [showPassword, setShowPassword] = useState(false)
     const [rememberMe, setRememberMe] = useState(false)
-    const [error, setError] = useState('')
+    const [error, setError] = useState<React.ReactNode>('')
     const [loading, setLoading] = useState(false)
     const [time, setTime] = useState(new Date())
 
@@ -59,14 +59,19 @@ export default function LoginPage() {
                 if (result.error === 'CredentialsSignin') {
                     setError('ユーザーIDまたはパスワードが正しくありません。 / Invalid ID or Password')
                 } else if (result.error.startsWith('PENDING_APPROVAL')) {
-                    const country = result.error.split('_')[2] || 'UNKNOWN';
-                    if (country === 'KR') {
-                        setError('관리자 승인 대기중입니다. (승인 후 이용 가능합니다.)');
-                    } else if (country === 'JP') {
-                        setError('管理者の承認待ちです。(承認後にご利用いただけます。)');
-                    } else {
-                        setError('Account is pending admin approval. Please wait for authorization.');
-                    }
+                    setError(
+                        <div className="flex flex-col gap-1.5 mt-0.5 text-center px-1">
+                            <span className="font-bold text-[13px] text-[#e34219] tracking-tight">
+                                アカウントの承認待ちです。承認されるまでお待ちください。
+                            </span>
+                            <span className="text-[10px] font-normal text-[#e34219] tracking-tight leading-snug">
+                                Account is pending admin approval. Please wait for authorization.
+                            </span>
+                            <span className="text-[10px] font-normal text-[#e34219] tracking-tight leading-snug">
+                                관리자 승인 대기중입니다. 승인 후 이용해 주세요.
+                            </span>
+                        </div>
+                    );
                 } else {
                     setError('ログインに失敗しました。 / Login failed. Please try again.')
                 }
@@ -169,8 +174,8 @@ export default function LoginPage() {
                     </div>
 
                     {error && (
-                        <div className="text-red-500 text-xs font-bold bg-red-50 px-4 py-2.5 rounded-lg border border-red-100">
-                            {error}
+                        <div className="text-red-500 text-xs bg-red-50 px-4 py-3 rounded-lg border border-red-100 flex flex-col items-center justify-center">
+                            {typeof error === 'string' ? <span className="font-bold">{error}</span> : error}
                         </div>
                     )}
 

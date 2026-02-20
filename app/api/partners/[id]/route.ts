@@ -67,22 +67,10 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
     try {
         const { id } = await context.params
 
-        // Delete related profile first (if cascading is not set up, but let's assume Prisma handles relations or we do it manually)
-        // With Prisma SQLite, cascading isn't always automatic unless defined.
-        // Let's safe delete: Profile first, then User.
-
-        // First find the user to get the profile ID if needed, but we can delete profile by userId
-        try {
-            await prisma.partnerProfile.delete({
-                where: { userId: id }
-            })
-        } catch (e) {
-            // Check if error is "Record not found" - ignore it
-        }
-
-        // Delete User
-        await prisma.user.delete({
-            where: { id }
+        // Soft-delete: update status to DELETED
+        await prisma.user.update({
+            where: { id },
+            data: { status: 'DELETED' }
         })
 
         return NextResponse.json({ success: true })
