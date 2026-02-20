@@ -18,6 +18,6 @@ export default async function OrderHistoryPage() {
     })
 
     return (
-        <OrderHistory orders={orders} />
+        <OrderHistory orders={orders} userCountry={session.user.country} />
     )
 }
