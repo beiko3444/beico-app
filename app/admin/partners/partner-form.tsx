@@ -69,7 +69,12 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
     }, [isOpen, initialData])
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
+        const { name, value } = e.target;
+        let finalValue = value;
+        if (name === 'businessRegNumber') {
+            finalValue = value.replace(/[^\d]/g, '');
+        }
+        setFormData(prev => ({ ...prev, [name]: finalValue }))
     }
 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -226,7 +231,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                         </div>
                         <div>
                             <label className="block font-medium text-gray-700 mb-1">사업자 등록 번호</label>
-                            <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="000-00-00000" />
+                            <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="숫자만 입력 (Length irrelevant)" />
                         </div>
                     </div>
 

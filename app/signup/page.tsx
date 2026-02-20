@@ -123,14 +123,7 @@ export default function SignupPage() {
                 finalValue = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`
             }
         } else if (name === 'businessRegNumber') {
-            const numbers = value.replace(/[^\d]/g, '')
-            if (numbers.length <= 3) {
-                finalValue = numbers
-            } else if (numbers.length <= 5) {
-                finalValue = `${numbers.slice(0, 3)}-${numbers.slice(3)}`
-            } else {
-                finalValue = `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5, 10)}`
-            }
+            finalValue = value.replace(/[^\d]/g, '')
         }
 
         setFormData(prev => ({ ...prev, [name]: finalValue }))
@@ -406,9 +399,8 @@ export default function SignupPage() {
                                     value={formData.businessRegNumber}
                                     onChange={handleChange as any}
                                     required
-                                    maxLength={13}
                                     className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                    placeholder="123-45-67890"
+                                    placeholder="Business Registration Number (numbers only)"
                                 />
                             </div>
                         </div>
