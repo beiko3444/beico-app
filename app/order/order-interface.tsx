@@ -129,9 +129,11 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         <h3 className="text-lg font-black text-black leading-tight truncate tracking-tight">
                                             {product.nameJP || product.name}
                                         </h3>
-                                        <p className="text-[13px] font-medium text-black uppercase tracking-normal truncate">
-                                            {product.nameEN || product.name}
-                                        </p>
+                                        {product.nameEN && (
+                                            <p className="text-[12px] font-bold text-gray-500 tracking-tight truncate">
+                                                {product.nameEN}
+                                            </p>
+                                        )}
                                         <div className="flex items-center gap-2">
                                             <span className="text-[11px] font-bold text-black uppercase tracking-normal">Product Code:</span>
                                             <span className="text-[11px] font-medium text-black uppercase tracking-tighter font-inter">{product.productCode || '-'}</span>
@@ -369,7 +371,10 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50">
                                         <div>
                                             <p className="text-sm font-bold text-gray-800">{p.nameJP || p.name}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">{p.nameEN || p.name} × {quantities[p.id]}</p>
+                                            <p className="text-[10px] text-gray-400 mt-0.5">
+                                                {p.nameEN && <span className="mr-1">{p.nameEN}</span>}
+                                                <span>× {quantities[p.id]}</span>
+                                            </p>
                                         </div>
                                         <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{(p.sellPrice * quantities[p.id]).toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                     </div>
