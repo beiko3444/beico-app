@@ -187,7 +187,7 @@ export default function SignupPage() {
     return (
         <div className="min-h-screen bg-[#f9f9f9] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-6">
             <div className="w-full max-w-[500px] mb-5">
-                <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
+                <div className="flex items-center gap-6">
                     <div className="w-[77px] h-auto relative shrink-0">
                         <img
                             src="/logo.png"
@@ -204,9 +204,9 @@ export default function SignupPage() {
                 </div>
             </div>
 
-            <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-500 delay-100">
+            <div className="w-full max-w-[500px]">
                 {error && (
-                    <div className="mb-6 bg-red-50 border-l-4 border-[#e34219] text-[#e34219] px-4 py-3 rounded-r-lg text-sm font-medium animate-in fade-in slide-in-from-top-2">
+                    <div className="mb-6 bg-red-50 border-l-4 border-[#e34219] text-[#e34219] px-4 py-3 rounded-r-lg text-sm font-medium">
                         ⚠️ {error}
                     </div>
                 )}
@@ -256,7 +256,7 @@ export default function SignupPage() {
                         </div>
                     </form>
                 ) : (
-                    <form onSubmit={handleSubmit} className="space-y-5 animate-in slide-in-from-right-4 duration-500">
+                    <form onSubmit={handleSubmit} className="space-y-5">
                         <div className="flex justify-between items-center mb-6">
                             <button
                                 type="button"
@@ -343,7 +343,7 @@ export default function SignupPage() {
                                 />
                             </div>
                             {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                                <p className="text-[10px] text-[#e34219] font-bold ml-1 transition-all animate-in fade-in slide-in-from-top-1">
+                                <p className="text-[10px] text-[#e34219] font-bold ml-1 transition-all">
                                     {t.passwordMismatch}
                                 </p>
                             )}
