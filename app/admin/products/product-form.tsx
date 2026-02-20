@@ -544,6 +544,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
                                                     </div>
                                                 )}
+                                                {country === 'KR' && exchangeRates && curPrices.cost && (
+                                                    <div className="text-[9px] text-gray-400 font-bold mt-0.5 text-right tracking-tighter leading-tight">
+                                                        <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) / exchangeRates.JPY))}</div>
+                                                        <div>≈ ${((parseFloat(parseNumber(curPrices.cost)) || 0) / exchangeRates.USD).toFixed(2)}</div>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="space-y-1">
@@ -565,6 +571,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
                                                     </div>
                                                 )}
+                                                {country === 'KR' && exchangeRates && curPrices.wholesale && (
+                                                    <div className="text-[9px] text-red-400 font-bold mt-0.5 text-right tracking-tighter leading-tight">
+                                                        <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) / exchangeRates.JPY))}</div>
+                                                        <div>≈ ${((parseFloat(parseNumber(curPrices.wholesale)) || 0) / exchangeRates.USD).toFixed(2)}</div>
+                                                    </div>
+                                                )}
                                             </div>
 
                                             <div className="space-y-1">
@@ -584,6 +596,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                 {country !== 'KR' && exchangeRates && curPrices.retail && (
                                                     <div className="text-[10px] text-blue-400 font-bold mt-0.5 text-right tracking-tighter">
                                                         ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                    </div>
+                                                )}
+                                                {country === 'KR' && exchangeRates && curPrices.retail && (
+                                                    <div className="text-[9px] text-blue-400 font-bold mt-0.5 text-right tracking-tighter leading-tight">
+                                                        <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) / exchangeRates.JPY))}</div>
+                                                        <div>≈ ${((parseFloat(parseNumber(curPrices.retail)) || 0) / exchangeRates.USD).toFixed(2)}</div>
                                                     </div>
                                                 )}
                                             </div>
