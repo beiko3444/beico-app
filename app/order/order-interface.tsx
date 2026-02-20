@@ -88,7 +88,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     const shippingFee = (totalQuantity > 0 && !isUSD) ? Math.ceil(totalQuantity / 100) * 3000 : 0
 
     const supplyTotal = productTotal + shippingFee
-    const vat = Math.round(supplyTotal * 0.1)
+    const vat = isUSD ? 0 : Math.round(supplyTotal * 0.1)
     const totalAmount = supplyTotal + vat
 
     const hasItems = productTotal > 0
@@ -391,10 +391,12 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <span>供給価額 (Supply)</span>
                                     <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{supplyTotal.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                 </div>
-                                <div className="flex justify-between text-sm text-gray-500 font-medium">
-                                    <span>消費税 (10%)</span>
-                                    <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{vat.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
-                                </div>
+                                {!isUSD && (
+                                    <div className="flex justify-between text-sm text-gray-500 font-medium">
+                                        <span>消費税 (10%)</span>
+                                        <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{vat.toLocaleString()}</span>
+                                    </div>
+                                )}
                                 <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 mt-2">
                                     <span className="font-bold text-lg text-gray-900">合計金額</span>
                                     <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">{currencySymbol}</span>{totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
