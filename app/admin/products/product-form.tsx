@@ -72,9 +72,19 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     // Helper for formatting number with commas
     const formatNumber = (val: string | number) => {
         if (val === "" || val === null || val === undefined) return "";
-        const num = String(val).replace(/[^0-9]/g, "");
-        if (!num) return "";
-        return Number(num).toLocaleString();
+        const strVal = String(val);
+        // Remove characters except digits and the decimal point
+        const numStr = strVal.replace(/[^0-9.]/g, "");
+        if (!numStr) return "";
+
+        const parts = numStr.split('.');
+        parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+
+        // Return with decimal part if it exists (even if it's just '123.')
+        if (parts.length > 1) {
+            return `${parts[0]}.${parts.slice(1).join('')}`;
+        }
+        return parts[0];
     };
 
     const parseNumber = (val: string) => {
@@ -172,21 +182,21 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
                 productCode: productCode.trim(),
-                buyPrice: parseInt(parseNumber(buyPrice)) || 0,
-                sellPrice: parseInt(parseNumber(sellPrice)) || 0,
-                onlinePrice: parseInt(parseNumber(onlinePrice)) || 0,
-                jpBuyPrice: parseInt(parseNumber(jpBuyPrice)) || 0,
-                jpSellPrice: parseInt(parseNumber(jpSellPrice)) || 0,
-                krBuyPrice: parseInt(parseNumber(krBuyPrice)) || 0,
-                krSellPrice: parseInt(parseNumber(krSellPrice)) || 0,
-                usBuyPrice: parseInt(parseNumber(usBuyPrice)) || 0,
-                usSellPrice: parseInt(parseNumber(usSellPrice)) || 0,
+                buyPrice: parseFloat(parseNumber(buyPrice)) || 0,
+                sellPrice: parseFloat(parseNumber(sellPrice)) || 0,
+                onlinePrice: parseFloat(parseNumber(onlinePrice)) || 0,
+                jpBuyPrice: parseFloat(parseNumber(jpBuyPrice)) || 0,
+                jpSellPrice: parseFloat(parseNumber(jpSellPrice)) || 0,
+                krBuyPrice: parseFloat(parseNumber(krBuyPrice)) || 0,
+                krSellPrice: parseFloat(parseNumber(krSellPrice)) || 0,
+                usBuyPrice: parseFloat(parseNumber(usBuyPrice)) || 0,
+                usSellPrice: parseFloat(parseNumber(usSellPrice)) || 0,
                 stock: parseInt(parseNumber(stock)) || 0,
                 safetyStock: parseInt(parseNumber(safetyStock)) || 0,
-                priceA: priceA === "" ? null : parseInt(parseNumber(priceA)),
-                priceB: priceB === "" ? null : parseInt(parseNumber(priceB)),
-                priceC: parseInt(parseNumber(sellPrice)) || 0, // Always sync C with Wholesale (sellPrice)
-                priceD: priceD === "" ? null : parseInt(parseNumber(priceD)),
+                priceA: priceA === "" ? null : parseFloat(parseNumber(priceA)),
+                priceB: priceB === "" ? null : parseFloat(parseNumber(priceB)),
+                priceC: parseFloat(parseNumber(sellPrice)) || 0, // Always sync C with Wholesale (sellPrice)
+                priceD: priceD === "" ? null : parseFloat(parseNumber(priceD)),
                 imageUrl: imageUrl,
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
             }

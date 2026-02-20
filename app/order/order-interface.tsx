@@ -22,6 +22,7 @@ type Product = {
     jpSellPrice: number
     krBuyPrice: number
     krSellPrice: number
+    usBuyPrice: number
 }
 
 // Hardcoded bank info for now as requested
@@ -96,7 +97,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                     return (
                         <div key={product.id} className="bg-white rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 border border-gray-100 flex flex-col h-full transition-all duration-300 relative">
                             {/* Product Index Number */}
-                            <div className="absolute top-2 left-3 text-[10px] font-bold text-gray-300 font-inter">
+                            <div className="absolute top-2 left-3 text-[10px] font-bold text-gray-600 font-inter">
                                 {String(index + 1).padStart(3, '0')}
                             </div>
                             <div className="px-8 pt-8 flex-1">
@@ -136,10 +137,10 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     width={0.8}
                                                     height={24}
                                                     displayValue={false}
-                                                    containerClassName="gap-3"
+                                                    containerClassName="gap-3 mb-1"
                                                     buttonClassName="px-2 py-0.5 bg-gray-50 text-[9px] font-medium text-gray-400 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 transition-all uppercase"
                                                 />
-                                                <p className="text-[10px] font-medium text-black font-inter mt-[-4px]">{product.barcode}</p>
+                                                <p className="text-[10px] font-medium text-black font-inter mt-1 tracking-widest">{product.barcode}</p>
                                             </div>
                                         ) : (
                                             <div className="pt-0.5">
@@ -154,20 +155,20 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                     <div className="grid grid-cols-2 border-b border-gray-300">
                                         <div className="py-1.5 px-4 border-r border-gray-300">
                                             <div className="flex flex-col mb-0.5">
+                                                <span className="text-[11px] font-black text-black leading-tight">卸売価格 米国</span>
+                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale US</span>
+                                            </div>
+                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
+                                                <span className="text-[0.85em] mr-0.5">$</span>{product.usBuyPrice.toLocaleString()}
+                                            </p>
+                                        </div>
+                                        <div className="py-1.5 px-4 border-r border-gray-300">
+                                            <div className="flex flex-col mb-0.5">
                                                 <span className="text-[11px] font-black text-black leading-tight">卸売価格 日本</span>
                                                 <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">wholesale JP</span>
                                             </div>
                                             <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
                                                 <span className="text-[0.85em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
-                                            </p>
-                                        </div>
-                                        <div className="py-1.5 px-4">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black leading-tight">小売価格 日本</span>
-                                                <span className="text-[8px] font-bold text-black uppercase tracking-widest leading-none">Retail Price JP</span>
-                                            </div>
-                                            <p className="text-[22px] font-medium text-gray-900 leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                <span className="text-[0.85em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
                                             </p>
                                         </div>
                                     </div>
