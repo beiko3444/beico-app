@@ -43,7 +43,7 @@ export default async function PartnersPage() {
                 </div>
             </div>
 
-            <div className="glass-panel rounded-2xl shadow-sm bg-white border border-gray-100 overflow-hidden">
+            <div className="glass-panel rounded-2xl shadow-sm bg-white border border-gray-100 overflow-x-auto">
                 <table className="table-auto min-w-full border-collapse text-xs">
                     <thead className="bg-[#d9361b] text-white h-8">
                         <tr>

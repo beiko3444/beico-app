@@ -518,8 +518,8 @@ export default function ProductionClient() {
 
 
             {/* Table */}
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-visible shadow-sm">
-                <div className="overflow-visible">
+            <div className="bg-white border border-gray-100 rounded-2xl overflow-x-auto shadow-sm pb-16">
+                <div className="min-w-[800px]">
                     <table className="w-full text-xs text-left">
                         <thead className="bg-gray-50 text-black font-black uppercase border-b border-gray-100">
                             <tr>

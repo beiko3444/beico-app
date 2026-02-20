@@ -258,48 +258,50 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
         >
-            <table className="w-full table-auto min-w-max border-collapse">
-                <thead className="bg-[var(--color-brand-blue)] text-white">
-                    <tr>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">순서</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">No</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">이미지</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품코드</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">바코드</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">매입가</th>
-                        <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매가</th>
-                        <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">판매가</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">재고</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">마진(도매/소매)</th>
-                        <th className="px-2 py-1.5 text-center font-bold text-[11px] last:border-0 whitespace-nowrap">관리</th>
-                    </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                    <SortableContext
-                        items={products.map(p => p.id)}
-                        strategy={verticalListSortingStrategy}
-                    >
-                        {products.length === 0 ? (
-                            <tr>
-                                <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
-                                    등록된 상품이 없습니다.
-                                </td>
-                            </tr>
-                        ) : (
-                            products.map((product: any, index: number) => (
-                                <SortableProductRow
-                                    key={product.id}
-                                    product={product}
-                                    index={index}
-                                    onSortOrderChange={onSortOrderChange}
-                                    onDelete={handleDelete}
-                                />
-                            ))
-                        )}
-                    </SortableContext>
-                </tbody>
-            </table>
+            <div className="overflow-x-auto w-full pb-2">
+                <table className="w-full table-auto min-w-max border-collapse">
+                    <thead className="bg-[var(--color-brand-blue)] text-white">
+                        <tr>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">순서</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">No</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">이미지</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품코드</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">바코드</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">매입가</th>
+                            <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매가</th>
+                            <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">판매가</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">재고</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">마진(도매/소매)</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] last:border-0 whitespace-nowrap">관리</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                        <SortableContext
+                            items={products.map(p => p.id)}
+                            strategy={verticalListSortingStrategy}
+                        >
+                            {products.length === 0 ? (
+                                <tr>
+                                    <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
+                                        등록된 상품이 없습니다.
+                                    </td>
+                                </tr>
+                            ) : (
+                                products.map((product: any, index: number) => (
+                                    <SortableProductRow
+                                        key={product.id}
+                                        product={product}
+                                        index={index}
+                                        onSortOrderChange={onSortOrderChange}
+                                        onDelete={handleDelete}
+                                    />
+                                ))
+                            )}
+                        </SortableContext>
+                    </tbody>
+                </table>
+            </div>
         </DndContext>
     )
 }
