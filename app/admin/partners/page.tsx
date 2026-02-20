@@ -97,7 +97,7 @@ export default async function PartnersPage() {
                                                 partner.country === 'Japan' ? '🇯🇵 일본' :
                                                     partner.country === 'USA' ? '🇺🇸 미국' :
                                                         partner.country === 'China' ? '🇨🇳 중국' :
-                                                            partner.country === 'Turkey' ? '🇹🇷 터키' :
+                                                            partner.country === 'Turkey' ? '🇹🇷 투르키예' :
                                                                 partner.country === 'Indonesia' ? '🇮🇩 인도네시아' :
                                                                     partner.country || '-'}
                                         </span>

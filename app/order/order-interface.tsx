@@ -89,6 +89,10 @@ export default function OrderInterface({ products }: { products: Product[] }) {
 
     const hasItems = productTotal > 0
 
+    const userCountry = products[0]?.country
+    const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
+    const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
+
     return (
         <div className="pb-32 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -367,13 +371,13 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             <p className="text-sm font-bold text-gray-800">{p.nameJP || p.name}</p>
                                             <p className="text-[10px] text-gray-400 mt-0.5">{p.nameEN || p.name} × {quantities[p.id]}</p>
                                         </div>
-                                        <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">₩</span>{(p.sellPrice * quantities[p.id]).toLocaleString()}</span>
+                                        <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{(p.sellPrice * quantities[p.id]).toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                     </div>
                                 ))}
                                 {shippingFee > 0 && (
                                     <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 mt-2">
                                         <span className="text-sm font-bold text-gray-600">配送料 (Shipping)</span>
-                                        <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">₩</span>{shippingFee.toLocaleString()}</span>
+                                        <span className="font-bold text-gray-900"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{shippingFee.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                     </div>
                                 )}
                             </div>
@@ -381,15 +385,15 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <div className="bg-gray-50 rounded-2xl p-6 space-y-3 mb-8">
                                 <div className="flex justify-between text-sm text-gray-500 font-medium">
                                     <span>供給価額 (Supply)</span>
-                                    <span><span className="text-[0.8em] mr-0.5">₩</span>{supplyTotal.toLocaleString()}</span>
+                                    <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{supplyTotal.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                 </div>
                                 <div className="flex justify-between text-sm text-gray-500 font-medium">
                                     <span>消費税 (10%)</span>
-                                    <span><span className="text-[0.8em] mr-0.5">₩</span>{vat.toLocaleString()}</span>
+                                    <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{vat.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                 </div>
                                 <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 mt-2">
                                     <span className="font-bold text-lg text-gray-900">合計金額</span>
-                                    <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">₩</span>{totalAmount.toLocaleString()}</span>
+                                    <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">{currencySymbol}</span>{totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                 </div>
                             </div>
 

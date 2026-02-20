@@ -220,7 +220,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                 <option value="Korea">🇰🇷 한국 (Korea)</option>
                                 <option value="USA">🇺🇸 미국 (USA)</option>
                                 <option value="China">🇨🇳 중국 (China)</option>
-                                <option value="Turkey">🇹🇷 土耳其 (Turkey)</option>
+                                <option value="Turkey">🇹🇷 투르키예 (Türkiye)</option>
                                 <option value="Indonesia">🇮🇩 印度尼西亜 (Indonesia)</option>
                             </select>
                         </div>
