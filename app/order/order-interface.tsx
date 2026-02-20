@@ -129,11 +129,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         <h3 className="text-lg font-black text-black leading-tight truncate tracking-tight">
                                             {product.nameJP || product.name}
                                         </h3>
-                                        {product.nameEN && (
-                                            <p className="text-[12px] font-bold text-gray-500 tracking-tight truncate">
-                                                {product.nameEN}
-                                            </p>
-                                        )}
+                                        <p className="text-[13px] font-medium text-black uppercase tracking-normal truncate">
+                                            {product.nameEN || product.name}
+                                        </p>
                                         <div className="flex items-center gap-2">
                                             <span className="text-[11px] font-bold text-black uppercase tracking-normal">Product Code:</span>
                                             <span className="text-[11px] font-medium text-black uppercase tracking-tighter font-inter">{product.productCode || '-'}</span>
@@ -325,19 +323,19 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             </div>
 
             {/* Sticky Footer */}
-            <div className="fixed bottom-0 left-0 right-0 bg-white/90 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)]">
-                <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
-                    <div className="text-right flex flex-col items-end">
-                        <div className="flex flex-col items-end mb-1 text-gray-400 gap-0.5">
-                            <span className="text-[10px] font-black leading-tight">合計金額 (税抜)</span>
-                            <span className="text-[8px] font-bold uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
+            {hasItems && (
+                <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-200 p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] animate-in slide-in-from-bottom duration-300">
+                    <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
+                        <div className="text-right flex flex-col items-end">
+                            <div className="flex flex-col items-end mb-1 text-gray-400 gap-0.5">
+                                <span className="text-[10px] font-black leading-tight">合計金額 (税抜)</span>
+                                <span className="text-[8px] font-bold uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
+                            </div>
+                            <p className="text-4xl font-medium text-[#111827] leading-none font-inter tracking-tighter">
+                                <span className="text-[0.5em] mr-1">{currencySymbol}</span>{productTotal.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})}
+                            </p>
                         </div>
-                        <p className="text-4xl font-medium text-[#111827] leading-none font-inter tracking-tighter">
-                            <span className="text-[0.5em] mr-1">₩</span>{productTotal.toLocaleString()}
-                        </p>
-                    </div>
 
-                    {hasItems && (
                         <button
                             onClick={handleOrderNow}
                             className="h-14 px-10 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-end md:justify-center gap-3 font-bold text-[15px] tracking-wide group w-full md:w-auto"
@@ -348,9 +346,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             </div>
                             <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
                         </button>
-                    )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {
                 showSummary && (
