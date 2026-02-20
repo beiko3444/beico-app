@@ -4,23 +4,87 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
-    User,
-    Lock,
-    Building2,
-    FileText,
-    Mail,
-    Phone,
-    Printer,
-    MapPin,
-    Home,
-    ArrowRight,
-    Eye,
-    EyeOff,
-    Globe
+    User, Lock, Building2, Mail, Phone, Printer, MapPin, Home, ArrowRight, Eye, EyeOff, Globe, ArrowLeft
 } from 'lucide-react'
+
+const TRANSLATIONS: Record<string, any> = {
+    Japan: {
+        title: "業者向け会員登録",
+        subtitle: "WHOLESALE REGISTRATION",
+        userId: "ユーザーID / User ID",
+        password: "パスワード / Password",
+        confirmPassword: "パスワードの確認 / Confirm Password",
+        companyName: "商号 / Company Name",
+        contactPerson: "担当者名 / Contact Person",
+        nationality: "国籍 / Nationality",
+        registrationNumber: "事業者登録番号 / Business Reg. Number",
+        email: "メールアドレス / Email",
+        phone: "電話番号 / Phone",
+        fax: "ファックス / Fax",
+        address1: "住所1 / Address 1",
+        address2: "詳細住所 / Address 2",
+        submit: "登録する / Register",
+        passwordMismatch: "パスワードが一致しません。 / Passwords do not match.",
+        successMsg: "会員登録が完了しました。管理者の承認をお待ちください。\nRegistration complete. Please wait for admin approval.",
+        errorPrefix: "登録中にエラーが発生しました。 / An error occurred during registration.",
+        loginText: "すでにアカウントをお持ちですか？",
+        loginLink: "ログイン Login",
+        countryPlaceholder: "国籍を選択 / Select Nationality",
+        nextButton: "次へ / Next"
+    },
+    Korea: {
+        title: "도매상 회원가입",
+        subtitle: "WHOLESALE REGISTRATION",
+        userId: "로그인 아이디 (User ID)",
+        password: "비밀번호 (Password)",
+        confirmPassword: "비밀번호 확인 (Confirm Password)",
+        companyName: "상호명 (Company Name)",
+        contactPerson: "담당자명 (Contact Person)",
+        nationality: "국가 (Nationality)",
+        registrationNumber: "사업자등록번호 (Business Reg. Number)",
+        email: "이메일 (Email)",
+        phone: "전화번호 (Phone)",
+        fax: "팩스 (Fax)",
+        address1: "기본 주소 (Address 1)",
+        address2: "상세 주소 (Address 2)",
+        submit: "가입하기 (Register)",
+        passwordMismatch: "비밀번호가 일치하지 않습니다.",
+        successMsg: "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.",
+        errorPrefix: "등록 중 오류가 발생했습니다.",
+        loginText: "이미 계정이 있으신가요?",
+        loginLink: "로그인 Login",
+        countryPlaceholder: "국가 선택 / Select Nationality",
+        nextButton: "다음 / Next"
+    },
+    Default: {
+        title: "Wholesale Registration",
+        subtitle: "WHOLESALE REGISTRATION",
+        userId: "User ID",
+        password: "Password",
+        confirmPassword: "Confirm Password",
+        companyName: "Company Name",
+        contactPerson: "Contact Person",
+        nationality: "Nationality",
+        registrationNumber: "Business Registration Number",
+        email: "Email",
+        phone: "Phone",
+        fax: "Fax",
+        address1: "Address 1",
+        address2: "Address 2",
+        submit: "Register",
+        passwordMismatch: "Passwords do not match.",
+        successMsg: "Registration complete. Please wait for admin approval.",
+        errorPrefix: "An error occurred during registration.",
+        loginText: "Already have an account?",
+        loginLink: "Log in",
+        countryPlaceholder: "Select Nationality",
+        nextButton: "Next"
+    }
+}
 
 export default function SignupPage() {
     const router = useRouter()
+    const [step, setStep] = useState(1)
     const [formData, setFormData] = useState({
         businessName: '',
         representativeName: '',
@@ -39,16 +103,16 @@ export default function SignupPage() {
     const [loading, setLoading] = useState(false)
     const [error, setError] = useState('')
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const t = TRANSLATIONS[formData.country] || TRANSLATIONS['Default'];
+
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target
         let finalValue = value
 
-        // Password matching validation error reset
         if (name === 'password' || name === 'confirmPassword') {
             setError('')
         }
 
-        // Auto-format phone number
         if (name === 'contact') {
             const numbers = value.replace(/[^\d]/g, '')
             if (numbers.length <= 3) {
@@ -72,19 +136,28 @@ export default function SignupPage() {
         setFormData(prev => ({ ...prev, [name]: finalValue }))
     }
 
+    const handleNextStep = (e: React.FormEvent) => {
+        e.preventDefault()
+        if (!formData.country) {
+            setError('Please select a nationality first.')
+            return
+        }
+        setError('')
+        setStep(2)
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
         setLoading(true)
         setError('')
 
         if (formData.password !== formData.confirmPassword) {
-            setError('パスワードが一致しません。 / Passwords do not match.')
+            setError(t.passwordMismatch)
             setLoading(false)
             return
         }
 
         try {
-            // Combine address and detail address
             const submitData = {
                 ...formData,
                 address: `${formData.address} ${formData.addressDetail}`.trim()
@@ -99,10 +172,10 @@ export default function SignupPage() {
             const data = await res.json()
 
             if (!res.ok) {
-                throw new Error(data.error || '登録中にエラーが発生しました。 / An error occurred during registration.')
+                throw new Error(data.error || t.errorPrefix)
             }
 
-            alert('会員登録が完了しました。管理者の承認をお待ちください。\nRegistration complete. Please wait for admin approval.')
+            alert(t.successMsg)
             router.push('/login')
         } catch (err: any) {
             setError(err.message)
@@ -113,7 +186,6 @@ export default function SignupPage() {
 
     return (
         <div className="min-h-screen bg-[#f9f9f9] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-6">
-
             <div className="w-full max-w-[500px] mb-5">
                 <div className="flex items-center gap-6 animate-in fade-in slide-in-from-top-4 duration-500">
                     <div className="w-[77px] h-auto relative shrink-0">
@@ -123,325 +195,351 @@ export default function SignupPage() {
                             className="w-full h-full object-contain"
                         />
                     </div>
-
                     <div className="flex flex-col justify-center mt-2">
-                        <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">業者向け会員登録</h1>
+                        <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">{t.title}</h1>
                         <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 whitespace-nowrap">
-                            Wholesale Registration
+                            {t.subtitle}
                         </p>
                     </div>
                 </div>
             </div>
 
             <div className="w-full max-w-[500px] animate-in fade-in zoom-in duration-500 delay-100">
-
                 {error && (
                     <div className="mb-6 bg-red-50 border-l-4 border-[#e34219] text-[#e34219] px-4 py-3 rounded-r-lg text-sm font-medium animate-in fade-in slide-in-from-top-2">
                         ⚠️ {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSubmit} className="space-y-5">
-
-                    {/* User ID */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> ユーザーID / User ID
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <User size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type="text"
-                                name="username"
-                                value={formData.username}
-                                onChange={handleChange}
-                                required
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="Desired User ID"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Password */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> パスワード / Password
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Lock size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="password"
-                                value={formData.password}
-                                onChange={handleChange}
-                                required
-                                className="w-full h-12 pl-11 pr-11 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm"
-                                placeholder="••••••••"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
-                            >
-                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                            </button>
-                        </div>
-                    </div>
-
-                    {/* Confirm Password */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> パスワードの確認 / Confirm Password
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Lock size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type={showPassword ? "text" : "password"}
-                                name="confirmPassword"
-                                value={formData.confirmPassword}
-                                onChange={handleChange}
-                                required
-                                className={`w-full h-12 pl-11 pr-11 bg-white border rounded-lg outline-none transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm ${formData.confirmPassword && formData.password !== formData.confirmPassword
-                                    ? 'border-red-300 focus:border-red-400'
-                                    : 'border-gray-200 focus:border-gray-400'
-                                    }`}
-                                placeholder="••••••••"
-                            />
-                        </div>
-                        {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                            <p className="text-[10px] text-[#e34219] font-bold ml-1 transition-all animate-in fade-in slide-in-from-top-1">
-                                パスワードが一致しません。 / Passwords do not match.
-                            </p>
-                        )}
-                    </div>
-
-                    {/* Company Name */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> 商号 / Company Name
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Building2 size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type="text"
-                                name="businessName"
-                                value={formData.businessName}
-                                onChange={handleChange}
-                                required
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="Your Company Name"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Contact Person */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> 担当者名 / Contact Person
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <User size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type="text"
-                                name="representativeName"
-                                value={formData.representativeName}
-                                onChange={handleChange}
-                                required
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="Full Name"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Nationality Selection */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> 国籍 / Nationality
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors pointer-events-none">
-                                <Globe size={18} strokeWidth={1.5} />
-                            </div>
-                            <select
-                                name="country"
-                                value={formData.country}
-                                onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                                required
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium shadow-sm appearance-none cursor-pointer"
-                            >
-                                <option value="" disabled>Select Nationality</option>
-                                <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
-                                <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
-                                <option value="USA">🇺🇸 米国 / USA / 미국</option>
-                                <option value="China">🇨🇳 中国 / China / 중국</option>
-                                <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
-                                <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
-                            </select>
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                <ArrowRight size={14} className="rotate-90" />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Business Reg Number */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> 事業者登録番号 / Business Registration Number
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <span className="text-lg font-bold">#</span>
-                            </div>
-                            <input
-                                type="text"
-                                name="businessRegNumber"
-                                value={formData.businessRegNumber}
-                                onChange={handleChange}
-                                required
-                                maxLength={13}
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="123-45-67890"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Email */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> メールアドレス / Email
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Mail size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type="email"
-                                name="email"
-                                value={formData.email}
-                                onChange={handleChange}
-                                required
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="example@company.com"
-                            />
-                        </div>
-                    </div>
-
-                    {/* Phone & Fax Grid */}
-                    <div className="grid grid-cols-2 gap-3">
-                        {/* Phone */}
+                {step === 1 ? (
+                    <form onSubmit={handleNextStep} className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
                         <div className="space-y-1.5">
                             <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> 電話番号 / Phone
+                                <span className="text-[#e34219]">*</span> 国籍 / Nationality / 국가
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors pointer-events-none">
+                                    <Globe size={18} strokeWidth={1.5} />
+                                </div>
+                                <select
+                                    name="country"
+                                    value={formData.country}
+                                    onChange={(e) => {
+                                        handleChange(e as any)
+                                        setError('')
+                                    }}
+                                    required
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium shadow-sm appearance-none cursor-pointer"
+                                >
+                                    <option value="" disabled>Select Nationality</option>
+                                    <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
+                                    <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
+                                    <option value="USA">🇺🇸 米国 / USA / 미국</option>
+                                    <option value="China">🇨🇳 中国 / China / 중국</option>
+                                    <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
+                                    <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                    <ArrowRight size={14} className="rotate-90" />
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="pt-4">
+                            <button
+                                type="submit"
+                                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight group"
+                            >
+                                <span>Next / 次へ / 다음</span>
+                                <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    <form onSubmit={handleSubmit} className="space-y-5 animate-in slide-in-from-right-4 duration-500">
+                        <div className="flex justify-between items-center mb-6">
+                            <button
+                                type="button"
+                                onClick={() => setStep(1)}
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-800 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-gray-100"
+                            >
+                                <ArrowLeft size={12} strokeWidth={3} />
+                                Change Nationality / 国籍変更 / 국가 변경
+                            </button>
+                            <div className="px-3 py-1 text-[10px] font-black text-[#e34219] bg-red-50 rounded-full border border-red-100 uppercase tracking-widest">
+                                Step 2/2
+                            </div>
+                        </div>
+
+                        {/* User ID */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.userId}
                             </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Phone size={18} strokeWidth={1.5} />
+                                    <User size={18} strokeWidth={1.5} />
                                 </div>
                                 <input
                                     type="text"
-                                    name="contact"
-                                    value={formData.contact}
-                                    onChange={handleChange}
+                                    name="username"
+                                    value={formData.username}
+                                    onChange={handleChange as any}
+                                    required
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    placeholder="your_id"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Password */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.password}
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <Lock size={18} strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="password"
+                                    value={formData.password}
+                                    onChange={handleChange as any}
+                                    required
+                                    className="w-full h-12 pl-11 pr-11 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm"
+                                    placeholder="••••••••"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
+                                >
+                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Confirm Password */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.confirmPassword}
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <Lock size={18} strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type={showPassword ? "text" : "password"}
+                                    name="confirmPassword"
+                                    value={formData.confirmPassword}
+                                    onChange={handleChange as any}
+                                    required
+                                    className={`w-full h-12 pl-11 pr-11 bg-white border rounded-lg outline-none transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm ${formData.confirmPassword && formData.password !== formData.confirmPassword
+                                        ? 'border-red-300 focus:border-red-400'
+                                        : 'border-gray-200 focus:border-gray-400'
+                                        }`}
+                                    placeholder="••••••••"
+                                />
+                            </div>
+                            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
+                                <p className="text-[10px] text-[#e34219] font-bold ml-1 transition-all animate-in fade-in slide-in-from-top-1">
+                                    {t.passwordMismatch}
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Company Name */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.companyName}
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <Building2 size={18} strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type="text"
+                                    name="businessName"
+                                    value={formData.businessName}
+                                    onChange={handleChange as any}
+                                    required
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    placeholder="Your Company Name"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Contact Person */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.contactPerson}
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <User size={18} strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type="text"
+                                    name="representativeName"
+                                    value={formData.representativeName}
+                                    onChange={handleChange as any}
+                                    required
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    placeholder="Full Name"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Business Reg Number */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.registrationNumber}
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <span className="text-lg font-bold">#</span>
+                                </div>
+                                <input
+                                    type="text"
+                                    name="businessRegNumber"
+                                    value={formData.businessRegNumber}
+                                    onChange={handleChange as any}
                                     required
                                     maxLength={13}
                                     className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                    placeholder="03-1234-5678"
+                                    placeholder="123-45-67890"
                                 />
                             </div>
                         </div>
 
-                        {/* Fax */}
+                        {/* Email */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">ファックス / Fax</label>
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.email}
+                            </label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Printer size={18} strokeWidth={1.5} />
+                                    <Mail size={18} strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type="email"
+                                    name="email"
+                                    value={formData.email}
+                                    onChange={handleChange as any}
+                                    required
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    placeholder={t.emailPlaceholder}
+                                />
+                            </div>
+                        </div>
+
+                        {/* Phone & Fax Grid */}
+                        <div className="grid grid-cols-2 gap-3">
+                            {/* Phone */}
+                            <div className="space-y-1.5">
+                                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                    <span className="text-[#e34219]">*</span> {t.phone}
+                                </label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                        <Phone size={18} strokeWidth={1.5} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        name="contact"
+                                        value={formData.contact}
+                                        onChange={handleChange as any}
+                                        required
+                                        maxLength={13}
+                                        className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                        placeholder="03-1234-5678"
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Fax */}
+                            <div className="space-y-1.5">
+                                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">{t.fax}</label>
+                                <div className="relative group">
+                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                        <Printer size={18} strokeWidth={1.5} />
+                                    </div>
+                                    <input
+                                        type="text"
+                                        name="fax"
+                                        value={formData.fax}
+                                        onChange={handleChange as any}
+                                        className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                        placeholder="(Optional)"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Address 1 */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> {t.address1}
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <MapPin size={18} strokeWidth={1.5} />
                                 </div>
                                 <input
                                     type="text"
-                                    name="fax"
-                                    value={formData.fax}
-                                    onChange={handleChange}
+                                    name="address"
+                                    value={formData.address}
+                                    onChange={handleChange as any}
+                                    required
                                     className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                    placeholder="(Optional)"
+                                    placeholder="Prefecture, City, District"
                                 />
                             </div>
                         </div>
-                    </div>
 
-                    {/* Address 1 */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
-                            <span className="text-[#e34219]">*</span> 住所1 / Address 1
-                        </label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <MapPin size={18} strokeWidth={1.5} />
+                        {/* Address 2 */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">{t.address2}</label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
+                                    <Home size={18} strokeWidth={1.5} />
+                                </div>
+                                <input
+                                    type="text"
+                                    name="addressDetail"
+                                    value={formData.addressDetail}
+                                    onChange={handleChange as any}
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    placeholder="Building, Apt, Suite"
+                                />
                             </div>
-                            <input
-                                type="text"
-                                name="address"
-                                value={formData.address}
-                                onChange={handleChange}
-                                required
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="Prefecture, City, District"
-                            />
                         </div>
-                    </div>
 
-                    {/* Address 2 */}
-                    <div className="space-y-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">住所2 / Address 2</label>
-                        <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                <Home size={18} strokeWidth={1.5} />
-                            </div>
-                            <input
-                                type="text"
-                                name="addressDetail"
-                                value={formData.addressDetail}
-                                onChange={handleChange}
-                                className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
-                                placeholder="Building, Apt, Suite"
-                            />
+                        {/* Submit Button */}
+                        <div className="pt-6">
+                            <button
+                                type="submit"
+                                disabled={loading}
+                                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight disabled:opacity-70 disabled:cursor-not-allowed group"
+                            >
+                                {loading ? (
+                                    <span className="animate-pulse">Processing...</span>
+                                ) : (
+                                    <>
+                                        <span>{t.submit}</span>
+                                        <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
+                                    </>
+                                )}
+                            </button>
                         </div>
-                    </div>
-
-
-                    {/* Submit Button */}
-                    <div className="pt-6">
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight disabled:opacity-70 disabled:cursor-not-allowed group"
-                        >
-                            {loading ? (
-                                <span className="animate-pulse">Processing...</span>
-                            ) : (
-                                <>
-                                    <span>業者向け会員登録 / Register</span>
-                                    <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
-                                </>
-                            )}
-                        </button>
-                    </div>
-                </form>
+                    </form>
+                )}
 
                 {/* Footer */}
                 <div className="mt-8 text-center">
                     <p className="text-xs text-gray-500 font-medium tracking-wide">
-                        すでにアカウントをお持ちですか？ <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">ログイン Login</Link>
+                        {t.loginText} <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">{t.loginLink}</Link>
                     </p>
                 </div>
             </div>
