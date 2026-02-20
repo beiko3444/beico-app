@@ -209,112 +209,103 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     }
 
     return (
-        <div className="flex flex-col items-end gap-2 w-full">
-            {/* Tax Invoice badges removed per user request to save space */}
+        <div className="flex flex-col gap-3 w-full">
+            {/* Shipping Info Section */}
+            <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-gray-400 ml-1">Carrier selection</label>
+                    <div className="relative">
+                        <select
+                            value={courier}
+                            onChange={(e) => setCourier(e.target.value)}
+                            disabled={!isEditingTracking && !!order.trackingNumber}
+                            className="w-full appearance-none border border-gray-200 rounded-lg p-3 text-sm text-gray-800 font-medium bg-white outline-none focus:border-[#ea580c]"
+                        >
+                            <option value="Rosen">Rosen Courier (CJ Logistics)</option>
+                            <option value="CJ">CJ Logistics</option>
+                            <option value="Lotte">Lotte Courier</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-gray-400">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                    </div>
+                </div>
 
-            {/* Shipping Info Section - Enabled for relevant statuses */}
-            {(status === 'PENDING' || status === 'APPROVED' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED') && (
-                <div className="flex flex-col items-end gap-2">
-                    {isEditingTracking || !order.trackingNumber ? (
-                        <div className="flex items-center gap-2">
-                            <select
-                                value={courier}
-                                onChange={(e) => setCourier(e.target.value)}
-                                className="px-2 py-1 border rounded text-xs w-[140px] font-bold text-gray-700 bg-gray-50"
-                            >
-                                <option value="Rosen">로젠택배</option>
-                                <option value="CJ">CJ대한통운</option>
-                                <option value="Lotte">롯데택배</option>
-                            </select>
-                            <input
-                                type="text"
-                                value={trackingNumber}
-                                onChange={(e) => setTrackingNumber(e.target.value)}
-                                placeholder="송장번호 입력"
-                                className="px-2 py-1 bg-white text-[#d9361b] border border-gray-300 rounded text-xs w-[140px] font-bold placeholder-gray-300 focus:border-[#d9361b] outline-none transition-all"
-                            />
+                <div className="flex flex-col gap-1">
+                    <label className="text-[11px] text-gray-400 ml-1">Tracking Number</label>
+                    <div className="flex gap-2">
+                        <input
+                            type="text"
+                            value={trackingNumber}
+                            onChange={(e) => setTrackingNumber(e.target.value)}
+                            disabled={!isEditingTracking && !!order.trackingNumber}
+                            placeholder="Enter tracking no."
+                            className="flex-1 border border-gray-200 rounded-lg p-3 text-sm text-gray-800 font-medium bg-white outline-none focus:border-[#ea580c]"
+                        />
+                        {(!order.trackingNumber || isEditingTracking) ? (
                             <button
                                 onClick={saveShippingInfo}
                                 disabled={loading}
-                                className="bg-[#d9361b] text-white px-3 py-1 rounded-md text-xs font-bold hover:brightness-110 shadow-md hover:shadow-lg active:scale-95 transition-all whitespace-nowrap"
+                                className="bg-[#e43f29] text-white px-6 rounded-lg font-bold text-sm w-[80px]"
                             >
-                                저장
+                                Save
                             </button>
-                        </div>
-                    ) : (
-                        <div className="flex items-center gap-2">
-                            <div className="flex items-center gap-2 text-xs text-gray-700 bg-white px-3 py-0.5 rounded border border-gray-200">
-                                <span className="font-semibold text-gray-900">
-                                    {courier === 'Rosen' ? 'Rosen (로젠택배)' :
-                                        courier === 'CJ' ? 'CJ Logistics (CJ대한통운)' :
-                                            courier === 'Lotte' ? 'Lotte (롯데택배)' : courier}
-                                </span>
-                                <span className="mx-1 text-gray-400">|</span>
-                                <span className="">송장번호 : <span className="font-bold">{order.trackingNumber}</span></span>
-                            </div>
+                        ) : (
                             <button
                                 onClick={() => setIsEditingTracking(true)}
-                                className="text-xs bg-[#d9361b] text-white px-2.5 py-1 rounded-md font-bold hover:brightness-110 shadow-sm hover:shadow-md active:scale-95 transition-all"
+                                className="bg-gray-100 text-gray-600 px-6 rounded-lg font-bold text-sm w-[80px]"
                             >
-                                수정
+                                Edit
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
-            )}
+            </div>
 
-            <div className="flex flex-col items-end gap-2 w-full">
-                {/* Deposit Info removed per user request */}
-
-                {/* Status Toggles */}
-                <div className="flex items-center gap-2 flex-wrap justify-end">
-                    {status === 'DEPOSIT_COMPLETED' && !adminDepositConfirmedAt && (
-                        <button
-                            onClick={confirmAdminDeposit}
-                            disabled={loading}
-                            className="bg-green-600 text-white px-4 py-1 rounded-md text-xs font-bold hover:bg-green-700 shadow-md hover:shadow-lg active:scale-95 transition-all"
-                        >
-                            {loading ? '처리 중...' : '입금확인'}
-                        </button>
-                    )}
-                    {status === 'PENDING' && (
-                        <button
-                            onClick={() => updateStatus('DEPOSIT_COMPLETED')}
-                            disabled={loading}
-                            className="bg-gray-600 text-white px-4 py-1 rounded-md text-xs font-bold hover:bg-gray-700 shadow-md hover:shadow-lg active:scale-95 transition-all"
-                        >
-                            {loading ? '처리 중...' : '입금확인 (Confirm Deposit)'}
-                        </button>
-                    )}
-
-                    {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                        <>
-                            <button
-                                onClick={() => router.push(`/invoice/${order.id}`)}
-                                className="bg-gray-700 text-white px-3 py-1 rounded-md text-xs font-bold hover:bg-gray-800 shadow-md hover:shadow-lg active:scale-95 transition-all"
-                            >
-                                거래명세표
-                            </button>
-
-                            <button
-                                onClick={toggleTaxInvoice}
-                                disabled={loading}
-                                className={`px-3 py-1 rounded-md text-xs font-bold text-white shadow-md hover:shadow-lg active:scale-95 transition-all ${taxInvoiceIssued ? 'bg-gray-500 hover:bg-gray-600 border border-gray-400' : 'bg-[#d9361b] hover:brightness-110'}`}
-                            >
-                                {taxInvoiceIssued ? '계산서발급취소' : '세금계산서 발급'}
-                            </button>
-                        </>
-                    )}
-
+            <div className="flex flex-col gap-2 mt-2 w-full">
+                {/* Confirmation Button */}
+                {status === 'PENDING' ? (
                     <button
-                        type="button"
-                        onClick={() => deleteOrder()}
+                        onClick={() => updateStatus('DEPOSIT_COMPLETED')}
                         disabled={loading}
-                        className={`bg-gray-900 text-white px-3 py-1 rounded-md text-xs font-bold hover:bg-black shadow-md hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+                        className="w-full py-4 text-sm font-bold text-white rounded-[1rem] flex gap-2 items-center justify-center bg-[#424853] hover:bg-[#2d323a] transition-colors"
                     >
-                        {loading ? '삭제 중...' : '주문삭제'}
+                        <svg className="w-5 h-5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                        Confirm Deposit (입금확인)
                     </button>
-                </div>
+                ) : status === 'DEPOSIT_COMPLETED' && !adminDepositConfirmedAt ? (
+                    <button
+                        onClick={confirmAdminDeposit}
+                        disabled={loading}
+                        className="w-full py-4 text-sm font-bold text-white rounded-[1rem] flex gap-2 items-center justify-center bg-[#424853] hover:bg-[#2d323a] transition-colors"
+                    >
+                        <svg className="w-5 h-5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                        Admin Confirm Deposit (입금확인)
+                    </button>
+                ) : null}
+
+                {/* Statement Button */}
+                {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
+                    <button
+                        onClick={() => router.push(`/invoice/${order.id}`)}
+                        className="w-full py-4 text-sm font-bold text-white rounded-[1rem] flex gap-2 items-center justify-center bg-[#515966] hover:bg-[#424853] transition-colors"
+                    >
+                        <svg className="w-5 h-5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        Statement (거래명세표)
+                    </button>
+                )}
+
+                {/* Tax Invoice Button */}
+                {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
+                    <button
+                        onClick={toggleTaxInvoice}
+                        disabled={loading}
+                        className={`w-full py-4 text-sm font-bold text-white rounded-[1rem] flex gap-2 items-center justify-center transition-colors ${taxInvoiceIssued ? 'bg-gray-400 hover:bg-gray-500' : 'bg-[#e43f29] hover:bg-[#cb3622]'}`}
+                    >
+                        <svg className="w-5 h-5 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        {taxInvoiceIssued ? '계산서 발행 취소' : 'Issue Tax Invoice (세금계산서 발급)'}
+                    </button>
+                )}
             </div>
         </div>
     )
