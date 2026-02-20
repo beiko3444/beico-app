@@ -12,10 +12,22 @@ export async function PATCH(
     console.log('[API] Approve User Request:', id)
     try {
         const session = await getServerSession(authOptions)
-        console.log('[API] Session:', JSON.stringify(session, null, 2))
 
-        if (!session || session.user.role !== 'ADMIN') {
-            console.log('[API] Unauthorized access attempt')
+        // Robust check for ADMIN role
+        let isAdmin = (session?.user as any)?.role === 'ADMIN'
+
+        // Fallback: Check DB if session role is missing (common in some Next.js environments)
+        if (!isAdmin && session?.user?.email) {
+            const dbUser = await prisma.user.findUnique({
+                where: { username: session.user.email }
+            })
+            if (dbUser?.role === 'ADMIN') {
+                isAdmin = true
+            }
+        }
+
+        if (!isAdmin) {
+            console.log('[API] Unauthorized access attempt. Session exists:', !!session)
             return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
         }
 
