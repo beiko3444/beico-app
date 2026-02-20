@@ -122,7 +122,16 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setMinOrderQuantity(formatNumber(initialData.minOrderQuantity || 1))
 
             if (initialData.regionalPrices && Object.keys(initialData.regionalPrices).length > 0) {
-                setRegionalPrices(initialData.regionalPrices);
+                // Formatting values when loading from existing JSON
+                const formattedPrices = { ...initialData.regionalPrices };
+                Object.keys(formattedPrices).forEach(g => {
+                    Object.keys(formattedPrices[g]).forEach(c => {
+                        formattedPrices[g][c].cost = formatNumber(formattedPrices[g][c].cost);
+                        formattedPrices[g][c].wholesale = formatNumber(formattedPrices[g][c].wholesale);
+                        formattedPrices[g][c].retail = formatNumber(formattedPrices[g][c].retail);
+                    });
+                });
+                setRegionalPrices(formattedPrices);
             } else {
                 // Fallback from old schema data or defaults
                 const fallback = {
@@ -133,17 +142,17 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 };
 
                 // Try to infer old data to C grade
-                fallback['C'].KR.cost = String(initialData.buyPrice || '');
-                fallback['C'].KR.wholesale = String(initialData.krBuyPrice || initialData.sellPrice || '');
-                fallback['C'].KR.retail = String(initialData.krSellPrice || initialData.onlinePrice || '');
+                fallback['C'].KR.cost = formatNumber(initialData.buyPrice || '');
+                fallback['C'].KR.wholesale = formatNumber(initialData.krBuyPrice || initialData.sellPrice || '');
+                fallback['C'].KR.retail = formatNumber(initialData.krSellPrice || initialData.onlinePrice || '');
 
-                fallback['C'].JP.cost = String(initialData.buyPrice || '');
-                fallback['C'].JP.wholesale = String(initialData.jpBuyPrice || '');
-                fallback['C'].JP.retail = String(initialData.jpSellPrice || '');
+                fallback['C'].JP.cost = formatNumber(initialData.buyPrice || '');
+                fallback['C'].JP.wholesale = formatNumber(initialData.jpBuyPrice || '');
+                fallback['C'].JP.retail = formatNumber(initialData.jpSellPrice || '');
 
-                fallback['C'].US.cost = String(initialData.buyPrice || '');
-                fallback['C'].US.wholesale = String(initialData.usBuyPrice || '');
-                fallback['C'].US.retail = String(initialData.usSellPrice || '');
+                fallback['C'].US.cost = formatNumber(initialData.buyPrice || '');
+                fallback['C'].US.wholesale = formatNumber(initialData.usBuyPrice || '');
+                fallback['C'].US.retail = formatNumber(initialData.usSellPrice || '');
 
                 setRegionalPrices(fallback);
             }
