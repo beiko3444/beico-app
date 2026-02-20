@@ -58,8 +58,15 @@ export default function LoginPage() {
             if (result?.error) {
                 if (result.error === 'CredentialsSignin') {
                     setError('ユーザーIDまたはパスワードが正しくありません。 / Invalid ID or Password')
-                } else if (result.error === 'PENDING_APPROVAL') {
-                    setError('アカウントの承認待ちです。 / Account is pending approval.')
+                } else if (result.error.startsWith('PENDING_APPROVAL')) {
+                    const country = result.error.split('_')[2] || 'UNKNOWN';
+                    if (country === 'KR') {
+                        setError('관리자 승인 대기중입니다. (승인 후 이용 가능합니다.)');
+                    } else if (country === 'JP') {
+                        setError('管理者の承認待ちです。(承認後にご利用いただけます。)');
+                    } else {
+                        setError('Account is pending admin approval. Please wait for authorization.');
+                    }
                 } else {
                     setError('ログインに失敗しました。 / Login failed. Please try again.')
                 }

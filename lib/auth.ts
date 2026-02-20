@@ -35,7 +35,7 @@ export const authOptions: NextAuthOptions = {
                     }
 
                     if (user.status !== 'APPROVED' && user.role !== 'ADMIN') {
-                        throw new Error('PENDING_APPROVAL')
+                        throw new Error(`PENDING_APPROVAL_${user.country || 'UNKNOWN'}`)
                     }
 
                     return {
@@ -45,7 +45,11 @@ export const authOptions: NextAuthOptions = {
                         role: user.role,
                         country: user.country,
                     }
-                } catch (error) {
+                } catch (error: any) {
+                    if (error.message?.startsWith('PENDING_APPROVAL')) {
+                        throw error;
+                    }
+
                     console.log("Database Error or Offline Mode:", error)
                     // Fallback for offline testing
                     if (credentials.username === 'admin' && credentials.password === '1234') {
