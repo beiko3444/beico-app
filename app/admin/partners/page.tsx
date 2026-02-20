@@ -3,7 +3,7 @@ import PartnerForm from "./partner-form"
 import DeletePartnerButton from '@/components/DeletePartnerButton'
 import Link from 'next/link'
 import ApproveUserButton from '@/components/ApproveUserButton'
-import RestorePartnerButton from '@/components/RestorePartnerButton'
+import PartnerTrashbin from '@/components/PartnerTrashbin'
 
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
@@ -37,48 +37,11 @@ export default async function PartnersPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <PartnerTrashbin deletedPartners={deletedPartners} />
                         <PartnerForm />
                     </div>
                 </div>
             </div>
-
-            {deletedPartners.length > 0 && (
-                <details className="glass-panel group rounded-2xl bg-white border border-red-100 shadow-sm overflow-hidden mb-6">
-                    <summary className="cursor-pointer bg-red-50 text-red-600 font-bold px-6 py-4 flex items-center justify-between list-none">
-                        <div className="flex items-center gap-2">
-                            <span>🗑️ 휴지통 (삭제된 파트너 {deletedPartners.length}명)</span>
-                        </div>
-                        <svg className="w-5 h-5 transition-transform group-open:rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
-                    </summary>
-                    <div className="border-t border-red-100 overflow-x-auto">
-                        <table className="table-auto min-w-full border-collapse text-xs">
-                            <thead className="bg-red-100/50 text-red-800 h-8">
-                                <tr>
-                                    <th className="px-3 py-1.5 text-center font-bold whitespace-nowrap w-12">No</th>
-                                    <th className="px-3 py-1.5 text-left font-bold whitespace-nowrap">상호명</th>
-                                    <th className="px-3 py-1.5 text-center font-bold whitespace-nowrap">사업자번호</th>
-                                    <th className="px-3 py-1.5 text-center font-bold whitespace-nowrap w-24">관리</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-red-50">
-                                {deletedPartners.map((partner, index) => (
-                                    <tr key={partner.id} className="hover:bg-red-50/50 transition-colors">
-                                        <td className="px-3 py-2 text-center text-red-400 font-bold">{deletedPartners.length - index}</td>
-                                        <td className="px-3 py-2 text-left">
-                                            <div className="font-bold text-gray-700">{partner.name}</div>
-                                            <div className="text-[10px] text-gray-400">담당자: {partner.partnerProfile?.representativeName || '-'}</div>
-                                        </td>
-                                        <td className="px-3 py-2 text-center text-gray-500 font-mono tracking-tight">{partner.partnerProfile?.businessRegNumber || '-'}</td>
-                                        <td className="px-3 py-2 text-center">
-                                            <RestorePartnerButton partnerId={partner.id} size="sm" />
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
-                </details>
-            )}
 
             <div className="glass-panel rounded-2xl shadow-sm bg-white border border-gray-100 overflow-hidden">
                 <table className="table-auto min-w-full border-collapse text-xs">
