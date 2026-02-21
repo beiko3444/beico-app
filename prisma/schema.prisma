@@ -55,6 +55,7 @@ model Product {
   updatedAt        DateTime    @updatedAt
   barcode          String?
   productCode      String?
+  coupangSku       String?     @unique
   imageUrl         String?
   sortOrder        Int         @default(0)
   minOrderQuantity Int         @default(1)

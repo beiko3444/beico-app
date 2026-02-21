@@ -12,6 +12,7 @@ type Product = {
     nameEN?: string | null
     barcode?: string | null
     productCode?: string | null
+    coupangSku?: string | null
     buyPrice: number
     sellPrice: number
     onlinePrice?: number | null
@@ -51,6 +52,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [nameEN, setNameEN] = useState('')
     const [barcode, setBarcode] = useState('')
     const [productCode, setProductCode] = useState('')
+    const [coupangSku, setCoupangSku] = useState('')
     const [buyPrice, setBuyPrice] = useState('')
     const [sellPrice, setSellPrice] = useState('')
     const [onlinePrice, setOnlinePrice] = useState('')
@@ -138,6 +140,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode(initialData.productCode || '')
+            setCoupangSku(initialData.coupangSku || '')
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
             setImageUrl(initialData.imageUrl || null)
@@ -189,6 +192,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN('')
             setBarcode('')
             setProductCode('')
+            setCoupangSku('')
             setStock('0')
             setSafetyStock('0')
             setImageUrl(null)
@@ -242,6 +246,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
                 productCode: productCode.trim(),
+                coupangSku: coupangSku.trim(),
                 buyPrice: parseFloat(parseNumber(regionalPrices['C'].KR.cost)) || 0,
                 sellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.wholesale)) || 0,
                 stock: parseInt(parseNumber(stock)) || 0,
@@ -268,6 +273,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setNameEN('')
                     setBarcode('')
                     setProductCode('')
+                    setCoupangSku('')
                     setStock('0')
                     setSafetyStock('0')
                     setImageUrl(null)
@@ -434,6 +440,16 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     onChange={e => setBarcode(e.target.value)}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
                                     placeholder="BARCODE"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-orange-600">쿠팡 연동 바코드 (선택)</label>
+                                <input
+                                    type="text"
+                                    value={coupangSku}
+                                    onChange={e => setCoupangSku(e.target.value)}
+                                    className="w-full px-2 py-1.5 bg-orange-50/50 border border-orange-200 outline-none focus:border-orange-500 text-sm font-bold text-orange-900"
+                                    placeholder="쿠팡 판매자상품코드 (숫자)"
                                 />
                             </div>
                         </div>

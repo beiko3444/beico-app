@@ -20,6 +20,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             nameEN: body.nameEN ? String(body.nameEN).trim() : null,
             barcode: body.barcode ? String(body.barcode).trim() : null,
             productCode: body.productCode ? String(body.productCode).trim() : null,
+            coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),
             onlinePrice: (body.onlinePrice !== null && body.onlinePrice !== undefined && body.onlinePrice !== "") ? Number(body.onlinePrice) : 0,

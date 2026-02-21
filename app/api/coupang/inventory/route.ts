@@ -79,50 +79,38 @@ export async function GET(request: Request) {
 
         const data: any = await response.json();
 
-        // Enhance the items with local product names by calling Coupang Seller Product API
+        // 향후 쿠팡 API가 아닌, 우리 사이트 DB의 `coupangSku`(신규 추가) 또는 `barcode`를 통해 상품명을 매칭합니다.
+        // 쿠팡 옵션 ID에 해당하는 상품명을 DB에서 쉽게 불러오기 위함입니다.
         let itemsFetchedCount = 0;
         if (data?.data && Array.isArray(data.data)) {
             itemsFetchedCount = data.data.length;
             const externalSkus = data.data.map((item: any) => String(item.externalSkuId)).filter(Boolean);
 
             if (externalSkus.length > 0) {
+                // DB에서 coupangSku 가 매칭되거나, barcode 가 매칭되는 상품을 모두 가져옵니다.
+                const products = await prisma.product.findMany({
+                    where: {
+                        OR: [
+                            { coupangSku: { in: externalSkus } },
+                            { barcode: { in: externalSkus } }
+                        ]
+                    },
+                    select: { coupangSku: true, barcode: true, name: true, nameEN: true }
+                });
+
                 const productMap = new Map();
-
-                // Fetch product names from Coupang in small chunks to avoid rate limiting
-                const chunkSize = 5;
-                for (let i = 0; i < externalSkus.length; i += chunkSize) {
-                    const chunk = externalSkus.slice(i, i + chunkSize);
-                    await Promise.all(chunk.map(async (sku: string) => {
-                        try {
-                            const pPath = `/v2/providers/seller_api/apis/api/v1/marketplace/seller-products/${sku}`;
-                            const pAuth = generateHmacAuthHeader("GET", pPath, "");
-                            const pFetchOptions: any = {
-                                method: "GET",
-                                headers: {
-                                    "Authorization": pAuth,
-                                    "x-requested-with": "OPENAPI",
-                                    "Content-Type": "application/json",
-                                },
-                            };
-                            if (proxyUrl) {
-                                pFetchOptions.agent = new HttpsProxyAgent(proxyUrl);
-                            }
-
-                            const pRes = await fetch(`https://api-gateway.coupang.com${pPath}`, pFetchOptions);
-                            if (pRes.ok) {
-                                const pData: any = await pRes.json();
-                                if (pData?.data?.displayProductName) {
-                                    productMap.set(sku, pData.data.displayProductName);
-                                }
-                            }
-                        } catch (err) {
-                            console.error(`Failed to fetch product name for SKU ${sku}`, err);
-                        }
-                    }));
-                }
+                products.forEach(p => {
+                    if (p.coupangSku) {
+                        productMap.set(p.coupangSku, p.name || p.nameEN);
+                    }
+                    if (p.barcode) {
+                        productMap.set(p.barcode, p.name || p.nameEN);
+                    }
+                });
 
                 data.data = data.data.map((item: any) => {
-                    item.productName = productMap.get(String(item.externalSkuId)) || "알 수 없는 상품";
+                    const sku = String(item.externalSkuId);
+                    item.productName = productMap.get(sku) || "알 수 없는 상품 (매칭 실패)";
                     return item;
                 });
             }

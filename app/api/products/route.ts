@@ -15,7 +15,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity } = body
+        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity, coupangSku } = body
 
         // Validation
         if (!name || buyPrice === undefined || sellPrice === undefined) {
@@ -28,6 +28,7 @@ export async function POST(request: Request) {
             nameEN: nameEN ? String(nameEN).trim() : null,
             barcode: barcode ? String(barcode).trim() : null,
             productCode: productCode ? String(productCode).trim() : null,
+            coupangSku: coupangSku ? String(coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),
             onlinePrice: (body.onlinePrice !== null && body.onlinePrice !== undefined && body.onlinePrice !== "") ? Number(body.onlinePrice) : 0,
