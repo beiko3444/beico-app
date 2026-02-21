@@ -1,5 +1,6 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 // Using credentials from the user's provided snapshot
 const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY || "316ac83a-78d0-48e3-a8fe-41b744bd90fe";
@@ -56,6 +57,31 @@ export async function GET(request: Request) {
         }
 
         const data = await response.json();
+
+        // Enhance the items with local product names
+        if (data?.data && Array.isArray(data.data)) {
+            const externalSkus = data.data.map((item: any) => item.externalSkuId).filter(Boolean);
+
+            if (externalSkus.length > 0) {
+                const products = await prisma.product.findMany({
+                    where: { barcode: { in: externalSkus } },
+                    select: { barcode: true, name: true, nameEn: true }
+                });
+
+                const productMap = new Map();
+                products.forEach(p => {
+                    if (p.barcode) {
+                        productMap.set(p.barcode, p.name || p.nameEn);
+                    }
+                });
+
+                data.data = data.data.map((item: any) => {
+                    item.productName = productMap.get(item.externalSkuId) || "알 수 없는 상품";
+                    return item;
+                });
+            }
+        }
+
         return NextResponse.json(data);
     } catch (error: any) {
         console.error("Failed to fetch Coupang Inventory:", error);

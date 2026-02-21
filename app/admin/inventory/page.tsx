@@ -7,6 +7,7 @@ interface InventoryItem {
     vendorId: string;
     vendorItemId: string;
     externalSkuId: string;
+    productName?: string;
     inventoryDetails: {
         totalOrderableQuantity: number;
     };
@@ -87,6 +88,7 @@ export default function InventoryPage() {
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100">
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider">외부 SKU ID (바코드)</th>
+                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider">상품명</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider">옵션 ID</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider text-right">주문가능 재고</th>
                                 <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider text-right">최근 30일 판매량</th>
@@ -95,7 +97,7 @@ export default function InventoryPage() {
                         <tbody className="divide-y divide-gray-50">
                             {loading && inventory.length === 0 ? (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
+                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
                                         <div className="flex flex-col items-center justify-center gap-3">
                                             <RefreshCw className="w-6 h-6 animate-spin text-gray-300" />
                                             재고 정보를 불러오는 중입니다...
@@ -104,7 +106,7 @@ export default function InventoryPage() {
                                 </tr>
                             ) : inventory.length === 0 && !error ? (
                                 <tr>
-                                    <td colSpan={4} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
+                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
                                         등록된 재고 데이터가 없습니다.
                                     </td>
                                 </tr>
@@ -113,6 +115,9 @@ export default function InventoryPage() {
                                     <tr key={`${item.vendorItemId}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="text-sm font-bold text-gray-900">{item.externalSkuId || "-"}</div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-bold text-gray-700 max-w-[200px] truncate" title={item.productName}>{item.productName || "알 수 없는 상품"}</div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs font-medium text-gray-500">{item.vendorItemId}</div>
