@@ -83,7 +83,7 @@ export async function GET(request: Request) {
         let itemsFetchedCount = 0;
         if (data?.data && Array.isArray(data.data)) {
             itemsFetchedCount = data.data.length;
-            const externalSkus = data.data.map((item: any) => item.externalSkuId).filter(Boolean);
+            const externalSkus = data.data.map((item: any) => String(item.externalSkuId)).filter(Boolean);
 
             if (externalSkus.length > 0) {
                 const products = await prisma.product.findMany({
