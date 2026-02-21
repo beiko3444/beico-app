@@ -1,5 +1,5 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
   binaryTargets = ["native", "rhel-openssl-3.0.x"]
 }
 
@@ -14,75 +14,75 @@ model User {
   username       String          @unique
   password       String
   name           String
-  role           String          @default("PARTNER") // PARTNER, ADMIN
-  status         String          @default("PENDING") // PENDING, APPROVED, REJECTED
-  country        String?         // Added country
+  role           String          @default("PARTNER")
+  status         String          @default("PENDING")
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  country        String?
   orders         Order[]
   partnerProfile PartnerProfile?
 }
 
 model PartnerProfile {
-  id                 String  @id @default(uuid())
-  userId             String  @unique
-  contact            String?
-  fax                String? // Added fax
-  email              String?
-  businessName       String?
-  representativeName String?
-  businessRegNumber  String?
-  address            String?
+  id                      String  @id @default(uuid())
+  userId                  String  @unique
+  contact                 String?
+  fax                     String?
+  email                   String?
+  businessName            String?
+  representativeName      String?
+  businessRegNumber       String?
+  address                 String?
   businessRegistrationUrl String?
-  grade              String  @default("C")
-  user               User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  grade                   String  @default("C")
+  user                    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Product {
-  id          String      @id @default(uuid())
-  name        String
-  nameJP      String?
-  nameEN      String?
-  buyPrice    Float
-  sellPrice   Float
-  jpBuyPrice  Float?      @default(0)
-  jpSellPrice Float?      @default(0)
-  krBuyPrice  Float?      @default(0)
-  krSellPrice Float?      @default(0)
-  usBuyPrice  Float?      @default(0)
-  usSellPrice Float?      @default(0)
-  onlinePrice Float?      @default(0)
-  priceA      Float?
-  priceB      Float?
-  priceC      Float?
-  priceD      Float?
-  stock       Int         @default(0)
-  safetyStock Int         @default(0)
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  barcode     String?
-  productCode String?
-  imageUrl    String?
-  sortOrder   Int         @default(0)
-  minOrderQuantity Int    @default(1)
-  regionalPrices Json?    @default("{}")
+  id               String      @id @default(uuid())
+  name             String
+  nameJP           String?
+  buyPrice         Float
+  sellPrice        Float
+  onlinePrice      Float?      @default(0)
+  priceA           Float?
+  priceB           Float?
+  priceC           Float?
+  priceD           Float?
+  stock            Int         @default(0)
+  safetyStock      Int         @default(0)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  barcode          String?
+  productCode      String?
+  imageUrl         String?
+  sortOrder        Int         @default(0)
+  minOrderQuantity Int         @default(1)
+  nameEN           String?
+  jpBuyPrice       Float?      @default(0)
+  jpSellPrice      Float?      @default(0)
+  krBuyPrice       Float?      @default(0)
+  krSellPrice      Float?      @default(0)
+  usBuyPrice       Float?      @default(0)
+  usSellPrice      Float?      @default(0)
+  regionalPrices   Json?       @default("{}")
   orderItems       OrderItem[]
 }
 
 model Order {
-  id               String      @id @default(uuid())
-  userId           String
-  total            Float
-  createdAt        DateTime    @default(now())
-  status           String      @default("PENDING")
-  trackingNumber   String?
-  courier          String?
-  taxInvoiceIssued   Boolean     @default(false)
-  orderNumber        String?     @unique
+  id                      String      @id @default(uuid())
+  userId                  String
+  total                   Float
+  createdAt               DateTime    @default(now())
+  status                  String      @default("PENDING")
+  trackingNumber          String?
+  courier                 String?
+  taxInvoiceIssued        Boolean     @default(false)
+  orderNumber             String?     @unique
   depositConfirmedAt      DateTime?
   adminDepositConfirmedAt DateTime?
-  user               User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  items            OrderItem[]
+  user                    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items                   OrderItem[]
 }
 
 model OrderItem {
@@ -91,61 +91,51 @@ model OrderItem {
   productId String
   quantity  Int
   price     Float
-  product   Product @relation(fields: [productId], references: [id])
   order     Order   @relation(fields: [orderId], references: [id])
+  product   Product @relation(fields: [productId], references: [id])
 }
 
 model ProductionBatch {
-  id                String   @id @default(uuid())
-  category          String   // e.g. 청갯지렁이, 홍갯지렁이...
-  productionDate    DateTime // Manually selected date
-  rawMaterialCost   Int      // 원재료비
-  depositDollar     Float?   // 입금달러 (선택)
-  electricityCost   Int      // 전기세
-  packagingCost     Int      // 포장비
-  warehouseCost     Int      @default(0) // 창고료
-  shippingCost      Int      @default(0) // 운송료
-  customsFee        Int      @default(0) // 관세사 수수료
-  customsDuty       Int      @default(0) // 관세
-  vat               Int      @default(0) // 부가세
-  quantity          Int
-  unitCost          Float?   // (Raw + Elec + Pack) / Qty
-  salesPrice        Int      // Linked from Product DB
-  wholesalePrice    Int      // Linked from Product DB (Price C)
-  memo              String?  // Renamed from remarks
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id              String   @id @default(uuid())
+  category        String
+  productionDate  DateTime
+  rawMaterialCost Int
+  depositDollar   Float?
+  electricityCost Int
+  packagingCost   Int
+  warehouseCost   Int      @default(0)
+  shippingCost    Int      @default(0)
+  customsFee      Int      @default(0)
+  customsDuty     Int      @default(0)
+  vat             Int      @default(0)
+  quantity        Int
+  unitCost        Float?
+  salesPrice      Int
+  wholesalePrice  Int
+  memo            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 }
 
 model ElectricityUsage {
-  id        String   @id @default(uuid())
-  year      Int
-  month     Int
-  
-  // Bill Details
-  readingDate       String   // 검침일
-  usagePeriod       String   // 전기사용기간
-  meterCurrent      String   // Aggregated string (e.g. "123 / 456")
-  meterPrevious     String   // Aggregated string
-  
-  totalUsage        Int      // 당월 사용량
-  totalAmount       Int      // 청구금액
-  
-  // Raw Bill Data (JSON for flexibility in display)
-  rawBillData       String   // JSON string of all parsed fields
-
-  // Landlord Details
-  landlordMeterPrev Int?     // 전월 측정값
-  landlordMeterCurr Int?     // 월말 측정값
-  landlordUsage     Int?     // Calculated or manual
-  
-  waterHeaterKw     Float?   // 온수기 KW
-  outdoorLightKw    Float?   // 외등 KW
-  
+  id                String   @id @default(uuid())
+  year              Int
+  month             Int
+  readingDate       String
+  usagePeriod       String
+  meterCurrent      String
+  meterPrevious     String
+  totalUsage        Int
+  totalAmount       Int
+  rawBillData       String
+  landlordMeterPrev Int?
+  landlordMeterCurr Int?
+  landlordUsage     Int?
+  waterHeaterKw     Float?
+  outdoorLightKw    Float?
   meterPhotoUrl     String?
-  rawText           String?  // The text pasted in the textarea
-  extractionHistory String?  // JSON string for extraction logs
-  
+  rawText           String?
+  extractionHistory String?
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
 
@@ -155,8 +145,8 @@ model ElectricityUsage {
 model Task {
   id          String   @id @default(uuid())
   title       String
-  description String?  // Added description
-  fileUrl     String?  // Added file URL
+  description String?
+  fileUrl     String?
   completed   Boolean  @default(false)
   date        DateTime
   createdAt   DateTime @default(now())
@@ -167,6 +157,6 @@ model CoupangSyncHistory {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())
   itemsFetched Int      @default(0)
-  status       String   @default("SUCCESS") // SUCCESS, ERROR
+  status       String   @default("SUCCESS")
   errorMessage String?
 }
