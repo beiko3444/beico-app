@@ -36,16 +36,20 @@ export default function InventoryPage() {
             // Set last sync time if provided
             if (data?.lastSyncedAt) {
                 const date = new Date(data.lastSyncedAt);
-                setLastSyncTime(`${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')} 기준`);
+                const syncTimeStr = `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')} 기준`;
+                setLastSyncTime(syncTimeStr);
+                sessionStorage.setItem("coupang_lastSyncTime", syncTimeStr);
             }
 
             // Checking if Coupang gave valid structured data
             if (data?.data && Array.isArray(data.data)) {
                 setInventory(data.data);
+                sessionStorage.setItem("coupang_inventory", JSON.stringify(data.data));
             } else if (data?.code === "ERROR") {
                 throw new Error(data.message || "쿠팡 API 오류가 발생했습니다.");
             } else {
                 setInventory([]);
+                sessionStorage.removeItem("coupang_inventory");
             }
         } catch (err: any) {
             console.error(err);
@@ -56,7 +60,21 @@ export default function InventoryPage() {
     };
 
     useEffect(() => {
-        // fetchInventory(); // Removed so user must manually click refresh
+        // Restore from sessionStorage if exists
+        const cachedInventory = sessionStorage.getItem("coupang_inventory");
+        const cachedSyncTime = sessionStorage.getItem("coupang_lastSyncTime");
+
+        if (cachedInventory) {
+            try {
+                setInventory(JSON.parse(cachedInventory));
+            } catch (e) {
+                console.error("Failed to parse cached inventory");
+            }
+        }
+        if (cachedSyncTime) {
+            setLastSyncTime(cachedSyncTime);
+        }
+
         setLoading(false); // Stop the initial loading spinner
     }, []);
 
