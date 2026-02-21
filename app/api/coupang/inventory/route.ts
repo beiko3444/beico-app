@@ -8,7 +8,8 @@ const VENDOR_ID = process.env.COUPANG_VENDOR_ID || "A00534715";
 
 function generateHmacAuthHeader(method: string, path: string, query: string = "") {
     const now = new Date();
-    const year = now.getUTCFullYear();
+    // Coupang requires YYMMDD format, not YYYYMMDD
+    const year = String(now.getUTCFullYear()).slice(-2);
     const month = String(now.getUTCMonth() + 1).padStart(2, "0");
     const day = String(now.getUTCDate()).padStart(2, "0");
     const hour = String(now.getUTCHours()).padStart(2, "0");
