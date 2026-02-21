@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Package, RefreshCw, AlertCircle, ShoppingCart } from "lucide-react";
+import { Package, RefreshCw, AlertCircle, ShoppingCart, ArrowUpDown } from "lucide-react";
 
 interface InventoryItem {
     vendorId: string;
@@ -21,6 +21,7 @@ export default function InventoryPage() {
     const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
     const fetchInventory = async () => {
         setLoading(true);
@@ -78,6 +79,54 @@ export default function InventoryPage() {
         setLoading(false); // Stop the initial loading spinner
     }, []);
 
+    const sortedInventory = [...inventory].sort((a, b) => {
+        if (!sortConfig) return 0;
+        const { key, direction } = sortConfig;
+        let aValue: any;
+        let bValue: any;
+
+        if (key === "externalSkuId") {
+            aValue = a.externalSkuId || "";
+            bValue = b.externalSkuId || "";
+        } else if (key === "productName") {
+            aValue = a.productName || "";
+            bValue = b.productName || "";
+        } else if (key === "vendorItemId") {
+            aValue = a.vendorItemId || "";
+            bValue = b.vendorItemId || "";
+        } else if (key === "stock") {
+            aValue = a.inventoryDetails?.totalOrderableQuantity || 0;
+            bValue = b.inventoryDetails?.totalOrderableQuantity || 0;
+        } else if (key === "sales") {
+            aValue = a.salesCountMap?.SALES_COUNT_LAST_THIRTY_DAYS || 0;
+            bValue = b.salesCountMap?.SALES_COUNT_LAST_THIRTY_DAYS || 0;
+        }
+
+        if (aValue < bValue) return direction === "asc" ? -1 : 1;
+        if (aValue > bValue) return direction === "asc" ? 1 : -1;
+        return 0;
+    });
+
+    const requestSort = (key: string) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
+
+    const renderSortHeader = (title: string, key: string, alignRight = false) => (
+        <th
+            className={`px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors ${alignRight ? 'text-right' : 'text-left'}`}
+            onClick={() => requestSort(key)}
+        >
+            <div className={`flex items-center gap-1.5 ${alignRight ? 'justify-end' : ''}`}>
+                {title}
+                <ArrowUpDown className={`w-3.5 h-3.5 ${sortConfig?.key === key ? 'opacity-100 text-[#e34219]' : 'opacity-30'}`} />
+            </div>
+        </th>
+    );
+
     return (
         <div className="max-w-7xl mx-auto px-4 py-8 mt-12">
             <div className="flex items-center justify-between mb-8">
@@ -115,12 +164,12 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100">
-                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider">외부 SKU ID (바코드)</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider">상품명</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider">옵션 ID</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider text-right">주문가능 재고</th>
-                                <th className="px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider text-right">최근 30일 판매량</th>
+                            <tr className="bg-gray-50/50 border-b border-gray-100 select-none">
+                                {renderSortHeader("외부 SKU ID (바코드)", "externalSkuId")}
+                                {renderSortHeader("상품명", "productName")}
+                                {renderSortHeader("옵션 ID", "vendorItemId")}
+                                {renderSortHeader("주문가능 재고", "stock", true)}
+                                {renderSortHeader("최근 30일 판매량", "sales", true)}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -140,13 +189,13 @@ export default function InventoryPage() {
                                     </td>
                                 </tr>
                             ) : (
-                                inventory.map((item, idx) => (
+                                sortedInventory.map((item, idx) => (
                                     <tr key={`${item.vendorItemId}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="text-sm font-bold text-gray-900">{item.externalSkuId || "-"}</div>
                                         </td>
                                         <td className="px-6 py-4">
-                                            <div className="text-sm font-bold text-gray-700 max-w-[200px] truncate" title={item.productName}>{item.productName || "알 수 없는 상품"}</div>
+                                            <div className="text-sm font-bold text-gray-700 min-w-[300px] whitespace-normal leading-relaxed" title={item.productName}>{item.productName || "알 수 없는 상품"}</div>
                                         </td>
                                         <td className="px-6 py-4">
                                             <div className="text-xs font-medium text-gray-500">{item.vendorItemId}</div>

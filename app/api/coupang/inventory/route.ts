@@ -32,52 +32,63 @@ import fetch from "node-fetch";
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
-        const nextToken = searchParams.get('nextToken');
+        let allData: any[] = [];
+        let currentNextToken: string | null = searchParams.get('nextToken');
 
-        const path = `/v2/providers/rg_open_api/apis/api/v1/vendors/${VENDOR_ID}/rg/inventory/summaries`;
-        const query = nextToken ? `nextToken=${nextToken}` : "";
-        const fullPath = query ? `${path}?${query}` : path;
+        // Loop up to 10 times to prevent infinite loops, adjust as necessary
+        for (let i = 0; i < 10; i++) {
+            const path = `/v2/providers/rg_open_api/apis/api/v1/vendors/${VENDOR_ID}/rg/inventory/summaries`;
+            const query = currentNextToken ? `nextToken=${currentNextToken}` : "";
+            const fullPath = query ? `${path}?${query}` : path;
 
-        const authorization = generateHmacAuthHeader("GET", path, query);
+            const authorization = generateHmacAuthHeader("GET", path, query);
 
-        // Vercel 환경에서 HTTP_PROXY 등 환경변수가 설정되어 있으면 프록시를 통해 요청
-        // FIXIE_URL 과 같은 특정 부가 서비스 환경변수가 제공될 수도 있으므로 대응
-        const proxyUrl = process.env.QUOTAGUARDSTATIC_URL || process.env.FIXIE_URL || process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+            const proxyUrl = process.env.QUOTAGUARDSTATIC_URL || process.env.FIXIE_URL || process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
 
-        let fetchOptions: any = {
-            method: "GET",
-            headers: {
-                "Authorization": authorization,
-                "x-requested-with": "OPENAPI",
-                "Content-Type": "application/json",
-            },
-        };
+            let fetchOptions: any = {
+                method: "GET",
+                headers: {
+                    "Authorization": authorization,
+                    "x-requested-with": "OPENAPI",
+                    "Content-Type": "application/json",
+                },
+            };
 
-        if (proxyUrl) {
-            fetchOptions.agent = new HttpsProxyAgent(proxyUrl);
+            if (proxyUrl) {
+                fetchOptions.agent = new HttpsProxyAgent(proxyUrl);
+            }
+
+            const response = await fetch(`https://api-gateway.coupang.com${fullPath}`, fetchOptions);
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                // Record error in DB
+                await prisma.coupangSyncHistory.create({
+                    data: {
+                        status: "ERROR",
+                        errorMessage: `Response ${response.status}: ${errorText}`.substring(0, 255)
+                    }
+                });
+                console.error("Coupang API Error Response:", response.status, errorText);
+                return NextResponse.json(
+                    { error: "Failed to fetch from Coupang API", details: errorText },
+                    { status: response.status }
+                );
+            }
+
+            const dataObj: any = await response.json();
+
+            if (dataObj?.data && Array.isArray(dataObj.data)) {
+                allData = allData.concat(dataObj.data);
+            }
+
+            currentNextToken = dataObj?.nextToken;
+            if (!currentNextToken) {
+                break;
+            }
         }
 
-        const response = await fetch(`https://api-gateway.coupang.com${fullPath}`, fetchOptions);
-
-        if (!response.ok) {
-            const errorText = await response.text();
-
-            // Record error in DB
-            await prisma.coupangSyncHistory.create({
-                data: {
-                    status: "ERROR",
-                    errorMessage: `Response ${response.status}: ${errorText}`.substring(0, 255)
-                }
-            });
-
-            console.error("Coupang API Error Response:", response.status, errorText);
-            return NextResponse.json(
-                { error: "Failed to fetch from Coupang API", details: errorText },
-                { status: response.status }
-            );
-        }
-
-        const data: any = await response.json();
+        const data = { data: allData };
 
         // 향후 쿠팡 API가 아닌, 우리 사이트 DB의 `coupangSku`(신규 추가) 또는 `barcode`를 통해 상품명을 매칭합니다.
         // 쿠팡 옵션 ID에 해당하는 상품명을 DB에서 쉽게 불러오기 위함입니다.
