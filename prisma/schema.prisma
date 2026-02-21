@@ -163,4 +163,10 @@ model Task {
   updatedAt   DateTime @updatedAt
 }
 
-
+model CoupangSyncHistory {
+  id           String   @id @default(uuid())
+  createdAt    DateTime @default(now())
+  itemsFetched Int      @default(0)
+  status       String   @default("SUCCESS") // SUCCESS, ERROR
+  errorMessage String?
+}

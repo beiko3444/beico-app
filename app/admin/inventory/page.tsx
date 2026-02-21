@@ -18,6 +18,7 @@ interface InventoryItem {
 
 export default function InventoryPage() {
     const [inventory, setInventory] = useState<InventoryItem[]>([]);
+    const [lastSyncTime, setLastSyncTime] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -31,6 +32,12 @@ export default function InventoryPage() {
                 throw new Error(text || "리스트를 불러오는 데 실패했습니다.");
             }
             const data = await res.json();
+
+            // Set last sync time if provided
+            if (data?.lastSyncedAt) {
+                const date = new Date(data.lastSyncedAt);
+                setLastSyncTime(`${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일 ${date.getHours()}:${String(date.getMinutes()).padStart(2, '0')} 기준`);
+            }
 
             // Checking if Coupang gave valid structured data
             if (data?.data && Array.isArray(data.data)) {
@@ -60,7 +67,10 @@ export default function InventoryPage() {
                         <Package className="w-7 h-7 text-[#e34219]" />
                         로켓창고 재고관리
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1 font-medium">쿠팡 로켓창고에 등록된 상품의 재고와 판매량을 관리합니다.</p>
+                    <p className="text-sm text-gray-500 mt-1 font-medium">
+                        쿠팡 로켓창고에 등록된 상품의 재고와 판매량을 관리합니다.
+                        {lastSyncTime && <span className="ml-2 font-bold text-[#e34219]">({lastSyncTime})</span>}
+                    </p>
                 </div>
                 <button
                     onClick={fetchInventory}

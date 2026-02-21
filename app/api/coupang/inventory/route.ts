@@ -26,6 +26,8 @@ function generateHmacAuthHeader(method: string, path: string, query: string = ""
 
     return `CEA algorithm=HmacSHA256, access-key=${ACCESS_KEY}, signed-date=${datetime}, signature=${signature}`;
 }
+import { HttpsProxyAgent } from "https-proxy-agent";
+import fetch from "node-fetch";
 
 export async function GET(request: Request) {
     try {
@@ -38,17 +40,36 @@ export async function GET(request: Request) {
 
         const authorization = generateHmacAuthHeader("GET", path, query);
 
-        const response = await fetch(`https://api-gateway.coupang.com${fullPath}`, {
+        // Vercel 환경에서 HTTP_PROXY 등 환경변수가 설정되어 있으면 프록시를 통해 요청
+        // FIXIE_URL 과 같은 특정 부가 서비스 환경변수가 제공될 수도 있으므로 대응
+        const proxyUrl = process.env.QUOTAGUARDSTATIC_URL || process.env.FIXIE_URL || process.env.HTTP_PROXY || process.env.HTTPS_PROXY;
+
+        let fetchOptions: any = {
             method: "GET",
             headers: {
                 "Authorization": authorization,
                 "x-requested-with": "OPENAPI",
                 "Content-Type": "application/json",
             },
-        });
+        };
+
+        if (proxyUrl) {
+            fetchOptions.agent = new HttpsProxyAgent(proxyUrl);
+        }
+
+        const response = await fetch(`https://api-gateway.coupang.com${fullPath}`, fetchOptions);
 
         if (!response.ok) {
             const errorText = await response.text();
+
+            // Record error in DB
+            await prisma.coupangSyncHistory.create({
+                data: {
+                    status: "ERROR",
+                    errorMessage: `Response ${response.status}: ${errorText}`.substring(0, 255)
+                }
+            });
+
             console.error("Coupang API Error Response:", response.status, errorText);
             return NextResponse.json(
                 { error: "Failed to fetch from Coupang API", details: errorText },
@@ -56,10 +77,12 @@ export async function GET(request: Request) {
             );
         }
 
-        const data = await response.json();
+        const data: any = await response.json();
 
         // Enhance the items with local product names
+        let itemsFetchedCount = 0;
         if (data?.data && Array.isArray(data.data)) {
+            itemsFetchedCount = data.data.length;
             const externalSkus = data.data.map((item: any) => item.externalSkuId).filter(Boolean);
 
             if (externalSkus.length > 0) {
@@ -82,7 +105,18 @@ export async function GET(request: Request) {
             }
         }
 
-        return NextResponse.json(data);
+        // Record success in DB
+        const syncHistory = await prisma.coupangSyncHistory.create({
+            data: {
+                status: "SUCCESS",
+                itemsFetched: itemsFetchedCount
+            }
+        });
+
+        return NextResponse.json({
+            data: data.data,
+            lastSyncedAt: syncHistory.createdAt
+        });
     } catch (error: any) {
         console.error("Failed to fetch Coupang Inventory:", error);
         return NextResponse.json(
