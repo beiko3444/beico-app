@@ -34,11 +34,14 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url);
         let allData: any[] = [];
         let currentNextToken: string | null = searchParams.get('nextToken');
+        let pagesFetched = 0;
 
-        // Loop up to 10 times to prevent infinite loops, adjust as necessary
-        for (let i = 0; i < 10; i++) {
+        // Loop up to 50 times to prevent infinite loops (max ~2500 items)
+        while (pagesFetched < 50) {
+            pagesFetched++;
             const path = `/v2/providers/rg_open_api/apis/api/v1/vendors/${VENDOR_ID}/rg/inventory/summaries`;
-            const query = currentNextToken ? `nextToken=${currentNextToken}` : "";
+            const encodedToken = currentNextToken ? encodeURIComponent(currentNextToken) : "";
+            const query = encodedToken ? `nextToken=${encodedToken}` : "";
             const fullPath = query ? `${path}?${query}` : path;
 
             const authorization = generateHmacAuthHeader("GET", path, query);
@@ -88,6 +91,7 @@ export async function GET(request: Request) {
             }
         }
 
+        console.log(`[Coupang Sync] Fetched ${pagesFetched} pages, total ${allData.length} items`);
         const data = { data: allData };
 
         // 향후 쿠팡 API가 아닌, 우리 사이트 DB의 `coupangSku`(신규 추가) 또는 `barcode`를 통해 상품명을 매칭합니다.
