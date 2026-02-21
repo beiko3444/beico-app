@@ -56,7 +56,8 @@ export default function InventoryPage() {
     };
 
     useEffect(() => {
-        fetchInventory();
+        // fetchInventory(); // Removed so user must manually click refresh
+        setLoading(false); // Stop the initial loading spinner
     }, []);
 
     return (

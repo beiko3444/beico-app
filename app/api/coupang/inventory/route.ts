@@ -99,7 +99,7 @@ export async function GET(request: Request) {
                 });
 
                 data.data = data.data.map((item: any) => {
-                    item.productName = productMap.get(item.externalSkuId) || "알 수 없는 상품";
+                    item.productName = productMap.get(String(item.externalSkuId)) || "알 수 없는 상품";
                     return item;
                 });
             }
