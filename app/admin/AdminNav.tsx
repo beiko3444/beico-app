@@ -15,6 +15,7 @@ export default function AdminNav({ counts }: { counts?: { pendingOrders: number,
         { name: '생산관리', path: '/admin/production' },
         { name: '업무관리', path: '/admin/tasks' },
         { name: '전력관리', path: '/admin/electricity', alert: counts?.missingBill && counts.missingBill > 0 },
+        { name: '재고관리', path: '/admin/inventory' },
     ]
 
     return (
