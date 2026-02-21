@@ -154,7 +154,7 @@ export default function InventoryPage() {
 
     const renderSortHeader = (title: string, key: string, alignRight = false) => (
         <th
-            className={`px-6 py-4 text-xs font-black text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors ${alignRight ? 'text-right' : 'text-left'}`}
+            className={`px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors ${alignRight ? 'text-right' : 'text-left'}`}
             onClick={() => requestSort(key)}
         >
             <div className={`flex items-center gap-1.5 ${alignRight ? 'justify-end' : ''}`}>
@@ -212,9 +212,9 @@ export default function InventoryPage() {
                     <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="bg-gray-50/50 border-b border-gray-100 select-none">
-                                {renderSortHeader("외부 SKU ID (바코드)", "externalSkuId")}
-                                {renderSortHeader("상품명", "productName")}
+                                {renderSortHeader("SKU ID", "externalSkuId")}
                                 {renderSortHeader("옵션 ID", "vendorItemId")}
+                                {renderSortHeader("상품명", "productName")}
                                 {renderSortHeader("주문가능 재고", "stock", true)}
                                 {renderSortHeader("최근 30일 판매량", "sales", true)}
                             </tr>
@@ -237,9 +237,12 @@ export default function InventoryPage() {
                                 </tr>
                             ) : (
                                 sortedInventory.map((item, idx) => (
-                                    <tr key={`${item.vendorItemId}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
+                                    <tr key={`${item.vendorItemId}-${idx}`} className="even:bg-gray-50/50 hover:bg-gray-50/80 transition-colors">
                                         <td className="px-6 py-2">
-                                            <div className="text-xs text-gray-900">{item.externalSkuId || "-"}</div>
+                                            <div className="text-xs text-gray-700">{item.externalSkuId || "-"}</div>
+                                        </td>
+                                        <td className="px-6 py-2">
+                                            <div className="text-xs text-gray-500">{item.vendorItemId}</div>
                                         </td>
                                         <td className="px-6 py-2">
                                             <div className="flex items-center gap-3">
@@ -253,12 +256,9 @@ export default function InventoryPage() {
                                                 <div className="text-xs text-gray-700 min-w-[300px] whitespace-normal leading-relaxed" title={item.productName}>{item.productName || "알 수 없는 상품"}</div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-2">
-                                            <div className="text-xs text-gray-500">{item.vendorItemId}</div>
-                                        </td>
                                         <td className="px-6 py-2 text-right">
                                             <div className="inline-flex items-center justify-end gap-1.5 min-w-[3rem]">
-                                                <span className={`text-xs ${item.inventoryDetails.totalOrderableQuantity > 10 ? 'text-gray-900' : 'text-red-500'}`}>
+                                                <span className={`text-xs ${item.inventoryDetails.totalOrderableQuantity > 10 ? 'text-gray-700' : 'text-red-500'}`}>
                                                     {item.inventoryDetails.totalOrderableQuantity.toLocaleString()}
                                                 </span>
                                                 <span className="text-[10px] text-gray-400">개</span>
