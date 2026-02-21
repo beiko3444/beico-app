@@ -8,6 +8,7 @@ interface InventoryItem {
     vendorItemId: string;
     externalSkuId: string;
     productName?: string;
+    imageUrl?: string | null;
     inventoryDetails: {
         totalOrderableQuantity: number;
     };
@@ -79,6 +80,42 @@ export default function InventoryPage() {
         setLoading(false); // Stop the initial loading spinner
     }, []);
 
+    const syncWithDB = async () => {
+        if (inventory.length === 0) return;
+        setLoading(true);
+        setError(null);
+        try {
+            const externalSkus = inventory.map(item => item.externalSkuId).filter(Boolean);
+            const res = await fetch("/api/coupang/match-db", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ externalSkus })
+            });
+            if (!res.ok) {
+                const text = await res.text();
+                throw new Error(text || "DB 동기화에 실패했습니다.");
+            }
+            const data = await res.json();
+            const mapping = data.mapping || {};
+
+            const updatedInventory = inventory.map(item => {
+                const match = mapping[item.externalSkuId];
+                if (match) {
+                    return { ...item, productName: match.name, imageUrl: match.imageUrl };
+                }
+                return item;
+            });
+
+            setInventory(updatedInventory);
+            sessionStorage.setItem("coupang_inventory", JSON.stringify(updatedInventory));
+        } catch (err: any) {
+            console.error(err);
+            setError(err.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const sortedInventory = [...inventory].sort((a, b) => {
         if (!sortConfig) return 0;
         const { key, direction } = sortConfig;
@@ -140,14 +177,24 @@ export default function InventoryPage() {
                         {lastSyncTime && <span className="ml-2 font-bold text-[#e34219]">({lastSyncTime})</span>}
                     </p>
                 </div>
-                <button
-                    onClick={fetchInventory}
-                    disabled={loading}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-bold rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
-                >
-                    <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
-                    새로고침
-                </button>
+                <div className="flex items-center gap-3">
+                    <button
+                        onClick={syncWithDB}
+                        disabled={loading || inventory.length === 0}
+                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-bold text-gray-700 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        나의 DB 연동 새로고침
+                    </button>
+                    <button
+                        onClick={fetchInventory}
+                        disabled={loading}
+                        className="flex items-center gap-2 px-4 py-2 bg-[#e34219] text-white text-sm font-bold rounded-xl hover:bg-[#c93a15] transition-all disabled:opacity-50"
+                    >
+                        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                        쿠팡서버 새로고침
+                    </button>
+                </div>
             </div>
 
             {error && (
@@ -191,27 +238,36 @@ export default function InventoryPage() {
                             ) : (
                                 sortedInventory.map((item, idx) => (
                                     <tr key={`${item.vendorItemId}-${idx}`} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-bold text-gray-900">{item.externalSkuId || "-"}</div>
+                                        <td className="px-6 py-2">
+                                            <div className="text-xs text-gray-900">{item.externalSkuId || "-"}</div>
                                         </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-sm font-bold text-gray-700 min-w-[300px] whitespace-normal leading-relaxed" title={item.productName}>{item.productName || "알 수 없는 상품"}</div>
-                                        </td>
-                                        <td className="px-6 py-4">
-                                            <div className="text-xs font-medium text-gray-500">{item.vendorItemId}</div>
-                                        </td>
-                                        <td className="px-6 py-4 text-right">
-                                            <div className="inline-flex items-center justify-end gap-1.5 min-w-[3rem]">
-                                                <span className={`text-sm font-black ${item.inventoryDetails.totalOrderableQuantity > 10 ? 'text-gray-900' : 'text-red-500'}`}>
-                                                    {item.inventoryDetails.totalOrderableQuantity.toLocaleString()}
-                                                </span>
-                                                <span className="text-xs font-medium text-gray-400">개</span>
+                                        <td className="px-6 py-2">
+                                            <div className="flex items-center gap-3">
+                                                {item.imageUrl ? (
+                                                    <img src={item.imageUrl} alt={item.productName} className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-100 bg-white" />
+                                                ) : (
+                                                    <div className="w-10 h-10 bg-gray-50 rounded-md border border-gray-100 flex-shrink-0 flex items-center justify-center">
+                                                        <Package className="w-4 h-4 text-gray-300" />
+                                                    </div>
+                                                )}
+                                                <div className="text-xs text-gray-700 min-w-[300px] whitespace-normal leading-relaxed" title={item.productName}>{item.productName || "알 수 없는 상품"}</div>
                                             </div>
                                         </td>
-                                        <td className="px-6 py-4 text-right">
+                                        <td className="px-6 py-2">
+                                            <div className="text-xs text-gray-500">{item.vendorItemId}</div>
+                                        </td>
+                                        <td className="px-6 py-2 text-right">
+                                            <div className="inline-flex items-center justify-end gap-1.5 min-w-[3rem]">
+                                                <span className={`text-xs ${item.inventoryDetails.totalOrderableQuantity > 10 ? 'text-gray-900' : 'text-red-500'}`}>
+                                                    {item.inventoryDetails.totalOrderableQuantity.toLocaleString()}
+                                                </span>
+                                                <span className="text-[10px] text-gray-400">개</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-2 text-right">
                                             <div className="inline-flex items-center justify-end gap-1.5 text-blue-600 min-w-[3rem]">
                                                 <ShoppingCart className="w-3.5 h-3.5" />
-                                                <span className="text-sm font-bold">
+                                                <span className="text-xs">
                                                     {(item.salesCountMap?.SALES_COUNT_LAST_THIRTY_DAYS || 0).toLocaleString()}
                                                 </span>
                                             </div>

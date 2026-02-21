@@ -110,22 +110,25 @@ export async function GET(request: Request) {
                             { barcode: { in: externalSkus } }
                         ]
                     },
-                    select: { coupangSku: true, barcode: true, name: true, nameEN: true }
+                    select: { coupangSku: true, barcode: true, name: true, nameEN: true, imageUrl: true }
                 });
 
                 const productMap = new Map();
                 products.forEach(p => {
+                    const mappedData = { name: p.name || p.nameEN, imageUrl: p.imageUrl };
                     if (p.coupangSku) {
-                        productMap.set(p.coupangSku, p.name || p.nameEN);
+                        productMap.set(p.coupangSku, mappedData);
                     }
                     if (p.barcode) {
-                        productMap.set(p.barcode, p.name || p.nameEN);
+                        productMap.set(p.barcode, mappedData);
                     }
                 });
 
                 data.data = data.data.map((item: any) => {
                     const sku = String(item.externalSkuId);
-                    item.productName = productMap.get(sku) || "알 수 없는 상품 (매칭 실패)";
+                    const mapped = productMap.get(sku);
+                    item.productName = mapped?.name || "알 수 없는 상품 (매칭 실패)";
+                    item.imageUrl = mapped?.imageUrl || null;
                     return item;
                 });
             }
