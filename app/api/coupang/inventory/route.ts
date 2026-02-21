@@ -65,13 +65,13 @@ export async function GET(request: Request) {
             if (externalSkus.length > 0) {
                 const products = await prisma.product.findMany({
                     where: { barcode: { in: externalSkus } },
-                    select: { barcode: true, name: true, nameEn: true }
+                    select: { barcode: true, name: true, nameEN: true }
                 });
 
                 const productMap = new Map();
                 products.forEach(p => {
                     if (p.barcode) {
-                        productMap.set(p.barcode, p.name || p.nameEn);
+                        productMap.set(p.barcode, p.name || p.nameEN);
                     }
                 });
 
