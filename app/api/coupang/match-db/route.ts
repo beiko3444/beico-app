@@ -10,11 +10,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Invalid externalSkus array" }, { status: 400 });
         }
 
+        // Prisma expects strings for coupangSku and barcode, but Coupang API may return numbers
+        const stringSkus = externalSkus.map(sku => String(sku));
+
         const products = await prisma.product.findMany({
             where: {
                 OR: [
-                    { coupangSku: { in: externalSkus } },
-                    { barcode: { in: externalSkus } }
+                    { coupangSku: { in: stringSkus } },
+                    { barcode: { in: stringSkus } }
                 ]
             },
             select: { coupangSku: true, barcode: true, name: true, nameEN: true, imageUrl: true }
