@@ -8,24 +8,38 @@ type OrderStatusProps = {
 
 export default function OrderStatus({ status, trackingNumber, taxInvoiceIssued }: OrderStatusProps) {
     const steps = [
-        { label: '주문신청', key: 'ORDERED' },
+        { label: '주문접수', key: 'ORDERED' },
         { label: '입금대기', key: 'PENDING_DEPOSIT' },
         { label: '입금확인', key: 'DEPOSIT_COMPLETED' },
-        { label: '배송중', key: 'SHIPPED' },
+        { label: '발송완료', key: 'SHIPPED' },
+        { label: '계산서 발급완료', key: 'INVOICED' },
     ];
 
     const isStepReached = (stepKey: string) => {
-        if (taxInvoiceIssued || trackingNumber || status === 'SHIPPED') return true;
-        if (status === 'DEPOSIT_COMPLETED' && (stepKey === 'ORDERED' || stepKey === 'PENDING_DEPOSIT' || stepKey === 'DEPOSIT_COMPLETED')) return true;
-        if ((status === 'PENDING' || status === 'APPROVED') && (stepKey === 'ORDERED' || stepKey === 'PENDING_DEPOSIT')) return true;
-        if (stepKey === 'ORDERED') return true;
-        return false;
+        if (taxInvoiceIssued) return true;
+        if (stepKey === 'INVOICED') return taxInvoiceIssued;
+
+        if (trackingNumber || status === 'SHIPPED') {
+            return stepKey !== 'INVOICED';
+        }
+
+        if (status === 'DEPOSIT_COMPLETED') {
+            return ['ORDERED', 'PENDING_DEPOSIT', 'DEPOSIT_COMPLETED'].includes(stepKey);
+        }
+
+        if (status === 'PENDING' || status === 'APPROVED') {
+            return ['ORDERED', 'PENDING_DEPOSIT'].includes(stepKey);
+        }
+
+        return stepKey === 'ORDERED';
     };
 
     const getCurrentStepKey = () => {
-        if (taxInvoiceIssued || trackingNumber || status === 'SHIPPED') return 'SHIPPED';
+        if (taxInvoiceIssued) return 'INVOICED';
+        if (trackingNumber || status === 'SHIPPED') return 'SHIPPED';
         if (status === 'DEPOSIT_COMPLETED') return 'DEPOSIT_COMPLETED';
-        return 'PENDING_DEPOSIT';
+        if (status === 'PENDING' || status === 'APPROVED') return 'PENDING_DEPOSIT';
+        return 'ORDERED';
     };
 
     const currentStepKey = getCurrentStepKey();
