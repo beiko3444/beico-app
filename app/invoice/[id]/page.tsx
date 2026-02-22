@@ -109,20 +109,24 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold">{order.user.partnerProfile?.businessName || order.user.name} 殿/귀하</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1 px-2 text-xs font-bold">{order.user.partnerProfile?.businessName || order.user.name} 殿/귀하</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold">{order.user.partnerProfile?.representativeName || order.user.name}</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1 px-2 text-xs font-bold">{order.user.partnerProfile?.representativeName || order.user.name}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
-                                    <td className="py-1.5 px-2 text-xs leading-tight font-bold">{order.user.partnerProfile?.address || '-'}</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td className="py-1 px-2 text-xs leading-tight font-bold">{order.user.partnerProfile?.address || '-'}</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold">{order.user.partnerProfile?.contact || '-'}</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
+                                    <td className="py-1 px-2 text-xs font-bold">{order.user.partnerProfile?.contact || '-'}</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td className="py-1 px-2 text-xs font-bold">{order.user.partnerProfile?.email || '-'}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -145,8 +149,8 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                         <table className="w-full text-sm border-collapse border border-black">
                             <tbody className="divide-y divide-black">
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold border-r border-black">주식회사 베이코</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1 px-2 text-xs font-bold border-r border-black">주식회사 베이코</td>
                                     <td rowSpan={2} className="w-20 relative p-0 overflow-hidden text-center align-middle bg-white">
                                         {/* Background text (underneath) */}
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
@@ -154,25 +158,29 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                         </div>
                                         {/* Seal image (on top) */}
                                         <div className="absolute inset-0 flex items-center justify-center z-10">
-                                            <img src="/bko.png" alt="Seal" style={{ width: '60px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
+                                            <img src="/bko.png" alt="Seal" style={{ width: '45px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
                                         </div>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
-                                    <td className="py-1.5 px-2 text-xs font-bold border-r border-black">이다빈</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1 px-2 text-xs font-bold border-r border-black">이다빈</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
-                                    <td colSpan={2} className="py-1.5 px-2 text-xs leading-tight font-bold">부산시 강서구 낙동남로 1013번길 35</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td colSpan={2} className="py-1 px-2 text-xs leading-tight font-bold">부산시 강서구 낙동남로 1013번길 35</td>
                                 </tr>
                                 <tr>
                                     <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
                                     <td colSpan={2} className="py-1.5 px-2 text-xs font-bold">010-8119-3313</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
-                                    <td colSpan={2} className="py-1.5 px-2 text-xs font-bold">contact@beiko.co.kr</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話번호<br />전화번호</td>
+                                    <td colSpan={2} className="py-1 px-2 text-xs font-bold">010-8119-3313</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td colSpan={2} className="py-1 px-2 text-xs font-bold">contact@beiko.co.kr</td>
                                 </tr>
                             </tbody>
                         </table>
