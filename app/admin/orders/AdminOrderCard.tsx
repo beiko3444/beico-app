@@ -53,7 +53,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
     };
 
     return (
-        <div className="bg-[#f4f5f7] rounded-[2rem] w-full max-w-[500px] mx-auto p-4 md:p-6 mb-6">
+        <div className="bg-[#f8f9fa] rounded-[2.5rem] w-full max-w-[500px] mx-auto p-4 md:p-7 mb-10 border border-gray-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.03)] relative transition-all hover:shadow-[0_10px_40px_rgba(0,0,0,0.06)] hover:border-gray-300">
             <OrderStatus
                 status={order.status}
                 trackingNumber={order.trackingNumber}
