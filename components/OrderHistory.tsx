@@ -250,7 +250,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                         ) : (
                                             <>
                                                 <span className="text-sm font-bold">入金確認の要請</span>
-                                                <span className="text-[10px] md:text-[11px] font-medium opacity-80">(Confirm Deposit)</span>
+                                                <span className="text-[10px] md:text-[11px] font-medium opacity-80">(입금완료 시 눌러주세요)</span>
                                             </>
                                         )
                                     )}
@@ -262,7 +262,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                         className="h-13 border-2 border-gray-200 text-gray-400 bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight"
                                     >
                                         <span className="text-sm font-bold">注文キャンセル</span>
-                                        <span className="text-[10px] md:text-[11px] font-medium opacity-80">(Cancel)</span>
+                                        <span className="text-[10px] md:text-[11px] font-medium opacity-80">(주문취소)</span>
                                     </button>
                                 )}
                             </div>

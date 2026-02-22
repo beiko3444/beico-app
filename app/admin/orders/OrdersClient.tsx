@@ -277,10 +277,10 @@ export default function OrdersClient({
                         <div key={order.id}>
                             <AdminOrderCard order={order} />
                             {idx < filteredOrders.length - 1 && (
-                                <div className="py-2 flex items-center gap-4 px-10 mb-8 overflow-hidden">
-                                    <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
-                                    <div className="text-[10px] font-black text-gray-300 uppercase tracking-widest whitespace-nowrap">NEXT ORDER</div>
-                                    <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-gray-200 to-transparent" />
+                                <div className="py-2 flex items-center gap-4 px-10 mb-8 overflow-hidden opacity-80">
+                                    <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-red-200 to-transparent" />
+                                    <div className="text-[10px] font-black text-[#e43f29] uppercase tracking-widest whitespace-nowrap">NEXT ORDER</div>
+                                    <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-red-200 to-transparent" />
                                 </div>
                             )}
                         </div>
