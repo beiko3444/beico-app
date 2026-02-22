@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+import { sendEmail } from "@/lib/email"
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
     console.log("PATCH request received")
@@ -147,6 +148,34 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
             })
             return updatedOrder
         })
+
+        if (session.user.role !== 'ADMIN' && status === 'DEPOSIT_COMPLETED' && order.status !== 'DEPOSIT_COMPLETED') {
+            try {
+                await sendEmail({
+                    to: 'contact@beiko.co.kr',
+                    subject: `[입금완료 알림] ${order.user?.name || '고객'}님의 입금 확인 요청`,
+                    text: `고객(${order.user?.name || '알 수 없음'})님이 입금 확인을 요청했습니다.\n\n주문번호: ${order.orderNumber || order.id}\n상태: 입금완료\n\n관리자 페이지: ${process.env.NEXTAUTH_URL}/admin/orders`,
+                    html: `
+                        <div style="font-family: sans-serif; padding: 20px; color: #333;">
+                            <h2 style="color: #e43f29;">💰 입금 완료 알림</h2>
+                            <p><strong>${order.user?.name || '고객'}</strong>님이 입금 확인을 요청했습니다.</p>
+                            <div style="background: #f9f9f9; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                                <p style="margin: 5px 0;"><strong>주문번호:</strong> ${order.orderNumber || order.id}</p>
+                                <p style="margin: 5px 0;"><strong>상태:</strong> 입금완료 (관리자 확인 필요)</p>
+                            </div>
+                            <p>
+                                <a href="${process.env.NEXTAUTH_URL}/admin/orders" 
+                                   style="display: inline-block; padding: 10px 20px; background: #424853; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                                   관리자 페이지에서 확인하기
+                                </a>
+                            </p>
+                        </div>
+                    `
+                });
+            } catch (err) {
+                console.error("Failed to send deposit confirmation email:", err);
+            }
+        }
 
         return NextResponse.json(result)
 
