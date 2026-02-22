@@ -8,10 +8,10 @@ type OrderStatusProps = {
 
 export default function OrderStatus({ status, trackingNumber, taxInvoiceIssued }: OrderStatusProps) {
     const steps = [
-        { label: 'Placed', key: 'ORDERED' },
-        { label: 'Deposit', key: 'PENDING_DEPOSIT' },
-        { label: 'Paid', key: 'DEPOSIT_COMPLETED' },
-        { label: 'Shipped', key: 'SHIPPED' },
+        { label: '주문신청', key: 'ORDERED' },
+        { label: '입금대기', key: 'PENDING_DEPOSIT' },
+        { label: '입금확인', key: 'DEPOSIT_COMPLETED' },
+        { label: '배송중', key: 'SHIPPED' },
     ];
 
     const isStepReached = (stepKey: string) => {

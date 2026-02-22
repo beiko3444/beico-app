@@ -170,6 +170,10 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                     <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
                                     <td colSpan={2} className="py-1.5 px-2 text-xs font-bold">010-8119-3313</td>
                                 </tr>
+                                <tr>
+                                    <td className="py-1.5 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td colSpan={2} className="py-1.5 px-2 text-xs font-bold">contact@beiko.co.kr</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>

@@ -63,7 +63,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
             <div className="bg-white rounded-[1.2rem] p-5 shadow-sm mb-6">
                 <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-50">
                     <h2 className="text-xl font-black text-gray-800 tracking-tight">
-                        No. {orderNumber}
+                        주문번호 {orderNumber}
                     </h2>
                     <div className="flex items-center gap-2">
                         <span className="bg-gray-100 text-gray-500 rounded-full px-3 py-1 text-[10px] font-bold">
@@ -101,6 +101,10 @@ export default function AdminOrderCard({ order }: { order: any }) {
                         <span className="text-sm text-gray-400">이메일</span>
                         <span className="text-sm text-gray-800 font-bold">{order.user.partnerProfile?.email || '-'}</span>
                     </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm text-gray-400">사업자 번호</span>
+                        <span className="text-sm text-gray-800 font-bold">{order.user.partnerProfile?.businessRegNumber || '-'}</span>
+                    </div>
                 </div>
             </div>
 
@@ -132,40 +136,48 @@ export default function AdminOrderCard({ order }: { order: any }) {
                                             <p className="text-[10px] text-gray-400 truncate mb-2 mt-0.5">{item.product.nameJP || item.product.name}</p>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-y-2 gap-x-2 w-full text-[11px] pr-2">
+                                        {/* Financial Row: 단가, 수량, 공급가, 부가세 */}
+                                        <div className="flex items-center gap-4 text-[11px] border-b border-gray-50 pb-2 mb-2">
                                             <div className="flex flex-col">
                                                 <span className="text-gray-400">단가</span>
                                                 <span className="font-bold text-gray-900">{item.price.toLocaleString()}</span>
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400">공급가</span>
-                                                <span className="font-bold text-gray-900">{supplyPrice.toLocaleString()}</span>
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-gray-400">수량</span>
                                                 <span className="font-bold text-gray-900">{item.quantity}</span>
                                             </div>
                                             <div className="flex flex-col">
+                                                <span className="text-gray-400">공급가</span>
+                                                <span className="font-bold text-gray-900">{supplyPrice.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-gray-400">부가세</span>
+                                                <span className="font-bold text-gray-900">{vat.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+
+                                        {/* Code & Barcode Row */}
+                                        <div className="flex items-center justify-between gap-4 text-[11px]">
+                                            <div className="flex flex-col">
                                                 <span className="text-gray-400">상품코드</span>
                                                 <span className="font-bold text-gray-900 truncate">{item.product.productCode || '-'}</span>
                                             </div>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div className="flex justify-between items-end pt-3 mt-3">
-                                    <div className="text-[11px] text-gray-400 w-full flex justify-between items-center pr-2">
-                                        <span>부가세: <strong className="font-bold text-gray-900">{vat.toLocaleString()}</strong></span>
-                                        <span className="flex items-center gap-2">
-                                            바코드:
-                                            {item.product.barcode ? (
-                                                <div className="h-[12px] overflow-hidden opacity-70">
-                                                    <BarcodeDisplay value={item.product.barcode} width={1} height={12} fontSize={0} displayValue={false} showDownload={false} />
+                                            <div className="flex flex-col items-end">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-gray-400">바코드</span>
+                                                    {item.product.barcode ? (
+                                                        <div className="flex flex-col items-center">
+                                                            <div className="h-[14px] overflow-hidden opacity-90 mb-1">
+                                                                <BarcodeDisplay value={item.product.barcode} width={1} height={14} fontSize={0} displayValue={false} showDownload={false} />
+                                                            </div>
+                                                            <span className="text-[9px] font-mono text-gray-400 leading-none">{item.product.barcode}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-gray-300">없음</span>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                <span className="w-[80px] h-[12px] bg-[#424853] rounded-sm" />
-                                            )}
-                                        </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
