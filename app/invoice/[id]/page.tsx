@@ -95,7 +95,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                 {/* Info Section - Traditional Box Style */}
                 <div className="grid grid-cols-2 gap-0 mb-2">
                     {/* Recipient Side */}
-                    <div className="border-r border-black p-4 py-1">
+                    <div className="border-r border-black pr-4 py-1">
                         <div className="mb-1 flex justify-between items-center">
                             <div className="flex flex-col">
                                 <span className="text-[10px] font-bold text-gray-500 leading-none">供給先</span>
@@ -133,7 +133,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                     </div>
 
                     {/* Supplier Side */}
-                    <div className="p-4 py-1 bg-white relative">
+                    <div className="pl-4 py-1 bg-white relative">
                         <div className="mb-1 flex justify-between items-center">
                             <div className="flex flex-col relative">
                                 <span className="text-[10px] font-bold text-gray-500 leading-none">供給者</span>
