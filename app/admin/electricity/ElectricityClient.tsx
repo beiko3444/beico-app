@@ -41,6 +41,7 @@ export default function ElectricityClient() {
     const [extractionHistory, setExtractionHistory] = useState<any[]>([])
     const [loading, setLoading] = useState(false)
     const [prevMonthData, setPrevMonthData] = useState<any>(null)
+    const [invoiceRemarks, setInvoiceRemarks] = useState('')
 
     // Landlord Input States
     const [landlordInputs, setLandlordInputs] = useState({
@@ -987,6 +988,17 @@ export default function ElectricityClient() {
                         >
                             {/* Floating Side Buttons - Fixed Right */}
                             <div className="fixed top-1/2 right-6 -translate-y-1/2 z-[200] flex flex-col gap-4 print:hidden">
+                                {/* Remarks Input Modal Tool */}
+                                <div className="absolute right-full top-0 mr-4 w-64 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 mb-4 hover:shadow-2xl transition-all">
+                                    <div className="text-xs font-bold text-gray-700 mb-2">하단 비고란 입력</div>
+                                    <textarea
+                                        value={invoiceRemarks}
+                                        onChange={(e) => setInvoiceRemarks(e.target.value)}
+                                        placeholder="청구서 하단에 인쇄할 안내사항이나 입금 계좌 변경 등의 내용을 자유롭게 적어주세요."
+                                        rows={4}
+                                        className="w-full text-xs p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] transition-all resize-none"
+                                    />
+                                </div>
                                 <button
                                     onClick={() => window.print()}
                                     title="PDF로 저장"
@@ -1194,6 +1206,15 @@ export default function ElectricityClient() {
                                         <div className="mt-1 text-center border-t border-gray-100 pt-1">
                                             <p className="text-[9px] font-medium text-gray-500 italic">위와 같이 전력 사용 요금을 청구합니다.</p>
                                         </div>
+
+                                        {invoiceRemarks && invoiceRemarks.trim() !== '' && (
+                                            <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded-lg text-left">
+                                                <div className="text-[10px] font-bold text-gray-800 mb-1">※ 비고</div>
+                                                <div className="text-[9px] text-gray-600 whitespace-pre-wrap leading-relaxed">
+                                                    {invoiceRemarks}
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
                                 );
                             })()}
