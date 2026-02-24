@@ -1092,13 +1092,13 @@ export default function ElectricityClient() {
                                                 <tbody>
                                                     <tr>
                                                         <td className="border border-black p-1">
-                                                            <div className="h-56 bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+                                                            <div className="h-36 print:h-36 bg-white flex items-center justify-center overflow-hidden border border-gray-100">
                                                                 {prevMonthPhoto ? <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="prev" /> : "사진 없음"}
                                                             </div>
                                                             <div className="text-center mt-1 font-bold text-[11px]">전월 지침: {landlordData.prevMeter.toLocaleString()} kWh</div>
                                                         </td>
                                                         <td className="border border-black p-1">
-                                                            <div className="h-56 bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+                                                            <div className="h-36 print:h-36 bg-white flex items-center justify-center overflow-hidden border border-gray-100">
                                                                 {landlordData.photo ? <img src={landlordData.photo} className="w-full h-full object-contain" alt="curr" /> : "사진 없음"}
                                                             </div>
                                                             <div className="text-center mt-1 font-bold text-[11px]">당월 지침: {landlordData.currMeter.toLocaleString()} kWh</div>
@@ -1226,12 +1226,13 @@ export default function ElectricityClient() {
                                     top: 0 !important;
                                     left: 0 !important;
                                     width: 210mm !important;
-                                    height: 297mm !important;
+                                    height: calc(297mm - 1px) !important;
                                     margin: 0 !important;
-                                    padding: 10mm !important;
+                                    padding: 8mm !important;
                                     background: white !important;
                                     z-index: 99999 !important;
                                     box-sizing: border-box !important;
+                                    overflow: hidden !important; 
                                 }
                                 
                                 table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed; }
