@@ -979,10 +979,10 @@ export default function ElectricityClient() {
             {
                 isInvoiceOpen && landlordData && billData && (
                     <div
-                        className="fixed inset-0 bg-gray-950/95 z-[150] flex items-center justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto"
+                        className="fixed inset-0 bg-gray-950/95 z-[150] flex items-center justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:absolute print:inset-0 print:block print:p-0"
                     >
                         <div
-                            className="bg-white w-full max-w-[210mm] shadow-2xl relative print:m-0 print:shadow-none animate-in fade-in zoom-in-95 duration-300 my-10 print:my-0"
+                            className="bg-white w-full max-w-[210mm] shadow-2xl relative print:static print:transform-none print:m-0 print:shadow-none animate-in fade-in zoom-in-95 duration-300 my-10 print:my-0"
                             onClick={e => e.stopPropagation()}
                         >
                             {/* Floating Side Buttons - Fixed Right */}
