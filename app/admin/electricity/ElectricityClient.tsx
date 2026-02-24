@@ -562,7 +562,7 @@ export default function ElectricityClient() {
     const unitCostPerKwh = totalKwh > 0 ? Math.round((billData?.totalAmount || 0) / totalKwh) : 0
 
     return (
-        <div className="space-y-8 font-sans pb-20">
+        <div id="electricity-main" className="space-y-8 font-sans pb-20 print:pb-0 print:space-y-0">
             {/* Header */}
             <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 shadow-sm transition-all">
                 <div className="flex flex-col gap-4 py-4">
@@ -978,7 +978,7 @@ export default function ElectricityClient() {
 
             {
                 isInvoiceOpen && landlordData && billData && (
-                    <div
+                    <div id="print-modal"
                         className="fixed inset-0 bg-gray-950/95 z-[150] flex items-center justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:absolute print:inset-0 print:block print:p-0"
                     >
                         <div
@@ -1092,13 +1092,13 @@ export default function ElectricityClient() {
                                                 <tbody>
                                                     <tr>
                                                         <td className="border border-black p-1">
-                                                            <div className="h-36 print:h-36 bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+                                                            <div className="h-48 print:h-[180px] bg-white flex items-center justify-center overflow-hidden border border-gray-100">
                                                                 {prevMonthPhoto ? <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="prev" /> : "사진 없음"}
                                                             </div>
                                                             <div className="text-center mt-1 font-bold text-[11px]">전월 지침: {landlordData.prevMeter.toLocaleString()} kWh</div>
                                                         </td>
                                                         <td className="border border-black p-1">
-                                                            <div className="h-36 print:h-36 bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+                                                            <div className="h-48 print:h-[180px] bg-white flex items-center justify-center overflow-hidden border border-gray-100">
                                                                 {landlordData.photo ? <img src={landlordData.photo} className="w-full h-full object-contain" alt="curr" /> : "사진 없음"}
                                                             </div>
                                                             <div className="text-center mt-1 font-bold text-[11px]">당월 지침: {landlordData.currMeter.toLocaleString()} kWh</div>
@@ -1107,7 +1107,7 @@ export default function ElectricityClient() {
                                                     <tr>
                                                         <td colSpan={2} className="border border-black p-0.5 bg-gray-50">
                                                             <div className="flex justify-between items-center px-1">
-                                                                <span className="text-[8px] tracking-tighter">산출: ({landlordData.currMeter}-{landlordData.prevMeter})+{landlordData.waterHeaterKw}+{landlordData.outdoorLightKw}</span>
+                                                                <span className="text-[9px] tracking-tighter">산출: (당월 {landlordData.currMeter.toLocaleString()} - 전월 {landlordData.prevMeter.toLocaleString()}) + 온수기 {landlordData.waterHeaterKw} + 외등 {landlordData.outdoorLightKw}</span>
                                                                 <span className="text-[10px] font-bold underline decoration-double">총 사용량: {landlordUsageKwh.toLocaleString()} kWh</span>
                                                             </div>
                                                         </td>
@@ -1201,32 +1201,32 @@ export default function ElectricityClient() {
 
                         <style jsx global>{`
                             @media print {
-                                @page { size: A4; margin: 0; }
+                                @page { size: A4 portrait; margin: 0; }
                                 html, body { 
-                                    width: 210mm;
-                                    height: 297mm; /* Force single page height */
+                                    width: 210mm !important;
+                                    height: 297mm !important;
                                     margin: 0 !important; 
                                     padding: 0 !important; 
                                     background: white !important;
-                                    overflow: hidden !important; /* Cut off anything that spills over */
+                                    overflow: hidden !important; 
                                 }
                                 
-                                /* Hide everything naturally */
-                                body * { 
-                                    visibility: hidden !important; 
+                                /* Completely remove background layout elements from print flow */
+                                #electricity-main > div:not(#print-modal) {
+                                    display: none !important;
                                 }
                                 
                                 /* Show only the invoice */
-                                #invoice-content, #invoice-content * { 
+                                #print-modal, #print-modal * { 
                                     visibility: visible !important; 
                                 }
                                 
                                 #invoice-content {
-                                    position: absolute !important; /* Absolute prevents repeating on pages unlike fixed */
+                                    position: fixed !important;
                                     top: 0 !important;
                                     left: 0 !important;
                                     width: 210mm !important;
-                                    height: calc(297mm - 1px) !important;
+                                    height: 297mm !important;
                                     margin: 0 !important;
                                     padding: 8mm !important;
                                     background: white !important;
