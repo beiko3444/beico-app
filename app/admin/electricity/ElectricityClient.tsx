@@ -980,7 +980,6 @@ export default function ElectricityClient() {
                 isInvoiceOpen && landlordData && billData && (
                     <div
                         className="fixed inset-0 bg-gray-950/95 z-[150] flex items-center justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto"
-                        onClick={() => setIsInvoiceOpen(false)}
                     >
                         <div
                             className="bg-white w-full max-w-[210mm] shadow-2xl relative print:m-0 print:shadow-none animate-in fade-in zoom-in-95 duration-300 my-10 print:my-0"
@@ -1047,7 +1046,7 @@ export default function ElectricityClient() {
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">입금 계좌</td>
-                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">기업은행 656-045236-01-013 / 주식회사 베이코</td>
+                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">토스뱅크 1000-0918-2374 예금주 이다빈</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
