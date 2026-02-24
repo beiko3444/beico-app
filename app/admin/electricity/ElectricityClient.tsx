@@ -1181,17 +1181,17 @@ export default function ElectricityClient() {
                                                         <td className="border border-black p-0.5 text-center text-[9px]">합 계</td>
                                                         <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()}</td>
                                                         <td className="border border-black p-0.5">{beicoTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200 underline decoration-double">{landlordTotal.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()}</td>
                                                     </tr>
                                                     <tr className="bg-gray-200 font-black border-t-2 border-black">
                                                         <td colSpan={3} className="border border-black p-1 text-center text-[10px]">최종 청구 금액 (납부하실 금액)</td>
-                                                        <td className="border border-black p-1 text-sm text-right underline decoration-double">{landlordTotal.toLocaleString()}원</td>
+                                                        <td className="border border-black p-1 text-sm text-right">{landlordTotal.toLocaleString()}원</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
 
-                                        <div className="mt-2 text-center border-t border-gray-100 pt-2">
+                                        <div className="mt-1 text-center border-t border-gray-100 pt-1">
                                             <p className="text-[9px] font-medium text-gray-500 italic">위와 같이 전력 사용 요금을 청구합니다.</p>
                                         </div>
                                     </div>
