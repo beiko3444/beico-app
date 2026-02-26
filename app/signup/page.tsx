@@ -97,7 +97,8 @@ export default function SignupPage() {
         address: '',
         addressDetail: '',
         country: '',
-        confirmPassword: ''
+        confirmPassword: '',
+        businessRegistrationDocument: ''
     })
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
