@@ -120,10 +120,7 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete }: Pro
                     }
                 />
             </td>
-            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-500 font-mono text-[10px] whitespace-nowrap">{product.productCode || '-'}</td>
-            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-400 font-mono text-[10px] whitespace-nowrap">
-                <BarcodeDisplay value={product.barcode} />
-            </td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums text-gray-800 font-bold whitespace-nowrap">{product.regionalPrices?.C?.KR?.moq || product.minOrderQuantity || 1}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums text-gray-500 whitespace-nowrap">{(product.buyPrice || 0).toLocaleString()}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-[var(--color-brand-blue)] whitespace-nowrap">{(product.sellPrice || 0).toLocaleString()}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-gray-700 whitespace-nowrap">{(product.onlinePrice || 0).toLocaleString()}</td>
@@ -147,6 +144,10 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete }: Pro
                         </span>
                     </div>
                 </div>
+            </td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-500 font-mono text-[10px] whitespace-nowrap">{product.productCode || '-'}</td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-400 font-mono text-[10px] whitespace-nowrap">
+                <BarcodeDisplay value={product.barcode} />
             </td>
             <td className="px-2 py-1.5 text-center whitespace-nowrap">
                 <div className="flex items-center justify-center gap-1">
@@ -266,13 +267,14 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">No</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">이미지</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품코드</th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">바코드</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">KR 최소수량</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">매입가</th>
                             <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매가</th>
                             <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">판매가</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">재고</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">마진(도매/소매)</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품코드</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">바코드</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] last:border-0 whitespace-nowrap">관리</th>
                         </tr>
                     </thead>
@@ -283,7 +285,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                         >
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={12} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={13} className="px-6 py-12 text-center text-gray-500">
                                         등록된 상품이 없습니다.
                                     </td>
                                 </tr>
