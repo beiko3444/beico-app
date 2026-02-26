@@ -27,9 +27,13 @@ interface ProductRowProps {
     index: number
     onSortOrderChange: (productId: string, newOrder: number) => void
     onDelete: (productId: string) => void
+    checked: boolean
+    onToggleCheck: (id: string) => void
+    modifiedMoq: string | undefined
+    onMoqChange: (id: string, val: string) => void
 }
 
-function SortableProductRow({ product, index, onSortOrderChange, onDelete }: ProductRowProps) {
+function SortableProductRow({ product, index, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedMoq, onMoqChange }: ProductRowProps) {
     const {
         attributes,
         listeners,
@@ -69,8 +73,16 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete }: Pro
         <tr
             ref={setNodeRef}
             style={style}
-            className={`text-[11px] border-b border-gray-100 hover:bg-gray-50 transition-colors group ${isDragging ? 'bg-blue-50' : ''}`}
+            className={`text-[11px] border-b border-gray-100 hover:bg-gray-50 transition-colors group ${isDragging ? 'bg-blue-50' : ''} ${checked ? 'bg-blue-50/30' : ''}`}
         >
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
+                <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggleCheck(product.id)}
+                    className="cursor-pointer"
+                />
+            </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
                 <div
                     {...attributes}
@@ -120,7 +132,15 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete }: Pro
                     }
                 />
             </td>
-            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums text-gray-800 font-bold whitespace-nowrap">{product.regionalPrices?.C?.KR?.moq || product.minOrderQuantity || 1}</td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-800 font-bold whitespace-nowrap">
+                <input
+                    type="number"
+                    min="1"
+                    value={modifiedMoq !== undefined ? modifiedMoq : (product.regionalPrices?.C?.KR?.moq || product.minOrderQuantity || 1)}
+                    onChange={(e) => onMoqChange(product.id, e.target.value)}
+                    className="w-12 text-center border border-gray-200 rounded py-0.5 text-[11px] focus:border-[var(--color-brand-blue)] outline-none font-bold bg-white transition-colors"
+                />
+            </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums text-gray-500 whitespace-nowrap">{(product.buyPrice || 0).toLocaleString()}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-[var(--color-brand-blue)] whitespace-nowrap">{(product.sellPrice || 0).toLocaleString()}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-gray-700 whitespace-nowrap">{(product.onlinePrice || 0).toLocaleString()}</td>
@@ -178,6 +198,9 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete }: Pro
 
 export default function ProductTable({ initialProducts }: { initialProducts: any[] }) {
     const [products, setProducts] = useState(initialProducts)
+    const [modifiedMoqs, setModifiedMoqs] = useState<Record<string, string>>({})
+    const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+    const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
@@ -253,16 +276,87 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
         }
     }
 
+    const handleToggleCheck = (id: string) => {
+        const next = new Set(checkedIds)
+        if (next.has(id)) next.delete(id)
+        else next.add(id)
+        setCheckedIds(next)
+    }
+
+    const handleToggleAll = () => {
+        if (checkedIds.size === products.length) setCheckedIds(new Set())
+        else setCheckedIds(new Set(products.map(p => p.id)))
+    }
+
+    const handleMoqChange = (id: string, val: string) => {
+        setModifiedMoqs(prev => ({ ...prev, [id]: val }))
+        if (!checkedIds.has(id)) {
+            const next = new Set(checkedIds)
+            next.add(id)
+            setCheckedIds(next)
+        }
+    }
+
+    const handleSaveMoqs = async () => {
+        if (checkedIds.size === 0) return
+        if (!confirm(`선택된 ${checkedIds.size}개 상품의 최소수량을 저장하시겠습니까?`)) return
+
+        setIsSaving(true)
+        try {
+            const updates = Array.from(checkedIds).map(id => {
+                const product = products.find(p => p.id === id)
+                const currentMoqValue = modifiedMoqs[id] !== undefined ? modifiedMoqs[id] : (product?.regionalPrices?.C?.KR?.moq || product?.minOrderQuantity || 1)
+                const num = parseInt(String(currentMoqValue))
+                return { id, moq: isNaN(num) || num < 1 ? 1 : num }
+            })
+
+            const res = await fetch('/api/products/bulk/moq', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ updates })
+            })
+
+            if (res.ok) {
+                alert('저장되었습니다.')
+                setCheckedIds(new Set())
+                setModifiedMoqs({})
+                router.refresh()
+            } else {
+                alert('저장 실패')
+            }
+        } catch (e) {
+            console.error(e)
+            alert('오류 발생')
+        } finally {
+            setIsSaving(false)
+        }
+    }
+
     return (
         <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
             onDragEnd={handleDragEnd}
         >
+            {checkedIds.size > 0 && (
+                <div className="flex justify-between items-center p-2.5 bg-blue-50 border-b border-blue-100 rounded-t-lg">
+                    <span className="text-xs font-bold text-blue-800">{checkedIds.size}개 상품 선택됨</span>
+                    <button
+                        onClick={handleSaveMoqs}
+                        disabled={isSaving}
+                        className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition disabled:opacity-50"
+                    >
+                        {isSaving ? '저장 중...' : '선택된 항목 최수수량 저장'}
+                    </button>
+                </div>
+            )}
             <div className="overflow-x-auto w-full pb-2">
                 <table className="w-full table-auto min-w-max border-collapse">
                     <thead className="bg-[var(--color-brand-blue)] text-white">
                         <tr>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">
+                                <input type="checkbox" onChange={handleToggleAll} checked={products.length > 0 && checkedIds.size === products.length} className="cursor-pointer" />
+                            </th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">순서</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">No</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">이미지</th>
@@ -285,7 +379,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                         >
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={13} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={14} className="px-6 py-12 text-center text-gray-500">
                                         등록된 상품이 없습니다.
                                     </td>
                                 </tr>
@@ -297,6 +391,10 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                                         index={index}
                                         onSortOrderChange={onSortOrderChange}
                                         onDelete={handleDelete}
+                                        checked={checkedIds.has(product.id)}
+                                        onToggleCheck={handleToggleCheck}
+                                        modifiedMoq={modifiedMoqs[product.id]}
+                                        onMoqChange={handleMoqChange}
                                     />
                                 ))
                             )}
