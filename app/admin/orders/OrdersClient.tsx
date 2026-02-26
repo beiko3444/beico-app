@@ -79,6 +79,7 @@ export default function OrdersClient({
         const matchesType = (() => {
             if (type === 'invoice') return !order.taxInvoiceIssued
             if (type === 'tracking') return !order.trackingNumber && order.status === 'APPROVED'
+            if (type === 'inprogress') return !order.trackingNumber || !order.taxInvoiceIssued
             if (type === 'completed') return order.trackingNumber && order.taxInvoiceIssued
             return true
         })()
@@ -153,6 +154,14 @@ export default function OrdersClient({
                                 <span className="text-[10px] font-black">{missingTrackingCount} <span className="opacity-70 font-bold ml-1">송장누락</span></span>
                             </Link>
                         )}
+
+                        <Link
+                            href={type === 'inprogress' ? '/admin/orders' : '/admin/orders?type=inprogress'}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'inprogress' ? 'bg-orange-500 border-orange-500 text-white shadow-lg scale-105' : 'bg-white border-orange-200 text-orange-600 hover:bg-orange-50'}`}
+                        >
+                            <span className="text-[10px]">⏳</span>
+                            <span className="text-[10px] font-black">거래중</span>
+                        </Link>
 
                         <Link
                             href={type === 'completed' ? '/admin/orders' : '/admin/orders?type=completed'}
