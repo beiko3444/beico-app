@@ -15,22 +15,22 @@ const transporter = nodemailer.createTransport({
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json()
-        const {
-            username,
-            password,
-            businessName,
-            representativeName,
-            contact,
-            fax,
-            email,
-            businessRegNumber,
-            address,
-            country
-        } = body
+        const formData = await req.formData()
+
+        const username = formData.get('username') as string
+        const password = formData.get('password') as string
+        const businessName = formData.get('businessName') as string
+        const representativeName = formData.get('representativeName') as string
+        const contact = formData.get('contact') as string
+        const fax = formData.get('fax') as string
+        const email = formData.get('email') as string
+        const businessRegNumber = formData.get('businessRegNumber') as string
+        const address = formData.get('address') as string
+        const country = formData.get('country') as string
+        const businessRegistrationDocument = formData.get('businessRegistrationDocument') as string
 
         // Basic validation
-        if (!username || !password || !businessName || !representativeName || !contact || !email || !businessRegNumber || !address || !country) {
+        if (!username || !password || !businessName || !representativeName || !contact || !email || !businessRegNumber || !address || !country || !businessRegistrationDocument) {
             return NextResponse.json(
                 { error: '必須項目をすべて入力してください。 / Please fill in all required fields.' },
                 { status: 400 }
@@ -70,6 +70,7 @@ export async function POST(req: Request) {
                         email,
                         businessRegNumber,
                         address,
+                        businessRegistrationUrl: businessRegistrationDocument, // Stored as base64 string
                         grade: 'C' // Default grade
                     }
                 }

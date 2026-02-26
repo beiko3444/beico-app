@@ -123,10 +123,30 @@ export default function SignupPage() {
                 finalValue = `${numbers.slice(0, 3)}-${numbers.slice(3, 7)}-${numbers.slice(7, 11)}`
             }
         } else if (name === 'businessRegNumber') {
-            finalValue = value.replace(/[^\d]/g, '')
+            const numbers = value.replace(/[^\d]/g, '')
+            if (numbers.length <= 3) {
+                finalValue = numbers
+            } else if (numbers.length <= 5) {
+                finalValue = `${numbers.slice(0, 3)}-${numbers.slice(3)}`
+            } else {
+                finalValue = `${numbers.slice(0, 3)}-${numbers.slice(3, 5)}-${numbers.slice(5, 10)}`
+            }
         }
 
         setFormData(prev => ({ ...prev, [name]: finalValue }))
+    }
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0]
+        if (file) {
+            const reader = new FileReader()
+            reader.onloadend = () => {
+                setFormData(prev => ({ ...prev, businessRegistrationDocument: reader.result as string }))
+            }
+            reader.readAsDataURL(file)
+        } else {
+            setFormData(prev => ({ ...prev, businessRegistrationDocument: '' }))
+        }
     }
 
     const handleNextStep = (e: React.FormEvent) => {
@@ -151,15 +171,26 @@ export default function SignupPage() {
         }
 
         try {
-            const submitData = {
-                ...formData,
-                address: `${formData.address} ${formData.addressDetail}`.trim()
+            const submitData = new FormData()
+            submitData.append('username', formData.username)
+            submitData.append('password', formData.password)
+            submitData.append('businessName', formData.businessName)
+            submitData.append('representativeName', formData.representativeName)
+            submitData.append('contact', formData.contact)
+            submitData.append('fax', formData.fax)
+            submitData.append('email', formData.email)
+            submitData.append('businessRegNumber', formData.businessRegNumber)
+            submitData.append('country', formData.country)
+            submitData.append('address', `${formData.address} ${formData.addressDetail}`.trim())
+
+            if (formData.businessRegistrationDocument) {
+                // businessRegistrationDocument is a base64 string
+                submitData.append('businessRegistrationDocument', formData.businessRegistrationDocument)
             }
 
             const res = await fetch('/api/auth/signup', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(submitData)
+                body: submitData
             })
 
             const data = await res.json()
@@ -403,6 +434,36 @@ export default function SignupPage() {
                                     placeholder="Business Registration Number (numbers only)"
                                 />
                             </div>
+                        </div>
+
+                        {/* Business Registration Document */}
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> 事業者登録証 / Business Registration Document / 사업자등록증
+                            </label>
+                            <label className="flex items-center justify-center w-full h-12 px-4 bg-white border border-gray-200 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 focus:border-gray-400 transition-all shadow-sm">
+                                <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                                    <Printer size={18} strokeWidth={1.5} />
+                                    <span>
+                                        {formData.businessRegistrationDocument ?
+                                            'ファイル選択済み / File Selected / 파일 선택됨' :
+                                            'アップロード / Upload / 업로드'
+                                        }
+                                    </span>
+                                </div>
+                                <input
+                                    type="file"
+                                    accept="image/*,.pdf"
+                                    onChange={handleFileChange}
+                                    required
+                                    className="hidden"
+                                />
+                            </label>
+                            {formData.businessRegistrationDocument && (
+                                <p className="text-[10px] text-green-600 font-bold ml-1">
+                                    アップロード完了 / Upload Completed / 업로드 완료
+                                </p>
+                            )}
                         </div>
 
                         {/* Email */}
