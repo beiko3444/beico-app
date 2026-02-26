@@ -267,14 +267,24 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 )}
                             </div>
 
-                            <Link
-                                href={`/invoice/${order.id}`}
-                                target="_blank"
-                                className="w-full h-14 border-2 border-[#111827] text-[#111827] bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight mt-2 pb-1"
-                            >
-                                <span className="text-[13px] font-bold">取引明細書を確認する</span>
-                                <span className="text-[10px] font-bold opacity-60">{isUSD ? 'Check Transaction Details' : '거래명세표 확인하기'}</span>
-                            </Link>
+                            <div className="flex gap-2 w-full mt-2">
+                                <Link
+                                    href={`/invoice/${order.id}`}
+                                    target="_blank"
+                                    className="flex-1 h-14 border-2 border-[#111827] text-[#111827] bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
+                                >
+                                    <span className="text-[11px] md:text-[13px] font-bold">取引明細書を確認する</span>
+                                    <span className="text-[9px] md:text-[10px] font-bold opacity-60">{isUSD ? 'Check Transaction' : '거래명세표 확인하기'}</span>
+                                </Link>
+                                <a
+                                    href="/beiko_Business%20Registration%20Certificate.png"
+                                    download="beiko_Business_Registration_Certificate.png"
+                                    className="flex-1 h-14 border-2 border-gray-300 text-gray-700 bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
+                                >
+                                    <span className="text-[11px] md:text-[13px] font-bold">事業者登録証</span>
+                                    <span className="text-[9px] md:text-[10px] font-bold opacity-60">{isUSD ? 'Business Reg. Download' : '사업자등록증 다운로드'}</span>
+                                </a>
+                            </div>
                         </div>
                         <div className="border-t border-gray-100 mx-5 mt-4 mb-3" />
 
