@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import nodemailer from 'nodemailer'
+import { writeFile, mkdir } from 'fs/promises'
+import path from 'path'
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -27,7 +29,7 @@ export async function POST(req: Request) {
         const businessRegNumber = formData.get('businessRegNumber') as string
         const address = formData.get('address') as string
         const country = formData.get('country') as string
-        const businessRegistrationDocument = formData.get('businessRegistrationDocument') as string
+        const businessRegistrationDocument = formData.get('businessRegistrationDocument')
 
         // Basic validation
         if (!username || !password || !businessName || !representativeName || !contact || !email || !businessRegNumber || !address || !country || !businessRegistrationDocument) {
@@ -52,6 +54,28 @@ export async function POST(req: Request) {
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 12)
 
+        let businessRegistrationUrl = ''
+        if (businessRegistrationDocument instanceof File) {
+            const bytes = await businessRegistrationDocument.arrayBuffer()
+            const buffer = Buffer.from(bytes)
+
+            // Get original extension
+            const ext = businessRegistrationDocument.name.split('.').pop() || 'tmp'
+
+            // Generate filename: 업체명_사업자등록증
+            // Note: safely replace characters that might break filesystem
+            const sanitizedBusinessName = businessName.replace(/[^a-zA-Z0-9가-힣]/g, '_')
+            const filename = `${sanitizedBusinessName}_사업자등록증.${ext}`
+
+            const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'business-registrations')
+            await mkdir(uploadDir, { recursive: true })
+
+            const filePath = path.join(uploadDir, filename)
+            await writeFile(filePath, buffer)
+
+            businessRegistrationUrl = `/uploads/business-registrations/${filename}`
+        }
+
         // Create user and profile
         const user = await prisma.user.create({
             data: {
@@ -70,7 +94,7 @@ export async function POST(req: Request) {
                         email,
                         businessRegNumber,
                         address,
-                        businessRegistrationUrl: businessRegistrationDocument, // Stored as base64 string
+                        businessRegistrationUrl, // Stored as relative URL path
                         grade: 'C' // Default grade
                     }
                 }

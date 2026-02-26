@@ -98,7 +98,7 @@ export default function SignupPage() {
         addressDetail: '',
         country: '',
         confirmPassword: '',
-        businessRegistrationDocument: ''
+        businessRegistrationDocument: null as File | null
     })
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
@@ -140,13 +140,9 @@ export default function SignupPage() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (file) {
-            const reader = new FileReader()
-            reader.onloadend = () => {
-                setFormData(prev => ({ ...prev, businessRegistrationDocument: reader.result as string }))
-            }
-            reader.readAsDataURL(file)
+            setFormData(prev => ({ ...prev, businessRegistrationDocument: file }))
         } else {
-            setFormData(prev => ({ ...prev, businessRegistrationDocument: '' }))
+            setFormData(prev => ({ ...prev, businessRegistrationDocument: null }))
         }
     }
 
@@ -185,7 +181,7 @@ export default function SignupPage() {
             submitData.append('address', `${formData.address} ${formData.addressDetail}`.trim())
 
             if (formData.businessRegistrationDocument) {
-                // businessRegistrationDocument is a base64 string
+                // businessRegistrationDocument is a File object
                 submitData.append('businessRegistrationDocument', formData.businessRegistrationDocument)
             }
 

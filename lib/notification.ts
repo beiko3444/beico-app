@@ -1,5 +1,17 @@
+import nodemailer from 'nodemailer';
+
 const KAKAO_REST_API_KEY = process.env.KAKAO_REST_API_KEY || '';
 const KAKAO_REFRESH_TOKEN = process.env.KAKAO_REFRESH_TOKEN || '';
+
+const transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST || 'smtp.gmail.com',
+    port: parseInt(process.env.SMTP_PORT || '465'),
+    secure: process.env.SMTP_PORT === '465' || !process.env.SMTP_PORT,
+    auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS
+    }
+});
 
 let cachedAccessToken = '';
 
@@ -94,8 +106,36 @@ export async function sendOrderNotification(data: OrderNotificationData) {
         }
 
         // console.log('Kakao order notification sent successfully');
-        return result;
+        // result holds kakao response, we can just log or ignore
     } catch (error) {
         console.error('Failed to send Kakao order notification:', error);
+    }
+
+    // Send Email Notification
+    try {
+        if (process.env.SMTP_USER && process.env.SMTP_PASS) {
+            await transporter.sendMail({
+                from: `"Beiko Admin" <${process.env.SMTP_USER}>`,
+                to: 'contact@beiko.co.kr',
+                subject: `[신규 주문 알림] ${data.customerName}님의 새로운 주문 (${data.orderNumber})`,
+                html: `
+                    <h2>새로운 주문이 접수되었습니다.</h2>
+                    <hr />
+                    <ul>
+                        <li><strong>주문번호:</strong> ${data.orderNumber}</li>
+                        <li><strong>고객(사)명:</strong> ${data.customerName}</li>
+                        <li><strong>총 상품 수:</strong> ${data.itemsCount}개</li>
+                        <li><strong>총 주문 금액:</strong> ${data.total.toLocaleString()}원</li>
+                    </ul>
+                    <br />
+                    <p>관리자 페이지에서 주문 목록을 확인해주세요.</p>
+                `
+            });
+            // console.log('Email order notification sent successfully');
+        } else {
+            console.warn('SMTP credentials not configured. Email notification skipped.');
+        }
+    } catch (emailError) {
+        console.error('Failed to send order notification email:', emailError);
     }
 }
