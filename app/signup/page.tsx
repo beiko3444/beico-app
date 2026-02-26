@@ -39,7 +39,7 @@ const TRANSLATIONS: Record<string, any> = {
         password: "비밀번호 (Password)",
         confirmPassword: "비밀번호 확인 (Confirm Password)",
         companyName: "상호명 (Company Name)",
-        contactPerson: "담당자명 (Contact Person)",
+        contactPerson: "대표자명 (Contact Person)",
         nationality: "국가 (Nationality)",
         registrationNumber: "사업자등록번호 (Business Reg. Number)",
         email: "이메일 (Email)",
