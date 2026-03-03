@@ -37,6 +37,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing year or month" }, { status: 400 })
         }
 
+        // Filter out null/undefined from body to avoid overwriting or creating with invalid values
+        const baseData = Object.fromEntries(
+            Object.entries(body).filter(([k, v]) => v !== null && v !== undefined && k !== 'id')
+        );
+
         const usage = await prisma.electricityUsage.upsert({
             where: {
                 year_month: {
@@ -45,11 +50,19 @@ export async function POST(request: Request) {
                 }
             },
             update: {
-                ...body,
+                ...baseData,
                 updatedAt: new Date()
             },
             create: {
-                ...body
+                // Required fields default values if not provided in baseData
+                readingDate: "-",
+                usagePeriod: "-",
+                meterCurrent: "0",
+                meterPrevious: "0",
+                totalUsage: 0,
+                totalAmount: 0,
+                rawBillData: "{}",
+                ...baseData
             }
         })
 
