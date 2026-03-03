@@ -51,17 +51,21 @@ export async function POST(request: Request) {
             },
             update: {
                 ...baseData,
+                year,
+                month,
                 updatedAt: new Date()
             },
             create: {
                 // Required fields default values if not provided in baseData
-                readingDate: "-",
-                usagePeriod: "-",
-                meterCurrent: "0",
-                meterPrevious: "0",
-                totalUsage: 0,
-                totalAmount: 0,
-                rawBillData: "{}",
+                year,
+                month,
+                readingDate: body.readingDate || "-",
+                usagePeriod: body.usagePeriod || "-",
+                meterCurrent: body.meterCurrent || "0",
+                meterPrevious: body.meterPrevious || "0",
+                totalUsage: body.totalUsage || 0,
+                totalAmount: body.totalAmount || 0,
+                rawBillData: body.rawBillData || "{}",
                 ...baseData
             }
         })
