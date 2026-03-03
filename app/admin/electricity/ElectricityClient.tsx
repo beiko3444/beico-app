@@ -202,25 +202,25 @@ export default function ElectricityClient() {
         fetchData()
     }, [selectedYear, selectedMonth])
 
-    const saveData = async (bData: BillData, lData: LandlordData | null, currentRawText?: string, currentHistory?: any[]) => {
+    const saveData = async (bData: BillData | null, lData: LandlordData | null, currentRawText?: string, currentHistory?: any[]) => {
         setLoading(true)
         try {
             const shares = calculateCurrentShares(bData, lData)
 
             const payload = {
-                year: bData.year,
-                month: bData.month,
-                readingDate: bData.readingDate,
-                usagePeriod: bData.usagePeriod,
-                meterCurrent: bData.meterCurrent,
-                meterPrevious: bData.meterPrevious,
-                totalUsage: bData.currentUsage,
-                totalAmount: bData.totalAmount,
-                rawBillData: JSON.stringify({
+                year: bData ? bData.year : selectedYear,
+                month: bData ? bData.month : selectedMonth,
+                readingDate: bData ? bData.readingDate : null,
+                usagePeriod: bData ? bData.usagePeriod : null,
+                meterCurrent: bData ? bData.meterCurrent : null,
+                meterPrevious: bData ? bData.meterPrevious : null,
+                totalUsage: bData ? bData.currentUsage : null,
+                totalAmount: bData ? bData.totalAmount : null,
+                rawBillData: bData ? JSON.stringify({
                     ...bData.parsedDetails,
                     beicoTotal: shares.beicoTotal,
                     landlordTotal: shares.landlordTotal
-                }),
+                }) : null,
                 landlordMeterPrev: lData ? lData.prevMeter : null,
                 landlordMeterCurr: lData ? lData.currMeter : null,
                 landlordUsage: lData ? (lData.currMeter - lData.prevMeter + lData.waterHeaterKw + lData.outdoorLightKw) : null,
@@ -359,8 +359,6 @@ export default function ElectricityClient() {
     }
 
     const calculateLandlordBill = async () => {
-        if (!billData) return
-
         const prev = parseFloat(landlordInputs.prevMeter.replace(/,/g, '')) || 0
         const curr = parseFloat(landlordInputs.currMeter.replace(/,/g, '')) || 0
         const water = parseFloat(landlordInputs.waterHeaterKw.replace(/,/g, '')) || 0
@@ -420,7 +418,9 @@ export default function ElectricityClient() {
         reader.readAsDataURL(file)
     }
 
-    const calculateCurrentShares = (bData: BillData, lData: LandlordData | null) => {
+    const calculateCurrentShares = (bData: BillData | null, lData: LandlordData | null) => {
+        if (!bData) return { landlordTotal: 0, beicoTotal: 0 }
+
         const baseTotal = bData.parsedDetails['기본요금'] || 0
         const usageTotal = bData.parsedDetails['전력량요금'] || 0
         const envTotal = bData.parsedDetails['기후환경요금'] || 0
@@ -775,16 +775,24 @@ export default function ElectricityClient() {
             ) : (
                 <div className="h-[50vh] flex flex-col items-center justify-center text-center">
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </div>
                     <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedYear}년 {selectedMonth}월 데이터 없음</h3>
                     <p className="text-gray-500 text-sm mb-6">등록된 전기요금 명세서가 없습니다.</p>
-                    <button
-                        onClick={() => setIsUsageModalOpen(true)}
-                        className="bg-[#d9361b] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm"
-                    >
-                        명세서 입력하기
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            onClick={() => setIsLandlordModalOpen(true)}
+                            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 border border-green-700"
+                        >
+                            📸 단자함 사진 업로드
+                        </button>
+                        <button
+                            onClick={() => setIsUsageModalOpen(true)}
+                            className="bg-[#d9361b] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm"
+                        >
+                            명세서 입력하기
+                        </button>
+                    </div>
                 </div>
             )}
 
