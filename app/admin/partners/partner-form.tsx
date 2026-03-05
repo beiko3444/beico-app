@@ -14,6 +14,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
     const [mounted, setMounted] = useState(false)
     const [isOpen, setIsOpen] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
 
     useEffect(() => {
         setMounted(true)
@@ -216,6 +217,12 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                         </div>
                     </div>
 
+                    {/* Move Address immediately below phone number section */}
+                    <div>
+                        <label className="block font-medium text-gray-700 mb-1">배송지 주소 (Address)</label>
+                        <input name="address" type="text" value={formData.address} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="상세 주소 입력" />
+                    </div>
+
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label className="block font-medium text-gray-700 mb-1">국적 / Nationality</label>
@@ -237,7 +244,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
 
                     <div>
                         <label className="block font-medium text-gray-700 mb-1">사업자 등록증 (첨부)</label>
-                        <div className="flex items-center gap-4">
+                        <div className="flex flex-col gap-3">
                             <input
                                 type="file"
                                 accept="image/*,application/pdf"
@@ -245,22 +252,52 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                 className="block w-full text-xs text-gray-500 file:mr-4 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-orange-50 file:text-orange-700 hover:file:bg-orange-100"
                             />
                             {formData.businessRegistrationUrl && (
-                                <a
-                                    href={formData.businessRegistrationUrl}
-                                    download="business_registration"
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-200 transition-colors whitespace-nowrap flex items-center gap-1"
-                                >
-                                    <span>📄</span> 확인/다운로드
-                                </a>
+                                <div className="flex flex-col gap-2 border rounded-md p-3 bg-gray-50/50">
+                                    {(formData.businessRegistrationUrl.startsWith('data:image') || formData.businessRegistrationUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i)) ? (
+                                        <div className="relative group cursor-pointer" onClick={() => setEnlargedImage(formData.businessRegistrationUrl)}>
+                                            <img
+                                                src={formData.businessRegistrationUrl}
+                                                alt="사업자 등록증 미리보기"
+                                                className="h-32 object-contain bg-white border border-gray-200 rounded-md transition-all group-hover:brightness-90"
+                                            />
+                                            <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <div className="bg-black/60 text-white px-3 py-1.5 rounded-full text-xs font-bold flex items-center gap-1">
+                                                    <span>🔍</span> <span>클릭하여 확대</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="flex items-center gap-2 p-3 bg-white border border-gray-200 rounded-md">
+                                            <span className="text-xl">📄</span>
+                                            <span className="text-gray-600 font-medium">문서 파일이 첨부되었습니다.</span>
+                                        </div>
+                                    )}
+                                    <div className="flex gap-2 mt-2">
+                                        <a
+                                            href={formData.businessRegistrationUrl}
+                                            download="사업자등록증"
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-1 shadow-sm w-fit"
+                                            onClick={(e) => e.stopPropagation()}
+                                        >
+                                            <span>💾</span> 다운로드
+                                        </a>
+                                        {formData.businessRegistrationUrl.startsWith('data:application/pdf') && (
+                                            <a
+                                                href={formData.businessRegistrationUrl}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-gray-50 transition-colors whitespace-nowrap flex items-center gap-1 shadow-sm w-fit"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <span>🔗</span> 새 탭에서 열기
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
                             )}
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="block font-medium text-gray-700 mb-1">배송지 주소</label>
-                        <input name="address" type="text" value={formData.address} onChange={handleChange} className="w-full px-3 py-1.5 border rounded-md text-xs" placeholder="상세 주소 입력" />
                     </div>
 
                     <div className="flex gap-2 justify-end pt-4 border-t mt-4">
@@ -293,6 +330,35 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 )}
             </div>
             {isOpen && mounted && createPortal(modalContent, document.body)}
+
+            {/* Image Enlargement Modal */}
+            {enlargedImage && mounted && createPortal(
+                <div
+                    className="fixed inset-0 bg-black/90 z-[999999] flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in duration-200"
+                    onClick={() => setEnlargedImage(null)}
+                >
+                    <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col items-center">
+                        <div className="absolute top-0 right-0 -translate-y-full mb-4">
+                            <button
+                                onClick={() => setEnlargedImage(null)}
+                                className="bg-white/10 hover:bg-white/20 text-white rounded-full p-2 transition-colors backdrop-blur-md border border-white/20"
+                            >
+                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
+                            </button>
+                        </div>
+                        <img
+                            src={enlargedImage}
+                            alt="사업자 등록증 확대"
+                            className="w-auto h-auto max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl border border-white/20"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                        <div className="mt-6 text-white/70 text-sm font-medium">
+                            아무 곳이나 클릭하여 닫기
+                        </div>
+                    </div>
+                </div>,
+                document.body
+            )}
         </>
     )
 }
