@@ -55,25 +55,31 @@ export async function POST(req: Request) {
         const hashedPassword = await bcrypt.hash(password, 12)
 
         let businessRegistrationUrl = ''
-        if (businessRegistrationDocument instanceof File) {
-            const bytes = await businessRegistrationDocument.arrayBuffer()
-            const buffer = Buffer.from(bytes)
+        if (businessRegistrationDocument && typeof businessRegistrationDocument === 'object' && 'arrayBuffer' in businessRegistrationDocument) {
+            try {
+                // @ts-ignore - businessRegistrationDocument is File-like from FormData
+                const bytes = await businessRegistrationDocument.arrayBuffer()
+                const buffer = Buffer.from(bytes)
 
-            // Get original extension
-            const ext = businessRegistrationDocument.name.split('.').pop() || 'tmp'
+                // Get original extension
+                // @ts-ignore
+                const ext = (businessRegistrationDocument.name || 'document').split('.').pop() || 'tmp'
 
-            // Generate filename: 업체명_사업자등록증
-            // Note: safely replace characters that might break filesystem
-            const sanitizedBusinessName = businessName.replace(/[^a-zA-Z0-9가-힣]/g, '_')
-            const filename = `${sanitizedBusinessName}_사업자등록증.${ext}`
+                // Generate filename: 업체명_사업자등록증
+                // Note: safely replace characters that might break filesystem
+                const sanitizedBusinessName = businessName.replace(/[^a-zA-Z0-9가-힣]/g, '_')
+                const filename = `${sanitizedBusinessName}_사업자등록증.${ext}`
 
-            const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'business-registrations')
-            await mkdir(uploadDir, { recursive: true })
+                const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'business-registrations')
+                await mkdir(uploadDir, { recursive: true })
 
-            const filePath = path.join(uploadDir, filename)
-            await writeFile(filePath, buffer)
+                const filePath = path.join(uploadDir, filename)
+                await writeFile(filePath, buffer)
 
-            businessRegistrationUrl = `/uploads/business-registrations/${filename}`
+                businessRegistrationUrl = `/uploads/business-registrations/${filename}`
+            } catch (err) {
+                console.warn('File save failed (likely read-only filesystem on Vercel), skipping file save:', err)
+            }
         }
 
         // Create user and profile
@@ -140,8 +146,9 @@ export async function POST(req: Request) {
 
     } catch (error) {
         console.error('Signup error:', error)
+        const errorMessage = error instanceof Error ? error.message : String(error)
         return NextResponse.json(
-            { error: '登録中にエラーが発生しました。 / An error occurred during registration.' },
+            { error: `登録中にエラーが発生しました。 / An error occurred during registration. (詳細 / Detail: ${errorMessage})` },
             { status: 500 }
         )
     }
