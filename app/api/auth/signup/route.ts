@@ -61,24 +61,14 @@ export async function POST(req: Request) {
                 const bytes = await businessRegistrationDocument.arrayBuffer()
                 const buffer = Buffer.from(bytes)
 
-                // Get original extension
+                // Convert directly to base64 to avoid local filesystem issues (Vercel read-only restrictions)
                 // @ts-ignore
-                const ext = (businessRegistrationDocument.name || 'document').split('.').pop() || 'tmp'
+                const mimeType = businessRegistrationDocument.type || 'application/octet-stream'
+                const base64String = `data:${mimeType};base64,${buffer.toString('base64')}`
 
-                // Generate filename: 업체명_사업자등록증
-                // Note: safely replace characters that might break filesystem
-                const sanitizedBusinessName = businessName.replace(/[^a-zA-Z0-9가-힣]/g, '_')
-                const filename = `${sanitizedBusinessName}_사업자등록증.${ext}`
-
-                const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'business-registrations')
-                await mkdir(uploadDir, { recursive: true })
-
-                const filePath = path.join(uploadDir, filename)
-                await writeFile(filePath, buffer)
-
-                businessRegistrationUrl = `/uploads/business-registrations/${filename}`
+                businessRegistrationUrl = base64String
             } catch (err) {
-                console.warn('File save failed (likely read-only filesystem on Vercel), skipping file save:', err)
+                console.warn('File conversion to base64 failed:', err)
             }
         }
 
