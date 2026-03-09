@@ -1144,58 +1144,58 @@ export default function ElectricityClient() {
                                                     <tr className="bg-gray-50 text-center">
                                                         <th className="border border-black p-0.5">항목</th>
                                                         <th className="border border-black p-0.5">전체 금액</th>
-                                                        <th className="border border-black p-0.5">베이코 분담</th>
-                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">에코모터스 청구액</th>
+                                                        <th className="border border-black p-0.5">베이코 분담 (10kWh)</th>
+                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">에코모터스 청구액 (20kWh)</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center bg-gray-50 font-bold">전력 사용량 (kWh)</td>
-                                                        <td className="border border-black p-0.5">{(beicoUsageKwh + landlordUsageKwh).toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoUsageKwh.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageKwh.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{(beicoUsageKwh + landlordUsageKwh).toLocaleString()} kWh</td>
+                                                        <td className="border border-black p-0.5">{beicoUsageKwh.toLocaleString()} kWh</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageKwh.toLocaleString()} kWh</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">기본 요금 (20kW)</td>
-                                                        <td className="border border-black p-0.5">{baseTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoBaseCost.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()}</td>
+                                                        <td className="border border-black border-b-2 p-0.5 text-center">기본 요금 (30kw)</td>
+                                                        <td className="border border-black border-b-2 p-0.5">{baseTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black border-b-2 p-0.5">{beicoBaseCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black border-b-2 p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">전력량 요금</td>
-                                                        <td className="border border-black p-0.5">{usageTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoUsageCost.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageCost.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{usageTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoUsageCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageCost.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">기후환경 요금</td>
-                                                        <td className="border border-black p-0.5">{envTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoEnvCost.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordEnvCost.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{envTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoEnvCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordEnvCost.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">연료비 조정액</td>
-                                                        <td className="border border-black p-0.5">{fuelTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoFuelCost.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFuelCost.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{fuelTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoFuelCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFuelCost.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center font-bold italic">부가가치세</td>
-                                                        <td className="border border-black p-0.5">{totalVat.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoVat.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordVat.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{totalVat.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoVat.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordVat.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">전력산업기금</td>
-                                                        <td className="border border-black p-0.5">{totalFund.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoFund.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFund.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{totalFund.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoFund.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFund.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">TV 수신료</td>
-                                                        <td className="border border-black p-0.5">{tvTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoTvFee.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordTvFee.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{tvTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoTvFee.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordTvFee.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr className="bg-gray-100 font-bold border-t border-black">
                                                         <td className="border border-black p-0.5 text-center text-[9px]">합 계</td>
