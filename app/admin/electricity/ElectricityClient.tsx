@@ -1144,8 +1144,8 @@ export default function ElectricityClient() {
                                                     <tr className="bg-gray-50 text-center">
                                                         <th className="border border-black p-0.5">항목</th>
                                                         <th className="border border-black p-0.5">전체 금액</th>
-                                                        <th className="border border-black p-0.5">베이코 분담 (10kWh)</th>
-                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">에코모터스 청구액 (20kWh)</th>
+                                                        <th className="border border-black p-0.5">베이코 분담</th>
+                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">에코모터스 청구액</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1158,8 +1158,8 @@ export default function ElectricityClient() {
                                                     <tr>
                                                         <td className="border border-black border-b-2 p-0.5 text-center">기본 요금 (30kw)</td>
                                                         <td className="border border-black border-b-2 p-0.5">{baseTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black border-b-2 p-0.5">{beicoBaseCost.toLocaleString()} 원</td>
-                                                        <td className="border border-black border-b-2 p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black border-b-2 p-0.5">{beicoBaseCost.toLocaleString()} 원 (10kWh)</td>
+                                                        <td className="border border-black border-b-2 p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()} 원 (20kWh)</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">전력량 요금</td>
