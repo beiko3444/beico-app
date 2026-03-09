@@ -1199,9 +1199,9 @@ export default function ElectricityClient() {
                                                     </tr>
                                                     <tr className="bg-gray-100 font-bold border-t border-black">
                                                         <td className="border border-black p-0.5 text-center text-[9px]">합 계</td>
-                                                        <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5">{beicoTotal.toLocaleString()}</td>
-                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()}</td>
+                                                        <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5">{beicoTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()} 원</td>
                                                     </tr>
                                                     <tr className="bg-gray-200 font-black border-t-2 border-black">
                                                         <td colSpan={3} className="border border-black p-1 text-center text-[10px]">최종 청구 금액 (납부하실 금액)</td>
