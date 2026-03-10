@@ -1034,10 +1034,13 @@ export default function ElectricityClient() {
                             <table className="w-full text-sm">
                                 <thead className="bg-white text-gray-600 border-b border-gray-100">
                                     <tr>
-                                        <th className="text-left px-4 py-3">월</th>
-                                        <th className="text-right px-4 py-3">임대인 전기세</th>
-                                        <th className="text-center px-4 py-3">월세 세금계산서</th>
-                                        <th className="text-center px-4 py-3">전기세 납부</th>
+                                        <th className="text-left px-4 py-3 whitespace-nowrap">월</th>
+                                        <th className="text-center px-4 py-3 whitespace-nowrap">월세 입금일자</th>
+                                        <th className="text-right px-4 py-3 whitespace-nowrap">입금액</th>
+                                        <th className="text-center px-4 py-3 whitespace-nowrap">임대일자</th>
+                                        <th className="text-center px-4 py-3 whitespace-nowrap">월세 세금계산서</th>
+                                        <th className="text-right px-4 py-3 whitespace-nowrap">임대인 전기세</th>
+                                        <th className="text-center px-4 py-3 whitespace-nowrap">전기세 납부</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
@@ -1047,26 +1050,36 @@ export default function ElectricityClient() {
                                             const status = getPaymentStatus(selectedYear, m)
                                             const isSelected = m === selectedMonth
                                             const lTotal = monthlyLandlordTotals[m]
+                                            const rowRentInfo = getRentPaymentInfo(selectedYear, m)
 
                                             return (
                                                 <tr key={m} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
-                                                    <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer" onClick={() => setSelectedMonth(m)}>
+                                                    <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
                                                         {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
                                                     </td>
-                                                    <td className="px-4 py-3 text-right text-gray-600">
-                                                        {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
+                                                    <td className="px-4 py-3 text-center text-gray-700 whitespace-nowrap">
+                                                        {rowRentInfo.paidDate}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                                        {rowRentInfo.amount}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">
+                                                        {rowRentInfo.period}
                                                     </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                                                             {status.rentTaxInvoiceIssued ? '✓' : '-'}
                                                         </span>
                                                     </td>
+                                                    <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                                        {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
+                                                    </td>
                                                     <td className="px-4 py-3 text-center">
                                                         <div className="flex flex-col items-center">
                                                             <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
                                                                 {status.electricityPaid ? '✓' : '-'}
                                                             </span>
-                                                            {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
+                                                            {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
                                                         </div>
                                                     </td>
                                                 </tr>
