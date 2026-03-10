@@ -1127,12 +1127,12 @@ export default function ElectricityClient() {
                                 </div>
                                 <div className="h-px bg-gray-100 my-2"></div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <InputGroup label="湲곕낯?붽툑" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
-                                    <InputGroup label="?꾨젰?됱슂湲? value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
-                                    <InputGroup label="湲고썑?섍꼍?붽툑" value={manualInputs.envFee} onChange={v => setManualInputs({ ...manualInputs, envFee: v })} />
-                                    <InputGroup label="?곕즺鍮꾩“?뺤븸" value={manualInputs.fuelFee} onChange={v => setManualInputs({ ...manualInputs, fuelFee: v })} />
-                                    <InputGroup label="??쪧?붽툑" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
-                                    <InputGroup label="TV?섏떊猷? value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
+                                    <InputGroup label="기본요금" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
+                                    <InputGroup label="전력량요금" value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
+                                    <InputGroup label="기후환경요금" value={manualInputs.envFee} onChange={v => setManualInputs({ ...manualInputs, envFee: v })} />
+                                    <InputGroup label="연료비조정액" value={manualInputs.fuelFee} onChange={v => setManualInputs({ ...manualInputs, fuelFee: v })} />
+                                    <InputGroup label="역률요금" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
+                                    <InputGroup label="TV수신료" value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
                                 </div>
                                 <div className="h-px bg-gray-100 my-2"></div>
                                 <div className="grid grid-cols-2 gap-3">
