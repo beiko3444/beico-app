@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 
 import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
@@ -22,6 +22,16 @@ type LandlordData = {
     outdoorLightKw: number
     photo: string | null
 }
+
+type DetailKey =
+    | 'baseFee'
+    | 'usageFee'
+    | 'envFee'
+    | 'fuelFee'
+    | 'powerFactorFee'
+    | 'tvFee'
+    | 'vat'
+    | 'fund'
 
 type PaymentChecklistStatus = {
     rentTaxInvoiceIssued: boolean
@@ -87,6 +97,33 @@ export default function ElectricityClient() {
         if (!s) return '';
         return parseInt(s, 10).toLocaleString();
     };
+
+    const legacyDetailKeys: Record<DetailKey, string[]> = {
+        baseFee: ['旮半掣?旉笀'],
+        usageFee: ['?勲牓?夓殧旮?', ''],
+        envFee: ['旮绊泟?橁步?旉笀'],
+        fuelFee: ['?半牍勳“?曥暋'],
+        powerFactorFee: ['???旉笀'],
+        tvFee: ['TV?橃嫚耄?', ''],
+        vat: ['攵€臧€臧€旃橃劯'],
+        fund: ['?勲牓旮瓣笀']
+    }
+
+    const parseNumber = (value: unknown) => {
+        const num = Number(value)
+        return Number.isFinite(num) ? num : 0
+    }
+
+    const getParsedAmount = (source: Record<string, unknown> | null | undefined, key: DetailKey) => {
+        if (!source) return 0
+        const candidates = [key, ...legacyDetailKeys[key]]
+        for (const candidate of candidates) {
+            if (candidate in source) {
+                return parseNumber(source[candidate])
+            }
+        }
+        return 0
+    }
 
     const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 
@@ -155,14 +192,14 @@ export default function ElectricityClient() {
                         setManualInputs({
                             totalAmount: formatWithCommas(data.totalAmount),
                             currentUsage: formatWithCommas(data.totalUsage),
-                            baseFee: formatWithCommas(parsed['기본요금'] || 0),
-                            usageFee: formatWithCommas(parsed['전력량요금'] || 0),
-                            envFee: formatWithCommas(parsed['기후환경요금'] || 0),
-                            fuelFee: formatWithCommas(parsed['연료비조정액'] || 0),
-                            powerFactorFee: formatWithCommas(parsed['역률요금'] || 0),
-                            tvFee: formatWithCommas(parsed['TV수신료'] || 0),
-                            vat: formatWithCommas(parsed['부가가치세'] || 0),
-                            fund: formatWithCommas(parsed['전력기금'] || 0),
+                            baseFee: formatWithCommas(getParsedAmount(parsed, 'baseFee')),
+                            usageFee: formatWithCommas(getParsedAmount(parsed, 'usageFee')),
+                            envFee: formatWithCommas(getParsedAmount(parsed, 'envFee')),
+                            fuelFee: formatWithCommas(getParsedAmount(parsed, 'fuelFee')),
+                            powerFactorFee: formatWithCommas(getParsedAmount(parsed, 'powerFactorFee')),
+                            tvFee: formatWithCommas(getParsedAmount(parsed, 'tvFee')),
+                            vat: formatWithCommas(getParsedAmount(parsed, 'vat')),
+                            fund: formatWithCommas(getParsedAmount(parsed, 'fund')),
                             readingDate: data.readingDate || '',
                             usagePeriod: data.usagePeriod || '',
                             meterCurrent: data.meterCurrent || '',
@@ -202,9 +239,20 @@ export default function ElectricityClient() {
                         setRawText('')
                         setExtractionHistory([])
                         setManualInputs({
-                            totalAmount: '', currentUsage: '', baseFee: '', usageFee: '',
-                            envFee: '', fuelFee: '', powerFactorFee: '', tvFee: '', vat: '', fund: '',
-                            readingDate: '', usagePeriod: '', meterCurrent: '', meterPrevious: ''
+                            totalAmount: '',
+                            currentUsage: '',
+                            baseFee: '',
+                            usageFee: '',
+                            envFee: '',
+                            fuelFee: '',
+                            powerFactorFee: '',
+                            tvFee: '',
+                            vat: '',
+                            fund: '',
+                            readingDate: '',
+                            usagePeriod: '',
+                            meterCurrent: '',
+                            meterPrevious: ''
                         })
                     }
                 }
@@ -331,11 +379,11 @@ export default function ElectricityClient() {
 
             if (!res.ok) {
                 const err = await res.json()
-                alert(`저장 실패: ${err.error}`)
+                alert(`????ㅽ뙣: ${err.error}`)
             }
         } catch (e) {
             console.error(e)
-            alert('저장 중 오류가 발생했습니다.')
+            alert('???以??ㅻ쪟媛 諛쒖깮?덉뒿?덈떎.')
         } finally {
             setLoading(false)
         }
@@ -353,51 +401,47 @@ export default function ElectricityClient() {
                 const match = rawText.match(regex)
                 return match ? match[1].trim() : ''
             }
-
             const getSignedNum = (keyword: string) => {
                 const regex = new RegExp(`${keyword}\\s*([-\\d,]+)`)
                 const match = rawText.match(regex)
                 return match ? parseInt(match[1].replace(/,/g, '')) : 0
             }
 
-            if (rawText.trim()) {
-                const total = rawText.match(/청구금액\(.*?\)\s*([\d,]+)/)?.[1]
-                    ? parseInt(rawText.match(/청구금액\(.*?\)\s*([\d,]+)/)![1].replace(/,/g, ''))
-                    : getNum('청구금액')
+            if (!rawText.trim()) return
 
-                const inputs = {
-                    totalAmount: formatWithCommas(total || 0),
-                    currentUsage: formatWithCommas(getNum('당월 사용량')),
-                    baseFee: formatWithCommas(getNum('기본요금')),
-                    usageFee: formatWithCommas(getNum('전력량요금')),
-                    envFee: formatWithCommas(getNum('기후환경요금')),
-                    fuelFee: formatWithCommas(getSignedNum('연료비조정액')),
-                    powerFactorFee: formatWithCommas(getSignedNum('역률요금')),
-                    tvFee: formatWithCommas(getNum('TV\\s*수신료') || getNum('ＴＶ수신료')),
-                    vat: formatWithCommas(getNum('부가가치세')),
-                    fund: formatWithCommas(getNum('전력기금')),
-                    readingDate: getStr('검침일'),
-                    usagePeriod: getStr('전기사용기간'),
-                    meterCurrent: getStr('당월심야지침') + ' / ' + getStr('당월기타지침'),
-                    meterPrevious: getStr('전월심야지침') + ' / ' + getStr('전월기타지침'),
-                }
-                setManualInputs(inputs)
+            const total = rawText.match(/([\d,]+)\s*원/)?.[1]
+                ? parseInt(rawText.match(/([\d,]+)\s*원/)![1].replace(/,/g, ''))
+                : 0
 
-                // Add to history
-                const newHistoryItem = {
-                    id: Date.now().toString(),
-                    timestamp: new Date().toLocaleString(),
-                    rawText: rawText,
-                    inputs: inputs
-                }
-                const updatedHistory = [newHistoryItem, ...extractionHistory]
-                setExtractionHistory(updatedHistory)
+            const inputs = {
+                totalAmount: formatWithCommas(total || 0),
+                currentUsage: formatWithCommas(getNum('사용량')),
+                baseFee: formatWithCommas(getNum('기본요금')),
+                usageFee: formatWithCommas(getNum('전력량요금')),
+                envFee: formatWithCommas(getNum('기후환경요금')),
+                fuelFee: formatWithCommas(getSignedNum('연료비조정액')),
+                powerFactorFee: formatWithCommas(getSignedNum('역률요금')),
+                tvFee: formatWithCommas(getNum('TV수신료')),
+                vat: formatWithCommas(getNum('부가가치세')),
+                fund: formatWithCommas(getNum('전력기금')),
+                readingDate: getStr('검침일'),
+                usagePeriod: getStr('사용기간'),
+                meterCurrent: manualInputs.meterCurrent,
+                meterPrevious: manualInputs.meterPrevious,
             }
+            setManualInputs(inputs)
+
+            const newHistoryItem = {
+                id: Date.now().toString(),
+                timestamp: new Date().toLocaleString(),
+                rawText,
+                inputs
+            }
+            setExtractionHistory(prev => [newHistoryItem, ...prev])
         } catch (e) {
             alert('텍스트 분석 오류')
         }
     }
-
     const deleteHistoryItem = (id: string) => {
         setExtractionHistory(prev => prev.filter(item => item.id !== id))
     }
@@ -423,14 +467,14 @@ export default function ElectricityClient() {
 
     const confirmBillInput = async () => {
         const parsedDetails = {
-            '기본요금': parseInt(manualInputs.baseFee.replace(/,/g, '')) || 0,
-            '전력량요금': parseInt(manualInputs.usageFee.replace(/,/g, '')) || 0,
-            '기후환경요금': parseInt(manualInputs.envFee.replace(/,/g, '')) || 0,
-            '연료비조정액': parseInt(manualInputs.fuelFee.replace(/,/g, '')) || 0,
-            '역률요금': parseInt(manualInputs.powerFactorFee.replace(/,/g, '')) || 0,
-            'TV수신료': parseInt(manualInputs.tvFee.replace(/,/g, '')) || 0,
-            '부가가치세': parseInt(manualInputs.vat.replace(/,/g, '')) || 0,
-            '전력기금': parseInt(manualInputs.fund.replace(/,/g, '')) || 0,
+            baseFee: parseInt(manualInputs.baseFee.replace(/,/g, '')) || 0,
+            usageFee: parseInt(manualInputs.usageFee.replace(/,/g, '')) || 0,
+            envFee: parseInt(manualInputs.envFee.replace(/,/g, '')) || 0,
+            fuelFee: parseInt(manualInputs.fuelFee.replace(/,/g, '')) || 0,
+            powerFactorFee: parseInt(manualInputs.powerFactorFee.replace(/,/g, '')) || 0,
+            tvFee: parseInt(manualInputs.tvFee.replace(/,/g, '')) || 0,
+            vat: parseInt(manualInputs.vat.replace(/,/g, '')) || 0,
+            fund: parseInt(manualInputs.fund.replace(/,/g, '')) || 0,
         }
 
         const newData: BillData = {
@@ -449,7 +493,6 @@ export default function ElectricityClient() {
         await saveData(newData, landlordData, rawText, extractionHistory)
         setIsUsageModalOpen(false)
     }
-
     const calculateLandlordBill = async () => {
         const prev = parseFloat(landlordInputs.prevMeter.replace(/,/g, '')) || 0
         const curr = parseFloat(landlordInputs.currMeter.replace(/,/g, '')) || 0
@@ -512,15 +555,14 @@ export default function ElectricityClient() {
 
     const calculateCurrentShares = (bData: BillData | null, lData: LandlordData | null) => {
         if (!bData) return { landlordTotal: 0, beicoTotal: 0 }
-
-        const baseTotal = bData.parsedDetails['기본요금'] || 0
-        const usageTotal = bData.parsedDetails['전력량요금'] || 0
-        const envTotal = bData.parsedDetails['기후환경요금'] || 0
-        const fuelTotal = bData.parsedDetails['연료비조정액'] || 0
-        const powerFactorTotal = bData.parsedDetails['역률요금'] || 0
-        const tvTotal = bData.parsedDetails['TV수신료'] || 0
-        const totalVat = bData.parsedDetails['부가가치세'] || 0
-        const totalFund = bData.parsedDetails['전력기금'] || 0
+        const baseTotal = getParsedAmount(bData.parsedDetails, 'baseFee')
+        const usageTotal = getParsedAmount(bData.parsedDetails, 'usageFee')
+        const envTotal = getParsedAmount(bData.parsedDetails, 'envFee')
+        const fuelTotal = getParsedAmount(bData.parsedDetails, 'fuelFee')
+        const powerFactorTotal = getParsedAmount(bData.parsedDetails, 'powerFactorFee')
+        const tvTotal = getParsedAmount(bData.parsedDetails, 'tvFee')
+        const totalVat = getParsedAmount(bData.parsedDetails, 'vat')
+        const totalFund = getParsedAmount(bData.parsedDetails, 'fund')
 
         const landlordBaseCost = Math.round(baseTotal * (20 / 30))
         const landlordUsageKwh = lData ? (lData.currMeter - lData.prevMeter) + lData.waterHeaterKw + lData.outdoorLightKw : 0
@@ -558,15 +600,14 @@ export default function ElectricityClient() {
         if (parsed.beicoTotal !== undefined) {
             return { beicoTotal: parsed.beicoTotal, landlordTotal: parsed.landlordTotal }
         }
-
-        const baseTotal = parsed['기본요금'] || 0
-        const usageTotal = parsed['전력량요금'] || 0
-        const envTotal = parsed['기후환경요금'] || 0
-        const fuelTotal = parsed['연료비조정액'] || 0
-        const powerFactorTotal = parsed['역률요금'] || 0
-        const tvTotal = parsed['TV수신료'] || 0
-        const totalVat = parsed['부가가치세'] || 0
-        const totalFund = parsed['전력기금'] || 0
+        const baseTotal = getParsedAmount(parsed, 'baseFee')
+        const usageTotal = getParsedAmount(parsed, 'usageFee')
+        const envTotal = getParsedAmount(parsed, 'envFee')
+        const fuelTotal = getParsedAmount(parsed, 'fuelFee')
+        const powerFactorTotal = getParsedAmount(parsed, 'powerFactorFee')
+        const tvTotal = getParsedAmount(parsed, 'tvFee')
+        const totalVat = getParsedAmount(parsed, 'vat')
+        const totalFund = getParsedAmount(parsed, 'fund')
 
         const landlordBaseCost = Math.round(baseTotal * (20 / 30))
         const landlordUsageKwh = record.landlordUsage || 0
@@ -595,15 +636,14 @@ export default function ElectricityClient() {
     }
 
     // --- Calculations ---
-    const baseTotal = billData?.parsedDetails['기본요금'] || 0
-    const usageTotal = billData?.parsedDetails['전력량요금'] || 0
-    const envTotal = billData?.parsedDetails['기후환경요금'] || 0
-    const fuelTotal = billData?.parsedDetails['연료비조정액'] || 0
-    const powerFactorTotal = billData?.parsedDetails['역률요금'] || 0
-    const tvTotal = billData?.parsedDetails['TV수신료'] || 0
-
-    const totalVat = billData?.parsedDetails['부가가치세'] || 0
-    const totalFund = billData?.parsedDetails['전력기금'] || 0
+    const baseTotal = getParsedAmount(billData?.parsedDetails, 'baseFee')
+    const usageTotal = getParsedAmount(billData?.parsedDetails, 'usageFee')
+    const envTotal = getParsedAmount(billData?.parsedDetails, 'envFee')
+    const fuelTotal = getParsedAmount(billData?.parsedDetails, 'fuelFee')
+    const powerFactorTotal = getParsedAmount(billData?.parsedDetails, 'powerFactorFee')
+    const tvTotal = getParsedAmount(billData?.parsedDetails, 'tvFee')
+    const totalVat = getParsedAmount(billData?.parsedDetails, 'vat')
+    const totalFund = getParsedAmount(billData?.parsedDetails, 'fund')
 
     const landlordBaseCost = Math.round(baseTotal * (20 / 30))
     const beicoBaseCost = baseTotal - landlordBaseCost
@@ -652,6 +692,7 @@ export default function ElectricityClient() {
     const shareRatioLandlord = billData && billData.totalAmount > 0 ? (landlordTotal / billData.totalAmount) * 100 : 0
     const shareRatioBeico = billData && billData.totalAmount > 0 ? (beicoTotal / billData.totalAmount) * 100 : 0
 
+    const unitCostPerKwh = totalKwh > 0 ? Math.round((billData?.totalAmount || 0) / totalKwh) : 0
     const currentPaymentStatus = getPaymentStatus(selectedYear, selectedMonth)
     const rentAutoTransferDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-14`
     const selectedMonthLandlordTotal = monthlyLandlordTotals[selectedMonth] ?? null
@@ -670,7 +711,7 @@ export default function ElectricityClient() {
                             <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#d9361b] transition-all">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight">전력 관리</h1>
+                            <h1 className="text-lg font-black text-gray-900 tracking-tight">?꾨젰 愿由?</h1>
                         </div>
                     </div>
                 </div>
@@ -707,7 +748,7 @@ export default function ElectricityClient() {
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
                         className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] block p-2 font-bold min-w-[100px]"
                     >
-                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
+                        {yearOptions.map(y => <option key={y} value={y}>{y}년</option>)}
                     </select>
                     <div className="flex gap-2 min-w-max">
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
@@ -719,7 +760,7 @@ export default function ElectricityClient() {
                                     : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                                     }`}
                             >
-                                {month}월
+                                {month}??
                             </button>
                         ))}
                     </div>
@@ -728,16 +769,16 @@ export default function ElectricityClient() {
                 {activeTab === 'analysis' && billData && (
                     <div className="flex flex-wrap gap-2 justify-start pt-2 border-t border-gray-50">
                         <button onClick={() => setIsPhotoModalOpen(true)} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-green-700 shadow-sm">
-                            계량기 확인하기
+                            怨꾨웾湲??뺤씤?섍린
                         </button>
                         <button onClick={() => setIsLandlordModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
-                            {landlordData ? '임대인 데이터 수정' : '임대인 사용량 입력'}
+                            {landlordData ? '임대인 사용량 수정' : '임대인 사용량 입력'}
                         </button>
                         <button onClick={() => setIsUsageModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
-                            고지서 수정
+                            怨좎????섏젙
                         </button>
                         <button onClick={() => setIsInvoiceOpen(true)} className="px-5 py-2.5 bg-[#d9361b] hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ml-auto">
-                            📄 청구서 발행
+                            ?뱞 泥?뎄??諛쒗뻾
                         </button>
                     </div>
                 )}
@@ -750,22 +791,22 @@ export default function ElectricityClient() {
                         <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
                             <div>
                                 <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <span>⚡️</span> {selectedMonth}월 전기요금 총괄표
+                                    <span>?∽툘</span> {selectedMonth}???꾧린?붽툑 珥앷큵??
                                 </h2>
                                 <p className="text-sm text-gray-400 mt-1">{billData.usagePeriod}</p>
                             </div>
                             <div className="text-right">
-                                <div className="text-3xl font-black tracking-tight">{billData.totalAmount.toLocaleString()}원</div>
+                                <div className="text-3xl font-black tracking-tight">{billData.totalAmount.toLocaleString()}??</div>
                                 <div className="text-xs text-gray-400 mt-1 flex flex-col items-end gap-1">
-                                    <div>총 사용량: <span className="text-white font-bold">{billData.currentUsage.toLocaleString()} kWh</span></div>
+                                    <div>珥??ъ슜?? <span className="text-white font-bold">{billData.currentUsage.toLocaleString()} kWh</span></div>
                                     {prevMonthData && (
                                         <div className="flex items-center gap-2 text-[10px]">
-                                            <span>전월대비:</span>
+                                            <span>?꾩썡?鍮?</span>
                                             <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400' : 'text-blue-400'}>
                                                 {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '▲' : '▼'} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
                                             </span>
                                             <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400' : 'text-blue-400'}>
-                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '▲' : '▼'} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} 원
+                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '▲' : '▼'} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} ??
                                             </span>
                                         </div>
                                     )}
@@ -779,11 +820,11 @@ export default function ElectricityClient() {
                                     <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
                                 </div>
                                 <div className="text-[10px] text-gray-400 font-bold mb-1 tracking-widest uppercase">Beico Share ({shareRatioBeico.toFixed(1)}%)</div>
-                                <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}원</div>
-                                <div className="text-xs text-gray-400 mt-1">베이코 이용요금</div>
+                                <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}??</div>
+                                <div className="text-xs text-gray-400 mt-1">踰좎씠肄??댁슜?붽툑</div>
                                 {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        전월비 {beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}원
+                                    <div className={`text-[10px] mt-2 font-bold `}>
+                                        ?꾩썡鍮?{beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}??
                                     </div>
                                 )}
                             </div>
@@ -792,11 +833,11 @@ export default function ElectricityClient() {
                                     <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
                                 </div>
                                 <div className="text-[10px] text-red-400 font-bold mb-1 tracking-widest uppercase">Landlord Share ({shareRatioLandlord.toFixed(1)}%)</div>
-                                <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}원</div>
-                                <div className="text-xs text-red-400 mt-1">임대인 이용요금</div>
+                                <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}??</div>
+                                <div className="text-xs text-red-400 mt-1">?꾨????댁슜?붽툑</div>
                                 {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        전월비 {landlordTotal - prevShares.landlordTotal >= 0 ? '▲' : '▼'}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}원
+                                    <div className={`text-[10px] mt-2 font-bold `}>
+                                        ?꾩썡鍮?{landlordTotal - prevShares.landlordTotal >= 0 ? '▲' : '▼'}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}??
                                     </div>
                                 )}
                             </div>
@@ -806,86 +847,86 @@ export default function ElectricityClient() {
                     {/* Detailed Comparison Table */}
                     <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
                         <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                            <h3 className="text-base font-bold text-gray-800">요금 분담 상세 내역</h3>
+                            <h3 className="text-base font-bold text-gray-800">?붽툑 遺꾨떞 ?곸꽭 ?댁뿭</h3>
                         </div>
                         <div className="overflow-x-auto">
                             <table className="w-full text-[11px] text-left">
                                 <thead className="bg-gray-100 text-gray-600 font-bold uppercase border-b border-gray-200">
                                     <tr>
-                                        <th className="px-4 py-2">항목</th>
-                                        <th className="px-4 py-2 text-right">전체 금액</th>
-                                        <th className="px-4 py-2 text-right">베이코 ({shareRatioBeico.toFixed(1)}%)</th>
-                                        <th className="px-4 py-2 text-right">임대인 ({shareRatioLandlord.toFixed(1)}%)</th>
+                                        <th className="px-4 py-2">??ぉ</th>
+                                        <th className="px-4 py-2 text-right">?꾩껜 湲덉븸</th>
+                                        <th className="px-4 py-2 text-right">踰좎씠肄?({shareRatioBeico.toFixed(1)}%)</th>
+                                        <th className="px-4 py-2 text-right">?꾨???({shareRatioLandlord.toFixed(1)}%)</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 [&>tr:nth-child(even)]:bg-gray-50">
                                     <tr className="bg-blue-50/20 text-blue-900 font-bold">
-                                        <td className="px-4 py-2">총 사용 전력량</td>
+                                        <td className="px-4 py-2">珥??ъ슜 ?꾨젰??</td>
                                         <td className="px-4 py-2 text-right">{totalKwh.toLocaleString()}kWh</td>
                                         <td className="px-4 py-2 text-right">{beicoUsageKwh.toLocaleString()}kWh</td>
                                         <td className="px-4 py-2 text-right">{landlordUsageKwh.toLocaleString()}kWh</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">기본요금</td>
-                                        <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">湲곕낯?붽툑</td>
+                                        <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">전력량요금</td>
-                                        <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">?꾨젰?됱슂湲?</td>
+                                        <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">기후환경요금</td>
-                                        <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">湲고썑?섍꼍?붽툑</td>
+                                        <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">연료비조정액</td>
-                                        <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">?곕즺鍮꾩“?뺤븸</td>
+                                        <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">역률요금</td>
-                                        <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">??쪧?붽툑</td>
+                                        <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">부가가치세</td>
-                                        <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">遺媛媛移섏꽭</td>
+                                        <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">전력기금</td>
-                                        <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">?꾨젰湲곌툑</td>
+                                        <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">TV 수신료</td>
-                                        <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}원</td>
+                                        <td className="px-4 py-1.5">TV ?섏떊猷?</td>
+                                        <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}??</td>
                                     </tr>
                                     {roundingDiff !== 0 && (
                                         <tr className="hover:bg-gray-50 text-gray-400 italic">
-                                            <td className="px-4 py-1.5">원단위 절사</td>
-                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
-                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
-                                            <td className="px-4 py-1.5 text-right">0원</td>
+                                            <td className="px-4 py-1.5">?먮떒???덉궗</td>
+                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}??</td>
+                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}??</td>
+                                            <td className="px-4 py-1.5 text-right">0??</td>
                                         </tr>
                                     )}
                                     <tr className="bg-gray-900 text-white font-black border-t-2 border-gray-900">
-                                        <td className="px-4 py-3 text-sm">최종 청구 금액</td>
-                                        <td className="px-4 py-3 text-right text-gray-400 text-sm">{billData.totalAmount.toLocaleString()}원</td>
-                                        <td className="px-4 py-3 text-right text-[#d9361b] text-sm">{beicoTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-3 text-right text-sm font-black">{landlordTotal.toLocaleString()}원</td>
+                                        <td className="px-4 py-3 text-sm">理쒖쥌 泥?뎄 湲덉븸</td>
+                                        <td className="px-4 py-3 text-right text-gray-400 text-sm">{billData.totalAmount.toLocaleString()}??</td>
+                                        <td className="px-4 py-3 text-right text-[#d9361b] text-sm">{beicoTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-3 text-right text-sm font-black">{landlordTotal.toLocaleString()}??</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -898,20 +939,20 @@ export default function ElectricityClient() {
                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
                         <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedYear}년 {selectedMonth}월 데이터 없음</h3>
-                    <p className="text-gray-500 text-sm mb-6">등록된 전기요금 명세서가 없습니다.</p>
+                    <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedYear}??{selectedMonth}???곗씠???놁쓬</h3>
+                    <p className="text-gray-500 text-sm mb-6">?깅줉???꾧린?붽툑 紐낆꽭?쒓? ?놁뒿?덈떎.</p>
                     <div className="flex gap-2">
                         <button
                             onClick={() => setIsLandlordModalOpen(true)}
                             className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 border border-green-700"
                         >
-                            📸 단자함 사진 업로드
+                            ?벝 ?⑥옄???ъ쭊 ?낅줈??
                         </button>
                         <button
                             onClick={() => setIsUsageModalOpen(true)}
                             className="bg-[#d9361b] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm"
                         >
-                            명세서 입력하기
+                            紐낆꽭???낅젰?섍린
                         </button>
                     </div>
                 </div>
@@ -982,40 +1023,46 @@ export default function ElectricityClient() {
                                         <th className="text-right px-4 py-3">임대인 전기세</th>
                                         <th className="text-center px-4 py-3">월세 세금계산서</th>
                                         <th className="text-center px-4 py-3">전기세 납부</th>
+                                        <th className="text-center px-4 py-3">전기세 체크 시각</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {Array.from({ length: 12 }, (_, i) => i + 1)
-                                        .filter(m => selectedYear > PAYMENT_START_YEAR || (selectedYear === PAYMENT_START_YEAR && m >= 1))
-                                        .map(m => {
-                                            const status = getPaymentStatus(selectedYear, m)
-                                            const isSelected = m === selectedMonth
-                                            const lTotal = monthlyLandlordTotals[m]
-
-                                            return (
-                                                <tr key={m} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
-                                                    <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer" onClick={() => setSelectedMonth(m)}>
-                                                        {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right text-gray-600">
-                                                        {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                            {status.rentTaxInvoiceIssued ? '✓' : '-'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                                {status.electricityPaid ? '✓' : '-'}
-                                                            </span>
-                                                            {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
+                                <tbody>
+                                    {Array.from({ length: 12 }, (_, idx) => idx + 1).map(month => {
+                                        const status = getPaymentStatus(selectedYear, month)
+                                        const landlordAmount = monthlyLandlordTotals[month]
+                                        return (
+                                            <tr key={month} className="border-b border-gray-100 hover:bg-gray-50">
+                                                <td className="px-4 py-3 font-semibold text-gray-900">{month}월</td>
+                                                <td className="px-4 py-3 text-right text-gray-700">
+                                                    {landlordAmount !== null && landlordAmount !== undefined ? `${landlordAmount.toLocaleString()}원` : '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={status.rentTaxInvoiceIssued}
+                                                        onChange={(e) => updatePaymentStatus(selectedYear, month, prev => ({
+                                                            ...prev,
+                                                            rentTaxInvoiceIssued: e.target.checked
+                                                        }))}
+                                                        className="h-4 w-4 accent-[#d9361b]"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={status.electricityPaid}
+                                                        onChange={(e) => updatePaymentStatus(selectedYear, month, prev => ({
+                                                            ...prev,
+                                                            electricityPaid: e.target.checked,
+                                                            electricityPaidAt: e.target.checked ? new Date().toISOString() : null
+                                                        }))}
+                                                        className="h-4 w-4 accent-[#d9361b]"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-3 text-center text-xs text-gray-500">{formatChecklistTimestamp(status.electricityPaidAt)}</td>
+                                            </tr>
+                                        )
+                                    })}
                                 </tbody>
                             </table>
                         </div>
@@ -1027,24 +1074,24 @@ export default function ElectricityClient() {
                 <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsUsageModalOpen(false)}>
                     <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6 border-b pb-4">
-                            <h3 className="text-lg font-bold">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
-                            <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">✕</button>
+                            <h3 className="text-lg font-bold">{selectedYear}??{selectedMonth}??怨좎????곸꽭 ?낅젰</h3>
+                            <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">??</button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-4">
-                                <label className="block text-xs font-bold text-gray-500">문자/명세서 내용 붙여넣기</label>
+                                <label className="block text-xs font-bold text-gray-500">臾몄옄/紐낆꽭???댁슜 遺숈뿬?ｊ린</label>
                                 <textarea
                                     value={rawText}
                                     onChange={(e) => setRawText(e.target.value)}
                                     className="w-full h-40 p-3 text-xs font-mono bg-gray-50 border rounded-xl resize-none focus:ring-2 focus:ring-[#d9361b]"
-                                    placeholder="여기에 텍스트를 붙여넣고 [추출하기]를 누르면 우측 폼이 자동으로 채워집니다."
+                                    placeholder="?ш린???띿뒪?몃? 遺숈뿬?ｊ퀬 [異붿텧?섍린]瑜??꾨Ⅴ硫??곗륫 ?쇱씠 ?먮룞?쇰줈 梨꾩썙吏묐땲??"
                                 />
-                                <button type="button" onClick={parseBillText} className="w-full py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-black transition-all">텍스트에서 데이터 추출하기</button>
+                                <button type="button" onClick={parseBillText} className="w-full py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-black transition-all">?띿뒪?몄뿉???곗씠??異붿텧?섍린</button>
 
                                 {extractionHistory.length > 0 && (
                                     <div className="mt-4 space-y-2">
-                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">추출 히스토리</label>
+                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">異붿텧 ?덉뒪?좊━</label>
                                         <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
                                             {extractionHistory.map((item) => (
                                                 <div key={item.id} className="flex gap-1">
@@ -1056,14 +1103,14 @@ export default function ElectricityClient() {
                                                         className="flex-1 text-left px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg text-[10px] text-gray-600 flex justify-between items-center transition-colors"
                                                     >
                                                         <span>{item.timestamp}</span>
-                                                        <span className="font-bold text-gray-400">불러오기</span>
+                                                        <span className="font-bold text-gray-400">遺덈윭?ㅺ린</span>
                                                     </button>
                                                     <button
                                                         onClick={() => deleteHistoryItem(item.id)}
                                                         className="px-2 text-gray-300 hover:text-red-500 transition-colors"
-                                                        title="삭제"
+                                                        title="??젣"
                                                     >
-                                                        ✕
+                                                        ??
                                                     </button>
                                                 </div>
                                             ))}
@@ -1073,10 +1120,10 @@ export default function ElectricityClient() {
                             </div>
 
                             <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                                <h4 className="font-bold text-sm border-b pb-2">상세 내역 (직접 수정 가능)</h4>
+                                <h4 className="font-bold text-sm border-b pb-2">?곸꽭 ?댁뿭 (吏곸젒 ?섏젙 媛??</h4>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <InputGroup label="총 청구금액" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
-                                    <InputGroup label="당월 사용량(kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
+                                    <InputGroup label="珥?泥?뎄湲덉븸" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
+                                    <InputGroup label="?뱀썡 ?ъ슜??kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
                                 </div>
                                 <div className="h-px bg-gray-100 my-2"></div>
                                 <div className="grid grid-cols-2 gap-3">
@@ -1089,19 +1136,19 @@ export default function ElectricityClient() {
                                 </div>
                                 <div className="h-px bg-gray-100 my-2"></div>
                                 <div className="grid grid-cols-2 gap-3">
-                                    <InputGroup label="부가가치세" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
-                                    <InputGroup label="전력기금" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
+                                    <InputGroup label="遺媛媛移섏꽭" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
+                                    <InputGroup label="?꾨젰湲곌툑" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
                                 </div>
                                 <div className="h-px bg-gray-100 my-2"></div>
                                 <div className="space-y-2">
-                                    <InputGroup label="검침일" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
-                                    <InputGroup label="사용기간" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
+                                    <InputGroup label="寃移⑥씪" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
+                                    <InputGroup label="?ъ슜湲곌컙" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
                                 </div>
                             </div>
                         </div>
 
                         <div className="flex gap-2 justify-end mt-6 border-t pt-4">
-                            <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">상세내역 초기화</button>
+                            <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">?곸꽭?댁뿭 珥덇린??</button>
                             <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
                                 {loading ? '저장 중...' : '저장 완료'}
                             </button>
@@ -1115,19 +1162,19 @@ export default function ElectricityClient() {
                 isLandlordModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsLandlordModalOpen(false)}>
                         <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-lg font-bold mb-4">임대인 사용량 입력</h3>
+                            <h3 className="text-lg font-bold mb-4">?꾨????ъ슜???낅젰</h3>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
-                                    <InputGroup label="전월 지침 (자동)" value={landlordInputs.prevMeter} onChange={v => setLandlordInputs({ ...landlordInputs, prevMeter: v })} />
+                                    <InputGroup label="?꾩썡 吏移?(?먮룞)" value={landlordInputs.prevMeter} onChange={v => setLandlordInputs({ ...landlordInputs, prevMeter: v })} />
                                     <InputGroup label="당월 지침" value={landlordInputs.currMeter} onChange={v => setLandlordInputs({ ...landlordInputs, currMeter: v })} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed">
-                                    <InputGroup label="온수기 (kWh)" value={landlordInputs.waterHeaterKw} onChange={v => setLandlordInputs({ ...landlordInputs, waterHeaterKw: v })} />
-                                    <InputGroup label="외등 (kWh)" value={landlordInputs.outdoorLightKw} onChange={v => setLandlordInputs({ ...landlordInputs, outdoorLightKw: v })} />
+                                    <InputGroup label="?⑥닔湲?(kWh)" value={landlordInputs.waterHeaterKw} onChange={v => setLandlordInputs({ ...landlordInputs, waterHeaterKw: v })} />
+                                    <InputGroup label="?몃벑 (kWh)" value={landlordInputs.outdoorLightKw} onChange={v => setLandlordInputs({ ...landlordInputs, outdoorLightKw: v })} />
                                 </div>
 
                                 <div className="pt-4">
-                                    <label className="block text-xs font-bold text-gray-500 mb-2">계량기 사진 업로드</label>
+                                    <label className="block text-xs font-bold text-gray-500 mb-2">怨꾨웾湲??ъ쭊 ?낅줈??</label>
                                     <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative overflow-hidden">
                                         <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                         {landlordPhoto ? (
@@ -1136,17 +1183,17 @@ export default function ElectricityClient() {
                                             </div>
                                         ) : (
                                             <div className="py-4">
-                                                <div className="text-3xl mb-2">📸</div>
-                                                <div className="text-gray-400 text-xs font-bold">클릭하여 계량기 사진 업로드</div>
+                                                <div className="text-3xl mb-2">?벝</div>
+                                                <div className="text-gray-400 text-xs font-bold">?대┃?섏뿬 怨꾨웾湲??ъ쭊 ?낅줈??</div>
                                             </div>
                                         )}
                                     </div>
                                 </div>
                             </div>
                             <div className="flex gap-2 justify-end mt-6">
-                                <button onClick={() => setIsLandlordModalOpen(false)} className="px-4 py-2 text-gray-500 text-sm font-medium">취소</button>
+                                <button onClick={() => setIsLandlordModalOpen(false)} className="px-4 py-2 text-gray-500 text-sm font-medium">痍⑥냼</button>
                                 <button onClick={calculateLandlordBill} disabled={loading} className="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-black disabled:opacity-50">
-                                    {loading ? '저장 중...' : '저장하기'}
+                                    {loading ? '저장 중...' : '계산하기'}
                                 </button>
                             </div>
                         </div>
@@ -1159,7 +1206,7 @@ export default function ElectricityClient() {
                     <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setIsPhotoModalOpen(false)}>
                         <div className="bg-white rounded-3xl p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-between items-center mb-8 border-b pb-4">
-                                <h3 className="text-2xl font-black text-gray-900">계량기 사진 확인 (전월 vs 당월)</h3>
+                                <h3 className="text-2xl font-black text-gray-900">怨꾨웾湲??ъ쭊 ?뺤씤 (?꾩썡 vs ?뱀썡)</h3>
                                 <button onClick={() => setIsPhotoModalOpen(false)} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors">
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
@@ -1168,9 +1215,9 @@ export default function ElectricityClient() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 font-sans">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">전월 계량기</span>
+                                        <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">?꾩썡 怨꾨웾湲?</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400">전월 지침</div>
+                                            <div className="text-xs text-gray-400">?꾩썡 吏移?</div>
                                             <div className="text-xl font-black">{landlordData.prevMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400">kWh</span></div>
                                         </div>
                                     </div>
@@ -1178,16 +1225,16 @@ export default function ElectricityClient() {
                                         {prevMonthPhoto ? (
                                             <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="Prev month meter" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold italic">사진 데이터 없음</div>
+                                            <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold italic">?ъ쭊 ?곗씠???놁쓬</div>
                                         )}
                                     </div>
                                 </div>
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">당월 계량기</span>
+                                        <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">?뱀썡 怨꾨웾湲?</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400">당월 지침</div>
+                                            <div className="text-xs text-gray-400">?뱀썡 吏移?</div>
                                             <div className="text-xl font-black text-[#d9361b]">{landlordData.currMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400">kWh</span></div>
                                         </div>
                                     </div>
@@ -1195,7 +1242,7 @@ export default function ElectricityClient() {
                                         {landlordData.photo ? (
                                             <img src={landlordData.photo} className="w-full h-full object-contain" alt="Current month meter" />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold italic">사진 데이터 없음</div>
+                                            <div className="w-full h-full flex items-center justify-center text-gray-300 font-bold italic">?ъ쭊 ?곗씠???놁쓬</div>
                                         )}
                                     </div>
                                 </div>
@@ -1204,7 +1251,7 @@ export default function ElectricityClient() {
                             <div className="mt-8 p-6 bg-red-50 rounded-2xl border border-red-100 text-center">
                                 <div className="text-xs text-red-400 font-bold mb-1 tracking-widest uppercase">Usage Delta</div>
                                 <div className="text-3xl font-black text-red-600">
-                                    {(landlordData.currMeter - landlordData.prevMeter).toLocaleString()} <span className="text-lg font-bold">kWh 증가</span>
+                                    {(landlordData.currMeter - landlordData.prevMeter).toLocaleString()} <span className="text-lg font-bold">kWh 利앷?</span>
                                 </div>
                             </div>
                         </div>
@@ -1225,32 +1272,32 @@ export default function ElectricityClient() {
                             <div className="fixed top-1/2 right-6 -translate-y-1/2 z-[200] flex flex-col gap-4 print:hidden">
                                 {/* Remarks Input Modal Tool */}
                                 <div className="absolute right-full top-0 mr-4 w-64 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 mb-4 hover:shadow-2xl transition-all">
-                                    <div className="text-xs font-bold text-gray-700 mb-2">하단 비고란 입력</div>
+                                    <div className="text-xs font-bold text-gray-700 mb-2">?섎떒 鍮꾧퀬? ?낅젰</div>
                                     <textarea
                                         value={invoiceRemarks}
                                         onChange={(e) => setInvoiceRemarks(e.target.value)}
-                                        placeholder="청구서 하단에 인쇄할 안내사항이나 입금 계좌 변경 등의 내용을 자유롭게 적어주세요."
+                                        placeholder="泥?뎄???섎떒???몄뇙???덈궡?ы빆?대굹 ?낃툑 怨꾩쥖 蹂寃??깆쓽 ?댁슜???먯쑀濡?쾶 ?곸뼱二쇱꽭??"
                                         rows={4}
                                         className="w-full text-xs p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] transition-all resize-none"
                                     />
                                 </div>
                                 <button
                                     onClick={() => window.print()}
-                                    title="PDF로 저장"
+                                    title="PDF 저장"
                                     className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-2xl transition-all border border-white/20 active:scale-90"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                                 </button>
                                 <button
                                     onClick={() => window.print()}
-                                    title="청구서 인쇄"
+                                    title="泥?뎄???몄뇙"
                                     className="p-3 bg-gray-900 hover:bg-black text-white rounded-full shadow-2xl transition-all border border-white/20 active:scale-90"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
                                 </button>
                                 <button
                                     onClick={() => setIsInvoiceOpen(false)}
-                                    title="닫기"
+                                    title="?リ린"
                                     className="p-3 bg-white hover:bg-gray-50 text-gray-900 rounded-full shadow-2xl border border-gray-200 active:scale-90"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
@@ -1262,13 +1309,13 @@ export default function ElectricityClient() {
                                 const usageYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
                                 const usageMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
                                 const lastDay = new Date(usageYear, usageMonth, 0).getDate();
-                                const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}일`;
+                                const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}`;
 
                                 return (
                                     <div className="p-[10mm] bg-white flex flex-col w-[210mm] mx-auto text-black font-sans" id="invoice-content">
                                         {/* Title Section */}
                                         <div className="text-center mb-2">
-                                            <h1 className="text-[14px] font-bold tracking-[0.2em] border-b border-black pb-0.5 inline-block px-8">{selectedMonth}월 전기요금 청구 명세서</h1>
+                                            <h1 className="text-[14px] font-bold tracking-[0.2em] border-b border-black pb-0.5 inline-block px-8">{selectedMonth}???꾧린?붽툑 泥?뎄 紐낆꽭??</h1>
                                         </div>
 
                                         <div className="flex justify-between mb-2 text-[10px] gap-2">
@@ -1276,24 +1323,24 @@ export default function ElectricityClient() {
                                                 <table className="w-full border-collapse border border-black h-full">
                                                     <tbody>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 font-bold text-center">청구 대상</td>
-                                                            <td className="border border-black p-0.5 font-bold italic underline decoration-gray-400">(주)에코모터스 귀하</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 font-bold text-center">泥?뎄 ???</td>
+                                                            <td className="border border-black p-0.5 font-bold italic underline decoration-gray-400">(二??먯퐫紐⑦꽣??洹??</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">청구 년월</td>
-                                                            <td className="border border-black p-0.5">{selectedYear}년 {selectedMonth}월분</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">泥?뎄 ?꾩썡</td>
+                                                            <td className="border border-black p-0.5">{selectedYear}??{selectedMonth}?붾텇</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">사용 기간</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?ъ슜 湲곌컙</td>
                                                             <td className="border border-black p-0.5">{usagePeriodStr}</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">청구 금액</td>
-                                                            <td className="border border-black p-0.5 font-bold text-xs">금 {landlordTotal.toLocaleString()} 원정</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">泥?뎄 湲덉븸</td>
+                                                            <td className="border border-black p-0.5 font-bold text-xs">湲?{landlordTotal.toLocaleString()} ?먯젙</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">입금 계좌</td>
-                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">토스뱅크 1000-0918-2374 예금주 이다빈</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?낃툑 怨꾩쥖</td>
+                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">?좎뒪諭낇겕 1000-0918-2374 ?덇툑二??대떎鍮?</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -1302,24 +1349,24 @@ export default function ElectricityClient() {
                                                 <table className="w-full border-collapse border border-black h-full">
                                                     <tbody>
                                                         <tr>
-                                                            <td rowSpan={5} className="border border-black bg-gray-50 p-0.5 w-8 font-bold text-center leading-none text-[9px]">청<br />구<br />자</td>
-                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 text-center font-bold">상 호</td>
-                                                            <td className="border border-black p-0.5 font-bold">주식회사 베이코</td>
+                                                            <td rowSpan={5} className="border border-black bg-gray-50 p-0.5 w-8 font-bold text-center leading-none text-[9px]">泥?<br />援?<br />??</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 text-center font-bold">????</td>
+                                                            <td className="border border-black p-0.5 font-bold">二쇱떇?뚯궗 踰좎씠肄?</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">대 표</td>
-                                                            <td className="border border-black p-0.5">이 다 빈</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">? ??</td>
+                                                            <td className="border border-black p-0.5">????鍮?</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">연락처</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?곕씫泥?</td>
                                                             <td className="border border-black p-0.5">010-3444-3467</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">주 소</td>
-                                                            <td className="border border-black p-0.5 leading-none font-medium text-[8px]">부산 강서구 에코델타1로 42 e·112-903</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">二???</td>
+                                                            <td className="border border-black p-0.5 leading-none font-medium text-[8px]">遺??媛뺤꽌援??먯퐫?명?1濡?42 e쨌112-903</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">이메일</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?대찓??</td>
                                                             <td className="border border-black p-0.5 font-medium text-[8px]">vdvin@naver.com</td>
                                                         </tr>
                                                     </tbody>
@@ -1328,34 +1375,34 @@ export default function ElectricityClient() {
                                         </div>
 
                                         <div className="mb-2">
-                                            <div className="text-[10px] font-bold mb-0.5">1. 계량기 검침 내역</div>
+                                            <div className="text-[10px] font-bold mb-0.5">1. 怨꾨웾湲?寃移??댁뿭</div>
                                             <table className="w-full border-collapse border border-black text-[10px]">
                                                 <thead>
                                                     <tr className="bg-gray-50">
-                                                        <th className="border border-black p-0.5 w-1/2">전월 지침</th>
-                                                        <th className="border border-black p-0.5 w-1/2">당월 지침</th>
+                                                        <th className="border border-black p-0.5 w-1/2">?꾩썡 吏移?</th>
+                                                        <th className="border border-black p-0.5 w-1/2">?뱀썡 吏移?</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <tr>
                                                         <td className="border border-black p-1">
                                                             <div className="h-48 print:h-[180px] bg-white flex items-center justify-center overflow-hidden border border-gray-100">
-                                                                {prevMonthPhoto ? <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="prev" /> : "사진 없음"}
+                                                                {prevMonthPhoto ? <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="prev" /> : "?ъ쭊 ?놁쓬"}
                                                             </div>
-                                                            <div className="text-center mt-1 font-bold text-[11px]">전월 지침: {landlordData.prevMeter.toLocaleString()} kWh</div>
+                                                            <div className="text-center mt-1 font-bold text-[11px]">?꾩썡 吏移? {landlordData.prevMeter.toLocaleString()} kWh</div>
                                                         </td>
                                                         <td className="border border-black p-1">
                                                             <div className="h-48 print:h-[180px] bg-white flex items-center justify-center overflow-hidden border border-gray-100">
-                                                                {landlordData.photo ? <img src={landlordData.photo} className="w-full h-full object-contain" alt="curr" /> : "사진 없음"}
+                                                                {landlordData.photo ? <img src={landlordData.photo} className="w-full h-full object-contain" alt="curr" /> : "?ъ쭊 ?놁쓬"}
                                                             </div>
-                                                            <div className="text-center mt-1 font-bold text-[11px]">당월 지침: {landlordData.currMeter.toLocaleString()} kWh</div>
+                                                            <div className="text-center mt-1 font-bold text-[11px]">?뱀썡 吏移? {landlordData.currMeter.toLocaleString()} kWh</div>
                                                         </td>
                                                     </tr>
                                                     <tr>
                                                         <td colSpan={2} className="border border-black p-0.5 bg-gray-50">
                                                             <div className="flex justify-between items-center px-1">
-                                                                <span className="text-[9px] tracking-tighter">산출: (당월 {landlordData.currMeter.toLocaleString()} - 전월 {landlordData.prevMeter.toLocaleString()}) + 온수기 {landlordData.waterHeaterKw} + 외등 {landlordData.outdoorLightKw}</span>
-                                                                <span className="text-[10px] font-bold underline decoration-double">총 사용량: {landlordUsageKwh.toLocaleString()} kWh</span>
+                                                                <span className="text-[9px] tracking-tighter">?곗텧: (?뱀썡 {landlordData.currMeter.toLocaleString()} - ?꾩썡 {landlordData.prevMeter.toLocaleString()}) + ?⑥닔湲?{landlordData.waterHeaterKw} + ?몃벑 {landlordData.outdoorLightKw}</span>
+                                                                <span className="text-[10px] font-bold underline decoration-double">珥??ъ슜?? {landlordUsageKwh.toLocaleString()} kWh</span>
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1365,86 +1412,86 @@ export default function ElectricityClient() {
 
                                         {/* Breakdown Table */}
                                         <div className="flex-1">
-                                            <div className="text-[10px] font-bold mb-0.5">2. 사용 요금 세부 산출 내역</div>
+                                            <div className="text-[10px] font-bold mb-0.5">2. ?ъ슜 ?붽툑 ?몃? ?곗텧 ?댁뿭</div>
                                             <table className="w-full border-collapse border border-black text-[10px] text-right">
                                                 <thead>
                                                     <tr className="bg-gray-50 text-center">
-                                                        <th className="border border-black p-0.5">항목</th>
-                                                        <th className="border border-black p-0.5">전체 금액</th>
-                                                        <th className="border border-black p-0.5">베이코 분담</th>
-                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">에코모터스 청구액</th>
+                                                        <th className="border border-black p-0.5">??ぉ</th>
+                                                        <th className="border border-black p-0.5">?꾩껜 湲덉븸</th>
+                                                        <th className="border border-black p-0.5">踰좎씠肄?遺꾨떞</th>
+                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">?먯퐫紐⑦꽣??泥?뎄??</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center bg-gray-50 font-bold">전력 사용량 (kWh)</td>
+                                                        <td className="border border-black p-0.5 text-center bg-gray-50 font-bold">?꾨젰 ?ъ슜??(kWh)</td>
                                                         <td className="border border-black p-0.5">{(beicoUsageKwh + landlordUsageKwh).toLocaleString()} kWh</td>
                                                         <td className="border border-black p-0.5">{beicoUsageKwh.toLocaleString()} kWh</td>
                                                         <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageKwh.toLocaleString()} kWh</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black border-b-2 p-0.5 text-center">기본 요금 (30kw)</td>
-                                                        <td className="border border-black border-b-2 p-0.5">{baseTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black border-b-2 p-0.5">{beicoBaseCost.toLocaleString()} 원 (10kWh)</td>
-                                                        <td className="border border-black border-b-2 p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()} 원 (20kWh)</td>
+                                                        <td className="border border-black border-b-2 p-0.5 text-center">湲곕낯 ?붽툑 (30kw)</td>
+                                                        <td className="border border-black border-b-2 p-0.5">{baseTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black border-b-2 p-0.5">{beicoBaseCost.toLocaleString()} ??(10kWh)</td>
+                                                        <td className="border border-black border-b-2 p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()} ??(20kWh)</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">전력량 요금</td>
-                                                        <td className="border border-black p-0.5">{usageTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoUsageCost.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center">?꾨젰???붽툑</td>
+                                                        <td className="border border-black p-0.5">{usageTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoUsageCost.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageCost.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">기후환경 요금</td>
-                                                        <td className="border border-black p-0.5">{envTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoEnvCost.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordEnvCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center">湲고썑?섍꼍 ?붽툑</td>
+                                                        <td className="border border-black p-0.5">{envTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoEnvCost.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordEnvCost.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">연료비 조정액</td>
-                                                        <td className="border border-black p-0.5">{fuelTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoFuelCost.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFuelCost.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center">?곕즺鍮?議곗젙??</td>
+                                                        <td className="border border-black p-0.5">{fuelTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoFuelCost.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFuelCost.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center font-bold italic">부가가치세</td>
-                                                        <td className="border border-black p-0.5">{totalVat.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoVat.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordVat.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center font-bold italic">遺媛媛移섏꽭</td>
+                                                        <td className="border border-black p-0.5">{totalVat.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoVat.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordVat.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">전력산업기금</td>
-                                                        <td className="border border-black p-0.5">{totalFund.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoFund.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFund.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center">?꾨젰?곗뾽湲곌툑</td>
+                                                        <td className="border border-black p-0.5">{totalFund.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoFund.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFund.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">TV 수신료</td>
-                                                        <td className="border border-black p-0.5">{tvTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoTvFee.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordTvFee.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center">TV ?섏떊猷?</td>
+                                                        <td className="border border-black p-0.5">{tvTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoTvFee.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordTvFee.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr className="bg-gray-100 font-bold border-t border-black">
-                                                        <td className="border border-black p-0.5 text-center text-[9px]">합 계</td>
-                                                        <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5">{beicoTotal.toLocaleString()} 원</td>
-                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()} 원</td>
+                                                        <td className="border border-black p-0.5 text-center text-[9px]">??怨?</td>
+                                                        <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr className="bg-gray-200 font-black border-t-2 border-black">
-                                                        <td colSpan={3} className="border border-black p-1 text-center text-[10px]">최종 청구 금액 (납부하실 금액)</td>
-                                                        <td className="border border-black p-1 text-sm text-right">{landlordTotal.toLocaleString()}원</td>
+                                                        <td colSpan={3} className="border border-black p-1 text-center text-[10px]">理쒖쥌 泥?뎄 湲덉븸 (?⑸??섏떎 湲덉븸)</td>
+                                                        <td className="border border-black p-1 text-sm text-right">{landlordTotal.toLocaleString()}??</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
 
                                         <div className="mt-1 text-center border-t border-gray-100 pt-1">
-                                            <p className="text-[9px] font-medium text-gray-500 italic">위와 같이 전력 사용 요금을 청구합니다.</p>
+                                            <p className="text-[9px] font-medium text-gray-500 italic">?꾩? 媛숈씠 ?꾨젰 ?ъ슜 ?붽툑??泥?뎄?⑸땲??</p>
                                         </div>
 
                                         {invoiceRemarks && invoiceRemarks.trim() !== '' && (
                                             <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded-lg text-left">
-                                                <div className="text-[10px] font-bold text-gray-800 mb-1">※ 비고</div>
+                                                <div className="text-[10px] font-bold text-gray-800 mb-1">??鍮꾧퀬</div>
                                                 <div className="text-[9px] text-gray-600 whitespace-pre-wrap leading-relaxed">
                                                     {invoiceRemarks}
                                                 </div>
@@ -1455,49 +1502,6 @@ export default function ElectricityClient() {
                             })()}
                         </div>
 
-                        <style jsx global>{`
-                            @media print {
-                                @page { size: A4 portrait; margin: 0; }
-                                html, body { 
-                                    width: 210mm !important;
-                                    height: 297mm !important;
-                                    margin: 0 !important; 
-                                    padding: 0 !important; 
-                                    background: white !important;
-                                    overflow: hidden !important; 
-                                }
-                                
-                                /* Completely remove background layout elements from print flow */
-                                #electricity-main > div:not(#print-modal) {
-                                    display: none !important;
-                                }
-                                
-                                /* Show only the invoice */
-                                #print-modal, #print-modal * { 
-                                    visibility: visible !important; 
-                                }
-                                
-                                #invoice-content {
-                                    position: fixed !important;
-                                    top: 0 !important;
-                                    left: 0 !important;
-                                    width: 210mm !important;
-                                    height: 297mm !important;
-                                    margin: 0 !important;
-                                    padding: 8mm !important;
-                                    background: white !important;
-                                    z-index: 99999 !important;
-                                    box-sizing: border-box !important;
-                                    overflow: hidden !important; 
-                                }
-                                
-                                table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed; }
-                                td, th { border: 1px solid black !important; word-break: break-all; }
-                                .bg-gray-50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .bg-gray-100 { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .bg-gray-200 { background-color: #e5e7eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            }
-                        `}</style>
                     </div>
                 )
             }
@@ -1534,3 +1538,12 @@ function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = tru
         </div>
     )
 }
+
+
+
+
+
+
+
+
+
