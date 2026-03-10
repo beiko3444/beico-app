@@ -711,7 +711,7 @@ export default function ElectricityClient() {
                             <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#d9361b] transition-all">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight">?꾨젰 愿由?/h1>
+                            <h1 className="text-lg font-black text-gray-900 tracking-tight">?꾨젰 愿由?</h1>
                         </div>
                     </div>
                 </div>
@@ -796,7 +796,7 @@ export default function ElectricityClient() {
                                 <p className="text-sm text-gray-400 mt-1">{billData.usagePeriod}</p>
                             </div>
                             <div className="text-right">
-                                <div className="text-3xl font-black tracking-tight">{billData.totalAmount.toLocaleString()}??/div>
+                                <div className="text-3xl font-black tracking-tight">{billData.totalAmount.toLocaleString()}??</div>
                                 <div className="text-xs text-gray-400 mt-1 flex flex-col items-end gap-1">
                                     <div>珥??ъ슜?? <span className="text-white font-bold">{billData.currentUsage.toLocaleString()} kWh</span></div>
                                     {prevMonthData && (
@@ -820,7 +820,7 @@ export default function ElectricityClient() {
                                     <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
                                 </div>
                                 <div className="text-[10px] text-gray-400 font-bold mb-1 tracking-widest uppercase">Beico Share ({shareRatioBeico.toFixed(1)}%)</div>
-                                <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}??/div>
+                                <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}??</div>
                                 <div className="text-xs text-gray-400 mt-1">踰좎씠肄??댁슜?붽툑</div>
                                 {prevMonthData && (
                                     <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500'': 'text-blue-500'}`}>
@@ -833,7 +833,7 @@ export default function ElectricityClient() {
                                     <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
                                 </div>
                                 <div className="text-[10px] text-red-400 font-bold mb-1 tracking-widest uppercase">Landlord Share ({shareRatioLandlord.toFixed(1)}%)</div>
-                                <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}??/div>
+                                <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}??</div>
                                 <div className="text-xs text-red-400 mt-1">?꾨????댁슜?붽툑</div>
                                 {prevMonthData && (
                                     <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500'': 'text-blue-500'}`}>
@@ -861,72 +861,72 @@ export default function ElectricityClient() {
                                 </thead>
                                 <tbody className="divide-y divide-gray-100 [&>tr:nth-child(even)]:bg-gray-50">
                                     <tr className="bg-blue-50/20 text-blue-900 font-bold">
-                                        <td className="px-4 py-2">珥??ъ슜 ?꾨젰??/td>
+                                        <td className="px-4 py-2">珥??ъ슜 ?꾨젰??</td>
                                         <td className="px-4 py-2 text-right">{totalKwh.toLocaleString()}kWh</td>
                                         <td className="px-4 py-2 text-right">{beicoUsageKwh.toLocaleString()}kWh</td>
                                         <td className="px-4 py-2 text-right">{landlordUsageKwh.toLocaleString()}kWh</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
                                         <td className="px-4 py-1.5">湲곕낯?붽툑</td>
-                                        <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">?꾨젰?됱슂湲?/td>
-                                        <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5">?꾨젰?됱슂湲?</td>
+                                        <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
                                         <td className="px-4 py-1.5">湲고썑?섍꼍?붽툑</td>
-                                        <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
                                         <td className="px-4 py-1.5">?곕즺鍮꾩“?뺤븸</td>
-                                        <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50">
                                         <td className="px-4 py-1.5">??쪧?붽툑</td>
-                                        <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50 text-gray-500">
                                         <td className="px-4 py-1.5">遺媛媛移섏꽭</td>
-                                        <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50 text-gray-500">
                                         <td className="px-4 py-1.5">?꾨젰湲곌툑</td>
-                                        <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}??</td>
                                     </tr>
                                     <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">TV ?섏떊猷?/td>
-                                        <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}??/td>
-                                        <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}??/td>
+                                        <td className="px-4 py-1.5">TV ?섏떊猷?</td>
+                                        <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}??</td>
+                                        <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}??</td>
                                     </tr>
                                     {roundingDiff !== 0 && (
                                         <tr className="hover:bg-gray-50 text-gray-400 italic">
                                             <td className="px-4 py-1.5">?먮떒???덉궗</td>
-                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}??/td>
-                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}??/td>
-                                            <td className="px-4 py-1.5 text-right">0??/td>
+                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}??</td>
+                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}??</td>
+                                            <td className="px-4 py-1.5 text-right">0??</td>
                                         </tr>
                                     )}
                                     <tr className="bg-gray-900 text-white font-black border-t-2 border-gray-900">
                                         <td className="px-4 py-3 text-sm">理쒖쥌 泥?뎄 湲덉븸</td>
-                                        <td className="px-4 py-3 text-right text-gray-400 text-sm">{billData.totalAmount.toLocaleString()}??/td>
-                                        <td className="px-4 py-3 text-right text-[#d9361b] text-sm">{beicoTotal.toLocaleString()}??/td>
-                                        <td className="px-4 py-3 text-right text-sm font-black">{landlordTotal.toLocaleString()}??/td>
+                                        <td className="px-4 py-3 text-right text-gray-400 text-sm">{billData.totalAmount.toLocaleString()}??</td>
+                                        <td className="px-4 py-3 text-right text-[#d9361b] text-sm">{beicoTotal.toLocaleString()}??</td>
+                                        <td className="px-4 py-3 text-right text-sm font-black">{landlordTotal.toLocaleString()}??</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1075,7 +1075,7 @@ export default function ElectricityClient() {
                     <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-between items-center mb-6 border-b pb-4">
                             <h3 className="text-lg font-bold">{selectedYear}??{selectedMonth}??怨좎????곸꽭 ?낅젰</h3>
-                            <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">??/button>
+                            <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">??</button>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1148,7 +1148,7 @@ export default function ElectricityClient() {
                         </div>
 
                         <div className="flex gap-2 justify-end mt-6 border-t pt-4">
-                            <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">?곸꽭?댁뿭 珥덇린??/button>
+                            <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">?곸꽭?댁뿭 珥덇린??</button>
                             <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
                                 {loading ? '???以?..'': '????꾨즺'}
                             </button>
@@ -1174,7 +1174,7 @@ export default function ElectricityClient() {
                                 </div>
 
                                 <div className="pt-4">
-                                    <label className="block text-xs font-bold text-gray-500 mb-2">怨꾨웾湲??ъ쭊 ?낅줈??/label>
+                                    <label className="block text-xs font-bold text-gray-500 mb-2">怨꾨웾湲??ъ쭊 ?낅줈??</label>
                                     <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative overflow-hidden">
                                         <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                         {landlordPhoto ? (
@@ -1184,7 +1184,7 @@ export default function ElectricityClient() {
                                         ) : (
                                             <div className="py-4">
                                                 <div className="text-3xl mb-2">?벝</div>
-                                                <div className="text-gray-400 text-xs font-bold">?대┃?섏뿬 怨꾨웾湲??ъ쭊 ?낅줈??/div>
+                                                <div className="text-gray-400 text-xs font-bold">?대┃?섏뿬 怨꾨웾湲??ъ쭊 ?낅줈??</div>
                                             </div>
                                         )}
                                     </div>
@@ -1215,9 +1215,9 @@ export default function ElectricityClient() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 font-sans">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">?꾩썡 怨꾨웾湲?/span>
+                                        <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">?꾩썡 怨꾨웾湲?</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400">?꾩썡 吏移?/div>
+                                            <div className="text-xs text-gray-400">?꾩썡 吏移?</div>
                                             <div className="text-xl font-black">{landlordData.prevMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400">kWh</span></div>
                                         </div>
                                     </div>
@@ -1232,9 +1232,9 @@ export default function ElectricityClient() {
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">?뱀썡 怨꾨웾湲?/span>
+                                        <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">?뱀썡 怨꾨웾湲?</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400">?뱀썡 吏移?/div>
+                                            <div className="text-xs text-gray-400">?뱀썡 吏移?</div>
                                             <div className="text-xl font-black text-[#d9361b]">{landlordData.currMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400">kWh</span></div>
                                         </div>
                                     </div>
@@ -1315,7 +1315,7 @@ export default function ElectricityClient() {
                                     <div className="p-[10mm] bg-white flex flex-col w-[210mm] mx-auto text-black font-sans" id="invoice-content">
                                         {/* Title Section */}
                                         <div className="text-center mb-2">
-                                            <h1 className="text-[14px] font-bold tracking-[0.2em] border-b border-black pb-0.5 inline-block px-8">{selectedMonth}???꾧린?붽툑 泥?뎄 紐낆꽭??/h1>
+                                            <h1 className="text-[14px] font-bold tracking-[0.2em] border-b border-black pb-0.5 inline-block px-8">{selectedMonth}???꾧린?붽툑 泥?뎄 紐낆꽭??</h1>
                                         </div>
 
                                         <div className="flex justify-between mb-2 text-[10px] gap-2">
@@ -1323,8 +1323,8 @@ export default function ElectricityClient() {
                                                 <table className="w-full border-collapse border border-black h-full">
                                                     <tbody>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 font-bold text-center">泥?뎄 ???/td>
-                                                            <td className="border border-black p-0.5 font-bold italic underline decoration-gray-400">(二??먯퐫紐⑦꽣??洹??/td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 font-bold text-center">泥?뎄 ???</td>
+                                                            <td className="border border-black p-0.5 font-bold italic underline decoration-gray-400">(二??먯퐫紐⑦꽣??洹??</td>
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">泥?뎄 ?꾩썡</td>
@@ -1340,7 +1340,7 @@ export default function ElectricityClient() {
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?낃툑 怨꾩쥖</td>
-                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">?좎뒪諭낇겕 1000-0918-2374 ?덇툑二??대떎鍮?/td>
+                                                            <td className="border border-black p-0.5 font-medium tracking-tighter">?좎뒪諭낇겕 1000-0918-2374 ?덇툑二??대떎鍮?</td>
                                                         </tr>
                                                     </tbody>
                                                 </table>
@@ -1349,24 +1349,24 @@ export default function ElectricityClient() {
                                                 <table className="w-full border-collapse border border-black h-full">
                                                     <tbody>
                                                         <tr>
-                                                            <td rowSpan={5} className="border border-black bg-gray-50 p-0.5 w-8 font-bold text-center leading-none text-[9px]">泥?br />援?br />??/td>
-                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 text-center font-bold">????/td>
-                                                            <td className="border border-black p-0.5 font-bold">二쇱떇?뚯궗 踰좎씠肄?/td>
+                                                            <td rowSpan={5} className="border border-black bg-gray-50 p-0.5 w-8 font-bold text-center leading-none text-[9px]">泥?<br />援?<br />??</td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 w-16 text-center font-bold">????</td>
+                                                            <td className="border border-black p-0.5 font-bold">二쇱떇?뚯궗 踰좎씠肄?</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">? ??/td>
-                                                            <td className="border border-black p-0.5">????鍮?/td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">? ??</td>
+                                                            <td className="border border-black p-0.5">????鍮?</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?곕씫泥?/td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?곕씫泥?</td>
                                                             <td className="border border-black p-0.5">010-3444-3467</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">二???/td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">二???</td>
                                                             <td className="border border-black p-0.5 leading-none font-medium text-[8px]">遺??媛뺤꽌援??먯퐫?명?1濡?42 e쨌112-903</td>
                                                         </tr>
                                                         <tr>
-                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?대찓??/td>
+                                                            <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">?대찓??</td>
                                                             <td className="border border-black p-0.5 font-medium text-[8px]">vdvin@naver.com</td>
                                                         </tr>
                                                     </tbody>
@@ -1379,8 +1379,8 @@ export default function ElectricityClient() {
                                             <table className="w-full border-collapse border border-black text-[10px]">
                                                 <thead>
                                                     <tr className="bg-gray-50">
-                                                        <th className="border border-black p-0.5 w-1/2">?꾩썡 吏移?/th>
-                                                        <th className="border border-black p-0.5 w-1/2">?뱀썡 吏移?/th>
+                                                        <th className="border border-black p-0.5 w-1/2">?꾩썡 吏移?</th>
+                                                        <th className="border border-black p-0.5 w-1/2">?뱀썡 吏移?</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1419,7 +1419,7 @@ export default function ElectricityClient() {
                                                         <th className="border border-black p-0.5">??ぉ</th>
                                                         <th className="border border-black p-0.5">?꾩껜 湲덉븸</th>
                                                         <th className="border border-black p-0.5">踰좎씠肄?遺꾨떞</th>
-                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">?먯퐫紐⑦꽣??泥?뎄??/th>
+                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">?먯퐫紐⑦꽣??泥?뎄??</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
@@ -1431,55 +1431,55 @@ export default function ElectricityClient() {
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black border-b-2 p-0.5 text-center">湲곕낯 ?붽툑 (30kw)</td>
-                                                        <td className="border border-black border-b-2 p-0.5">{baseTotal.toLocaleString()} ??/td>
+                                                        <td className="border border-black border-b-2 p-0.5">{baseTotal.toLocaleString()} ??</td>
                                                         <td className="border border-black border-b-2 p-0.5">{beicoBaseCost.toLocaleString()} ??(10kWh)</td>
                                                         <td className="border border-black border-b-2 p-0.5 font-bold bg-gray-100">{landlordBaseCost.toLocaleString()} ??(20kWh)</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">?꾨젰???붽툑</td>
-                                                        <td className="border border-black p-0.5">{usageTotal.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoUsageCost.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageCost.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5">{usageTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoUsageCost.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordUsageCost.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">湲고썑?섍꼍 ?붽툑</td>
-                                                        <td className="border border-black p-0.5">{envTotal.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoEnvCost.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordEnvCost.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5">{envTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoEnvCost.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordEnvCost.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">?곕즺鍮?議곗젙??/td>
-                                                        <td className="border border-black p-0.5">{fuelTotal.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoFuelCost.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFuelCost.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5 text-center">?곕즺鍮?議곗젙??</td>
+                                                        <td className="border border-black p-0.5">{fuelTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoFuelCost.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFuelCost.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center font-bold italic">遺媛媛移섏꽭</td>
-                                                        <td className="border border-black p-0.5">{totalVat.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoVat.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordVat.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5">{totalVat.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoVat.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-bold bg-gray-100">{landlordVat.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
                                                         <td className="border border-black p-0.5 text-center">?꾨젰?곗뾽湲곌툑</td>
-                                                        <td className="border border-black p-0.5">{totalFund.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoFund.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFund.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5">{totalFund.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoFund.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordFund.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr>
-                                                        <td className="border border-black p-0.5 text-center">TV ?섏떊猷?/td>
-                                                        <td className="border border-black p-0.5">{tvTotal.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoTvFee.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordTvFee.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5 text-center">TV ?섏떊猷?</td>
+                                                        <td className="border border-black p-0.5">{tvTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoTvFee.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 font-medium bg-gray-100">{landlordTvFee.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr className="bg-gray-100 font-bold border-t border-black">
-                                                        <td className="border border-black p-0.5 text-center text-[9px]">??怨?/td>
-                                                        <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5">{beicoTotal.toLocaleString()} ??/td>
-                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()} ??/td>
+                                                        <td className="border border-black p-0.5 text-center text-[9px]">??怨?</td>
+                                                        <td className="border border-black p-0.5">{billData.totalAmount.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5">{beicoTotal.toLocaleString()} ??</td>
+                                                        <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()} ??</td>
                                                     </tr>
                                                     <tr className="bg-gray-200 font-black border-t-2 border-black">
                                                         <td colSpan={3} className="border border-black p-1 text-center text-[10px]">理쒖쥌 泥?뎄 湲덉븸 (?⑸??섏떎 湲덉븸)</td>
-                                                        <td className="border border-black p-1 text-sm text-right">{landlordTotal.toLocaleString()}??/td>
+                                                        <td className="border border-black p-1 text-sm text-right">{landlordTotal.toLocaleString()}??</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
@@ -1581,6 +1581,7 @@ function InputGroup({ label, value, onChange, placeholder = '0'': { label: strin
         </div>
     )
 }
+
 
 
 
