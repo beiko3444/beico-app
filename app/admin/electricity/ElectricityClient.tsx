@@ -1502,49 +1502,6 @@ export default function ElectricityClient() {
                             })()}
                         </div>
 
-                        <style jsx global>{`
-                            @media print {
-                                @page { size: A4 portrait; margin: 0; }
-                                html, body { 
-                                    width: 210mm !important;
-                                    height: 297mm !important;
-                                    margin: 0 !important; 
-                                    padding: 0 !important; 
-                                    background: white !important;
-                                    overflow: hidden !important; 
-                                }
-                                
-                                /* Completely remove background layout elements from print flow */
-                                #electricity-main > div:not(#print-modal) {
-                                    display: none !important;
-                                }
-                                
-                                /* Show only the invoice */
-                                #print-modal, #print-modal * { 
-                                    visibility: visible !important; 
-                                }
-                                
-                                #invoice-content {
-                                    position: fixed !important;
-                                    top: 0 !important;
-                                    left: 0 !important;
-                                    width: 210mm !important;
-                                    height: 297mm !important;
-                                    margin: 0 !important;
-                                    padding: 8mm !important;
-                                    background: white !important;
-                                    z-index: 99999 !important;
-                                    box-sizing: border-box !important;
-                                    overflow: hidden !important; 
-                                }
-                                
-                                table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed; }
-                                td, th { border: 1px solid black !important; word-break: break-all; }
-                                .bg-gray-50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .bg-gray-100 { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                                .bg-gray-200 { background-color: #e5e7eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-                            }
-                        `}</style>
                     </div>
                 )
             }
