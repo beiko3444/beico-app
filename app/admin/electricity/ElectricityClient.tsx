@@ -723,7 +723,7 @@ export default function ElectricityClient() {
                     onClick={() => setActiveTab('analysis')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'analysis'
                         ? 'bg-gray-900 text-white'
-                        : '':bg-gray-100'
+                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                         }`}
                 >
                     전력관리
@@ -733,7 +733,7 @@ export default function ElectricityClient() {
                     onClick={() => setActiveTab('payment')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'payment'
                         ? 'bg-[#d9361b] text-white'
-                        : '':bg-gray-100'
+                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                         }`}
                 >
                     납부관리
@@ -757,7 +757,7 @@ export default function ElectricityClient() {
                                 onClick={() => setSelectedMonth(month)}
                                 className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedMonth === month
                                     ? 'bg-[#d9361b] text-white shadow-md transform scale-105'
-                                    : '':bg-gray-100'
+                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
                                     }`}
                             >
                                 {month}??
@@ -772,7 +772,7 @@ export default function ElectricityClient() {
                             怨꾨웾湲??뺤씤?섍린
                         </button>
                         <button onClick={() => setIsLandlordModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
-                            {landlordData ? '?꾨????곗씠???섏젙'': '?꾨????ъ슜???낅젰'}
+                            {landlordData ? '임대인 사용량 수정' : '임대인 사용량 입력'}
                         </button>
                         <button onClick={() => setIsUsageModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
                             怨좎????섏젙
@@ -802,11 +802,11 @@ export default function ElectricityClient() {
                                     {prevMonthData && (
                                         <div className="flex items-center gap-2 text-[10px]">
                                             <span>?꾩썡?鍮?</span>
-                                            <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400'': 'text-blue-400'}>
-                                                {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '': '??} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
+                                            <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400' : 'text-blue-400'}>
+                                                {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '▲' : '▼'} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
                                             </span>
-                                            <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400'': 'text-blue-400'}>
-                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '': '??} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} ??
+                                            <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400' : 'text-blue-400'}>
+                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '▲' : '▼'} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} ??
                                             </span>
                                         </div>
                                     )}
@@ -823,8 +823,8 @@ export default function ElectricityClient() {
                                 <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}??</div>
                                 <div className="text-xs text-gray-400 mt-1">踰좎씠肄??댁슜?붽툑</div>
                                 {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500'': 'text-blue-500'}`}>
-                                        ?꾩썡鍮?{beicoTotal - prevShares.beicoTotal >= 0 ? '': '??}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}??
+                                    <div className={`text-[10px] mt-2 font-bold `}>
+                                        ?꾩썡鍮?{beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}??
                                     </div>
                                 )}
                             </div>
@@ -836,8 +836,8 @@ export default function ElectricityClient() {
                                 <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}??</div>
                                 <div className="text-xs text-red-400 mt-1">?꾨????댁슜?붽툑</div>
                                 {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500'': 'text-blue-500'}`}>
-                                        ?꾩썡鍮?{landlordTotal - prevShares.landlordTotal >= 0 ? '': '??}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}??
+                                    <div className={`text-[10px] mt-2 font-bold `}>
+                                        ?꾩썡鍮?{landlordTotal - prevShares.landlordTotal >= 0 ? '▲' : '▼'}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}??
                                     </div>
                                 )}
                             </div>
@@ -1150,7 +1150,7 @@ export default function ElectricityClient() {
                         <div className="flex gap-2 justify-end mt-6 border-t pt-4">
                             <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">?곸꽭?댁뿭 珥덇린??</button>
                             <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
-                                {loading ? '???以?..'': '????꾨즺'}
+                                {loading ? '저장 중...' : '저장 완료'}
                             </button>
                         </div>
                     </div>
@@ -1193,7 +1193,7 @@ export default function ElectricityClient() {
                             <div className="flex gap-2 justify-end mt-6">
                                 <button onClick={() => setIsLandlordModalOpen(false)} className="px-4 py-2 text-gray-500 text-sm font-medium">痍⑥냼</button>
                                 <button onClick={calculateLandlordBill} disabled={loading} className="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-black disabled:opacity-50">
-                                    {loading ? '???以?..'': '??ν븯湲?}
+                                    {loading ? '저장 중...' : '계산하기'}
                                 </button>
                             </div>
                         </div>
@@ -1552,7 +1552,7 @@ export default function ElectricityClient() {
     )
 }
 
-function InputGroup({ label, value, onChange, placeholder = '0'': { label: string, value: string, onChange: (v: string) => void, placeholder?: string, isNumeric?: boolean }) {
+function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = true }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string, isNumeric?: boolean }) {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         if (!isNumeric) {
@@ -1581,6 +1581,7 @@ function InputGroup({ label, value, onChange, placeholder = '0'': { label: strin
         </div>
     )
 }
+
 
 
 
