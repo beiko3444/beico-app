@@ -325,7 +325,7 @@ export default function ElectricityClient() {
 
                         try {
                             const parsedRaw = JSON.parse(data.rawBillData)
-                            const amount = typeof parsedRaw.landlordTotal === 'number'': null
+                            const amount = typeof parsedRaw.landlordTotal === 'number' ? parsedRaw.landlordTotal : null
                             return [month, amount] as const
                         } catch {
                             return [month, null] as const
