@@ -660,6 +660,35 @@ export default function ElectricityClient() {
         return new Date(value).toLocaleString('ko-KR')
     }
 
+    const getRentPaymentInfo = (year: number, month: number) => {
+        const nextMonth = month === 12 ? 1 : month + 1;
+        const nextYear = month === 12 ? year + 1 : year;
+        const periodStr = `${year}년 ${month}월 14일 ~ ${nextYear}년 ${nextMonth}월 13일`;
+
+        if (year === 2025 && month === 12) {
+            return {
+                period: periodStr,
+                paidDate: "12월 18일 입금",
+                amount: "1,595,000원"
+            };
+        }
+        if (year === 2026 && month === 1) {
+            return {
+                period: periodStr,
+                paidDate: "입금 완료",
+                amount: "1,595,000원"
+            };
+        }
+
+        return {
+            period: periodStr,
+            paidDate: "매월 14일 입금",
+            amount: "1,595,000원"
+        };
+    };
+
+    const rentInfo = getRentPaymentInfo(selectedYear, selectedMonth);
+
     return (
         <div id="electricity-main" className="space-y-8 font-sans pb-20 print:pb-0 print:space-y-0">
             {/* Header */}
@@ -932,10 +961,20 @@ export default function ElectricityClient() {
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-gray-50">
+                            <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-blue-50/50">
                                 <div>
                                     <div className="text-sm font-bold text-gray-900">월세 납부 세금계산서 발행</div>
-                                    <div className="text-xs text-gray-500 mt-1">자동이체 납부 예정일: {rentAutoTransferDate}</div>
+                                    <div className="mt-1.5 space-y-0.5">
+                                        <div className="text-[11px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded inline-block">
+                                            임대기간: {rentInfo.period}
+                                        </div>
+                                        <div className="text-xs text-gray-600 mt-1">
+                                            • 납부금액: <span className="font-bold text-gray-900">{rentInfo.amount}</span>
+                                        </div>
+                                        <div className="text-xs text-gray-600">
+                                            • 납부상태: <span className="font-bold text-gray-900">{rentInfo.paidDate}</span>
+                                        </div>
+                                    </div>
                                 </div>
                                 <input
                                     type="checkbox"
