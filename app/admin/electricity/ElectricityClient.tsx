@@ -658,6 +658,23 @@ export default function ElectricityClient() {
     const currentPaymentStatus = getPaymentStatus(selectedYear, selectedMonth)
     const rentAutoTransferDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-14`
     const selectedMonthLandlordTotal = monthlyLandlordTotals[selectedMonth] ?? null
+    const unpaidLandlordElectricitySummary = Array.from({ length: 12 }, (_, idx) => idx + 1)
+        .filter(month => {
+            if (selectedYear < currentYear) return true
+            if (selectedYear > currentYear) return false
+            return month < currentMonth
+        })
+        .reduce((acc, month) => {
+            const amount = monthlyLandlordTotals[month]
+            const status = getPaymentStatus(selectedYear, month)
+            if (amount === null || amount === undefined || status.electricityPaid) {
+                return acc
+            }
+
+            acc.total += amount
+            acc.months += 1
+            return acc
+        }, { total: 0, months: 0 })
     const formatChecklistTimestamp = (value: string | null) => {
         if (!value) return '-'
         return new Date(value).toLocaleString('ko-KR')
@@ -966,6 +983,16 @@ export default function ElectricityClient() {
                             <div className="text-right">
                                 <div className="text-xs text-gray-500">선택 월</div>
                                 <div className="text-sm font-bold text-gray-900">{selectedYear}년 {selectedMonth}월</div>
+                            </div>
+                        </div>
+
+                        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                            <div className="text-xs font-bold text-red-600">현재 일자 기준 임대인 미납 전기세</div>
+                            <div className="mt-1 text-lg font-black text-gray-900">
+                                {unpaidLandlordElectricitySummary.total.toLocaleString()}원
+                            </div>
+                            <div className="text-xs text-gray-600 mt-1">
+                                {selectedYear}년 도래분 중 미납 {unpaidLandlordElectricitySummary.months}개월 합계
                             </div>
                         </div>
 
