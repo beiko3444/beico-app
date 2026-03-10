@@ -1309,7 +1309,7 @@ export default function ElectricityClient() {
                                 const usageYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
                                 const usageMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
                                 const lastDay = new Date(usageYear, usageMonth, 0).getDate();
-                                const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}??;
+                                const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}`;
 
                                 return (
                                     <div className="p-[10mm] bg-white flex flex-col w-[210mm] mx-auto text-black font-sans" id="invoice-content">
