@@ -754,6 +754,23 @@ export default function ElectricityClient() {
                     </div>
                 </div>
 
+                <div className="flex justify-end relative">
+                    <button onClick={async () => {
+                        if (confirm('데이터를 옮깁니다: 모든 전력 관리 데이터를 1달 이전으로 변경합니다. 진행하시겠습니까?')) {
+                            const res = await fetch('/api/admin/electricity/shift');
+                            const data = await res.json();
+                            if (data.success) {
+                                alert(`성공: 총 ${data.count}개의 데이터가 1달 이전으로 변경되었습니다.`);
+                                window.location.reload();
+                            } else {
+                                alert('오류: ' + data.error);
+                            }
+                        }
+                    }} className="px-5 py-2.5 bg-yellow-500 hover:bg-yellow-600 text-white rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-2">
+                        ⚠️ 전체 요금정보 1달 이전으로 돌리기
+                    </button>
+                </div>
+
                 {activeTab === 'analysis' && billData && (
                     <div className="flex flex-wrap gap-2 justify-start pt-2 border-t border-gray-50">
                         <button onClick={() => setIsPhotoModalOpen(true)} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-green-700 shadow-sm">
