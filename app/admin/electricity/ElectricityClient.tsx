@@ -23,6 +23,16 @@ type LandlordData = {
     photo: string | null
 }
 
+type DetailKey =
+    | 'baseFee'
+    | 'usageFee'
+    | 'envFee'
+    | 'fuelFee'
+    | 'powerFactorFee'
+    | 'tvFee'
+    | 'vat'
+    | 'fund'
+
 type PaymentChecklistStatus = {
     rentTaxInvoiceIssued: boolean
     electricityPaid: boolean
@@ -87,6 +97,33 @@ export default function ElectricityClient() {
         if (!s) return '';
         return parseInt(s, 10).toLocaleString();
     };
+
+    const legacyDetailKeys: Record<DetailKey, string[]> = {
+        baseFee: ['旮半掣?旉笀'],
+        usageFee: ['?勲牓?夓殧旮?', ''],
+        envFee: ['旮绊泟?橁步?旉笀'],
+        fuelFee: ['?半牍勳“?曥暋'],
+        powerFactorFee: ['???旉笀'],
+        tvFee: ['TV?橃嫚耄?', ''],
+        vat: ['攵€臧€臧€旃橃劯'],
+        fund: ['?勲牓旮瓣笀']
+    }
+
+    const parseNumber = (value: unknown) => {
+        const num = Number(value)
+        return Number.isFinite(num) ? num : 0
+    }
+
+    const getParsedAmount = (source: Record<string, unknown> | null | undefined, key: DetailKey) => {
+        if (!source) return 0
+        const candidates = [key, ...legacyDetailKeys[key]]
+        for (const candidate of candidates) {
+            if (candidate in source) {
+                return parseNumber(source[candidate])
+            }
+        }
+        return 0
+    }
 
     const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 
@@ -155,14 +192,14 @@ export default function ElectricityClient() {
                         setManualInputs({
                             totalAmount: formatWithCommas(data.totalAmount),
                             currentUsage: formatWithCommas(data.totalUsage),
-                            baseFee: formatWithCommas(parsed['湲곕낯?붽툑'] || 0),
-                            usageFee: formatWithCommas(parsed['?꾨젰?됱슂湲?] || 0),
-                            envFee: formatWithCommas(parsed['湲고썑?섍꼍?붽툑'] || 0),
-                            fuelFee: formatWithCommas(parsed['?곕즺鍮꾩“?뺤븸'] || 0),
-                            powerFactorFee: formatWithCommas(parsed['??쪧?붽툑'] || 0),
-                            tvFee: formatWithCommas(parsed['TV?섏떊猷?] || 0),
-                            vat: formatWithCommas(parsed['遺媛媛移섏꽭'] || 0),
-                            fund: formatWithCommas(parsed['?꾨젰湲곌툑'] || 0),
+                            baseFee: formatWithCommas(getParsedAmount(parsed, 'baseFee')),
+                            usageFee: formatWithCommas(getParsedAmount(parsed, 'usageFee')),
+                            envFee: formatWithCommas(getParsedAmount(parsed, 'envFee')),
+                            fuelFee: formatWithCommas(getParsedAmount(parsed, 'fuelFee')),
+                            powerFactorFee: formatWithCommas(getParsedAmount(parsed, 'powerFactorFee')),
+                            tvFee: formatWithCommas(getParsedAmount(parsed, 'tvFee')),
+                            vat: formatWithCommas(getParsedAmount(parsed, 'vat')),
+                            fund: formatWithCommas(getParsedAmount(parsed, 'fund')),
                             readingDate: data.readingDate || '',
                             usagePeriod: data.usagePeriod || '',
                             meterCurrent: data.meterCurrent || '',
@@ -202,9 +239,9 @@ export default function ElectricityClient() {
                         setRawText('')
                         setExtractionHistory([])
                         setManualInputs({
-                            totalAmount: '', currentUsage: '', baseFee: '', usageFee: '',
-                            envFee: '', fuelFee: '', powerFactorFee: '', tvFee: '', vat: '', fund: '',
-                            readingDate: '', usagePeriod: '', meterCurrent: '', meterPrevious: ''
+                            totalAmount: ''': ''': ''': '',
+                            envFee: ''': ''': ''': ''': ''': '',
+                            readingDate: ''': ''': ''': ''
                         })
                     }
                 }
@@ -277,7 +314,7 @@ export default function ElectricityClient() {
 
                         try {
                             const parsedRaw = JSON.parse(data.rawBillData)
-                            const amount = typeof parsedRaw.landlordTotal === 'number' ? parsedRaw.landlordTotal : null
+                            const amount = typeof parsedRaw.landlordTotal === 'number'': null
                             return [month, amount] as const
                         } catch {
                             return [month, null] as const
@@ -353,51 +390,47 @@ export default function ElectricityClient() {
                 const match = rawText.match(regex)
                 return match ? match[1].trim() : ''
             }
-
             const getSignedNum = (keyword: string) => {
                 const regex = new RegExp(`${keyword}\\s*([-\\d,]+)`)
                 const match = rawText.match(regex)
                 return match ? parseInt(match[1].replace(/,/g, '')) : 0
             }
 
-            if (rawText.trim()) {
-                const total = rawText.match(/泥?뎄湲덉븸\(.*?\)\s*([\d,]+)/)?.[1]
-                    ? parseInt(rawText.match(/泥?뎄湲덉븸\(.*?\)\s*([\d,]+)/)![1].replace(/,/g, ''))
-                    : getNum('泥?뎄湲덉븸')
+            if (!rawText.trim()) return
 
-                const inputs = {
-                    totalAmount: formatWithCommas(total || 0),
-                    currentUsage: formatWithCommas(getNum('?뱀썡 ?ъ슜??)),
-                    baseFee: formatWithCommas(getNum('湲곕낯?붽툑')),
-                    usageFee: formatWithCommas(getNum('?꾨젰?됱슂湲?)),
-                    envFee: formatWithCommas(getNum('湲고썑?섍꼍?붽툑')),
-                    fuelFee: formatWithCommas(getSignedNum('?곕즺鍮꾩“?뺤븸')),
-                    powerFactorFee: formatWithCommas(getSignedNum('??쪧?붽툑')),
-                    tvFee: formatWithCommas(getNum('TV\\s*?섏떊猷?) || getNum('竊댐섬?섏떊猷?)),
-                    vat: formatWithCommas(getNum('遺媛媛移섏꽭')),
-                    fund: formatWithCommas(getNum('?꾨젰湲곌툑')),
-                    readingDate: getStr('寃移⑥씪'),
-                    usagePeriod: getStr('?꾧린?ъ슜湲곌컙'),
-                    meterCurrent: getStr('?뱀썡?ъ빞吏移?) + ' / ' + getStr('?뱀썡湲고?吏移?),
-                    meterPrevious: getStr('?꾩썡?ъ빞吏移?) + ' / ' + getStr('?꾩썡湲고?吏移?),
-                }
-                setManualInputs(inputs)
+            const total = rawText.match(/([\d,]+)\s*원/)?.[1]
+                ? parseInt(rawText.match(/([\d,]+)\s*원/)![1].replace(/,/g, ''))
+                : 0
 
-                // Add to history
-                const newHistoryItem = {
-                    id: Date.now().toString(),
-                    timestamp: new Date().toLocaleString(),
-                    rawText: rawText,
-                    inputs: inputs
-                }
-                const updatedHistory = [newHistoryItem, ...extractionHistory]
-                setExtractionHistory(updatedHistory)
+            const inputs = {
+                totalAmount: formatWithCommas(total || 0),
+                currentUsage: formatWithCommas(getNum('사용량')),
+                baseFee: formatWithCommas(getNum('기본요금')),
+                usageFee: formatWithCommas(getNum('전력량요금')),
+                envFee: formatWithCommas(getNum('기후환경요금')),
+                fuelFee: formatWithCommas(getSignedNum('연료비조정액')),
+                powerFactorFee: formatWithCommas(getSignedNum('역률요금')),
+                tvFee: formatWithCommas(getNum('TV수신료')),
+                vat: formatWithCommas(getNum('부가가치세')),
+                fund: formatWithCommas(getNum('전력기금')),
+                readingDate: getStr('검침일'),
+                usagePeriod: getStr('사용기간'),
+                meterCurrent: manualInputs.meterCurrent,
+                meterPrevious: manualInputs.meterPrevious,
             }
+            setManualInputs(inputs)
+
+            const newHistoryItem = {
+                id: Date.now().toString(),
+                timestamp: new Date().toLocaleString(),
+                rawText,
+                inputs
+            }
+            setExtractionHistory(prev => [newHistoryItem, ...prev])
         } catch (e) {
-            alert('?띿뒪??遺꾩꽍 ?ㅻ쪟')
+            alert('텍스트 분석 오류')
         }
     }
-
     const deleteHistoryItem = (id: string) => {
         setExtractionHistory(prev => prev.filter(item => item.id !== id))
     }
@@ -423,14 +456,14 @@ export default function ElectricityClient() {
 
     const confirmBillInput = async () => {
         const parsedDetails = {
-            '湲곕낯?붽툑': parseInt(manualInputs.baseFee.replace(/,/g, '')) || 0,
-            '?꾨젰?됱슂湲?: parseInt(manualInputs.usageFee.replace(/,/g, '')) || 0,
-            '湲고썑?섍꼍?붽툑': parseInt(manualInputs.envFee.replace(/,/g, '')) || 0,
-            '?곕즺鍮꾩“?뺤븸': parseInt(manualInputs.fuelFee.replace(/,/g, '')) || 0,
-            '??쪧?붽툑': parseInt(manualInputs.powerFactorFee.replace(/,/g, '')) || 0,
-            'TV?섏떊猷?: parseInt(manualInputs.tvFee.replace(/,/g, '')) || 0,
-            '遺媛媛移섏꽭': parseInt(manualInputs.vat.replace(/,/g, '')) || 0,
-            '?꾨젰湲곌툑': parseInt(manualInputs.fund.replace(/,/g, '')) || 0,
+            baseFee: parseInt(manualInputs.baseFee.replace(/,/g, '')) || 0,
+            usageFee: parseInt(manualInputs.usageFee.replace(/,/g, '')) || 0,
+            envFee: parseInt(manualInputs.envFee.replace(/,/g, '')) || 0,
+            fuelFee: parseInt(manualInputs.fuelFee.replace(/,/g, '')) || 0,
+            powerFactorFee: parseInt(manualInputs.powerFactorFee.replace(/,/g, '')) || 0,
+            tvFee: parseInt(manualInputs.tvFee.replace(/,/g, '')) || 0,
+            vat: parseInt(manualInputs.vat.replace(/,/g, '')) || 0,
+            fund: parseInt(manualInputs.fund.replace(/,/g, '')) || 0,
         }
 
         const newData: BillData = {
@@ -449,7 +482,6 @@ export default function ElectricityClient() {
         await saveData(newData, landlordData, rawText, extractionHistory)
         setIsUsageModalOpen(false)
     }
-
     const calculateLandlordBill = async () => {
         const prev = parseFloat(landlordInputs.prevMeter.replace(/,/g, '')) || 0
         const curr = parseFloat(landlordInputs.currMeter.replace(/,/g, '')) || 0
@@ -512,15 +544,14 @@ export default function ElectricityClient() {
 
     const calculateCurrentShares = (bData: BillData | null, lData: LandlordData | null) => {
         if (!bData) return { landlordTotal: 0, beicoTotal: 0 }
-
-        const baseTotal = bData.parsedDetails['湲곕낯?붽툑'] || 0
-        const usageTotal = bData.parsedDetails['?꾨젰?됱슂湲?] || 0
-        const envTotal = bData.parsedDetails['湲고썑?섍꼍?붽툑'] || 0
-        const fuelTotal = bData.parsedDetails['?곕즺鍮꾩“?뺤븸'] || 0
-        const powerFactorTotal = bData.parsedDetails['??쪧?붽툑'] || 0
-        const tvTotal = bData.parsedDetails['TV?섏떊猷?] || 0
-        const totalVat = bData.parsedDetails['遺媛媛移섏꽭'] || 0
-        const totalFund = bData.parsedDetails['?꾨젰湲곌툑'] || 0
+        const baseTotal = getParsedAmount(bData.parsedDetails, 'baseFee')
+        const usageTotal = getParsedAmount(bData.parsedDetails, 'usageFee')
+        const envTotal = getParsedAmount(bData.parsedDetails, 'envFee')
+        const fuelTotal = getParsedAmount(bData.parsedDetails, 'fuelFee')
+        const powerFactorTotal = getParsedAmount(bData.parsedDetails, 'powerFactorFee')
+        const tvTotal = getParsedAmount(bData.parsedDetails, 'tvFee')
+        const totalVat = getParsedAmount(bData.parsedDetails, 'vat')
+        const totalFund = getParsedAmount(bData.parsedDetails, 'fund')
 
         const landlordBaseCost = Math.round(baseTotal * (20 / 30))
         const landlordUsageKwh = lData ? (lData.currMeter - lData.prevMeter) + lData.waterHeaterKw + lData.outdoorLightKw : 0
@@ -558,15 +589,14 @@ export default function ElectricityClient() {
         if (parsed.beicoTotal !== undefined) {
             return { beicoTotal: parsed.beicoTotal, landlordTotal: parsed.landlordTotal }
         }
-
-        const baseTotal = parsed['湲곕낯?붽툑'] || 0
-        const usageTotal = parsed['?꾨젰?됱슂湲?] || 0
-        const envTotal = parsed['湲고썑?섍꼍?붽툑'] || 0
-        const fuelTotal = parsed['?곕즺鍮꾩“?뺤븸'] || 0
-        const powerFactorTotal = parsed['??쪧?붽툑'] || 0
-        const tvTotal = parsed['TV?섏떊猷?] || 0
-        const totalVat = parsed['遺媛媛移섏꽭'] || 0
-        const totalFund = parsed['?꾨젰湲곌툑'] || 0
+        const baseTotal = getParsedAmount(parsed, 'baseFee')
+        const usageTotal = getParsedAmount(parsed, 'usageFee')
+        const envTotal = getParsedAmount(parsed, 'envFee')
+        const fuelTotal = getParsedAmount(parsed, 'fuelFee')
+        const powerFactorTotal = getParsedAmount(parsed, 'powerFactorFee')
+        const tvTotal = getParsedAmount(parsed, 'tvFee')
+        const totalVat = getParsedAmount(parsed, 'vat')
+        const totalFund = getParsedAmount(parsed, 'fund')
 
         const landlordBaseCost = Math.round(baseTotal * (20 / 30))
         const landlordUsageKwh = record.landlordUsage || 0
@@ -595,15 +625,14 @@ export default function ElectricityClient() {
     }
 
     // --- Calculations ---
-    const baseTotal = billData?.parsedDetails['湲곕낯?붽툑'] || 0
-    const usageTotal = billData?.parsedDetails['?꾨젰?됱슂湲?] || 0
-    const envTotal = billData?.parsedDetails['湲고썑?섍꼍?붽툑'] || 0
-    const fuelTotal = billData?.parsedDetails['?곕즺鍮꾩“?뺤븸'] || 0
-    const powerFactorTotal = billData?.parsedDetails['??쪧?붽툑'] || 0
-    const tvTotal = billData?.parsedDetails['TV?섏떊猷?] || 0
-
-    const totalVat = billData?.parsedDetails['遺媛媛移섏꽭'] || 0
-    const totalFund = billData?.parsedDetails['?꾨젰湲곌툑'] || 0
+    const baseTotal = getParsedAmount(billData?.parsedDetails, 'baseFee')
+    const usageTotal = getParsedAmount(billData?.parsedDetails, 'usageFee')
+    const envTotal = getParsedAmount(billData?.parsedDetails, 'envFee')
+    const fuelTotal = getParsedAmount(billData?.parsedDetails, 'fuelFee')
+    const powerFactorTotal = getParsedAmount(billData?.parsedDetails, 'powerFactorFee')
+    const tvTotal = getParsedAmount(billData?.parsedDetails, 'tvFee')
+    const totalVat = getParsedAmount(billData?.parsedDetails, 'vat')
+    const totalFund = getParsedAmount(billData?.parsedDetails, 'fund')
 
     const landlordBaseCost = Math.round(baseTotal * (20 / 30))
     const beicoBaseCost = baseTotal - landlordBaseCost
@@ -683,7 +712,7 @@ export default function ElectricityClient() {
                     onClick={() => setActiveTab('analysis')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'analysis'
                         ? 'bg-gray-900 text-white'
-                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        : '':bg-gray-100'
                         }`}
                 >
                     전력관리
@@ -693,7 +722,7 @@ export default function ElectricityClient() {
                     onClick={() => setActiveTab('payment')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'payment'
                         ? 'bg-[#d9361b] text-white'
-                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        : '':bg-gray-100'
                         }`}
                 >
                     납부관리
@@ -717,7 +746,7 @@ export default function ElectricityClient() {
                                 onClick={() => setSelectedMonth(month)}
                                 className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedMonth === month
                                     ? 'bg-[#d9361b] text-white shadow-md transform scale-105'
-                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                    : '':bg-gray-100'
                                     }`}
                             >
                                 {month}??
@@ -732,7 +761,7 @@ export default function ElectricityClient() {
                             怨꾨웾湲??뺤씤?섍린
                         </button>
                         <button onClick={() => setIsLandlordModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
-                            {landlordData ? '?꾨????곗씠???섏젙' : '?꾨????ъ슜???낅젰'}
+                            {landlordData ? '?꾨????곗씠???섏젙'': '?꾨????ъ슜???낅젰'}
                         </button>
                         <button onClick={() => setIsUsageModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
                             怨좎????섏젙
@@ -762,11 +791,11 @@ export default function ElectricityClient() {
                                     {prevMonthData && (
                                         <div className="flex items-center gap-2 text-[10px]">
                                             <span>?꾩썡?鍮?</span>
-                                            <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400' : 'text-blue-400'}>
-                                                {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '?? : '??} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
+                                            <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400'': 'text-blue-400'}>
+                                                {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '': '??} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
                                             </span>
-                                            <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400' : 'text-blue-400'}>
-                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '?? : '??} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} ??
+                                            <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400'': 'text-blue-400'}>
+                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '': '??} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} ??
                                             </span>
                                         </div>
                                     )}
@@ -783,8 +812,8 @@ export default function ElectricityClient() {
                                 <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}??/div>
                                 <div className="text-xs text-gray-400 mt-1">踰좎씠肄??댁슜?붽툑</div>
                                 {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        ?꾩썡鍮?{beicoTotal - prevShares.beicoTotal >= 0 ? '?? : '??}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}??
+                                    <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500'': 'text-blue-500'}`}>
+                                        ?꾩썡鍮?{beicoTotal - prevShares.beicoTotal >= 0 ? '': '??}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}??
                                     </div>
                                 )}
                             </div>
@@ -796,8 +825,8 @@ export default function ElectricityClient() {
                                 <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}??/div>
                                 <div className="text-xs text-red-400 mt-1">?꾨????댁슜?붽툑</div>
                                 {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        ?꾩썡鍮?{landlordTotal - prevShares.landlordTotal >= 0 ? '?? : '??}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}??
+                                    <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500'': 'text-blue-500'}`}>
+                                        ?꾩썡鍮?{landlordTotal - prevShares.landlordTotal >= 0 ? '': '??}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}??
                                     </div>
                                 )}
                             </div>
@@ -1110,7 +1139,7 @@ export default function ElectricityClient() {
                         <div className="flex gap-2 justify-end mt-6 border-t pt-4">
                             <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">?곸꽭?댁뿭 珥덇린??/button>
                             <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
-                                {loading ? '???以?..' : '????꾨즺'}
+                                {loading ? '???以?..'': '????꾨즺'}
                             </button>
                         </div>
                     </div>
@@ -1153,7 +1182,7 @@ export default function ElectricityClient() {
                             <div className="flex gap-2 justify-end mt-6">
                                 <button onClick={() => setIsLandlordModalOpen(false)} className="px-4 py-2 text-gray-500 text-sm font-medium">痍⑥냼</button>
                                 <button onClick={calculateLandlordBill} disabled={loading} className="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-black disabled:opacity-50">
-                                    {loading ? '???以?..' : '??ν븯湲?}
+                                    {loading ? '???以?..'': '??ν븯湲?}
                                 </button>
                             </div>
                         </div>
@@ -1512,7 +1541,7 @@ export default function ElectricityClient() {
     )
 }
 
-function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = true }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string, isNumeric?: boolean }) {
+function InputGroup({ label, value, onChange, placeholder = '0'': { label: string, value: string, onChange: (v: string) => void, placeholder?: string, isNumeric?: boolean }) {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         if (!isNumeric) {
@@ -1541,6 +1570,10 @@ function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = tru
         </div>
     )
 }
+
+
+
+
 
 
 
