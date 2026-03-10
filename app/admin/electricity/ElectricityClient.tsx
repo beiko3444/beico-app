@@ -239,9 +239,20 @@ export default function ElectricityClient() {
                         setRawText('')
                         setExtractionHistory([])
                         setManualInputs({
-                            totalAmount: ''': ''': ''': '',
-                            envFee: ''': ''': ''': ''': ''': '',
-                            readingDate: ''': ''': ''': ''
+                            totalAmount: '',
+                            currentUsage: '',
+                            baseFee: '',
+                            usageFee: '',
+                            envFee: '',
+                            fuelFee: '',
+                            powerFactorFee: '',
+                            tvFee: '',
+                            vat: '',
+                            fund: '',
+                            readingDate: '',
+                            usagePeriod: '',
+                            meterCurrent: '',
+                            meterPrevious: ''
                         })
                     }
                 }
