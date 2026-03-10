@@ -667,28 +667,14 @@ export default function ElectricityClient() {
         const nextMonth = month === 12 ? 1 : month + 1;
         const nextYear = month === 12 ? year + 1 : year;
         const periodStr = `${year}년 ${month}월 14일 ~ ${nextYear}년 ${nextMonth}월 13일`;
+        const scheduledDepositDate = year === 2025 && month === 12 ? '12월 18일' : `${month}월 14일`
         const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth)
         const isCurrentMonthDepositCompleted = year === currentYear && month === currentMonth && currentDay >= 14
         const isDeposited = isPastMonth || isCurrentMonthDepositCompleted
 
-        if (year === 2025 && month === 12) {
-            return {
-                period: periodStr,
-                paidDate: "12월 18일 입금",
-                amount: isDeposited ? "1,595,000원" : "-"
-            };
-        }
-        if (year === 2026 && month === 1) {
-            return {
-                period: periodStr,
-                paidDate: "입금 완료",
-                amount: isDeposited ? "1,595,000원" : "-"
-            };
-        }
-
         return {
             period: periodStr,
-            paidDate: isDeposited ? "매월 14일 입금" : "미입금",
+            paidDate: scheduledDepositDate,
             amount: isDeposited ? "1,595,000원" : "-"
         };
     };
