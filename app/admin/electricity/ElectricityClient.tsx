@@ -1166,7 +1166,7 @@ export default function ElectricityClient() {
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
                                     <InputGroup label="?꾩썡 吏移?(?먮룞)" value={landlordInputs.prevMeter} onChange={v => setLandlordInputs({ ...landlordInputs, prevMeter: v })} />
-                                    <InputGroup label="?뱀썡 吏移? value={landlordInputs.currMeter} onChange={v => setLandlordInputs({ ...landlordInputs, currMeter: v })} />
+                                    <InputGroup label="당월 지침" value={landlordInputs.currMeter} onChange={v => setLandlordInputs({ ...landlordInputs, currMeter: v })} />
                                 </div>
                                 <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed">
                                     <InputGroup label="?⑥닔湲?(kWh)" value={landlordInputs.waterHeaterKw} onChange={v => setLandlordInputs({ ...landlordInputs, waterHeaterKw: v })} />
@@ -1283,7 +1283,7 @@ export default function ElectricityClient() {
                                 </div>
                                 <button
                                     onClick={() => window.print()}
-                                    title="PDF濡????
+                                    title="PDF 저장"
                                     className="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-2xl transition-all border border-white/20 active:scale-90"
                                 >
                                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
