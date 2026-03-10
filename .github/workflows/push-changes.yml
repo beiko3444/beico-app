@@ -1,0 +1,49 @@
+name: Push Changes
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Push target branch"
+        required: true
+        default: "main"
+      commit_message:
+        description: "Commit message"
+        required: true
+        default: "chore: apply automated action changes"
+
+permissions:
+  contents: write
+
+jobs:
+  push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit changes if any
+        id: commit
+        shell: bash
+        run: |
+          if [[ -z "$(git status --porcelain)" ]]; then
+            echo "No changes to commit."
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          git add -A
+          git commit -m "${{ github.event.inputs.commit_message }}"
+          echo "has_changes=true" >> "$GITHUB_OUTPUT"
+
+      - name: Push to target branch
+        if: steps.commit.outputs.has_changes == 'true'
+        run: |
+          git push origin HEAD:${{ github.event.inputs.target_branch }}
