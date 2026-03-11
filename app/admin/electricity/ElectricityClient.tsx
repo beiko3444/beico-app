@@ -1790,7 +1790,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                 <th colSpan={4} className="border-x border-black py-2 text-sm tracking-widest">임대차 계약 정보</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-300 font-bold">
+                        <tbody className="divide-y divide-black font-bold">
                             <tr>
                                 <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">계약 시작일</td>
                                 <td className="border-x border-black py-2 px-3 w-1/3">
@@ -1803,9 +1803,11 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                             </tr>
                             <tr>
                                 <td className="border-x border-black py-2 px-3 bg-gray-50 text-center text-xs">월 임대료</td>
-                                <td className="border-x border-black py-2 px-3 flex items-center gap-1">
-                                    <input className={inputCls} value={monthlyRent} onChange={e => setMonthlyRent(e.target.value)} />
-                                    <span>원</span>
+                                <td className="border-x border-black py-2 px-3">
+                                    <div className="flex items-center gap-1">
+                                        <input className={inputCls} value={monthlyRent} onChange={e => setMonthlyRent(e.target.value)} />
+                                        <span className="shrink-0">원</span>
+                                    </div>
                                 </td>
                                 <td className="border-x border-black py-2 px-3 bg-gray-50 text-center text-xs">임대 기간</td>
                                 <td className="border-x border-black py-2 px-3">
@@ -1821,7 +1823,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                 <th colSpan={4} className="border-x border-black py-2 text-sm tracking-widest">지급 정보</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-300 font-bold">
+                        <tbody className="divide-y divide-black font-bold">
                             <tr>
                                 <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">지급일자</td>
                                 <td className="border-x border-black py-2 px-3 w-1/3">
@@ -1845,10 +1847,10 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                     </table>
 
                     <div className="flex border border-black mt-8 items-center">
-                        <div className="text-black border-r border-black px-6 py-3 font-extrabold text-center w-48 text-sm leading-tight tracking-widest">
-                            영 수 금 액<br />(Total)
+                        <div className="text-black border-r border-black px-6 py-3 font-bold text-center w-48 text-xs leading-tight">
+                            영수금액
                         </div>
-                        <div className="flex-grow px-8 py-3 text-2xl font-black text-right tracking-tight text-black">
+                        <div className="flex-grow px-8 py-3 text-sm font-bold text-right text-black">
                             ₩ {payAmount}원
                         </div>
                     </div>
@@ -1865,8 +1867,11 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                             has been fully paid and received in accordance with the specified payment date and method above.
                         </div>
                     </div>
-                    <div className="text-right flex flex-col items-end gap-1 shrink-0 pt-2">
-                        <p className="text-xl font-black tracking-widest">(주)에코모터스</p>
+                    <div className="text-right flex flex-col items-end gap-2 shrink-0 pt-2">
+                        <p className="text-sm font-bold">(주)에코모터스</p>
+                        <div className="relative w-[70px] h-[70px]">
+                            <img src="/stamp.png" alt="Seal" style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} className="select-none" />
+                        </div>
                     </div>
                 </div>
 
