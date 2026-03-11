@@ -39,7 +39,7 @@ export default function ElectricityClient() {
     const currentDay = today.getDate()
     const [selectedYear, setSelectedYear] = useState(Math.max(today.getFullYear(), PAYMENT_START_YEAR))
     const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1)
-    const [activeTab, setActiveTab] = useState<'analysis' | 'payment'>('analysis')
+    const [activeTab, setActiveTab] = useState<'analysis' | 'payment' | 'rent-receipt'>('analysis')
 
     const [billData, setBillData] = useState<BillData | null>(null)
     const [landlordData, setLandlordData] = useState<LandlordData | null>(null)
@@ -735,6 +735,16 @@ export default function ElectricityClient() {
                 >
                     납부관리
                 </button>
+                <button
+                    type="button"
+                    onClick={() => setActiveTab('rent-receipt')}
+                    className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'rent-receipt'
+                        ? 'bg-blue-600 text-white'
+                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        }`}
+                >
+                    임대료영수증
+                </button>
             </div>
 
             {/* Month Selection */}
@@ -781,405 +791,410 @@ export default function ElectricityClient() {
                 )}
             </div>
 
-            {activeTab === 'analysis' && (billData ? (
-                <>
-                    {/* Total Bill Summary */}
-                    <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-                        <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
-                            <div>
-                                <h2 className="text-xl font-bold flex items-center gap-2">
-                                    <span>⚡️</span> {selectedMonth}월 전기요금 총괄표
-                                </h2>
-                                <p className="text-sm text-gray-400 mt-1">{billData.usagePeriod}</p>
+            {
+                activeTab === 'analysis' && (billData ? (
+                    <>
+                        {/* Total Bill Summary */}
+                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+                            <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
+                                <div>
+                                    <h2 className="text-xl font-bold flex items-center gap-2">
+                                        <span>⚡️</span> {selectedMonth}월 전기요금 총괄표
+                                    </h2>
+                                    <p className="text-sm text-gray-400 mt-1">{billData.usagePeriod}</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-3xl font-black tracking-tight">{billData.totalAmount.toLocaleString()}원</div>
+                                    <div className="text-xs text-gray-400 mt-1 flex flex-col items-end gap-1">
+                                        <div>총 사용량: <span className="text-white font-bold">{billData.currentUsage.toLocaleString()} kWh</span></div>
+                                        {prevMonthData && (
+                                            <div className="flex items-center gap-2 text-[10px]">
+                                                <span>전월대비:</span>
+                                                <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400' : 'text-blue-400'}>
+                                                    {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '▲' : '▼'} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
+                                                </span>
+                                                <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400' : 'text-blue-400'}>
+                                                    {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '▲' : '▼'} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} 원
+                                                </span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="text-right">
-                                <div className="text-3xl font-black tracking-tight">{billData.totalAmount.toLocaleString()}원</div>
-                                <div className="text-xs text-gray-400 mt-1 flex flex-col items-end gap-1">
-                                    <div>총 사용량: <span className="text-white font-bold">{billData.currentUsage.toLocaleString()} kWh</span></div>
+
+                            <div className="p-6 grid grid-cols-2 gap-4">
+                                <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 text-gray-100 group-hover:text-gray-200 transition-colors">
+                                        <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
+                                    </div>
+                                    <div className="text-[10px] text-gray-400 font-bold mb-1 tracking-widest uppercase">Beico Share ({shareRatioBeico.toFixed(1)}%)</div>
+                                    <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}원</div>
+                                    <div className="text-xs text-gray-400 mt-1">베이코 이용요금</div>
                                     {prevMonthData && (
-                                        <div className="flex items-center gap-2 text-[10px]">
-                                            <span>전월대비:</span>
-                                            <span className={billData.currentUsage - prevMonthData.totalUsage >= 0 ? 'text-red-400' : 'text-blue-400'}>
-                                                {billData.currentUsage - prevMonthData.totalUsage >= 0 ? '▲' : '▼'} {(Math.abs(billData.currentUsage - prevMonthData.totalUsage)).toLocaleString()} kWh
-                                            </span>
-                                            <span className={billData.totalAmount - prevMonthData.totalAmount >= 0 ? 'text-red-400' : 'text-blue-400'}>
-                                                {billData.totalAmount - prevMonthData.totalAmount >= 0 ? '▲' : '▼'} {(Math.abs(billData.totalAmount - prevMonthData.totalAmount)).toLocaleString()} 원
-                                            </span>
+                                        <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                            전월비 {beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}원
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="bg-red-50 p-5 rounded-3xl border border-red-100 relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 p-4 text-red-100 group-hover:text-red-200 transition-colors">
+                                        <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
+                                    </div>
+                                    <div className="text-[10px] text-red-400 font-bold mb-1 tracking-widest uppercase">Landlord Share ({shareRatioLandlord.toFixed(1)}%)</div>
+                                    <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}원</div>
+                                    <div className="text-xs text-red-400 mt-1">임대인 이용요금</div>
+                                    {prevMonthData && (
+                                        <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
+                                            전월비 {landlordTotal - prevShares.landlordTotal >= 0 ? '▲' : '▼'}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}원
                                         </div>
                                     )}
                                 </div>
                             </div>
                         </div>
 
-                        <div className="p-6 grid grid-cols-2 gap-4">
-                            <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 text-gray-100 group-hover:text-gray-200 transition-colors">
-                                    <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
-                                </div>
-                                <div className="text-[10px] text-gray-400 font-bold mb-1 tracking-widest uppercase">Beico Share ({shareRatioBeico.toFixed(1)}%)</div>
-                                <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}원</div>
-                                <div className="text-xs text-gray-400 mt-1">베이코 이용요금</div>
-                                {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        전월비 {beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}원
-                                    </div>
-                                )}
+                        {/* Detailed Comparison Table */}
+                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+                            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
+                                <h3 className="text-base font-bold text-gray-800">요금 분담 상세 내역</h3>
                             </div>
-                            <div className="bg-red-50 p-5 rounded-3xl border border-red-100 relative overflow-hidden group">
-                                <div className="absolute top-0 right-0 p-4 text-red-100 group-hover:text-red-200 transition-colors">
-                                    <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
-                                </div>
-                                <div className="text-[10px] text-red-400 font-bold mb-1 tracking-widest uppercase">Landlord Share ({shareRatioLandlord.toFixed(1)}%)</div>
-                                <div className="text-2xl font-black text-red-600 tracking-tight">{landlordTotal.toLocaleString()}원</div>
-                                <div className="text-xs text-red-400 mt-1">임대인 이용요금</div>
-                                {prevMonthData && (
-                                    <div className={`text-[10px] mt-2 font-bold ${landlordTotal - prevShares.landlordTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
-                                        전월비 {landlordTotal - prevShares.landlordTotal >= 0 ? '▲' : '▼'}{Math.abs(landlordTotal - prevShares.landlordTotal).toLocaleString()}원
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Detailed Comparison Table */}
-                    <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-                        <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                            <h3 className="text-base font-bold text-gray-800">요금 분담 상세 내역</h3>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-[11px] text-left">
-                                <thead className="bg-gray-100 text-gray-600 font-bold uppercase border-b border-gray-200">
-                                    <tr>
-                                        <th className="px-4 py-2">항목</th>
-                                        <th className="px-4 py-2 text-right">전체 금액</th>
-                                        <th className="px-4 py-2 text-right">베이코 ({shareRatioBeico.toFixed(1)}%)</th>
-                                        <th className="px-4 py-2 text-right">임대인 ({shareRatioLandlord.toFixed(1)}%)</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 [&>tr:nth-child(even)]:bg-gray-50">
-                                    <tr className="bg-blue-50/20 text-blue-900 font-bold">
-                                        <td className="px-4 py-2">총 사용 전력량</td>
-                                        <td className="px-4 py-2 text-right">{totalKwh.toLocaleString()}kWh</td>
-                                        <td className="px-4 py-2 text-right">{beicoUsageKwh.toLocaleString()}kWh</td>
-                                        <td className="px-4 py-2 text-right">{landlordUsageKwh.toLocaleString()}kWh</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">기본요금</td>
-                                        <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">전력량요금</td>
-                                        <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">기후환경요금</td>
-                                        <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">연료비조정액</td>
-                                        <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50">
-                                        <td className="px-4 py-1.5">역률요금</td>
-                                        <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">부가가치세</td>
-                                        <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">전력기금</td>
-                                        <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}원</td>
-                                    </tr>
-                                    <tr className="hover:bg-gray-50 text-gray-500">
-                                        <td className="px-4 py-1.5">TV 수신료</td>
-                                        <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}원</td>
-                                        <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}원</td>
-                                    </tr>
-                                    {roundingDiff !== 0 && (
-                                        <tr className="hover:bg-gray-50 text-gray-400 italic">
-                                            <td className="px-4 py-1.5">원단위 절사</td>
-                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
-                                            <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
-                                            <td className="px-4 py-1.5 text-right">0원</td>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-[11px] text-left">
+                                    <thead className="bg-gray-100 text-gray-600 font-bold uppercase border-b border-gray-200">
+                                        <tr>
+                                            <th className="px-4 py-2">항목</th>
+                                            <th className="px-4 py-2 text-right">전체 금액</th>
+                                            <th className="px-4 py-2 text-right">베이코 ({shareRatioBeico.toFixed(1)}%)</th>
+                                            <th className="px-4 py-2 text-right">임대인 ({shareRatioLandlord.toFixed(1)}%)</th>
                                         </tr>
-                                    )}
-                                    <tr className="bg-gray-900 text-white font-black border-t-2 border-gray-900">
-                                        <td className="px-4 py-3 text-sm">최종 청구 금액</td>
-                                        <td className="px-4 py-3 text-right text-gray-400 text-sm">{billData.totalAmount.toLocaleString()}원</td>
-                                        <td className="px-4 py-3 text-right text-[#d9361b] text-sm">{beicoTotal.toLocaleString()}원</td>
-                                        <td className="px-4 py-3 text-right text-sm font-black">{landlordTotal.toLocaleString()}원</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                </>
-            ) : (
-                <div className="h-[50vh] flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
-                        <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    </div>
-                    <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedYear}년 {selectedMonth}월 데이터 없음</h3>
-                    <p className="text-gray-500 text-sm mb-6">등록된 전기요금 명세서가 없습니다.</p>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={() => setIsLandlordModalOpen(true)}
-                            className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 border border-green-700"
-                        >
-                            📸 단자함 사진 업로드
-                        </button>
-                        <button
-                            onClick={() => setIsUsageModalOpen(true)}
-                            className="bg-[#d9361b] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm"
-                        >
-                            명세서 입력하기
-                        </button>
-                    </div>
-                </div>
-            ))}
-
-            {activeTab === 'payment' && (
-                <div className="space-y-4">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-                        <div className="flex items-start justify-between gap-3">
-                            <div>
-                                <h2 className="text-lg font-black text-gray-900">납부관리 체크리스트</h2>
-                                <p className="text-xs text-gray-500 mt-1">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-xs text-gray-500">선택 월</div>
-                                <div className="text-sm font-bold text-gray-900">{selectedYear}년 {selectedMonth}월</div>
-                            </div>
-                        </div>
-
-                        <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
-                            <div className="text-xs font-bold text-red-600">현재 일자 기준 임대인 미납 전기세</div>
-                            <div className="mt-1 text-lg font-black text-gray-900">
-                                {unpaidLandlordElectricitySummary.total.toLocaleString()}원
-                            </div>
-                            <div className="text-xs text-gray-600 mt-1">
-                                {selectedYear}년 도래분 중 미납 {unpaidLandlordElectricitySummary.months}개월 합계
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-blue-50/50">
-                                <div>
-                                    <div className="text-sm font-bold text-gray-900">월세 납부 세금계산서 발행</div>
-                                    <div className="mt-1.5 space-y-0.5">
-                                        <div className="text-[11px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded inline-block">
-                                            임대기간: {rentInfo.period}
-                                        </div>
-                                        <div className="text-xs text-gray-600 mt-1">
-                                            • 납부금액: <span className="font-bold text-gray-900">{rentInfo.amount}</span>
-                                        </div>
-                                        <div className="text-xs text-gray-600">
-                                            • 납부상태: <span className="font-bold text-gray-900">{rentInfo.paidDate}</span>
-                                        </div>
-                                    </div>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    checked={currentPaymentStatus.rentTaxInvoiceIssued}
-                                    onChange={(e) => updatePaymentStatus(selectedYear, selectedMonth, prev => ({
-                                        ...prev,
-                                        rentTaxInvoiceIssued: e.target.checked
-                                    }))}
-                                    className="h-5 w-5 accent-[#d9361b]"
-                                />
-                            </label>
-
-                            <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-gray-50">
-                                <div>
-                                    <div className="text-sm font-bold text-gray-900">전기세 납부 완료</div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                        임대인 월별 전기세: {selectedMonthLandlordTotal !== null ? `${selectedMonthLandlordTotal.toLocaleString()}원` : '계산 데이터 없음'}
-                                    </div>
-                                </div>
-                                <input
-                                    type="checkbox"
-                                    checked={currentPaymentStatus.electricityPaid}
-                                    onChange={(e) => updatePaymentStatus(selectedYear, selectedMonth, prev => ({
-                                        ...prev,
-                                        electricityPaid: e.target.checked,
-                                        electricityPaidAt: e.target.checked ? new Date().toISOString() : null
-                                    }))}
-                                    className="h-5 w-5 accent-[#d9361b]"
-                                />
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                            <h3 className="text-sm font-bold text-gray-800">{selectedYear}년 월별 납부 현황</h3>
-                            <div className="text-xs text-gray-500">체크 결과는 현재 브라우저에 저장됩니다.</div>
-                        </div>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead className="bg-white text-gray-600 border-b border-gray-100">
-                                    <tr>
-                                        <th className="text-left px-4 py-3 whitespace-nowrap">월</th>
-                                        <th className="text-center px-4 py-3 whitespace-nowrap">월세 입금일자</th>
-                                        <th className="text-right px-4 py-3 whitespace-nowrap">입금액</th>
-                                        <th className="text-center px-4 py-3 whitespace-nowrap">임대일자</th>
-                                        <th className="text-center px-4 py-3 whitespace-nowrap">월세 세금계산서</th>
-                                        <th className="text-right px-4 py-3 whitespace-nowrap">임대인 전기세</th>
-                                        <th className="text-center px-4 py-3 whitespace-nowrap">전기세 납부</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100">
-                                    {Array.from({ length: 12 }, (_, i) => i + 1)
-                                        .filter(m => selectedYear > PAYMENT_START_YEAR || (selectedYear === PAYMENT_START_YEAR && m >= 1))
-                                        .map(m => {
-                                            const status = getPaymentStatus(selectedYear, m)
-                                            const isSelected = m === selectedMonth
-                                            const lTotal = monthlyLandlordTotals[m]
-                                            const rowRentInfo = getRentPaymentInfo(selectedYear, m)
-
-                                            return (
-                                                <tr key={m} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
-                                                    <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
-                                                        {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center text-gray-700 whitespace-nowrap">
-                                                        {rowRentInfo.paidDate}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
-                                                        {rowRentInfo.amount}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">
-                                                        {rowRentInfo.period}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                            {status.rentTaxInvoiceIssued ? '✓' : '-'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
-                                                        {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-center">
-                                                        <div className="flex flex-col items-center">
-                                                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
-                                                                {status.electricityPaid ? '✓' : '-'}
-                                                            </span>
-                                                            {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            )
-                                        })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {isUsageModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsUsageModalOpen(false)}>
-                    <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
-                        <div className="flex justify-between items-center mb-6 border-b pb-4">
-                            <h3 className="text-lg font-bold">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
-                            <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">✕</button>
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <label className="block text-xs font-bold text-gray-500">문자/명세서 내용 붙여넣기</label>
-                                <textarea
-                                    value={rawText}
-                                    onChange={(e) => setRawText(e.target.value)}
-                                    className="w-full h-40 p-3 text-xs font-mono bg-gray-50 border rounded-xl resize-none focus:ring-2 focus:ring-[#d9361b]"
-                                    placeholder="여기에 텍스트를 붙여넣고 [추출하기]를 누르면 우측 폼이 자동으로 채워집니다."
-                                />
-                                <button type="button" onClick={parseBillText} className="w-full py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-black transition-all">텍스트에서 데이터 추출하기</button>
-
-                                {extractionHistory.length > 0 && (
-                                    <div className="mt-4 space-y-2">
-                                        <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">추출 히스토리</label>
-                                        <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                                            {extractionHistory.map((item) => (
-                                                <div key={item.id} className="flex gap-1">
-                                                    <button
-                                                        onClick={() => {
-                                                            setRawText(item.rawText)
-                                                            setManualInputs(item.inputs)
-                                                        }}
-                                                        className="flex-1 text-left px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg text-[10px] text-gray-600 flex justify-between items-center transition-colors"
-                                                    >
-                                                        <span>{item.timestamp}</span>
-                                                        <span className="font-bold text-gray-400">불러오기</span>
-                                                    </button>
-                                                    <button
-                                                        onClick={() => deleteHistoryItem(item.id)}
-                                                        className="px-2 text-gray-300 hover:text-red-500 transition-colors"
-                                                        title="삭제"
-                                                    >
-                                                        ✕
-                                                    </button>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                                <h4 className="font-bold text-sm border-b pb-2">상세 내역 (직접 수정 가능)</h4>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <InputGroup label="총 청구금액" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
-                                    <InputGroup label="당월 사용량(kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
-                                </div>
-                                <div className="h-px bg-gray-100 my-2"></div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <InputGroup label="기본요금" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
-                                    <InputGroup label="전력량요금" value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
-                                    <InputGroup label="기후환경요금" value={manualInputs.envFee} onChange={v => setManualInputs({ ...manualInputs, envFee: v })} />
-                                    <InputGroup label="연료비조정액" value={manualInputs.fuelFee} onChange={v => setManualInputs({ ...manualInputs, fuelFee: v })} />
-                                    <InputGroup label="역률요금" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
-                                    <InputGroup label="TV수신료" value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
-                                </div>
-                                <div className="h-px bg-gray-100 my-2"></div>
-                                <div className="grid grid-cols-2 gap-3">
-                                    <InputGroup label="부가가치세" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
-                                    <InputGroup label="전력기금" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
-                                </div>
-                                <div className="h-px bg-gray-100 my-2"></div>
-                                <div className="space-y-2">
-                                    <InputGroup label="검침일" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
-                                    <InputGroup label="사용기간" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
-                                </div>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100 [&>tr:nth-child(even)]:bg-gray-50">
+                                        <tr className="bg-blue-50/20 text-blue-900 font-bold">
+                                            <td className="px-4 py-2">총 사용 전력량</td>
+                                            <td className="px-4 py-2 text-right">{totalKwh.toLocaleString()}kWh</td>
+                                            <td className="px-4 py-2 text-right">{beicoUsageKwh.toLocaleString()}kWh</td>
+                                            <td className="px-4 py-2 text-right">{landlordUsageKwh.toLocaleString()}kWh</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-4 py-1.5">기본요금</td>
+                                            <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-4 py-1.5">전력량요금</td>
+                                            <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-4 py-1.5">기후환경요금</td>
+                                            <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-4 py-1.5">연료비조정액</td>
+                                            <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50">
+                                            <td className="px-4 py-1.5">역률요금</td>
+                                            <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 text-gray-500">
+                                            <td className="px-4 py-1.5">부가가치세</td>
+                                            <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 text-gray-500">
+                                            <td className="px-4 py-1.5">전력기금</td>
+                                            <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}원</td>
+                                        </tr>
+                                        <tr className="hover:bg-gray-50 text-gray-500">
+                                            <td className="px-4 py-1.5">TV 수신료</td>
+                                            <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}원</td>
+                                            <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}원</td>
+                                        </tr>
+                                        {roundingDiff !== 0 && (
+                                            <tr className="hover:bg-gray-50 text-gray-400 italic">
+                                                <td className="px-4 py-1.5">원단위 절사</td>
+                                                <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
+                                                <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
+                                                <td className="px-4 py-1.5 text-right">0원</td>
+                                            </tr>
+                                        )}
+                                        <tr className="bg-gray-900 text-white font-black border-t-2 border-gray-900">
+                                            <td className="px-4 py-3 text-sm">최종 청구 금액</td>
+                                            <td className="px-4 py-3 text-right text-gray-400 text-sm">{billData.totalAmount.toLocaleString()}원</td>
+                                            <td className="px-4 py-3 text-right text-[#d9361b] text-sm">{beicoTotal.toLocaleString()}원</td>
+                                            <td className="px-4 py-3 text-right text-sm font-black">{landlordTotal.toLocaleString()}원</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
 
-                        <div className="flex gap-2 justify-end mt-6 border-t pt-4">
-                            <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">상세내역 초기화</button>
-                            <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
-                                {loading ? '저장 중...' : '저장 완료'}
+                    </>
+                ) : (
+                    <div className="h-[50vh] flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-gray-400">
+                            <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedYear}년 {selectedMonth}월 데이터 없음</h3>
+                        <p className="text-gray-500 text-sm mb-6">등록된 전기요금 명세서가 없습니다.</p>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={() => setIsLandlordModalOpen(true)}
+                                className="px-6 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-bold shadow-md transition-all flex items-center gap-2 border border-green-700"
+                            >
+                                📸 단자함 사진 업로드
+                            </button>
+                            <button
+                                onClick={() => setIsUsageModalOpen(true)}
+                                className="bg-[#d9361b] text-white px-6 py-2.5 rounded-xl font-bold hover:shadow-lg transition-all text-sm"
+                            >
+                                명세서 입력하기
                             </button>
                         </div>
                     </div>
-                </div>
-            )
+                ))
+            }
+
+            {
+                activeTab === 'payment' && (
+                    <div className="space-y-4">
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h2 className="text-lg font-black text-gray-900">납부관리 체크리스트</h2>
+                                    <p className="text-xs text-gray-500 mt-1">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
+                                </div>
+                                <div className="text-right">
+                                    <div className="text-xs text-gray-500">선택 월</div>
+                                    <div className="text-sm font-bold text-gray-900">{selectedYear}년 {selectedMonth}월</div>
+                                </div>
+                            </div>
+
+                            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                                <div className="text-xs font-bold text-red-600">현재 일자 기준 임대인 미납 전기세</div>
+                                <div className="mt-1 text-lg font-black text-gray-900">
+                                    {unpaidLandlordElectricitySummary.total.toLocaleString()}원
+                                </div>
+                                <div className="text-xs text-gray-600 mt-1">
+                                    {selectedYear}년 도래분 중 미납 {unpaidLandlordElectricitySummary.months}개월 합계
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-blue-50/50">
+                                    <div>
+                                        <div className="text-sm font-bold text-gray-900">월세 납부 세금계산서 발행</div>
+                                        <div className="mt-1.5 space-y-0.5">
+                                            <div className="text-[11px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded inline-block">
+                                                임대기간: {rentInfo.period}
+                                            </div>
+                                            <div className="text-xs text-gray-600 mt-1">
+                                                • 납부금액: <span className="font-bold text-gray-900">{rentInfo.amount}</span>
+                                            </div>
+                                            <div className="text-xs text-gray-600">
+                                                • 납부상태: <span className="font-bold text-gray-900">{rentInfo.paidDate}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={currentPaymentStatus.rentTaxInvoiceIssued}
+                                        onChange={(e) => updatePaymentStatus(selectedYear, selectedMonth, prev => ({
+                                            ...prev,
+                                            rentTaxInvoiceIssued: e.target.checked
+                                        }))}
+                                        className="h-5 w-5 accent-[#d9361b]"
+                                    />
+                                </label>
+
+                                <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-gray-50">
+                                    <div>
+                                        <div className="text-sm font-bold text-gray-900">전기세 납부 완료</div>
+                                        <div className="text-xs text-gray-500 mt-1">
+                                            임대인 월별 전기세: {selectedMonthLandlordTotal !== null ? `${selectedMonthLandlordTotal.toLocaleString()}원` : '계산 데이터 없음'}
+                                        </div>
+                                    </div>
+                                    <input
+                                        type="checkbox"
+                                        checked={currentPaymentStatus.electricityPaid}
+                                        onChange={(e) => updatePaymentStatus(selectedYear, selectedMonth, prev => ({
+                                            ...prev,
+                                            electricityPaid: e.target.checked,
+                                            electricityPaidAt: e.target.checked ? new Date().toISOString() : null
+                                        }))}
+                                        className="h-5 w-5 accent-[#d9361b]"
+                                    />
+                                </label>
+                            </div>
+                        </div>
+
+                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-gray-800">{selectedYear}년 월별 납부 현황</h3>
+                                <div className="text-xs text-gray-500">체크 결과는 현재 브라우저에 저장됩니다.</div>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-white text-gray-600 border-b border-gray-100">
+                                        <tr>
+                                            <th className="text-left px-4 py-3 whitespace-nowrap">월</th>
+                                            <th className="text-center px-4 py-3 whitespace-nowrap">월세 입금일자</th>
+                                            <th className="text-right px-4 py-3 whitespace-nowrap">입금액</th>
+                                            <th className="text-center px-4 py-3 whitespace-nowrap">임대일자</th>
+                                            <th className="text-center px-4 py-3 whitespace-nowrap">월세 세금계산서</th>
+                                            <th className="text-right px-4 py-3 whitespace-nowrap">임대인 전기세</th>
+                                            <th className="text-center px-4 py-3 whitespace-nowrap">전기세 납부</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {Array.from({ length: 12 }, (_, i) => i + 1)
+                                            .filter(m => selectedYear > PAYMENT_START_YEAR || (selectedYear === PAYMENT_START_YEAR && m >= 1))
+                                            .map(m => {
+                                                const status = getPaymentStatus(selectedYear, m)
+                                                const isSelected = m === selectedMonth
+                                                const lTotal = monthlyLandlordTotals[m]
+                                                const rowRentInfo = getRentPaymentInfo(selectedYear, m)
+
+                                                return (
+                                                    <tr key={m} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
+                                                        <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
+                                                            {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-gray-700 whitespace-nowrap">
+                                                            {rowRentInfo.paidDate}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                                            {rowRentInfo.amount}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">
+                                                            {rowRentInfo.period}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                                                {status.rentTaxInvoiceIssued ? '✓' : '-'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                                            {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-center">
+                                                            <div className="flex flex-col items-center">
+                                                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                                                    {status.electricityPaid ? '✓' : '-'}
+                                                                </span>
+                                                                {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                )
+            }
+
+            {
+                isUsageModalOpen && (
+                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsUsageModalOpen(false)}>
+                        <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-6 border-b pb-4">
+                                <h3 className="text-lg font-bold">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
+                                <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">✕</button>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-4">
+                                    <label className="block text-xs font-bold text-gray-500">문자/명세서 내용 붙여넣기</label>
+                                    <textarea
+                                        value={rawText}
+                                        onChange={(e) => setRawText(e.target.value)}
+                                        className="w-full h-40 p-3 text-xs font-mono bg-gray-50 border rounded-xl resize-none focus:ring-2 focus:ring-[#d9361b]"
+                                        placeholder="여기에 텍스트를 붙여넣고 [추출하기]를 누르면 우측 폼이 자동으로 채워집니다."
+                                    />
+                                    <button type="button" onClick={parseBillText} className="w-full py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-black transition-all">텍스트에서 데이터 추출하기</button>
+
+                                    {extractionHistory.length > 0 && (
+                                        <div className="mt-4 space-y-2">
+                                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">추출 히스토리</label>
+                                            <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                                                {extractionHistory.map((item) => (
+                                                    <div key={item.id} className="flex gap-1">
+                                                        <button
+                                                            onClick={() => {
+                                                                setRawText(item.rawText)
+                                                                setManualInputs(item.inputs)
+                                                            }}
+                                                            className="flex-1 text-left px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg text-[10px] text-gray-600 flex justify-between items-center transition-colors"
+                                                        >
+                                                            <span>{item.timestamp}</span>
+                                                            <span className="font-bold text-gray-400">불러오기</span>
+                                                        </button>
+                                                        <button
+                                                            onClick={() => deleteHistoryItem(item.id)}
+                                                            className="px-2 text-gray-300 hover:text-red-500 transition-colors"
+                                                            title="삭제"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
+                                    <h4 className="font-bold text-sm border-b pb-2">상세 내역 (직접 수정 가능)</h4>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <InputGroup label="총 청구금액" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
+                                        <InputGroup label="당월 사용량(kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
+                                    </div>
+                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <InputGroup label="기본요금" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
+                                        <InputGroup label="전력량요금" value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
+                                        <InputGroup label="기후환경요금" value={manualInputs.envFee} onChange={v => setManualInputs({ ...manualInputs, envFee: v })} />
+                                        <InputGroup label="연료비조정액" value={manualInputs.fuelFee} onChange={v => setManualInputs({ ...manualInputs, fuelFee: v })} />
+                                        <InputGroup label="역률요금" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
+                                        <InputGroup label="TV수신료" value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
+                                    </div>
+                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <InputGroup label="부가가치세" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
+                                        <InputGroup label="전력기금" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
+                                    </div>
+                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="space-y-2">
+                                        <InputGroup label="검침일" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
+                                        <InputGroup label="사용기간" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="flex gap-2 justify-end mt-6 border-t pt-4">
+                                <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">상세내역 초기화</button>
+                                <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
+                                    {loading ? '저장 중...' : '저장 완료'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )
             }
 
             {
@@ -1572,7 +1587,13 @@ export default function ElectricityClient() {
                     </div>
                 )
             }
-        </div>
+
+            {/* ── 임대료영수증 탭 ── */}
+            {activeTab === 'rent-receipt' && (
+                <RentReceipt selectedYear={selectedYear} selectedMonth={selectedMonth} />
+            )}
+
+        </div >
     )
 }
 
@@ -1602,6 +1623,189 @@ function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = tru
                 className="w-full p-2 bg-white border border-gray-200 rounded text-xs font-medium focus:border-black outline-none transition-colors"
                 placeholder={placeholder}
             />
+        </div>
+    )
+}
+
+// ── 임대료영수증 컴포넌트 ──────────────────────────────────────────────────────
+function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
+    // 임차인 (공급받는자) — 베이코
+    const recipient = {
+        name: '주식회사 베이코 Beiko Inc.',
+        rep: '이다빈',
+        regNo: '881-88-03836',
+        addr: '부산시 강서구 낙동남로 1013번길 35 1층 베이코',
+        tel: '010-3444-3467',
+        email: 'sales@beiko.co.kr',
+    }
+    // 공급자 — 에코모터스
+    const supplier = {
+        name: '(주)에코모터스',
+        rep: '정창용',
+        regNo: '',
+        addr: '',
+        tel: '010-9611-1818',
+        email: '',
+    }
+
+    // 계약 정보 (편집 가능)
+    const [contractStart, setContractStart] = React.useState('2025. 12. 14')
+    const [contractEnd, setContractEnd] = React.useState('2026. 12. 13')
+    const [monthlyRent, setMonthlyRent] = React.useState('1,450,000')
+    const [leasePeriod, setLeasePeriod] = React.useState(
+        `${selectedMonth}월 (${selectedMonth}월 14일부터 ${selectedMonth === 12 ? 1 : selectedMonth + 1}월 13일까지)`
+    )
+
+    // 지급 정보 (편집 가능)
+    const [payDate, setPayDate] = React.useState(`${selectedYear}. ${String(selectedMonth).padStart(2, '0')}. 14`)
+    const [payAmount, setPayAmount] = React.useState('1,450,000')
+    const [payMethod, setPayMethod] = React.useState('이체')
+
+    // 발행일
+    const [issueDate, setIssueDate] = React.useState(`${selectedYear}. ${String(selectedMonth).padStart(2, '0')}. 14`)
+
+    const inputCls = 'border-b border-gray-300 focus:border-blue-500 outline-none text-sm w-full bg-transparent py-0.5'
+    const tdCls = 'border border-gray-400 px-2 py-1.5 text-sm'
+    const thCls = 'border border-gray-400 px-2 py-1.5 text-sm font-bold bg-gray-100 text-center whitespace-nowrap'
+
+    return (
+        <div className="space-y-4">
+            {/* 인쇄 버튼 */}
+            <div className="flex justify-end gap-2 print:hidden">
+                <button
+                    onClick={() => window.print()}
+                    className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
+                >
+                    🖨 인쇄 / PDF 저장
+                </button>
+            </div>
+
+            {/* 영수증 본문 */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto print:shadow-none print:rounded-none print:border-none print:max-w-full">
+                {/* 제목 */}
+                <h2 className="text-center text-2xl font-black tracking-widest mb-6 border-b-2 border-gray-800 pb-3">
+                    임 대 료 영 수 증
+                </h2>
+
+                {/* 공급받는자 / 공급자 양쪽 */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                    {/* 공급받는자 (임차인 = 베이코) */}
+                    <div className="border border-gray-400 rounded p-3 space-y-1">
+                        <p className="text-[11px] font-bold text-gray-500 mb-2">공급받는자 (임차인)</p>
+                        <table className="w-full text-xs">
+                            <tbody>
+                                <tr><td className="font-bold text-gray-500 w-16 py-0.5">상호</td><td>{recipient.name}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">대표자</td><td>{recipient.rep}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">등록번호</td><td>{recipient.regNo}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">주소</td><td className="text-[11px]">{recipient.addr}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">전화</td><td>{recipient.tel}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">이메일</td><td>{recipient.email}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* 공급자 (임대인 = 에코모터스) */}
+                    <div className="border border-gray-400 rounded p-3 space-y-1">
+                        <p className="text-[11px] font-bold text-gray-500 mb-2">공급자 (임대인)</p>
+                        <table className="w-full text-xs">
+                            <tbody>
+                                <tr><td className="font-bold text-gray-500 w-16 py-0.5">상호</td><td>{supplier.name}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">대표자</td><td>{supplier.rep}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">등록번호</td><td>{supplier.regNo || '–'}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">주소</td><td className="text-[11px]">{supplier.addr || '–'}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">전화</td><td>{supplier.tel}</td></tr>
+                                <tr><td className="font-bold text-gray-500 py-0.5">이메일</td><td>{supplier.email || '–'}</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                {/* 임대차 계약 정보 */}
+                <table className="w-full mb-4" style={{ borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr>
+                            <th className={thCls} colSpan={4}>임대차 계약 정보</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td className={thCls}>계약 시작일</td>
+                            <td className={tdCls}>
+                                <input className={inputCls} value={contractStart} onChange={e => setContractStart(e.target.value)} />
+                            </td>
+                            <td className={thCls}>계약 종료일</td>
+                            <td className={tdCls}>
+                                <input className={inputCls} value={contractEnd} onChange={e => setContractEnd(e.target.value)} />
+                            </td>
+                        </tr>
+                        <tr>
+                            <td className={thCls}>월 임대료</td>
+                            <td className={tdCls}>
+                                <input className={inputCls} value={monthlyRent} onChange={e => setMonthlyRent(e.target.value)} />원
+                            </td>
+                            <td className={thCls}>임대 기간</td>
+                            <td className={tdCls}>
+                                <input className={inputCls} value={leasePeriod} onChange={e => setLeasePeriod(e.target.value)} />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* 지급 정보 */}
+                <table className="w-full mb-6" style={{ borderCollapse: 'collapse' }}>
+                    <thead>
+                        <tr>
+                            <th className={thCls} colSpan={4}>지급 정보</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td className={thCls}>지급일자</td>
+                            <td className={tdCls}>
+                                <input className={inputCls} value={payDate} onChange={e => setPayDate(e.target.value)} />
+                            </td>
+                            <td className={thCls}>지급금액</td>
+                            <td className={tdCls}>
+                                <input className={inputCls} value={payAmount} onChange={e => setPayAmount(e.target.value)} />원
+                            </td>
+                        </tr>
+                        <tr>
+                            <td className={thCls}>지급방법</td>
+                            <td className={tdCls} colSpan={3}>
+                                <input className={inputCls} value={payMethod} onChange={e => setPayMethod(e.target.value)} />
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                {/* 발행일 & 서명 */}
+                <div className="flex justify-between items-end mt-8">
+                    <div className="text-sm space-y-1">
+                        <div className="flex items-center gap-2">
+                            <span className="font-bold text-gray-600">영수증 발행일자</span>
+                            <input
+                                className="border-b border-gray-300 focus:border-blue-500 outline-none text-sm bg-transparent py-0.5 w-36"
+                                value={issueDate}
+                                onChange={e => setIssueDate(e.target.value)}
+                            />
+                        </div>
+                    </div>
+                    <div className="text-sm text-right space-y-6">
+                        <div className="font-bold text-gray-700">(주)에코모터스 대리인</div>
+                        <div className="border-b-2 border-gray-400 w-40 mt-8">&nbsp;</div>
+                        <div className="text-gray-400 text-xs">서명</div>
+                    </div>
+                </div>
+            </div>
+
+            <style>{`
+                @media print {
+                    body * { visibility: hidden; }
+                    .print\\:shadow-none, .print\\:shadow-none * { visibility: visible; }
+                    .print\\:shadow-none { position: absolute; left: 0; top: 0; width: 100%; }
+                    .print\\:hidden { display: none !important; }
+                }
+            `}</style>
         </div>
     )
 }
