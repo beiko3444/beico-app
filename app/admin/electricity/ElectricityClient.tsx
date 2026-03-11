@@ -1645,7 +1645,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
     // 발행일
     const [issueDate, setIssueDate] = React.useState(`${selectedYear}년 ${String(selectedMonth).padStart(2, '0')}월 14일`)
 
-    const inputCls = 'border-b border-gray-300 focus:border-blue-500 outline-none text-sm w-full bg-transparent py-0.5'
+    const inputCls = 'outline-none text-sm w-full bg-transparent py-0.5'
 
     return (
         <div className="space-y-4 font-sans text-black pb-10 print:pb-0">
@@ -1707,8 +1707,8 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                 <span>881-88-03836</span>
                             </div>
                         </div>
-                        <table className="w-full text-sm border-collapse border border-black h-full">
-                            <tbody className="divide-y divide-black h-full">
+                        <table className="w-full text-sm border-collapse border border-black">
+                            <tbody className="divide-y divide-black">
                                 <tr>
                                     <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
                                     <td className="py-[6px] px-2 text-[11px] font-bold">주식회사 베이코 / beiko Inc.<br /><span className="text-[10px] text-gray-500 font-normal">殿/귀하</span></td>
@@ -1747,8 +1747,8 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                 <span>110-27-04692</span>
                             </div>
                         </div>
-                        <table className="w-full text-sm border-collapse border border-black h-full">
-                            <tbody className="divide-y divide-black h-full">
+                        <table className="w-full text-sm border-collapse border border-black">
+                            <tbody className="divide-y divide-black">
                                 <tr>
                                     <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
                                     <td className="py-[6px] px-2 text-xs font-bold border-r border-black">(주)에코모터스</td>
@@ -1784,7 +1784,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
 
                 {/* 내역 */}
                 <div className="flex-1">
-                    <table className="w-full border-collapse border-y-2 border-black text-xs mb-6">
+                    <table className="w-full border-collapse border border-black text-xs mb-6">
                         <thead className="bg-gray-100 border-b border-black">
                             <tr className="text-center font-bold">
                                 <th colSpan={4} className="border-x border-black py-2 text-sm tracking-widest">임대차 계약 정보</th>
@@ -1815,7 +1815,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                         </tbody>
                     </table>
 
-                    <table className="w-full border-collapse border-y-2 border-black text-xs">
+                    <table className="w-full border-collapse border border-black text-xs">
                         <thead className="bg-gray-100 border-b border-black">
                             <tr className="text-center font-bold">
                                 <th colSpan={4} className="border-x border-black py-2 text-sm tracking-widest">지급 정보</th>
@@ -1828,9 +1828,11 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                     <input className={inputCls} value={payDate} onChange={e => setPayDate(e.target.value)} />
                                 </td>
                                 <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">지급금액</td>
-                                <td className="border-x border-black py-2 px-3 w-1/3 flex items-center gap-1">
-                                    <input className={inputCls} value={payAmount} onChange={e => setPayAmount(e.target.value)} />
-                                    <span>원</span>
+                                <td className="border-x border-black py-2 px-3 w-1/3">
+                                    <div className="flex items-center gap-1">
+                                        <input className={inputCls} value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+                                        <span className="shrink-0">원</span>
+                                    </div>
                                 </td>
                             </tr>
                             <tr>
@@ -1842,17 +1844,12 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                         </tbody>
                     </table>
 
-                    <div className="flex border-4 border-black mt-8 items-center">
-                        <div className="text-black border-r-4 border-black px-6 py-4 font-extrabold text-center w-48 text-sm leading-tight tracking-widest">
+                    <div className="flex border border-black mt-8 items-center">
+                        <div className="text-black border-r border-black px-6 py-3 font-extrabold text-center w-48 text-sm leading-tight tracking-widest">
                             영 수 금 액<br />(Total)
                         </div>
-                        <div className="flex-grow px-8 py-4 text-3xl font-black text-right tracking-tight text-black flex justify-end gap-2 items-center">
-                            <span className="text-xl font-bold">₩</span>
-                            <input
-                                className="border-none bg-transparent outline-none text-right font-black w-full min-w-[200px] text-3xl p-0 m-0"
-                                value={payAmount}
-                                onChange={e => setPayAmount(e.target.value)}
-                            />
+                        <div className="flex-grow px-8 py-3 text-2xl font-black text-right tracking-tight text-black">
+                            ₩ {payAmount}원
                         </div>
                     </div>
                 </div>
