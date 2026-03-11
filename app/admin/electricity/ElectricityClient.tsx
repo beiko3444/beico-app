@@ -1659,7 +1659,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                 </button>
             </div>
 
-            {/* Print Style Reset */}
+            {/* Print Style - 임대료영수증만 출력 */}
             <style type="text/css" media="print">{`
                 @page { 
                     size: A4; 
@@ -1669,15 +1669,30 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                     margin: 0px; 
                     -webkit-print-color-adjust: exact;
                     print-color-adjust: exact;
-                    font-size: 10pt;
                 }
-                nav, header, footer, .no-print, .print\\:hidden { display: none !important; }
-                .print\\:shadow-none { box-shadow: none !important; }
-                .print\\:m-0 { margin: 0 !important; }
-                .print\\:p-0 { padding: 0 !important; }
+                /* 페이지 전체 숨기기 */
+                body * {
+                    visibility: hidden;
+                }
+                /* 영수증 영역만 보이기 */
+                #rent-receipt-print,
+                #rent-receipt-print * {
+                    visibility: visible;
+                }
+                #rent-receipt-print {
+                    position: absolute;
+                    left: 0;
+                    top: 0;
+                    width: 210mm;
+                    min-height: 297mm;
+                    padding: 15mm;
+                    margin: 0;
+                    box-shadow: none !important;
+                    box-sizing: border-box;
+                }
             `}</style>
 
-            <div id="invoice-content" className="w-[210mm] min-h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[10mm] shadow-xl print:shadow-none relative flex flex-col box-border">
+            <div id="rent-receipt-print" className="w-[210mm] min-h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[10mm] shadow-xl print:shadow-none relative flex flex-col box-border">
                 {/* Formal Header */}
                 <div className="text-center mb-6 pt-2 pb-3 border-b-4 border-black">
                     <h1 className="text-3xl font-black tracking-[0.4em] mb-2 uppercase">임 대 료 영 수 증</h1>
