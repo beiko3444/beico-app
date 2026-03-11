@@ -1707,27 +1707,27 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                 <span>881-88-03836</span>
                             </div>
                         </div>
-                        <table className="w-full text-sm border-collapse border border-black">
-                            <tbody className="divide-y divide-black">
+                        <table className="w-full text-sm border-collapse border border-black h-full">
+                            <tbody className="divide-y divide-black h-full">
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
-                                    <td className="py-1 px-2 text-xs font-bold">주식회사 베이코 殿/귀하</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-[6px] px-2 text-[11px] font-bold">주식회사 베이코 / beiko Inc.<br /><span className="text-[10px] text-gray-500 font-normal">殿/귀하</span></td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
-                                    <td className="py-1 px-2 text-xs font-bold">이다빈</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-[6px] px-2 text-xs font-bold">이다빈</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
-                                    <td className="py-1 px-2 text-[11px] leading-tight font-bold tracking-tight">부산시 강서구 낙동남로 1013번길 35 1층 베이코</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td className="py-[6px] px-2 text-[11px] leading-tight font-bold tracking-tight">부산시 강서구 낙동남로 1013번길 35 1층 베이코</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
-                                    <td className="py-1 px-2 text-xs font-bold">010-3444-3467</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
+                                    <td className="py-[6px] px-2 text-xs font-bold">010-3444-3467</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
-                                    <td className="py-1 px-2 text-xs font-bold">sales@beiko.co.kr</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td className="py-[6px] px-2 text-xs font-bold">sales@beiko.co.kr</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1750,34 +1750,32 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                         <table className="w-full text-sm border-collapse border border-black h-full">
                             <tbody className="divide-y divide-black h-full">
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
-                                    <td className="py-1 px-2 text-xs font-bold border-r border-black">(주)에코모터스</td>
-                                    <td rowSpan={2} className="w-20 relative p-0 overflow-hidden text-center align-middle bg-white">
-                                        {/* Background text (underneath) */}
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-[6px] px-2 text-xs font-bold border-r border-black">(주)에코모터스</td>
+                                    <td rowSpan={2} className="w-[60px] relative p-0 m-0 overflow-hidden text-center align-middle bg-white">
                                         <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                                             <span className="text-[14px] text-gray-300 font-black opacity-30">(印)</span>
                                         </div>
-                                        {/* Seal image (on top) */}
-                                        <div className="absolute inset-0 flex items-center justify-center z-10">
-                                            <img src="/stamp.png" alt="Seal" style={{ width: '60px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
+                                        <div className="absolute inset-0 flex items-center justify-center z-10 px-1 py-1">
+                                            <img src="/stamp.png" alt="Seal" style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} className="select-none" />
                                         </div>
                                     </td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
-                                    <td className="py-1 px-2 text-xs font-bold border-r border-black">정창용</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-[6px] px-2 text-xs font-bold border-r border-black">정창용</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
-                                    <td colSpan={2} className="py-1 px-2 text-[11px] leading-tight font-bold tracking-tight">부산시 사하구 낙동남로 1405번길 13</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td colSpan={2} className="py-[6px] px-2 text-[11px] leading-tight font-bold tracking-tight">부산시 사하구 낙동남로 1405번길 13</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話번호<br />전화번호</td>
-                                    <td colSpan={2} className="py-1 px-2 text-xs font-bold">010-9611-1818</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話번호<br />전화번호</td>
+                                    <td colSpan={2} className="py-[6px] px-2 text-xs font-bold">010-9611-1818</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
-                                    <td colSpan={2} className="py-1 px-2 text-xs font-bold text-gray-400">-</td>
+                                    <td className="py-[6px] px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td colSpan={2} className="py-[6px] px-2 text-xs font-bold text-gray-400">-</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -1851,7 +1849,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                         <div className="flex-grow px-8 py-4 text-3xl font-black text-right tracking-tight text-black flex justify-end gap-2 items-center">
                             <span className="text-xl font-bold">₩</span>
                             <input
-                                className="border-none bg-transparent outline-none text-right font-black w-48 text-3xl p-0 m-0"
+                                className="border-none bg-transparent outline-none text-right font-black w-full min-w-[200px] text-3xl p-0 m-0"
                                 value={payAmount}
                                 onChange={e => setPayAmount(e.target.value)}
                             />
