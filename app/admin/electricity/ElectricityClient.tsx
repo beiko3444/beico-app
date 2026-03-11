@@ -1629,25 +1629,6 @@ function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = tru
 
 // ── 임대료영수증 컴포넌트 ──────────────────────────────────────────────────────
 function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; selectedMonth: number }) {
-    // 임차인 (공급받는자) — 베이코
-    const recipient = {
-        name: '주식회사 베이코 Beiko Inc.',
-        rep: '이다빈',
-        regNo: '881-88-03836',
-        addr: '부산시 강서구 낙동남로 1013번길 35 1층 베이코',
-        tel: '010-3444-3467',
-        email: 'sales@beiko.co.kr',
-    }
-    // 공급자 — 에코모터스
-    const supplier = {
-        name: '(주)에코모터스',
-        rep: '정창용',
-        regNo: '',
-        addr: '',
-        tel: '010-9611-1818',
-        email: '',
-    }
-
     // 계약 정보 (편집 가능)
     const [contractStart, setContractStart] = React.useState('2025. 12. 14')
     const [contractEnd, setContractEnd] = React.useState('2026. 12. 13')
@@ -1657,21 +1638,19 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
     )
 
     // 지급 정보 (편집 가능)
-    const [payDate, setPayDate] = React.useState(`${selectedYear}. ${String(selectedMonth).padStart(2, '0')}. 14`)
+    const [payDate, setPayDate] = React.useState(`${selectedYear}년 ${String(selectedMonth).padStart(2, '0')}월 14일`)
     const [payAmount, setPayAmount] = React.useState('1,450,000')
     const [payMethod, setPayMethod] = React.useState('이체')
 
     // 발행일
-    const [issueDate, setIssueDate] = React.useState(`${selectedYear}. ${String(selectedMonth).padStart(2, '0')}. 14`)
+    const [issueDate, setIssueDate] = React.useState(`${selectedYear}년 ${String(selectedMonth).padStart(2, '0')}월 14일`)
 
     const inputCls = 'border-b border-gray-300 focus:border-blue-500 outline-none text-sm w-full bg-transparent py-0.5'
-    const tdCls = 'border border-gray-400 px-2 py-1.5 text-sm'
-    const thCls = 'border border-gray-400 px-2 py-1.5 text-sm font-bold bg-gray-100 text-center whitespace-nowrap'
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 font-sans text-black pb-10 print:pb-0">
             {/* 인쇄 버튼 */}
-            <div className="flex justify-end gap-2 print:hidden">
+            <div className="flex justify-end gap-2 print:hidden mb-4">
                 <button
                     onClick={() => window.print()}
                     className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-sm font-bold transition-all flex items-center gap-2 shadow-sm"
@@ -1680,132 +1659,223 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                 </button>
             </div>
 
-            {/* 영수증 본문 */}
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8 max-w-2xl mx-auto print:shadow-none print:rounded-none print:border-none print:max-w-full">
-                {/* 제목 */}
-                <h2 className="text-center text-2xl font-black tracking-widest mb-6 border-b-2 border-gray-800 pb-3">
-                    임 대 료 영 수 증
-                </h2>
+            {/* Print Style Reset */}
+            <style type="text/css" media="print">{`
+                @page { 
+                    size: A4; 
+                    margin: 0; 
+                }
+                body { 
+                    margin: 0px; 
+                    -webkit-print-color-adjust: exact;
+                    print-color-adjust: exact;
+                    font-size: 10pt;
+                }
+                nav, header, footer, .no-print, .print\\:hidden { display: none !important; }
+                .print\\:shadow-none { box-shadow: none !important; }
+                .print\\:m-0 { margin: 0 !important; }
+                .print\\:p-0 { padding: 0 !important; }
+            `}</style>
 
-                {/* 공급받는자 / 공급자 양쪽 */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                    {/* 공급받는자 (임차인 = 베이코) */}
-                    <div className="border border-gray-400 rounded p-3 space-y-1">
-                        <p className="text-[11px] font-bold text-gray-500 mb-2">공급받는자 (임차인)</p>
-                        <table className="w-full text-xs">
-                            <tbody>
-                                <tr><td className="font-bold text-gray-500 w-16 py-0.5">상호</td><td>{recipient.name}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">대표자</td><td>{recipient.rep}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">등록번호</td><td>{recipient.regNo}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">주소</td><td className="text-[11px]">{recipient.addr}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">전화</td><td>{recipient.tel}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">이메일</td><td>{recipient.email}</td></tr>
+            <div id="invoice-content" className="w-[210mm] min-h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[10mm] shadow-xl print:shadow-none relative flex flex-col box-border">
+                {/* Formal Header */}
+                <div className="text-center mb-6 pt-2 pb-3 border-b-4 border-black">
+                    <h1 className="text-3xl font-black tracking-[0.4em] mb-2 uppercase">임 대 료 영 수 증</h1>
+                    <div className="flex justify-between items-end mt-4 text-xs font-bold">
+                        <div className="text-left space-y-1">
+                            <p className="flex items-center gap-2">발행일자:
+                                <input className="border-b border-gray-300 outline-none w-32 font-bold" value={issueDate} onChange={e => setIssueDate(e.target.value)} />
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[11px] text-gray-500 font-medium">(귀하의 일익 번창을 기원합니다)</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Info Section - Traditional Box Style */}
+                <div className="grid grid-cols-2 gap-0 mb-8">
+                    {/* Recipient Side (임차인) */}
+                    <div className="border-r border-black pr-4 py-1">
+                        <div className="mb-1 flex justify-between items-center">
+                            <div className="flex flex-col">
+                                <span className="text-[10px] font-bold text-gray-500 leading-none">供給先</span>
+                                <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급받는자</span>
+                            </div>
+                            <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold font-sans">
+                                <span>登録番号 / 등록번호:</span>
+                                <span>881-88-03836</span>
+                            </div>
+                        </div>
+                        <table className="w-full text-sm border-collapse border border-black">
+                            <tbody className="divide-y divide-black">
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1 px-2 text-xs font-bold">주식회사 베이코 殿/귀하</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1 px-2 text-xs font-bold">이다빈</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td className="py-1 px-2 text-[11px] leading-tight font-bold tracking-tight">부산시 강서구 낙동남로 1013번길 35 1층 베이코</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
+                                    <td className="py-1 px-2 text-xs font-bold">010-3444-3467</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td className="py-1 px-2 text-xs font-bold">sales@beiko.co.kr</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
 
-                    {/* 공급자 (임대인 = 에코모터스) */}
-                    <div className="border border-gray-400 rounded p-3 space-y-1">
-                        <p className="text-[11px] font-bold text-gray-500 mb-2">공급자 (임대인)</p>
-                        <table className="w-full text-xs">
-                            <tbody>
-                                <tr><td className="font-bold text-gray-500 w-16 py-0.5">상호</td><td>{supplier.name}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">대표자</td><td>{supplier.rep}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">등록번호</td><td>{supplier.regNo || '–'}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">주소</td><td className="text-[11px]">{supplier.addr || '–'}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">전화</td><td>{supplier.tel}</td></tr>
-                                <tr><td className="font-bold text-gray-500 py-0.5">이메일</td><td>{supplier.email || '–'}</td></tr>
+                    {/* Supplier Side (임대인) */}
+                    <div className="pl-4 py-1 bg-white relative">
+                        <div className="mb-1 flex justify-between items-center">
+                            <div className="flex flex-col relative">
+                                <span className="text-[10px] font-bold text-gray-500 leading-none">供給者</span>
+                                <div className="flex items-center gap-1 relative">
+                                    <span className="text-sm font-bold border-b-2 border-black pb-0.5">공급자</span>
+                                </div>
+                            </div>
+                            <div className="border border-black px-2 py-0.5 text-xs items-center flex gap-1 font-bold">
+                                <span>登録番号 / 등록번호:</span>
+                                <span>110-27-04692</span>
+                            </div>
+                        </div>
+                        <table className="w-full text-sm border-collapse border border-black h-full">
+                            <tbody className="divide-y divide-black h-full">
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">商号<br />상 호</td>
+                                    <td className="py-1 px-2 text-xs font-bold border-r border-black">(주)에코모터스</td>
+                                    <td rowSpan={2} className="w-20 relative p-0 overflow-hidden text-center align-middle bg-white">
+                                        {/* Background text (underneath) */}
+                                        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                            <span className="text-[14px] text-gray-300 font-black opacity-30">(印)</span>
+                                        </div>
+                                        {/* Seal image (on top) */}
+                                        <div className="absolute inset-0 flex items-center justify-center z-10">
+                                            <img src="/stamp.png" alt="Seal" style={{ width: '60px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">代表者<br />대 표 자</td>
+                                    <td className="py-1 px-2 text-xs font-bold border-r border-black">정창용</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">住所<br />주 소</td>
+                                    <td colSpan={2} className="py-1 px-2 text-[11px] leading-tight font-bold tracking-tight">부산시 사하구 낙동남로 1405번길 13</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話번호<br />전화번호</td>
+                                    <td colSpan={2} className="py-1 px-2 text-xs font-bold">010-9611-1818</td>
+                                </tr>
+                                <tr>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">E-mail<br />이메일</td>
+                                    <td colSpan={2} className="py-1 px-2 text-xs font-bold text-gray-400">-</td>
+                                </tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
 
-                {/* 임대차 계약 정보 */}
-                <table className="w-full mb-4" style={{ borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr>
-                            <th className={thCls} colSpan={4}>임대차 계약 정보</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td className={thCls}>계약 시작일</td>
-                            <td className={tdCls}>
-                                <input className={inputCls} value={contractStart} onChange={e => setContractStart(e.target.value)} />
-                            </td>
-                            <td className={thCls}>계약 종료일</td>
-                            <td className={tdCls}>
-                                <input className={inputCls} value={contractEnd} onChange={e => setContractEnd(e.target.value)} />
-                            </td>
-                        </tr>
-                        <tr>
-                            <td className={thCls}>월 임대료</td>
-                            <td className={tdCls}>
-                                <input className={inputCls} value={monthlyRent} onChange={e => setMonthlyRent(e.target.value)} />원
-                            </td>
-                            <td className={thCls}>임대 기간</td>
-                            <td className={tdCls}>
-                                <input className={inputCls} value={leasePeriod} onChange={e => setLeasePeriod(e.target.value)} />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                {/* 내역 */}
+                <div className="flex-1">
+                    <table className="w-full border-collapse border-y-2 border-black text-xs mb-6">
+                        <thead className="bg-gray-100 border-b border-black">
+                            <tr className="text-center font-bold">
+                                <th colSpan={4} className="border-x border-black py-2 text-sm tracking-widest">임대차 계약 정보</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-300 font-bold">
+                            <tr>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">계약 시작일</td>
+                                <td className="border-x border-black py-2 px-3 w-1/3">
+                                    <input className={inputCls} value={contractStart} onChange={e => setContractStart(e.target.value)} />
+                                </td>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">계약 종료일</td>
+                                <td className="border-x border-black py-2 px-3 w-1/3">
+                                    <input className={inputCls} value={contractEnd} onChange={e => setContractEnd(e.target.value)} />
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 text-center text-xs">월 임대료</td>
+                                <td className="border-x border-black py-2 px-3 flex items-center gap-1">
+                                    <input className={inputCls} value={monthlyRent} onChange={e => setMonthlyRent(e.target.value)} />
+                                    <span>원</span>
+                                </td>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 text-center text-xs">임대 기간</td>
+                                <td className="border-x border-black py-2 px-3">
+                                    <input className={inputCls} value={leasePeriod} onChange={e => setLeasePeriod(e.target.value)} />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
 
-                {/* 지급 정보 */}
-                <table className="w-full mb-6" style={{ borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr>
-                            <th className={thCls} colSpan={4}>지급 정보</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr>
-                            <td className={thCls}>지급일자</td>
-                            <td className={tdCls}>
-                                <input className={inputCls} value={payDate} onChange={e => setPayDate(e.target.value)} />
-                            </td>
-                            <td className={thCls}>지급금액</td>
-                            <td className={tdCls}>
-                                <input className={inputCls} value={payAmount} onChange={e => setPayAmount(e.target.value)} />원
-                            </td>
-                        </tr>
-                        <tr>
-                            <td className={thCls}>지급방법</td>
-                            <td className={tdCls} colSpan={3}>
-                                <input className={inputCls} value={payMethod} onChange={e => setPayMethod(e.target.value)} />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
+                    <table className="w-full border-collapse border-y-2 border-black text-xs">
+                        <thead className="bg-gray-100 border-b border-black">
+                            <tr className="text-center font-bold">
+                                <th colSpan={4} className="border-x border-black py-2 text-sm tracking-widest">지급 정보</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-300 font-bold">
+                            <tr>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">지급일자</td>
+                                <td className="border-x border-black py-2 px-3 w-1/3">
+                                    <input className={inputCls} value={payDate} onChange={e => setPayDate(e.target.value)} />
+                                </td>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 w-32 text-center text-xs">지급금액</td>
+                                <td className="border-x border-black py-2 px-3 w-1/3 flex items-center gap-1">
+                                    <input className={inputCls} value={payAmount} onChange={e => setPayAmount(e.target.value)} />
+                                    <span>원</span>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td className="border-x border-black py-2 px-3 bg-gray-50 text-center text-xs">지급방법</td>
+                                <td colSpan={3} className="border-x border-black py-2 px-3">
+                                    <input className={inputCls} value={payMethod} onChange={e => setPayMethod(e.target.value)} />
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
 
-                {/* 발행일 & 서명 */}
-                <div className="flex justify-between items-end mt-8">
-                    <div className="text-sm space-y-1">
-                        <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-600">영수증 발행일자</span>
+                    <div className="flex border-4 border-black mt-8 items-center">
+                        <div className="text-black border-r-4 border-black px-6 py-4 font-extrabold text-center w-48 text-sm leading-tight tracking-widest">
+                            영 수 금 액<br />(Total)
+                        </div>
+                        <div className="flex-grow px-8 py-4 text-3xl font-black text-right tracking-tight text-black flex justify-end gap-2 items-center">
+                            <span className="text-xl font-bold">₩</span>
                             <input
-                                className="border-b border-gray-300 focus:border-blue-500 outline-none text-sm bg-transparent py-0.5 w-36"
-                                value={issueDate}
-                                onChange={e => setIssueDate(e.target.value)}
+                                className="border-none bg-transparent outline-none text-right font-black w-48 text-3xl p-0 m-0"
+                                value={payAmount}
+                                onChange={e => setPayAmount(e.target.value)}
                             />
                         </div>
                     </div>
-                    <div className="text-sm text-right space-y-6">
-                        <div className="font-bold text-gray-700">(주)에코모터스 대리인</div>
-                        <div className="border-b-2 border-gray-400 w-40 mt-8">&nbsp;</div>
-                        <div className="text-gray-400 text-xs">서명</div>
+                </div>
+
+                {/* Footer Section - 대리인 삭제, 단순 발급 정보 */}
+                <div className="border-t border-black mt-12 pt-4 flex justify-between items-start pb-4">
+                    <div className="space-y-4 max-w-[70%]">
+                        <div className="text-[10px] text-gray-500 italic leading-relaxed font-bold">
+                            * 본 영수증은 (주)에코모터스의 자산에 대한 일체의 임대료가 위에 명시된 지급일자와 지급방법에 따라<br />
+                            정상적으로 납부 및 영수되었음을 증명합니다.
+                            <br /><br />
+                            This receipt certifies that the rental fee for the property belonging to Eco Motors Co., Ltd.<br />
+                            has been fully paid and received in accordance with the specified payment date and method above.
+                        </div>
+                    </div>
+                    <div className="text-right flex flex-col items-end gap-1 shrink-0 pt-2">
+                        <p className="text-xl font-black tracking-widest">(주)에코모터스</p>
                     </div>
                 </div>
-            </div>
 
-            <style>{`
-                @media print {
-                    body * { visibility: hidden; }
-                    .print\\:shadow-none, .print\\:shadow-none * { visibility: visible; }
-                    .print\\:shadow-none { position: absolute; left: 0; top: 0; width: 100%; }
-                    .print\\:hidden { display: none !important; }
-                }
-            `}</style>
+            </div>
         </div>
     )
 }
