@@ -179,19 +179,13 @@ export default function ProformaClient({
         const baseRows = previewInvoice.items.map((item, index) => {
             const productMeta = item.productId ? productMap.get(item.productId) : undefined
             const model = textOrDash(productMeta?.productCode || item.productCode)
-            const specificationLines = [
-                `Commodity: ${textOrDash(item.productNameEN || item.productName)}`,
-                `Model: ${model}`,
-                `Price term: EXW (US$)`,
-                `Source price: Product.usBuyPrice`
-            ]
             return {
                 id: item.id,
                 no: index + 1,
                 productName: item.productName,
+                productNameEN: item.productNameEN || productMeta?.nameEN || '',
                 model,
                 imageUrl: productMeta?.imageUrl || null,
-                specificationLines,
                 price: item.unitPriceUsd,
                 quantity: item.quantity,
                 amount: item.amountUsd,
@@ -202,9 +196,9 @@ export default function ProformaClient({
             id: `blank-${idx}`,
             no: baseRows.length + idx + 1,
             productName: '',
+            productNameEN: '',
             model: '',
             imageUrl: null,
-            specificationLines: [] as string[],
             price: 0,
             quantity: 0,
             amount: 0,
@@ -609,13 +603,13 @@ export default function ProformaClient({
                     <div className="bg-white border border-gray-300 p-3">
                         <div className="h-1 w-full bg-[#e53b19] mb-2" />
                         <div className="flex items-start gap-2 border-b-2 border-[#e53b19] pb-2">
-                            <div className="w-20 pt-1 shrink-0">
-                                <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
-                            </div>
                             <div className="flex-1 text-center">
                                 <h1 className="text-2xl leading-none font-black tracking-tight text-[#1f2340]">beiko Inc.</h1>
                                 <p className="mt-1 text-[11px]">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
                                 <p className="text-[11px] mt-0.5">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
+                            </div>
+                            <div className="w-20 pt-1 shrink-0">
+                                <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
                             </div>
                         </div>
 
@@ -630,16 +624,16 @@ export default function ProformaClient({
                                     <td className="border border-gray-900 px-2 py-1 w-56">{issueDateText}</td>
                                 </tr>
                                 <tr>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">From:</td>
+                                    <td className="border border-gray-900 px-2 py-1">beiko Inc.</td>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
+                                    <td className="border border-gray-900 px-2 py-1">Lee Dabin +82-10-3444-3467</td>
+                                </tr>
+                                <tr>
                                     <td className="border border-gray-900 px-2 py-1 font-black">Consignee:</td>
                                     <td className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.companyName}</td>
                                     <td className="border border-gray-900 px-2 py-1 font-black">Phone:</td>
                                     <td className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.phone}</td>
-                                </tr>
-                                <tr>
-                                    <td className="border border-gray-900 px-2 py-1 font-black">From:</td>
-                                    <td className="border border-gray-900 px-2 py-1">beiko Inc.</td>
-                                    <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
-                                    <td className="border border-gray-900 px-2 py-1">Lee Dabin</td>
                                 </tr>
                                 <tr>
                                     <td className="border border-gray-900 px-2 py-1 font-black">Address:</td>
@@ -657,41 +651,44 @@ export default function ProformaClient({
                         <table className="w-full border-collapse border border-gray-900 mt-0 text-[11px]">
                             <thead className="bg-[#f7ebe5]">
                                 <tr className="text-center font-black">
-                                    <th className="border border-gray-900 px-2 py-1 w-40">Product Name</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-24">Model</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-44">Picture</th>
-                                    <th className="border border-gray-900 px-2 py-1.5">Specification</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-10">No.</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-52">Product Name</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-28">Model</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-20">Picture</th>
                                     <th className="border border-gray-900 px-2 py-1 w-32">
-                                        Unit price <span className="text-[#e53b19]">EXW</span> (US$)
+                                        Unit price <span className="text-[#e53b19]">FOB</span> (US$)
                                     </th>
-                                    <th className="border border-gray-900 px-2 py-1 w-16">Qty<br />(set)</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-16">Qty</th>
                                     <th className="border border-gray-900 px-2 py-1 w-32">
-                                        Total price <span className="text-[#e53b19]">EXW</span> (US$)
+                                        Total price <span className="text-[#e53b19]">FOB</span> (US$)
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {printableRows.map((row) => (
-                                    <tr key={row.id} className={row.isBlank ? 'h-8' : 'h-32 align-top'}>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.productName}</td>
+                                    <tr key={row.id} className={row.isBlank ? 'h-8' : 'h-24 align-top'}>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.no}</td>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">
+                                            {row.isBlank ? (
+                                                ''
+                                            ) : (
+                                                <div className="space-y-1 leading-tight">
+                                                    <div>{row.productName}</div>
+                                                    <div className="text-[10px] text-gray-700">{row.productNameEN || '-'}</div>
+                                                </div>
+                                            )}
+                                        </td>
                                         <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.model}</td>
                                         <td className="border border-gray-900 px-2 py-2">
                                             {row.isBlank ? (
                                                 <div />
                                             ) : row.imageUrl ? (
-                                                <img src={row.imageUrl} alt={row.productName} className="w-full h-24 object-contain bg-white" />
+                                                <div className="w-14 h-14 mx-auto border border-gray-200 bg-white flex items-center justify-center">
+                                                    <img src={row.imageUrl} alt={row.productName} className="w-12 h-12 object-contain" />
+                                                </div>
                                             ) : (
-                                                <div className="w-full h-24 flex items-center justify-center text-[10px] text-gray-400">No Image</div>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-900 px-2 py-2 text-[10px] leading-[1.35]">
-                                            {row.isBlank ? (
-                                                <div />
-                                            ) : (
-                                                <div className="space-y-0.5">
-                                                    {row.specificationLines.map((line, idx) => (
-                                                        <div key={`${row.id}-spec-${idx}`} className={idx >= 2 ? 'text-[#e53b19]' : ''}>{line}</div>
-                                                    ))}
+                                                <div className="w-14 h-14 mx-auto border border-gray-200 bg-white flex items-center justify-center text-[9px] text-gray-400">
+                                                    No Image
                                                 </div>
                                             )}
                                         </td>
@@ -710,7 +707,7 @@ export default function ProformaClient({
 
                         <div className="mt-3 flex items-start justify-between gap-4">
                             <div className="text-[10px] leading-snug flex-1">
-                                <p>1. Price terms: EXW BUSAN</p>
+                                <p>1. Price terms: FOB BUSAN</p>
                                 <p className="mt-1">2. Packaging: by export carton box</p>
                                 <p className="mt-1">3. Payment Term: 100% deposit by T/T</p>
                                 <p className="mt-1">4. Production time: 3-5 days after receiving the deposit</p>
