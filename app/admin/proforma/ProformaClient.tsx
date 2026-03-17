@@ -336,6 +336,8 @@ export default function ProformaClient({
                         margin: 0 auto !important;
                         width: 190mm !important;
                         min-height: 277mm !important;
+                        overflow: visible !important;
+                        aspect-ratio: auto !important;
                     }
                 }
             `}</style>
@@ -423,6 +425,7 @@ export default function ProformaClient({
                                         <thead className="bg-gray-50 border-b border-gray-100 text-gray-600">
                                             <tr>
                                                 <th className="px-3 py-2 text-center">선택</th>
+                                                <th className="px-3 py-2 text-center">이미지</th>
                                                 <th className="px-3 py-2 text-left">상품</th>
                                                 <th className="px-3 py-2 text-center">재고</th>
                                                 <th className="px-3 py-2 text-right">USD 단가</th>
@@ -443,6 +446,15 @@ export default function ProformaClient({
                                                                 onChange={() => toggleProduct(product.id)}
                                                                 className="h-4 w-4 accent-[#e53b19]"
                                                             />
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <div className="mx-auto w-11 h-11 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center">
+                                                                {product.imageUrl ? (
+                                                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                                                ) : (
+                                                                    <span className="text-[10px] text-gray-300 font-black">IMG</span>
+                                                                )}
+                                                            </div>
                                                         </td>
                                                         <td className="px-3 py-2">
                                                             <div className="font-bold text-gray-900">{product.nameJP || product.name}</div>
@@ -511,7 +523,7 @@ export default function ProformaClient({
                     </section>
                 </div>
 
-                <section id="pi-print-sheet" className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f] xl:sticky xl:top-24 xl:max-h-[calc(100vh-130px)] xl:overflow-auto">
+                <section id="pi-print-sheet" className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-8 w-full max-w-[620px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24">
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
 
                     <div className="bg-white border border-gray-300 p-4">
