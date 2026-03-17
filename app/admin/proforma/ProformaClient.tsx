@@ -71,6 +71,10 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
 })
 
 const textOrDash = (value: string | null | undefined) => (value && value.trim().length > 0 ? value : '-')
+const usdText = (value: number) =>
+    `US$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const slashDate = (date: Date) =>
+    `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
 
 export default function ProformaClient({
     partners,
@@ -154,39 +158,52 @@ export default function ProformaClient({
     }, [activeIssuedInvoice, selectedPartner, draftTotalUsd, draftItems])
 
     const issueDate = useMemo(() => new Date(previewInvoice.issueDate), [previewInvoice.issueDate])
-    const dueDate = useMemo(() => {
-        const date = new Date(previewInvoice.issueDate)
-        date.setDate(date.getDate() + 30)
-        return date
-    }, [previewInvoice.issueDate])
-    const estShipDate = useMemo(() => {
-        const date = new Date(previewInvoice.issueDate)
-        date.setDate(date.getDate() + 7)
-        return date
-    }, [previewInvoice.issueDate])
+    const issueDateText = useMemo(() => slashDate(issueDate), [issueDate])
     const totalQuantity = useMemo(
         () => previewInvoice.items.reduce((sum, item) => sum + item.quantity, 0),
         [previewInvoice.items]
     )
+    const productMap = useMemo(
+        () => new Map(products.map((product) => [product.id, product])),
+        [products]
+    )
     const printableRows = useMemo(() => {
-        const baseRows = previewInvoice.items.map((item, index) => ({
-            id: item.id,
-            no: index + 1,
-            description: item.productName,
-            price: item.unitPriceUsd,
-            quantity: item.quantity,
-            amount: item.amountUsd
-        }))
+        const baseRows = previewInvoice.items.map((item, index) => {
+            const productMeta = item.productId ? productMap.get(item.productId) : undefined
+            const model = textOrDash(productMeta?.productCode || item.productCode)
+            const specificationLines = [
+                `Commodity: ${textOrDash(item.productNameEN || item.productName)}`,
+                `Model: ${model}`,
+                `Price term: EXW (US$)`,
+                `Source price: Product.usBuyPrice`
+            ]
+            return {
+                id: item.id,
+                no: index + 1,
+                productName: item.productName,
+                model,
+                imageUrl: productMeta?.imageUrl || null,
+                specificationLines,
+                price: item.unitPriceUsd,
+                quantity: item.quantity,
+                amount: item.amountUsd,
+                isBlank: false
+            }
+        })
         const blanks = Array.from({ length: Math.max(0, 5 - baseRows.length) }, (_, idx) => ({
             id: `blank-${idx}`,
             no: baseRows.length + idx + 1,
-            description: '',
+            productName: '',
+            model: '',
+            imageUrl: null,
+            specificationLines: [] as string[],
             price: 0,
             quantity: 0,
-            amount: 0
+            amount: 0,
+            isBlank: true
         }))
         return [...baseRows, ...blanks]
-    }, [previewInvoice.items])
+    }, [previewInvoice.items, productMap])
     const subtotalUsd = previewInvoice.totalUsd
     const taxUsd = 0
     const shippingUsd = 0
