@@ -20,6 +20,7 @@ model User {
   updatedAt      DateTime        @updatedAt
   country        String?
   orders         Order[]
+  proformaInvoices ProformaInvoice[]
   partnerProfile PartnerProfile?
 }
 
@@ -68,6 +69,7 @@ model Product {
   usSellPrice      Float?      @default(0)
   regionalPrices   Json?       @default("{}")
   orderItems       OrderItem[]
+  proformaInvoiceItems ProformaInvoiceItem[]
 }
 
 model Order {
@@ -160,4 +162,32 @@ model CoupangSyncHistory {
   itemsFetched Int      @default(0)
   status       String   @default("SUCCESS")
   errorMessage String?
+}
+
+model ProformaInvoice {
+  id            String                @id @default(uuid())
+  invoiceNumber String                @unique
+  partnerId     String?
+  partnerName   String
+  issueDate     DateTime              @default(now())
+  totalUsd      Float                 @default(0)
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
+  partner       User?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  items         ProformaInvoiceItem[]
+}
+
+model ProformaInvoiceItem {
+  id                String          @id @default(uuid())
+  proformaInvoiceId String
+  productId         String?
+  productName       String
+  productNameEN     String?
+  productCode       String?
+  quantity          Int
+  unitPriceUsd      Float
+  amountUsd         Float
+  createdAt         DateTime        @default(now())
+  proformaInvoice   ProformaInvoice @relation(fields: [proformaInvoiceId], references: [id], onDelete: Cascade)
+  product           Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
