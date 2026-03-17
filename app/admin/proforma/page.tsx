@@ -46,7 +46,11 @@ export default async function ProformaPage() {
     const partnerOptions: PartnerOption[] = partners.map((partner) => ({
         id: partner.id,
         name: partner.name,
-        businessName: partner.partnerProfile?.businessName || null
+        businessName: partner.partnerProfile?.businessName || null,
+        representativeName: partner.partnerProfile?.representativeName || null,
+        email: partner.partnerProfile?.email || null,
+        contact: partner.partnerProfile?.contact || null,
+        address: partner.partnerProfile?.address || null
     }))
 
     const productOptions: ProductOption[] = products.map((product) => ({

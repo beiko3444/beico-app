@@ -6,6 +6,10 @@ export type PartnerOption = {
     id: string
     name: string
     businessName: string | null
+    representativeName: string | null
+    email: string | null
+    contact: string | null
+    address: string | null
 }
 
 export type ProductOption = {
@@ -66,6 +70,8 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
     day: '2-digit'
 })
 
+const textOrDash = (value: string | null | undefined) => (value && value.trim().length > 0 ? value : '-')
+
 export default function ProformaClient({
     partners,
     products,
@@ -115,6 +121,12 @@ export default function ProformaClient({
         [issuedInvoices, activeIssuedId]
     )
 
+    const previewPartner = useMemo(() => {
+        if (selectedPartner) return selectedPartner
+        if (!activeIssuedInvoice) return null
+        return partners.find((partner) => (partner.businessName || partner.name) === activeIssuedInvoice.partnerName) || null
+    }, [selectedPartner, activeIssuedInvoice, partners])
+
     const previewInvoice = useMemo<PreviewInvoice>(() => {
         if (activeIssuedInvoice) {
             return {
@@ -137,6 +149,45 @@ export default function ProformaClient({
             items: draftItems
         }
     }, [activeIssuedInvoice, selectedPartner, draftTotalUsd, draftItems])
+
+    const issueDate = useMemo(() => new Date(previewInvoice.issueDate), [previewInvoice.issueDate])
+    const dueDate = useMemo(() => {
+        const date = new Date(previewInvoice.issueDate)
+        date.setDate(date.getDate() + 30)
+        return date
+    }, [previewInvoice.issueDate])
+    const estShipDate = useMemo(() => {
+        const date = new Date(previewInvoice.issueDate)
+        date.setDate(date.getDate() + 7)
+        return date
+    }, [previewInvoice.issueDate])
+    const totalQuantity = useMemo(
+        () => previewInvoice.items.reduce((sum, item) => sum + item.quantity, 0),
+        [previewInvoice.items]
+    )
+    const printableRows = useMemo(() => {
+        const baseRows = previewInvoice.items.map((item, index) => ({
+            id: item.id,
+            no: index + 1,
+            description: item.productName,
+            price: item.unitPriceUsd,
+            quantity: item.quantity,
+            amount: item.amountUsd
+        }))
+        const blanks = Array.from({ length: Math.max(0, 5 - baseRows.length) }, (_, idx) => ({
+            id: `blank-${idx}`,
+            no: baseRows.length + idx + 1,
+            description: '',
+            price: 0,
+            quantity: 0,
+            amount: 0
+        }))
+        return [...baseRows, ...blanks]
+    }, [previewInvoice.items])
+    const subtotalUsd = previewInvoice.totalUsd
+    const taxUsd = 0
+    const shippingUsd = 0
+    const grandTotalUsd = subtotalUsd + taxUsd + shippingUsd
 
     const toggleProduct = (productId: string) => {
         setDraftState((prev) => ({
@@ -409,69 +460,121 @@ export default function ProformaClient({
                 </section>
             </div>
 
-            <section id="pi-print-sheet" className="bg-white rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto">
-                <div className="border-b-2 border-black pb-4 mb-4">
+            <section id="pi-print-sheet" className="bg-[#f3f4f8] rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f]">
+                <div className="bg-[#6f1d91] text-white -mx-8 -mt-8 px-8 pt-6 pb-5 rounded-t-2xl">
                     <div className="flex items-start justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-black tracking-tight">PROFORMA INVOICE</h1>
-                            <div className="text-xs text-gray-500 mt-2">PI No: <span className="font-bold text-gray-900">{previewInvoice.invoiceNumber}</span></div>
-                            <div className="text-xs text-gray-500 mt-1">Date: <span className="font-bold text-gray-900">{dateFormatter.format(new Date(previewInvoice.issueDate))}</span></div>
-                            <div className="text-xs text-gray-500 mt-1">Company: <span className="font-bold text-gray-900">{previewInvoice.partnerName}</span></div>
+                        <div className="w-20 text-center">
+                            <div className="mx-auto w-12 h-12 rounded-full border border-white/60 flex items-center justify-center text-xl font-black">$</div>
+                            <div className="text-[10px] font-bold mt-2 tracking-wider">BEIKO TRADING</div>
                         </div>
-                        <div className="text-right text-xs text-gray-500">
-                            <div className="font-black text-gray-900">BEIKO Co., Ltd.</div>
-                            <div className="mt-1">Busan, Republic of Korea</div>
-                            <div>contact@beiko.co.kr</div>
+                        <div className="flex-1 text-center">
+                            <h1 className="text-[42px] leading-none font-black tracking-tight">PROFORMA INVOICE</h1>
+                            <p className="mt-2 text-sm font-bold">BEIKO Co., Ltd.</p>
+                            <p className="text-xs mt-1">35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan</p>
+                            <p className="text-xs mt-0.5">+82-10-8119-3313 · contact@beiko.co.kr</p>
+                        </div>
+                        <div className="w-20" />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3 mt-4">
+                    <div className="border border-[#6f1d91]/20 bg-white">
+                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Bill To</div>
+                        <div className="p-3 space-y-2 text-sm">
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Name</span><span>{textOrDash(previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</span></div>
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Email</span><span>{textOrDash(previewPartner?.email)}</span></div>
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Phone</span><span>{textOrDash(previewPartner?.contact)}</span></div>
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Address</span><span>{textOrDash(previewPartner?.address)}</span></div>
+                        </div>
+                    </div>
+                    <div className="border border-[#6f1d91]/20 bg-white">
+                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Ship To</div>
+                        <div className="p-3 space-y-2 text-sm">
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Name</span><span>{textOrDash(previewPartner?.representativeName || previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</span></div>
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Email</span><span>{textOrDash(previewPartner?.email)}</span></div>
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Phone</span><span>{textOrDash(previewPartner?.contact)}</span></div>
+                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Address</span><span>{textOrDash(previewPartner?.address)}</span></div>
                         </div>
                     </div>
                 </div>
 
-                <table className="w-full text-sm border-collapse border border-black">
-                    <thead className="bg-gray-100">
+                <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div className="border border-[#6f1d91]/20 bg-white">
+                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Shipping Details</div>
+                        <div className="p-3 space-y-2 text-sm">
+                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Est. Ship Date</span><span>{dateFormatter.format(estShipDate)}</span></div>
+                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Est. Weight (kg)</span><span>{totalQuantity.toLocaleString()}</span></div>
+                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Transportation</span><span>Air</span></div>
+                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Carrier</span><span>-</span></div>
+                        </div>
+                    </div>
+                    <div className="border border-[#6f1d91]/20 bg-white">
+                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Invoice Details</div>
+                        <div className="p-3 space-y-2 text-sm">
+                            <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Invoice #</span><span>{previewInvoice.invoiceNumber}</span></div>
+                            <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Invoice Date</span><span>{dateFormatter.format(issueDate)}</span></div>
+                            <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Due Date</span><span>{dateFormatter.format(dueDate)}</span></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="h-[3px] bg-[#6f1d91] mt-4 mb-3" />
+
+                <table className="w-full text-sm border-collapse border border-[#cdcfdb] bg-white">
+                    <thead className="bg-[#e7e7f1] text-[#2b2f4c]">
                         <tr>
-                            <th className="border border-black px-2 py-2 text-center w-12">No</th>
-                            <th className="border border-black px-2 py-2 text-left">Description</th>
-                            <th className="border border-black px-2 py-2 text-center w-20">Qty</th>
-                            <th className="border border-black px-2 py-2 text-right w-36">Unit Price (USD)</th>
-                            <th className="border border-black px-2 py-2 text-right w-36">Amount (USD)</th>
+                            <th className="border border-[#cdcfdb] px-2 py-2 text-left w-12">#</th>
+                            <th className="border border-[#cdcfdb] px-2 py-2 text-left">Description</th>
+                            <th className="border border-[#cdcfdb] px-2 py-2 text-right w-32">Price ($)</th>
+                            <th className="border border-[#cdcfdb] px-2 py-2 text-right w-24">Quantity</th>
+                            <th className="border border-[#cdcfdb] px-2 py-2 text-right w-32">Amount ($)</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        {previewInvoice.items.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="border border-black px-2 py-10 text-center text-gray-400">
-                                    선택된 상품이 없습니다.
-                                </td>
+                    <tbody className="text-[#4d5168]">
+                        {printableRows.map((row) => (
+                            <tr key={row.id}>
+                                <td className="border border-[#cdcfdb] px-2 py-2 text-left font-black">{row.no}</td>
+                                <td className="border border-[#cdcfdb] px-2 py-2">{row.description || '-'}</td>
+                                <td className="border border-[#cdcfdb] px-2 py-2 text-right">{row.description ? usdFormatter.format(row.price) : '-'}</td>
+                                <td className="border border-[#cdcfdb] px-2 py-2 text-right">{row.quantity > 0 ? row.quantity.toLocaleString() : '-'}</td>
+                                <td className="border border-[#cdcfdb] px-2 py-2 text-right">{row.description ? usdFormatter.format(row.amount) : usdFormatter.format(0)}</td>
                             </tr>
-                        ) : (
-                            previewInvoice.items.map((item, index) => (
-                                <tr key={item.id}>
-                                    <td className="border border-black px-2 py-2 text-center">{index + 1}</td>
-                                    <td className="border border-black px-2 py-2">
-                                        <div className="font-bold">{item.productName}</div>
-                                        <div className="text-xs text-gray-500">{item.productNameEN || '-'}</div>
-                                        <div className="text-[11px] text-gray-400 font-mono">{item.productCode || '-'}</div>
-                                    </td>
-                                    <td className="border border-black px-2 py-2 text-center">{item.quantity.toLocaleString()}</td>
-                                    <td className="border border-black px-2 py-2 text-right">{usdFormatter.format(item.unitPriceUsd)}</td>
-                                    <td className="border border-black px-2 py-2 text-right font-bold">{usdFormatter.format(item.amountUsd)}</td>
-                                </tr>
-                            ))
-                        )}
+                        ))}
                     </tbody>
-                    <tfoot className="bg-gray-100">
-                        <tr>
-                            <td colSpan={4} className="border border-black px-2 py-3 text-right font-black">TOTAL</td>
-                            <td className="border border-black px-2 py-3 text-right font-black text-[#d9361b]">
-                                {usdFormatter.format(previewInvoice.totalUsd)}
-                            </td>
-                        </tr>
-                    </tfoot>
                 </table>
 
-                <div className="mt-6 text-xs text-gray-500 space-y-1">
-                    <p>This PI is generated from registered USD price (`usBuyPrice`) in product settings.</p>
-                    <p>Click print to open the browser dialog and choose PDF save or printer output.</p>
+                <div className="grid grid-cols-2 gap-5 mt-4 text-sm">
+                    <div className="space-y-4">
+                        <div className="grid grid-cols-[130px_1fr] gap-2">
+                            <span className="font-black">Payment Method</span>
+                            <span>Bank Transfer</span>
+                        </div>
+                        <div className="flex items-start gap-2 text-[#5a5f79]">
+                            <span className="mt-0.5">☑</span>
+                            <p>I acknowledge that the information above is accurate and true.</p>
+                        </div>
+                        <div className="space-y-2">
+                            <div className="grid grid-cols-[130px_1fr] gap-2"><span className="font-black">Shipper Name</span><span>{textOrDash(previewPartner?.representativeName || previewPartner?.name)}</span></div>
+                            <div className="grid grid-cols-[130px_1fr] gap-2 items-end">
+                                <span className="font-black">Shipper Signature</span>
+                                <div className="h-8 border-b border-[#a7aac0]" />
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Subtotal</span><span>{usdFormatter.format(subtotalUsd)}</span></div>
+                        <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Tax ($)</span><span>{usdFormatter.format(taxUsd)}</span></div>
+                        <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Shipping ($)</span><span>{usdFormatter.format(shippingUsd)}</span></div>
+                        <div className="grid grid-cols-[1fr_auto] gap-2 bg-[#dfd3e9] px-3 py-2 font-black text-base">
+                            <span>Total Amount</span>
+                            <span>{usdFormatter.format(grandTotalUsd)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="mt-6 text-xs text-[#6f748f]">
+                    Notes: This invoice is in USD. Total payment due is 30 days.
                 </div>
             </section>
         </div>
