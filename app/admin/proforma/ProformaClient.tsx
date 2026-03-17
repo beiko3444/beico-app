@@ -436,8 +436,8 @@ export default function ProformaClient({
                 }
             `}</style>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-6 items-start">
-                <div className="pi-no-print space-y-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,0.72fr)_minmax(210mm,1fr)] gap-6 items-start xl:justify-center">
+                <div className="pi-no-print space-y-6 xl:max-w-[560px]">
                     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
@@ -617,7 +617,10 @@ export default function ProformaClient({
                     </section>
                 </div>
 
-                <section id="pi-print-sheet" className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24">
+                <section
+                    id="pi-print-sheet"
+                    className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24 xl:w-[210mm] xl:max-w-none xl:min-w-[210mm] xl:h-[297mm] xl:min-h-[297mm] xl:aspect-auto"
+                >
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
 
                     <div className="bg-white border border-gray-300 p-3">
