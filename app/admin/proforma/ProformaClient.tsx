@@ -79,7 +79,7 @@ const slashDate = (date: Date) =>
 const CONSIGNEE_INFO = {
     companyName: 'LODOS BALIKCILIK ITH.IHR.SAN.VE TIC.LTD.STI.',
     addressLine1: 'MAHMUTBEY MAH.2420 SOKAK ISTOC 4.ADA NO:70/76',
-    addressLine2: 'BAGCILAR - ISTANBUL, TURKEY',
+    addressLine2: 'BAGCILAR - ISTANBUL, TÜRKİYE',
     phone: '+90 212 6592063',
     tax: 'Gunesli VD.6090890618'
 }
