@@ -350,7 +350,7 @@ export default function ProformaClient({
             <style jsx global>{`
                 @page {
                     size: A4;
-                    margin: 10mm;
+                    margin: 0;
                 }
                 body.pi-printing {
                     overflow: hidden !important;
@@ -373,9 +373,9 @@ export default function ProformaClient({
                     border: 0 !important;
                     border-radius: 0 !important;
                     margin: 0 !important;
-                    padding: 6mm 8mm !important;
-                    width: 190mm !important;
-                    min-height: 277mm !important;
+                    padding: 10mm !important;
+                    width: 210mm !important;
+                    min-height: 297mm !important;
                     max-height: none !important;
                     overflow: visible !important;
                     aspect-ratio: auto !important;
@@ -407,9 +407,9 @@ export default function ProformaClient({
                         border: 0 !important;
                         border-radius: 0 !important;
                         margin: 0 !important;
-                        padding: 6mm 8mm !important;
-                        width: 190mm !important;
-                        min-height: 277mm !important;
+                        padding: 10mm !important;
+                        width: 210mm !important;
+                        min-height: 297mm !important;
                         max-height: none !important;
                         overflow: visible !important;
                         aspect-ratio: auto !important;
@@ -434,6 +434,7 @@ export default function ProformaClient({
                                 >
                                     출력 (PDF 저장/인쇄)
                                 </button>
+                                <span className="text-[11px] text-gray-500">인쇄창에서 머리글/바닥글 해제 시 날짜/URL 표시가 사라집니다.</span>
                                 {leftTab === 'write' && (
                                     <>
                                         <button
