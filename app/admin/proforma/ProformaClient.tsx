@@ -155,10 +155,12 @@ export default function ProformaClient({
         }
 
         const partnerName = selectedPartner?.businessName || selectedPartner?.name || '-'
+        const now = new Date()
+        const draftNumber = `PI-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-001`
         return {
             id: 'draft',
-            invoiceNumber: 'DRAFT-PI',
-            issueDate: new Date().toISOString(),
+            invoiceNumber: draftNumber,
+            issueDate: now.toISOString(),
             partnerName,
             totalUsd: draftTotalUsd,
             items: draftItems
@@ -348,20 +350,70 @@ export default function ProformaClient({
 
         const origin = window.location.origin
 
+        const consigneeName = previewInvoice.partnerName || '-'
+
         const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Proforma Invoice - ${previewInvoice.invoiceNumber}</title>
 <style>
-@page { size: A4 portrait; margin: 0; }
+@page {
+    size: A4 portrait;
+    margin: 10mm 15mm 15mm 12mm;
+}
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-html, body { width: 210mm; min-height: 297mm; background: white; }
-body { padding: 10mm 12mm; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif; color: #22253f; font-size: 11px; line-height: 1.4; }
+html, body { background: white; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif; color: #22253f; font-size: 11px; line-height: 1.4; }
 table { border-collapse: collapse; width: 100%; }
+
+/* Fixed footer - repeats on every printed page */
+.print-footer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 9px;
+    color: #999;
+    padding: 2mm 0;
+}
+.print-footer::after {
+    content: " — Page " counter(page) " / " counter(pages);
+}
+
+/* Right side watermark - repeats on every printed page */
+.print-watermark {
+    position: fixed;
+    top: 50%;
+    right: -2mm;
+    transform: translateY(-50%) rotate(180deg);
+    writing-mode: vertical-rl;
+    font-size: 7px;
+    color: #ccc;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    z-index: 1000;
+}
+.print-watermark::after {
+    content: " (" counter(page) "/" counter(pages) ")";
+}
+
+/* Ensure body has enough bottom padding so content doesn't overlap footer */
+body { padding-bottom: 12mm; }
 </style>
 </head>
 <body>
+
+<!-- Right side watermark (fixed = repeats on every page) -->
+<div class="print-watermark">
+    This document is an officially issued Proforma Invoice by beiko Inc. | ${previewInvoice.invoiceNumber} | To: ${consigneeName}
+</div>
+
+<!-- Footer with page number (fixed = repeats on every page) -->
+<div class="print-footer">
+    ${previewInvoice.invoiceNumber} &mdash; beiko Inc. Proforma Invoice
+</div>
 
 <!-- Top red line -->
 <div style="height:4px;width:100%;background:#e53b19;margin-bottom:8px"></div>

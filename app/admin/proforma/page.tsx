@@ -83,7 +83,7 @@ export default async function ProformaPage() {
         name: product.name,
         nameEN: product.nameEN || null,
         nameJP: product.nameJP || null,
-        productCode: product.productCode || null,
+        productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
         imageUrl: product.imageUrl || null,
         usBuyPrice: resolveUsdUnitPrice(product),
         stock: product.stock
@@ -100,7 +100,7 @@ export default async function ProformaPage() {
             productId: item.productId,
             productName: item.productName,
             productNameEN: item.productNameEN,
-            productCode: item.productCode,
+            productCode: item.productCode ? String(item.productCode).toUpperCase() : null,
             quantity: item.quantity,
             unitPriceUsd: item.unitPriceUsd,
             amountUsd: item.amountUsd

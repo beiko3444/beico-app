@@ -16,6 +16,7 @@ export async function POST(request: Request) {
     try {
         const body = await request.json()
         const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity, coupangSku } = body
+        const normalizedProductCode = productCode ? String(productCode).trim().toUpperCase() : null
 
         // Validation
         if (!name || buyPrice === undefined || sellPrice === undefined) {
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
             nameJP: nameJP ? String(nameJP).trim() : null,
             nameEN: nameEN ? String(nameEN).trim() : null,
             barcode: barcode ? String(barcode).trim() : null,
-            productCode: productCode ? String(productCode).trim() : null,
+            productCode: normalizedProductCode,
             coupangSku: coupangSku ? String(coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),

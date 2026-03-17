@@ -110,6 +110,8 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     });
     const [activeGradeTab, setActiveGradeTab] = useState('C');
 
+    const normalizeProductCode = (value: string) => value.toUpperCase();
+
     // Helper for formatting number with commas
     const formatNumber = (val: string | number) => {
         if (val === "" || val === null || val === undefined) return "";
@@ -139,7 +141,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameJP(initialData.nameJP || '')
             setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
-            setProductCode(initialData.productCode || '')
+            setProductCode((initialData.productCode || '').toUpperCase())
             setCoupangSku(initialData.coupangSku || '')
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
@@ -245,7 +247,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 nameJP: nameJP.trim(),
                 nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
-                productCode: productCode.trim(),
+                productCode: normalizeProductCode(productCode.trim()),
                 coupangSku: coupangSku.trim(),
                 buyPrice: parseFloat(parseNumber(regionalPrices['C'].KR.cost)) || 0,
                 sellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.wholesale)) || 0,
@@ -434,7 +436,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                 <input
                                     type="text"
                                     value={productCode}
-                                    onChange={e => setProductCode(e.target.value)}
+                                    onChange={e => setProductCode(normalizeProductCode(e.target.value))}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono uppercase"
                                     placeholder="ITEM CODE"
                                 />

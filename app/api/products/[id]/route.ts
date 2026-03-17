@@ -6,6 +6,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const { id } = await context.params
         const body = await request.json()
         console.log(`[UPDATE PRODUCT] ID: ${id}, Body:`, body)
+        const normalizedProductCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null
 
         const { name, buyPrice, sellPrice, stock } = body
 
@@ -19,7 +20,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             nameJP: body.nameJP ? String(body.nameJP).trim() : null,
             nameEN: body.nameEN ? String(body.nameEN).trim() : null,
             barcode: body.barcode ? String(body.barcode).trim() : null,
-            productCode: body.productCode ? String(body.productCode).trim() : null,
+            productCode: normalizedProductCode,
             coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),

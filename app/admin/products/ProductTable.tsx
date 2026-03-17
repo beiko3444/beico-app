@@ -165,7 +165,7 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete, check
                     </div>
                 </div>
             </td>
-            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-500 font-mono text-[10px] whitespace-nowrap">{product.productCode || '-'}</td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-500 font-mono text-[10px] whitespace-nowrap">{product.productCode ? String(product.productCode).toUpperCase() : '-'}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-400 font-mono text-[10px] whitespace-nowrap">
                 <BarcodeDisplay value={product.barcode} />
             </td>
