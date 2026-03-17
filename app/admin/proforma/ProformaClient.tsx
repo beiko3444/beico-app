@@ -313,12 +313,6 @@ export default function ProformaClient({
             return
         }
 
-        const printWindow = window.open('', '_blank', 'width=794,height=1123')
-        if (!printWindow) {
-            alert('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해주세요.')
-            return
-        }
-
         // Build product rows HTML with inline styles
         const rowsHtml = printableRows.map((row) => {
             if (row.isBlank) {
@@ -476,25 +470,35 @@ ${rowsHtml}
 </body>
 </html>`
 
-        printWindow.document.write(fullHtml)
-        printWindow.document.close()
+        // Use hidden iframe for reliable printing (popup has timing issues)
+        const existingFrame = document.getElementById('pi-print-frame')
+        if (existingFrame) existingFrame.remove()
 
-        // Wait for images to load, then trigger print
-        const tryPrint = () => {
-            printWindow.focus()
-            printWindow.print()
+        const iframe = document.createElement('iframe')
+        iframe.id = 'pi-print-frame'
+        iframe.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:210mm;height:297mm;border:none;'
+        document.body.appendChild(iframe)
+
+        const iframeDoc = iframe.contentDocument || iframe.contentWindow?.document
+        if (!iframeDoc || !iframe.contentWindow) {
+            alert('인쇄 프레임을 생성할 수 없습니다.')
+            iframe.remove()
+            return
         }
 
-        printWindow.onload = () => {
-            setTimeout(tryPrint, 500)
-        }
+        iframeDoc.open()
+        iframeDoc.write(fullHtml)
+        iframeDoc.close()
 
-        // Fallback
-        setTimeout(() => {
-            if (!printWindow.closed) {
-                tryPrint()
-            }
-        }, 3000)
+        // Wait for content + images to render, then print
+        iframe.onload = () => {
+            setTimeout(() => {
+                iframe.contentWindow?.focus()
+                iframe.contentWindow?.print()
+                // Clean up after print dialog closes
+                setTimeout(() => { iframe.remove() }, 2000)
+            }, 300)
+        }
     }
 
     return (
