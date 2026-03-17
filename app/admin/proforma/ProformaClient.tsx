@@ -520,7 +520,7 @@ export default function ProformaClient({
                                 <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
                             </div>
                             <div className="flex-1 text-center">
-                                <h1 className="text-4xl leading-none font-black tracking-tight">BEIKO CO., LTD.</h1>
+                                <h1 className="text-4xl leading-none font-black tracking-tight">beiko Inc.</h1>
                                 <p className="mt-2 text-sm">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
                                 <p className="text-sm mt-1">Mob: +82 10 8119 3313&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
                             </div>
@@ -544,7 +544,7 @@ export default function ProformaClient({
                                 </tr>
                                 <tr>
                                     <td className="border border-gray-900 px-2 py-1 font-black">From:</td>
-                                    <td className="border border-gray-900 px-2 py-1">BEIKO CO., LTD.</td>
+                                    <td className="border border-gray-900 px-2 py-1">beiko Inc.</td>
                                     <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
                                     <td className="border border-gray-900 px-2 py-1">Lee Dabin</td>
                                 </tr>
@@ -617,7 +617,7 @@ export default function ProformaClient({
                                     <p className="mt-1">Payment currency: USD</p>
                                     <p className="text-[#e53b19]">Beneficiary account number: 656-045236-01-013</p>
                                     <p className="text-[#e53b19]">SWIFT code: IBKOKRSEXXX</p>
-                                    <p>Beneficiary name: BEIKO CO., LTD.</p>
+                                    <p>Beneficiary name: beiko Inc.</p>
                                     <p>Beneficiary bank: IBK Industrial Bank of Korea</p>
                                     <p>Beneficiary bank address: Busan, Republic of Korea</p>
                                 </div>
