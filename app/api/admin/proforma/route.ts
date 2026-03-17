@@ -165,7 +165,7 @@ export async function POST(request: Request) {
                 productId: product.id,
                 productName: product.nameJP || product.name,
                 productNameEN: product.nameEN,
-                productCode: product.productCode,
+                productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
                 quantity: item.quantity,
                 unitPriceUsd,
                 amountUsd: unitPriceUsd * item.quantity
