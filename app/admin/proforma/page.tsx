@@ -93,11 +93,13 @@ export default async function ProformaPage() {
                 </div>
             </div>
 
-            <ProformaClient
-                partners={partnerOptions}
-                products={productOptions}
-                initialIssuedInvoices={issuedInvoices}
-            />
+            <div className="relative left-1/2 w-[min(1720px,calc(100vw-2rem))] -translate-x-1/2">
+                <ProformaClient
+                    partners={partnerOptions}
+                    products={productOptions}
+                    initialIssuedInvoices={issuedInvoices}
+                />
+            </div>
         </div>
     )
 }

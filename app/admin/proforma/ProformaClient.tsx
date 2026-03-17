@@ -418,8 +418,8 @@ export default function ProformaClient({
                 }
             `}</style>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(340px,0.72fr)_minmax(210mm,1fr)] gap-6 items-start xl:justify-center">
-                <div className="pi-no-print space-y-6 xl:max-w-[560px]">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(480px,1fr)_210mm] gap-8 items-start">
+                <div className="pi-no-print space-y-6 xl:max-w-none">
                     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
