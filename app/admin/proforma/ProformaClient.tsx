@@ -714,13 +714,11 @@ export default function ProformaClient({
                                     <p>Beneficiary bank address: Busan, Republic of Korea</p>
                                 </div>
                             </div>
-                            <div className="pt-5 flex flex-col items-end gap-1.5 shrink-0">
-                                <img src="/logo.png" alt="BEIKO" className="w-20 object-contain" />
-                                <div className="flex items-end justify-end gap-2">
-                                    <span className="text-sm font-black text-[#1f2340] leading-none">beiko Inc.</span>
-                                    <div className="w-20">
-                                        <img src="/bko.png" alt="seal" className="w-full object-contain opacity-80" />
-                                    </div>
+                            <div className="pt-5 shrink-0">
+                                <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] items-end gap-x-2 gap-y-1">
+                                    <img src="/logo.png" alt="BEIKO" className="w-20 object-contain row-start-1 col-start-1" />
+                                    <span className="text-sm font-black text-[#1f2340] leading-none row-start-2 col-start-1">beiko Inc.</span>
+                                    <img src="/bko.png" alt="seal" className="w-20 object-contain opacity-80 row-start-1 row-span-2 col-start-2 self-end" />
                                 </div>
                             </div>
                         </div>
