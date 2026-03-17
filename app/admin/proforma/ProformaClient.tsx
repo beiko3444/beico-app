@@ -513,121 +513,120 @@ export default function ProformaClient({
 
                 <section id="pi-print-sheet" className="bg-[#f6f3f1] rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f] xl:sticky xl:top-24 xl:max-h-[calc(100vh-130px)] xl:overflow-auto">
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
-                <div className="bg-[#e53b19] text-white -mx-8 -mt-8 px-8 pt-6 pb-5 rounded-t-2xl">
-                    <div className="flex items-start justify-between gap-4">
-                        <div className="w-20 text-center">
-                            <div className="mx-auto w-12 h-12 rounded-full border border-white/60 flex items-center justify-center text-xl font-black">$</div>
-                            <div className="text-[10px] font-bold mt-2 tracking-wider">BEIKO TRADING</div>
-                        </div>
-                        <div className="flex-1 text-center">
-                            <h1 className="text-[42px] leading-none font-black tracking-tight">PROFORMA INVOICE</h1>
-                            <p className="mt-2 text-sm font-bold">BEIKO Co., Ltd.</p>
-                            <p className="text-xs mt-1">35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan</p>
-                            <p className="text-xs mt-0.5">+82-10-8119-3313 · contact@beiko.co.kr</p>
-                        </div>
-                        <div className="w-20" />
-                    </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-4">
-                    <div className="border border-[#e53b19]/20 bg-white">
-                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Bill To</div>
-                        <div className="p-3 space-y-2 text-sm">
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Name</span><span>{textOrDash(previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</span></div>
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Email</span><span>{textOrDash(previewPartner?.email)}</span></div>
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Phone</span><span>{textOrDash(previewPartner?.contact)}</span></div>
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Address</span><span>{textOrDash(previewPartner?.address)}</span></div>
+                    <div className="bg-white border border-gray-300 p-4">
+                        <div className="flex items-start gap-4 border-b border-gray-300 pb-3">
+                            <div className="w-44 pt-1">
+                                <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
+                            </div>
+                            <div className="flex-1 text-center">
+                                <h1 className="text-4xl leading-none font-black tracking-tight">BEIKO CO., LTD.</h1>
+                                <p className="mt-2 text-sm">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
+                                <p className="text-sm mt-1">Mob: +82 10 8119 3313&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
+                            </div>
                         </div>
-                    </div>
-                    <div className="border border-[#e53b19]/20 bg-white">
-                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Ship To</div>
-                        <div className="p-3 space-y-2 text-sm">
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Name</span><span>{textOrDash(previewPartner?.representativeName || previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</span></div>
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Email</span><span>{textOrDash(previewPartner?.email)}</span></div>
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Phone</span><span>{textOrDash(previewPartner?.contact)}</span></div>
-                            <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Address</span><span>{textOrDash(previewPartner?.address)}</span></div>
-                        </div>
-                    </div>
-                </div>
 
-                <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div className="border border-[#e53b19]/20 bg-white">
-                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Shipping Details</div>
-                        <div className="p-3 space-y-2 text-sm">
-                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Est. Ship Date</span><span>{dateFormatter.format(estShipDate)}</span></div>
-                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Est. Weight (kg)</span><span>{totalQuantity.toLocaleString()}</span></div>
-                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Transportation</span><span>Air</span></div>
-                            <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Carrier</span><span>-</span></div>
-                        </div>
-                    </div>
-                    <div className="border border-[#e53b19]/20 bg-white">
-                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Invoice Details</div>
-                        <div className="p-3 space-y-2 text-sm">
-                            <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Invoice #</span><span>{previewInvoice.invoiceNumber}</span></div>
-                            <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Invoice Date</span><span>{dateFormatter.format(issueDate)}</span></div>
-                            <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Due Date</span><span>{dateFormatter.format(dueDate)}</span></div>
-                        </div>
-                    </div>
-                </div>
+                        <h2 className="text-center text-3xl font-black mt-3 mb-3">Proforma Invoice</h2>
 
-                <div className="h-[3px] bg-[#e53b19] mt-4 mb-3" />
+                        <table className="w-full border-collapse border border-gray-900 text-sm">
+                            <tbody>
+                                <tr>
+                                    <td className="border border-gray-900 px-2 py-1 w-16 font-black">No.:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{previewInvoice.invoiceNumber}</td>
+                                    <td className="border border-gray-900 px-2 py-1 w-24 font-black">Date:</td>
+                                    <td className="border border-gray-900 px-2 py-1 w-56">{issueDateText}</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">TO:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{textOrDash(previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</td>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{textOrDash(previewPartner?.representativeName || previewPartner?.name)}</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">From:</td>
+                                    <td className="border border-gray-900 px-2 py-1">BEIKO CO., LTD.</td>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
+                                    <td className="border border-gray-900 px-2 py-1">Lee Dabin</td>
+                                </tr>
+                            </tbody>
+                        </table>
 
-                <table className="w-full text-sm border-collapse border border-[#cdcfdb] bg-white">
-                    <thead className="bg-[#f7ebe5] text-[#4b2f23]">
-                        <tr>
-                            <th className="border border-[#cdcfdb] px-2 py-2 text-left w-12">#</th>
-                            <th className="border border-[#cdcfdb] px-2 py-2 text-left">Description</th>
-                            <th className="border border-[#cdcfdb] px-2 py-2 text-right w-32">Price ($)</th>
-                            <th className="border border-[#cdcfdb] px-2 py-2 text-right w-24">Quantity</th>
-                            <th className="border border-[#cdcfdb] px-2 py-2 text-right w-32">Amount ($)</th>
-                        </tr>
-                    </thead>
-                    <tbody className="text-[#4d5168]">
-                        {printableRows.map((row) => (
-                            <tr key={row.id}>
-                                <td className="border border-[#cdcfdb] px-2 py-2 text-left font-black">{row.no}</td>
-                                <td className="border border-[#cdcfdb] px-2 py-2">{row.description || '-'}</td>
-                                <td className="border border-[#cdcfdb] px-2 py-2 text-right">{row.description ? usdFormatter.format(row.price) : '-'}</td>
-                                <td className="border border-[#cdcfdb] px-2 py-2 text-right">{row.quantity > 0 ? row.quantity.toLocaleString() : '-'}</td>
-                                <td className="border border-[#cdcfdb] px-2 py-2 text-right">{row.description ? usdFormatter.format(row.amount) : usdFormatter.format(0)}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                        <table className="w-full border-collapse border border-gray-900 mt-0 text-sm">
+                            <thead className="bg-[#f7ebe5]">
+                                <tr className="text-center font-black">
+                                    <th className="border border-gray-900 px-2 py-1.5 w-44">Product Name</th>
+                                    <th className="border border-gray-900 px-2 py-1.5 w-28">Model</th>
+                                    <th className="border border-gray-900 px-2 py-1.5 w-52">Picture</th>
+                                    <th className="border border-gray-900 px-2 py-1.5">Specification</th>
+                                    <th className="border border-gray-900 px-2 py-1.5 w-36">
+                                        Unit price <span className="text-[#e53b19]">EXW</span> (US$)
+                                    </th>
+                                    <th className="border border-gray-900 px-2 py-1.5 w-20">Qty<br />(set)</th>
+                                    <th className="border border-gray-900 px-2 py-1.5 w-36">
+                                        Total price <span className="text-[#e53b19]">EXW</span> (US$)
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {printableRows.map((row) => (
+                                    <tr key={row.id} className={row.isBlank ? 'h-14' : 'h-56 align-top'}>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.productName}</td>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.model}</td>
+                                        <td className="border border-gray-900 px-2 py-2">
+                                            {row.isBlank ? (
+                                                <div />
+                                            ) : row.imageUrl ? (
+                                                <img src={row.imageUrl} alt={row.productName} className="w-full h-48 object-contain bg-white" />
+                                            ) : (
+                                                <div className="w-full h-48 flex items-center justify-center text-xs text-gray-400">No Image</div>
+                                            )}
+                                        </td>
+                                        <td className="border border-gray-900 px-2 py-2 text-[13px] leading-relaxed">
+                                            {row.isBlank ? (
+                                                <div />
+                                            ) : (
+                                                <div className="space-y-0.5">
+                                                    {row.specificationLines.map((line, idx) => (
+                                                        <div key={`${row.id}-spec-${idx}`} className={idx >= 2 ? 'text-[#e53b19]' : ''}>{line}</div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </td>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : usdText(row.price)}</td>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.quantity.toLocaleString()}</td>
+                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : usdText(row.amount)}</td>
+                                    </tr>
+                                ))}
+                                <tr className="font-black">
+                                    <td colSpan={5} className="border border-gray-900 px-2 py-2 text-center">Total</td>
+                                    <td className="border border-gray-900 px-2 py-2 text-center">{totalQuantity.toLocaleString()}</td>
+                                    <td className="border border-gray-900 px-2 py-2 text-center">{usdText(grandTotalUsd)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
 
-                <div className="grid grid-cols-2 gap-5 mt-4 text-sm">
-                    <div className="space-y-4">
-                        <div className="grid grid-cols-[130px_1fr] gap-2">
-                            <span className="font-black">Payment Method</span>
-                            <span>Bank Transfer</span>
-                        </div>
-                        <div className="flex items-start gap-2 text-[#5a5f79]">
-                            <span className="mt-0.5">☑</span>
-                            <p>I acknowledge that the information above is accurate and true.</p>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="grid grid-cols-[130px_1fr] gap-2"><span className="font-black">Shipper Name</span><span>{textOrDash(previewPartner?.representativeName || previewPartner?.name)}</span></div>
-                            <div className="grid grid-cols-[130px_1fr] gap-2 items-end">
-                                <span className="font-black">Shipper Signature</span>
-                                <div className="h-8 border-b border-[#a7aac0]" />
+                        <div className="mt-4 flex items-start justify-between gap-6">
+                            <div className="text-sm leading-snug flex-1">
+                                <p>1. Price terms: EXW BUSAN</p>
+                                <p className="mt-1">2. Packaging: by export carton box</p>
+                                <p className="mt-1">3. Payment Term: 100% deposit by T/T</p>
+                                <p className="mt-1">4. Production time: 3-5 days after receiving the deposit</p>
+                                <p className="mt-1">5. Validity Period: quotation valid for 30 days from invoice date</p>
+                                <div className="mt-3">
+                                    <p className="text-[#e53b19] font-black text-2xl leading-none">Bank details:</p>
+                                    <p className="mt-1">Payment currency: USD</p>
+                                    <p className="text-[#e53b19]">Beneficiary account number: 656-045236-01-013</p>
+                                    <p className="text-[#e53b19]">SWIFT code: IBKOKRSEXXX</p>
+                                    <p>Beneficiary name: BEIKO CO., LTD.</p>
+                                    <p>Beneficiary bank: IBK Industrial Bank of Korea</p>
+                                    <p>Beneficiary bank address: Busan, Republic of Korea</p>
+                                </div>
+                            </div>
+                            <div className="w-52 pt-14">
+                                <img src="/bko.png" alt="seal" className="w-full object-contain opacity-80" />
                             </div>
                         </div>
                     </div>
-
-                    <div className="space-y-2">
-                        <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Subtotal</span><span>{usdFormatter.format(subtotalUsd)}</span></div>
-                        <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Tax ($)</span><span>{usdFormatter.format(taxUsd)}</span></div>
-                        <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Shipping ($)</span><span>{usdFormatter.format(shippingUsd)}</span></div>
-                        <div className="grid grid-cols-[1fr_auto] gap-2 bg-[#f3dad1] px-3 py-2 font-black text-base">
-                            <span>Total Amount</span>
-                            <span>{usdFormatter.format(grandTotalUsd)}</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="mt-6 text-xs text-[#6f748f]">
-                    Notes: This invoice is in USD. Total payment due is 30 days.
-                </div>
                 </section>
             </div>
         </div>
