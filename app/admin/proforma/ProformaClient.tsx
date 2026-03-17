@@ -511,7 +511,7 @@ export default function ProformaClient({
                     </section>
                 </div>
 
-                <section id="pi-print-sheet" className="bg-[#f6f3f1] rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f] xl:sticky xl:top-24 xl:max-h-[calc(100vh-130px)] xl:overflow-auto">
+                <section id="pi-print-sheet" className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f] xl:sticky xl:top-24 xl:max-h-[calc(100vh-130px)] xl:overflow-auto">
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
 
                     <div className="bg-white border border-gray-300 p-4">
@@ -519,7 +519,7 @@ export default function ProformaClient({
                             <div className="text-center">
                                 <h1 className="text-4xl leading-none font-black tracking-tight">beiko Inc.</h1>
                                 <p className="mt-2 text-sm">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
-                                <p className="text-sm mt-1">Mob: +82 10 8119 3313&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
+                                <p className="text-sm mt-1">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
                             </div>
                         </div>
 
