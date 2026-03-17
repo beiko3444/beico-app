@@ -515,11 +515,8 @@ export default function ProformaClient({
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
 
                     <div className="bg-white border border-gray-300 p-4">
-                        <div className="flex items-start gap-4 border-b border-gray-300 pb-3">
-                            <div className="w-44 pt-1">
-                                <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
-                            </div>
-                            <div className="flex-1 text-center">
+                        <div className="border-b border-gray-300 pb-3">
+                            <div className="text-center">
                                 <h1 className="text-4xl leading-none font-black tracking-tight">beiko Inc.</h1>
                                 <p className="mt-2 text-sm">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
                                 <p className="text-sm mt-1">Mob: +82 10 8119 3313&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
