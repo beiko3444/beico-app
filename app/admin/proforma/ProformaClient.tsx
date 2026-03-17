@@ -76,6 +76,14 @@ const usdText = (value: number) =>
 const slashDate = (date: Date) =>
     `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
 
+const CONSIGNEE_INFO = {
+    companyName: 'LODOS BALIKCILIK ITH.IHR.SAN.VE TIC.LTD.STI.',
+    addressLine1: 'MAHMUTBEY MAH.2420 SOKAK ISTOC 4.ADA NO:70/76',
+    addressLine2: 'BAGCILAR - ISTANBUL, TURKEY',
+    phone: '+90 212 6592063',
+    tax: 'Gunesli VD.6090890618'
+}
+
 export default function ProformaClient({
     partners,
     products,
@@ -546,16 +554,26 @@ export default function ProformaClient({
                                     <td className="border border-gray-900 px-2 py-1 w-56">{issueDateText}</td>
                                 </tr>
                                 <tr>
-                                    <td className="border border-gray-900 px-2 py-1 font-black">TO:</td>
-                                    <td className="border border-gray-900 px-2 py-1">{textOrDash(previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</td>
-                                    <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
-                                    <td className="border border-gray-900 px-2 py-1">{textOrDash(previewPartner?.representativeName || previewPartner?.name)}</td>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Consignee:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.companyName}</td>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Phone:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.phone}</td>
                                 </tr>
                                 <tr>
                                     <td className="border border-gray-900 px-2 py-1 font-black">From:</td>
                                     <td className="border border-gray-900 px-2 py-1">beiko Inc.</td>
                                     <td className="border border-gray-900 px-2 py-1 font-black">Contact:</td>
                                     <td className="border border-gray-900 px-2 py-1">Lee Dabin</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Address:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.addressLine1}</td>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">TAX:</td>
+                                    <td className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.tax}</td>
+                                </tr>
+                                <tr>
+                                    <td className="border border-gray-900 px-2 py-1 font-black">Address 2:</td>
+                                    <td colSpan={3} className="border border-gray-900 px-2 py-1">{CONSIGNEE_INFO.addressLine2}</td>
                                 </tr>
                             </tbody>
                         </table>
