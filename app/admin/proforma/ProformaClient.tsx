@@ -632,6 +632,8 @@ ${rowsHtml}
                                                                 min={1}
                                                                 value={rowState.quantity}
                                                                 onChange={(event) => updateQuantity(product.id, event.target.value)}
+                                                                onFocus={(event) => event.currentTarget.select()}
+                                                                onClick={(event) => event.currentTarget.select()}
                                                                 className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-center font-bold"
                                                             />
                                                         </td>
