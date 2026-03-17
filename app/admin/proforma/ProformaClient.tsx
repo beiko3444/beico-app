@@ -316,8 +316,10 @@ export default function ProformaClient({
                 }
             `}</style>
 
-            <div className="pi-no-print grid grid-cols-1 xl:grid-cols-3 gap-6">
-                <section className="xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+            <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-6 items-start">
+                <div className="pi-no-print space-y-6">
+                    <div className="grid grid-cols-1 2xl:grid-cols-3 gap-6">
+                        <section className="2xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                         <div>
                             <h2 className="text-base font-black text-gray-900">PI 작성</h2>
@@ -342,7 +344,7 @@ export default function ProformaClient({
                                 type="button"
                                 onClick={handleIssue}
                                 disabled={isIssuing}
-                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#d9361b] text-white hover:brightness-110 disabled:opacity-50 transition-all"
+                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 disabled:opacity-50 transition-all"
                             >
                                 {isIssuing ? '발행 중...' : '발행하기'}
                             </button>
@@ -357,7 +359,7 @@ export default function ProformaClient({
                                 setSelectedPartnerId(event.target.value)
                                 setActiveIssuedId(null)
                             }}
-                            className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-bold focus:ring-[#d9361b] focus:border-[#d9361b]"
+                            className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-bold focus:ring-[#e53b19] focus:border-[#e53b19]"
                         >
                             <option value="">업체를 선택하세요</option>
                             {partners.map((partner) => (
@@ -385,13 +387,13 @@ export default function ProformaClient({
                                     const rowState = draftState[product.id] || { checked: false, quantity: 1 }
                                     const amount = rowState.quantity * Number(product.usBuyPrice || 0)
                                     return (
-                                        <tr key={product.id} className={rowState.checked ? 'bg-[#d9361b]/5' : 'bg-white'}>
+                                        <tr key={product.id} className={rowState.checked ? 'bg-[#e53b19]/5' : 'bg-white'}>
                                             <td className="px-3 py-2 text-center">
                                                 <input
                                                     type="checkbox"
                                                     checked={rowState.checked}
                                                     onChange={() => toggleProduct(product.id)}
-                                                    className="h-4 w-4 accent-[#d9361b]"
+                                                    className="h-4 w-4 accent-[#e53b19]"
                                                 />
                                             </td>
                                             <td className="px-3 py-2">
@@ -410,7 +412,7 @@ export default function ProformaClient({
                                                     className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-center font-bold"
                                                 />
                                             </td>
-                                            <td className="px-3 py-2 text-right font-bold text-[#d9361b]">
+                                            <td className="px-3 py-2 text-right font-bold text-[#e53b19]">
                                                 {rowState.checked ? usdFormatter.format(amount) : '-'}
                                             </td>
                                         </tr>
@@ -421,7 +423,7 @@ export default function ProformaClient({
                     </div>
                 </section>
 
-                <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                     <div>
                         <h2 className="text-base font-black text-gray-900">PI 발급리스트</h2>
                         <p className="text-xs text-gray-500 mt-1">날짜, 업체명, 총가격 기준으로 확인할 수 있습니다.</p>
@@ -445,23 +447,25 @@ export default function ProformaClient({
                                     issuedInvoices.map((invoice) => (
                                         <tr
                                             key={invoice.id}
-                                            className={`cursor-pointer hover:bg-gray-50 ${activeIssuedId === invoice.id ? 'bg-[#d9361b]/5' : ''}`}
+                                            className={`cursor-pointer hover:bg-gray-50 ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
                                             onClick={() => setActiveIssuedId(invoice.id)}
                                         >
                                             <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
                                             <td className="px-3 py-2 font-bold text-gray-900">{invoice.partnerName}</td>
-                                            <td className="px-3 py-2 text-right font-bold text-[#d9361b]">{usdFormatter.format(invoice.totalUsd)}</td>
+                                            <td className="px-3 py-2 text-right font-bold text-[#e53b19]">{usdFormatter.format(invoice.totalUsd)}</td>
                                         </tr>
                                     ))
                                 )}
                             </tbody>
                         </table>
                     </div>
-                </section>
-            </div>
+                        </section>
+                    </div>
+                </div>
 
-            <section id="pi-print-sheet" className="bg-[#f3f4f8] rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f]">
-                <div className="bg-[#6f1d91] text-white -mx-8 -mt-8 px-8 pt-6 pb-5 rounded-t-2xl">
+                <section id="pi-print-sheet" className="bg-[#f6f3f1] rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f] xl:sticky xl:top-24 xl:max-h-[calc(100vh-130px)] xl:overflow-auto">
+                    <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
+                <div className="bg-[#e53b19] text-white -mx-8 -mt-8 px-8 pt-6 pb-5 rounded-t-2xl">
                     <div className="flex items-start justify-between gap-4">
                         <div className="w-20 text-center">
                             <div className="mx-auto w-12 h-12 rounded-full border border-white/60 flex items-center justify-center text-xl font-black">$</div>
@@ -478,8 +482,8 @@ export default function ProformaClient({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-4">
-                    <div className="border border-[#6f1d91]/20 bg-white">
-                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Bill To</div>
+                    <div className="border border-[#e53b19]/20 bg-white">
+                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Bill To</div>
                         <div className="p-3 space-y-2 text-sm">
                             <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Name</span><span>{textOrDash(previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</span></div>
                             <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Email</span><span>{textOrDash(previewPartner?.email)}</span></div>
@@ -487,8 +491,8 @@ export default function ProformaClient({
                             <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Address</span><span>{textOrDash(previewPartner?.address)}</span></div>
                         </div>
                     </div>
-                    <div className="border border-[#6f1d91]/20 bg-white">
-                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Ship To</div>
+                    <div className="border border-[#e53b19]/20 bg-white">
+                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Ship To</div>
                         <div className="p-3 space-y-2 text-sm">
                             <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Name</span><span>{textOrDash(previewPartner?.representativeName || previewPartner?.businessName || previewPartner?.name || previewInvoice.partnerName)}</span></div>
                             <div className="grid grid-cols-[82px_1fr] gap-2"><span className="font-black">Email</span><span>{textOrDash(previewPartner?.email)}</span></div>
@@ -499,8 +503,8 @@ export default function ProformaClient({
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 mt-3">
-                    <div className="border border-[#6f1d91]/20 bg-white">
-                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Shipping Details</div>
+                    <div className="border border-[#e53b19]/20 bg-white">
+                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Shipping Details</div>
                         <div className="p-3 space-y-2 text-sm">
                             <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Est. Ship Date</span><span>{dateFormatter.format(estShipDate)}</span></div>
                             <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Est. Weight (kg)</span><span>{totalQuantity.toLocaleString()}</span></div>
@@ -508,8 +512,8 @@ export default function ProformaClient({
                             <div className="grid grid-cols-[122px_1fr] gap-2"><span className="font-black">Carrier</span><span>-</span></div>
                         </div>
                     </div>
-                    <div className="border border-[#6f1d91]/20 bg-white">
-                        <div className="bg-[#6f1d91] text-white px-3 py-1.5 font-black text-sm">Invoice Details</div>
+                    <div className="border border-[#e53b19]/20 bg-white">
+                        <div className="bg-[#e53b19] text-white px-3 py-1.5 font-black text-sm">Invoice Details</div>
                         <div className="p-3 space-y-2 text-sm">
                             <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Invoice #</span><span>{previewInvoice.invoiceNumber}</span></div>
                             <div className="grid grid-cols-[98px_1fr] gap-2"><span className="font-black">Invoice Date</span><span>{dateFormatter.format(issueDate)}</span></div>
@@ -518,10 +522,10 @@ export default function ProformaClient({
                     </div>
                 </div>
 
-                <div className="h-[3px] bg-[#6f1d91] mt-4 mb-3" />
+                <div className="h-[3px] bg-[#e53b19] mt-4 mb-3" />
 
                 <table className="w-full text-sm border-collapse border border-[#cdcfdb] bg-white">
-                    <thead className="bg-[#e7e7f1] text-[#2b2f4c]">
+                    <thead className="bg-[#f7ebe5] text-[#4b2f23]">
                         <tr>
                             <th className="border border-[#cdcfdb] px-2 py-2 text-left w-12">#</th>
                             <th className="border border-[#cdcfdb] px-2 py-2 text-left">Description</th>
@@ -566,7 +570,7 @@ export default function ProformaClient({
                         <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Subtotal</span><span>{usdFormatter.format(subtotalUsd)}</span></div>
                         <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Tax ($)</span><span>{usdFormatter.format(taxUsd)}</span></div>
                         <div className="grid grid-cols-[1fr_auto] gap-2"><span className="font-black">Shipping ($)</span><span>{usdFormatter.format(shippingUsd)}</span></div>
-                        <div className="grid grid-cols-[1fr_auto] gap-2 bg-[#dfd3e9] px-3 py-2 font-black text-base">
+                        <div className="grid grid-cols-[1fr_auto] gap-2 bg-[#f3dad1] px-3 py-2 font-black text-base">
                             <span>Total Amount</span>
                             <span>{usdFormatter.format(grandTotalUsd)}</span>
                         </div>
@@ -576,7 +580,8 @@ export default function ProformaClient({
                 <div className="mt-6 text-xs text-[#6f748f]">
                     Notes: This invoice is in USD. Total payment due is 30 days.
                 </div>
-            </section>
+                </section>
+            </div>
         </div>
     )
 }
