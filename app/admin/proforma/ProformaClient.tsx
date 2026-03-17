@@ -85,6 +85,7 @@ export default function ProformaClient({
     const [draftState, setDraftState] = useState<DraftState>(() => makeInitialDraftState(products))
     const [issuedInvoices, setIssuedInvoices] = useState<IssuedInvoice[]>(initialIssuedInvoices)
     const [activeIssuedId, setActiveIssuedId] = useState<string | null>(initialIssuedInvoices[0]?.id || null)
+    const [leftTab, setLeftTab] = useState<'write' | 'issued'>('write')
     const [isIssuing, setIsIssuing] = useState(false)
 
     const selectedPartner = useMemo(
@@ -122,9 +123,11 @@ export default function ProformaClient({
     )
 
     const previewPartner = useMemo(() => {
+        if (activeIssuedInvoice) {
+            return partners.find((partner) => (partner.businessName || partner.name) === activeIssuedInvoice.partnerName) || null
+        }
         if (selectedPartner) return selectedPartner
-        if (!activeIssuedInvoice) return null
-        return partners.find((partner) => (partner.businessName || partner.name) === activeIssuedInvoice.partnerName) || null
+        return null
     }, [selectedPartner, activeIssuedInvoice, partners])
 
     const previewInvoice = useMemo<PreviewInvoice>(() => {
@@ -198,6 +201,7 @@ export default function ProformaClient({
             }
         }))
         setActiveIssuedId(null)
+        setLeftTab('write')
     }
 
     const updateQuantity = (productId: string, value: string) => {
@@ -212,11 +216,13 @@ export default function ProformaClient({
             }
         }))
         setActiveIssuedId(null)
+        setLeftTab('write')
     }
 
     const resetDraft = () => {
         setDraftState(makeInitialDraftState(products))
         setActiveIssuedId(null)
+        setLeftTab('write')
     }
 
     const handleIssue = async () => {
@@ -272,6 +278,7 @@ export default function ProformaClient({
 
             setIssuedInvoices((prev) => [created, ...prev])
             setActiveIssuedId(created.id)
+            setLeftTab('issued')
             alert('PI가 발행되어 발급리스트에 저장되었습니다.')
         } catch (error) {
             console.error(error)
@@ -318,149 +325,173 @@ export default function ProformaClient({
 
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)] gap-6 items-start">
                 <div className="pi-no-print space-y-6">
-                    <div className="grid grid-cols-1 2xl:grid-cols-3 gap-6">
-                        <section className="2xl:col-span-2 bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div>
-                            <h2 className="text-base font-black text-gray-900">PI 작성</h2>
-                            <p className="text-xs text-gray-500 mt-1">업체를 선택하고 상품을 체크하면 USD 단가 기준으로 PI 견적리스트가 생성됩니다.</p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={resetDraft}
-                                className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
-                            >
-                                초기화
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handlePrint}
-                                className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-900 text-white hover:bg-black transition-all"
-                            >
-                                출력 (PDF 저장/인쇄)
-                            </button>
-                            <button
-                                type="button"
-                                onClick={handleIssue}
-                                disabled={isIssuing}
-                                className="px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 disabled:opacity-50 transition-all"
-                            >
-                                {isIssuing ? '발행 중...' : '발행하기'}
-                            </button>
-                        </div>
-                    </div>
-
-                    <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
-                        <label className="text-xs font-bold text-gray-700">업체 선택</label>
-                        <select
-                            value={selectedPartnerId}
-                            onChange={(event) => {
-                                setSelectedPartnerId(event.target.value)
-                                setActiveIssuedId(null)
-                            }}
-                            className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-bold focus:ring-[#e53b19] focus:border-[#e53b19]"
-                        >
-                            <option value="">업체를 선택하세요</option>
-                            {partners.map((partner) => (
-                                <option key={partner.id} value={partner.id}>
-                                    {partner.businessName || partner.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="overflow-x-auto border border-gray-100 rounded-xl">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50 border-b border-gray-100 text-gray-600">
-                                <tr>
-                                    <th className="px-3 py-2 text-center">선택</th>
-                                    <th className="px-3 py-2 text-left">상품</th>
-                                    <th className="px-3 py-2 text-center">재고</th>
-                                    <th className="px-3 py-2 text-right">USD 단가</th>
-                                    <th className="px-3 py-2 text-center">수량</th>
-                                    <th className="px-3 py-2 text-right">금액(USD)</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {products.map((product) => {
-                                    const rowState = draftState[product.id] || { checked: false, quantity: 1 }
-                                    const amount = rowState.quantity * Number(product.usBuyPrice || 0)
-                                    return (
-                                        <tr key={product.id} className={rowState.checked ? 'bg-[#e53b19]/5' : 'bg-white'}>
-                                            <td className="px-3 py-2 text-center">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={rowState.checked}
-                                                    onChange={() => toggleProduct(product.id)}
-                                                    className="h-4 w-4 accent-[#e53b19]"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2">
-                                                <div className="font-bold text-gray-900">{product.nameJP || product.name}</div>
-                                                <div className="text-[11px] text-gray-500">{product.nameEN || product.name}</div>
-                                                <div className="text-[10px] text-gray-400 font-mono">{product.productCode || '-'}</div>
-                                            </td>
-                                            <td className="px-3 py-2 text-center text-gray-600">{product.stock.toLocaleString()}</td>
-                                            <td className="px-3 py-2 text-right font-bold text-gray-900">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
-                                            <td className="px-3 py-2 text-center">
-                                                <input
-                                                    type="number"
-                                                    min={1}
-                                                    value={rowState.quantity}
-                                                    onChange={(event) => updateQuantity(product.id, event.target.value)}
-                                                    className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-center font-bold"
-                                                />
-                                            </td>
-                                            <td className="px-3 py-2 text-right font-bold text-[#e53b19]">
-                                                {rowState.checked ? usdFormatter.format(amount) : '-'}
-                                            </td>
-                                        </tr>
-                                    )
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
-
-                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                    <div>
-                        <h2 className="text-base font-black text-gray-900">PI 발급리스트</h2>
-                        <p className="text-xs text-gray-500 mt-1">날짜, 업체명, 총가격 기준으로 확인할 수 있습니다.</p>
-                    </div>
-
-                    <div className="max-h-[520px] overflow-auto border border-gray-100 rounded-xl">
-                        <table className="w-full text-xs">
-                            <thead className="bg-gray-50 text-gray-600 border-b border-gray-100">
-                                <tr>
-                                    <th className="px-3 py-2 text-left">날짜</th>
-                                    <th className="px-3 py-2 text-left">업체명</th>
-                                    <th className="px-3 py-2 text-right">총가격</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100">
-                                {issuedInvoices.length === 0 ? (
-                                    <tr>
-                                        <td colSpan={3} className="px-3 py-8 text-center text-gray-400">발급된 PI가 없습니다.</td>
-                                    </tr>
-                                ) : (
-                                    issuedInvoices.map((invoice) => (
-                                        <tr
-                                            key={invoice.id}
-                                            className={`cursor-pointer hover:bg-gray-50 ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
-                                            onClick={() => setActiveIssuedId(invoice.id)}
+                    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                            <div>
+                                <h2 className="text-base font-black text-gray-900">프로포마인보이스 관리</h2>
+                                <p className="text-xs text-gray-500 mt-1">좌측 탭에서 제품리스트 작성/발급리스트 관리를 분리했습니다.</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={handlePrint}
+                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-900 text-white hover:bg-black transition-all"
+                                >
+                                    출력 (PDF 저장/인쇄)
+                                </button>
+                                {leftTab === 'write' && (
+                                    <>
+                                        <button
+                                            type="button"
+                                            onClick={resetDraft}
+                                            className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
                                         >
-                                            <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
-                                            <td className="px-3 py-2 font-bold text-gray-900">{invoice.partnerName}</td>
-                                            <td className="px-3 py-2 text-right font-bold text-[#e53b19]">{usdFormatter.format(invoice.totalUsd)}</td>
-                                        </tr>
-                                    ))
+                                            초기화
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={handleIssue}
+                                            disabled={isIssuing}
+                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 disabled:opacity-50 transition-all"
+                                        >
+                                            {isIssuing ? '발행 중...' : '발행하기'}
+                                        </button>
+                                    </>
                                 )}
-                            </tbody>
-                        </table>
-                    </div>
-                        </section>
-                    </div>
+                            </div>
+                        </div>
+
+                        <div className="inline-flex rounded-xl border border-gray-200 p-1 bg-gray-50">
+                            <button
+                                type="button"
+                                onClick={() => setLeftTab('write')}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'write' ? 'bg-[#e53b19] text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                            >
+                                PI 작성
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setLeftTab('issued')}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'issued' ? 'bg-[#e53b19] text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                            >
+                                PI 발급리스트
+                            </button>
+                        </div>
+
+                        {leftTab === 'write' ? (
+                            <div className="space-y-4">
+                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                    <label className="text-xs font-bold text-gray-700">업체 선택</label>
+                                    <select
+                                        value={selectedPartnerId}
+                                        onChange={(event) => {
+                                            setSelectedPartnerId(event.target.value)
+                                            setActiveIssuedId(null)
+                                            setLeftTab('write')
+                                        }}
+                                        className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-bold focus:ring-[#e53b19] focus:border-[#e53b19]"
+                                    >
+                                        <option value="">업체를 선택하세요</option>
+                                        {partners.map((partner) => (
+                                            <option key={partner.id} value={partner.id}>
+                                                {partner.businessName || partner.name}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    <p className="mt-2 text-[11px] text-gray-500">USD 단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
+                                </div>
+
+                                <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                                    <table className="w-full text-sm">
+                                        <thead className="bg-gray-50 border-b border-gray-100 text-gray-600">
+                                            <tr>
+                                                <th className="px-3 py-2 text-center">선택</th>
+                                                <th className="px-3 py-2 text-left">상품</th>
+                                                <th className="px-3 py-2 text-center">재고</th>
+                                                <th className="px-3 py-2 text-right">USD 단가</th>
+                                                <th className="px-3 py-2 text-center">수량</th>
+                                                <th className="px-3 py-2 text-right">금액(USD)</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {products.map((product) => {
+                                                const rowState = draftState[product.id] || { checked: false, quantity: 1 }
+                                                const amount = rowState.quantity * Number(product.usBuyPrice || 0)
+                                                return (
+                                                    <tr key={product.id} className={rowState.checked ? 'bg-[#e53b19]/5' : 'bg-white'}>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={rowState.checked}
+                                                                onChange={() => toggleProduct(product.id)}
+                                                                className="h-4 w-4 accent-[#e53b19]"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2">
+                                                            <div className="font-bold text-gray-900">{product.nameJP || product.name}</div>
+                                                            <div className="text-[11px] text-gray-500">{product.nameEN || product.name}</div>
+                                                            <div className="text-[10px] text-gray-400 font-mono">{product.productCode || '-'}</div>
+                                                        </td>
+                                                        <td className="px-3 py-2 text-center text-gray-600">{product.stock.toLocaleString()}</td>
+                                                        <td className="px-3 py-2 text-right font-bold text-gray-900">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <input
+                                                                type="number"
+                                                                min={1}
+                                                                value={rowState.quantity}
+                                                                onChange={(event) => updateQuantity(product.id, event.target.value)}
+                                                                className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-center font-bold"
+                                                            />
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right font-bold text-[#e53b19]">
+                                                            {rowState.checked ? usdFormatter.format(amount) : '-'}
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-3">
+                                <div>
+                                    <h3 className="text-sm font-black text-gray-900">PI 발급리스트</h3>
+                                    <p className="text-xs text-gray-500 mt-1">발급된 PI를 선택하면 우측 인쇄 미리보기에 즉시 반영됩니다.</p>
+                                </div>
+                                <div className="max-h-[620px] overflow-auto border border-gray-100 rounded-xl">
+                                    <table className="w-full text-xs">
+                                        <thead className="bg-gray-50 text-gray-600 border-b border-gray-100">
+                                            <tr>
+                                                <th className="px-3 py-2 text-left">날짜</th>
+                                                <th className="px-3 py-2 text-left">업체명</th>
+                                                <th className="px-3 py-2 text-right">총가격</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {issuedInvoices.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={3} className="px-3 py-8 text-center text-gray-400">발급된 PI가 없습니다.</td>
+                                                </tr>
+                                            ) : (
+                                                issuedInvoices.map((invoice) => (
+                                                    <tr
+                                                        key={invoice.id}
+                                                        className={`cursor-pointer hover:bg-gray-50 ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
+                                                        onClick={() => setActiveIssuedId(invoice.id)}
+                                                    >
+                                                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
+                                                        <td className="px-3 py-2 font-bold text-gray-900">{invoice.partnerName}</td>
+                                                        <td className="px-3 py-2 text-right font-bold text-[#e53b19]">{usdFormatter.format(invoice.totalUsd)}</td>
+                                                    </tr>
+                                                ))
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </section>
                 </div>
 
                 <section id="pi-print-sheet" className="bg-[#f6f3f1] rounded-2xl border border-gray-200 shadow-lg p-8 max-w-[210mm] mx-auto text-[#22253f] xl:sticky xl:top-24 xl:max-h-[calc(100vh-130px)] xl:overflow-auto">
