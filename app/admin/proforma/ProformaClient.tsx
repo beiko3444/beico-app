@@ -464,12 +464,12 @@ table { border-collapse: collapse; width: 100%; }
 <!-- Product table -->
 <table style="border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px;margin-top:0">
 <colgroup>
+    <col style="width:4%">
+    <col style="width:48%">
+    <col style="width:14%">
+    <col style="width:12%">
     <col style="width:5%">
-    <col style="width:40%">
-    <col style="width:16%">
-    <col style="width:13%">
-    <col style="width:6%">
-    <col style="width:20%">
+    <col style="width:17%">
 </colgroup>
 <thead>
     <tr style="background:#f7ebe5;text-align:center;font-weight:900">
@@ -807,12 +807,12 @@ setPageNumbers();
 
                         <table className="w-full table-fixed border-collapse border border-gray-900 mt-0 text-[10px]">
                             <colgroup>
+                                <col style={{ width: '4%' }} />
+                                <col style={{ width: '48%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '12%' }} />
                                 <col style={{ width: '5%' }} />
-                                <col style={{ width: '40%' }} />
-                                <col style={{ width: '16%' }} />
-                                <col style={{ width: '13%' }} />
-                                <col style={{ width: '6%' }} />
-                                <col style={{ width: '20%' }} />
+                                <col style={{ width: '17%' }} />
                             </colgroup>
                             <thead className="bg-[#f7ebe5]">
                                 <tr className="text-center font-black">
