@@ -322,21 +322,25 @@ export default function ProformaClient({
             document.body.classList.remove('pi-printing')
         }
 
+        const fallbackTimer = window.setTimeout(() => {
+            clearPrintState()
+        }, 30000)
+
         window.addEventListener(
             'afterprint',
             () => {
+                window.clearTimeout(fallbackTimer)
                 clearPrintState()
             },
             { once: true }
         )
 
         document.body.classList.add('pi-printing')
-        window.setTimeout(() => {
-            window.print()
-        }, 40)
-        window.setTimeout(() => {
-            clearPrintState()
-        }, 1500)
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                window.print()
+            })
+        })
     }
 
     return (
@@ -647,17 +651,25 @@ export default function ProformaClient({
                             </tbody>
                         </table>
 
-                        <table className="w-full border-collapse border border-gray-900 mt-0 text-[11px]">
+                        <table className="w-full table-fixed border-collapse border border-gray-900 mt-0 text-[10px]">
+                            <colgroup>
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '43%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '8%' }} />
+                                <col style={{ width: '14%' }} />
+                            </colgroup>
                             <thead className="bg-[#f7ebe5]">
                                 <tr className="text-center font-black">
-                                    <th className="border border-gray-900 px-2 py-1 w-10">No.</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-56">Product Name</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-28">Model</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-32">
+                                    <th className="border border-gray-900 px-1.5 py-1">No.</th>
+                                    <th className="border border-gray-900 px-1.5 py-1">Product Name</th>
+                                    <th className="border border-gray-900 px-1.5 py-1">Model</th>
+                                    <th className="border border-gray-900 px-1.5 py-1">
                                         Unit price <span className="text-[#e53b19]">FOB</span> (US$)
                                     </th>
-                                    <th className="border border-gray-900 px-2 py-1 w-16">Qty</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-32">
+                                    <th className="border border-gray-900 px-1.5 py-1">Qty</th>
+                                    <th className="border border-gray-900 px-1.5 py-1">
                                         Total price <span className="text-[#e53b19]">FOB</span> (US$)
                                     </th>
                                 </tr>
@@ -665,28 +677,28 @@ export default function ProformaClient({
                             <tbody>
                                 {printableRows.map((row) => (
                                     <tr key={row.id} className={row.isBlank ? 'h-7' : ''}>
-                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : row.no}</td>
-                                        <td className="border border-gray-900 px-2 py-1.5 align-top">
+                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top">{row.isBlank ? '' : row.no}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 align-top">
                                             {row.isBlank ? (
                                                 ''
                                             ) : (
-                                                <div className="flex items-start gap-2">
+                                                <div className="flex items-start gap-1.5">
                                                     {row.imageUrl ? (
-                                                        <img src={row.imageUrl} alt={row.productName} className="w-10 h-10 object-contain shrink-0" />
+                                                        <img src={row.imageUrl} alt={row.productName} className="w-8 h-8 object-contain shrink-0" />
                                                     ) : (
-                                                        <div className="w-10 h-10 shrink-0" />
+                                                        <div className="w-8 h-8 shrink-0" />
                                                     )}
-                                                    <div className="space-y-0.5 leading-tight text-left">
+                                                    <div className="space-y-0.5 leading-tight text-left break-words">
                                                         <div>{row.productName}</div>
-                                                        <div className="text-[10px] text-gray-700">{row.productNameEN || '-'}</div>
+                                                        <div className="text-[9px] text-gray-700">{row.productNameEN || '-'}</div>
                                                     </div>
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : row.model}</td>
-                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : usdText(row.price)}</td>
-                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : row.quantity.toLocaleString()}</td>
-                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : usdText(row.amount)}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap break-keep">{row.isBlank ? '' : row.model}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap">{row.isBlank ? '' : usdText(row.price)}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap">{row.isBlank ? '' : row.quantity.toLocaleString()}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap">{row.isBlank ? '' : usdText(row.amount)}</td>
                                     </tr>
                                 ))}
                                 <tr className="font-black">
