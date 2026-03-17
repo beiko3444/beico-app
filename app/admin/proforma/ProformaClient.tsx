@@ -604,14 +604,11 @@ export default function ProformaClient({
 
                     <div className="bg-white border border-gray-300 p-3">
                         <div className="h-1 w-full bg-[#e53b19] mb-2" />
-                        <div className="flex items-start gap-2 border-b-2 border-[#e53b19] pb-2">
-                            <div className="flex-1 text-center">
+                        <div className="border-b-2 border-[#e53b19] pb-2">
+                            <div className="text-center">
                                 <h1 className="text-2xl leading-none font-black tracking-tight text-[#1f2340]">beiko Inc.</h1>
                                 <p className="mt-1 text-[11px]">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
                                 <p className="text-[11px] mt-0.5">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
-                            </div>
-                            <div className="w-20 pt-1 shrink-0">
-                                <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
                             </div>
                         </div>
 
@@ -717,10 +714,13 @@ export default function ProformaClient({
                                     <p>Beneficiary bank address: Busan, Republic of Korea</p>
                                 </div>
                             </div>
-                            <div className="pt-5 flex items-end justify-end gap-2 shrink-0">
-                                <span className="text-sm font-black text-[#1f2340] leading-none">beiko Inc.</span>
-                                <div className="w-20">
-                                    <img src="/bko.png" alt="seal" className="w-full object-contain opacity-80" />
+                            <div className="pt-5 flex flex-col items-end gap-1.5 shrink-0">
+                                <img src="/logo.png" alt="BEIKO" className="w-20 object-contain" />
+                                <div className="flex items-end justify-end gap-2">
+                                    <span className="text-sm font-black text-[#1f2340] leading-none">beiko Inc.</span>
+                                    <div className="w-20">
+                                        <img src="/bko.png" alt="seal" className="w-full object-contain opacity-80" />
+                                    </div>
                                 </div>
                             </div>
                         </div>
