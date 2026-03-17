@@ -324,72 +324,25 @@ export default function ProformaClient({
             return
         }
 
-        const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=1400')
-        if (!printWindow) {
-            alert('팝업이 차단되어 인쇄창을 열 수 없습니다. 팝업 허용 후 다시 시도해주세요.')
-            return
+        const clearPrintState = () => {
+            document.body.classList.remove('pi-printing')
         }
 
-        const inheritedStyles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
-            .map((node) => node.outerHTML)
-            .join('\n')
-
-        const printDoc = `<!doctype html>
-<html lang="ko">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>${previewInvoice.invoiceNumber}</title>
-  ${inheritedStyles}
-  <style>
-    @page {
-      size: A4;
-      margin: 10mm;
-    }
-    html, body {
-      margin: 0;
-      padding: 0;
-      background: #ffffff;
-      -webkit-print-color-adjust: exact !important;
-      print-color-adjust: exact !important;
-    }
-    #pi-print-sheet {
-      margin: 0 auto !important;
-      width: 190mm !important;
-      min-height: 277mm !important;
-      max-width: 190mm !important;
-      box-shadow: none !important;
-      border: 0 !important;
-      border-radius: 0 !important;
-      background: #ffffff !important;
-      padding: 6mm 8mm !important;
-      overflow: visible !important;
-      aspect-ratio: auto !important;
-    }
-  </style>
-</head>
-<body>
-  ${printTarget.outerHTML}
-</body>
-</html>`
-
-        printWindow.document.open()
-        printWindow.document.write(printDoc)
-        printWindow.document.close()
-
-        printWindow.addEventListener(
-            'load',
+        window.addEventListener(
+            'afterprint',
             () => {
-                printWindow.focus()
-                setTimeout(() => {
-                    printWindow.print()
-                }, 220)
+                clearPrintState()
             },
             { once: true }
         )
-        printWindow.onafterprint = () => {
-            printWindow.close()
-        }
+
+        document.body.classList.add('pi-printing')
+        window.setTimeout(() => {
+            window.print()
+        }, 40)
+        window.setTimeout(() => {
+            clearPrintState()
+        }, 1500)
     }
 
     return (
@@ -398,6 +351,35 @@ export default function ProformaClient({
                 @page {
                     size: A4;
                     margin: 10mm;
+                }
+                body.pi-printing {
+                    overflow: hidden !important;
+                }
+                body.pi-printing * {
+                    visibility: hidden !important;
+                }
+                body.pi-printing .pi-no-print {
+                    display: none !important;
+                }
+                body.pi-printing #pi-print-sheet,
+                body.pi-printing #pi-print-sheet * {
+                    visibility: visible !important;
+                }
+                body.pi-printing #pi-print-sheet {
+                    position: fixed !important;
+                    left: 0 !important;
+                    top: 0 !important;
+                    box-shadow: none !important;
+                    border: 0 !important;
+                    border-radius: 0 !important;
+                    margin: 0 !important;
+                    padding: 6mm 8mm !important;
+                    width: 190mm !important;
+                    min-height: 277mm !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    aspect-ratio: auto !important;
+                    background: white !important;
                 }
                 @media print {
                     html, body {
