@@ -739,7 +739,7 @@ export default function ProformaClient({
                                     <p>Beneficiary bank address: Busan, Republic of Korea</p>
                                 </div>
                             </div>
-                            <div className="w-40 pt-8">
+                            <div className="w-28 pt-5">
                                 <img src="/bko.png" alt="seal" className="w-full object-contain opacity-80" />
                             </div>
                         </div>
