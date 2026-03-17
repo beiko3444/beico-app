@@ -367,12 +367,13 @@ export default function ProformaClient({
                     border: 0 !important;
                     border-radius: 0 !important;
                     margin: 0 !important;
-                    padding: 10mm !important;
+                    padding: 6mm !important;
                     width: 210mm !important;
                     min-height: 297mm !important;
                     max-height: none !important;
                     overflow: visible !important;
                     aspect-ratio: auto !important;
+                    box-sizing: border-box !important;
                     background: white !important;
                 }
                 @media print {
@@ -401,12 +402,13 @@ export default function ProformaClient({
                         border: 0 !important;
                         border-radius: 0 !important;
                         margin: 0 !important;
-                        padding: 10mm !important;
+                        padding: 6mm !important;
                         width: 210mm !important;
                         min-height: 297mm !important;
                         max-height: none !important;
                         overflow: visible !important;
                         aspect-ratio: auto !important;
+                        box-sizing: border-box !important;
                         background: white !important;
                     }
                 }
@@ -652,9 +654,8 @@ export default function ProformaClient({
                             <thead className="bg-[#f7ebe5]">
                                 <tr className="text-center font-black">
                                     <th className="border border-gray-900 px-2 py-1 w-10">No.</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-52">Product Name</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-56">Product Name</th>
                                     <th className="border border-gray-900 px-2 py-1 w-28">Model</th>
-                                    <th className="border border-gray-900 px-2 py-1 w-20">Picture</th>
                                     <th className="border border-gray-900 px-2 py-1 w-32">
                                         Unit price <span className="text-[#e53b19]">FOB</span> (US$)
                                     </th>
@@ -666,39 +667,33 @@ export default function ProformaClient({
                             </thead>
                             <tbody>
                                 {printableRows.map((row) => (
-                                    <tr key={row.id} className={row.isBlank ? 'h-8' : 'h-24 align-top'}>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.no}</td>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">
+                                    <tr key={row.id} className={row.isBlank ? 'h-7' : ''}>
+                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : row.no}</td>
+                                        <td className="border border-gray-900 px-2 py-1.5 align-top">
                                             {row.isBlank ? (
                                                 ''
                                             ) : (
-                                                <div className="space-y-1 leading-tight">
-                                                    <div>{row.productName}</div>
-                                                    <div className="text-[10px] text-gray-700">{row.productNameEN || '-'}</div>
+                                                <div className="flex items-start gap-2">
+                                                    {row.imageUrl ? (
+                                                        <img src={row.imageUrl} alt={row.productName} className="w-10 h-10 object-contain shrink-0" />
+                                                    ) : (
+                                                        <div className="w-10 h-10 shrink-0" />
+                                                    )}
+                                                    <div className="space-y-0.5 leading-tight text-left">
+                                                        <div>{row.productName}</div>
+                                                        <div className="text-[10px] text-gray-700">{row.productNameEN || '-'}</div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </td>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.model}</td>
-                                        <td className="border border-gray-900 px-2 py-2">
-                                            {row.isBlank ? (
-                                                <div />
-                                            ) : row.imageUrl ? (
-                                                <div className="w-14 h-14 mx-auto border border-gray-200 bg-white flex items-center justify-center">
-                                                    <img src={row.imageUrl} alt={row.productName} className="w-12 h-12 object-contain" />
-                                                </div>
-                                            ) : (
-                                                <div className="w-14 h-14 mx-auto border border-gray-200 bg-white flex items-center justify-center text-[9px] text-gray-400">
-                                                    No Image
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : usdText(row.price)}</td>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.quantity.toLocaleString()}</td>
-                                        <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : usdText(row.amount)}</td>
+                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : row.model}</td>
+                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : usdText(row.price)}</td>
+                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : row.quantity.toLocaleString()}</td>
+                                        <td className="border border-gray-900 px-2 py-1.5 text-center align-top">{row.isBlank ? '' : usdText(row.amount)}</td>
                                     </tr>
                                 ))}
                                 <tr className="font-black">
-                                    <td colSpan={5} className="border border-gray-900 px-2 py-2 text-center">Total</td>
+                                    <td colSpan={4} className="border border-gray-900 px-2 py-2 text-center">Total</td>
                                     <td className="border border-gray-900 px-2 py-2 text-center">{totalQuantity.toLocaleString()}</td>
                                     <td className="border border-gray-900 px-2 py-2 text-center">{usdText(grandTotalUsd)}</td>
                                 </tr>

@@ -93,7 +93,7 @@ export default async function ProformaPage() {
                 </div>
             </div>
 
-            <div className="relative left-1/2 w-[min(1720px,calc(100vw-2rem))] -translate-x-1/2">
+            <div className="w-[min(1720px,calc(100vw-2rem))] mx-auto">
                 <ProformaClient
                     partners={partnerOptions}
                     products={productOptions}
