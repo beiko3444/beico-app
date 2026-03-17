@@ -318,7 +318,78 @@ export default function ProformaClient({
             alert('출력할 PI 항목이 없습니다.')
             return
         }
-        window.print()
+        const printTarget = document.getElementById('pi-print-sheet')
+        if (!printTarget) {
+            alert('인쇄할 PI 문서를 찾을 수 없습니다.')
+            return
+        }
+
+        const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=1024,height=1400')
+        if (!printWindow) {
+            alert('팝업이 차단되어 인쇄창을 열 수 없습니다. 팝업 허용 후 다시 시도해주세요.')
+            return
+        }
+
+        const inheritedStyles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+            .map((node) => node.outerHTML)
+            .join('\n')
+
+        const printDoc = `<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${previewInvoice.invoiceNumber}</title>
+  ${inheritedStyles}
+  <style>
+    @page {
+      size: A4;
+      margin: 10mm;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: #ffffff;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    #pi-print-sheet {
+      margin: 0 auto !important;
+      width: 190mm !important;
+      min-height: 277mm !important;
+      max-width: 190mm !important;
+      box-shadow: none !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: #ffffff !important;
+      padding: 6mm 8mm !important;
+      overflow: visible !important;
+      aspect-ratio: auto !important;
+    }
+  </style>
+</head>
+<body>
+  ${printTarget.outerHTML}
+</body>
+</html>`
+
+        printWindow.document.open()
+        printWindow.document.write(printDoc)
+        printWindow.document.close()
+
+        printWindow.addEventListener(
+            'load',
+            () => {
+                printWindow.focus()
+                setTimeout(() => {
+                    printWindow.print()
+                }, 220)
+            },
+            { once: true }
+        )
+        printWindow.onafterprint = () => {
+            printWindow.close()
+        }
     }
 
     return (
@@ -329,23 +400,38 @@ export default function ProformaClient({
                     margin: 10mm;
                 }
                 @media print {
-                    body {
-                        margin: 0;
+                    html, body {
+                        margin: 0 !important;
+                        padding: 0 !important;
                         -webkit-print-color-adjust: exact;
                         print-color-adjust: exact;
-                        background: white;
+                        background: white !important;
+                    }
+                    body * {
+                        visibility: hidden !important;
                     }
                     .pi-no-print {
                         display: none !important;
                     }
+                    #pi-print-sheet,
+                    #pi-print-sheet * {
+                        visibility: visible !important;
+                    }
                     #pi-print-sheet {
+                        position: fixed !important;
+                        left: 0 !important;
+                        top: 0 !important;
                         box-shadow: none !important;
                         border: 0 !important;
-                        margin: 0 auto !important;
+                        border-radius: 0 !important;
+                        margin: 0 !important;
+                        padding: 6mm 8mm !important;
                         width: 190mm !important;
                         min-height: 277mm !important;
+                        max-height: none !important;
                         overflow: visible !important;
                         aspect-ratio: auto !important;
+                        background: white !important;
                     }
                 }
             `}</style>
@@ -362,7 +448,7 @@ export default function ProformaClient({
                                 <button
                                     type="button"
                                     onClick={handlePrint}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-gray-900 text-white hover:bg-black transition-all"
+                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 transition-all"
                                 >
                                     출력 (PDF 저장/인쇄)
                                 </button>
@@ -531,21 +617,25 @@ export default function ProformaClient({
                     </section>
                 </div>
 
-                <section id="pi-print-sheet" className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-8 w-full max-w-[620px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24">
+                <section id="pi-print-sheet" className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24">
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
 
-                    <div className="bg-white border border-gray-300 p-4">
-                        <div className="border-b border-gray-300 pb-3">
-                            <div className="text-center">
-                                <h1 className="text-4xl leading-none font-black tracking-tight">beiko Inc.</h1>
-                                <p className="mt-2 text-sm">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
-                                <p className="text-sm mt-1">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
+                    <div className="bg-white border border-gray-300 p-3">
+                        <div className="h-1 w-full bg-[#e53b19] mb-2" />
+                        <div className="flex items-start gap-2 border-b-2 border-[#e53b19] pb-2">
+                            <div className="w-20 pt-1 shrink-0">
+                                <img src="/logo.png" alt="BEIKO" className="w-full object-contain" />
+                            </div>
+                            <div className="flex-1 text-center">
+                                <h1 className="text-2xl leading-none font-black tracking-tight text-[#1f2340]">beiko Inc.</h1>
+                                <p className="mt-1 text-[11px]">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
+                                <p className="text-[11px] mt-0.5">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
                             </div>
                         </div>
 
-                        <h2 className="text-center text-3xl font-black mt-3 mb-3">Proforma Invoice</h2>
+                        <h2 className="text-center text-xl font-black text-[#e53b19] mt-2 mb-2">Proforma Invoice</h2>
 
-                        <table className="w-full border-collapse border border-gray-900 text-sm">
+                        <table className="w-full border-collapse border border-gray-900 text-[11px]">
                             <tbody>
                                 <tr>
                                     <td className="border border-gray-900 px-2 py-1 w-16 font-black">No.:</td>
@@ -578,37 +668,37 @@ export default function ProformaClient({
                             </tbody>
                         </table>
 
-                        <table className="w-full border-collapse border border-gray-900 mt-0 text-sm">
+                        <table className="w-full border-collapse border border-gray-900 mt-0 text-[11px]">
                             <thead className="bg-[#f7ebe5]">
                                 <tr className="text-center font-black">
-                                    <th className="border border-gray-900 px-2 py-1.5 w-44">Product Name</th>
-                                    <th className="border border-gray-900 px-2 py-1.5 w-28">Model</th>
-                                    <th className="border border-gray-900 px-2 py-1.5 w-52">Picture</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-40">Product Name</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-24">Model</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-44">Picture</th>
                                     <th className="border border-gray-900 px-2 py-1.5">Specification</th>
-                                    <th className="border border-gray-900 px-2 py-1.5 w-36">
+                                    <th className="border border-gray-900 px-2 py-1 w-32">
                                         Unit price <span className="text-[#e53b19]">EXW</span> (US$)
                                     </th>
-                                    <th className="border border-gray-900 px-2 py-1.5 w-20">Qty<br />(set)</th>
-                                    <th className="border border-gray-900 px-2 py-1.5 w-36">
+                                    <th className="border border-gray-900 px-2 py-1 w-16">Qty<br />(set)</th>
+                                    <th className="border border-gray-900 px-2 py-1 w-32">
                                         Total price <span className="text-[#e53b19]">EXW</span> (US$)
                                     </th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {printableRows.map((row) => (
-                                    <tr key={row.id} className={row.isBlank ? 'h-14' : 'h-56 align-top'}>
+                                    <tr key={row.id} className={row.isBlank ? 'h-8' : 'h-32 align-top'}>
                                         <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.productName}</td>
                                         <td className="border border-gray-900 px-2 py-2 text-center">{row.isBlank ? '' : row.model}</td>
                                         <td className="border border-gray-900 px-2 py-2">
                                             {row.isBlank ? (
                                                 <div />
                                             ) : row.imageUrl ? (
-                                                <img src={row.imageUrl} alt={row.productName} className="w-full h-48 object-contain bg-white" />
+                                                <img src={row.imageUrl} alt={row.productName} className="w-full h-24 object-contain bg-white" />
                                             ) : (
-                                                <div className="w-full h-48 flex items-center justify-center text-xs text-gray-400">No Image</div>
+                                                <div className="w-full h-24 flex items-center justify-center text-[10px] text-gray-400">No Image</div>
                                             )}
                                         </td>
-                                        <td className="border border-gray-900 px-2 py-2 text-[13px] leading-relaxed">
+                                        <td className="border border-gray-900 px-2 py-2 text-[10px] leading-[1.35]">
                                             {row.isBlank ? (
                                                 <div />
                                             ) : (
@@ -632,15 +722,15 @@ export default function ProformaClient({
                             </tbody>
                         </table>
 
-                        <div className="mt-4 flex items-start justify-between gap-6">
-                            <div className="text-sm leading-snug flex-1">
+                        <div className="mt-3 flex items-start justify-between gap-4">
+                            <div className="text-[10px] leading-snug flex-1">
                                 <p>1. Price terms: EXW BUSAN</p>
                                 <p className="mt-1">2. Packaging: by export carton box</p>
                                 <p className="mt-1">3. Payment Term: 100% deposit by T/T</p>
                                 <p className="mt-1">4. Production time: 3-5 days after receiving the deposit</p>
                                 <p className="mt-1">5. Validity Period: quotation valid for 30 days from invoice date</p>
                                 <div className="mt-3">
-                                    <p className="text-[#e53b19] font-black text-2xl leading-none">Bank details:</p>
+                                    <p className="text-[#e53b19] font-black text-base leading-none">Bank details:</p>
                                     <p className="mt-1">Payment currency: USD</p>
                                     <p className="text-[#e53b19]">Beneficiary account number: 656-045236-01-013</p>
                                     <p className="text-[#e53b19]">SWIFT code: IBKOKRSEXXX</p>
@@ -649,7 +739,7 @@ export default function ProformaClient({
                                     <p>Beneficiary bank address: Busan, Republic of Korea</p>
                                 </div>
                             </div>
-                            <div className="w-52 pt-14">
+                            <div className="w-40 pt-8">
                                 <img src="/bko.png" alt="seal" className="w-full object-contain opacity-80" />
                             </div>
                         </div>
