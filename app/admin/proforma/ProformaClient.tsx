@@ -361,18 +361,38 @@ export default function ProformaClient({
 <style>
 @page {
     size: A4 portrait;
-    margin: 12mm 3mm 20mm 0;
+    margin: 0;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-html, body { background: white; }
+html, body { background: white; width: 210mm; }
 body {
-    padding: 0 12mm;
+    padding: 12mm 15mm 20mm 12mm;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif;
     color: #22253f; font-size: 11px; line-height: 1.4;
 }
 table { border-collapse: collapse; width: 100%; }
 
-/* Fixed footer - repeats on every printed page */
+/* White spacers to create margins on every page (since @page margin is 0) */
+.top-spacer {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 10mm;
+    background: white;
+    z-index: 9999;
+}
+.bottom-spacer {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 18mm;
+    background: white;
+    z-index: 9999;
+}
+
+/* Footer text - sits on top of bottom spacer */
 .print-footer {
     position: fixed;
     bottom: 5mm;
@@ -381,14 +401,15 @@ table { border-collapse: collapse; width: 100%; }
     text-align: center;
     font-size: 9px;
     color: #666;
+    z-index: 10000;
 }
 
-/* Right side watermark - repeats on every printed page */
+/* Right side watermark */
 .print-watermark {
     position: fixed;
-    top: 12mm;
-    right: 0;
-    bottom: 20mm;
+    top: 10mm;
+    right: 2mm;
+    bottom: 18mm;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -398,11 +419,15 @@ table { border-collapse: collapse; width: 100%; }
     color: #666;
     letter-spacing: 0.3px;
     white-space: nowrap;
-    z-index: 1000;
+    z-index: 10000;
 }
 </style>
 </head>
 <body>
+
+<!-- Fixed white spacers to cover browser header/footer areas -->
+<div class="top-spacer"></div>
+<div class="bottom-spacer"></div>
 
 <!-- Right side watermark (fixed = repeats on every page) -->
 <div class="print-watermark">
