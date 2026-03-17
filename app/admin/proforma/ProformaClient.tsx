@@ -357,16 +357,16 @@ export default function ProformaClient({
 <html>
 <head>
 <meta charset="utf-8">
-<title>Proforma Invoice</title>
+<title></title>
 <style>
 @page {
     size: A4 portrait;
-    margin: 0;
+    margin: 12mm 3mm 20mm 0;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-html, body { background: white; width: 210mm; }
+html, body { background: white; }
 body {
-    padding: 10mm 15mm 18mm 12mm;
+    padding: 0 12mm;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif;
     color: #22253f; font-size: 11px; line-height: 1.4;
 }
@@ -375,27 +375,27 @@ table { border-collapse: collapse; width: 100%; }
 /* Fixed footer - repeats on every printed page */
 .print-footer {
     position: fixed;
-    bottom: 3mm;
+    bottom: 5mm;
     left: 12mm;
     right: 15mm;
     text-align: center;
-    font-size: 8px;
-    color: #aaa;
+    font-size: 9px;
+    color: #666;
 }
 
 /* Right side watermark - repeats on every printed page */
 .print-watermark {
     position: fixed;
-    top: 10mm;
-    right: 3mm;
-    bottom: 10mm;
+    top: 12mm;
+    right: 0;
+    bottom: 20mm;
     display: flex;
     align-items: center;
     justify-content: center;
     writing-mode: vertical-rl;
     transform: rotate(180deg);
-    font-size: 6.5px;
-    color: #ccc;
+    font-size: 8px;
+    color: #666;
     letter-spacing: 0.3px;
     white-space: nowrap;
     z-index: 1000;
