@@ -180,7 +180,8 @@ export default function ProformaClient({
     const printableRows = useMemo(() => {
         const baseRows = previewInvoice.items.map((item, index) => {
             const productMeta = item.productId ? productMap.get(item.productId) : undefined
-            const model = textOrDash(productMeta?.productCode || item.productCode)
+            const modelCode = (productMeta?.productCode || item.productCode || '').toUpperCase()
+            const model = textOrDash(modelCode)
             return {
                 id: item.id,
                 no: index + 1,
@@ -674,7 +675,7 @@ ${rowsHtml}
                                                         <td className="px-3 py-2">
                                                             <div className="font-bold text-gray-900">{product.nameJP || product.name}</div>
                                                             <div className="text-[11px] text-gray-500">{product.nameEN || product.name}</div>
-                                                            <div className="text-[10px] text-gray-400 font-mono">{product.productCode || '-'}</div>
+                                                            <div className="text-[10px] text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
                                                         </td>
                                                         <td className="px-3 py-2 text-center text-gray-600">{product.stock.toLocaleString()}</td>
                                                         <td className="px-3 py-2 text-right font-bold text-gray-900">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
