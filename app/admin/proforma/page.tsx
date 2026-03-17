@@ -7,6 +7,29 @@ import ProformaClient, { type IssuedInvoice, type PartnerOption, type ProductOpt
 
 export const dynamic = 'force-dynamic'
 
+const readNumber = (value: unknown): number => {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : 0
+    }
+    if (typeof value === 'string') {
+        const cleaned = value.replace(/[^0-9.-]/g, '')
+        const parsed = Number(cleaned)
+        return Number.isFinite(parsed) ? parsed : 0
+    }
+    return 0
+}
+
+const resolveUsdUnitPrice = (product: { usBuyPrice?: number | null; usSellPrice?: number | null; regionalPrices?: unknown }) => {
+    const direct = readNumber(product.usBuyPrice)
+    if (direct > 0) return direct
+
+    const regional = product.regionalPrices as Record<string, any> | null | undefined
+    const fromRegional = readNumber(regional?.C?.US?.wholesale ?? regional?.C?.US?.cost)
+    if (fromRegional > 0) return fromRegional
+
+    return readNumber(product.usSellPrice)
+}
+
 export default async function ProformaPage() {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -29,6 +52,8 @@ export default async function ProformaPage() {
                 productCode: true,
                 imageUrl: true,
                 usBuyPrice: true,
+                usSellPrice: true,
+                regionalPrices: true,
                 stock: true
             }
         }),
@@ -60,7 +85,7 @@ export default async function ProformaPage() {
         nameJP: product.nameJP || null,
         productCode: product.productCode || null,
         imageUrl: product.imageUrl || null,
-        usBuyPrice: product.usBuyPrice || 0,
+        usBuyPrice: resolveUsdUnitPrice(product),
         stock: product.stock
     }))
 

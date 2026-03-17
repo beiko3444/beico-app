@@ -9,6 +9,29 @@ type PostItem = {
     quantity: number
 }
 
+const readNumber = (value: unknown): number => {
+    if (typeof value === 'number') {
+        return Number.isFinite(value) ? value : 0
+    }
+    if (typeof value === 'string') {
+        const cleaned = value.replace(/[^0-9.-]/g, '')
+        const parsed = Number(cleaned)
+        return Number.isFinite(parsed) ? parsed : 0
+    }
+    return 0
+}
+
+const resolveUsdUnitPrice = (product: { usBuyPrice?: number | null; usSellPrice?: number | null; regionalPrices?: unknown }) => {
+    const direct = readNumber(product.usBuyPrice)
+    if (direct > 0) return direct
+
+    const regional = product.regionalPrices as Record<string, any> | null | undefined
+    const fromRegional = readNumber(regional?.C?.US?.wholesale ?? regional?.C?.US?.cost)
+    if (fromRegional > 0) return fromRegional
+
+    return readNumber(product.usSellPrice)
+}
+
 const buildInvoicePrefix = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -121,7 +144,9 @@ export async function POST(request: Request) {
                 nameEN: true,
                 nameJP: true,
                 productCode: true,
-                usBuyPrice: true
+                usBuyPrice: true,
+                usSellPrice: true,
+                regionalPrices: true
             }
         })
         if (products.length !== items.length) {
@@ -135,7 +160,7 @@ export async function POST(request: Request) {
                 throw new Error(`Product not found: ${item.productId}`)
             }
 
-            const unitPriceUsd = Number(product.usBuyPrice || 0)
+            const unitPriceUsd = resolveUsdUnitPrice(product)
             return {
                 productId: product.id,
                 productName: product.nameJP || product.name,
