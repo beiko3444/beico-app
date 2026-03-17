@@ -371,31 +371,12 @@ body {
     color: #22253f; font-size: 11px; line-height: 1.4;
 }
 table { border-collapse: collapse; width: 100%; }
+thead { display: table-header-group; }
 
-/* White spacers to create margins on every page (since @page margin is 0) */
-.top-spacer {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 10mm;
-    background: white;
-    z-index: 9999;
-}
-.bottom-spacer {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 18mm;
-    background: white;
-    z-index: 9999;
-}
-
-/* Footer text - sits on top of bottom spacer */
+/* Footer text */
 .print-footer {
     position: fixed;
-    bottom: 5mm;
+    bottom: 3mm;
     left: 12mm;
     right: 15mm;
     text-align: center;
@@ -409,7 +390,7 @@ table { border-collapse: collapse; width: 100%; }
     position: fixed;
     top: 10mm;
     right: 2mm;
-    bottom: 18mm;
+    bottom: 10mm;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -424,10 +405,6 @@ table { border-collapse: collapse; width: 100%; }
 </style>
 </head>
 <body>
-
-<!-- Fixed white spacers to cover browser header/footer areas -->
-<div class="top-spacer"></div>
-<div class="bottom-spacer"></div>
 
 <!-- Right side watermark (fixed = repeats on every page) -->
 <div class="print-watermark">
@@ -584,8 +561,15 @@ setPageNumbers();
         // Wait for content + images to render, then print
         iframe.onload = () => {
             setTimeout(() => {
+                // Temporarily clear parent title to suppress browser header
+                const originalTitle = document.title
+                document.title = ' '
+
                 iframe.contentWindow?.focus()
                 iframe.contentWindow?.print()
+
+                // Restore title after print dialog
+                document.title = originalTitle
                 // Clean up after print dialog closes
                 setTimeout(() => { iframe.remove() }, 2000)
             }, 300)
