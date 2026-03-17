@@ -312,11 +312,6 @@ export default function ProformaClient({
             alert('출력할 PI 항목이 없습니다.')
             return
         }
-        const printTarget = document.getElementById('pi-print-sheet')
-        if (!printTarget) {
-            alert('인쇄할 PI 문서를 찾을 수 없습니다.')
-            return
-        }
 
         const printWindow = window.open('', '_blank', 'width=794,height=1123')
         if (!printWindow) {
@@ -324,78 +319,177 @@ export default function ProformaClient({
             return
         }
 
-        // Clone inner content only (skip the preview label)
-        const innerContent = printTarget.querySelector('.pi-inner-content')
-        const contentHtml = innerContent ? innerContent.outerHTML : printTarget.innerHTML
+        // Build product rows HTML with inline styles
+        const rowsHtml = printableRows.map((row) => {
+            if (row.isBlank) {
+                return `<tr>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;height:28px"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;vertical-align:top"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
+                </tr>`
+            }
+            const imgHtml = row.imageUrl
+                ? `<img src="${row.imageUrl}" alt="" style="width:32px;height:32px;object-fit:contain;flex-shrink:0">`
+                : `<div style="width:32px;height:32px;flex-shrink:0"></div>`
+            return `<tr>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top">${row.no}</td>
+                <td style="border:1px solid #111827;padding:4px 6px;vertical-align:top">
+                    <div style="display:flex;align-items:flex-start;gap:6px">
+                        ${imgHtml}
+                        <div style="line-height:1.3;text-align:left;word-break:break-word">
+                            <div>${row.productName}</div>
+                            <div style="font-size:9px;color:#374151">${row.productNameEN || '-'}</div>
+                        </div>
+                    </div>
+                </td>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${row.model}</td>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${usdText(row.price)}</td>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${row.quantity.toLocaleString()}</td>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${usdText(row.amount)}</td>
+            </tr>`
+        }).join('\n')
 
-        // Gather all stylesheets from the parent document
-        const styleSheets: string[] = []
-        document.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
-            styleSheets.push(link.outerHTML)
-        })
-        document.querySelectorAll('style').forEach((style) => {
-            styleSheets.push(style.outerHTML)
-        })
+        const origin = window.location.origin
 
-        const printStyles = `
-<style>
-  @page {
-    size: A4 portrait;
-    margin: 0;
-  }
-  *, *::before, *::after {
-    -webkit-print-color-adjust: exact !important;
-    print-color-adjust: exact !important;
-  }
-  html, body {
-    width: 210mm !important;
-    min-height: 297mm !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: white !important;
-  }
-  body {
-    padding: 10mm 12mm !important;
-    display: block !important;
-  }
-  .pi-no-print {
-    display: none !important;
-  }
-  .pi-inner-content {
-    border: none !important;
-    background: white !important;
-    padding: 0 !important;
-    max-width: none !important;
-    width: 100% !important;
-  }
-</style>`
-
-        printWindow.document.write(`<!DOCTYPE html>
+        const fullHtml = `<!DOCTYPE html>
 <html>
 <head>
 <meta charset="utf-8">
 <title>Proforma Invoice - ${previewInvoice.invoiceNumber}</title>
-${styleSheets.join('\n')}
-${printStyles}
+<style>
+@page { size: A4 portrait; margin: 0; }
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+html, body { width: 210mm; min-height: 297mm; background: white; }
+body { padding: 10mm 12mm; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif; color: #22253f; font-size: 11px; line-height: 1.4; }
+table { border-collapse: collapse; width: 100%; }
+</style>
 </head>
-<body>${contentHtml}</body>
-</html>`)
+<body>
+
+<!-- Top red line -->
+<div style="height:4px;width:100%;background:#e53b19;margin-bottom:8px"></div>
+
+<!-- Header -->
+<div style="border-bottom:2px solid #e53b19;padding-bottom:8px;text-align:center">
+    <h1 style="font-size:24px;font-weight:900;color:#1f2340;letter-spacing:-0.5px;line-height:1;margin:0">beiko Inc.</h1>
+    <p style="margin-top:4px;font-size:11px">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
+    <p style="font-size:11px;margin-top:2px">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
+</div>
+
+<!-- Title -->
+<h2 style="text-align:center;font-size:20px;font-weight:900;color:#e53b19;margin:8px 0">Proforma Invoice</h2>
+
+<!-- Info table -->
+<table style="border-collapse:collapse;width:100%;font-size:11px">
+<tbody>
+    <tr>
+        <td style="border:1px solid #111827;padding:4px 8px;width:80px;font-weight:900">No.:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">${previewInvoice.invoiceNumber}</td>
+        <td style="border:1px solid #111827;padding:4px 8px;width:80px;font-weight:900">Date:</td>
+        <td style="border:1px solid #111827;padding:4px 8px;width:220px">${issueDateText}</td>
+    </tr>
+    <tr>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">From:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">beiko Inc.</td>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">Contact:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">Lee Dabin +82-10-3444-3467</td>
+    </tr>
+    <tr>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">Consignee:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">${CONSIGNEE_INFO.companyName}</td>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">Phone:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">${CONSIGNEE_INFO.phone}</td>
+    </tr>
+    <tr>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">Address:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">${CONSIGNEE_INFO.addressLine1}</td>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">TAX:</td>
+        <td style="border:1px solid #111827;padding:4px 8px">${CONSIGNEE_INFO.tax}</td>
+    </tr>
+    <tr>
+        <td style="border:1px solid #111827;padding:4px 8px;font-weight:900">Address 2:</td>
+        <td colspan="3" style="border:1px solid #111827;padding:4px 8px">${CONSIGNEE_INFO.addressLine2}</td>
+    </tr>
+</tbody>
+</table>
+
+<!-- Product table -->
+<table style="border-collapse:collapse;width:100%;table-layout:fixed;font-size:10px;margin-top:0">
+<colgroup>
+    <col style="width:7%">
+    <col style="width:50%">
+    <col style="width:10%">
+    <col style="width:11%">
+    <col style="width:7%">
+    <col style="width:15%">
+</colgroup>
+<thead>
+    <tr style="background:#f7ebe5;text-align:center;font-weight:900">
+        <th style="border:1px solid #111827;padding:4px 6px">No.</th>
+        <th style="border:1px solid #111827;padding:4px 6px">Product Name</th>
+        <th style="border:1px solid #111827;padding:4px 6px">Model</th>
+        <th style="border:1px solid #111827;padding:4px 6px">Unit price <span style="color:#e53b19">FOB</span> (US$)</th>
+        <th style="border:1px solid #111827;padding:4px 6px">Qty</th>
+        <th style="border:1px solid #111827;padding:4px 6px">Total price <span style="color:#e53b19">FOB</span> (US$)</th>
+    </tr>
+</thead>
+<tbody>
+${rowsHtml}
+    <tr style="font-weight:900">
+        <td colspan="4" style="border:1px solid #111827;padding:8px;text-align:center">Total</td>
+        <td style="border:1px solid #111827;padding:8px;text-align:center">${totalQuantity.toLocaleString()}</td>
+        <td style="border:1px solid #111827;padding:8px;text-align:center">${usdText(grandTotalUsd)}</td>
+    </tr>
+</tbody>
+</table>
+
+<!-- Bottom section -->
+<div style="margin-top:12px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px">
+    <div style="font-size:10px;line-height:1.6;flex:1">
+        <p>1. Price terms: FOB BUSAN</p>
+        <p>2. Packaging: by export carton box</p>
+        <p>3. Payment Term: 100% deposit by T/T</p>
+        <p>4. Production time: 3-5 days after receiving the deposit</p>
+        <p>5. Validity Period: quotation valid for 30 days from invoice date</p>
+        <div style="margin-top:12px">
+            <p style="color:#e53b19;font-weight:900;font-size:16px;line-height:1">Bank details:</p>
+            <p style="margin-top:4px">Payment currency: USD</p>
+            <p style="color:#e53b19">Beneficiary account number: 656-045236-01-013</p>
+            <p style="color:#e53b19">SWIFT code: IBKOKRSEXXX</p>
+            <p>Beneficiary name: beiko Inc.</p>
+            <p>Beneficiary bank: IBK Industrial Bank of Korea</p>
+            <p>Beneficiary bank address: Busan, Republic of Korea</p>
+        </div>
+    </div>
+    <div style="padding-top:20px;flex-shrink:0">
+        <div style="display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;align-items:end;gap:4px 8px">
+            <img src="${origin}/logo.png" alt="BEIKO" style="width:80px;object-fit:contain;grid-row:1;grid-column:1">
+            <span style="font-size:14px;font-weight:900;color:#1f2340;line-height:1;grid-row:2;grid-column:1">beiko Inc.</span>
+            <img src="${origin}/bko.png" alt="seal" style="width:80px;object-fit:contain;opacity:0.8;grid-row:1/3;grid-column:2;align-self:end">
+        </div>
+    </div>
+</div>
+
+</body>
+</html>`
+
+        printWindow.document.write(fullHtml)
         printWindow.document.close()
 
-        // Wait for stylesheets & images to load, then print
+        // Wait for images to load, then trigger print
         const tryPrint = () => {
             printWindow.focus()
             printWindow.print()
-            // Close after print dialog is dismissed
-            setTimeout(() => { printWindow.close() }, 1000)
         }
 
-        // Give stylesheets time to load
         printWindow.onload = () => {
-            setTimeout(tryPrint, 800)
+            setTimeout(tryPrint, 500)
         }
 
-        // Fallback in case onload doesn't fire
+        // Fallback
         setTimeout(() => {
             if (!printWindow.closed) {
                 tryPrint()
@@ -405,99 +499,6 @@ ${printStyles}
 
     return (
         <div className="space-y-6">
-            <style jsx global>{`
-                @page {
-                    size: A4 portrait;
-                    margin: 0;
-                }
-                body.pi-printing {
-                    overflow: hidden !important;
-                }
-                body.pi-printing * {
-                    visibility: hidden !important;
-                }
-                body.pi-printing .pi-no-print {
-                    display: none !important;
-                }
-                body.pi-printing #pi-print-sheet,
-                body.pi-printing #pi-print-sheet * {
-                    visibility: visible !important;
-                }
-                body.pi-printing #pi-print-sheet {
-                    position: fixed !important;
-                    left: 0 !important;
-                    top: 0 !important;
-                    z-index: 999999 !important;
-                    box-shadow: none !important;
-                    border: none !important;
-                    border-radius: 0 !important;
-                    margin: 0 !important;
-                    padding: 10mm 12mm !important;
-                    width: 210mm !important;
-                    min-width: 210mm !important;
-                    max-width: none !important;
-                    height: 297mm !important;
-                    min-height: 297mm !important;
-                    max-height: none !important;
-                    overflow: visible !important;
-                    aspect-ratio: auto !important;
-                    box-sizing: border-box !important;
-                    background: white !important;
-                }
-                body.pi-printing #pi-print-sheet .pi-inner-content {
-                    border: none !important;
-                    padding: 0 !important;
-                    background: white !important;
-                }
-                @media print {
-                    html, body {
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        width: 210mm !important;
-                        height: 297mm !important;
-                        overflow: visible !important;
-                        -webkit-print-color-adjust: exact;
-                        print-color-adjust: exact;
-                        background: white !important;
-                    }
-                    body * {
-                        visibility: hidden !important;
-                    }
-                    .pi-no-print {
-                        display: none !important;
-                    }
-                    #pi-print-sheet,
-                    #pi-print-sheet * {
-                        visibility: visible !important;
-                    }
-                    #pi-print-sheet {
-                        position: fixed !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        z-index: 999999 !important;
-                        box-shadow: none !important;
-                        border: none !important;
-                        border-radius: 0 !important;
-                        margin: 0 !important;
-                        padding: 10mm 12mm !important;
-                        width: 210mm !important;
-                        min-width: 210mm !important;
-                        max-width: none !important;
-                        height: 297mm !important;
-                        min-height: 297mm !important;
-                        max-height: none !important;
-                        overflow: visible !important;
-                        aspect-ratio: auto !important;
-                        box-sizing: border-box !important;
-                        background: white !important;
-                    }
-                    #pi-print-sheet .pi-inner-content {
-                        border: none !important;
-                        padding: 0 !important;
-                        background: white !important;
-                    }
-                }
-            `}</style>
 
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(480px,1fr)_210mm] gap-8 items-start">
                 <div className="pi-no-print space-y-6 xl:max-w-none">
