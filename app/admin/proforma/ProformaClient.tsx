@@ -654,11 +654,11 @@ export default function ProformaClient({
                         <table className="w-full table-fixed border-collapse border border-gray-900 mt-0 text-[10px]">
                             <colgroup>
                                 <col style={{ width: '7%' }} />
-                                <col style={{ width: '43%' }} />
-                                <col style={{ width: '14%' }} />
-                                <col style={{ width: '14%' }} />
-                                <col style={{ width: '8%' }} />
-                                <col style={{ width: '14%' }} />
+                                <col style={{ width: '50%' }} />
+                                <col style={{ width: '10%' }} />
+                                <col style={{ width: '11%' }} />
+                                <col style={{ width: '7%' }} />
+                                <col style={{ width: '15%' }} />
                             </colgroup>
                             <thead className="bg-[#f7ebe5]">
                                 <tr className="text-center font-black">
