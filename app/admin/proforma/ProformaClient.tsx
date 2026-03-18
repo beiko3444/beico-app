@@ -366,17 +366,25 @@ export default function ProformaClient({
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 html, body { background: white; width: 210mm; }
 body {
-    padding: 12mm 15mm 20mm 12mm;
+    padding: 0 15mm 0 12mm;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif;
     color: #22253f; font-size: 11px; line-height: 1.4;
 }
 table { border-collapse: collapse; width: 100%; }
 thead { display: table-header-group; }
+tfoot { display: table-footer-group; }
+
+/* Wrapper table for repeating page margins */
+.page-wrapper { border: none; width: 100%; }
+.page-wrapper > thead td,
+.page-wrapper > tfoot td { border: none; padding: 0; }
+.page-spacer-top { height: 10mm; }
+.page-spacer-bottom { height: 18mm; }
 
 /* Footer text */
 .print-footer {
     position: fixed;
-    bottom: 3mm;
+    bottom: 4mm;
     left: 12mm;
     right: 15mm;
     text-align: center;
