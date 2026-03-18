@@ -9,6 +9,8 @@ type PostItem = {
     quantity: number
 }
 
+const DEFAULT_PRODUCTION_TIME = '3-5 days after receiving the deposit'
+
 const readNumber = (value: unknown): number => {
     if (typeof value === 'number') {
         return Number.isFinite(value) ? value : 0
@@ -116,6 +118,10 @@ export async function POST(request: Request) {
         const body = await request.json()
         const partnerId = typeof body?.partnerId === 'string' ? body.partnerId : ''
         const items = parseItems(body?.items)
+        const productionTime =
+            typeof body?.productionTime === 'string' && body.productionTime.trim().length > 0
+                ? body.productionTime.trim()
+                : DEFAULT_PRODUCTION_TIME
 
         if (!partnerId) {
             return NextResponse.json({ error: 'partnerId is required' }, { status: 400 })
@@ -184,6 +190,7 @@ export async function POST(request: Request) {
                     partnerName: partner.partnerProfile?.businessName || partner.name,
                     issueDate: issuedAt,
                     totalUsd,
+                    productionTime,
                     items: {
                         create: lineItems
                     }
@@ -200,5 +207,34 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Failed to issue PI:', error)
         return NextResponse.json({ error: 'Failed to issue PI' }, { status: 500 })
+    }
+}
+
+export async function DELETE(request: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    try {
+        const { searchParams } = new URL(request.url)
+        const id = searchParams.get('id')?.trim() || ''
+
+        if (!id) {
+            return NextResponse.json({ error: 'id is required' }, { status: 400 })
+        }
+
+        const deleted = await prisma.proformaInvoice.delete({
+            where: { id },
+            select: { id: true }
+        })
+
+        return NextResponse.json(deleted)
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return NextResponse.json({ error: 'PI not found' }, { status: 404 })
+        }
+        console.error('Failed to delete PI:', error)
+        return NextResponse.json({ error: 'Failed to delete PI' }, { status: 500 })
     }
 }

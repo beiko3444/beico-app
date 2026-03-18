@@ -95,6 +95,7 @@ export default async function ProformaPage() {
         issueDate: invoice.issueDate.toISOString(),
         partnerName: invoice.partnerName,
         totalUsd: invoice.totalUsd,
+        productionTime: invoice.productionTime,
         items: invoice.items.map((item) => ({
             id: item.id,
             productId: item.productId,
@@ -114,7 +115,7 @@ export default async function ProformaPage() {
                     <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#e53b19] transition-all" title="Dashboard">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                    <h1 className="text-lg font-black text-gray-900 tracking-tight">프로포마인보이스 작성</h1>
+                    <h1 className="text-lg font-black text-gray-900 tracking-tight">P.I발급 작성</h1>
                 </div>
             </div>
 
