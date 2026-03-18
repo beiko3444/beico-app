@@ -504,11 +504,11 @@ ${rowsHtml}
         <div style="margin-top:12px">
             <p style="color:#e53b19;font-weight:900;font-size:16px;line-height:1">Bank details:</p>
             <p style="margin-top:4px">Payment currency: USD</p>
-            <p style="color:#e53b19">Beneficiary account number: 656-045236-01-013</p>
-            <p style="color:#e53b19">SWIFT code: IBKOKRSEXXX</p>
-            <p>Beneficiary name: beiko Inc.</p>
-            <p>Beneficiary bank: IBK Industrial Bank of Korea</p>
-            <p>Beneficiary bank address: Busan, Republic of Korea</p>
+            <p style="color:#e53b19">BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
+            <p style="color:#e53b19">SWIFT CODE (BIC): IBKOKRSEXXX</p>
+            <p>BENEFICIARY NAME: beiko Inc.</p>
+            <p>BANK NAME: INDUSTRIAL BANK OF KOREA</p>
+            <p>BANK ADDRESS: EULJI-RO, 82 IBK FINANCE TOWER FLOOR 16, JUNG-GU, SEOUL, REPUBLIC OF KOREA</p>
         </div>
     </div>
     <div style="padding-top:20px;flex-shrink:0">
@@ -882,11 +882,11 @@ setPageNumbers();
                                 <div className="mt-3">
                                     <p className="text-[#e53b19] font-black text-base leading-none">Bank details:</p>
                                     <p className="mt-1">Payment currency: USD</p>
-                                    <p className="text-[#e53b19]">Beneficiary account number: 656-045236-01-013</p>
-                                    <p className="text-[#e53b19]">SWIFT code: IBKOKRSEXXX</p>
-                                    <p>Beneficiary name: beiko Inc.</p>
-                                    <p>Beneficiary bank: IBK Industrial Bank of Korea</p>
-                                    <p>Beneficiary bank address: Busan, Republic of Korea</p>
+                                    <p className="text-[#e53b19]">BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
+                                    <p className="text-[#e53b19]">SWIFT CODE (BIC): IBKOKRSEXXX</p>
+                                    <p>BENEFICIARY NAME: beiko Inc.</p>
+                                    <p>BANK NAME: INDUSTRIAL BANK OF KOREA</p>
+                                    <p>BANK ADDRESS: EULJI-RO, 82 IBK FINANCE TOWER FLOOR 16, JUNG-GU, SEOUL, REPUBLIC OF KOREA</p>
                                 </div>
                             </div>
                             <div className="pt-5 shrink-0">
