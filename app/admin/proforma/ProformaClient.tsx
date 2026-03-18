@@ -460,9 +460,6 @@ tfoot { display: table-footer-group; }
     white-space: nowrap;
     z-index: 10000;
 }
-.print-page-number::after {
-    content: "Page " counter(page) " / " counter(pages);
-}
 </style>
 </head>
 <body>
@@ -580,6 +577,21 @@ ${rowsHtml}
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    function setPages() {
+        var ph = 297 * 96 / 25.4;
+        var total = Math.max(1, Math.ceil(document.body.scrollHeight / ph));
+        var els = document.querySelectorAll('.print-page-number');
+        for (var i = 0; i < els.length; i++) {
+            els[i].textContent = 'Page 1 / ' + total;
+        }
+    }
+    setPages();
+    window.addEventListener('beforeprint', setPages);
+})();
+</script>
 
 </body>
 </html>`
