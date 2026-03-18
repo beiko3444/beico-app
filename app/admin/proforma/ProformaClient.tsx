@@ -72,7 +72,7 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
 
 const textOrDash = (value: string | null | undefined) => (value && value.trim().length > 0 ? value : '-')
 const usdText = (value: number) =>
-    `US$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    `${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const slashDate = (date: Date) =>
     `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
 
@@ -322,8 +322,8 @@ export default function ProformaClient({
                 return `<tr>
                     <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;height:28px"></td>
                     <td style="border:1px solid #111827;padding:4px 6px;vertical-align:top"></td>
-                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
-                    <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:right;vertical-align:top"></td>
+                    <td style="border:1px solid #111827;padding:4px 6px;text-align:right;vertical-align:top"></td>
                     <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
                     <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top"></td>
                 </tr>`
@@ -343,9 +343,9 @@ export default function ProformaClient({
                     </div>
                 </td>
                 <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${row.model}</td>
-                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${usdText(row.price)}</td>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:right;vertical-align:top;white-space:nowrap">${usdText(row.price)}</td>
                 <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${row.quantity.toLocaleString()}</td>
-                <td style="border:1px solid #111827;padding:4px 6px;text-align:center;vertical-align:top;white-space:nowrap">${usdText(row.amount)}</td>
+                <td style="border:1px solid #111827;padding:4px 6px;text-align:right;vertical-align:top;white-space:nowrap">${usdText(row.amount)}</td>
             </tr>`
         }).join('\n')
 
@@ -478,9 +478,9 @@ thead { display: table-header-group; }
         <th style="border:1px solid #111827;padding:4px 6px">No.</th>
         <th style="border:1px solid #111827;padding:4px 6px">Product Name</th>
         <th style="border:1px solid #111827;padding:4px 6px">Model</th>
-        <th style="border:1px solid #111827;padding:4px 6px">Unit price <span style="color:#e53b19">FOB</span> (US$)</th>
+        <th style="border:1px solid #111827;padding:4px 6px;text-align:right">Unit price <span style="color:#e53b19">FOB</span></th>
         <th style="border:1px solid #111827;padding:4px 6px">Qty</th>
-        <th style="border:1px solid #111827;padding:4px 6px">Total price <span style="color:#e53b19">FOB</span> (US$)</th>
+        <th style="border:1px solid #111827;padding:4px 6px;text-align:right">Total price <span style="color:#e53b19">FOB</span></th>
     </tr>
 </thead>
 <tbody>
@@ -488,7 +488,7 @@ ${rowsHtml}
     <tr style="font-weight:900">
         <td colspan="4" style="border:1px solid #111827;padding:8px;text-align:center">Total</td>
         <td style="border:1px solid #111827;padding:8px;text-align:center">${totalQuantity.toLocaleString()}</td>
-        <td style="border:1px solid #111827;padding:8px;text-align:center">${usdText(grandTotalUsd)}</td>
+        <td style="border:1px solid #111827;padding:8px;text-align:right">${usdText(grandTotalUsd)}</td>
     </tr>
 </tbody>
 </table>
@@ -504,8 +504,8 @@ ${rowsHtml}
         <div style="margin-top:12px">
             <p style="color:#e53b19;font-weight:900;font-size:16px;line-height:1">Bank details:</p>
             <p style="margin-top:4px">Payment currency: USD</p>
-            <p style="color:#e53b19">BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
-            <p style="color:#e53b19">SWIFT CODE (BIC): IBKOKRSEXXX</p>
+            <p>BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
+            <p>SWIFT CODE (BIC): IBKOKRSEXXX</p>
             <p>BENEFICIARY NAME: beiko Inc.</p>
             <p>BANK NAME: INDUSTRIAL BANK OF KOREA</p>
             <p>BANK ADDRESS: EULJI-RO, 82 IBK FINANCE TOWER FLOOR 16, JUNG-GU, SEOUL, REPUBLIC OF KOREA</p>
@@ -655,7 +655,7 @@ setPageNumbers();
                                             </option>
                                         ))}
                                     </select>
-                                    <p className="mt-2 text-[11px] text-gray-500">USD 단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
+                                    <p className="mt-2 text-[11px] text-gray-500">단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
                                 </div>
 
                                 <div className="overflow-x-auto border border-gray-100 rounded-xl">
@@ -666,9 +666,9 @@ setPageNumbers();
                                                 <th className="px-3 py-2 text-center">이미지</th>
                                                 <th className="px-3 py-2 text-left">상품</th>
                                                 <th className="px-3 py-2 text-center">재고</th>
-                                                <th className="px-3 py-2 text-right">USD 단가</th>
+                                                <th className="px-3 py-2 text-right">단가</th>
                                                 <th className="px-3 py-2 text-center">수량</th>
-                                                <th className="px-3 py-2 text-right">금액(USD)</th>
+                                                <th className="px-3 py-2 text-right">금액</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
@@ -829,11 +829,11 @@ setPageNumbers();
                                     <th className="border border-gray-900 px-1.5 py-1">Product Name</th>
                                     <th className="border border-gray-900 px-1.5 py-1">Model</th>
                                     <th className="border border-gray-900 px-1.5 py-1">
-                                        Unit price <span className="text-[#e53b19]">FOB</span> (US$)
+                                        <span className="block text-right">Unit price <span className="text-[#e53b19]">FOB</span></span>
                                     </th>
                                     <th className="border border-gray-900 px-1.5 py-1">Qty</th>
                                     <th className="border border-gray-900 px-1.5 py-1">
-                                        Total price <span className="text-[#e53b19]">FOB</span> (US$)
+                                        <span className="block text-right">Total price <span className="text-[#e53b19]">FOB</span></span>
                                     </th>
                                 </tr>
                             </thead>
@@ -859,15 +859,15 @@ setPageNumbers();
                                             )}
                                         </td>
                                         <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap break-keep">{row.isBlank ? '' : row.model}</td>
-                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap">{row.isBlank ? '' : usdText(row.price)}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 text-right align-top whitespace-nowrap">{row.isBlank ? '' : usdText(row.price)}</td>
                                         <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap">{row.isBlank ? '' : row.quantity.toLocaleString()}</td>
-                                        <td className="border border-gray-900 px-1.5 py-1 text-center align-top whitespace-nowrap">{row.isBlank ? '' : usdText(row.amount)}</td>
+                                        <td className="border border-gray-900 px-1.5 py-1 text-right align-top whitespace-nowrap">{row.isBlank ? '' : usdText(row.amount)}</td>
                                     </tr>
                                 ))}
                                 <tr className="font-black">
                                     <td colSpan={4} className="border border-gray-900 px-2 py-2 text-center">Total</td>
                                     <td className="border border-gray-900 px-2 py-2 text-center">{totalQuantity.toLocaleString()}</td>
-                                    <td className="border border-gray-900 px-2 py-2 text-center">{usdText(grandTotalUsd)}</td>
+                                    <td className="border border-gray-900 px-2 py-2 text-right">{usdText(grandTotalUsd)}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -882,8 +882,8 @@ setPageNumbers();
                                 <div className="mt-3">
                                     <p className="text-[#e53b19] font-black text-base leading-none">Bank details:</p>
                                     <p className="mt-1">Payment currency: USD</p>
-                                    <p className="text-[#e53b19]">BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
-                                    <p className="text-[#e53b19]">SWIFT CODE (BIC): IBKOKRSEXXX</p>
+                                    <p>BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
+                                    <p>SWIFT CODE (BIC): IBKOKRSEXXX</p>
                                     <p>BENEFICIARY NAME: beiko Inc.</p>
                                     <p>BANK NAME: INDUSTRIAL BANK OF KOREA</p>
                                     <p>BANK ADDRESS: EULJI-RO, 82 IBK FINANCE TOWER FLOOR 16, JUNG-GU, SEOUL, REPUBLIC OF KOREA</p>
