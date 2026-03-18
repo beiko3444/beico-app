@@ -109,6 +109,7 @@ export default function ProformaClient({
     const [activeIssuedId, setActiveIssuedId] = useState<string | null>(initialIssuedInvoices[0]?.id || null)
     const [leftTab, setLeftTab] = useState<'write' | 'issued'>('write')
     const [isIssuing, setIsIssuing] = useState(false)
+    const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null)
     const [draftProductionTime, setDraftProductionTime] = useState(DEFAULT_PRODUCTION_TIME)
 
     const selectedPartner = useMemo(
@@ -329,6 +330,35 @@ export default function ProformaClient({
         }
     }
 
+    const handleDeleteIssued = async (invoiceId: string) => {
+        if (!confirm('선택한 PI 발급건을 삭제하시겠습니까?')) {
+            return
+        }
+
+        setDeletingInvoiceId(invoiceId)
+        try {
+            const response = await fetch(`/api/admin/proforma?id=${encodeURIComponent(invoiceId)}`, {
+                method: 'DELETE'
+            })
+            const data: { error?: string } | null = await response.json().catch(() => null)
+
+            if (!response.ok) {
+                alert(data?.error || 'PI 삭제에 실패했습니다.')
+                return
+            }
+
+            const nextInvoices = issuedInvoices.filter((invoice) => invoice.id !== invoiceId)
+            setIssuedInvoices(nextInvoices)
+            setActiveIssuedId((prev) => (prev === invoiceId ? nextInvoices[0]?.id || null : prev))
+            alert('PI 발급건이 삭제되었습니다.')
+        } catch (error) {
+            console.error(error)
+            alert('PI 삭제 중 오류가 발생했습니다.')
+        } finally {
+            setDeletingInvoiceId(null)
+        }
+    }
+
     const handlePrint = () => {
         if (previewInvoice.items.length === 0) {
             alert('출력할 PI 항목이 없습니다.')
@@ -422,18 +452,21 @@ thead { display: table-header-group; }
     white-space: nowrap;
     z-index: 10000;
 }
+.print-page-number::after {
+    content: "Page " counter(page) " / " counter(pages);
+}
 </style>
 </head>
 <body>
 
 <!-- Right side watermark (fixed = repeats on every page) -->
 <div class="print-watermark">
-    This document is an officially issued Proforma Invoice by beiko Inc. | ${previewInvoice.invoiceNumber} | To: ${consigneeName} | <span id="wm-page"></span>
+    This document is an officially issued Proforma Invoice by beiko Inc. | ${previewInvoice.invoiceNumber} | To: ${consigneeName} | <span class="print-page-number"></span>
 </div>
 
 <!-- Footer (fixed = repeats on every page) -->
 <div class="print-footer">
-    ${previewInvoice.invoiceNumber} — beiko Inc. Proforma Invoice — <span id="ft-page"></span>
+    ${previewInvoice.invoiceNumber} — beiko Inc. Proforma Invoice — <span class="print-page-number"></span>
 </div>
 
 <!-- Top red line -->
@@ -540,21 +573,6 @@ ${rowsHtml}
     </div>
 </div>
 
-<script>
-// Calculate total pages and set page numbers before printing
-function setPageNumbers() {
-    var pageHeightPx = 297 * (96 / 25.4); // A4 height in pixels at 96dpi
-    var totalPages = Math.max(1, Math.ceil(document.body.scrollHeight / pageHeightPx));
-    var pageText = 'Page 1 / ' + totalPages;
-    var wmEl = document.getElementById('wm-page');
-    var ftEl = document.getElementById('ft-page');
-    if (wmEl) wmEl.textContent = pageText;
-    if (ftEl) ftEl.textContent = pageText;
-}
-window.addEventListener('beforeprint', setPageNumbers);
-setPageNumbers();
-</script>
-
 </body>
 </html>`
 
@@ -604,7 +622,7 @@ setPageNumbers();
                     <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-base font-black text-gray-900">프로포마인보이스 관리</h2>
+                                <h2 className="text-base font-black text-gray-900">P.I발급 관리</h2>
                                 <p className="text-xs text-gray-500 mt-1">좌측 탭에서 제품리스트 작성/발급리스트 관리를 분리했습니다.</p>
                             </div>
                             <div className="flex items-center gap-2">
@@ -765,12 +783,13 @@ setPageNumbers();
                                                 <th className="px-3 py-2 text-left">날짜</th>
                                                 <th className="px-3 py-2 text-left">업체명</th>
                                                 <th className="px-3 py-2 text-center">총가격</th>
+                                                <th className="px-3 py-2 text-center">관리</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
                                             {issuedInvoices.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={3} className="px-3 py-8 text-center text-gray-400">발급된 PI가 없습니다.</td>
+                                                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400">발급된 PI가 없습니다.</td>
                                                 </tr>
                                             ) : (
                                                 issuedInvoices.map((invoice) => (
@@ -782,6 +801,19 @@ setPageNumbers();
                                                         <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
                                                         <td className="px-3 py-2 font-bold text-gray-900">{invoice.partnerName}</td>
                                                         <td className="px-3 py-2 text-right font-bold text-[#e53b19]">{usdFormatter.format(invoice.totalUsd)}</td>
+                                                        <td className="px-3 py-2 text-center">
+                                                            <button
+                                                                type="button"
+                                                                onClick={(event) => {
+                                                                    event.stopPropagation()
+                                                                    void handleDeleteIssued(invoice.id)
+                                                                }}
+                                                                disabled={deletingInvoiceId === invoice.id}
+                                                                className="px-2 py-1 rounded-md text-[11px] font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                                            >
+                                                                {deletingInvoiceId === invoice.id ? '삭제중...' : '삭제'}
+                                                            </button>
+                                                        </td>
                                                     </tr>
                                                 ))
                                             )}

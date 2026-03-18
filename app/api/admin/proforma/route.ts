@@ -209,3 +209,32 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Failed to issue PI' }, { status: 500 })
     }
 }
+
+export async function DELETE(request: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    try {
+        const { searchParams } = new URL(request.url)
+        const id = searchParams.get('id')?.trim() || ''
+
+        if (!id) {
+            return NextResponse.json({ error: 'id is required' }, { status: 400 })
+        }
+
+        const deleted = await prisma.proformaInvoice.delete({
+            where: { id },
+            select: { id: true }
+        })
+
+        return NextResponse.json(deleted)
+    } catch (error) {
+        if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+            return NextResponse.json({ error: 'PI not found' }, { status: 404 })
+        }
+        console.error('Failed to delete PI:', error)
+        return NextResponse.json({ error: 'Failed to delete PI' }, { status: 500 })
+    }
+}
