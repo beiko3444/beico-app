@@ -416,6 +416,7 @@ export default function ProformaClient({
 * { margin: 0; padding: 0; box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 html, body { background: white; width: 210mm; }
 body {
+    position: relative;
     padding: 0 15mm 0 12mm;
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans CJK KR", "Noto Sans CJK JP", sans-serif;
     color: #22253f; font-size: 11px; line-height: 1.4;
@@ -431,10 +432,9 @@ tfoot { display: table-footer-group; }
 .page-spacer-top { height: 10mm; }
 .page-spacer-bottom { height: 18mm; }
 
-/* Footer text */
-.print-footer {
-    position: fixed;
-    bottom: 4mm;
+/* Per-page footer (created by JS at each page boundary) */
+.page-footer {
+    position: absolute;
     left: 12mm;
     right: 15mm;
     text-align: center;
@@ -469,10 +469,7 @@ tfoot { display: table-footer-group; }
     This document is an officially issued Proforma Invoice by beiko Inc. | ${previewInvoice.invoiceNumber} | To: ${consigneeName} | <span class="print-page-number"></span>
 </div>
 
-<!-- Footer (fixed = repeats on every page) -->
-<div class="print-footer">
-    ${previewInvoice.invoiceNumber} — beiko Inc. Proforma Invoice — <span class="print-page-number"></span>
-</div>
+
 
 <!-- Page wrapper: thead/tfoot repeat on every page to create margins -->
 <table class="page-wrapper">
@@ -589,16 +586,28 @@ ${rowsHtml}
 
 <script>
 (function() {
-    function setPages() {
+    function createPageFooters() {
+        var old = document.querySelectorAll('.page-footer');
+        for (var i = 0; i < old.length; i++) old[i].remove();
+
         var ph = 297 * 96 / 25.4;
         var total = Math.max(1, Math.ceil(document.body.scrollHeight / ph));
-        var els = document.querySelectorAll('.print-page-number');
-        for (var i = 0; i < els.length; i++) {
-            els[i].textContent = total + ' pages';
+
+        var pnEls = document.querySelectorAll('.print-page-number');
+        for (var j = 0; j < pnEls.length; j++) {
+            pnEls[j].textContent = total + 'p';
+        }
+
+        for (var p = 1; p <= total; p++) {
+            var f = document.createElement('div');
+            f.className = 'page-footer';
+            f.style.top = (p * ph - 42) + 'px';
+            f.textContent = '${previewInvoice.invoiceNumber} \u2014 beiko Inc. Proforma Invoice \u2014 Page ' + p + ' / ' + total;
+            document.body.appendChild(f);
         }
     }
-    setPages();
-    window.addEventListener('beforeprint', setPages);
+    createPageFooters();
+    window.addEventListener('beforeprint', createPageFooters);
 })();
 </script>
 
