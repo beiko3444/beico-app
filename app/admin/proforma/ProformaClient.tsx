@@ -72,7 +72,7 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
 
 const textOrDash = (value: string | null | undefined) => (value && value.trim().length > 0 ? value : '-')
 const usdText = (value: number) =>
-    `${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+    `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 const slashDate = (date: Date) =>
     `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
 
@@ -478,9 +478,9 @@ thead { display: table-header-group; }
         <th style="border:1px solid #111827;padding:4px 6px">No.</th>
         <th style="border:1px solid #111827;padding:4px 6px">Product Name</th>
         <th style="border:1px solid #111827;padding:4px 6px">Model</th>
-        <th style="border:1px solid #111827;padding:4px 6px;text-align:right">Unit price <span style="color:#e53b19">FOB</span></th>
+        <th style="border:1px solid #111827;padding:4px 6px">Unit price <span style="color:#e53b19">FOB</span></th>
         <th style="border:1px solid #111827;padding:4px 6px">Qty</th>
-        <th style="border:1px solid #111827;padding:4px 6px;text-align:right">Total price <span style="color:#e53b19">FOB</span></th>
+        <th style="border:1px solid #111827;padding:4px 6px">Total price <span style="color:#e53b19">FOB</span></th>
     </tr>
 </thead>
 <tbody>
@@ -666,9 +666,9 @@ setPageNumbers();
                                                 <th className="px-3 py-2 text-center">이미지</th>
                                                 <th className="px-3 py-2 text-left">상품</th>
                                                 <th className="px-3 py-2 text-center">재고</th>
-                                                <th className="px-3 py-2 text-right">단가</th>
+                                                <th className="px-3 py-2 text-center">단가</th>
                                                 <th className="px-3 py-2 text-center">수량</th>
-                                                <th className="px-3 py-2 text-right">금액</th>
+                                                <th className="px-3 py-2 text-center">금액</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
@@ -734,7 +734,7 @@ setPageNumbers();
                                             <tr>
                                                 <th className="px-3 py-2 text-left">날짜</th>
                                                 <th className="px-3 py-2 text-left">업체명</th>
-                                                <th className="px-3 py-2 text-right">총가격</th>
+                                                <th className="px-3 py-2 text-center">총가격</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100">
@@ -829,11 +829,11 @@ setPageNumbers();
                                     <th className="border border-gray-900 px-1.5 py-1">Product Name</th>
                                     <th className="border border-gray-900 px-1.5 py-1">Model</th>
                                     <th className="border border-gray-900 px-1.5 py-1">
-                                        <span className="block text-right">Unit price <span className="text-[#e53b19]">FOB</span></span>
+                                        Unit price <span className="text-[#e53b19]">FOB</span>
                                     </th>
                                     <th className="border border-gray-900 px-1.5 py-1">Qty</th>
                                     <th className="border border-gray-900 px-1.5 py-1">
-                                        <span className="block text-right">Total price <span className="text-[#e53b19]">FOB</span></span>
+                                        Total price <span className="text-[#e53b19]">FOB</span>
                                     </th>
                                 </tr>
                             </thead>
