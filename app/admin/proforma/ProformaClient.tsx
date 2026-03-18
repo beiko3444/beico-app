@@ -474,6 +474,12 @@ tfoot { display: table-footer-group; }
     ${previewInvoice.invoiceNumber} — beiko Inc. Proforma Invoice — <span class="print-page-number"></span>
 </div>
 
+<!-- Page wrapper: thead/tfoot repeat on every page to create margins -->
+<table class="page-wrapper">
+<thead><tr><td class="page-spacer-top"></td></tr></thead>
+<tfoot><tr><td class="page-spacer-bottom"></td></tr></tfoot>
+<tbody><tr><td>
+
 <!-- Top red line -->
 <div style="height:4px;width:100%;background:#e53b19;margin-bottom:8px"></div>
 
@@ -578,6 +584,9 @@ ${rowsHtml}
     </div>
 </div>
 
+</td></tr></tbody>
+</table>
+
 <script>
 (function() {
     function setPages() {
@@ -585,7 +594,7 @@ ${rowsHtml}
         var total = Math.max(1, Math.ceil(document.body.scrollHeight / ph));
         var els = document.querySelectorAll('.print-page-number');
         for (var i = 0; i < els.length; i++) {
-            els[i].textContent = 'Page 1 / ' + total;
+            els[i].textContent = total + ' pages';
         }
     }
     setPages();
