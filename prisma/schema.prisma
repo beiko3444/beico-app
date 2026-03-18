@@ -171,6 +171,7 @@ model ProformaInvoice {
   partnerName   String
   issueDate     DateTime              @default(now())
   totalUsd      Float                 @default(0)
+  productionTime String               @default("3-5 days after receiving the deposit")
   createdAt     DateTime              @default(now())
   updatedAt     DateTime              @updatedAt
   partner       User?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)

@@ -95,6 +95,7 @@ export default async function ProformaPage() {
         issueDate: invoice.issueDate.toISOString(),
         partnerName: invoice.partnerName,
         totalUsd: invoice.totalUsd,
+        productionTime: invoice.productionTime,
         items: invoice.items.map((item) => ({
             id: item.id,
             productId: item.productId,

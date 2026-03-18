@@ -40,6 +40,7 @@ export type IssuedInvoice = {
     issueDate: string
     partnerName: string
     totalUsd: number
+    productionTime: string
     items: IssuedInvoiceItem[]
 }
 
@@ -51,6 +52,7 @@ type PreviewInvoice = {
     issueDate: string
     partnerName: string
     totalUsd: number
+    productionTime: string
     items: IssuedInvoiceItem[]
 }
 
@@ -73,8 +75,16 @@ const dateFormatter = new Intl.DateTimeFormat('ko-KR', {
 const textOrDash = (value: string | null | undefined) => (value && value.trim().length > 0 ? value : '-')
 const usdText = (value: number) =>
     `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+const escapeHtml = (value: string) =>
+    value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;')
 const slashDate = (date: Date) =>
     `${date.getFullYear()}/${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`
+const DEFAULT_PRODUCTION_TIME = '3-5 days after receiving the deposit'
 
 const CONSIGNEE_INFO = {
     companyName: 'LODOS BALIKCILIK ITH.IHR.SAN.VE TIC.LTD.STI.',
@@ -99,6 +109,7 @@ export default function ProformaClient({
     const [activeIssuedId, setActiveIssuedId] = useState<string | null>(initialIssuedInvoices[0]?.id || null)
     const [leftTab, setLeftTab] = useState<'write' | 'issued'>('write')
     const [isIssuing, setIsIssuing] = useState(false)
+    const [draftProductionTime, setDraftProductionTime] = useState(DEFAULT_PRODUCTION_TIME)
 
     const selectedPartner = useMemo(
         () => partners.find((partner) => partner.id === selectedPartnerId) || null,
@@ -150,6 +161,7 @@ export default function ProformaClient({
                 issueDate: activeIssuedInvoice.issueDate,
                 partnerName: activeIssuedInvoice.partnerName,
                 totalUsd: activeIssuedInvoice.totalUsd,
+                productionTime: activeIssuedInvoice.productionTime || DEFAULT_PRODUCTION_TIME,
                 items: activeIssuedInvoice.items
             }
         }
@@ -163,9 +175,10 @@ export default function ProformaClient({
             issueDate: now.toISOString(),
             partnerName,
             totalUsd: draftTotalUsd,
+            productionTime: draftProductionTime,
             items: draftItems
         }
-    }, [activeIssuedInvoice, selectedPartner, draftTotalUsd, draftItems])
+    }, [activeIssuedInvoice, selectedPartner, draftTotalUsd, draftItems, draftProductionTime])
 
     const issueDate = useMemo(() => new Date(previewInvoice.issueDate), [previewInvoice.issueDate])
     const issueDateText = useMemo(() => slashDate(issueDate), [issueDate])
@@ -243,6 +256,7 @@ export default function ProformaClient({
 
     const resetDraft = () => {
         setDraftState(makeInitialDraftState(products))
+        setDraftProductionTime(DEFAULT_PRODUCTION_TIME)
         setActiveIssuedId(null)
         setLeftTab('write')
     }
@@ -264,6 +278,7 @@ export default function ProformaClient({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     partnerId: selectedPartnerId,
+                    productionTime: draftProductionTime,
                     items: draftItems.map((item) => ({
                         productId: item.productId,
                         quantity: item.quantity
@@ -283,6 +298,10 @@ export default function ProformaClient({
                 issueDate: data.issueDate,
                 partnerName: data.partnerName,
                 totalUsd: data.totalUsd,
+                productionTime:
+                    typeof data.productionTime === 'string' && data.productionTime.trim().length > 0
+                        ? data.productionTime
+                        : DEFAULT_PRODUCTION_TIME,
                 items: (Array.isArray(data.items) ? data.items : []).map((item: unknown) => {
                     const typed = item as Record<string, unknown>
                     return {
@@ -352,6 +371,7 @@ export default function ProformaClient({
         const origin = window.location.origin
 
         const consigneeName = previewInvoice.partnerName || '-'
+        const productionTimeText = escapeHtml(previewInvoice.productionTime || DEFAULT_PRODUCTION_TIME)
 
         const fullHtml = `<!DOCTYPE html>
 <html>
@@ -499,7 +519,7 @@ ${rowsHtml}
         <p>1. Price terms: FOB BUSAN</p>
         <p>2. Packaging: by export carton box</p>
         <p>3. Payment Term: 100% deposit by T/T</p>
-        <p>4. Production time: 3-5 days after receiving the deposit</p>
+        <p>4. Production time: ${productionTimeText}</p>
         <p>5. Validity Period: quotation valid for 30 days from invoice date</p>
         <div style="margin-top:12px">
             <p style="color:#e53b19;font-weight:900;font-size:16px;line-height:1">Bank details:</p>
@@ -656,6 +676,16 @@ setPageNumbers();
                                         ))}
                                     </select>
                                     <p className="mt-2 text-[11px] text-gray-500">단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
+                                    <div className="mt-3">
+                                        <label className="text-xs font-bold text-gray-700">Production time</label>
+                                        <input
+                                            type="text"
+                                            value={draftProductionTime}
+                                            onChange={(event) => setDraftProductionTime(event.target.value)}
+                                            className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-medium focus:ring-[#e53b19] focus:border-[#e53b19]"
+                                            placeholder="e.g. 3-5 days after receiving the deposit"
+                                        />
+                                    </div>
                                 </div>
 
                                 <div className="overflow-x-auto border border-gray-100 rounded-xl">
@@ -877,7 +907,7 @@ setPageNumbers();
                                 <p>1. Price terms: FOB BUSAN</p>
                                 <p className="mt-1">2. Packaging: by export carton box</p>
                                 <p className="mt-1">3. Payment Term: 100% deposit by T/T</p>
-                                <p className="mt-1">4. Production time: 3-5 days after receiving the deposit</p>
+                                <p className="mt-1">4. Production time: {previewInvoice.productionTime || DEFAULT_PRODUCTION_TIME}</p>
                                 <p className="mt-1">5. Validity Period: quotation valid for 30 days from invoice date</p>
                                 <div className="mt-3">
                                     <p className="text-[#e53b19] font-black text-base leading-none">Bank details:</p>
