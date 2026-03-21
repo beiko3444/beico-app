@@ -1,5 +1,8 @@
 
 import { prisma } from "@/lib/prisma"
+import { getServerSession } from "next-auth"
+import { redirect } from "next/navigation"
+import { authOptions } from "@/lib/auth"
 import AdminNav from "./AdminNav"
 
 export default async function AdminLayout({
@@ -7,6 +10,11 @@ export default async function AdminLayout({
 }: {
     children: React.ReactNode
 }) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+        redirect('/login')
+    }
+
     let pendingOrderCount = 0
     let lowStockCount = 0
     let pendingPartnerCount = 0
