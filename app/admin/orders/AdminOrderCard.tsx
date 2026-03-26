@@ -18,6 +18,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
     if (hour === 0) hour = 12
     const minute = String(date.getMinutes()).padStart(2, '0')
     const orderNumber = order.orderNumber || order.id.slice(0, 8);
+    const partnerName = order.user.partnerProfile?.businessName || order.user.name || '-'
     const formattedDate = `${year}-${month}-${day} ${ampm} ${hour}:${minute}`
 
     // Calculate totals
@@ -64,6 +65,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
                 <div className="flex justify-between items-center mb-4 pb-2 border-b border-gray-50">
                     <h2 className="text-xl font-black text-gray-800 tracking-tight">
                         주문번호 {orderNumber}
+                        <span className="ml-2 text-xs font-bold text-gray-500 align-middle">{formattedDate}</span>
                     </h2>
                     <div className="flex items-center gap-2">
                         <span className="bg-gray-100 text-gray-500 rounded-full px-3 py-1 text-[10px] font-bold">
@@ -82,12 +84,8 @@ export default function AdminOrderCard({ order }: { order: any }) {
 
                 <div className="space-y-3 p-1">
                     <div className="flex justify-between items-center">
-                        <span className="text-sm text-gray-400">일시</span>
-                        <span className="text-sm text-gray-800 font-bold">{formattedDate}</span>
-                    </div>
-                    <div className="flex justify-between items-center bg-transparent">
-                        <span className="text-sm text-gray-400">고객 ID</span>
-                        <span className="text-sm text-gray-800 font-bold">{order.user.username}</span>
+                        <span className="text-sm text-gray-400">업체명</span>
+                        <span className="text-sm text-gray-800 font-bold text-right">{partnerName}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-sm text-gray-400 w-24 shrink-0">배송지</span>
