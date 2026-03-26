@@ -277,7 +277,7 @@ export default function OrdersClient({
 
 
 
-            <div className="space-y-6">
+            <div className="flex flex-col gap-10">
                 {filteredOrders.length === 0 ? (
                     <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
                         <p className="text-gray-400 font-medium">검색 결과가 없습니다.</p>
@@ -290,6 +290,13 @@ export default function OrdersClient({
                 ) : (
                     filteredOrders.map((order, idx) => (
                         <div key={order.id}>
+                            {idx > 0 && (
+                                <div className="flex items-center gap-3 mb-8 max-w-[480px] mx-auto">
+                                    <div className="flex-1 h-px bg-gray-200" />
+                                    <span className="text-[9px] font-bold text-gray-300 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
+                                    <div className="flex-1 h-px bg-gray-200" />
+                                </div>
+                            )}
                             <AdminOrderCard order={order} />
                         </div>
                     ))
