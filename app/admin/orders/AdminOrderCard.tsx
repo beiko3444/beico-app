@@ -2,13 +2,13 @@
 
 import React, { useState } from 'react'
 import OrderActions from '@/components/OrderActions'
-import BarcodeDisplay from '@/components/BarcodeDisplay'
 import OrderStatus from '@/components/OrderStatus'
-import { Trash2, FileText, AlertTriangle, Copy, Check } from 'lucide-react'
+import { Trash2, FileText, AlertTriangle, Copy, Check, Clock, Building2, Truck } from 'lucide-react'
 
 export default function AdminOrderCard({ order }: { order: any }) {
     const [isDeleting, setIsDeleting] = useState(false);
     const [copiedField, setCopiedField] = useState<string | null>(null);
+    const [showInvoiceInfo, setShowInvoiceInfo] = useState(!order.taxInvoiceIssued);
 
     const date = new Date(order.createdAt)
     const year = date.getFullYear()
@@ -33,13 +33,13 @@ export default function AdminOrderCard({ order }: { order: any }) {
     const grandVat = Math.round(grandSupply * 0.1);
     const totalAmount = grandSupply + grandVat
 
-    const gradeColors: Record<string, { bg: string, text: string, border: string }> = {
-        'A': { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200' },
-        'B': { bg: 'bg-blue-50', text: 'text-blue-700', border: 'border-blue-200' },
-        'C': { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200' },
-        'D': { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' },
+    const gradeConfig: Record<string, { color: string, label: string }> = {
+        'A': { color: '#10b981', label: 'A' },
+        'B': { color: '#3b82f6', label: 'B' },
+        'C': { color: '#f59e0b', label: 'C' },
+        'D': { color: '#6b7280', label: 'D' },
     }
-    const gc = gradeColors[partnerGrade] || gradeColors['C']
+    const grade = gradeConfig[partnerGrade] || gradeConfig['C']
 
     const formatTimestamp = (ts: string | null) => {
         if (!ts) return null
@@ -60,18 +60,13 @@ export default function AdminOrderCard({ order }: { order: any }) {
 
     const handleDelete = async () => {
         if (!confirm('정말로 이 주문을 삭제하시겠습니까? 삭제 시 재고가 복구됩니다.')) return;
-
         setIsDeleting(true);
         try {
-            const res = await fetch(`/api/orders/${order.id}`, {
-                method: 'DELETE',
-            });
-
+            const res = await fetch(`/api/orders/${order.id}`, { method: 'DELETE' });
             if (!res.ok) {
                 const error = await res.json();
                 throw new Error(error.error || '주문 삭제 중 오류가 발생했습니다.');
             }
-
             alert('주문이 성공적으로 삭제되었습니다.');
             window.location.reload();
         } catch (error: any) {
@@ -85,218 +80,226 @@ export default function AdminOrderCard({ order }: { order: any }) {
     const adminDepositConfirmedAt = formatTimestamp(order.adminDepositConfirmedAt)
 
     return (
-        <div className="bg-[#f8f9fa] rounded-[2.5rem] w-full max-w-[500px] mx-auto p-4 md:p-7 mb-10 border border-gray-200/60 shadow-[0_10px_40px_rgba(0,0,0,0.03)] relative transition-all hover:shadow-[0_10px_40px_rgba(0,0,0,0.06)] hover:border-gray-300">
-            <OrderStatus
-                status={order.status}
-                trackingNumber={order.trackingNumber}
-                taxInvoiceIssued={order.taxInvoiceIssued}
-            />
+        <div className="w-full max-w-[520px] mx-auto mb-8">
+            {/* ━━━ MAIN CARD ━━━ */}
+            <div className="bg-[#1a1d23] rounded-[1.8rem] overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.15)]">
 
-            {/* ── 주문 헤더 ── */}
-            <div className="bg-white rounded-[1.2rem] p-5 shadow-sm mb-4">
-                <div className="flex justify-between items-start mb-3 pb-3 border-b border-gray-100">
-                    <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-black text-gray-800 tracking-tight">
-                                #{orderNumber}
-                            </h2>
-                            <span className={`px-2 py-0.5 rounded-md text-[9px] font-black border ${gc.bg} ${gc.text} ${gc.border}`}>
-                                {partnerGrade}등급
-                            </span>
+                {/* ── TOP: 주문 헤더 (다크 그라데이션) ── */}
+                <div className="bg-gradient-to-br from-[#1a1d23] via-[#22262e] to-[#2a2f38] px-6 pt-5 pb-4">
+                    <div className="flex justify-between items-start mb-4">
+                        <div>
+                            <div className="flex items-center gap-2.5 mb-1">
+                                <h2 className="text-white text-xl font-black tracking-tight">
+                                    #{orderNumber}
+                                </h2>
+                                <div
+                                    className="w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black text-white"
+                                    style={{ backgroundColor: grade.color }}
+                                >
+                                    {grade.label}
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2 text-[11px] text-gray-500">
+                                <Clock size={11} />
+                                <span>{formattedDate}</span>
+                            </div>
                         </div>
-                        <span className="text-[11px] text-gray-400 font-medium">{formattedDate}</span>
+                        <div className="flex items-center gap-1.5">
+                            <span className="bg-white/10 text-gray-400 rounded-lg px-2.5 py-1 text-[9px] font-bold tracking-wider uppercase">
+                                도매
+                            </span>
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="bg-red-500/15 text-red-400 rounded-lg px-2 py-1 text-[9px] font-bold hover:bg-red-500/25 transition-all flex items-center gap-1"
+                            >
+                                <Trash2 size={10} />
+                                {isDeleting ? '...' : '삭제'}
+                            </button>
+                        </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <span className="bg-gray-100 text-gray-500 rounded-full px-3 py-1 text-[10px] font-bold">
-                            도매
-                        </span>
-                        <button
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="flex items-center gap-1 bg-red-50 text-red-500 rounded-full px-2 py-1 text-[10px] font-bold hover:bg-red-100 transition-colors"
-                        >
-                            <Trash2 size={12} />
-                            {isDeleting ? '진행중' : '삭제'}
-                        </button>
+
+                    {/* 업체 정보 인라인 */}
+                    <div className="bg-white/[0.06] rounded-xl px-4 py-3 backdrop-blur-sm border border-white/[0.06]">
+                        <div className="flex items-center gap-2 mb-2">
+                            <Building2 size={13} className="text-gray-500" />
+                            <span className="text-white font-black text-[14px]">{partnerName}</span>
+                        </div>
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px]">
+                            <div className="flex items-center gap-2 text-gray-500">
+                                <span>배송지</span>
+                            </div>
+                            <span className="text-gray-300 font-medium text-right truncate">{order.user.partnerProfile?.address || '-'}</span>
+                            <div className="flex items-center gap-2 text-gray-500">
+                                <span>연락처</span>
+                            </div>
+                            <span className="text-gray-300 font-medium text-right">{order.user.partnerProfile?.contact || '-'}</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* 주문자 / 업체 기본 정보 */}
-                <div className="space-y-2 p-1">
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-400 font-medium">업체명</span>
-                        <span className="text-sm text-gray-900 font-black">{partnerName}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-400 font-medium w-16 shrink-0">배송지</span>
-                        <span className="text-xs text-gray-800 font-bold max-w-full truncate text-right">{order.user.partnerProfile?.address || '-'}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-400 font-medium">연락처</span>
-                        <span className="text-sm text-gray-800 font-bold">{order.user.partnerProfile?.contact || '-'}</span>
-                    </div>
+                {/* ── 주문 상태 바 ── */}
+                <div className="px-5 py-3 bg-[#1e2128]">
+                    <OrderStatus
+                        status={order.status}
+                        trackingNumber={order.trackingNumber}
+                        taxInvoiceIssued={order.taxInvoiceIssued}
+                    />
                 </div>
-            </div>
 
-            {/* ── 계산서 발급 정보 블록 ── */}
-            <div className={`rounded-[1.2rem] p-4 mb-4 border ${order.taxInvoiceIssued ? 'bg-emerald-50/50 border-emerald-200' : 'bg-orange-50/50 border-orange-200'}`}>
-                <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                        <FileText size={14} className={order.taxInvoiceIssued ? 'text-emerald-600' : 'text-orange-600'} />
-                        <h3 className={`text-xs font-black ${order.taxInvoiceIssued ? 'text-emerald-700' : 'text-orange-700'}`}>
-                            계산서 발급 정보
-                        </h3>
-                    </div>
-                    {order.taxInvoiceIssued ? (
-                        <span className="bg-emerald-100 text-emerald-700 px-2.5 py-0.5 rounded-full text-[9px] font-black border border-emerald-200">
-                            ✅ 발급완료
-                        </span>
-                    ) : (
-                        <span className="bg-orange-100 text-orange-700 px-2.5 py-0.5 rounded-full text-[9px] font-black border border-orange-200 flex items-center gap-1">
-                            <AlertTriangle size={10} />
-                            미발행
-                        </span>
+                {/* ── 계산서 발급 정보 ── */}
+                <div className="px-5 py-4 border-t border-white/[0.06]">
+                    <button
+                        onClick={() => setShowInvoiceInfo(!showInvoiceInfo)}
+                        className="w-full flex items-center justify-between group mb-0"
+                    >
+                        <div className="flex items-center gap-2">
+                            <FileText size={13} className={order.taxInvoiceIssued ? 'text-emerald-400' : 'text-amber-400'} />
+                            <span className="text-[12px] font-black text-gray-300">계산서 발급 정보</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            {order.taxInvoiceIssued ? (
+                                <span className="bg-emerald-500/20 text-emerald-400 px-2.5 py-0.5 rounded-md text-[9px] font-black">
+                                    발급완료
+                                </span>
+                            ) : (
+                                <span className="bg-amber-500/20 text-amber-400 px-2.5 py-0.5 rounded-md text-[9px] font-black flex items-center gap-1">
+                                    <AlertTriangle size={9} />
+                                    미발행
+                                </span>
+                            )}
+                            <svg className={`w-3.5 h-3.5 text-gray-500 transition-transform ${showInvoiceInfo ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                    </button>
+
+                    {showInvoiceInfo && (
+                        <div className="mt-3 space-y-1.5 animate-in fade-in slide-in-from-top-2 duration-200">
+                            {/* 사업자번호 */}
+                            <div className="flex items-center justify-between bg-white/[0.04] rounded-lg px-3.5 py-2.5 group/row hover:bg-white/[0.07] transition-colors">
+                                <span className="text-[10px] text-gray-500 font-medium">사업자번호</span>
+                                <button
+                                    onClick={() => copyToClipboard(order.user.partnerProfile?.businessRegNumber || '', 'bizNum')}
+                                    className="flex items-center gap-1.5 text-[12px] font-black text-white hover:text-[#e43f29] transition-colors"
+                                >
+                                    {order.user.partnerProfile?.businessRegNumber || '-'}
+                                    {copiedField === 'bizNum'
+                                        ? <Check size={11} className="text-emerald-400" />
+                                        : <Copy size={11} className="text-gray-600 group-hover/row:text-gray-400 transition-colors" />
+                                    }
+                                </button>
+                            </div>
+                            {/* 대표자 / 상호 */}
+                            <div className="grid grid-cols-2 gap-1.5">
+                                <div className="bg-white/[0.04] rounded-lg px-3.5 py-2.5">
+                                    <span className="text-[10px] text-gray-500 font-medium block mb-0.5">대표자명</span>
+                                    <span className="text-[12px] font-black text-white">{representativeName}</span>
+                                </div>
+                                <div className="bg-white/[0.04] rounded-lg px-3.5 py-2.5">
+                                    <span className="text-[10px] text-gray-500 font-medium block mb-0.5">상호</span>
+                                    <span className="text-[12px] font-bold text-gray-300 truncate block">{partnerName}</span>
+                                </div>
+                            </div>
+                            {/* 이메일 */}
+                            <div className="flex items-center justify-between bg-white/[0.04] rounded-lg px-3.5 py-2.5 group/row hover:bg-white/[0.07] transition-colors">
+                                <span className="text-[10px] text-gray-500 font-medium">이메일</span>
+                                <button
+                                    onClick={() => copyToClipboard(order.user.partnerProfile?.email || '', 'email')}
+                                    className="flex items-center gap-1.5 text-[11px] font-bold text-gray-300 hover:text-[#e43f29] transition-colors"
+                                >
+                                    <span className="truncate max-w-[200px]">{order.user.partnerProfile?.email || '-'}</span>
+                                    {copiedField === 'email'
+                                        ? <Check size={10} className="text-emerald-400 shrink-0" />
+                                        : <Copy size={10} className="text-gray-600 group-hover/row:text-gray-400 shrink-0 transition-colors" />
+                                    }
+                                </button>
+                            </div>
+                        </div>
                     )}
                 </div>
 
-                <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px]">
-                    {/* 사업자번호 */}
-                    <div className="col-span-2 flex justify-between items-center bg-white/60 rounded-lg px-3 py-2">
-                        <span className="text-gray-400 font-medium">사업자번호</span>
-                        <button
-                            onClick={() => copyToClipboard(order.user.partnerProfile?.businessRegNumber || '', 'bizNum')}
-                            className="flex items-center gap-1.5 font-black text-gray-900 hover:text-[#e43f29] transition-colors"
-                        >
-                            {order.user.partnerProfile?.businessRegNumber || '-'}
-                            {copiedField === 'bizNum' ? <Check size={11} className="text-emerald-500" /> : <Copy size={11} className="opacity-30" />}
-                        </button>
+                {/* ── 입금 이력 ── */}
+                {(depositConfirmedAt || adminDepositConfirmedAt) && (
+                    <div className="px-5 pb-4 border-t border-white/[0.06] pt-3">
+                        <div className="grid grid-cols-2 gap-1.5">
+                            {depositConfirmedAt && (
+                                <div className="bg-white/[0.04] rounded-lg px-3.5 py-2.5">
+                                    <span className="text-[9px] text-gray-500 font-medium block mb-0.5">거래처 입금확인</span>
+                                    <span className="text-[11px] font-bold text-gray-300">{depositConfirmedAt}</span>
+                                </div>
+                            )}
+                            {adminDepositConfirmedAt && (
+                                <div className="bg-emerald-500/10 rounded-lg px-3.5 py-2.5 border border-emerald-500/10">
+                                    <span className="text-[9px] text-emerald-500/70 font-medium block mb-0.5">관리자 확인</span>
+                                    <span className="text-[11px] font-bold text-emerald-400">{adminDepositConfirmedAt}</span>
+                                </div>
+                            )}
+                        </div>
                     </div>
-                    {/* 대표자명 */}
-                    <div className="flex flex-col bg-white/60 rounded-lg px-3 py-2">
-                        <span className="text-gray-400 font-medium mb-0.5">대표자명</span>
-                        <span className="font-black text-gray-900">{representativeName}</span>
-                    </div>
-                    {/* 상호 */}
-                    <div className="flex flex-col bg-white/60 rounded-lg px-3 py-2">
-                        <span className="text-gray-400 font-medium mb-0.5">상호</span>
-                        <span className="font-bold text-gray-900 truncate">{partnerName}</span>
-                    </div>
-                    {/* 이메일 */}
-                    <div className="flex flex-col bg-white/60 rounded-lg px-3 py-2">
-                        <span className="text-gray-400 font-medium mb-0.5">이메일</span>
-                        <button
-                            onClick={() => copyToClipboard(order.user.partnerProfile?.email || '', 'email')}
-                            className="flex items-center gap-1 font-bold text-gray-900 hover:text-[#e43f29] transition-colors text-left"
-                        >
-                            <span className="truncate">{order.user.partnerProfile?.email || '-'}</span>
-                            {copiedField === 'email' ? <Check size={10} className="text-emerald-500 shrink-0" /> : <Copy size={10} className="opacity-30 shrink-0" />}
-                        </button>
-                    </div>
-                    {/* FAX */}
-                    <div className="flex flex-col bg-white/60 rounded-lg px-3 py-2">
-                        <span className="text-gray-400 font-medium mb-0.5">FAX</span>
-                        <span className="font-bold text-gray-900">{order.user.partnerProfile?.fax || '-'}</span>
-                    </div>
-                </div>
+                )}
             </div>
 
-            {/* ── 입금 이력 ── */}
-            {(depositConfirmedAt || adminDepositConfirmedAt) && (
-                <div className="bg-white rounded-[1.2rem] p-4 shadow-sm mb-4">
-                    <h3 className="text-xs font-black text-gray-500 mb-2 flex items-center gap-1.5">
-                        <span className="w-1 h-3 bg-[#424853] rounded-full"></span>
-                        입금 확인 이력
-                    </h3>
-                    <div className="grid grid-cols-2 gap-3 text-[11px]">
-                        {depositConfirmedAt && (
-                            <div className="flex flex-col bg-gray-50 rounded-lg px-3 py-2">
-                                <span className="text-gray-400 font-medium">거래처 입금확인</span>
-                                <span className="font-bold text-gray-800 mt-0.5">{depositConfirmedAt}</span>
-                            </div>
-                        )}
-                        {adminDepositConfirmedAt && (
-                            <div className="flex flex-col bg-emerald-50 rounded-lg px-3 py-2">
-                                <span className="text-gray-400 font-medium">관리자 입금확인</span>
-                                <span className="font-bold text-emerald-700 mt-0.5">{adminDepositConfirmedAt}</span>
-                            </div>
-                        )}
-                    </div>
+            {/* ━━━ DELIVERY SECTION ━━━ */}
+            <div className="bg-white rounded-[1.4rem] -mt-3 mx-2 px-5 py-5 shadow-[0_8px_30px_rgba(0,0,0,0.06)] border border-gray-100/80 relative z-10">
+                <div className="flex items-center gap-2 mb-3">
+                    <Truck size={14} className="text-gray-400" />
+                    <h3 className="text-[13px] font-black text-gray-800">배송 상태 관리</h3>
                 </div>
-            )}
-
-            {/* ── 배송 상태 관리 ── */}
-            <div className="mb-6">
-                <h3 className="text-[17px] font-black text-gray-800 mb-3 ml-1">배송 상태 관리</h3>
                 <OrderActions order={order} />
             </div>
 
-            {/* ── 주문 상품 목록 ── */}
-            <div className="mb-6">
-                <h3 className="text-[17px] font-black text-gray-800 mb-3 ml-1">
-                    주문 상품 목록
-                    <span className="ml-2 text-xs font-bold text-gray-400">({order.items.length}건)</span>
-                </h3>
+            {/* ━━━ PRODUCT LIST ━━━ */}
+            <div className="bg-white rounded-[1.4rem] mx-2 mt-2 px-5 py-5 shadow-[0_8px_30px_rgba(0,0,0,0.04)] border border-gray-100/80">
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-[13px] font-black text-gray-800">
+                        주문 상품
+                        <span className="text-gray-400 font-bold ml-1.5">({order.items.length})</span>
+                    </h3>
+                    <span className="text-[10px] font-bold text-gray-400">
+                        총 {totalQuantity.toLocaleString()}개
+                    </span>
+                </div>
 
-                <div className="space-y-3">
+                <div className="space-y-2">
                     {order.items.map((item: any) => {
                         const supplyPrice = item.price * item.quantity;
                         const vat = Math.round(supplyPrice * 0.1);
+                        const lineTotal = supplyPrice + vat;
                         return (
-                            <div key={item.id} className="bg-white rounded-[1.2rem] p-4 shadow-sm flex flex-col">
-                                <div className="flex gap-4">
-                                    <div className="w-[84px] h-[84px] rounded-xl bg-black shrink-0 overflow-hidden flex items-center justify-center">
+                            <div key={item.id} className="bg-gray-50/80 rounded-xl p-3 hover:bg-gray-100/60 transition-colors">
+                                <div className="flex gap-3">
+                                    <div className="w-[60px] h-[60px] rounded-lg bg-gray-200 shrink-0 overflow-hidden">
                                         {item.product.imageUrl ? (
                                             <img src={item.product.imageUrl} alt="" className="w-full h-full object-cover" />
                                         ) : (
-                                            <span className="text-[10px] text-gray-500">이미지 없음</span>
+                                            <div className="w-full h-full flex items-center justify-center">
+                                                <span className="text-[8px] text-gray-400">N/A</span>
+                                            </div>
                                         )}
                                     </div>
-                                    <div className="flex-1 min-w-0 flex flex-col justify-between py-0.5">
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 text-[14px] leading-tight truncate">{item.product.name}</h4>
-                                            <p className="text-[10px] text-gray-400 truncate mb-2 mt-0.5">{item.product.nameJP || item.product.name}</p>
-                                        </div>
+                                    <div className="flex-1 min-w-0">
+                                        <h4 className="font-bold text-gray-900 text-[13px] leading-tight truncate">{item.product.name}</h4>
+                                        <p className="text-[9px] text-gray-400 truncate mt-0.5 mb-2">{item.product.nameJP || item.product.name}</p>
 
-                                        {/* Financial Row: 단가, 수량, 공급가, 부가세 */}
-                                        <div className="flex items-center gap-4 text-[11px] border-b border-gray-50 pb-2 mb-2">
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400">단가</span>
-                                                <span className="font-bold text-gray-900">{item.price.toLocaleString()}</span>
+                                        <div className="flex items-center gap-0 text-[10px] bg-white rounded-lg overflow-hidden border border-gray-100">
+                                            <div className="flex flex-col items-center px-2.5 py-1.5 border-r border-gray-100">
+                                                <span className="text-gray-400 text-[8px]">단가</span>
+                                                <span className="font-bold text-gray-800">{item.price.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400">수량</span>
-                                                <span className="font-bold text-gray-900">{item.quantity}</span>
+                                            <div className="flex flex-col items-center px-2.5 py-1.5 border-r border-gray-100">
+                                                <span className="text-gray-400 text-[8px]">수량</span>
+                                                <span className="font-bold text-gray-800">{item.quantity}</span>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400">공급가</span>
-                                                <span className="font-bold text-gray-900">{supplyPrice.toLocaleString()}</span>
+                                            <div className="flex flex-col items-center px-2.5 py-1.5 border-r border-gray-100">
+                                                <span className="text-gray-400 text-[8px]">공급가</span>
+                                                <span className="font-bold text-gray-800">{supplyPrice.toLocaleString()}</span>
                                             </div>
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400">부가세</span>
-                                                <span className="font-bold text-gray-900">{vat.toLocaleString()}</span>
+                                            <div className="flex flex-col items-center px-2.5 py-1.5 border-r border-gray-100">
+                                                <span className="text-gray-400 text-[8px]">VAT</span>
+                                                <span className="font-bold text-gray-800">{vat.toLocaleString()}</span>
                                             </div>
-                                        </div>
-
-                                        {/* Code & Barcode Row */}
-                                        <div className="flex items-center justify-between gap-4 text-[11px]">
-                                            <div className="flex flex-col">
-                                                <span className="text-gray-400">상품코드</span>
-                                                <span className="font-bold text-gray-900 truncate">{item.product.productCode || '-'}</span>
-                                            </div>
-                                            <div className="flex flex-col items-end">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-gray-400">바코드</span>
-                                                    {item.product.barcode ? (
-                                                        <div className="flex flex-col items-center">
-                                                            <div className="h-[14px] overflow-hidden opacity-90 mb-1">
-                                                                <BarcodeDisplay value={item.product.barcode} width={1} height={14} fontSize={0} displayValue={false} showDownload={false} />
-                                                            </div>
-                                                            <span className="text-[9px] font-mono text-gray-400 leading-none">{item.product.barcode}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <span className="text-gray-300">없음</span>
-                                                    )}
-                                                </div>
+                                            <div className="flex flex-col items-center px-2.5 py-1.5 bg-gray-50">
+                                                <span className="text-[#e43f29] text-[8px] font-medium">합계</span>
+                                                <span className="font-black text-gray-900">{lineTotal.toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -305,43 +308,40 @@ export default function AdminOrderCard({ order }: { order: any }) {
                         )
                     })}
 
-                    {/* Shipping Fee */}
+                    {/* 배송비 */}
                     {shippingFee > 0 && (
-                        <div className="bg-gray-50 border border-gray-100 rounded-[1.2rem] p-4 flex gap-4 items-center">
-                            <div className="w-14 h-14 bg-gray-200 rounded-xl flex flex-col justify-center items-center text-gray-500 shrink-0">
-                                <svg className="w-6 h-6 mb-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m-4 0a2 2 0 114 0m6 0a2 2 0 104 0m-4 0a2 2 0 114 0" /></svg>
-                                <span className="text-[8px] font-bold">배송</span>
-                            </div>
-                            <div className="flex-1 flex justify-between items-center">
-                                <div className="flex flex-col">
-                                    <span className="font-black text-[15px] text-gray-900">배송비</span>
-                                    <span className="text-[11px] text-gray-400 font-medium">수량: 1</span>
+                        <div className="flex items-center justify-between bg-gray-50/80 rounded-xl px-4 py-3 border border-dashed border-gray-200">
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-lg bg-gray-200 flex items-center justify-center">
+                                    <Truck size={14} className="text-gray-500" />
                                 </div>
-                                <div className="flex flex-col items-end">
-                                    <span className="font-black text-[15px] text-gray-900">{shippingFee.toLocaleString()}</span>
-                                    <span className="text-[10px] text-gray-400 mt-0.5">부가세: {shippingVat.toLocaleString()}</span>
+                                <div>
+                                    <span className="text-[12px] font-black text-gray-800 block">배송비</span>
+                                    <span className="text-[9px] text-gray-400">VAT: {shippingVat.toLocaleString()}</span>
                                 </div>
                             </div>
+                            <span className="text-[14px] font-black text-gray-800">{shippingFee.toLocaleString()}원</span>
                         </div>
                     )}
                 </div>
-            </div>
 
-            {/* ── 합계 ── */}
-            <div className="border-t border-gray-200 pt-4 flex justify-between items-end px-1 mt-6">
-                <div className="flex flex-col gap-1 w-full relative">
-                    <div className="flex items-center gap-4 text-[11px] font-bold text-gray-500">
-                        <span>공급가: {grandSupply.toLocaleString()}원</span>
-                        <span>부가세: {grandVat.toLocaleString()}원</span>
+                {/* ── 합계 ── */}
+                <div className="mt-4 pt-3 border-t-2 border-gray-900">
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex gap-3 text-[10px] text-gray-400 font-medium">
+                            <span>공급가 {grandSupply.toLocaleString()}</span>
+                            <span>VAT {grandVat.toLocaleString()}</span>
+                        </div>
                     </div>
-                    <span className="text-[12px] font-black tracking-widest text-[#424853] mt-2">총 결제금액</span>
-                </div>
-                <div className="flex flex-col items-end shrink-0">
-                    <span className="text-[11px] font-bold text-gray-500 mb-0.5">총 수량: {totalQuantity.toLocaleString()}</span>
-                    <span className="text-[26px] font-black text-[#e43f29] leading-none mb-1">{totalAmount.toLocaleString()}원</span>
+                    <div className="flex items-end justify-between">
+                        <span className="text-[11px] font-black text-gray-500 tracking-widest uppercase">합계금액</span>
+                        <span className="text-[28px] font-black text-[#e43f29] leading-none tracking-tight">
+                            {totalAmount.toLocaleString()}
+                            <span className="text-[14px] ml-0.5">원</span>
+                        </span>
+                    </div>
                 </div>
             </div>
-
         </div>
     )
 }

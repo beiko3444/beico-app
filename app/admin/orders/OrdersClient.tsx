@@ -3,9 +3,6 @@
 import { useState, useMemo } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import OrderActions from '@/components/OrderActions'
-import BarcodeDisplay from '@/components/BarcodeDisplay'
-import OrderStatus from '@/components/OrderStatus'
 import AdminOrderCard from './AdminOrderCard'
 
 export default function OrdersClient({
@@ -280,9 +277,9 @@ export default function OrdersClient({
 
 
 
-            <div className="space-y-4">
+            <div className="space-y-6">
                 {filteredOrders.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-100">
+                    <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
                         <p className="text-gray-400 font-medium">검색 결과가 없습니다.</p>
                         {(type || selectedPartner) && (
                             <button onClick={() => { setSelectedPartner(null); history.pushState({}, '', '/admin/orders'); }} className="text-[#d9361b] font-bold mt-2 inline-block hover:underline">
@@ -294,13 +291,6 @@ export default function OrdersClient({
                     filteredOrders.map((order, idx) => (
                         <div key={order.id}>
                             <AdminOrderCard order={order} />
-                            {idx < filteredOrders.length - 1 && (
-                                <div className="py-2 flex items-center gap-4 px-10 mb-8 overflow-hidden opacity-80">
-                                    <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-red-200 to-transparent" />
-                                    <div className="text-[10px] font-black text-[#e43f29] uppercase tracking-widest whitespace-nowrap">NEXT ORDER</div>
-                                    <div className="flex-1 h-[1.5px] bg-gradient-to-r from-transparent via-red-200 to-transparent" />
-                                </div>
-                            )}
                         </div>
                     ))
                 )}
