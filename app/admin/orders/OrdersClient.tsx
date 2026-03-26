@@ -291,10 +291,10 @@ export default function OrdersClient({
                     filteredOrders.map((order, idx) => (
                         <div key={order.id}>
                             {idx > 0 && (
-                                <div className="flex items-center gap-3 mb-8 max-w-[480px] mx-auto">
-                                    <div className="flex-1 h-px bg-gray-200" />
-                                    <span className="text-[9px] font-bold text-gray-300 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
-                                    <div className="flex-1 h-px bg-gray-200" />
+                                <div className="flex items-center gap-3 mb-8 max-w-[480px] mx-auto px-4">
+                                    <div className="flex-1 h-[2px] bg-gray-300 rounded-full" />
+                                    <span className="text-[9px] font-black text-gray-400 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
+                                    <div className="flex-1 h-[2px] bg-gray-300 rounded-full" />
                                 </div>
                             )}
                             <AdminOrderCard order={order} />
