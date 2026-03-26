@@ -21,7 +21,6 @@ export default function AdminOrderCard({ order }: { order: any }) {
     const orderNumber = order.orderNumber || order.id.slice(0, 8);
     const partnerName = order.user.partnerProfile?.businessName || order.user.name || '-'
     const representativeName = order.user.partnerProfile?.representativeName || '-'
-    const ordererName = order.user.name || '-'
     const formattedDate = `${year}-${month}-${day} ${ampm} ${hour}:${minute}`
     const partnerGrade = order.user.partnerProfile?.grade || 'C'
 
@@ -127,10 +126,6 @@ export default function AdminOrderCard({ order }: { order: any }) {
                     <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-400 font-medium">업체명</span>
                         <span className="text-sm text-gray-900 font-black">{partnerName}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-400 font-medium">담당자</span>
-                        <span className="text-sm text-gray-800 font-bold">{ordererName}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="text-xs text-gray-400 font-medium w-16 shrink-0">배송지</span>
