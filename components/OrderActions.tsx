@@ -28,11 +28,11 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 router.refresh()
             } else {
                 const data = await res.json()
-                alert(`입금 확인 처리 중 오류가 발생했습니다: ${data.error || 'Unknown error'}`)
+                alert(`오류: ${data.error || 'Unknown'}`)
             }
         } catch (e) {
             console.error(e)
-            alert('통신 오류가 발생했습니다.')
+            alert('통신 오류')
         } finally {
             setLoading(false)
         }
@@ -58,17 +58,15 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
             })
             if (res.ok) {
                 setStatus(newStatus)
-                if (newStatus === 'PENDING') {
-                    setAdminDepositConfirmedAt(null)
-                }
+                if (newStatus === 'PENDING') setAdminDepositConfirmedAt(null)
                 router.refresh()
             } else {
                 const data = await res.json()
-                alert(`상태 업데이트에 실패했습니다: ${data.error || '알 수 없는 오류'} (${res.status})`)
+                alert(`실패: ${data.error || '오류'} (${res.status})`)
             }
         } catch (e) {
             console.error(e)
-            alert('상태 업데이트 중 오류가 발생했습니다.')
+            alert('상태 업데이트 오류')
         } finally {
             setLoading(false)
         }
@@ -88,47 +86,33 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 router.refresh()
             } else {
                 const data = await res.json()
-                alert(`배송 정보 저장에 실패했습니다: ${data.error || '알 수 없는 오류'} (${res.status})`)
+                alert(`실패: ${data.error || '오류'}`)
             }
         } catch (e) {
             console.error(e)
-            alert('배송 정보 저장 중 오류가 발생했습니다.')
+            alert('배송 정보 저장 오류')
         } finally {
             setLoading(false)
         }
     }
 
     const deleteOrder = async () => {
-        console.log("Delete button clicked, order ID:", order.id)
-        if (!confirm("정말로 이 주문을 삭제하시겠습니까? 이 작업은 취소할 수 없습니다.")) {
-            console.log("Delete cancelled by user")
-            return
-        }
-        console.log("Proceeding with delete...")
+        if (!confirm("정말로 이 주문을 삭제하시겠습니까?")) return
         setLoading(true)
         try {
-            const res = await fetch(`/api/orders/${order.id}`, {
-                method: 'DELETE',
-                cache: 'no-store'
-            })
-            console.log("Delete response status:", res.status)
-            if (res.ok) {
-                console.log("Delete success, reloading...")
-                window.location.reload()
-            } else {
-                const data = await res.json();
-                alert(`삭제에 실패했습니다: ${data.error} (${res.status})`)
-            }
+            const res = await fetch(`/api/orders/${order.id}`, { method: 'DELETE', cache: 'no-store' })
+            if (res.ok) window.location.reload()
+            else { const d = await res.json(); alert(`실패: ${d.error}`) }
         } catch (e) {
             console.error(e)
-            alert('주문 삭제 중 오류가 발생했습니다.')
+            alert('삭제 오류')
         } finally {
             setLoading(false)
         }
     }
 
     const toggleTaxInvoice = async () => {
-        if (!confirm(`세금계산서 발급 상태를 ${!taxInvoiceIssued ? '발급' : '미발급'}(으)로 변경하시겠습니까?`)) return
+        if (!confirm(`세금계산서를 ${!taxInvoiceIssued ? '발급' : '미발급'}(으)로 변경하시겠습니까?`)) return
         setLoading(true)
         try {
             const res = await fetch(`/api/orders/${order.id}`, {
@@ -139,94 +123,70 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
             if (res.ok) {
                 setTaxInvoiceIssued(!taxInvoiceIssued)
                 router.refresh()
-            } else {
-                alert('세금계산서 상태 업데이트에 실패했습니다.')
-            }
+            } else alert('업데이트 실패')
         } catch (e) {
             console.error(e)
-            alert('세금계산서 상태 업데이트 중 오류가 발생했습니다.')
+            alert('오류 발생')
         } finally {
             setLoading(false)
         }
     }
 
+    // ── 파트너 뷰 ──
     if (isPartner) {
         return (
             <div className="flex flex-col items-end gap-2">
                 <div className="flex items-center gap-2">
                     {taxInvoiceIssued ? (
-                        <div className="flex items-center gap-2 relative">
-                            <span
-                                className="inline-block px-3 py-1 text-white text-xs font-bold rounded border border-red-800 custom-gradient-45 shadow-sm relative z-10"
-                            >
-                                세금계산서 발급완료
-                            </span>
-                        </div>
+                        <span className="inline-block px-3 py-1 text-white text-xs font-bold rounded border border-red-800 bg-gradient-to-r from-red-800 via-red-500 to-red-800 shadow-sm">
+                            세금계산서 발급완료
+                        </span>
                     ) : (
                         <span className="px-3 py-1 rounded text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">
                             세금계산서 발행중
                         </span>
                     )}
                     {status === 'PENDING' && (
-                        <button
-                            type="button"
-                            onClick={() => deleteOrder()}
-                            disabled={loading}
-                            className={`bg-gray-600 text-white px-3 py-1 rounded text-xs hover:bg-gray-700 shadow-sm transition-colors border border-gray-700 disabled:opacity-50 disabled:cursor-not-allowed`}
-                        >
+                        <button onClick={() => deleteOrder()} disabled={loading}
+                            className="bg-gray-600 text-white px-3 py-1 rounded text-xs hover:bg-gray-700 border border-gray-700 disabled:opacity-50">
                             {loading ? '삭제 중...' : '주문삭제'}
                         </button>
                     )}
                 </div>
                 {(status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED') && (
-                    <button
-                        onClick={() => router.push(`/invoice/${order.id}`)}
-                        className="text-xs bg-[var(--color-brand-blue)] text-white px-3 py-1 rounded hover:opacity-90 transition-opacity flex items-center gap-2"
-                    >
+                    <button onClick={() => router.push(`/invoice/${order.id}`)}
+                        className="text-xs bg-[var(--color-brand-blue)] text-white px-3 py-1 rounded hover:opacity-90 flex items-center gap-2">
                         <span>📄</span> 거래명세표 확인
                     </button>
                 )}
                 {(status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED') && order.trackingNumber && (
-                    <div className="text-xs bg-white text-gray-800 px-3 py-1 rounded-lg border border-gray-200 font-medium text-right shadow-sm">
-                        <span className="font-bold mr-2">
-                            로젠택배
-                        </span>
+                    <div className="text-xs bg-white text-gray-800 px-3 py-1 rounded-lg border border-gray-200 font-medium shadow-sm">
+                        <span className="font-bold mr-2">로젠택배</span>
                         <span className="text-[var(--color-brand-blue)]">송장번호 : <span className="font-bold">{order.trackingNumber}</span></span>
                     </div>
                 )}
-                <style jsx>{`
-                    .custom-gradient-45 {
-                        background: linear-gradient(45deg, #991b1b, #ef4444, #991b1b);
-                        background-size: 200% 200%;
-                        animation: gradient-45 3s ease-in-out infinite alternate;
-                    }
-                    @keyframes gradient-45 {
-                        0% { background-position: 0% 50%; }
-                        100% { background-position: 100% 50%; }
-                    }
-                `}
-                </style>
             </div>
         )
     }
 
+    // ── 관리자 뷰 ──
     return (
-        <div className="flex flex-col gap-2.5 w-full">
-            {/* Shipping Form */}
+        <div className="flex flex-col gap-3 w-full">
+            {/* 배송 폼 */}
             <div className="flex gap-2 items-end">
-                <div className="flex-1 flex flex-col gap-1">
-                    <label className="text-[10px] text-gray-400 font-medium ml-0.5">택배사</label>
+                <div className="w-28 flex flex-col gap-0.5">
+                    <label className="text-[10px] text-gray-400 ml-0.5">택배사</label>
                     <select
                         value={courier}
                         onChange={(e) => setCourier(e.target.value)}
                         disabled={!isEditingTracking && !!order.trackingNumber}
-                        className="w-full appearance-none border border-gray-200 rounded-xl px-3 py-2.5 text-[12px] text-gray-800 font-bold bg-gray-50 outline-none focus:border-[#e43f29] focus:bg-white transition-all"
+                        className="w-full appearance-none border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] text-gray-800 font-bold bg-white outline-none focus:border-[#d9361b] transition-colors"
                     >
                         <option value="Rosen">로젠택배</option>
                     </select>
                 </div>
-                <div className="flex-[2] flex flex-col gap-1">
-                    <label className="text-[10px] text-gray-400 font-medium ml-0.5">송장번호</label>
+                <div className="flex-1 flex flex-col gap-0.5">
+                    <label className="text-[10px] text-gray-400 ml-0.5">송장번호</label>
                     <div className="flex gap-1.5">
                         <input
                             type="text"
@@ -234,21 +194,16 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                             onChange={(e) => setTrackingNumber(e.target.value)}
                             disabled={!isEditingTracking && !!order.trackingNumber}
                             placeholder="송장번호 입력"
-                            className="flex-1 border border-gray-200 rounded-xl px-3 py-2.5 text-[12px] text-gray-800 font-bold bg-gray-50 outline-none focus:border-[#e43f29] focus:bg-white transition-all placeholder:text-gray-300 disabled:text-gray-400"
+                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] text-gray-800 font-bold bg-white outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300"
                         />
                         {(!order.trackingNumber || isEditingTracking) ? (
-                            <button
-                                onClick={saveShippingInfo}
-                                disabled={loading}
-                                className="bg-[#1a1d23] text-white px-4 rounded-xl font-bold text-[11px] hover:bg-[#2a2f38] transition-colors shrink-0 disabled:opacity-50"
-                            >
+                            <button onClick={saveShippingInfo} disabled={loading}
+                                className="bg-[#d9361b] text-white px-3.5 rounded-lg font-bold text-[10px] hover:bg-[#c0301a] transition-colors disabled:opacity-50">
                                 저장
                             </button>
                         ) : (
-                            <button
-                                onClick={() => setIsEditingTracking(true)}
-                                className="bg-gray-100 text-gray-600 px-4 rounded-xl font-bold text-[11px] hover:bg-gray-200 transition-colors shrink-0"
-                            >
+                            <button onClick={() => setIsEditingTracking(true)}
+                                className="bg-gray-100 text-gray-600 px-3.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 transition-colors">
                                 수정
                             </button>
                         )}
@@ -256,51 +211,34 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="grid grid-cols-2 gap-1.5 mt-1">
-                {/* 입금확인 버튼 */}
+            {/* 액션 버튼 */}
+            <div className="flex flex-col gap-1.5">
                 {status === 'PENDING' ? (
-                    <button
-                        onClick={() => updateStatus('DEPOSIT_COMPLETED')}
-                        disabled={loading}
-                        className="col-span-2 py-3 text-[11px] font-black text-white rounded-xl flex gap-1.5 items-center justify-center bg-[#1a1d23] hover:bg-[#2a2f38] transition-all active:scale-[0.98] disabled:opacity-50"
-                    >
-                        <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+                    <button onClick={() => updateStatus('DEPOSIT_COMPLETED')} disabled={loading}
+                        className="w-full py-2.5 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-gray-800 hover:bg-gray-900 transition-colors disabled:opacity-50">
                         입금확인
                     </button>
                 ) : status === 'DEPOSIT_COMPLETED' && !adminDepositConfirmedAt ? (
-                    <button
-                        onClick={confirmAdminDeposit}
-                        disabled={loading}
-                        className="col-span-2 py-3 text-[11px] font-black text-white rounded-xl flex gap-1.5 items-center justify-center bg-[#1a1d23] hover:bg-[#2a2f38] transition-all active:scale-[0.98] disabled:opacity-50"
-                    >
-                        <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                    <button onClick={confirmAdminDeposit} disabled={loading}
+                        className="w-full py-2.5 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-gray-800 hover:bg-gray-900 transition-colors disabled:opacity-50">
                         관리자 입금확인
                     </button>
                 ) : null}
 
-                {/* 거래명세표 */}
-                {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                    <button
-                        onClick={() => router.push(`/invoice/${order.id}`)}
-                        className="py-3 text-[11px] font-black text-white rounded-xl flex gap-1.5 items-center justify-center bg-[#3b4250] hover:bg-[#4a5060] transition-all active:scale-[0.98]"
-                    >
-                        <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        거래명세표
-                    </button>
-                )}
-
-                {/* 세금계산서 */}
-                {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                    <button
-                        onClick={toggleTaxInvoice}
-                        disabled={loading}
-                        className={`py-3 text-[11px] font-black text-white rounded-xl flex gap-1.5 items-center justify-center transition-all active:scale-[0.98] disabled:opacity-50 ${taxInvoiceIssued ? 'bg-gray-400 hover:bg-gray-500' : 'bg-[#e43f29] hover:bg-[#cb3622]'}`}
-                    >
-                        <svg className="w-4 h-4 opacity-70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        {taxInvoiceIssued ? '발행 취소' : '세금계산서'}
-                    </button>
-                )}
+                <div className="grid grid-cols-2 gap-1.5">
+                    {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
+                        <button onClick={() => router.push(`/invoice/${order.id}`)}
+                            className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-gray-600 hover:bg-gray-700 transition-colors">
+                            📄 거래명세표
+                        </button>
+                    )}
+                    {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
+                        <button onClick={toggleTaxInvoice} disabled={loading}
+                            className={`py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center transition-colors disabled:opacity-50 ${taxInvoiceIssued ? 'bg-gray-400 hover:bg-gray-500' : 'bg-[#d9361b] hover:bg-[#c0301a]'}`}>
+                            📋 {taxInvoiceIssued ? '계산서 취소' : '세금계산서'}
+                        </button>
+                    )}
+                </div>
             </div>
         </div>
     )

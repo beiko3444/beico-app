@@ -8,29 +8,19 @@ type OrderStatusProps = {
 
 export default function OrderStatus({ status, trackingNumber, taxInvoiceIssued }: OrderStatusProps) {
     const steps = [
-        { label: '주문접수', key: 'ORDERED', icon: '📋' },
-        { label: '입금대기', key: 'PENDING_DEPOSIT', icon: '⏳' },
-        { label: '입금확인', key: 'DEPOSIT_COMPLETED', icon: '✓' },
-        { label: '발송완료', key: 'SHIPPED', icon: '🚛' },
-        { label: '계산서', key: 'INVOICED', icon: '📄' },
+        { label: '주문접수', key: 'ORDERED' },
+        { label: '입금대기', key: 'PENDING_DEPOSIT' },
+        { label: '입금확인', key: 'DEPOSIT_COMPLETED' },
+        { label: '발송완료', key: 'SHIPPED' },
+        { label: '계산서', key: 'INVOICED' },
     ];
 
     const isStepReached = (stepKey: string) => {
         if (taxInvoiceIssued) return true;
         if (stepKey === 'INVOICED') return taxInvoiceIssued;
-
-        if (trackingNumber || status === 'SHIPPED') {
-            return stepKey !== 'INVOICED';
-        }
-
-        if (status === 'DEPOSIT_COMPLETED') {
-            return ['ORDERED', 'PENDING_DEPOSIT', 'DEPOSIT_COMPLETED'].includes(stepKey);
-        }
-
-        if (status === 'PENDING' || status === 'APPROVED') {
-            return ['ORDERED', 'PENDING_DEPOSIT'].includes(stepKey);
-        }
-
+        if (trackingNumber || status === 'SHIPPED') return stepKey !== 'INVOICED';
+        if (status === 'DEPOSIT_COMPLETED') return ['ORDERED', 'PENDING_DEPOSIT', 'DEPOSIT_COMPLETED'].includes(stepKey);
+        if (status === 'PENDING' || status === 'APPROVED') return ['ORDERED', 'PENDING_DEPOSIT'].includes(stepKey);
         return stepKey === 'ORDERED';
     };
 
@@ -45,40 +35,36 @@ export default function OrderStatus({ status, trackingNumber, taxInvoiceIssued }
     const currentStepKey = getCurrentStepKey();
 
     return (
-        <div className="w-full flex justify-between items-center relative">
-            {/* Background line */}
-            <div className="absolute left-4 right-4 top-[14px] h-[2px] bg-white/10 z-0" />
-            <div
-                className="absolute left-4 top-[14px] h-[2px] bg-[#e43f29] z-0 transition-all duration-500"
-                style={{
-                    width: `${(steps.findIndex(s => s.key === currentStepKey) / (steps.length - 1)) * (100 - 8)}%`,
-                }}
-            />
-
-            {steps.map((step) => {
+        <div className="w-full flex justify-between items-center relative py-1">
+            {steps.map((step, index) => {
                 const reached = isStepReached(step.key);
                 const isCurrent = step.key === currentStepKey;
                 const isPast = reached && !isCurrent;
 
                 return (
-                    <div key={step.key} className="flex flex-col items-center z-10 w-12">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center relative mb-1">
-                            {isPast ? (
-                                <div className="w-7 h-7 bg-[#e43f29] rounded-full flex items-center justify-center shadow-[0_0_12px_rgba(228,63,41,0.4)]">
-                                    <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-                                </div>
-                            ) : isCurrent ? (
-                                <div className="w-7 h-7 rounded-full border-2 border-[#e43f29] flex items-center justify-center bg-[#1a1d23]">
-                                    <div className="w-2.5 h-2.5 bg-[#e43f29] rounded-full animate-pulse" />
-                                </div>
-                            ) : (
-                                <div className="w-7 h-7 rounded-full border-[1.5px] border-white/20 bg-[#1a1d23]" />
-                            )}
+                    <React.Fragment key={step.key}>
+                        <div className="flex flex-col items-center z-10 w-10">
+                            <div className="w-6 h-6 rounded-full flex items-center justify-center mb-1 bg-white">
+                                {isPast ? (
+                                    <div className="w-6 h-6 bg-[#d9361b] rounded-full flex items-center justify-center">
+                                        <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                                    </div>
+                                ) : isCurrent ? (
+                                    <div className="w-6 h-6 rounded-full border-2 border-[#d9361b] flex items-center justify-center bg-white">
+                                        <div className="w-2 h-2 bg-[#d9361b] rounded-full" />
+                                    </div>
+                                ) : (
+                                    <div className="w-6 h-6 rounded-full border-[1.5px] border-gray-200 bg-white" />
+                                )}
+                            </div>
+                            <span className={`text-[8px] font-bold whitespace-nowrap ${isCurrent ? 'text-[#d9361b]' : isPast ? 'text-gray-500' : 'text-gray-300'}`}>
+                                {step.label}
+                            </span>
                         </div>
-                        <span className={`text-[8px] font-bold tracking-tight whitespace-nowrap ${isCurrent ? 'text-[#e43f29]' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>
-                            {step.label}
-                        </span>
-                    </div>
+                        {index < steps.length - 1 && (
+                            <div className={`flex-1 h-[1.5px] -mt-4 ${isStepReached(steps[index + 1].key) ? 'bg-[#d9361b]' : 'bg-gray-200'}`} />
+                        )}
+                    </React.Fragment>
                 );
             })}
         </div>
