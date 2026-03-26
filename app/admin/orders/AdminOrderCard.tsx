@@ -65,7 +65,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
     const adminDepositConfirmedAt = formatTimestamp(order.adminDepositConfirmedAt)
 
     return (
-        <div className={`w-full max-w-[480px] mx-auto rounded-2xl border shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden transition-colors ${order.taxInvoiceIssued ? 'bg-gray-100 border-gray-200/60 opacity-75' : 'bg-white border-gray-200'}`}>
+        <div className={`w-full max-w-[480px] mx-auto rounded-2xl border shadow-[0_4px_24px_rgba(0,0,0,0.06)] overflow-hidden ${order.taxInvoiceIssued ? 'bg-gray-200 border-gray-300' : 'bg-white border-gray-200'}`}>
 
             {/* ── 헤더: 주문번호 + 등급 + 날짜 ── */}
             <div className="px-5 pt-4 pb-3 border-b border-gray-100">
