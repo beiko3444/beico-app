@@ -576,7 +576,7 @@ ${rowsHtml}
         <div style="display:grid;grid-template-columns:auto auto;grid-template-rows:auto auto;align-items:end;gap:4px 8px">
             <img src="${origin}/logo.png" alt="BEIKO" style="width:80px;object-fit:contain;grid-row:1;grid-column:1">
             <span style="font-size:14px;font-weight:900;color:#1f2340;line-height:1;grid-row:2;grid-column:1">beiko Inc.</span>
-            <img src="${origin}/bko.png" alt="seal" style="width:80px;object-fit:contain;opacity:0.8;grid-row:1/3;grid-column:2;align-self:end">
+            <img src="${origin}/seal.png" alt="seal" style="width:80px;object-fit:contain;opacity:0.8;grid-row:1/3;grid-column:2;align-self:end">
         </div>
     </div>
 </div>
@@ -993,7 +993,7 @@ ${rowsHtml}
                                 <div className="grid grid-cols-[auto_auto] grid-rows-[auto_auto] items-end gap-x-2 gap-y-1">
                                     <img src="/logo.png" alt="BEIKO" className="w-20 object-contain row-start-1 col-start-1" />
                                     <span className="text-sm font-black text-[#1f2340] leading-none row-start-2 col-start-1">beiko Inc.</span>
-                                    <img src="/bko.png" alt="seal" className="w-20 object-contain opacity-80 row-start-1 row-span-2 col-start-2 self-end" />
+                                    <img src="/seal.png" alt="seal" className="w-20 object-contain opacity-80 row-start-1 row-span-2 col-start-2 self-end" />
                                 </div>
                             </div>
                         </div>
