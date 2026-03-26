@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { unstable_cache } from "next/cache"
 import PartnerForm from "./partner-form"
 import DeletePartnerButton from '@/components/DeletePartnerButton'
 import Link from 'next/link'
@@ -8,18 +9,28 @@ import PartnerTrashbin from '@/components/PartnerTrashbin'
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
 
-export default async function PartnersPage() {
-    const activePartners = await prisma.user.findMany({
-        where: { role: { in: ['PARTNER', 'ADMIN'] }, status: { not: 'DELETED' } },
-        include: { partnerProfile: true },
-        orderBy: [{ role: 'asc' }, { createdAt: 'desc' }]
-    })
+const getCachedPartnersPageData = unstable_cache(
+    async () => {
+        const [activePartners, deletedPartners] = await Promise.all([
+            prisma.user.findMany({
+                where: { role: { in: ['PARTNER', 'ADMIN'] }, status: { not: 'DELETED' } },
+                include: { partnerProfile: true },
+                orderBy: [{ role: 'asc' }, { createdAt: 'desc' }]
+            }),
+            prisma.user.findMany({
+                where: { role: { in: ['PARTNER', 'ADMIN'] }, status: 'DELETED' },
+                include: { partnerProfile: true },
+                orderBy: [{ createdAt: 'desc' }]
+            })
+        ])
+        return { activePartners, deletedPartners }
+    },
+    ['admin-partners-page-v1'],
+    { revalidate: 5 }
+)
 
-    const deletedPartners = await prisma.user.findMany({
-        where: { role: { in: ['PARTNER', 'ADMIN'] }, status: 'DELETED' },
-        include: { partnerProfile: true },
-        orderBy: [{ createdAt: 'desc' }]
-    })
+export default async function PartnersPage() {
+    const { activePartners, deletedPartners } = await getCachedPartnersPageData()
 
     return (
 

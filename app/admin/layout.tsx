@@ -3,26 +3,13 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
+import { unstable_cache } from "next/cache"
 import AdminNav from "./AdminNav"
 
-export default async function AdminLayout({
-    children,
-}: {
-    children: React.ReactNode
-}) {
-    const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
-        redirect('/login')
-    }
-
-    let pendingOrderCount = 0
-    let lowStockCount = 0
-    let pendingPartnerCount = 0
-    let missingBill = 0
-
-    try {
+const getCachedAdminCounts = unstable_cache(
+    async () => {
         // 1. Pending Orders
-        pendingOrderCount = await prisma.order.count({
+        const pendingOrderCount = await prisma.order.count({
             where: {
                 AND: [
                     { status: { not: 'CANCELLED' } },
@@ -37,14 +24,14 @@ export default async function AdminLayout({
             }
         })
 
-        // 2. Low Stock Products (Logic: stock < safetyStock)
+        // 2. Low Stock Products (stock <= safetyStock)
         const allProducts = await prisma.product.findMany({
             select: { stock: true, safetyStock: true }
         })
-        lowStockCount = allProducts.filter(p => p.stock <= p.safetyStock).length
+        const lowStockCount = allProducts.filter((p) => p.stock <= p.safetyStock).length
 
         // 3. Pending Partners
-        pendingPartnerCount = await prisma.user.count({
+        const pendingPartnerCount = await prisma.user.count({
             where: { role: 'PARTNER', status: 'PENDING' }
         })
 
@@ -60,16 +47,39 @@ export default async function AdminLayout({
                 }
             }
         })
-        missingBill = billExists ? 0 : 1
-    } catch (error) {
-        console.warn("Database unreachable in AdminLayout, using default counts.")
+        const missingBill = billExists ? 0 : 1
+
+        return {
+            pendingOrders: pendingOrderCount,
+            lowStock: lowStockCount,
+            pendingPartners: pendingPartnerCount,
+            missingBill
+        }
+    },
+    ['admin-layout-counts-v1'],
+    { revalidate: 5 }
+)
+
+export default async function AdminLayout({
+    children,
+}: {
+    children: React.ReactNode
+}) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+        redirect('/login')
     }
 
-    const counts = {
-        pendingOrders: pendingOrderCount,
-        lowStock: lowStockCount,
-        pendingPartners: pendingPartnerCount,
-        missingBill: missingBill
+    let counts = {
+        pendingOrders: 0,
+        lowStock: 0,
+        pendingPartners: 0,
+        missingBill: 0
+    }
+    try {
+        counts = await getCachedAdminCounts()
+    } catch (error) {
+        console.warn("Database unreachable in AdminLayout, using default counts.")
     }
 
     return (

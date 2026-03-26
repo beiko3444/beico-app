@@ -3,33 +3,15 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { unstable_cache } from "next/cache"
 import DashboardStatistics from '@/components/DashboardStatistics'
 import DashboardCalendarWidget from '@/components/DashboardCalendarWidget'
 
 export const dynamic = 'force-dynamic'
 
-export default async function AdminDashboard() {
-    const session = await getServerSession(authOptions)
-
-    if (!session || session.user.role !== 'ADMIN') {
-        redirect('/login')
-    }
-
-    // 1. Fetch Key Counts
-    // @ts-ignore - Task model exists in schema but might need prisma generate
-    // 1. Fetch Key Counts
-    // @ts-ignore - Task model exists in schema but might need prisma generate
-    let pendingCount = 0
-    let depositReqCount = 0
-    let approvedNoTrackingCount = 0
-    let completedCount = 0
-    let pendingTaxInvoices = 0
-    let recentOrders: any[] = []
-    let analyticsOrders: any[] = []
-    let allTasks: any[] = []
-
-    try {
-        [
+const getCachedAdminDashboardData = unstable_cache(
+    async () => {
+        const [
             pendingCount,
             depositReqCount,
             approvedNoTrackingCount,
@@ -74,6 +56,52 @@ export default async function AdminDashboard() {
             // @ts-ignore
             prisma.task.findMany({ orderBy: { date: 'asc' } })
         ])
+
+        return {
+            pendingCount,
+            depositReqCount,
+            approvedNoTrackingCount,
+            completedCount,
+            pendingTaxInvoices,
+            recentOrders,
+            analyticsOrders,
+            allTasks
+        }
+    },
+    ['admin-dashboard-page-v1'],
+    { revalidate: 5 }
+)
+
+export default async function AdminDashboard() {
+    const session = await getServerSession(authOptions)
+
+    if (!session || session.user.role !== 'ADMIN') {
+        redirect('/login')
+    }
+
+    // 1. Fetch Key Counts
+    // @ts-ignore - Task model exists in schema but might need prisma generate
+    // 1. Fetch Key Counts
+    // @ts-ignore - Task model exists in schema but might need prisma generate
+    let pendingCount = 0
+    let depositReqCount = 0
+    let approvedNoTrackingCount = 0
+    let completedCount = 0
+    let pendingTaxInvoices = 0
+    let recentOrders: any[] = []
+    let analyticsOrders: any[] = []
+    let allTasks: any[] = []
+
+    try {
+        const cached = await getCachedAdminDashboardData()
+        pendingCount = cached.pendingCount
+        depositReqCount = cached.depositReqCount
+        approvedNoTrackingCount = cached.approvedNoTrackingCount
+        completedCount = cached.completedCount
+        pendingTaxInvoices = cached.pendingTaxInvoices
+        recentOrders = cached.recentOrders
+        analyticsOrders = cached.analyticsOrders
+        allTasks = cached.allTasks
     } catch (error) {
         console.warn("Database unreachable in AdminDashboard, using default values.")
     }

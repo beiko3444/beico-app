@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { unstable_cache } from "next/cache"
 import ProductForm from "./product-form"
 import Link from 'next/link'
 import ProductTable from "./ProductTable"
@@ -6,10 +7,16 @@ import ProductTable from "./ProductTable"
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
 
-export default async function ProductsPage() {
-    const products = await prisma.product.findMany({
+const getCachedProducts = unstable_cache(
+    async () => prisma.product.findMany({
         orderBy: { sortOrder: 'asc' }
-    })
+    }),
+    ['admin-products-page-v1'],
+    { revalidate: 5 }
+)
+
+export default async function ProductsPage() {
+    const products = await getCachedProducts()
 
     return (
         <div className="space-y-6">

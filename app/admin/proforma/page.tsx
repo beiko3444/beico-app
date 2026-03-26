@@ -2,10 +2,51 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
+import { unstable_cache } from "next/cache"
 import Link from "next/link"
 import ProformaClient, { type IssuedInvoice, type PartnerOption, type ProductOption } from "./ProformaClient"
 
 export const dynamic = 'force-dynamic'
+
+const getCachedProformaPageData = unstable_cache(
+    async () => {
+        const [partners, products, issued] = await Promise.all([
+            prisma.user.findMany({
+                where: { role: 'PARTNER', status: { not: 'DELETED' } },
+                include: { partnerProfile: true },
+                orderBy: { name: 'asc' }
+            }),
+            prisma.product.findMany({
+                orderBy: { sortOrder: 'asc' },
+                select: {
+                    id: true,
+                    name: true,
+                    nameEN: true,
+                    nameJP: true,
+                    productCode: true,
+                    imageUrl: true,
+                    usBuyPrice: true,
+                    usSellPrice: true,
+                    regionalPrices: true,
+                    stock: true
+                }
+            }),
+            prisma.proformaInvoice.findMany({
+                include: {
+                    items: {
+                        orderBy: { createdAt: 'asc' }
+                    }
+                },
+                orderBy: { issueDate: 'desc' },
+                take: 100
+            })
+        ])
+
+        return { partners, products, issued }
+    },
+    ['admin-proforma-page-v1'],
+    { revalidate: 5 }
+)
 
 const readNumber = (value: unknown): number => {
     if (typeof value === 'number') {
@@ -36,37 +77,7 @@ export default async function ProformaPage() {
         redirect('/login')
     }
 
-    const [partners, products, issued] = await Promise.all([
-        prisma.user.findMany({
-            where: { role: 'PARTNER', status: { not: 'DELETED' } },
-            include: { partnerProfile: true },
-            orderBy: { name: 'asc' }
-        }),
-        prisma.product.findMany({
-            orderBy: { sortOrder: 'asc' },
-            select: {
-                id: true,
-                name: true,
-                nameEN: true,
-                nameJP: true,
-                productCode: true,
-                imageUrl: true,
-                usBuyPrice: true,
-                usSellPrice: true,
-                regionalPrices: true,
-                stock: true
-            }
-        }),
-        prisma.proformaInvoice.findMany({
-            include: {
-                items: {
-                    orderBy: { createdAt: 'asc' }
-                }
-            },
-            orderBy: { issueDate: 'desc' },
-            take: 100
-        })
-    ])
+    const { partners, products, issued } = await getCachedProformaPageData()
 
     const partnerOptions: PartnerOption[] = partners.map((partner) => ({
         id: partner.id,

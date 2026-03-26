@@ -30,6 +30,7 @@ export default function AdminNav({ counts }: { counts?: { pendingOrders: number,
                             <Link
                                 key={item.path}
                                 href={item.path}
+                                prefetch={true}
                                 className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap tracking-tight flex items-center gap-1.5 ${isActive
                                     ? 'bg-black text-white'
                                     : 'text-gray-400 hover:text-black hover:bg-gray-50'
