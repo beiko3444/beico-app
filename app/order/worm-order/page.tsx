@@ -55,12 +55,12 @@ export default function WormOrderPage() {
         setCopied(false)
 
         if (!receiveDate) {
-            setValidationError('수령 날짜를 선택해 주세요.')
+            setValidationError('Please choose a receiving date.')
             return
         }
 
         if (selectedOrders.length === 0) {
-            setValidationError('최소 1개 사이즈의 박스 수량을 입력해 주세요.')
+            setValidationError('Please choose at least one worm size and box quantity.')
             return
         }
 
@@ -111,8 +111,8 @@ export default function WormOrderPage() {
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-10">
             <div className="flex flex-col gap-2">
-                <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">지렁이 발주</h1>
-                <p className="text-sm text-gray-500 uppercase tracking-wider">사이즈별 박스 수량 입력 후 수령 날짜를 선택하세요</p>
+                <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">Worm Order</h1>
+                <p className="text-sm text-gray-500 uppercase tracking-wider">Choose boxes by size, then pick receiving date</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -198,7 +198,7 @@ export default function WormOrderPage() {
                     onClick={handleGenerate}
                     className="h-12 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide"
                 >
-                    생성하기
+                    Generate Message
                 </button>
 
                 {validationError && (
