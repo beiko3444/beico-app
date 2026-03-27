@@ -81,7 +81,7 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
         const executablePath = await chromium.executablePath()
 
         const browser = await playwrightCoreChromium.launch({
-            headless: headless ? (chromium.headless ?? true) : false,
+            headless,
             executablePath,
             args: chromium.args?.length ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
         })
