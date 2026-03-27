@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { CalendarDays, Copy, Minus, Plus, Sparkles } from 'lucide-react'
 
 type WormSize = {
@@ -27,11 +27,13 @@ function createInitialQuantities() {
 }
 
 export default function WormOrderPage() {
+    const today = new Date().toISOString().split('T')[0]
     const [quantities, setQuantities] = useState<Record<string, number>>(createInitialQuantities)
-    const [receiveDate, setReceiveDate] = useState('')
+    const [receiveDate, setReceiveDate] = useState(today)
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
     const [copied, setCopied] = useState(false)
+    const dateInputRef = useRef<HTMLInputElement>(null)
 
     const selectedOrders = useMemo(() => {
         return WORM_SIZES
@@ -108,11 +110,72 @@ export default function WormOrderPage() {
         }
     }
 
+    useEffect(() => {
+        const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
+        if (!input?.showPicker) return
+
+        const timer = window.setTimeout(() => {
+            try {
+                input.showPicker?.()
+            } catch {
+                // Ignore browsers that block programmatic picker open.
+            }
+        }, 120)
+
+        return () => window.clearTimeout(timer)
+    }, [])
+
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-10">
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">Worm Order</h1>
                 <p className="text-sm text-gray-500 uppercase tracking-wider">Choose boxes by size, then pick receiving date</p>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div className="flex flex-col md:flex-row md:items-end gap-4">
+                    <div className="min-w-0">
+                        <label htmlFor="receiveDate" className="block text-xs font-black text-gray-600 uppercase tracking-[0.15em] mb-2">
+                            Receiving Date
+                        </label>
+                        <div
+                            className="relative w-full md:w-[260px]"
+                            onClick={() => {
+                                const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
+                                try {
+                                    input?.showPicker?.()
+                                } catch {
+                                    // Ignore unsupported browser behavior.
+                                }
+                            }}
+                        >
+                            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                            <input
+                                ref={dateInputRef}
+                                id="receiveDate"
+                                type="date"
+                                value={receiveDate}
+                                onChange={(event) => {
+                                    setCopied(false)
+                                    setReceiveDate(event.target.value)
+                                }}
+                                min={today}
+                                className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                            />
+                        </div>
+                    </div>
+
+                    <button
+                        type="button"
+                        onClick={handleGenerate}
+                        className="h-11 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide w-full md:w-auto"
+                    >
+                        Generate Message
+                    </button>
+                </div>
+                {validationError && (
+                    <p className="text-sm font-semibold text-[#e34219] mt-3">{validationError}</p>
+                )}
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
@@ -131,18 +194,18 @@ export default function WormOrderPage() {
                         return (
                             <div
                                 key={size.id}
-                                className="grid grid-cols-1 md:grid-cols-[1fr_auto] items-center gap-3 border border-gray-200 rounded-xl px-4 py-3"
+                                className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-2.5"
                             >
                                 <div>
                                     <div className="text-lg font-black text-[#111827] leading-none">{size.id}</div>
-                                    <div className="text-xs text-gray-500 mt-1">{size.range}</div>
+                                    <div className="text-xs text-gray-500 mt-0.5">{size.range}</div>
                                 </div>
 
                                 <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden w-fit">
                                     <button
                                         type="button"
                                         onClick={() => handleQuantityChange(size.id, current - 1)}
-                                        className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50"
                                         aria-label={`${size.id} decrease`}
                                     >
                                         <Minus size={16} />
@@ -155,12 +218,12 @@ export default function WormOrderPage() {
                                             const next = Number(event.target.value)
                                             handleQuantityChange(size.id, Number.isFinite(next) ? next : 0)
                                         }}
-                                        className="w-16 h-10 text-center font-bold text-[#111827] outline-none"
+                                        className="w-14 h-9 text-center font-bold text-[#111827] outline-none"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => handleQuantityChange(size.id, current + 1)}
-                                        className="w-10 h-10 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50"
                                         aria-label={`${size.id} increase`}
                                     >
                                         <Plus size={16} />
@@ -172,57 +235,23 @@ export default function WormOrderPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-5">
-                <div>
-                    <label htmlFor="receiveDate" className="block text-sm font-bold text-gray-700 mb-2">
-                        Receiving Date
-                    </label>
-                    <div className="relative max-w-xs">
-                        <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                        <input
-                            id="receiveDate"
-                            type="date"
-                            value={receiveDate}
-                            onChange={(event) => {
-                                setCopied(false)
-                                setReceiveDate(event.target.value)
-                            }}
-                            min={new Date().toISOString().split('T')[0]}
-                            className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                        />
-                    </div>
+            {generatedMessage && (
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
+                    <textarea
+                        readOnly
+                        value={generatedMessage}
+                        className="w-full h-60 border border-gray-300 rounded-xl p-4 text-sm leading-6 text-gray-800 bg-gray-50"
+                    />
+                    <button
+                        type="button"
+                        onClick={handleCopy}
+                        className="inline-flex items-center gap-2 h-10 px-4 border border-gray-300 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50"
+                    >
+                        <Copy size={15} />
+                        {copied ? 'Copied' : 'Copy Message'}
+                    </button>
                 </div>
-
-                <button
-                    type="button"
-                    onClick={handleGenerate}
-                    className="h-12 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide"
-                >
-                    Generate Message
-                </button>
-
-                {validationError && (
-                    <p className="text-sm font-semibold text-[#e34219]">{validationError}</p>
-                )}
-
-                {generatedMessage && (
-                    <div className="space-y-3">
-                        <textarea
-                            readOnly
-                            value={generatedMessage}
-                            className="w-full h-60 border border-gray-300 rounded-xl p-4 text-sm leading-6 text-gray-800 bg-gray-50"
-                        />
-                        <button
-                            type="button"
-                            onClick={handleCopy}
-                            className="inline-flex items-center gap-2 h-10 px-4 border border-gray-300 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50"
-                        >
-                            <Copy size={15} />
-                            {copied ? 'Copied' : 'Copy Message'}
-                        </button>
-                    </div>
-                )}
-            </div>
+            )}
         </div>
     )
 }
