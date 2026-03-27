@@ -40,9 +40,12 @@ type LocatorLike = {
     waitFor: (options?: Record<string, unknown>) => Promise<void>
     click: (options?: Record<string, unknown>) => Promise<void>
     fill: (value: string) => Promise<void>
+    pressSequentially: (text: string, options?: Record<string, unknown>) => Promise<void>
     setInputFiles: (files: { name: string; mimeType: string; buffer: Buffer }) => Promise<void>
     check: (options?: Record<string, unknown>) => Promise<void>
     isVisible: () => Promise<boolean>
+    isEnabled: () => Promise<boolean>
+    isDisabled: () => Promise<boolean>
     count: () => Promise<number>
 }
 
@@ -166,6 +169,36 @@ const fillFirstVisible = async (
     throw new MoinAutomationError(step, `Could not find a fillable input for step: ${step} (url: ${page.url()})`)
 }
 
+/**
+ * Type characters one-by-one into an input field.
+ * This triggers proper React synthetic onChange events that fill() may miss.
+ * Used for login forms where React state controls button enabled/disabled.
+ */
+const typeFirstVisible = async (
+    page: PageLike,
+    selectors: string[],
+    value: string,
+    step: string,
+    timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<void> => {
+    for (const selector of selectors) {
+        try {
+            const target = page.locator(selector).first()
+            await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 9000) })
+            await target.click({ timeout: 5000 })
+            // Clear any existing value first
+            await target.fill('')
+            // Type character-by-character to trigger React onChange
+            await target.pressSequentially(value, { delay: 30 })
+            return
+        } catch {
+            // Try next selector.
+        }
+    }
+
+    throw new MoinAutomationError(step, `Could not find a typeable input for step: ${step} (url: ${page.url()})`)
+}
+
 const uploadFirstFileInput = async (
     page: PageLike,
     selectors: string[],
@@ -268,8 +301,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         await page.goto(MOIN_BIZPLUS_LOGIN_URL, { waitUntil: 'networkidle' })
         steps.push('open-login-page')
 
-        // ── Step 2: Fill login credentials ─────────────────────────────────
-        await fillFirstVisible(
+        // ── Step 2: Fill login credentials (type char-by-char for React) ──
+        await typeFirstVisible(
             page,
             [
                 'input[name="email"]',
@@ -284,7 +317,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('fill-login-id')
 
-        await fillFirstVisible(
+        await typeFirstVisible(
             page,
             ['input[name="password"]', 'input[type="password"]', 'input[autocomplete="current-password"]'],
             input.loginPassword,
@@ -293,23 +326,48 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('fill-login-password')
 
-        // Small delay to let the login button become enabled after input
-        await page.waitForTimeout(500)
+        // Wait for React to process input events and enable the login button
+        await page.waitForTimeout(1000)
 
         // ── Step 3: Submit login ───────────────────────────────────────────
         const loginUrlBefore = page.url()
 
-        await clickFirstVisible(
-            page,
-            [
-                `button[type="submit"]:has-text("${KO_LOGIN}")`,
-                `button:has-text("${KO_LOGIN}")`,
-                `[role="button"]:has-text("${KO_LOGIN}")`,
-                'button[type="submit"]',
-            ],
-            'Submit login',
-            DEFAULT_TIMEOUT_MS
-        )
+        // Wait for login button to become enabled
+        const loginBtnSelectors = [
+            `button[type="submit"]:has-text("${KO_LOGIN}")`,
+            `button:has-text("${KO_LOGIN}")`,
+            `[role="button"]:has-text("${KO_LOGIN}")`,
+            'button[type="submit"]',
+        ]
+
+        let loginClicked = false
+        for (const selector of loginBtnSelectors) {
+            try {
+                const btn = page.locator(selector).first()
+                await btn.waitFor({ state: 'visible', timeout: 5000 })
+
+                // Wait up to 3 seconds for button to become enabled
+                for (let attempt = 0; attempt < 6; attempt++) {
+                    try {
+                        const disabled = await btn.isDisabled()
+                        if (!disabled) break
+                    } catch {
+                        break // isDisabled not available, just proceed
+                    }
+                    await page.waitForTimeout(500)
+                }
+
+                await btn.click({ timeout: 5000 })
+                loginClicked = true
+                break
+            } catch {
+                // Try next selector
+            }
+        }
+
+        if (!loginClicked) {
+            throw new MoinAutomationError('Submit login', `Could not click login button. (url: ${page.url()})`)
+        }
         steps.push('submit-login')
 
         // Wait for URL to leave /login, which confirms successful login
