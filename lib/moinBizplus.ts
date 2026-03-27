@@ -47,6 +47,7 @@ type LocatorLike = {
     isEnabled: () => Promise<boolean>
     isDisabled: () => Promise<boolean>
     count: () => Promise<number>
+    textContent: () => Promise<string | null>
 }
 
 export type MoinRemittanceInput = {
@@ -188,8 +189,10 @@ const typeFirstVisible = async (
             await target.click({ timeout: 5000 })
             // Clear any existing value first
             await target.fill('')
-            // Type character-by-character to trigger React onChange
-            await target.pressSequentially(value, { delay: 30 })
+            // Type character-by-character to trigger React onChange and avoid bot detection
+            // Randomize delay between 80ms and 150ms per character to mimic human typing
+            const typingDelay = 80 + Math.floor(Math.random() * 70)
+            await target.pressSequentially(value, { delay: typingDelay })
             return
         } catch {
             // Try next selector.
@@ -327,7 +330,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('fill-login-password')
 
         // Wait for React to process input events and enable the login button
-        await page.waitForTimeout(1000)
+        // Add a random human-like delay before clicking submit (1.5 to 2.5 seconds)
+        const clickDelay = 1500 + Math.floor(Math.random() * 1000)
+        await page.waitForTimeout(clickDelay)
 
         // ── Step 3: Submit login ───────────────────────────────────────────
         const loginUrlBefore = page.url()
@@ -370,20 +375,51 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
         steps.push('submit-login')
 
-        // Wait for URL to leave /login, which confirms successful login
-        const postLoginUrl = await waitForUrlChange(page, loginUrlBefore, LONG_TIMEOUT_MS)
-        steps.push(`post-login-url:${postLoginUrl}`)
-
-        // Wait for page to settle after redirect
-        await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
-
-        // If still on login page, login likely failed
-        if (page.url().includes('/login')) {
-            throw new MoinAutomationError(
-                'Login',
-                `Login appears to have failed – still on login page. Check credentials. (url: ${page.url()})`
-            )
+        // ── Step 3.5: Check for explicit login errors ───────────────────────
+        // MOIN bizplus shows a red banner for invalid password or locked accounts.
+        // We wait up to 10 seconds to see if the URL changes OR an error banner appears.
+        let loginFailed = false
+        try {
+            await Promise.race([
+                waitForUrlChange(page, loginUrlBefore, 10000).then((url) => {
+                    if (url.includes('/login')) loginFailed = true
+                }),
+                page.getByText('비밀번호가 일치하지 않습니다').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+                page.getByText('초과').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+                page.getByText('잠금').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+                page.getByText('잠겨').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true })
+            ])
+        } catch {
+            // Ignore timeouts from race
         }
+
+        // Wait for page to settle
+        await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
+
+        if (loginFailed || page.url().includes('/login')) {
+            // Extract text from the page to see the exact error for the user
+            const bodyText = await page.locator('body').textContent().catch(() => '') || ''
+
+            if (bodyText.includes('초과') || bodyText.includes('잠금') || bodyText.includes('잠겨')) {
+                throw new MoinAutomationError(
+                    'Login Failed',
+                    '[계정 잠금] 로그인 시도 횟수를 초과했습니다. 보안을 위해 모인 비즈플러스 웹사이트(www.moinbizplus.com)에 직접 접속하여 "비밀번호 재설정"을 진행해 주세요.'
+                )
+            } else if (bodyText.includes('비밀번호가 일치하지 않습니다')) {
+                throw new MoinAutomationError(
+                    'Login Failed',
+                    '[비밀번호 오류] 비밀번호가 일치하지 않습니다. 정확한 비밀번호를 입력해 주세요. (계속 틀리면 계정이 잠깁니다)'
+                )
+            } else {
+                throw new MoinAutomationError(
+                    'Login Failed',
+                    `로그인에 실패했습니다 (URL: ${page.url()}). 계정 정보를 확인해 주세요.`
+                )
+            }
+        }
+
+        const postLoginUrl = page.url()
+        steps.push(`post-login-url:${postLoginUrl}`)
 
         // ── Step 4: Find and select the company/recipient ──────────────────
         // After login, the company might be visible on the dashboard, or we may
