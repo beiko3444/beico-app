@@ -2,12 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ShoppingCart, History, User } from 'lucide-react'
+import { ShoppingCart, History, User, Bug } from 'lucide-react'
 
 const NAV_ITEMS = [
-    { href: '/order', label: 'Order', subLabel: '注文', icon: ShoppingCart },
-    { href: '/order/history', label: 'History', subLabel: '注文履歴', icon: History },
-    { href: '/order/profile', label: 'My Page', subLabel: 'マイページ', icon: User },
+    { href: '/order', label: 'Order', subLabel: 'Order', icon: ShoppingCart },
+    { href: '/order/history', label: 'History', subLabel: 'History', icon: History },
+    { href: '/order/worm-order', label: 'Worm', subLabel: 'Worm Order', icon: Bug },
+    { href: '/order/profile', label: 'My Page', subLabel: 'My Page', icon: User },
 ]
 
 export default function UserNavbar() {
