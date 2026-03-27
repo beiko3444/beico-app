@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Copy, Minus, Plus, Sparkles } from 'lucide-react'
+import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles } from 'lucide-react'
 
 type WormSize = {
     id: string
@@ -33,6 +33,13 @@ export default function WormOrderPage() {
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
     const [copied, setCopied] = useState(false)
+    const [moinLoginId, setMoinLoginId] = useState('')
+    const [moinPassword, setMoinPassword] = useState('')
+    const [transferAmountUsd, setTransferAmountUsd] = useState('')
+    const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
+    const [remittanceError, setRemittanceError] = useState('')
+    const [remittanceSuccess, setRemittanceSuccess] = useState('')
+    const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
     const dateInputRef = useRef<HTMLInputElement>(null)
 
     const selectedOrders = useMemo(() => {
@@ -107,6 +114,61 @@ export default function WormOrderPage() {
         } catch {
             setCopied(false)
             alert('Copy failed. Please copy the message manually.')
+        }
+    }
+
+    const handleRemittanceApply = async () => {
+        setRemittanceError('')
+        setRemittanceSuccess('')
+
+        if (!moinLoginId.trim() || !moinPassword.trim()) {
+            setRemittanceError('Please enter MOIN login ID and password.')
+            return
+        }
+
+        const normalizedAmount = transferAmountUsd.replace(/,/g, '').trim()
+        const parsedAmount = Number(normalizedAmount)
+        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
+            setRemittanceError('Please enter a valid USD amount.')
+            return
+        }
+
+        if (!invoicePdf) {
+            setRemittanceError('Please upload an invoice PDF file.')
+            return
+        }
+
+        const isPdf = invoicePdf.type === 'application/pdf' || invoicePdf.name.toLowerCase().endsWith('.pdf')
+        if (!isPdf) {
+            setRemittanceError('Only PDF files are allowed.')
+            return
+        }
+
+        setRemittanceSubmitting(true)
+        try {
+            const submitData = new FormData()
+            submitData.append('moinLoginId', moinLoginId.trim())
+            submitData.append('moinPassword', moinPassword)
+            submitData.append('amountUsd', parsedAmount.toFixed(2))
+            submitData.append('invoicePdf', invoicePdf)
+
+            const response = await fetch('/api/admin/worm-order/remittance', {
+                method: 'POST',
+                body: submitData,
+            })
+            const result = await response.json()
+
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.')
+            }
+
+            setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
+            setMoinPassword('')
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
+            setRemittanceError(message)
+        } finally {
+            setRemittanceSubmitting(false)
         }
     }
 
@@ -252,6 +314,115 @@ export default function WormOrderPage() {
                     </button>
                 </div>
             )}
+
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
+                        <h3 className="text-lg font-black text-[#111827]">Auto Remittance Application</h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Fill amount + invoice PDF, then click apply to complete transfer submission automatically.
+                        </p>
+                    </div>
+                    <Send size={18} className="text-[#e34219] mt-1" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
+                            MOIN Login ID
+                        </label>
+                        <input
+                            type="text"
+                            value={moinLoginId}
+                            onChange={(event) => setMoinLoginId(event.target.value)}
+                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                            placeholder="Enter MOIN login ID"
+                            autoComplete="username"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
+                            MOIN Password
+                        </label>
+                        <input
+                            type="password"
+                            value={moinPassword}
+                            onChange={(event) => setMoinPassword(event.target.value)}
+                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                            placeholder="Enter MOIN password"
+                            autoComplete="current-password"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
+                            Transfer Amount (USD)
+                        </label>
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={transferAmountUsd}
+                            onChange={(event) => {
+                                const cleaned = event.target.value.replace(/[^0-9.,]/g, '')
+                                setTransferAmountUsd(cleaned)
+                            }}
+                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                            placeholder="Ex. 1250.50"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
+                            Invoice PDF
+                        </label>
+                        <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                            <div className="flex items-center gap-2 min-w-0">
+                                <FileText size={16} className="shrink-0 text-gray-500" />
+                                <span className="text-sm truncate">{invoicePdf?.name || 'Upload invoice PDF'}</span>
+                            </div>
+                            <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
+                            <input
+                                type="file"
+                                accept=".pdf,application/pdf"
+                                className="hidden"
+                                onChange={(event) => {
+                                    setRemittanceError('')
+                                    setRemittanceSuccess('')
+                                    const file = event.target.files?.[0] || null
+                                    setInvoicePdf(file)
+                                }}
+                            />
+                        </label>
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                        The automation will log in, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleRemittanceApply}
+                        disabled={remittanceSubmitting}
+                        className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                    >
+                        {remittanceSubmitting ? (
+                            <>
+                                <Loader2 size={15} className="animate-spin" />
+                                Applying...
+                            </>
+                        ) : (
+                            '신청하기'
+                        )}
+                    </button>
+                </div>
+
+                {remittanceError && (
+                    <p className="text-sm font-semibold text-[#e34219]">{remittanceError}</p>
+                )}
+                {remittanceSuccess && (
+                    <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
+                )}
+            </div>
         </div>
     )
 }
