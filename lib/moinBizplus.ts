@@ -1,6 +1,7 @@
-const MOIN_BIZPLUS_HOME_URL = 'https://www.moinbizplus.com/'
+const MOIN_BIZPLUS_LOGIN_URL = 'https://www.moinbizplus.com/login'
 const TARGET_COMPANY_NAME = 'Shanghai Oikki Trading Co.,Ltd'
 const DEFAULT_TIMEOUT_MS = 45000
+const LONG_TIMEOUT_MS = 60000
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
@@ -29,6 +30,9 @@ type PageLike = {
     setDefaultTimeout: (timeout: number) => void
     setDefaultNavigationTimeout: (timeout: number) => void
     waitForLoadState: (state?: string, options?: Record<string, unknown>) => Promise<void>
+    waitForURL: (url: string | RegExp, options?: Record<string, unknown>) => Promise<void>
+    waitForTimeout: (ms: number) => Promise<void>
+    content: () => Promise<string>
 }
 
 type LocatorLike = {
@@ -38,6 +42,8 @@ type LocatorLike = {
     fill: (value: string) => Promise<void>
     setInputFiles: (files: { name: string; mimeType: string; buffer: Buffer }) => Promise<void>
     check: (options?: Record<string, unknown>) => Promise<void>
+    isVisible: () => Promise<boolean>
+    count: () => Promise<number>
 }
 
 export type MoinRemittanceInput = {
@@ -135,7 +141,7 @@ const clickFirstVisible = async (
         }
     }
 
-    throw new MoinAutomationError(step, `Could not find a clickable element for step: ${step}`)
+    throw new MoinAutomationError(step, `Could not find a clickable element for step: ${step} (url: ${page.url()})`)
 }
 
 const fillFirstVisible = async (
@@ -157,7 +163,7 @@ const fillFirstVisible = async (
         }
     }
 
-    throw new MoinAutomationError(step, `Could not find a fillable input for step: ${step}`)
+    throw new MoinAutomationError(step, `Could not find a fillable input for step: ${step} (url: ${page.url()})`)
 }
 
 const uploadFirstFileInput = async (
@@ -177,7 +183,7 @@ const uploadFirstFileInput = async (
         }
     }
 
-    throw new MoinAutomationError('Upload invoice', 'Could not find file upload input.')
+    throw new MoinAutomationError('Upload invoice', `Could not find file upload input. (url: ${page.url()})`)
 }
 
 const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
@@ -228,7 +234,20 @@ const checkAgreement = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) =>
         }
     }
 
-    throw new MoinAutomationError('Agreement', 'Could not find the agreement checkbox.')
+    throw new MoinAutomationError('Agreement', `Could not find the agreement checkbox. (url: ${page.url()})`)
+}
+
+/** Wait for URL to move away from `startUrl` within `timeoutMs`. */
+const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: number) => {
+    const deadline = Date.now() + timeoutMs
+    while (Date.now() < deadline) {
+        const currentUrl = page.url()
+        if (currentUrl !== startUrl && !currentUrl.includes('/login')) {
+            return currentUrl
+        }
+        await page.waitForTimeout(500)
+    }
+    return page.url()
 }
 
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
@@ -243,31 +262,21 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const context = await browser.newContext({ locale: 'ko-KR' })
         const page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
-        page.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS)
+        page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
-        await page.goto(MOIN_BIZPLUS_HOME_URL, { waitUntil: 'domcontentloaded' })
-        steps.push('open-home')
+        // ── Step 1: Go directly to login page ─────────────────────────────
+        await page.goto(MOIN_BIZPLUS_LOGIN_URL, { waitUntil: 'networkidle' })
+        steps.push('open-login-page')
 
-        await clickFirstVisible(
-            page,
-            [
-                'button[data-testid="nav-login"]',
-                `button:has-text("${KO_LOGIN}")`,
-                `a:has-text("${KO_LOGIN}")`,
-            ],
-            'Open login',
-            DEFAULT_TIMEOUT_MS
-        )
-        steps.push('click-login-button')
-
+        // ── Step 2: Fill login credentials ─────────────────────────────────
         await fillFirstVisible(
             page,
             [
                 'input[name="email"]',
+                'input[type="email"]',
                 'input[name="username"]',
-                'input[name="id"]',
                 'input[autocomplete="username"]',
-                'input[type="text"]',
+                'input[autocomplete="email"]',
             ],
             input.loginId,
             'Fill login ID',
@@ -284,6 +293,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('fill-login-password')
 
+        // Small delay to let the login button become enabled after input
+        await page.waitForTimeout(500)
+
+        // ── Step 3: Submit login ───────────────────────────────────────────
+        const loginUrlBefore = page.url()
+
         await clickFirstVisible(
             page,
             [
@@ -296,13 +311,100 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             DEFAULT_TIMEOUT_MS
         )
         steps.push('submit-login')
+
+        // Wait for URL to leave /login, which confirms successful login
+        const postLoginUrl = await waitForUrlChange(page, loginUrlBefore, LONG_TIMEOUT_MS)
+        steps.push(`post-login-url:${postLoginUrl}`)
+
+        // Wait for page to settle after redirect
         await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
 
-        const companyCandidate = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
-        await companyCandidate.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
-        await companyCandidate.click({ timeout: DEFAULT_TIMEOUT_MS })
-        steps.push('select-company')
+        // If still on login page, login likely failed
+        if (page.url().includes('/login')) {
+            throw new MoinAutomationError(
+                'Login',
+                `Login appears to have failed – still on login page. Check credentials. (url: ${page.url()})`
+            )
+        }
 
+        // ── Step 4: Find and select the company/recipient ──────────────────
+        // After login, the company might be visible on the dashboard, or we may
+        // need to look for a "송금하기" or transfer link first.
+        try {
+            const companyCandidate = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+            await companyCandidate.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+            await companyCandidate.click({ timeout: DEFAULT_TIMEOUT_MS })
+            steps.push('select-company')
+        } catch {
+            // Company not visible on current page. Try navigating to remittance page
+            // or looking for transfer/recipient navigation links.
+            steps.push('company-not-on-dashboard')
+
+            // Try clicking "송금하기" or a transfer tab/link first
+            const transferSelectors = [
+                `a:has-text("${KO_REMIT}")`,
+                `button:has-text("${KO_REMIT}")`,
+                `[role="button"]:has-text("${KO_REMIT}")`,
+                'a:has-text("송금")',
+                'button:has-text("송금")',
+                'a:has-text("해외송금")',
+                'a:has-text("수취인")',
+                'a[href*="transfer"]',
+                'a[href*="remit"]',
+                'a[href*="recipient"]',
+                'a[href*="beneficiary"]',
+            ]
+
+            let navigatedToTransfer = false
+            for (const selector of transferSelectors) {
+                try {
+                    const link = page.locator(selector).first()
+                    const isVisible = await link.isVisible()
+                    if (isVisible) {
+                        await link.click({ timeout: 5000 })
+                        await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
+                        navigatedToTransfer = true
+                        steps.push(`nav-transfer:${selector}`)
+                        break
+                    }
+                } catch {
+                    // Next selector
+                }
+            }
+
+            if (!navigatedToTransfer) {
+                steps.push('no-transfer-link-found')
+            }
+
+            // Now try to find the company again after navigating
+            try {
+                const companyCandidate = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+                await companyCandidate.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+                await companyCandidate.click({ timeout: DEFAULT_TIMEOUT_MS })
+                steps.push('select-company-after-nav')
+            } catch {
+                // Include page URL and partial content for debugging
+                let pageInfo = `url: ${page.url()}`
+                try {
+                    const html = await page.content()
+                    // Extract first 500 chars of body text for debugging
+                    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+                    if (bodyMatch) {
+                        const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                        pageInfo += ` | page-text(first 500): ${textContent.slice(0, 500)}`
+                    }
+                } catch {
+                    // Ignore content extraction errors
+                }
+
+                throw new MoinAutomationError(
+                    'Select company',
+                    `Could not find "${TARGET_COMPANY_NAME}" on page after login. ${pageInfo}`
+                )
+            }
+        }
+
+        // ── Step 5: Click "송금하기" (remittance button in popup/detail) ────
         await clickFirstVisible(
             page,
             [
@@ -315,6 +417,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('open-remittance-popup')
 
+        // ── Step 6: Fill USD amount ────────────────────────────────────────
         await fillFirstVisible(
             page,
             [
@@ -322,8 +425,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 'input[id*="usd" i]',
                 'input[placeholder*="USD"]',
                 'input[aria-label*="USD"]',
+                'input[name*="amount" i]',
+                'input[id*="amount" i]',
                 'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
                 'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
+                'xpath=//*[contains(normalize-space(),"금액")]/following::input[1]',
             ],
             input.amountUsd,
             'Fill USD amount',
@@ -331,9 +437,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('fill-usd-amount')
 
+        // ── Step 7: Next step after amount ─────────────────────────────────
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-amount')
 
+        // ── Step 8: Upload invoice PDF ─────────────────────────────────────
         await uploadFirstFileInput(
             page,
             ['input[type="file"][accept*="pdf" i]', 'input[type="file"]'],
@@ -346,15 +454,19 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('upload-invoice')
 
+        // ── Step 9: Next step after upload ─────────────────────────────────
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-upload')
 
+        // ── Step 10: Check agreement ───────────────────────────────────────
         await checkAgreement(page, DEFAULT_TIMEOUT_MS)
         steps.push('check-agreement')
 
+        // ── Step 11: Submit remittance ─────────────────────────────────────
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('submit-remittance')
 
+        // ── Step 12: Wait for completion ───────────────────────────────────
         await Promise.race([
             page.getByText(KO_SUCCESS_PATTERN).first().waitFor({
                 state: 'visible',
@@ -370,12 +482,14 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
     } catch (error) {
         if (error instanceof MoinAutomationError) {
+            // Append accumulated steps to help debugging
+            error.message = `${error.message} [steps: ${steps.join(' → ')}]`
             throw error
         }
 
         throw new MoinAutomationError(
             'Automation',
-            error instanceof Error ? error.message : 'Unknown automation error.'
+            `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' → ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`
         )
     } finally {
         if (browser) {
