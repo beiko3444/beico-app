@@ -10,13 +10,13 @@
     "postinstall": "prisma generate"
   },
   "dependencies": {
-    "@sparticuz/chromium": "latest",
     "@capacitor/android": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@prisma/client": "^5.10.2",
+    "@sparticuz/chromium": "^143.0.4",
     "bcryptjs": "^3.0.3",
     "html-to-image": "^1.11.13",
     "html2canvas": "^1.4.1",
@@ -27,7 +27,7 @@
     "next-auth": "^4.24.13",
     "node-fetch": "^3.3.2",
     "nodemailer": "^7.0.13",
-    "playwright-core": "latest",
+    "playwright-core": "^1.58.2",
     "prisma": "^5.10.2",
     "react": "19.2.3",
     "react-barcode": "^1.6.1",

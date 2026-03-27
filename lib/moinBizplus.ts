@@ -1,6 +1,3 @@
-import { chromium as playwrightCoreChromium } from 'playwright-core'
-import chromium from '@sparticuz/chromium'
-
 const MOIN_BIZPLUS_HOME_URL = 'https://www.moinbizplus.com/'
 const TARGET_COMPANY_NAME = 'Shanghai Oikki Trading Co.,Ltd'
 const DEFAULT_TIMEOUT_MS = 45000
@@ -77,7 +74,11 @@ const getErrorMessage = (error: unknown) => {
 const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
     const runtimeErrors: string[] = []
 
+    // Attempt 1: @sparticuz/chromium (for Vercel/AWS Lambda)
     try {
+        const { chromium: playwrightCoreChromium } = await import('playwright-core')
+        const chromium = (await import('@sparticuz/chromium')).default
+
         const executablePath = await chromium.executablePath()
 
         const browser = await playwrightCoreChromium.launch({
@@ -91,12 +92,14 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
         runtimeErrors.push(`playwright-core+sparticuz: ${getErrorMessage(error)}`)
     }
 
-    // Optional fallback for self-hosted environments that provide a custom chromium path.
+    // Attempt 2: Custom path fallback for self-hosted environments
     try {
         const customExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || process.env.CHROMIUM_EXECUTABLE_PATH
         if (!customExecutablePath) {
             throw new Error('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH is not set')
         }
+
+        const { chromium: playwrightCoreChromium } = await import('playwright-core')
 
         const browser = await playwrightCoreChromium.launch({
             headless,
