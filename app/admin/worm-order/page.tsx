@@ -33,7 +33,7 @@ export default function WormOrderPage() {
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
     const [copied, setCopied] = useState(false)
-    const [moinLoginId, setMoinLoginId] = useState('')
+    const [moinLoginId, setMoinLoginId] = useState('xtracker@naver.com')
     const [moinPassword, setMoinPassword] = useState('')
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
     const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
