@@ -166,7 +166,11 @@ export default function WormOrderPage() {
             setMoinPassword('')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
-            setRemittanceError(message)
+            if (message.toLowerCase().includes('playwright')) {
+                setRemittanceError(`${message} (Run: npm install playwright && npx playwright install chromium)`)
+            } else {
+                setRemittanceError(message)
+            }
         } finally {
             setRemittanceSubmitting(false)
         }

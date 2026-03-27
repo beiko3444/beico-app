@@ -73,17 +73,27 @@ export class MoinAutomationError extends Error {
 }
 
 const importPlaywright = async (): Promise<PlaywrightLike> => {
-    const dynamicImporter = new Function('return import("playwright")') as () => Promise<unknown>
-    const imported = (await dynamicImporter()) as PlaywrightLike
+    try {
+        const dynamicImporter = new Function('return import("playwright")') as () => Promise<unknown>
+        const imported = (await dynamicImporter()) as PlaywrightLike
 
-    if (!imported?.chromium?.launch) {
+        if (!imported?.chromium?.launch) {
+            throw new MoinAutomationError(
+                'Load Playwright',
+                'Playwright is not installed. Please run "npm install playwright".'
+            )
+        }
+
+        return imported
+    } catch (error) {
+        if (error instanceof MoinAutomationError) {
+            throw error
+        }
         throw new MoinAutomationError(
             'Load Playwright',
-            'Playwright is not installed. Please run "npm install playwright".'
+            `Failed to load Playwright module: ${error instanceof Error ? error.message : 'Unknown error'}`
         )
     }
-
-    return imported
 }
 
 const clickFirstVisible = async (
@@ -200,16 +210,16 @@ const checkAgreement = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) =>
 }
 
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
-    const playwright = await importPlaywright()
-
-    const browser = await playwright.chromium!.launch({
-        headless: input.headless ?? true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    })
-
+    let browser: BrowserLike | null = null
     const steps: string[] = []
 
     try {
+        const playwright = await importPlaywright()
+        browser = await playwright.chromium!.launch({
+            headless: input.headless ?? true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        })
+
         const context = await browser.newContext({ locale: 'ko-KR' })
         const page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
@@ -348,6 +358,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             error instanceof Error ? error.message : 'Unknown automation error.'
         )
     } finally {
-        await browser.close().catch(() => undefined)
+        if (browser) {
+            await browser.close().catch(() => undefined)
+        }
     }
 }

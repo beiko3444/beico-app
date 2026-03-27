@@ -80,9 +80,10 @@ export async function POST(request: Request) {
         }
 
         console.error('Failed to apply MOIN remittance:', error)
+        const detail = error instanceof Error ? error.message : 'Unknown error'
         return NextResponse.json(
             {
-                error: 'Failed to complete remittance automation.',
+                error: `Failed to complete remittance automation: ${detail}`,
             },
             { status: 500 }
         )
