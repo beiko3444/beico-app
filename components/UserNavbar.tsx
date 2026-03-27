@@ -7,7 +7,7 @@ import { ShoppingCart, History, User, Bug } from 'lucide-react'
 const NAV_ITEMS = [
     { href: '/order', label: 'Order', subLabel: 'Order', icon: ShoppingCart },
     { href: '/order/history', label: 'History', subLabel: 'History', icon: History },
-    { href: '/order/worm-order', label: 'Worm', subLabel: 'Worm Order Form', icon: Bug },
+    { href: '/order/worm-order', label: 'Worm', subLabel: '지렁이 발주', icon: Bug },
     { href: '/order/profile', label: 'My Page', subLabel: 'My Page', icon: User },
 ]
 
