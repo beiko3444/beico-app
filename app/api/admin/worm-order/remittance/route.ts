@@ -5,6 +5,7 @@ import { MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const maxDuration = 300
 
 const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024
 

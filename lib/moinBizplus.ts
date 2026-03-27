@@ -46,6 +46,12 @@ type PlaywrightLike = {
     }
 }
 
+type ChromiumPackageLike = {
+    args?: string[]
+    headless?: boolean
+    executablePath?: (input?: string) => Promise<string>
+}
+
 export type MoinRemittanceInput = {
     loginId: string
     loginPassword: string
@@ -73,27 +79,77 @@ export class MoinAutomationError extends Error {
 }
 
 const importPlaywright = async (): Promise<PlaywrightLike> => {
+    const dynamicImporter = new Function('return import("playwright")') as () => Promise<unknown>
+    return (await dynamicImporter()) as PlaywrightLike
+}
+
+const importPlaywrightCore = async (): Promise<PlaywrightLike> => {
+    const dynamicImporter = new Function('return import("playwright-core")') as () => Promise<unknown>
+    return (await dynamicImporter()) as PlaywrightLike
+}
+
+const importSparticuzChromium = async (): Promise<ChromiumPackageLike> => {
+    const dynamicImporter = new Function('return import("@sparticuz/chromium")') as () => Promise<unknown>
+    const imported = (await dynamicImporter()) as { default?: ChromiumPackageLike } & ChromiumPackageLike
+    return imported?.default ?? imported
+}
+
+const getErrorMessage = (error: unknown) => {
+    if (error instanceof Error && error.message) return error.message
+    return String(error)
+}
+
+const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
+    const runtimeErrors: string[] = []
+
     try {
-        const dynamicImporter = new Function('return import("playwright")') as () => Promise<unknown>
-        const imported = (await dynamicImporter()) as PlaywrightLike
-
-        if (!imported?.chromium?.launch) {
-            throw new MoinAutomationError(
-                'Load Playwright',
-                'Playwright is not installed. Please run "npm install playwright".'
-            )
+        const playwright = await importPlaywright()
+        if (!playwright?.chromium?.launch) {
+            throw new Error('playwright chromium launcher is unavailable')
         }
 
-        return imported
+        const browser = await playwright.chromium.launch({
+            headless,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        })
+        return { browser, runtime: 'playwright' }
     } catch (error) {
-        if (error instanceof MoinAutomationError) {
-            throw error
-        }
-        throw new MoinAutomationError(
-            'Load Playwright',
-            `Failed to load Playwright module: ${error instanceof Error ? error.message : 'Unknown error'}`
-        )
+        runtimeErrors.push(`playwright: ${getErrorMessage(error)}`)
     }
+
+    try {
+        const [playwrightCore, chromium] = await Promise.all([
+            importPlaywrightCore(),
+            importSparticuzChromium(),
+        ])
+
+        if (!playwrightCore?.chromium?.launch) {
+            throw new Error('playwright-core chromium launcher is unavailable')
+        }
+
+        const executablePath =
+            typeof chromium?.executablePath === 'function'
+                ? await chromium.executablePath()
+                : undefined
+
+        const launchOptions: Record<string, unknown> = {
+            headless: headless ? (chromium?.headless ?? true) : false,
+            args: chromium?.args?.length ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+        }
+        if (executablePath) {
+            launchOptions.executablePath = executablePath
+        }
+
+        const browser = await playwrightCore.chromium.launch(launchOptions)
+        return { browser, runtime: 'playwright-core+sparticuz' }
+    } catch (error) {
+        runtimeErrors.push(`playwright-core+sparticuz: ${getErrorMessage(error)}`)
+    }
+
+    throw new MoinAutomationError(
+        'Launch Browser',
+        `No server browser runtime available. Install dependencies: npm install playwright-core @sparticuz/chromium. Details: ${runtimeErrors.join(' | ')}`
+    )
 }
 
 const clickFirstVisible = async (
@@ -214,11 +270,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
     const steps: string[] = []
 
     try {
-        const playwright = await importPlaywright()
-        browser = await playwright.chromium!.launch({
-            headless: input.headless ?? true,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        })
+        const launched = await launchBrowser(input.headless ?? true)
+        browser = launched.browser
+        steps.push(`runtime:${launched.runtime}`)
 
         const context = await browser.newContext({ locale: 'ko-KR' })
         const page = await context.newPage()
