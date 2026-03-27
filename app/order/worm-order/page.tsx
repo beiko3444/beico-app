@@ -85,11 +85,12 @@ export default function WormOrderPage() {
         const message = [
             'Hi Michael,',
             '',
-            `Please send ${totalBoxes} ${totalLabel} of worms so the shipment arrives by ${receiveDateText}.`,
+            `Please send the following worm order to arrive by ${receiveDateText}.`,
+            `Total requested: ${totalBoxes} ${totalLabel}.`,
             '',
             lines,
             '',
-            'Thank you!',
+            'Thanks.',
         ].join('\n')
 
         setGeneratedMessage(message)
@@ -111,14 +112,14 @@ export default function WormOrderPage() {
         <div className="max-w-4xl mx-auto space-y-6 pb-10">
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">Worm Order</h1>
-                <p className="text-sm text-gray-500 uppercase tracking-wider">Choose size, quantity, and receiving date</p>
+                <p className="text-sm text-gray-500 uppercase tracking-wider">Choose boxes by size, then pick receiving date</p>
             </div>
 
             <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
                     <div>
-                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Order Form</p>
-                        <h2 className="text-lg font-black text-[#1f2937]">How many boxes do you need?</h2>
+                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">WORM ORDER SHEET</p>
+                        <h2 className="text-lg font-black text-[#1f2937]">How many boxes do you want to order?</h2>
                     </div>
                     <Sparkles size={18} className="text-[#e34219]" />
                 </div>
@@ -186,6 +187,7 @@ export default function WormOrderPage() {
                                 setCopied(false)
                                 setReceiveDate(event.target.value)
                             }}
+                            min={new Date().toISOString().split('T')[0]}
                             className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
                         />
                     </div>
@@ -196,7 +198,7 @@ export default function WormOrderPage() {
                     onClick={handleGenerate}
                     className="h-12 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide"
                 >
-                    Generate Message
+                    Generate
                 </button>
 
                 {validationError && (
