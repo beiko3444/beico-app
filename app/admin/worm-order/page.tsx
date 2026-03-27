@@ -167,7 +167,7 @@ export default function WormOrderPage() {
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
             if (message.toLowerCase().includes('playwright')) {
-                setRemittanceError(`${message} (Run: npm install playwright-core @sparticuz/chromium)`)
+                setRemittanceError(`${message} (Install deps and redeploy: npm install playwright-core @sparticuz/chromium)`)
             } else {
                 setRemittanceError(message)
             }
