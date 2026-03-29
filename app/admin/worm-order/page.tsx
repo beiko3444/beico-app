@@ -46,11 +46,13 @@ export default function WormOrderPage() {
     const [loadingEmails, setLoadingEmails] = useState(false)
     const [emailError, setEmailError] = useState('')
     const [hasFetched, setHasFetched] = useState(false)
+    const [selectedEmailUid, setSelectedEmailUid] = useState<string | null>(null)
 
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
         setHasFetched(true)
+        setSelectedEmailUid(null)
         try {
             const res = await fetch('/api/admin/worm-order/emails')
             const data = await res.json()
@@ -467,54 +469,107 @@ export default function WormOrderPage() {
                         {loadingEmails ? 'Loading...' : 'Fetch Emails'}
                     </button>
                 </div>
-                <div className="p-0">
-                    {emailError && <div className="p-6 text-sm text-red-500 font-medium text-center">{emailError}</div>}
-                    
-                    {!hasFetched && !loadingEmails && !emailError && (
-                        <div className="p-10 text-center text-sm text-gray-500">우측 상단의 "Fetch Emails" 버튼을 눌러 제목에 'documents'가 포함된 메일을 불러오세요.</div>
-                    )}
-                    
-                    {loadingEmails && (
-                        <div className="p-10 flex flex-col items-center justify-center gap-3 text-slate-400">
-                            <Loader2 size={24} className="animate-spin text-slate-300" />
-                            <span className="text-sm font-medium">메일함을 스캔하고 있습니다...</span>
-                        </div>
-                    )}
-
-                    {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
-                        <div className="p-10 text-center text-sm font-medium text-gray-500 bg-gray-50/50">
-                            제목에 'documents'가 포함된 수신 메일이 없습니다. <br />
-                            <span className="text-xs text-gray-400 font-normal mt-2 inline-block">스팸함에 있거나 아직 도착하지 않았을 수 있습니다.</span>
-                        </div>
-                    )}
-
-                    {!loadingEmails && emails.map((email) => (
-                        <div key={email.uid} className="border-b border-gray-100 last:border-0 p-5 hover:bg-slate-50 transition-colors">
-                            <div className="flex justify-between items-start mb-2">
-                                <h3 className="font-bold text-gray-900 text-[15px] max-w-[80%] leading-tight">{email.subject}</h3>
-                                <span className="text-[12px] text-gray-400 font-medium whitespace-nowrap">{new Date(email.date).toLocaleString()}</span>
+                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100">
+                    {/* 좌측 리스트 패널 */}
+                    <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px]">
+                        {emailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{emailError}</div>}
+                        
+                        {!hasFetched && !loadingEmails && !emailError && (
+                            <div className="p-8 text-center text-[13px] text-gray-500 leading-relaxed font-medium">
+                                우측 상단의 "Fetch Emails" 버튼을 눌러<br />마이클(michael@oikki.com)의 메일을 불러오세요.
                             </div>
-                            <div className="text-[13px] text-gray-600 line-clamp-3 overflow-hidden text-ellipsis leading-relaxed focus:line-clamp-none hover:line-clamp-none transition-all" dangerouslySetInnerHTML={{ __html: email.text }} />
-                            {email.attachments && email.attachments.length > 0 ? (
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                    {email.attachments.map((att: any) => (
-                                        <a
-                                            key={att.index}
-                                            href={`/api/admin/worm-order/emails/attachment?uid=${email.uid}&index=${att.index}`}
-                                            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#e34219] bg-[#fff7f3] hover:bg-[#ffeadd] px-3 py-1.5 rounded-lg border border-[#ffeadd] transition-colors"
-                                            title="클릭하여 첨부파일 열기/다운로드"
+                        )}
+                        
+                        {loadingEmails && (
+                            <div className="p-10 flex flex-col items-center justify-center gap-3 text-slate-400">
+                                <Loader2 size={24} className="animate-spin text-slate-300" />
+                                <span className="text-[13px] font-medium">메일함을 스캔하는 중입니다...</span>
+                            </div>
+                        )}
+
+                        {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
+                            <div className="p-8 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50">
+                                메일 본문에 <span className="font-bold text-gray-700">'michael@oikki.com'</span>이 포함된<br />최근 메일이 없습니다.
+                            </div>
+                        )}
+
+                        {!loadingEmails && emails.length > 0 && (
+                            <div className="divide-y divide-gray-100">
+                                {emails.map((email) => {
+                                    const isSelected = selectedEmailUid === email.uid
+                                    return (
+                                        <button
+                                            key={email.uid}
+                                            onClick={() => setSelectedEmailUid(email.uid)}
+                                            className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${
+                                                isSelected ? 'bg-orange-50/50 border-l-[3px] border-orange-500 pl-[13px]' : 'border-l-[3px] border-transparent pl-4'
+                                            }`}
                                         >
-                                            📎 {att.filename} <span className="font-normal text-[10px] text-orange-400 opacity-80 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
-                                        </a>
-                                    ))}
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className={`text-[11px] font-bold ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
+                                                    {new Date(email.date).toLocaleDateString()}
+                                                </span>
+                                                {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                            </div>
+                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                {email.subject}
+                                            </h3>
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 우측 본문 렌더링 패널 */}
+                    <div className="w-full md:w-[65%] bg-gray-50/30 flex flex-col">
+                        {!selectedEmailUid ? (
+                            <div className="flex-1 flex items-center justify-center p-10 text-[13px] text-gray-400 font-medium">
+                                {emails.length > 0 ? "좌측에서 메일을 선택하시면 내용이 표시됩니다." : ""}
+                            </div>
+                        ) : (() => {
+                            const selectedEmail = emails.find(e => e.uid === selectedEmailUid)
+                            if (!selectedEmail) return null
+                            return (
+                                <div className="flex flex-col h-full max-h-[600px]">
+                                    {/* 상세 헤더 */}
+                                    <div className="p-6 bg-white border-b border-gray-100 shrink-0">
+                                        <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">{selectedEmail.subject}</h2>
+                                        <div className="flex items-center gap-3 text-[12px] text-gray-500 font-medium tracking-tight">
+                                            <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
+                                        </div>
+                                        
+                                        {/* 첨부파일 다운로드 */}
+                                        {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2">
+                                                {selectedEmail.attachments.map((att: any) => (
+                                                    <a
+                                                        key={att.index}
+                                                        href={`/api/admin/worm-order/emails/attachment?uid=${selectedEmail.uid}&index=${att.index}`}
+                                                        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#e34219] bg-[#fff7f3] hover:bg-[#ffeadd] px-3 py-1.5 rounded-lg border border-[#ffeadd] transition-colors"
+                                                        title="새 탭에서 열거나 다운로드하려면 클릭하세요"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        📎 {att.filename} <span className="font-normal text-[10px] text-orange-400 opacity-80 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    
+                                    {/* 메일 본문 내용 */}
+                                    <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
+                                        <div 
+                                            className="w-full text-gray-800 break-words leading-relaxed max-w-none"
+                                            style={{ whiteSpace: selectedEmail.text.includes('<html') ? 'normal' : 'pre-wrap' }}
+                                            dangerouslySetInnerHTML={{ __html: selectedEmail.text }} 
+                                        />
+                                    </div>
                                 </div>
-                            ) : email.hasAttachments ? (
-                                <span className="inline-flex items-center gap-1 mt-3 text-[11px] font-bold text-[#e34219] bg-[#fff7f3] px-2 py-0.5 rounded border border-[#ffeadd]">
-                                    📎 첨부파일 있음 (이름 불러오기 실패)
-                                </span>
-                            ) : null}
-                        </div>
-                    ))}
+                            )
+                        })()}
+                    </div>
                 </div>
             </div>
         </div>

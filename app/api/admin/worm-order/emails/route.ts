@@ -45,9 +45,9 @@ export async function GET() {
             for await (const message of client.fetch(seqRange, { source: true })) {
                 if (message && message.source) {
                     const parsed = await simpleParser(message.source)
-                    const subject = (parsed.subject || '').toLowerCase()
+                    const body = (parsed.html || parsed.textAsHtml || parsed.text || '').toLowerCase()
                     
-                    if (subject.includes('document')) {
+                    if (body.includes('michael@oikki.com')) {
                         emails.push({
                             uid: message.uid,
                             subject: parsed.subject || '(제목 없음)',
