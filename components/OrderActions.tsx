@@ -262,10 +262,16 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                         </button>
                     )}
                     {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                        <button onClick={issueTaxInvoiceAPI} disabled={loading}
-                            className={`py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center transition-colors disabled:opacity-50 ${taxInvoiceIssued ? 'bg-gray-400 hover:bg-gray-500' : 'bg-[#d9361b] hover:bg-[#c0301a]'}`}>
-                            📋 {taxInvoiceIssued ? '계산서 취소' : '세금계산서'}
-                        </button>
+                        taxInvoiceIssued ? (
+                            <button disabled className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-gray-400 cursor-not-allowed">
+                                ✅ 발급완료
+                            </button>
+                        ) : (
+                            <button onClick={issueTaxInvoiceAPI} disabled={loading}
+                                className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center transition-colors disabled:opacity-50 bg-[#d9361b] hover:bg-[#c0301a]">
+                                📋 세금계산서
+                            </button>
+                        )
                     )}
                 </div>
             </div>
