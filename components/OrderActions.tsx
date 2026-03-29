@@ -150,7 +150,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 alert(`✅ 세금계산서 발급 완료\n관리번호: ${data.mgtKey}`)
                 router.refresh()
             } else {
-                const debugInfo = data.debug ? `\nCERTKEY 로드: ${data.debug.certkeyLoaded}, 접두사: ${data.debug.certkeyPrefix}, CorpNum: ${data.debug.corpNum}` : ''
+                const debugInfo = data.debug ? `\nCERTKEY 로드: ${data.debug.certkeyLoaded}, 접두사: ${data.debug.certkeyPrefix}\nCorpNum: ${data.debug.corpNum}, ContactID: ${data.debug.contactId}` : ''
                 alert(`❌ 발급 실패\n${data.error || '알 수 없는 오류'}${debugInfo}`)
             }
         } catch (e) {

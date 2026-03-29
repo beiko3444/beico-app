@@ -79,6 +79,7 @@ export async function POST(req: Request) {
           certkeyLoaded: certkey.length > 0,
           certkeyPrefix: certkey.substring(0, 8),
           corpNum: process.env.BAROBILL_CORP_NUM || '(empty)',
+          contactId: process.env.BAROBILL_CONTACT_ID || '(empty)',
         },
       }, { status: 400 });
     }
