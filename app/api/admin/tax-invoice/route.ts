@@ -70,10 +70,16 @@ export async function POST(req: Request) {
         mgtKey: invoiceParams.mgtKey,
       });
     } else {
+      const certkey = process.env.BAROBILL_CERTKEY || '';
       return NextResponse.json({
         success: false,
         error: result.message,
         resultCode: result.resultCode,
+        debug: {
+          certkeyLoaded: certkey.length > 0,
+          certkeyPrefix: certkey.substring(0, 8),
+          corpNum: process.env.BAROBILL_CORP_NUM || '(empty)',
+        },
       }, { status: 400 });
     }
   } catch (error: any) {
