@@ -35,85 +35,127 @@ function createInitialQuantities() {
 
 const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
 const NON_AWB_CONTEXT_REGEX = /\b(?:TEL|PHONE|MOBILE|FAX|EMAIL|E-?MAIL|CONTACT|INVOICE|DATE|TOTAL|QTY|PCS|KILO)\b/i
+const PHONE_LIKE_PREFIX_REGEX = /^(010|011|016|017|018|019|070|080)/
 
-function normalizePotentialAwbToken(token: string) {
-    return token
+function normalizeOcrPatternText(input: string) {
+    return input
         .toUpperCase()
         .replace(/[|IL]/g, '1')
         .replace(/[OQ]/g, '0')
         .replace(/Z/g, '2')
         .replace(/S/g, '5')
         .replace(/B/g, '8')
-        .replace(/[^\d]/g, '')
 }
 
-function scoreAwbCandidate(value: string, context: string, hasAwbKeyword: boolean) {
-    let score = 0
-
-    if (value.length === 11) score += 80
-    else if (value.length >= 10 && value.length <= 14) score += 40
-
-    if (hasAwbKeyword) score += 130
-    if (/^(112|180)/.test(value)) score += 20
-
-    if (/^(010|011|016|017|018|019|070|080)/.test(value)) score -= 140
-    if (NON_AWB_CONTEXT_REGEX.test(context.toUpperCase())) score -= 45
-
-    return score
+function normalizeOcrDigits(input: string) {
+    return normalizeOcrPatternText(input).replace(/[^\d]/g, '')
 }
 
-function extractBestAwbCandidate(ocrText: string, source: string): AwbCandidate | null {
+function mergeAwbCandidate(map: Map<string, AwbCandidate>, candidate: AwbCandidate) {
+    const prev = map.get(candidate.value)
+    if (!prev || candidate.score > prev.score) {
+        map.set(candidate.value, candidate)
+    }
+}
+
+function createCanvasFromSource(source: HTMLCanvasElement) {
+    const canvas = document.createElement('canvas')
+    canvas.width = source.width
+    canvas.height = source.height
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(source, 0, 0)
+    return canvas
+}
+
+function createTopCropCanvas(source: HTMLCanvasElement, topRatio: number) {
+    const cropHeight = Math.max(1, Math.floor(source.height * topRatio))
+    const canvas = document.createElement('canvas')
+    canvas.width = source.width
+    canvas.height = cropHeight
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(source, 0, 0, source.width, cropHeight, 0, 0, source.width, cropHeight)
+    return canvas
+}
+
+function applyBinaryThreshold(canvas: HTMLCanvasElement, threshold: number) {
+    const ctx = canvas.getContext('2d')!
+    const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+    const data = imgData.data
+    for (let i = 0; i < data.length; i += 4) {
+        const brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+        const color = brightness < threshold ? 0 : 255
+        data[i] = color
+        data[i + 1] = color
+        data[i + 2] = color
+    }
+    ctx.putImageData(imgData, 0, 0)
+}
+
+function extractAwbCandidatesFromText(ocrText: string, source: string, trustBoost = 0): AwbCandidate[] {
     const lines = ocrText
         .split(/\r?\n/)
         .map(line => line.trim())
         .filter(Boolean)
 
-    if (lines.length === 0) return null
+    if (lines.length === 0) return []
 
     const byValue = new Map<string, AwbCandidate>()
 
-    const addCandidatesFromChunk = (chunk: string, context: string, hasAwbKeyword: boolean, sourceSuffix: string) => {
-        const rawTokens = chunk.match(/[A-Z0-9|][A-Z0-9|\s\-._]{8,28}[A-Z0-9|]/gi) || []
-        for (const token of rawTokens) {
-            const normalized = normalizePotentialAwbToken(token)
-            if (normalized.length < 10 || normalized.length > 14) continue
+    const addCandidate = (value: string, context: string, patternScore: number, lineIndex: number, sourceSuffix: string) => {
+        const normalized = normalizeOcrDigits(value)
+        if (normalized.length !== 11) return
 
-            const score = scoreAwbCandidate(normalized, context, hasAwbKeyword)
-            const prev = byValue.get(normalized)
-            if (!prev || score > prev.score) {
-                byValue.set(normalized, {
-                    value: normalized,
-                    score,
-                    source: `${source} (${sourceSuffix})`,
-                })
-            }
+        const upperContext = context.toUpperCase()
+        const hasKeyword = AWB_KEYWORD_REGEX.test(upperContext)
+
+        let score = trustBoost + patternScore
+        if (hasKeyword) score += 180
+        if (lineIndex <= Math.max(1, Math.floor(lines.length * 0.4))) score += 35
+        if (/^(112|180)/.test(normalized)) score += 20
+        if (/^0/.test(normalized)) score -= 200
+        if (PHONE_LIKE_PREFIX_REGEX.test(normalized)) score -= 260
+        if (!hasKeyword && NON_AWB_CONTEXT_REGEX.test(upperContext)) score -= 70
+
+        mergeAwbCandidate(byValue, {
+            value: normalized,
+            score,
+            source: `${source} (${sourceSuffix})`,
+        })
+    }
+
+    const addCandidatesFromChunk = (chunk: string, context: string, lineIndex: number, sourceSuffix: string) => {
+        const upper = chunk.toUpperCase()
+        const digitFriendly = normalizeOcrPatternText(upper)
+
+        const airportRegex = /(?:^|[^\d])(\d{3})\s+[A-Z]{3}\s*(\d{4})\s*(\d{4})(?=[^\d]|$)/g
+        let match: RegExpExecArray | null
+        while ((match = airportRegex.exec(upper)) !== null) {
+            addCandidate(`${match[1]}${match[2]}${match[3]}`, context, 300, lineIndex, `${sourceSuffix}-airport`)
+        }
+
+        const groupedRegex = /(?:^|[^\d])(\d{3})[\s\-_.:/]*(\d{4})[\s\-_.:/]*(\d{4})(?=[^\d]|$)/g
+        while ((match = groupedRegex.exec(digitFriendly)) !== null) {
+            addCandidate(`${match[1]}${match[2]}${match[3]}`, context, 270, lineIndex, `${sourceSuffix}-grouped`)
+        }
+
+        const compactRegex = /(?:^|[^\d])(\d{11})(?=[^\d]|$)/g
+        while ((match = compactRegex.exec(digitFriendly)) !== null) {
+            addCandidate(match[1], context, 220, lineIndex, `${sourceSuffix}-compact`)
         }
     }
 
     for (let i = 0; i < lines.length; i++) {
-        const line = lines[i]
+        const line = lines[i] || ''
+        const prevLine = lines[i - 1] || ''
         const nextLine = lines[i + 1] || ''
         const merged = `${line} ${nextLine}`.trim()
+        const context = `${prevLine} ${line} ${nextLine}`.trim()
 
-        const keywordInLine = AWB_KEYWORD_REGEX.test(line)
-        const keywordInMerged = AWB_KEYWORD_REGEX.test(merged)
-
-        addCandidatesFromChunk(line, line, keywordInLine, 'line')
-        addCandidatesFromChunk(merged, merged, keywordInMerged, 'merged')
-        if (keywordInLine && nextLine) {
-            addCandidatesFromChunk(nextLine, merged, true, 'next-line')
-        }
+        addCandidatesFromChunk(line, context, i + 1, 'line')
+        if (nextLine) addCandidatesFromChunk(merged, context, i + 1, 'merged')
     }
 
-    const ranked = Array.from(byValue.values()).sort((a, b) => {
-        if (b.score !== a.score) return b.score - a.score
-        if (a.value.length === 11 && b.value.length !== 11) return -1
-        if (b.value.length === 11 && a.value.length !== 11) return 1
-        return 0
-    })
-
-    if (ranked.length === 0) return null
-    return ranked[0]
+    return Array.from(byValue.values()).sort((a, b) => b.score - a.score)
 }
 
 export default function WormOrderPage() {
@@ -142,6 +184,7 @@ export default function WormOrderPage() {
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
     const [awbLoading, setAwbLoading] = useState(false)
     const [awbError, setAwbError] = useState('')
+    const [awbCandidates, setAwbCandidates] = useState<AwbCandidate[]>([])
 
     // ── 관세사 메일 전달 관련 State ──
     const [forwardEmail, setForwardEmail] = useState('')
@@ -180,9 +223,9 @@ export default function WormOrderPage() {
     const [fetchProgress, setFetchProgress] = useState(0)
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
-    const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate | null> => {
+    const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate[]> => {
         const res = await fetch(`/api/admin/worm-order/emails/attachment?uid=${uid}&index=${attIndex}`)
-        if (!res.ok) return null
+        if (!res.ok) return []
         const blob = await res.blob()
 
         const pdfjsLib = await import('pdfjs-dist')
@@ -190,7 +233,7 @@ export default function WormOrderPage() {
         const arrayBuffer = await blob.arrayBuffer()
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
 
-        let bestCandidate: AwbCandidate | null = null
+        const byValue = new Map<string, AwbCandidate>()
         const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} })
         await worker.setParameters({
             tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
@@ -203,6 +246,26 @@ export default function WormOrderPage() {
             const totalPages = pdf.numPages
             for (let pageNum = 1; pageNum <= Math.min(totalPages, 5); pageNum++) {
                 const page = await pdf.getPage(pageNum)
+
+                // 먼저 PDF 텍스트 레이어를 추출 시도 (가능한 경우 OCR보다 정확)
+                try {
+                    const textContent = await page.getTextContent()
+                    const pageText = (textContent.items || [])
+                        .map((item: any) => item?.str || '')
+                        .filter(Boolean)
+                        .join('\n')
+                    const textCandidates = extractAwbCandidatesFromText(
+                        pageText,
+                        `file=${attIndex},page=${pageNum},text`,
+                        130,
+                    )
+                    for (const c of textCandidates) {
+                        mergeAwbCandidate(byValue, c)
+                    }
+                } catch (err) {
+                    console.warn(`[AWB OCR] text-layer parse failed file=${attIndex},page=${pageNum}`, err)
+                }
+
                 const viewport = page.getViewport({ scale: 3.2 })
                 const canvas = document.createElement('canvas')
                 canvas.width = viewport.width
@@ -210,62 +273,66 @@ export default function WormOrderPage() {
                 const ctx = canvas.getContext('2d')!
                 await page.render({ canvasContext: ctx, viewport } as any).promise
 
-                // OCR 전 명암 대비를 높여 숫자 인식률 개선
-                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-                const data = imgData.data
-                for (let i = 0; i < data.length; i += 4) {
-                    const brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
-                    const adjusted = brightness < 170 ? 0 : 255
-                    data[i] = adjusted
-                    data[i + 1] = adjusted
-                    data[i + 2] = adjusted
-                }
-                ctx.putImageData(imgData, 0, 0)
+                const fullRaw = canvas
+                const fullBinary = createCanvasFromSource(canvas)
+                applyBinaryThreshold(fullBinary, 165)
+                const topRaw = createTopCropCanvas(canvas, 0.42)
+                const topBinary = createCanvasFromSource(topRaw)
+                applyBinaryThreshold(topBinary, 165)
 
-                const result = await worker.recognize(canvas)
-                const ocrText = result.data.text
-                console.log(`[AWB OCR] File idx=${attIndex}, Page ${pageNum}:`, ocrText)
+                const variants: Array<{ name: string; canvas: HTMLCanvasElement; boost: number }> = [
+                    { name: 'ocr-full-raw', canvas: fullRaw, boost: 30 },
+                    { name: 'ocr-full-binary', canvas: fullBinary, boost: 60 },
+                    { name: 'ocr-top-raw', canvas: topRaw, boost: 100 },
+                    { name: 'ocr-top-binary', canvas: topBinary, boost: 140 },
+                ]
 
-                const candidate = extractBestAwbCandidate(
-                    ocrText,
-                    `file=${attIndex},page=${pageNum}`,
-                )
-                if (!candidate) continue
+                for (const variant of variants) {
+                    const result = await worker.recognize(variant.canvas)
+                    const ocrText = result.data.text || ''
+                    console.log(`[AWB OCR] file=${attIndex}, page=${pageNum}, variant=${variant.name}`, ocrText)
 
-                if (!bestCandidate || candidate.score > bestCandidate.score) {
-                    bestCandidate = candidate
+                    const candidates = extractAwbCandidatesFromText(
+                        ocrText,
+                        `file=${attIndex},page=${pageNum},${variant.name}`,
+                        variant.boost,
+                    )
+                    for (const c of candidates) {
+                        mergeAwbCandidate(byValue, c)
+                    }
                 }
             }
         } finally {
             await worker.terminate()
         }
 
-        if (bestCandidate) {
-            console.log('[AWB OCR] Selected candidate:', bestCandidate)
-        }
-
-        return bestCandidate
+        return Array.from(byValue.values()).sort((a, b) => b.score - a.score)
     }, [])
 
     const runAwbOcr = useCallback(async (uid: string, skmIndices: number[]) => {
         setAwbNumber(null)
         setAwbLoading(true)
         setAwbError('')
+        setAwbCandidates([])
         try {
-            let bestCandidate: AwbCandidate | null = null
+            const byValue = new Map<string, AwbCandidate>()
 
             // 모든 SKM 파일을 순차적으로 시도해서 점수가 가장 높은 후보를 채택
             for (const idx of skmIndices) {
-                const found = await ocrOnePdf(uid, idx)
-                if (!found) continue
-
-                if (!bestCandidate || found.score > bestCandidate.score) {
-                    bestCandidate = found
+                const foundList = await ocrOnePdf(uid, idx)
+                for (const c of foundList) {
+                    mergeAwbCandidate(byValue, c)
                 }
             }
 
-            if (bestCandidate) {
-                setAwbNumber(bestCandidate.value)
+            const ranked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
+            setAwbCandidates(ranked.slice(0, 6))
+
+            if (ranked.length > 0) {
+                setAwbNumber(ranked[0].value)
+                if (ranked[0].score < 350) {
+                    setAwbError('OCR 신뢰도가 낮습니다. 아래 대안 후보에서 번호를 직접 선택해주세요.')
+                }
                 return
             }
 
@@ -285,6 +352,7 @@ export default function WormOrderPage() {
             runAwbOcr(email.uid, email.skmIndices)
         } else {
             setAwbNumber(null)
+            setAwbCandidates([])
             setAwbLoading(false)
             setAwbError('')
         }
@@ -829,9 +897,15 @@ export default function WormOrderPage() {
                                         </div>
                                         
                                         {/* AIR WAYBILL OCR 결과 */}
-                                        {(awbLoading || awbNumber || awbError) && (
+                                        {(awbLoading || awbNumber || awbError || awbCandidates.length > 0) && (
                                             <div className={`mt-5 p-4 rounded-xl border flex flex-col gap-2 ${
-                                                awbNumber ? 'border-blue-100 bg-blue-50/50' : awbError ? 'border-red-100 bg-red-50/50' : 'border-orange-100 bg-orange-50/50'
+                                                awbLoading
+                                                    ? 'border-orange-100 bg-orange-50/50'
+                                                    : awbError
+                                                    ? (awbNumber ? 'border-amber-100 bg-amber-50/60' : 'border-red-100 bg-red-50/50')
+                                                    : awbNumber
+                                                    ? 'border-blue-100 bg-blue-50/50'
+                                                    : 'border-orange-100 bg-orange-50/50'
                                             }`}>
                                                 {awbLoading && (
                                                     <div className="flex items-center gap-2 text-orange-600">
@@ -860,8 +934,28 @@ export default function WormOrderPage() {
                                                         </div>
                                                     </>
                                                 )}
+                                                {awbCandidates.length > 1 && !awbLoading && (
+                                                    <div className="mt-1 pt-2 border-t border-blue-100/70 flex flex-wrap items-center gap-2">
+                                                        <span className="text-[11px] font-bold text-slate-500">대안 후보</span>
+                                                        {awbCandidates.slice(1, 6).map((candidate) => (
+                                                            <button
+                                                                key={`${candidate.value}-${candidate.source}`}
+                                                                onClick={() => {
+                                                                    setAwbNumber(candidate.value)
+                                                                    setAwbError('')
+                                                                }}
+                                                                className="h-7 px-2.5 rounded-md border border-slate-200 bg-white text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                                                                title={`source: ${candidate.source}, score: ${candidate.score}`}
+                                                            >
+                                                                {candidate.value}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
                                                 {awbError && !awbLoading && (
-                                                    <div className="text-[12px] font-bold text-red-600 flex items-center gap-1.5">
+                                                    <div className={`text-[12px] font-bold flex items-center gap-1.5 ${
+                                                        awbNumber ? 'text-amber-700' : 'text-red-600'
+                                                    }`}>
                                                         <ScanSearch size={14} />
                                                         {awbError}
                                                     </div>
