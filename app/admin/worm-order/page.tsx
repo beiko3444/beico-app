@@ -81,18 +81,52 @@ export default function WormOrderPage() {
         }
     }
 
+    // ── 자동 페치 & 게이지 관련 State ──
+    const [fetchProgress, setFetchProgress] = useState(0)
+
+    useEffect(() => {
+        fetchEmails()
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
-        setHasFetched(true)
+        setHasFetched(false)
         setSelectedEmailUid(null)
+        setFetchProgress(0)
+
+        // 가짜(Fake) 프로그레스 메이커 (로딩 중일 때 90%까지 꾸준히 증가)
+        let currentProgress = 0
+        const interval = setInterval(() => {
+            currentProgress += Math.random() * 15
+            if (currentProgress > 90) currentProgress = 90
+            setFetchProgress(currentProgress)
+        }, 400)
+
         try {
             const res = await fetch('/api/admin/worm-order/emails')
+            clearInterval(interval)
+            setFetchProgress(100) // 100% 꽉 채우기
+
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to fetch emails')
-            setEmails(data.emails || [])
+            
+            const fetchedEmails = data.emails || []
+            setEmails(fetchedEmails)
+            if (fetchedEmails.length > 0) {
+                setSelectedEmailUid(fetchedEmails[0].uid)
+            }
+            
+            setHasFetched(true)
+            
+            // 0.5초 뒤 게이지 숨김
+            setTimeout(() => setFetchProgress(0), 500)
         } catch (err: any) {
+            clearInterval(interval)
+            setFetchProgress(0)
             setEmailError(err.message)
+            setHasFetched(true)
         } finally {
             setLoadingEmails(false)
         }
@@ -485,10 +519,23 @@ export default function WormOrderPage() {
             </div>
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-[#f8fafc] flex items-center justify-between">
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+                
+                {/* 상단 프로그레스 게이지 바 */}
+                {fetchProgress > 0 && (
+                    <div className="absolute top-0 left-0 w-full h-[4px] bg-slate-100 z-10 overflow-hidden">
+                        <div 
+                            className="h-full bg-orange-500 transition-all duration-300 ease-out"
+                            style={{ width: `${fetchProgress}%` }}
+                        />
+                    </div>
+                )}
+
+                <div className="px-6 py-4 border-b border-gray-100 bg-[#f8fafc] flex items-center justify-between mt-[2px]">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">INBOX</p>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] relative">INBOX
+                            {loadingEmails && <span className="absolute -top-1 -right-3 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
+                        </p>
                         <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
                             <Mail size={18} className="text-slate-500" /> Documents
                         </h2>
@@ -496,32 +543,29 @@ export default function WormOrderPage() {
                     <button
                         onClick={fetchEmails}
                         disabled={loadingEmails}
-                        className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors"
+                        className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
-                        {loadingEmails && <Loader2 size={14} className="animate-spin" />}
-                        {loadingEmails ? 'Loading...' : 'Fetch Emails'}
+                        {loadingEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
+                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : 'Fetch Emails'}</span>
                     </button>
                 </div>
                 <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100">
                     {/* 좌측 리스트 패널 */}
-                    <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px]">
+                    <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px] relative">
                         {emailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{emailError}</div>}
                         
-                        {!hasFetched && !loadingEmails && !emailError && (
-                            <div className="p-8 text-center text-[13px] text-gray-500 leading-relaxed font-medium">
-                                우측 상단의 "Fetch Emails" 버튼을 눌러<br />마이클(michael@oikki.com)의 메일을 불러오세요.
-                            </div>
-                        )}
-                        
                         {loadingEmails && (
-                            <div className="p-10 flex flex-col items-center justify-center gap-3 text-slate-400">
-                                <Loader2 size={24} className="animate-spin text-slate-300" />
-                                <span className="text-[13px] font-medium">메일함을 스캔하는 중입니다...</span>
+                            <div className="p-10 flex flex-col items-center justify-center gap-4 text-slate-400 h-full mt-20">
+                                <span className="text-[13px] font-bold text-orange-500 tracking-wider">스캔 진행률 {Math.round(fetchProgress)}%</span>
+                                <div className="w-[120px] h-[3px] bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-orange-500 transition-all duration-300 ease-out" style={{ width: `${fetchProgress}%` }} />
+                                </div>
+                                <span className="text-[12px] font-medium text-slate-400 animate-pulse mt-1">Daum 서버의 메일함을 순차 탐색하고 있습니다...</span>
                             </div>
                         )}
 
                         {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
-                            <div className="p-8 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50">
+                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50 mt-10">
                                 메일 본문에 <span className="font-bold text-gray-700">'michael@oikki.com'</span>이 포함된<br />최근 메일이 없습니다.
                             </div>
                         )}
