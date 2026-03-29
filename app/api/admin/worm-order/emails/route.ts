@@ -48,14 +48,13 @@ export async function GET() {
                     const body = (parsed.html || parsed.textAsHtml || parsed.text || '').toLowerCase()
                     
                     if (body.includes('michael@oikki.com')) {
-                        // SKM 첨부파일 인덱스 찾기 (프론트에서 OCR용)
-                        let skmAttachmentIndex: number | null = null;
+                        // SKM 첨부파일 인덱스들 찾기 (프론트에서 OCR용)
+                        const skmIndices: number[] = [];
                         if (parsed.attachments && parsed.attachments.length > 0) {
                             for (let i = 0; i < parsed.attachments.length; i++) {
                                 const filename = (parsed.attachments[i].filename || '').toUpperCase();
                                 if (filename.includes('SKM')) {
-                                    skmAttachmentIndex = i;
-                                    break;
+                                    skmIndices.push(i);
                                 }
                             }
                         }
@@ -66,7 +65,7 @@ export async function GET() {
                             date: parsed.date,
                             text: parsed.html || parsed.textAsHtml || parsed.text || '',
                             hasAttachments: parsed.attachments && parsed.attachments.length > 0,
-                            skmAttachmentIndex,
+                            skmIndices,
                             attachments: (parsed.attachments || []).map((att: any, idx: number) => ({
                                 filename: att.filename || `attachment-${idx}`,
                                 contentType: att.contentType,

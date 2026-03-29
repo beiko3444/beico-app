@@ -91,22 +91,20 @@ export default function WormOrderPage() {
     const [fetchProgress, setFetchProgress] = useState(0)
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
-    const runAwbOcr = useCallback(async (uid: string, skmIndex: number) => {
-        setAwbNumber(null)
-        setAwbLoading(true)
-        setAwbError('')
-        try {
-            // 1. 첨부파일 바이너리 다운로드
-            const res = await fetch(`/api/admin/worm-order/emails/attachment?uid=${uid}&index=${skmIndex}`)
-            if (!res.ok) throw new Error('첨부파일 다운로드 실패')
-            const blob = await res.blob()
+    const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<string | null> => {
+        const res = await fetch(`/api/admin/worm-order/emails/attachment?uid=${uid}&index=${attIndex}`)
+        if (!res.ok) return null
+        const blob = await res.blob()
 
-            // 2. PDF → Canvas 이미지 변환 (pdf.js) - 고해상도로 렌더링
-            const pdfjsLib = await import('pdfjs-dist')
-            pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
-            const arrayBuffer = await blob.arrayBuffer()
-            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-            const page = await pdf.getPage(1)
+        const pdfjsLib = await import('pdfjs-dist')
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+        const arrayBuffer = await blob.arrayBuffer()
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+
+        // 모든 페이지 시도
+        const totalPages = pdf.numPages
+        for (let pageNum = 1; pageNum <= Math.min(totalPages, 3); pageNum++) {
+            const page = await pdf.getPage(pageNum)
             const viewport = page.getViewport({ scale: 3.0 })
             const canvas = document.createElement('canvas')
             canvas.width = viewport.width
@@ -114,77 +112,66 @@ export default function WormOrderPage() {
             const ctx = canvas.getContext('2d')!
             await page.render({ canvasContext: ctx, viewport } as any).promise
 
-            // 3. Tesseract OCR 실행
-            const result = await Tesseract.recognize(canvas, 'eng', {
-                logger: () => {},
-            })
+            const result = await Tesseract.recognize(canvas, 'eng', { logger: () => {} })
             const ocrText = result.data.text
-            console.log('[AWB OCR Raw Text]', ocrText)
+            console.log(`[AWB OCR] File idx=${attIndex}, Page ${pageNum}:`, ocrText)
 
-            // 4. OCR 텍스트 정리 (흔한 OCR 오인식 보정)
-            const cleaned = ocrText
+            // OCR 보정
+            const corrected = ocrText
                 .replace(/[|]/g, '1')
                 .replace(/\n/g, ' ')
+                .replace(/[OoQ]/g, '0')
+                .replace(/[IilL]/g, '1')
 
-            // 5. 'WAYBILL' or 'MAWB' 키워드 근처에서 번호 추출
-            const lines = ocrText.split('\n')
-            let awbFound: string | null = null
+            // 패턴 1: 3자리 + 4자리 + 4자리 (띄어쓰기/하이픈 허용)
+            const m1 = corrected.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
+            if (m1) return m1[1] + m1[2] + m1[3]
 
-            for (let i = 0; i < lines.length; i++) {
-                const lineUpper = lines[i].toUpperCase()
-                if (lineUpper.includes('WAYBILL') || lineUpper.includes('MAWB') || lineUpper.includes('AWB')) {
-                    // 이 줄과 다음 3줄 내에서 숫자 패턴 탐색
-                    const searchBlock = lines.slice(i, i + 4).join(' ')
-                    const blockCleaned = searchBlock.replace(/[OoQ]/g, '0').replace(/[IilL|]/g, '1').replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[Zz]/g, '2')
-                    
-                    // XXX XXXX XXXX 또는 XXX-XXXX-XXXX 형태 (3+4+4)
-                    const m1 = blockCleaned.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
-                    if (m1) {
-                        awbFound = m1[1] + m1[2] + m1[3]
-                        break
-                    }
-                    // XXX XXXXXXXX 형태 (3+8)
-                    const m2 = blockCleaned.match(/(\d{3})\s*[-.]?\s*(\d{8})/)
-                    if (m2) {
-                        awbFound = m2[1] + m2[2]
-                        break
-                    }
-                    // 연속 11자리
-                    const m3 = blockCleaned.match(/\d{11}/)
-                    if (m3) {
-                        awbFound = m3[0]
-                        break
-                    }
+            // 패턴 2: 3자리 + 8자리
+            const m2 = corrected.match(/(\d{3})\s*[-.]?\s*(\d{8})/)
+            if (m2) return m2[1] + m2[2]
+
+            // 패턴 3: 연속 11자리
+            const m3 = corrected.match(/\d{11}/)
+            if (m3) return m3[0]
+
+            // 패턴 4: 공백/하이픈 포함 11자리 이상 숫자 뭉치
+            const m4 = corrected.match(/\d[\d\s-]{9,16}\d/)
+            if (m4) {
+                const digits = m4[0].replace(/[\s-]/g, '')
+                if (digits.length >= 11) return digits.substring(0, 11)
+            }
+        }
+        return null
+    }, [])
+
+    const runAwbOcr = useCallback(async (uid: string, skmIndices: number[]) => {
+        setAwbNumber(null)
+        setAwbLoading(true)
+        setAwbError('')
+        try {
+            // 모든 SKM 파일을 순차적으로 시도
+            for (const idx of skmIndices) {
+                const found = await ocrOnePdf(uid, idx)
+                if (found) {
+                    setAwbNumber(found)
+                    return
                 }
             }
-
-            // 6. 키워드 기반 실패 시 전체 텍스트에서 3+4+4 패턴 탐색
-            if (!awbFound) {
-                const fullCleaned = cleaned.replace(/[OoQ]/g, '0').replace(/[IilL|]/g, '1').replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[Zz]/g, '2')
-                const m = fullCleaned.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
-                if (m) {
-                    awbFound = m[1] + m[2] + m[3]
-                }
-            }
-
-            if (awbFound) {
-                setAwbNumber(awbFound)
-                return
-            }
-            setAwbError('OCR 완료했으나 11자리 운송장 번호를 찾지 못했습니다.')
+            setAwbError('모든 SKM 문서에서 운송장 번호를 찾지 못했습니다. 브라우저 콘솔(F12)에서 OCR 원문을 확인해주세요.')
         } catch (err: any) {
             console.error('AWB OCR Error:', err)
             setAwbError(err.message || 'OCR 처리 실패')
         } finally {
             setAwbLoading(false)
         }
-    }, [])
+    }, [ocrOnePdf])
 
     useEffect(() => {
         if (!selectedEmailUid) return
         const email = emails.find((e: any) => e.uid === selectedEmailUid)
-        if (email && email.skmAttachmentIndex !== null && email.skmAttachmentIndex !== undefined) {
-            runAwbOcr(email.uid, email.skmAttachmentIndex)
+        if (email && email.skmIndices && email.skmIndices.length > 0) {
+            runAwbOcr(email.uid, email.skmIndices)
         } else {
             setAwbNumber(null)
             setAwbLoading(false)
