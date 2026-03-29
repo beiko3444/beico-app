@@ -96,7 +96,7 @@ function InfoRow({ label, value, copyable, copyKey, copiedField, onCopy }: {
     if (!value || value === '-') return null
 
     return (
-        <div className="flex items-center justify-between py-2 border-b border-gray-50/50 last:border-0 hover:bg-gray-50/30 transition-colors -mx-5 px-5">
+        <div className="flex items-center justify-between py-2.5 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors -mx-5 px-5">
             <span className="text-[11px] text-gray-500 shrink-0 w-24 font-medium">{label}</span>
             {copyable && onCopy && copyKey ? (
                 <button
@@ -171,7 +171,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
     const adminDepositConfirmedAt = formatTimestamp(order.adminDepositConfirmedAt)
 
     return (
-        <div className="w-full max-w-[480px] mx-auto space-y-4 font-sans">
+        <div className={`w-full max-w-[480px] mx-auto space-y-4 font-sans transition-opacity duration-300 ${order.taxInvoiceIssued ? 'opacity-60 saturate-[.60] hover:opacity-100 hover:saturate-100' : ''}`}>
 
             {/* ── 헤더 카드 (완전 라이트 테마) ── */}
             <div className="bg-white rounded-2xl border border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
@@ -192,9 +192,12 @@ export default function AdminOrderCard({ order }: { order: any }) {
                                     </span>
                                 )}
                             </div>
-                            <h2 className="text-[24px] font-black text-gray-900 tracking-tight mt-1.5 flex items-baseline gap-2">
-                                <span className="text-gray-300 font-medium text-[20px]">#</span>{orderNumber}
-                            </h2>
+                            <div className="flex items-baseline gap-3 mt-1.5 flex-wrap">
+                                <h2 className="text-[24px] font-black text-gray-900 tracking-tight flex items-baseline gap-1.5">
+                                    <span className="text-gray-300 font-medium text-[20px]">#</span>{orderNumber}
+                                </h2>
+                                <span className="text-[20px] font-bold text-gray-700">{partnerName}</span>
+                            </div>
                             <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 font-medium">
                                 <span>{formattedDate}</span>
                             </div>
