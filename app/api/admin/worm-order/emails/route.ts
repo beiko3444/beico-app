@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET() {
     const user = process.env.DAUM_IMAP_USER
     const pass = process.env.DAUM_IMAP_PASS
