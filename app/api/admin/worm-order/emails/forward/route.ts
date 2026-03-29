@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { ImapFlow } from 'imapflow'
-import { simpleParser } from 'mailparser'
 import nodemailer from 'nodemailer'
+import { getParsedMailByUid } from '@/lib/wormOrderMail'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,32 +18,8 @@ export async function POST(req: Request) {
 
         if (!user || !pass) return NextResponse.json({ error: '메일 서버 환경변수가 없습니다.' }, { status: 500 })
 
-        // 1. IMAP 접속으로 원본 메일 및 첨부파일 확보
-        const imapClient = new ImapFlow({
-            host: 'imap.daum.net',
-            port: 993,
-            secure: true,
-            auth: { user, pass },
-            logger: false,
-        })
-
-        await imapClient.connect()
-        let parsedMessage;
-        
-        try {
-            const lock = await imapClient.getMailboxLock('INBOX')
-            try {
-                const message = await imapClient.fetchOne(uid, { source: true }, { uid: true })
-                if (!message || !message.source) {
-                    return NextResponse.json({ error: '해당 원본 메일을 찾을 수 없습니다.' }, { status: 404 })
-                }
-                parsedMessage = await simpleParser(message.source)
-            } finally {
-                lock.release()
-            }
-        } finally {
-            await imapClient.logout()
-        }
+        // 1. 원본 메일 및 첨부파일 확보 (캐시 재사용)
+        const parsedMessage = await getParsedMailByUid(uid)
 
         if (!parsedMessage) throw new Error('원본 메일 파싱에 실패했습니다.')
 
@@ -58,7 +33,7 @@ export async function POST(req: Request) {
         const bodyText = `안녕하세요 관세사님-\n[${dateStr}] 엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.\n<직접배차>예정입니다- 감사합니다:)`
 
         // 3. 원본 첨부파일 추출
-        const attachments = (parsedMessage.attachments || []).map((att: any) => ({
+        const attachments = (parsedMessage.attachments || []).map((att) => ({
             filename: att.filename || 'attachment.dat',
             content: att.content,
             contentType: att.contentType
@@ -88,8 +63,9 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ success: true, message: '이메일 전달 성공' })
 
-    } catch (error: any) {
+    } catch (error: unknown) {
         console.error('Email Forward Error:', error)
-        return NextResponse.json({ error: error.message || '이메일 전달 실패' }, { status: 500 })
+        const message = error instanceof Error ? error.message : '이메일 전달 실패'
+        return NextResponse.json({ error: message }, { status: 500 })
     }
 }

@@ -220,6 +220,7 @@ model CardUsage {
   installmentMonths     String?
   currencyCode          String?
   memo                  String?
+  userMemo              String?
   raw                   Json?
   syncedAt              DateTime @default(now())
   createdAt             DateTime @default(now())

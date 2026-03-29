@@ -15,6 +15,30 @@ type AwbCandidate = {
     source: string
 }
 
+type WormEmailAttachment = {
+    filename: string
+    contentType: string
+    size: number
+    index: number
+}
+
+type WormEmailListItem = {
+    uid: string
+    subject: string
+    date: string
+    hasAttachments: boolean
+}
+
+type WormEmailDetail = {
+    uid: string
+    subject: string
+    date: string
+    text: string
+    hasAttachments: boolean
+    skmIndices: number[]
+    attachments: WormEmailAttachment[]
+}
+
 const WORM_SIZES: WormSize[] = [
     { id: 'LLLL', range: '160-220 PCs/kilo' },
     { id: 'LLL', range: '240-280 PCs/kilo' },
@@ -185,8 +209,10 @@ export default function WormOrderPage() {
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
     const dateInputRef = useRef<HTMLInputElement>(null)
 
-    const [emails, setEmails] = useState<any[]>([])
+    const [emails, setEmails] = useState<WormEmailListItem[]>([])
+    const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
     const [loadingEmails, setLoadingEmails] = useState(false)
+    const [loadingEmailDetail, setLoadingEmailDetail] = useState(false)
     const [emailError, setEmailError] = useState('')
     const [hasFetched, setHasFetched] = useState(false)
     const [selectedEmailUid, setSelectedEmailUid] = useState<string | null>(null)
@@ -356,19 +382,44 @@ export default function WormOrderPage() {
         }
     }, [ocrOnePdf])
 
+    const fetchEmailDetail = useCallback(async (uid: string): Promise<WormEmailDetail | null> => {
+        if (emailDetails[uid]) return emailDetails[uid]
+
+        setLoadingEmailDetail(true)
+        try {
+            const res = await fetch(`/api/admin/worm-order/emails/detail?uid=${encodeURIComponent(uid)}`)
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || '메일 상세 조회 실패')
+
+            setEmailDetails(prev => ({ ...prev, [uid]: data }))
+            return data
+        } catch (err: any) {
+            setEmailError(err.message || '메일 상세 조회 실패')
+            return null
+        } finally {
+            setLoadingEmailDetail(false)
+        }
+    }, [emailDetails])
+
+    const handleRunSelectedAwbOcr = useCallback(async () => {
+        if (!selectedEmailUid) return
+        const detail = emailDetails[selectedEmailUid] || await fetchEmailDetail(selectedEmailUid)
+        if (!detail) return
+        if (!detail.skmIndices || detail.skmIndices.length === 0) {
+            setAwbError('선택한 메일에 SKM 첨부파일이 없어 OCR을 실행할 수 없습니다.')
+            return
+        }
+        runAwbOcr(selectedEmailUid, detail.skmIndices)
+    }, [selectedEmailUid, emailDetails, fetchEmailDetail, runAwbOcr])
+
     useEffect(() => {
         if (!selectedEmailUid) return
-        const email = emails.find((e: any) => e.uid === selectedEmailUid)
-        if (email && email.skmIndices && email.skmIndices.length > 0) {
-            runAwbOcr(email.uid, email.skmIndices)
-        } else {
-            setAwbNumber(null)
-            setAwbCandidates([])
-            setAwbLoading(false)
-            setAwbError('')
-        }
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedEmailUid])
+        setAwbNumber(null)
+        setAwbCandidates([])
+        setAwbLoading(false)
+        setAwbError('')
+        fetchEmailDetail(selectedEmailUid)
+    }, [selectedEmailUid, fetchEmailDetail])
 
     useEffect(() => {
         fetchEmails()
@@ -380,6 +431,7 @@ export default function WormOrderPage() {
         setEmailError('')
         setHasFetched(false)
         setSelectedEmailUid(null)
+        setEmailDetails({})
         setFetchProgress(0)
 
         // 가짜(Fake) 프로그레스 메이커 (로딩 중일 때 90%까지 꾸준히 증가)
@@ -398,7 +450,7 @@ export default function WormOrderPage() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to fetch emails')
             
-            const fetchedEmails = data.emails || []
+            const fetchedEmails: WormEmailListItem[] = data.emails || []
             setEmails(fetchedEmails)
             if (fetchedEmails.length > 0) {
                 setSelectedEmailUid(fetchedEmails[0].uid)
@@ -896,8 +948,19 @@ export default function WormOrderPage() {
                                 {emails.length > 0 ? "좌측에서 메일을 선택하시면 내용이 표시됩니다." : ""}
                             </div>
                         ) : (() => {
-                            const selectedEmail = emails.find(e => e.uid === selectedEmailUid)
-                            if (!selectedEmail) return null
+                            const selectedEmailBase = emails.find(e => e.uid === selectedEmailUid)
+                            const selectedEmailDetail = selectedEmailUid ? emailDetails[selectedEmailUid] : null
+                            if (!selectedEmailBase) return null
+
+                            const selectedEmail = {
+                                uid: selectedEmailBase.uid,
+                                subject: selectedEmailDetail?.subject || selectedEmailBase.subject,
+                                date: selectedEmailDetail?.date || selectedEmailBase.date,
+                                text: selectedEmailDetail?.text || '',
+                                hasAttachments: selectedEmailDetail?.hasAttachments ?? selectedEmailBase.hasAttachments,
+                                skmIndices: selectedEmailDetail?.skmIndices || [],
+                                attachments: selectedEmailDetail?.attachments || [],
+                            }
                             return (
                                 <div className="flex flex-col h-full max-h-[600px]">
                                     {/* 상세 헤더 */}
@@ -905,6 +968,25 @@ export default function WormOrderPage() {
                                         <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">{selectedEmail.subject}</h2>
                                         <div className="flex items-center gap-3 text-[12px] text-gray-500 font-medium tracking-tight">
                                             <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
+                                        </div>
+
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <button
+                                                onClick={handleRunSelectedAwbOcr}
+                                                disabled={loadingEmailDetail || awbLoading || selectedEmail.skmIndices.length === 0}
+                                                className="h-9 px-3 rounded-lg bg-slate-800 text-white text-[12px] font-bold disabled:opacity-50"
+                                            >
+                                                {awbLoading ? 'OCR 실행중...' : 'AWB OCR 실행'}
+                                            </button>
+                                            {loadingEmailDetail ? (
+                                                <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
+                                            ) : (
+                                                <span className="text-[12px] text-slate-500 font-medium">
+                                                    {selectedEmail.skmIndices.length > 0
+                                                        ? `SKM 첨부파일 ${selectedEmail.skmIndices.length}개`
+                                                        : 'SKM 첨부파일이 없습니다.'}
+                                                </span>
+                                            )}
                                         </div>
                                         
                                         {/* AIR WAYBILL OCR 결과 */}
@@ -975,9 +1057,9 @@ export default function WormOrderPage() {
                                         )}
 
                                         {/* 첨부파일 다운로드 */}
-                                        {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
+                                        {selectedEmail.attachments.length > 0 && (
                                             <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2">
-                                                {selectedEmail.attachments.map((att: any) => (
+                                                {selectedEmail.attachments.map((att) => (
                                                     <a
                                                         key={att.index}
                                                         href={`/api/admin/worm-order/emails/attachment?uid=${selectedEmail.uid}&index=${att.index}`}
@@ -1027,11 +1109,18 @@ export default function WormOrderPage() {
                                     </div>
                                     {/* 메일 본문 내용 */}
                                     <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
-                                        <div 
-                                            className="w-full text-gray-800 break-words leading-relaxed max-w-none"
-                                            style={{ whiteSpace: selectedEmail.text.includes('<html') ? 'normal' : 'pre-wrap' }}
-                                            dangerouslySetInnerHTML={{ __html: selectedEmail.text }} 
-                                        />
+                                        {loadingEmailDetail && !selectedEmail.text ? (
+                                            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
+                                                <Loader2 size={16} className="animate-spin mr-2" />
+                                                메일 본문을 불러오는 중...
+                                            </div>
+                                        ) : (
+                                            <div 
+                                                className="w-full text-gray-800 break-words leading-relaxed max-w-none"
+                                                style={{ whiteSpace: selectedEmail.text.includes('<html') ? 'normal' : 'pre-wrap' }}
+                                                dangerouslySetInnerHTML={{ __html: selectedEmail.text || '' }} 
+                                            />
+                                        )}
                                     </div>
                                 </div>
                             )

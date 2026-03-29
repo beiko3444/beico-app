@@ -88,3 +88,44 @@ export async function GET(request: Request) {
     )
   }
 }
+
+export async function PATCH(request: Request) {
+  try {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+      return NextResponse.json({ error: '권한이 없습니다.' }, { status: 403 })
+    }
+
+    const body = await request.json()
+    const id = String(body?.id || '').trim()
+    const memoInput = typeof body?.memo === 'string' ? body.memo : ''
+
+    if (!id) {
+      return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
+    }
+
+    const userMemo = memoInput.trim() ? memoInput.trim() : null
+
+    const updated = await prisma.cardUsage.update({
+      where: { id },
+      data: { userMemo },
+      select: {
+        id: true,
+        userMemo: true,
+        updatedAt: true,
+      },
+    })
+
+    return NextResponse.json({
+      success: true,
+      item: updated,
+    })
+  } catch (error: unknown) {
+    console.error('[CardUsage PATCH] error:', error)
+    const message = error instanceof Error ? error.message : '메모 저장 실패'
+    return NextResponse.json(
+      { error: message },
+      { status: 500 },
+    )
+  }
+}

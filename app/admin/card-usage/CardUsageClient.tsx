@@ -18,6 +18,7 @@ type CardUsageItem = {
   installmentMonths: string | null
   currencyCode: string | null
   memo: string | null
+  userMemo: string | null
   syncedAt: string
 }
 
@@ -73,6 +74,8 @@ export default function CardUsageClient() {
   const [refreshBeforeFetch, setRefreshBeforeFetch] = useState(false)
   const [error, setError] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
+  const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
+  const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
 
   const load = useCallback(async (targetPage = page) => {
     setLoading(true)
@@ -93,6 +96,11 @@ export default function CardUsageClient() {
         throw new Error(json.error || '카드 사용내역 조회 실패')
       }
       setData(json)
+      const nextDrafts: Record<string, string> = {}
+      ;(json.items || []).forEach((item: CardUsageItem) => {
+        nextDrafts[item.id] = item.userMemo ?? item.memo ?? ''
+      })
+      setMemoDrafts(nextDrafts)
       setPage(targetPage)
     } catch (err: unknown) {
       setError(errorMessage(err))
@@ -139,6 +147,39 @@ export default function CardUsageClient() {
       setError(errorMessage(err))
     } finally {
       setSyncing(false)
+    }
+  }
+
+  const handleSaveMemo = async (item: CardUsageItem) => {
+    const memo = memoDrafts[item.id] ?? ''
+    setSavingMemoId(item.id)
+    setError('')
+    setSyncMessage('')
+    try {
+      const res = await fetch('/api/admin/card-usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, memo }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        throw new Error(json.error || '메모 저장 실패')
+      }
+
+      setData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          items: prev.items.map((row) => (
+            row.id === item.id ? { ...row, userMemo: json.item?.userMemo ?? null } : row
+          )),
+        }
+      })
+      setSyncMessage('메모가 저장되었습니다.')
+    } catch (err: unknown) {
+      setError(errorMessage(err))
+    } finally {
+      setSavingMemoId(null)
     }
   }
 
@@ -265,7 +306,25 @@ export default function CardUsageClient() {
                       {(item.totalAmount || 0).toLocaleString()}원
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{item.currencyCode || 'KRW'}</td>
-                    <td className="px-4 py-3">{item.memo || '-'}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2 min-w-[220px]">
+                        <input
+                          type="text"
+                          value={memoDrafts[item.id] ?? ''}
+                          onChange={(e) => setMemoDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
+                          placeholder={item.memo || '메모 입력'}
+                          className="h-8 px-2 w-full rounded-md border border-gray-300 text-xs"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveMemo(item)}
+                          disabled={savingMemoId === item.id}
+                          className="h-8 px-2.5 rounded-md border border-gray-300 bg-gray-50 text-xs font-bold whitespace-nowrap disabled:opacity-60"
+                        >
+                          {savingMemoId === item.id ? '저장중' : '저장'}
+                        </button>
+                      </div>
+                    </td>
                   </tr>
                 ))
               ) : (
