@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles } from 'lucide-react'
+import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles, Mail } from 'lucide-react'
 
 type WormSize = {
     id: string
@@ -41,6 +41,25 @@ export default function WormOrderPage() {
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
     const dateInputRef = useRef<HTMLInputElement>(null)
+
+    const [emails, setEmails] = useState<any[]>([])
+    const [loadingEmails, setLoadingEmails] = useState(false)
+    const [emailError, setEmailError] = useState('')
+
+    const fetchEmails = async () => {
+        setLoadingEmails(true)
+        setEmailError('')
+        try {
+            const res = await fetch('/api/admin/worm-order/emails')
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Failed to fetch emails')
+            setEmails(data.emails || [])
+        } catch (err: any) {
+            setEmailError(err.message)
+        } finally {
+            setLoadingEmails(false)
+        }
+    }
 
     const selectedOrders = useMemo(() => {
         return WORM_SIZES
@@ -426,6 +445,46 @@ export default function WormOrderPage() {
                 {remittanceSuccess && (
                     <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
                 )}
+            </div>
+
+            {/* ── 최근 메일 조회 (INBOX) ── */}
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-[#f8fafc] flex items-center justify-between">
+                    <div>
+                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em]">INBOX</p>
+                        <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
+                            <Mail size={18} className="text-slate-500" /> Recent Replies (Michael)
+                        </h2>
+                    </div>
+                    <button
+                        onClick={fetchEmails}
+                        disabled={loadingEmails}
+                        className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors"
+                    >
+                        {loadingEmails && <Loader2 size={14} className="animate-spin" />}
+                        {loadingEmails ? 'Loading...' : 'Fetch Emails'}
+                    </button>
+                </div>
+                <div className="p-0">
+                    {emailError && <div className="p-6 text-sm text-red-500 font-medium text-center">{emailError}</div>}
+                    {!loadingEmails && emails.length === 0 && !emailError && (
+                        <div className="p-10 text-center text-sm text-gray-500">Click "Fetch Emails" to load recent messages from michael@oikki.com.</div>
+                    )}
+                    {emails.map((email) => (
+                        <div key={email.uid} className="border-b border-gray-100 last:border-0 p-5 hover:bg-slate-50 transition-colors">
+                            <div className="flex justify-between items-start mb-2">
+                                <h3 className="font-bold text-gray-900 text-[15px] max-w-[80%] leading-tight">{email.subject}</h3>
+                                <span className="text-[12px] text-gray-400 font-medium whitespace-nowrap">{new Date(email.date).toLocaleString()}</span>
+                            </div>
+                            <div className="text-[13px] text-gray-600 line-clamp-3 overflow-hidden text-ellipsis leading-relaxed" dangerouslySetInnerHTML={{ __html: email.text }} />
+                            {email.hasAttachments && (
+                                <span className="inline-flex items-center gap-1 mt-3 text-[11px] font-bold text-[#e34219] bg-[#fff7f3] px-2 py-0.5 rounded border border-[#ffeadd]">
+                                    📎 첨부파일 있음 (Daum 메일함 확인)
+                                </span>
+                            )}
+                        </div>
+                    ))}
+                </div>
             </div>
         </div>
     )

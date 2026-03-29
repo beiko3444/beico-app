@@ -10,7 +10,6 @@ function ProgressSteps({ status, trackingNumber, taxInvoiceIssued }: {
     trackingNumber?: string | null;
     taxInvoiceIssued?: boolean;
 }) {
-    const isDark = taxInvoiceIssued === true;
     const steps = [
         { label: '주문접수', key: 'ORDERED' },
         { label: '입금대기', key: 'PENDING_DEPOSIT' },
@@ -42,7 +41,7 @@ function ProgressSteps({ status, trackingNumber, taxInvoiceIssued }: {
                                 w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-black transition-all z-10
                                 ${isDone ? 'bg-orange-500 text-white shadow-sm shadow-orange-500/30' :
                                     isCurrent ? 'bg-white text-orange-600 border-[2.5px] border-orange-500 shadow-sm' :
-                                        (isDark ? 'bg-gray-800 text-gray-500 border border-gray-700' : 'bg-gray-50 text-gray-400 border border-gray-200')}
+                                        'bg-gray-50 text-gray-400 border border-gray-200'}
                             `}>
                                 {isDone ? (
                                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -54,14 +53,14 @@ function ProgressSteps({ status, trackingNumber, taxInvoiceIssued }: {
                             </div>
                             <span className={`text-[9px] mt-1.5 font-bold whitespace-nowrap
                                 ${isDone ? 'text-orange-600' :
-                                    isCurrent ? (isDark ? 'text-gray-100' : 'text-gray-900') :
-                                        (isDark ? 'text-gray-500' : 'text-gray-400')}
+                                    isCurrent ? 'text-gray-900' :
+                                        'text-gray-400'}
                             `}>
                                 {step.label}
                             </span>
                         </div>
                         {index < steps.length - 1 && (
-                            <div className={`flex-1 h-[2px] mx-1 mb-4 ${index < currentIndex ? 'bg-orange-400' : (isDark ? 'bg-gray-800' : 'bg-gray-100')}`} />
+                            <div className={`flex-1 h-[2px] mx-1 mb-4 ${index < currentIndex ? 'bg-orange-400' : 'bg-gray-100'}`} />
                         )}
                     </React.Fragment>
                 )
@@ -71,14 +70,14 @@ function ProgressSteps({ status, trackingNumber, taxInvoiceIssued }: {
 }
 
 // ── 섹션 래퍼 ──────────────────────────────────────────────────────
-function Section({ title, icon, isDark, children }: { title: string; icon: React.ReactNode; isDark?: boolean; children: React.ReactNode }) {
+function Section({ title, icon, children }: { title: string; icon: React.ReactNode; children: React.ReactNode }) {
     return (
-        <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-gray-900 border-gray-800 shadow-none' : 'bg-white border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)]'}`}>
-            <div className={`flex items-center gap-2 px-5 py-3.5 border-b ${isDark ? 'bg-gray-800/50 border-gray-800' : 'bg-gray-50/50 border-gray-100'}`}>
-                <span className={isDark ? "text-gray-600" : "text-gray-400"}>{icon}</span>
-                <span className={`text-[12px] font-bold tracking-tight ${isDark ? 'text-gray-400' : 'text-gray-700'}`}>{title}</span>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-[0_2px_12px_rgba(0,0,0,0.03)] overflow-hidden">
+            <div className="flex items-center gap-2 px-5 py-3.5 bg-gray-50/50 border-b border-gray-100">
+                <span className="text-gray-400">{icon}</span>
+                <span className="text-[12px] font-bold text-gray-700 tracking-tight">{title}</span>
             </div>
-            <div className={`px-5 py-4 ${isDark ? 'text-gray-300' : ''}`}>
+            <div className="px-5 py-4">
                 {children}
             </div>
         </div>
@@ -86,32 +85,31 @@ function Section({ title, icon, isDark, children }: { title: string; icon: React
 }
 
 // ── 정보 행 ────────────────────────────────────────────────────────
-function InfoRow({ label, value, copyable, copyKey, copiedField, onCopy, isDark }: {
+function InfoRow({ label, value, copyable, copyKey, copiedField, onCopy }: {
     label: string
     value: string
     copyable?: boolean
     copyKey?: string
     copiedField?: string | null
     onCopy?: (text: string, key: string) => void
-    isDark?: boolean
 }) {
     if (!value || value === '-') return null
 
     return (
-        <div className={`flex items-center justify-between py-2.5 border-b last:border-0 transition-colors -mx-5 px-5 ${isDark ? 'border-gray-800 hover:bg-gray-800/50' : 'border-gray-200 hover:bg-gray-50'}`}>
-            <span className={`text-[11px] shrink-0 w-24 font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>{label}</span>
+        <div className="flex items-center justify-between py-2.5 border-b border-gray-200 last:border-0 hover:bg-gray-50 transition-colors -mx-5 px-5">
+            <span className="text-[11px] text-gray-500 shrink-0 w-24 font-medium">{label}</span>
             {copyable && onCopy && copyKey ? (
                 <button
                     onClick={() => onCopy(value, copyKey)}
-                    className={`flex items-center gap-1.5 text-[12px] font-bold transition-colors text-right ${isDark ? 'text-gray-300 hover:text-orange-400' : 'text-gray-800 hover:text-orange-500'}`}
+                    className="flex items-center gap-1.5 text-[12px] font-bold text-gray-800 hover:text-orange-500 transition-colors text-right"
                 >
                     <span className="truncate max-w-[200px]">{value}</span>
                     {copiedField === copyKey
                         ? <Check size={12} className="text-emerald-500 shrink-0" />
-                        : <Copy size={12} className={`${isDark ? 'text-gray-600' : 'text-gray-300'} shrink-0`} />}
+                        : <Copy size={12} className="text-gray-300 shrink-0" />}
                 </button>
             ) : (
-                <span className={`text-[12px] font-bold text-right max-w-[230px] break-words ${isDark ? 'text-gray-300' : 'text-gray-800'}`}>{value}</span>
+                <span className="text-[12px] font-bold text-gray-800 text-right max-w-[230px] break-words">{value}</span>
             )}
         </div>
     )
@@ -171,188 +169,193 @@ export default function AdminOrderCard({ order }: { order: any }) {
 
     const depositConfirmedAt = formatTimestamp(order.depositConfirmedAt)
     const adminDepositConfirmedAt = formatTimestamp(order.adminDepositConfirmedAt)
-    const isDark = order.taxInvoiceIssued === true
 
     return (
-        <div className={`w-full max-w-[480px] mx-auto space-y-4 font-sans transition-all duration-300`}>
-
-            {/* ── 헤더 카드 ── */}
-            <div className={`rounded-2xl border overflow-hidden ${isDark ? 'bg-gray-900 border-gray-800 shadow-none' : 'bg-white border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.04)]'}`}>
-                <div className="px-6 pt-5 pb-4">
-                    <div className="flex items-start justify-between">
-                        <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${grade.bg} ${grade.text}`}>
-                                    {partnerGrade} 등급
-                                </span>
-                                {order.taxInvoiceIssued ? (
-                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100">
-                                        ✅ 계산서 완료
+        <div className="relative w-full max-w-[480px] mx-auto font-sans">
+            {/* Multiply Blend Layer for Completed */}
+            {order.taxInvoiceIssued && (
+                <div className="absolute inset-[-16px] z-50 bg-[#1e293b]/50 mix-blend-multiply pointer-events-none rounded-[2rem] shadow-[inset_0_0_100px_rgba(30,41,59,0.3)] transition-opacity" />
+            )}
+            
+            <div className={`space-y-4 ${order.taxInvoiceIssued ? 'opacity-95' : ''}`}>
+                {/* ── 헤더 카드 (완전 라이트 테마) ── */}
+                <div className="bg-white rounded-2xl border border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
+                    <div className="px-6 pt-5 pb-4">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <div className="flex items-center gap-2 mb-1">
+                                    <span className={`text-[10px] font-black px-2 py-0.5 rounded-md ${grade.bg} ${grade.text}`}>
+                                        {partnerGrade} 등급
                                     </span>
-                                ) : (
-                                    <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-100">
-                                        ⚠️ 계산서 미발행
-                                    </span>
-                                )}
-                            </div>
-                            <div className="flex items-baseline gap-3 mt-1.5 flex-wrap">
-                                <h2 className={`text-[24px] font-black tracking-tight flex items-baseline gap-1.5 ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                                    <span className={`font-medium text-[20px] ${isDark ? 'text-gray-600' : 'text-gray-300'}`}>#</span>{orderNumber}
-                                </h2>
-                                <span className={`text-[20px] font-bold ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>{partnerName}</span>
-                            </div>
-                            <div className={`flex items-center gap-1.5 mt-1 text-[11px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                <span>{formattedDate}</span>
-                            </div>
-                        </div>
-                        <button
-                            onClick={handleDelete}
-                            disabled={isDeleting}
-                            className="w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                        >
-                            <Trash2 size={15} />
-                        </button>
-                    </div>
-
-                    <div className="mt-5 pt-5 border-t border-gray-100">
-                        <ProgressSteps
-                            status={order.status}
-                            trackingNumber={order.trackingNumber}
-                            taxInvoiceIssued={order.taxInvoiceIssued}
-                        />
-                    </div>
-                </div>
-            </div>
-
-            {/* ── 거래처 정보 ── */}
-            <Section title="거래처 정보" icon={<Building2 size={14} />} isDark={isDark}>
-                <div className="flex flex-col">
-                    <InfoRow label="사업자번호" value={order.user.partnerProfile?.businessRegNumber || '-'} copyable copyKey="biz" copiedField={copiedField} onCopy={copyToClipboard} isDark={isDark} />
-                    <InfoRow label="상호" value={partnerName} copyable copyKey="partnerName" copiedField={copiedField} onCopy={copyToClipboard} isDark={isDark} />
-                    <InfoRow label="성명" value={representativeName} copyable copyKey="repName" copiedField={copiedField} onCopy={copyToClipboard} isDark={isDark} />
-                    <InfoRow label="이메일" value={order.user.partnerProfile?.email || '-'} copyable copyKey="email" copiedField={copiedField} onCopy={copyToClipboard} isDark={isDark} />
-                    <InfoRow label="연락처" value={order.user.partnerProfile?.contact || '-'} isDark={isDark} />
-                    <InfoRow label="배송지" value={order.user.partnerProfile?.address || '-'} isDark={isDark} />
-                </div>
-            </Section>
-
-            {/* ── 배송 정보 + 액션 ── */}
-            <Section title="배송 처리" icon={<Truck size={14} />} isDark={isDark}>
-                <div className="mb-3">
-                    <OrderActions order={order} />
-                </div>
-                {(depositConfirmedAt || adminDepositConfirmedAt) && (
-                    <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-x-4 gap-y-2">
-                        {depositConfirmedAt && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-gray-500 font-medium">거래처 확인</span>
-                                <span className="text-[11px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded flex items-center gap-1">
-                                    <Check size={10} /> {depositConfirmedAt}
-                                </span>
-                            </div>
-                        )}
-                        {adminDepositConfirmedAt && (
-                            <div className="flex items-center gap-2">
-                                <span className="text-[11px] text-gray-500 font-medium">관리자 확인</span>
-                                <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1">
-                                    <Check size={10} /> {adminDepositConfirmedAt}
-                                </span>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </Section>
-
-            {/* ── 주문 상품 ── */}
-            <Section title={`주문 상품 (총 ${totalQuantity.toLocaleString()}개)`} icon={<Package size={14} />} isDark={isDark}>
-                <div className="flex flex-col">
-                    {order.items.map((item: any) => {
-                        const supplyPrice = item.price * item.quantity
-                        const vat = Math.round(supplyPrice * 0.1)
-                        const lineTotal = supplyPrice + vat
-                        return (
-                            <div key={item.id} className={`flex gap-4 py-3 border-b last:border-b-0 ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
-                                {/* 상품 이미지 */}
-                                <div className={`w-14 h-14 rounded-xl shrink-0 overflow-hidden border flex items-center justify-center ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-gray-50 border-gray-100'}`}>
-                                    {item.product.imageUrl ? (
-                                        <img src={item.product.imageUrl} alt="" className="w-full h-full object-cover" />
+                                    {order.taxInvoiceIssued ? (
+                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-100">
+                                            ✅ 계산서 완료
+                                        </span>
                                     ) : (
-                                        <Package size={20} className="text-gray-300" />
+                                        <span className="text-[10px] font-black px-2 py-0.5 rounded-md bg-orange-50 text-orange-600 border border-orange-100">
+                                            ⚠️ 계산서 미발행
+                                        </span>
                                     )}
                                 </div>
-                                {/* 상품 정보 */}
-                                <div className="flex-1 min-w-0 flex flex-col justify-center">
-                                    <button
-                                        onClick={() => copyToClipboard(item.product.name, `prodName-${item.id}`)}
-                                        className={`flex items-center gap-1.5 text-[14px] font-bold transition-colors text-left w-full ${isDark ? 'text-gray-200 hover:text-orange-400' : 'text-gray-900 hover:text-orange-500'}`}
-                                    >
-                                        <span className="truncate">{item.product.name}</span>
-                                        {copiedField === `prodName-${item.id}`
-                                            ? <Check size={12} className="text-emerald-500 shrink-0" />
-                                            : <Copy size={12} className="text-gray-300 shrink-0" />}
-                                    </button>
-                                    <div className="mt-1.5 flex items-center gap-2">
-                                        <span className={`inline-flex items-center justify-center text-[11px] font-black px-2 py-0.5 rounded-md border ${isDark ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' : 'bg-orange-50 text-orange-600 border-orange-100'}`}>
-                                            {item.quantity.toLocaleString()}개
-                                        </span>
-                                        <span className={`text-[11px] ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>
-                                            단가 <strong className={isDark ? 'text-gray-300' : 'text-gray-700'}>{item.price.toLocaleString()}원</strong>
-                                        </span>
-                                    </div>
+                                <div className="flex items-baseline gap-3 mt-1.5 flex-wrap">
+                                    <h2 className="text-[24px] font-black text-gray-900 tracking-tight flex items-baseline gap-1.5">
+                                        <span className="text-gray-300 font-medium text-[20px]">#</span>{orderNumber}
+                                    </h2>
+                                    <span className="text-[20px] font-bold text-gray-700">{partnerName}</span>
                                 </div>
-                                {/* 소계 */}
-                                <div className="text-right shrink-0 self-center">
-                                    <div className={`text-[14px] font-black ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{lineTotal.toLocaleString()}<span className={`text-[10px] font-medium ml-0.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>원</span></div>
-                                    <div className={`text-[10px] mt-0.5 ${isDark ? 'text-gray-600' : 'text-gray-400'}`}>+ VAT 포함</div>
+                                <div className="flex items-center gap-1.5 mt-1 text-[11px] text-gray-500 font-medium">
+                                    <span>{formattedDate}</span>
                                 </div>
                             </div>
-                        )
-                    })}
+                            <button
+                                onClick={handleDelete}
+                                disabled={isDeleting}
+                                className="relative z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
+                            >
+                                <Trash2 size={15} />
+                            </button>
+                        </div>
 
-                    {/* 배송비 */}
-                    {shippingFee > 0 && (
-                        <div className={`flex items-center justify-between py-3 border-b -mx-5 px-5 ${isDark ? 'border-gray-800 bg-gray-800/50' : 'border-gray-100 bg-gray-50/50'}`}>
-                            <div className="flex items-center gap-2">
-                                <div className={`w-8 h-8 rounded-full shadow-sm border flex items-center justify-center ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'}`}>
-                                    <Truck size={14} className={isDark ? "text-gray-500" : "text-gray-400"} />
+                        <div className="mt-5 pt-5 border-t border-gray-100">
+                            <ProgressSteps
+                                status={order.status}
+                                trackingNumber={order.trackingNumber}
+                                taxInvoiceIssued={order.taxInvoiceIssued}
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                {/* ── 거래처 정보 ── */}
+                <Section title="거래처 정보" icon={<Building2 size={14} className="text-gray-400" />}>
+                    <div className="flex flex-col relative z-10">
+                        <InfoRow label="사업자번호" value={order.user.partnerProfile?.businessRegNumber || '-'} copyable copyKey="biz" copiedField={copiedField} onCopy={copyToClipboard} />
+                        <InfoRow label="상호" value={partnerName} copyable copyKey="partnerName" copiedField={copiedField} onCopy={copyToClipboard} />
+                        <InfoRow label="성명" value={representativeName} copyable copyKey="repName" copiedField={copiedField} onCopy={copyToClipboard} />
+                        <InfoRow label="이메일" value={order.user.partnerProfile?.email || '-'} copyable copyKey="email" copiedField={copiedField} onCopy={copyToClipboard} />
+                        <InfoRow label="연락처" value={order.user.partnerProfile?.contact || '-'} />
+                        <InfoRow label="배송지" value={order.user.partnerProfile?.address || '-'} />
+                    </div>
+                </Section>
+
+                {/* ── 배송 정보 + 액션 ── */}
+                <Section title="배송 처리" icon={<Truck size={14} className="text-gray-400" />}>
+                    <div className="mb-3 relative z-10">
+                        <OrderActions order={order} />
+                    </div>
+                    {(depositConfirmedAt || adminDepositConfirmedAt) && (
+                        <div className="pt-3 border-t border-gray-100 flex flex-wrap gap-x-4 gap-y-2">
+                            {depositConfirmedAt && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-500 font-medium">거래처 확인</span>
+                                    <span className="text-[11px] font-bold text-gray-700 bg-gray-100 px-2 py-0.5 rounded flex items-center gap-1">
+                                        <Check size={10} /> {depositConfirmedAt}
+                                    </span>
                                 </div>
-                                <div>
-                                    <span className={`text-[12px] font-bold ${isDark ? 'text-gray-300' : 'text-gray-800'}`}>배송비</span>
-                                    <span className={`text-[10px] ml-1.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>(VAT 포함)</span>
+                            )}
+                            {adminDepositConfirmedAt && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[11px] text-gray-500 font-medium">관리자 확인</span>
+                                    <span className="text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1">
+                                        <Check size={10} /> {adminDepositConfirmedAt}
+                                    </span>
                                 </div>
-                            </div>
-                            <span className={`text-[14px] font-black ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>{shippingFee.toLocaleString()}<span className={`text-[10px] font-medium ml-0.5 ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>원</span></span>
+                            )}
                         </div>
                     )}
-                </div>
+                </Section>
 
-                {/* ── 최종 합계 ── */}
-                <div className={`mt-4 pt-4 border-t-2 ${isDark ? 'border-gray-800' : 'border-gray-100'}`}>
-                    <div className="flex flex-col gap-2 mb-4">
-                        <div className="flex items-center justify-between">
-                            <span className={`text-[12px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>공급가액</span>
-                            <span className={`text-[13px] font-bold ${isDark ? 'text-gray-400' : 'text-gray-700'}`}>{grandSupply.toLocaleString()}원</span>
+                {/* ── 주문 상품 ── */}
+                <Section title={`주문 상품 (총 ${totalQuantity.toLocaleString()}개)`} icon={<Package size={14} className="text-gray-400" />}>
+                    <div className="flex flex-col relative z-10">
+                        {order.items.map((item: any) => {
+                            const supplyPrice = item.price * item.quantity
+                            const vat = Math.round(supplyPrice * 0.1)
+                            const lineTotal = supplyPrice + vat
+                            return (
+                                <div key={item.id} className="flex gap-4 py-3 border-b border-gray-100 last:border-b-0">
+                                    {/* 상품 이미지 */}
+                                    <div className="w-14 h-14 rounded-xl bg-gray-50 shrink-0 overflow-hidden border border-gray-100 flex items-center justify-center">
+                                        {item.product.imageUrl ? (
+                                            <img src={item.product.imageUrl} alt="" className="w-full h-full object-cover" />
+                                        ) : (
+                                            <Package size={20} className="text-gray-300" />
+                                        )}
+                                    </div>
+                                    {/* 상품 정보 */}
+                                    <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                        <button
+                                            onClick={() => copyToClipboard(item.product.name, `prodName-${item.id}`)}
+                                            className="flex items-center gap-1.5 text-[14px] font-bold text-gray-900 hover:text-orange-500 transition-colors text-left w-full"
+                                        >
+                                            <span className="truncate">{item.product.name}</span>
+                                            {copiedField === `prodName-${item.id}`
+                                                ? <Check size={12} className="text-emerald-500 shrink-0" />
+                                                : <Copy size={12} className="text-gray-300 shrink-0" />}
+                                        </button>
+                                        <div className="mt-1.5 flex items-center gap-2">
+                                            <span className="inline-flex items-center justify-center bg-orange-50 text-orange-600 text-[11px] font-black px-2 py-0.5 rounded-md border border-orange-100">
+                                                {item.quantity.toLocaleString()}개
+                                            </span>
+                                            <span className="text-[11px] text-gray-500">
+                                                단가 <strong className="text-gray-700">{item.price.toLocaleString()}원</strong>
+                                            </span>
+                                        </div>
+                                    </div>
+                                    {/* 소계 */}
+                                    <div className="text-right shrink-0 self-center">
+                                        <div className="text-[14px] font-black text-gray-900">{lineTotal.toLocaleString()}<span className="text-[10px] text-gray-500 font-medium ml-0.5">원</span></div>
+                                        <div className="text-[10px] text-gray-400 mt-0.5">+ VAT 포함</div>
+                                    </div>
+                                </div>
+                            )
+                        })}
+
+                        {/* 배송비 */}
+                        {shippingFee > 0 && (
+                            <div className="flex items-center justify-between py-3 border-b border-gray-100 -mx-5 px-5 bg-gray-50/50">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-8 h-8 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center">
+                                        <Truck size={14} className="text-gray-400" />
+                                    </div>
+                                    <div>
+                                        <span className="text-[12px] font-bold text-gray-800">배송비</span>
+                                        <span className="text-[10px] text-gray-500 ml-1.5">(VAT 포함)</span>
+                                    </div>
+                                </div>
+                                <span className="text-[14px] font-black text-gray-900">{shippingFee.toLocaleString()}<span className="text-[10px] text-gray-500 font-medium ml-0.5">원</span></span>
+                            </div>
+                        )}
+                    </div>
+
+                    {/* ── 최종 합계 ── */}
+                    <div className="mt-4 pt-4 border-t-2 border-gray-100 relative z-10">
+                        <div className="flex flex-col gap-2 mb-4">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[12px] text-gray-500 font-medium">공급가액</span>
+                                <span className="text-[13px] font-bold text-gray-700">{grandSupply.toLocaleString()}원</span>
+                            </div>
+                            <div className="flex items-center justify-between">
+                                <span className="text-[12px] text-gray-500 font-medium">부가세 (10%)</span>
+                                <span className="text-[13px] font-bold text-gray-700">{grandVat.toLocaleString()}원</span>
+                            </div>
                         </div>
-                        <div className="flex items-center justify-between">
-                            <span className={`text-[12px] font-medium ${isDark ? 'text-gray-500' : 'text-gray-500'}`}>부가세 (10%)</span>
-                            <span className={`text-[13px] font-bold ${isDark ? 'text-gray-400' : 'text-gray-700'}`}>{grandVat.toLocaleString()}원</span>
+                        
+                        <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100/50 rounded-xl p-4 border border-orange-200/60 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)]">
+                            <div>
+                                <p className="text-[12px] text-orange-600 font-black">최종 결제금액</p>
+                                <p className="text-[10px] text-orange-500/80 font-medium mt-0.5 tracking-tight">모든 세금 포함</p>
+                            </div>
+                            <div className="text-right flex items-baseline gap-0.5">
+                                <span className="text-[28px] font-black text-orange-600 tracking-tight leading-none">
+                                    {totalAmount.toLocaleString()}
+                                </span>
+                                <span className="text-[14px] font-bold text-orange-500">원</span>
+                            </div>
                         </div>
                     </div>
-                    
-                    <div className={`flex items-center justify-between rounded-xl p-4 border shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)] ${isDark ? 'bg-gray-800/80 border-gray-700 shadow-none' : 'bg-gradient-to-r from-orange-50 to-orange-100/50 border-orange-200/60'}`}>
-                        <div>
-                            <p className="text-[12px] text-orange-600 font-black">최종 결제금액</p>
-                            <p className="text-[10px] text-orange-500/80 font-medium mt-0.5 tracking-tight">모든 세금 포함</p>
-                        </div>
-                        <div className="text-right flex items-baseline gap-0.5">
-                            <span className="text-[28px] font-black text-orange-600 tracking-tight leading-none">
-                                {totalAmount.toLocaleString()}
-                            </span>
-                            <span className="text-[14px] font-bold text-orange-500">원</span>
-                        </div>
-                    </div>
-                </div>
-            </Section>
+                </Section>
+            </div>
         </div>
     )
 }
