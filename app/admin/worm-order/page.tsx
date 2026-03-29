@@ -343,28 +343,31 @@ export default function WormOrderPage() {
                     <Sparkles size={18} className="text-[#e34219]" />
                 </div>
 
-                <div className="p-6 space-y-3">
+                <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                     {WORM_SIZES.map((size) => {
                         const current = quantities[size.id] || 0
+                        const isSelected = current > 0
 
                         return (
                             <div
                                 key={size.id}
-                                className="flex items-center justify-between gap-3 border border-gray-200 rounded-xl px-4 py-2.5"
+                                className={`flex flex-col gap-3 justify-between border rounded-xl p-4 transition-all duration-200 ${
+                                    isSelected ? 'border-[#e34219] bg-[#fff7f3] shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'
+                                }`}
                             >
                                 <div>
-                                    <div className="text-lg font-black text-[#111827] leading-none">{size.id}</div>
-                                    <div className="text-xs text-gray-500 mt-0.5">{size.range}</div>
+                                    <div className="text-[17px] font-black text-[#111827] leading-none">{size.id}</div>
+                                    <div className="text-[11px] text-gray-500 mt-1.5">{size.range}</div>
                                 </div>
 
-                                <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden w-fit">
+                                <div className={`flex items-center rounded-lg border overflow-hidden w-full transition-colors ${isSelected ? 'border-[#e34219]/30 bg-white' : 'border-gray-300 bg-white'}`}>
                                     <button
                                         type="button"
                                         onClick={() => handleQuantityChange(size.id, current - 1)}
-                                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                        className="w-10 h-[38px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
                                         aria-label={`${size.id} decrease`}
                                     >
-                                        <Minus size={16} />
+                                        <Minus size={15} />
                                     </button>
                                     <input
                                         type="number"
@@ -374,15 +377,15 @@ export default function WormOrderPage() {
                                             const next = Number(event.target.value)
                                             handleQuantityChange(size.id, Number.isFinite(next) ? next : 0)
                                         }}
-                                        className="w-14 h-9 text-center font-bold text-[#111827] outline-none"
+                                        className="flex-1 min-w-0 h-[38px] text-center font-black text-[#111827] outline-none text-[15px]"
                                     />
                                     <button
                                         type="button"
                                         onClick={() => handleQuantityChange(size.id, current + 1)}
-                                        className="w-9 h-9 flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                        className="w-10 h-[38px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
                                         aria-label={`${size.id} increase`}
                                     >
-                                        <Plus size={16} />
+                                        <Plus size={15} />
                                     </button>
                                 </div>
                             </div>
