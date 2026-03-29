@@ -28,36 +28,42 @@ export async function GET() {
         
         const lock = await client.getMailboxLock('INBOX')
         try {
-            // 제목에 'documents'가 포함된 메일 검색 (UID 배열 반환)
-            const uids = await client.search({ subject: 'documents' }, { uid: true })
+            const status = await client.status('INBOX', { messages: true })
+            const total = typeof status.messages === 'number' ? status.messages : 0
             
-            if (!uids || uids.length === 0) {
+            if (total === 0) {
                 return NextResponse.json({ emails: [] })
             }
 
-            // 최신 메일이 나중에 오므로, 배열의 뒷부분 5개만 가져오고 역순(최신순) 정렬
-            const recentUids = typeof uids === 'object' && Array.isArray(uids) 
-                                ? uids.slice(-5).reverse() 
-                                : Array.from((uids as Set<number>).values()).slice(-5).reverse()
+            // 최근 30개의 메일 시퀀스 범위 지정
+            const startSeq = Math.max(1, total - 30)
+            const seqRange = `${startSeq}:*`
 
             const emails = []
 
-            for (const uid of recentUids) {
-                const message = await client.fetchOne(uid, { source: true }, { uid: true })
+            // 순차적으로 메일을 가져오면서 Node.js 레벨에서 필터링 (Daum IMAP Search 오류 우회)
+            for await (const message of client.fetch(seqRange, { source: true })) {
                 if (message && message.source) {
                     const parsed = await simpleParser(message.source)
-                    emails.push({
-                        uid,
-                        subject: parsed.subject || '(제목 없음)',
-                        date: parsed.date,
-                        // HTML 본문 우선, 없으면 Text 본문 반환
-                        text: parsed.html || parsed.textAsHtml || parsed.text || '',
-                        hasAttachments: parsed.attachments && parsed.attachments.length > 0,
-                    })
+                    const subject = (parsed.subject || '').toLowerCase()
+                    
+                    if (subject.includes('document')) {
+                        emails.push({
+                            uid: message.uid,
+                            subject: parsed.subject || '(제목 없음)',
+                            date: parsed.date,
+                            text: parsed.html || parsed.textAsHtml || parsed.text || '',
+                            hasAttachments: parsed.attachments && parsed.attachments.length > 0,
+                        })
+                    }
                 }
             }
 
-            return NextResponse.json({ emails })
+            // 최신 날짜 순으로 정렬 후 상위 10개만 리턴
+            emails.sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())
+            const recentEmails = emails.slice(0, 10)
+
+            return NextResponse.json({ emails: recentEmails })
         } finally {
             lock.release()
         }
