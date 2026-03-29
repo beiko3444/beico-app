@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
-import { fetchCardUsageByPeriod, type BarobillCardApprovalLog } from '@/lib/barobillCard'
+import { fetchCardUsageByPeriod, type BarobillCardApprovalLog } from '../../../../../lib/barobillCard'
 
 export const dynamic = 'force-dynamic'
 

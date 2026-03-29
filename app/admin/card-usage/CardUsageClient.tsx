@@ -157,7 +157,7 @@ export default function CardUsageClient() {
       }
 
       setSyncMessage(
-        `동기화 완료: 조회 ${json.fetchedCount?.toLocaleString?.() ?? 0}건 / 저장 ${json.storedCount?.toLocaleString?.() ?? 0}건`,
+        `동기화 완료: 조회 ${json.fetchedCount?.toLocaleString?.() ?? 0}건 / 저장 ${json.storedCount?.toLocaleString?.() ?? 0}건 / 금액확인 ${json.amountResolvedCount?.toLocaleString?.() ?? 0}건 / 금액없음 ${json.amountMissingCount?.toLocaleString?.() ?? 0}건`,
       )
       await load(1)
     } catch (err: unknown) {
