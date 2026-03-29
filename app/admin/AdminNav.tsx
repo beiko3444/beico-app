@@ -8,12 +8,12 @@ export default function AdminNav({ counts }: { counts?: { pendingOrders: number,
     const pathname = usePathname()
 
     const navItems = [
-        { name: '대시보드', path: '/admin' },
         { name: '주문관리', path: '/admin/orders', count: counts?.pendingOrders },
         { name: '상품관리', path: '/admin/products', count: counts?.lowStock },
         { name: '파트너관리', path: '/admin/partners', count: counts?.pendingPartners },
         { name: '생산관리', path: '/admin/production' },
         { name: '업무관리', path: '/admin/tasks' },
+        { name: '카드사용내역', path: '/admin/card-usage' },
         { name: '지렁이 발주', path: '/admin/worm-order' },
         { name: 'P.I발급', path: '/admin/proforma' },
         { name: '전력관리', path: '/admin/electricity', alert: counts?.missingBill && counts.missingBill > 0 },

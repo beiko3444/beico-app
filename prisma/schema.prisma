@@ -192,3 +192,41 @@ model ProformaInvoiceItem {
   proformaInvoice   ProformaInvoice @relation(fields: [proformaInvoiceId], references: [id], onDelete: Cascade)
   product           Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
+
+model CardUsage {
+  id                    String   @id @default(uuid())
+  corpNum               String
+  cardNum               String
+  useKey                String
+  useDT                 String
+  usedAt                DateTime?
+  approvalType          String?
+  approvalNum           String?
+  approvalAmount        Int?
+  foreignApprovalAmount Float?
+  amount                Int?
+  tax                   Int?
+  serviceCharge         Int?
+  totalAmount           Int?
+  useStoreNum           String?
+  useStoreCorpNum       String?
+  useStoreTaxType       Int?
+  useStoreName          String?
+  useStoreCeo           String?
+  useStoreAddr          String?
+  useStoreBizType       String?
+  useStoreTel           String?
+  paymentPlan           String?
+  installmentMonths     String?
+  currencyCode          String?
+  memo                  String?
+  raw                   Json?
+  syncedAt              DateTime @default(now())
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@unique([corpNum, cardNum, useKey])
+  @@index([usedAt])
+  @@index([cardNum])
+  @@index([approvalNum])
+}

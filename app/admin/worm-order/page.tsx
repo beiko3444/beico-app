@@ -51,6 +51,14 @@ function normalizeOcrDigits(input: string) {
     return normalizeOcrPatternText(input).replace(/[^\d]/g, '')
 }
 
+function isValidAwbByCheckDigit(awb11: string) {
+    if (!/^\d{11}$/.test(awb11)) return false
+    const serial7 = parseInt(awb11.slice(3, 10), 10)
+    const checkDigit = parseInt(awb11.slice(10), 10)
+    if (!Number.isFinite(serial7) || !Number.isFinite(checkDigit)) return false
+    return serial7 % 7 === checkDigit
+}
+
 function mergeAwbCandidate(map: Map<string, AwbCandidate>, candidate: AwbCandidate) {
     const prev = map.get(candidate.value)
     if (!prev || candidate.score > prev.score) {
@@ -107,11 +115,14 @@ function extractAwbCandidatesFromText(ocrText: string, source: string, trustBoos
 
         const upperContext = context.toUpperCase()
         const hasKeyword = AWB_KEYWORD_REGEX.test(upperContext)
+        const checkDigitValid = isValidAwbByCheckDigit(normalized)
 
         let score = trustBoost + patternScore
         if (hasKeyword) score += 180
         if (lineIndex <= Math.max(1, Math.floor(lines.length * 0.4))) score += 35
         if (/^(112|180)/.test(normalized)) score += 20
+        if (checkDigitValid) score += 420
+        else score -= 180
         if (/^0/.test(normalized)) score -= 200
         if (PHONE_LIKE_PREFIX_REGEX.test(normalized)) score -= 260
         if (!hasKeyword && NON_AWB_CONTEXT_REGEX.test(upperContext)) score -= 70
