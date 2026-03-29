@@ -9,6 +9,12 @@ type WormSize = {
     range: string
 }
 
+type AwbCandidate = {
+    value: string
+    score: number
+    source: string
+}
+
 const WORM_SIZES: WormSize[] = [
     { id: 'LLLL', range: '160-220 PCs/kilo' },
     { id: 'LLL', range: '240-280 PCs/kilo' },
@@ -25,6 +31,89 @@ function createInitialQuantities() {
         acc[size.id] = 0
         return acc
     }, {})
+}
+
+const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
+const NON_AWB_CONTEXT_REGEX = /\b(?:TEL|PHONE|MOBILE|FAX|EMAIL|E-?MAIL|CONTACT|INVOICE|DATE|TOTAL|QTY|PCS|KILO)\b/i
+
+function normalizePotentialAwbToken(token: string) {
+    return token
+        .toUpperCase()
+        .replace(/[|IL]/g, '1')
+        .replace(/[OQ]/g, '0')
+        .replace(/Z/g, '2')
+        .replace(/S/g, '5')
+        .replace(/B/g, '8')
+        .replace(/[^\d]/g, '')
+}
+
+function scoreAwbCandidate(value: string, context: string, hasAwbKeyword: boolean) {
+    let score = 0
+
+    if (value.length === 11) score += 80
+    else if (value.length >= 10 && value.length <= 14) score += 40
+
+    if (hasAwbKeyword) score += 130
+    if (/^(112|180)/.test(value)) score += 20
+
+    if (/^(010|011|016|017|018|019|070|080)/.test(value)) score -= 140
+    if (NON_AWB_CONTEXT_REGEX.test(context.toUpperCase())) score -= 45
+
+    return score
+}
+
+function extractBestAwbCandidate(ocrText: string, source: string): AwbCandidate | null {
+    const lines = ocrText
+        .split(/\r?\n/)
+        .map(line => line.trim())
+        .filter(Boolean)
+
+    if (lines.length === 0) return null
+
+    const byValue = new Map<string, AwbCandidate>()
+
+    const addCandidatesFromChunk = (chunk: string, context: string, hasAwbKeyword: boolean, sourceSuffix: string) => {
+        const rawTokens = chunk.match(/[A-Z0-9|][A-Z0-9|\s\-._]{8,28}[A-Z0-9|]/gi) || []
+        for (const token of rawTokens) {
+            const normalized = normalizePotentialAwbToken(token)
+            if (normalized.length < 10 || normalized.length > 14) continue
+
+            const score = scoreAwbCandidate(normalized, context, hasAwbKeyword)
+            const prev = byValue.get(normalized)
+            if (!prev || score > prev.score) {
+                byValue.set(normalized, {
+                    value: normalized,
+                    score,
+                    source: `${source} (${sourceSuffix})`,
+                })
+            }
+        }
+    }
+
+    for (let i = 0; i < lines.length; i++) {
+        const line = lines[i]
+        const nextLine = lines[i + 1] || ''
+        const merged = `${line} ${nextLine}`.trim()
+
+        const keywordInLine = AWB_KEYWORD_REGEX.test(line)
+        const keywordInMerged = AWB_KEYWORD_REGEX.test(merged)
+
+        addCandidatesFromChunk(line, line, keywordInLine, 'line')
+        addCandidatesFromChunk(merged, merged, keywordInMerged, 'merged')
+        if (keywordInLine && nextLine) {
+            addCandidatesFromChunk(nextLine, merged, true, 'next-line')
+        }
+    }
+
+    const ranked = Array.from(byValue.values()).sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score
+        if (a.value.length === 11 && b.value.length !== 11) return -1
+        if (b.value.length === 11 && a.value.length !== 11) return 1
+        return 0
+    })
+
+    if (ranked.length === 0) return null
+    return ranked[0]
 }
 
 export default function WormOrderPage() {
@@ -91,7 +180,7 @@ export default function WormOrderPage() {
     const [fetchProgress, setFetchProgress] = useState(0)
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
-    const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<string | null> => {
+    const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate | null> => {
         const res = await fetch(`/api/admin/worm-order/emails/attachment?uid=${uid}&index=${attIndex}`)
         if (!res.ok) return null
         const blob = await res.blob()
@@ -101,68 +190,61 @@ export default function WormOrderPage() {
         const arrayBuffer = await blob.arrayBuffer()
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
 
-        // 모든 페이지 시도
-        const totalPages = pdf.numPages
-        for (let pageNum = 1; pageNum <= Math.min(totalPages, 3); pageNum++) {
-            const page = await pdf.getPage(pageNum)
-            const viewport = page.getViewport({ scale: 3.0 })
-            const canvas = document.createElement('canvas')
-            canvas.width = viewport.width
-            canvas.height = viewport.height
-            const ctx = canvas.getContext('2d')!
-            await page.render({ canvasContext: ctx, viewport } as any).promise
+        let bestCandidate: AwbCandidate | null = null
+        const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} })
+        await worker.setParameters({
+            tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+            preserve_interword_spaces: '1',
+            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._:/ ',
+        } as any)
 
-            // ── Tesseract 인식률 극대화를 위한 이미지 이진화 (Binarization) ──
-            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-            const data = imgData.data
-            for (let i = 0; i < data.length; i += 4) {
-                // 픽셀 밝기 계산 (Luma)
-                const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]
-                // 임계값 150을 기준으로 흑/백으로 완전히 분리하여 흐릿한 글씨를 뚜렷하게 보정
-                const color = brightness < 150 ? 0 : 255
-                data[i] = data[i+1] = data[i+2] = color
-            }
-            ctx.putImageData(imgData, 0, 0)
+        try {
+            // 모든 페이지 시도 (최대 5페이지)
+            const totalPages = pdf.numPages
+            for (let pageNum = 1; pageNum <= Math.min(totalPages, 5); pageNum++) {
+                const page = await pdf.getPage(pageNum)
+                const viewport = page.getViewport({ scale: 3.2 })
+                const canvas = document.createElement('canvas')
+                canvas.width = viewport.width
+                canvas.height = viewport.height
+                const ctx = canvas.getContext('2d')!
+                await page.render({ canvasContext: ctx, viewport } as any).promise
 
-            // Tesseract Worker 초기화 및 PSM 11 (SPARSE_TEXT) 설정
-            // 기본 모드(PSM 3)는 내용 흐름 바깥(우측 상단 등)에 있는 고립된 번호를 스킵할 확률이 높으므로, 반드시 SPARSE_TEXT 모드를 써야 합니다.
-            const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} })
-            await worker.setParameters({
-                tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT, // '11'
-            } as any)
-            const result = await worker.recognize(canvas)
-            await worker.terminate()
-            const ocrText = result.data.text
-            console.log(`[AWB OCR] File idx=${attIndex}, Page ${pageNum}:`, ocrText)
+                // OCR 전 명암 대비를 높여 숫자 인식률 개선
+                const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+                const data = imgData.data
+                for (let i = 0; i < data.length; i += 4) {
+                    const brightness = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2]
+                    const adjusted = brightness < 170 ? 0 : 255
+                    data[i] = adjusted
+                    data[i + 1] = adjusted
+                    data[i + 2] = adjusted
+                }
+                ctx.putImageData(imgData, 0, 0)
 
-            // 숫자와 비슷한 오류 글자 강제 치환 (예: 11Z -> 112)
-            const correctedFull = ocrText
-                .replace(/[|IilL]/g, '1')
-                .replace(/[OoQ]/g, '0')
-                .replace(/[Zz]/g, '2')
-                .replace(/[Ss]/g, '5')
-                .replace(/[Bb]/g, '8')
+                const result = await worker.recognize(canvas)
+                const ocrText = result.data.text
+                console.log(`[AWB OCR] File idx=${attIndex}, Page ${pageNum}:`, ocrText)
 
-            // 공백, 하이픈, 마침표, 쉼표 등 기호가 섞여 있어도 '총 11자리의 숫자' 덩어리만 정확히 찾아내는 강력한 정규식
-            // (?<!\d) 등 Lookbehind는 구형 브라우저 에러가 나므로 (?:^|[^\d]) 로 우회
-            const regex = /(?:^|[^\d])((?:\d[\s\-.,_]*){11})(?=[^\d]|$)/g
-            const candidates: string[] = []
-            let match;
-            while ((match = regex.exec(correctedFull)) !== null) {
-                // 기호 다 날리고 순수 숫자만 추출
-                const pureNumber = match[1].replace(/[^\d]/g, '')
-                if (pureNumber.length === 11) {
-                    candidates.push(pureNumber)
+                const candidate = extractBestAwbCandidate(
+                    ocrText,
+                    `file=${attIndex},page=${pageNum}`,
+                )
+                if (!candidate) continue
+
+                if (!bestCandidate || candidate.score > bestCandidate.score) {
+                    bestCandidate = candidate
                 }
             }
-
-            if (candidates.length > 0) {
-                // 핸드폰 번호(010, 040 등 0으로 시작)보다 AWB(112, 180 등)를 우선순위 지정
-                const awbCandidate = candidates.find(c => !c.startsWith('0'))
-                return awbCandidate || candidates[0]
-            }
+        } finally {
+            await worker.terminate()
         }
-        return null
+
+        if (bestCandidate) {
+            console.log('[AWB OCR] Selected candidate:', bestCandidate)
+        }
+
+        return bestCandidate
     }, [])
 
     const runAwbOcr = useCallback(async (uid: string, skmIndices: number[]) => {
@@ -170,14 +252,23 @@ export default function WormOrderPage() {
         setAwbLoading(true)
         setAwbError('')
         try {
-            // 모든 SKM 파일을 순차적으로 시도
+            let bestCandidate: AwbCandidate | null = null
+
+            // 모든 SKM 파일을 순차적으로 시도해서 점수가 가장 높은 후보를 채택
             for (const idx of skmIndices) {
                 const found = await ocrOnePdf(uid, idx)
-                if (found) {
-                    setAwbNumber(found)
-                    return
+                if (!found) continue
+
+                if (!bestCandidate || found.score > bestCandidate.score) {
+                    bestCandidate = found
                 }
             }
+
+            if (bestCandidate) {
+                setAwbNumber(bestCandidate.value)
+                return
+            }
+
             setAwbError('모든 SKM 문서에서 운송장 번호를 찾지 못했습니다. 브라우저 콘솔(F12)에서 OCR 원문을 확인해주세요.')
         } catch (err: any) {
             console.error('AWB OCR Error:', err)
