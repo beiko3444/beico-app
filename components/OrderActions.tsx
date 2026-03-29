@@ -111,22 +111,50 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
         }
     }
 
-    const toggleTaxInvoice = async () => {
-        if (!confirm(`세금계산서를 ${!taxInvoiceIssued ? '발급' : '미발급'}(으)로 변경하시겠습니까?`)) return
+    const issueTaxInvoiceAPI = async () => {
+        if (taxInvoiceIssued) {
+            // 이미 발급된 경우: 상태만 토글 (취소)
+            if (!confirm('세금계산서 발급 상태를 미발급으로 변경하시겠습니까?\n(바로빌에서 발급된 계산서는 별도로 취소해야 합니다)')) return
+            setLoading(true)
+            try {
+                const res = await fetch(`/api/orders/${order.id}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ taxInvoiceIssued: false })
+                })
+                if (res.ok) {
+                    setTaxInvoiceIssued(false)
+                    router.refresh()
+                } else alert('업데이트 실패')
+            } catch (e) {
+                console.error(e)
+                alert('오류 발생')
+            } finally {
+                setLoading(false)
+            }
+            return
+        }
+
+        // 미발급 → 바로빌 API로 발급
+        if (!confirm('바로빌을 통해 전자세금계산서를 발급하시겠습니까?\n\n발급 후에는 국세청에 전송됩니다.')) return
         setLoading(true)
         try {
-            const res = await fetch(`/api/orders/${order.id}`, {
-                method: 'PATCH',
+            const res = await fetch('/api/admin/tax-invoice', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ taxInvoiceIssued: !taxInvoiceIssued })
+                body: JSON.stringify({ orderId: order.id })
             })
-            if (res.ok) {
-                setTaxInvoiceIssued(!taxInvoiceIssued)
+            const data = await res.json()
+            if (res.ok && data.success) {
+                setTaxInvoiceIssued(true)
+                alert(`✅ 세금계산서 발급 완료\n관리번호: ${data.mgtKey}`)
                 router.refresh()
-            } else alert('업데이트 실패')
+            } else {
+                alert(`❌ 발급 실패\n${data.error || '알 수 없는 오류'}`)
+            }
         } catch (e) {
             console.error(e)
-            alert('오류 발생')
+            alert('세금계산서 발급 중 통신 오류가 발생했습니다.')
         } finally {
             setLoading(false)
         }
@@ -233,7 +261,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                         </button>
                     )}
                     {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                        <button onClick={toggleTaxInvoice} disabled={loading}
+                        <button onClick={issueTaxInvoiceAPI} disabled={loading}
                             className={`py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center transition-colors disabled:opacity-50 ${taxInvoiceIssued ? 'bg-gray-400 hover:bg-gray-500' : 'bg-[#d9361b] hover:bg-[#c0301a]'}`}>
                             📋 {taxInvoiceIssued ? '계산서 취소' : '세금계산서'}
                         </button>

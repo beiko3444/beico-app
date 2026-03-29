@@ -33,6 +33,7 @@
     "react-barcode": "^1.6.1",
     "react-dom": "19.2.3",
     "recharts": "^3.7.0",
+    "soap": "^1.8.0",
     "tesseract.js": "^7.0.0"
   },
   "devDependencies": {
