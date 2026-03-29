@@ -124,37 +124,18 @@ export default function WormOrderPage() {
             }
             ctx.putImageData(imgData, 0, 0)
 
-            const result = await Tesseract.recognize(canvas, 'eng', { logger: () => {} })
+            // Tesseract Worker 초기화 및 PSM 11 (SPARSE_TEXT) 설정
+            // 기본 모드(PSM 3)는 내용 흐름 바깥(우측 상단 등)에 있는 고립된 번호를 스킵할 확률이 높으므로, 반드시 SPARSE_TEXT 모드를 써야 합니다.
+            const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} })
+            await worker.setParameters({
+                tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT, // '11'
+            } as any)
+            const result = await worker.recognize(canvas)
+            await worker.terminate()
             const ocrText = result.data.text
             console.log(`[AWB OCR] File idx=${attIndex}, Page ${pageNum}:`, ocrText)
 
-            const lines = ocrText.split('\n')
-            
-            // 1. 키워드(WAYBILL/MAWB/AWB) 우선 탐색 전략 (전화번호 등 오인식 방지)
-            for (let i = 0; i < lines.length; i++) {
-                const lineOrig = lines[i].toUpperCase().replace(/[^\w]/g, '')
-                if (lineOrig.includes('WAYBILL') || lineOrig.includes('MAWB') || lineOrig.includes('AWB')) {
-                    // 키워드가 있는 줄과 아래 4줄 반경을 하나의 블록으로 묶음
-                    const block = lines.slice(i, i + 5).join(' ')
-                    // 숫자와 비슷한 오류 글자 강제 치환 (보정)
-                    const correctedBlock = block
-                        .replace(/[|IilL]/g, '1')
-                        .replace(/[OoQ]/g, '0')
-                        .replace(/[Zz]/g, '2')
-                        .replace(/[Ss]/g, '5')
-                        .replace(/[Bb]/g, '8')
-                    
-                    // AWB 형식 추출: 3자리 + 4자리 + 4자리
-                    const m1 = correctedBlock.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
-                    if (m1) return m1[1] + m1[2] + m1[3]
-                    
-                    // AWB 형식 추출: 3자리 + 8자리
-                    const m2 = correctedBlock.match(/(\d{3})\s*[-.]?\s*(\d{8})/)
-                    if (m2) return m2[1] + m2[2]
-                }
-            }
-
-            // 2. 키워드를 못 찾았을 경우 전체 텍스트 스캔 (엄격한 AWB 포맷 우선)
+            // 숫자와 비슷한 오류 글자 강제 치환 (예: 11Z -> 112)
             const correctedFull = ocrText
                 .replace(/[|IilL]/g, '1')
                 .replace(/[OoQ]/g, '0')
@@ -162,17 +143,24 @@ export default function WormOrderPage() {
                 .replace(/[Ss]/g, '5')
                 .replace(/[Bb]/g, '8')
 
-            // 3+4+4 또는 3+8 형태로 뚜렷하게 분리된 경우 (전화번호 필터링)
-            const strictMatch = correctedFull.match(/(\d{3})\s*-\s*(\d{4})\s*[-]?\s*(\d{4})/) || 
-                                correctedFull.match(/(\d{3})\s*-\s*(\d{8})/) ||
-                                correctedFull.match(/(\d{3})\s+(\d{4})\s+(\d{4})/)
-            if (strictMatch) {
-                return strictMatch[1] + strictMatch[2] + (strictMatch[3] || '')
+            // 공백, 하이픈, 마침표, 쉼표 등 기호가 섞여 있어도 '총 11자리의 숫자' 덩어리만 정확히 찾아내는 강력한 정규식
+            // (?<!\d) 등 Lookbehind는 구형 브라우저 에러가 나므로 (?:^|[^\d]) 로 우회
+            const regex = /(?:^|[^\d])((?:\d[\s\-.,_]*){11})(?=[^\d]|$)/g
+            const candidates: string[] = []
+            let match;
+            while ((match = regex.exec(correctedFull)) !== null) {
+                // 기호 다 날리고 순수 숫자만 추출
+                const pureNumber = match[1].replace(/[^\d]/g, '')
+                if (pureNumber.length === 11) {
+                    candidates.push(pureNumber)
+                }
             }
 
-            // 최후의 수단: 단순히 연속된 11자리 (주의: 전화번호를 잡을 확률 높음)
-            const mFallback = correctedFull.match(/\d{11}/)
-            if (mFallback) return mFallback[0]
+            if (candidates.length > 0) {
+                // 핸드폰 번호(010, 040 등 0으로 시작)보다 AWB(112, 180 등)를 우선순위 지정
+                const awbCandidate = candidates.find(c => !c.startsWith('0'))
+                return awbCandidate || candidates[0]
+            }
         }
         return null
     }, [])
