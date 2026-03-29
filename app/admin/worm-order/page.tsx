@@ -112,35 +112,67 @@ export default function WormOrderPage() {
             const ctx = canvas.getContext('2d')!
             await page.render({ canvasContext: ctx, viewport } as any).promise
 
+            // ── Tesseract 인식률 극대화를 위한 이미지 이진화 (Binarization) ──
+            const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+            const data = imgData.data
+            for (let i = 0; i < data.length; i += 4) {
+                // 픽셀 밝기 계산 (Luma)
+                const brightness = 0.299 * data[i] + 0.587 * data[i+1] + 0.114 * data[i+2]
+                // 임계값 150을 기준으로 흑/백으로 완전히 분리하여 흐릿한 글씨를 뚜렷하게 보정
+                const color = brightness < 150 ? 0 : 255
+                data[i] = data[i+1] = data[i+2] = color
+            }
+            ctx.putImageData(imgData, 0, 0)
+
             const result = await Tesseract.recognize(canvas, 'eng', { logger: () => {} })
             const ocrText = result.data.text
             console.log(`[AWB OCR] File idx=${attIndex}, Page ${pageNum}:`, ocrText)
 
-            // OCR 보정
-            const corrected = ocrText
-                .replace(/[|]/g, '1')
-                .replace(/\n/g, ' ')
-                .replace(/[OoQ]/g, '0')
-                .replace(/[IilL]/g, '1')
-
-            // 패턴 1: 3자리 + 4자리 + 4자리 (띄어쓰기/하이픈 허용)
-            const m1 = corrected.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
-            if (m1) return m1[1] + m1[2] + m1[3]
-
-            // 패턴 2: 3자리 + 8자리
-            const m2 = corrected.match(/(\d{3})\s*[-.]?\s*(\d{8})/)
-            if (m2) return m2[1] + m2[2]
-
-            // 패턴 3: 연속 11자리
-            const m3 = corrected.match(/\d{11}/)
-            if (m3) return m3[0]
-
-            // 패턴 4: 공백/하이픈 포함 11자리 이상 숫자 뭉치
-            const m4 = corrected.match(/\d[\d\s-]{9,16}\d/)
-            if (m4) {
-                const digits = m4[0].replace(/[\s-]/g, '')
-                if (digits.length >= 11) return digits.substring(0, 11)
+            const lines = ocrText.split('\n')
+            
+            // 1. 키워드(WAYBILL/MAWB/AWB) 우선 탐색 전략 (전화번호 등 오인식 방지)
+            for (let i = 0; i < lines.length; i++) {
+                const lineOrig = lines[i].toUpperCase().replace(/[^\w]/g, '')
+                if (lineOrig.includes('WAYBILL') || lineOrig.includes('MAWB') || lineOrig.includes('AWB')) {
+                    // 키워드가 있는 줄과 아래 4줄 반경을 하나의 블록으로 묶음
+                    const block = lines.slice(i, i + 5).join(' ')
+                    // 숫자와 비슷한 오류 글자 강제 치환 (보정)
+                    const correctedBlock = block
+                        .replace(/[|IilL]/g, '1')
+                        .replace(/[OoQ]/g, '0')
+                        .replace(/[Zz]/g, '2')
+                        .replace(/[Ss]/g, '5')
+                        .replace(/[Bb]/g, '8')
+                    
+                    // AWB 형식 추출: 3자리 + 4자리 + 4자리
+                    const m1 = correctedBlock.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
+                    if (m1) return m1[1] + m1[2] + m1[3]
+                    
+                    // AWB 형식 추출: 3자리 + 8자리
+                    const m2 = correctedBlock.match(/(\d{3})\s*[-.]?\s*(\d{8})/)
+                    if (m2) return m2[1] + m2[2]
+                }
             }
+
+            // 2. 키워드를 못 찾았을 경우 전체 텍스트 스캔 (엄격한 AWB 포맷 우선)
+            const correctedFull = ocrText
+                .replace(/[|IilL]/g, '1')
+                .replace(/[OoQ]/g, '0')
+                .replace(/[Zz]/g, '2')
+                .replace(/[Ss]/g, '5')
+                .replace(/[Bb]/g, '8')
+
+            // 3+4+4 또는 3+8 형태로 뚜렷하게 분리된 경우 (전화번호 필터링)
+            const strictMatch = correctedFull.match(/(\d{3})\s*-\s*(\d{4})\s*[-]?\s*(\d{4})/) || 
+                                correctedFull.match(/(\d{3})\s*-\s*(\d{8})/) ||
+                                correctedFull.match(/(\d{3})\s+(\d{4})\s+(\d{4})/)
+            if (strictMatch) {
+                return strictMatch[1] + strictMatch[2] + (strictMatch[3] || '')
+            }
+
+            // 최후의 수단: 단순히 연속된 11자리 (주의: 전화번호를 잡을 확률 높음)
+            const mFallback = correctedFull.match(/\d{11}/)
+            if (mFallback) return mFallback[0]
         }
         return null
     }, [])
