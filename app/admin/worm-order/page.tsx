@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles, Mail } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles, Mail, ScanSearch } from 'lucide-react'
+import Tesseract from 'tesseract.js'
 
 type WormSize = {
     id: string
@@ -48,6 +49,11 @@ export default function WormOrderPage() {
     const [hasFetched, setHasFetched] = useState(false)
     const [selectedEmailUid, setSelectedEmailUid] = useState<string | null>(null)
 
+    // ── AWB OCR 관련 State ──
+    const [awbNumber, setAwbNumber] = useState<string | null>(null)
+    const [awbLoading, setAwbLoading] = useState(false)
+    const [awbError, setAwbError] = useState('')
+
     // ── 관세사 메일 전달 관련 State ──
     const [forwardEmail, setForwardEmail] = useState('')
     const [forwarding, setForwarding] = useState(false)
@@ -83,6 +89,78 @@ export default function WormOrderPage() {
 
     // ── 자동 페치 & 게이지 관련 State ──
     const [fetchProgress, setFetchProgress] = useState(0)
+
+    // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
+    const runAwbOcr = useCallback(async (uid: string, skmIndex: number) => {
+        setAwbNumber(null)
+        setAwbLoading(true)
+        setAwbError('')
+        try {
+            // 1. 첨부파일 바이너리 다운로드
+            const res = await fetch(`/api/admin/worm-order/emails/attachment?uid=${uid}&index=${skmIndex}`)
+            if (!res.ok) throw new Error('첨부파일 다운로드 실패')
+            const blob = await res.blob()
+
+            // 2. PDF → Canvas 이미지 변환 (pdf.js)
+            const pdfjsLib = await import('pdfjs-dist')
+            pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.mjs`
+            const arrayBuffer = await blob.arrayBuffer()
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+            const page = await pdf.getPage(1)
+            const viewport = page.getViewport({ scale: 2.0 })
+            const canvas = document.createElement('canvas')
+            canvas.width = viewport.width
+            canvas.height = viewport.height
+            const ctx = canvas.getContext('2d')!
+            await page.render({ canvasContext: ctx, viewport } as any).promise
+
+            // 3. Tesseract OCR 실행
+            const result = await Tesseract.recognize(canvas, 'eng', {
+                logger: () => {},
+            })
+            const ocrText = result.data.text
+
+            // 4. 11자리 숫자 추출
+            const cleaned = ocrText.replace(/[OoIl]/g, (c: string) => {
+                if (c === 'O' || c === 'o') return '0'
+                if (c === 'I' || c === 'l') return '1'
+                return c
+            })
+            const match = cleaned.match(/\d[\d\s-]{9,15}\d/)
+            if (match) {
+                const digits = match[0].replace(/[\s-]/g, '')
+                if (digits.length >= 11) {
+                    setAwbNumber(digits.substring(0, 11))
+                    return
+                }
+            }
+            // 단순 11자리 연속 숫자 시도
+            const simpleMatch = cleaned.match(/\d{11}/)
+            if (simpleMatch) {
+                setAwbNumber(simpleMatch[0])
+                return
+            }
+            setAwbError('OCR 완료했으나 11자리 운송장 번호를 찾지 못했습니다.')
+        } catch (err: any) {
+            console.error('AWB OCR Error:', err)
+            setAwbError(err.message || 'OCR 처리 실패')
+        } finally {
+            setAwbLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!selectedEmailUid) return
+        const email = emails.find((e: any) => e.uid === selectedEmailUid)
+        if (email && email.skmAttachmentIndex !== null && email.skmAttachmentIndex !== undefined) {
+            runAwbOcr(email.uid, email.skmAttachmentIndex)
+        } else {
+            setAwbNumber(null)
+            setAwbLoading(false)
+            setAwbError('')
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedEmailUid])
 
     useEffect(() => {
         fetchEmails()
@@ -621,25 +699,44 @@ export default function WormOrderPage() {
                                             <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
                                         </div>
                                         
-                                        {/* 추출된 AIR WAYBILL */}
-                                        {selectedEmail.extractedAWB && (
-                                            <div className="mt-5 p-4 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2">
-                                                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
-                                                    <Sparkles size={14} className="text-blue-500" />
-                                                    Air Waybill Extracted (from SKM doc)
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{selectedEmail.extractedAWB}</span>
-                                                    <button 
-                                                        onClick={() => {
-                                                            navigator.clipboard.writeText(selectedEmail.extractedAWB)
-                                                            alert('운송장 번호 ' + selectedEmail.extractedAWB + ' 이(가) 복사되었습니다.')
-                                                        }}
-                                                        className="h-9 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center shrink-0"
-                                                    >
-                                                        복사하기
-                                                    </button>
-                                                </div>
+                                        {/* AIR WAYBILL OCR 결과 */}
+                                        {(awbLoading || awbNumber || awbError) && (
+                                            <div className={`mt-5 p-4 rounded-xl border flex flex-col gap-2 ${
+                                                awbNumber ? 'border-blue-100 bg-blue-50/50' : awbError ? 'border-red-100 bg-red-50/50' : 'border-orange-100 bg-orange-50/50'
+                                            }`}>
+                                                {awbLoading && (
+                                                    <div className="flex items-center gap-2 text-orange-600">
+                                                        <ScanSearch size={16} className="animate-pulse" />
+                                                        <span className="text-[13px] font-bold">SKM 문서에서 Air Waybill 번호를 OCR 스캔 중...</span>
+                                                        <Loader2 size={14} className="animate-spin ml-auto" />
+                                                    </div>
+                                                )}
+                                                {awbNumber && !awbLoading && (
+                                                    <>
+                                                        <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                                                            <Sparkles size={14} className="text-blue-500" />
+                                                            Air Waybill Extracted (OCR from SKM doc)
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{awbNumber}</span>
+                                                            <button 
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(awbNumber)
+                                                                    alert('운송장 번호 ' + awbNumber + ' 이(가) 복사되었습니다.')
+                                                                }}
+                                                                className="h-9 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center shrink-0"
+                                                            >
+                                                                복사하기
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                                {awbError && !awbLoading && (
+                                                    <div className="text-[12px] font-bold text-red-600 flex items-center gap-1.5">
+                                                        <ScanSearch size={14} />
+                                                        {awbError}
+                                                    </div>
+                                                )}
                                             </div>
                                         )}
 

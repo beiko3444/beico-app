@@ -48,49 +48,14 @@ export async function GET() {
                     const body = (parsed.html || parsed.textAsHtml || parsed.text || '').toLowerCase()
                     
                     if (body.includes('michael@oikki.com')) {
-                        let extractedAWB = null;
-
-                        // 첨부파일 중 파일명이 SKM으로 시작하는 PDF에서 운송장 번호 추출 시도
+                        // SKM 첨부파일 인덱스 찾기 (프론트에서 OCR용)
+                        let skmAttachmentIndex: number | null = null;
                         if (parsed.attachments && parsed.attachments.length > 0) {
-                            for (const att of parsed.attachments) {
-                                const filename = att.filename || '';
-                                if (att.contentType === 'application/pdf' && att.content && filename.toUpperCase().includes('SKM')) {
-                                    try {
-                                        if (typeof global !== 'undefined') {
-                                            if (!global.DOMMatrix) (global as any).DOMMatrix = class DOMMatrix {};
-                                            if (!global.Path2D) (global as any).Path2D = class Path2D {};
-                                        }
-                                        const pdfParse = require('pdf-parse');
-                                        const data = await pdfParse(att.content);
-                                        const text = data.text;
-                                        const textClean = text.replace(/\n/g, ' ');
-                                        const match = textClean.match(/(?:^|[^0-9])([0-9](?:[\s-]*[0-9]){10})(?![0-9])/);
-                                        if (match && match[1]) {
-                                            extractedAWB = match[1].replace(/[\s-]/g, '');
-                                            break;
-                                        } else {
-                                            // 11자리 숫자가 정규식에 안 걸리는 경우 단순 검색 대체재
-                                            const simpleMatch = textClean.match(/\d{11}/);
-                                            if (simpleMatch) {
-                                                extractedAWB = simpleMatch[0];
-                                                break;
-                                            }
-
-                                            // 실패 원인 디버그 텍스트 반환
-                                            if (text.trim().length < 30) {
-                                                extractedAWB = "오류: 이미지 전용 PDF (텍스트 없음)";
-                                            } else {
-                                                const awbIndex = textClean.toUpperCase().indexOf('WAYBILL');
-                                                if (awbIndex !== -1) {
-                                                    extractedAWB = "실패: " + textClean.substring(awbIndex, awbIndex + 30).trim();
-                                                } else {
-                                                    extractedAWB = "오류: 11자리 숫자 패턴 없음";
-                                                }
-                                            }
-                                        }
-                                    } catch (err) {
-                                        console.error('PDF Parse Error:', err);
-                                    }
+                            for (let i = 0; i < parsed.attachments.length; i++) {
+                                const filename = (parsed.attachments[i].filename || '').toUpperCase();
+                                if (filename.includes('SKM')) {
+                                    skmAttachmentIndex = i;
+                                    break;
                                 }
                             }
                         }
@@ -101,7 +66,7 @@ export async function GET() {
                             date: parsed.date,
                             text: parsed.html || parsed.textAsHtml || parsed.text || '',
                             hasAttachments: parsed.attachments && parsed.attachments.length > 0,
-                            extractedAWB,
+                            skmAttachmentIndex,
                             attachments: (parsed.attachments || []).map((att: any, idx: number) => ({
                                 filename: att.filename || `attachment-${idx}`,
                                 contentType: att.contentType,
