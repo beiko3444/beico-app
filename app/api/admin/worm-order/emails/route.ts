@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
-const pdfParse = require('pdf-parse')
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +56,11 @@ export async function GET() {
                                 const filename = att.filename || '';
                                 if (att.contentType === 'application/pdf' && att.content && filename.toUpperCase().includes('SKM')) {
                                     try {
+                                        if (typeof global !== 'undefined') {
+                                            if (!global.DOMMatrix) (global as any).DOMMatrix = class DOMMatrix {};
+                                            if (!global.Path2D) (global as any).Path2D = class Path2D {};
+                                        }
+                                        const pdfParse = require('pdf-parse');
                                         const data = await pdfParse(att.content);
                                         const text = data.text;
                                         const textClean = text.replace(/\n/g, ' ');
