@@ -90,13 +90,20 @@ function extractTagBlocks(xml: string, tag: string) {
 
 function toInt(value: string | null) {
   if (!value) return null
-  const n = parseInt(value.replace(/,/g, '').trim(), 10)
-  return Number.isFinite(n) ? n : null
+  const normalized = value.replace(/,/g, '').trim()
+  const match = normalized.match(/-?\d+(?:\.\d+)?/)
+  if (!match) return null
+  const n = Number(match[0])
+  if (!Number.isFinite(n)) return null
+  return Math.round(n)
 }
 
 function toFloat(value: string | null) {
   if (!value) return null
-  const n = parseFloat(value.replace(/,/g, '').trim())
+  const normalized = value.replace(/,/g, '').trim()
+  const match = normalized.match(/-?\d+(?:\.\d+)?/)
+  if (!match) return null
+  const n = Number(match[0])
   return Number.isFinite(n) ? n : null
 }
 
@@ -161,8 +168,17 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
   const corpNum = decodeXml(extractTag(block, 'CorpNum') || '')
   const cardNum = decodeXml(extractTag(block, 'CardNum') || '')
   const useDT = decodeXml(extractTag(block, 'UseDT') || '')
-  const approvalNum = decodeXml(extractTag(block, 'ApprovalNum') || '')
-  const totalAmount = toInt(extractTag(block, 'TotalAmount'))
+  const approvalNum = decodeXml(extractTag(block, 'ApprovalNum') || extractTag(block, 'CardApprovalNum') || '')
+  const approvalType = decodeXml(extractTag(block, 'ApprovalType') || extractTag(block, 'CardApprovalType') || '')
+  const approvalAmount = toInt(
+    extractTag(block, 'ApprovalAmount') ||
+    extractTag(block, 'CardApprovalCost') ||
+    extractTag(block, 'ApprovalCost'),
+  )
+  const amount = toInt(extractTag(block, 'Amount')) ?? approvalAmount
+  const tax = toInt(extractTag(block, 'Tax'))
+  const serviceCharge = toInt(extractTag(block, 'ServiceCharge'))
+  const totalAmount = toInt(extractTag(block, 'TotalAmount')) ?? approvalAmount
   const useKeyRaw = decodeXml(extractTag(block, 'UseKey') || '')
   const useKey = useKeyRaw || `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
 
@@ -172,13 +188,13 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
     useKey,
     useDT,
     usedAt: parseUseDate(useDT),
-    approvalType: decodeXml(extractTag(block, 'ApprovalType') || '') || null,
+    approvalType: approvalType || null,
     approvalNum: approvalNum || null,
-    approvalAmount: toInt(extractTag(block, 'ApprovalAmount')),
+    approvalAmount,
     foreignApprovalAmount: toFloat(extractTag(block, 'ForeignApprovalAmount')),
-    amount: toInt(extractTag(block, 'Amount')),
-    tax: toInt(extractTag(block, 'Tax')),
-    serviceCharge: toInt(extractTag(block, 'ServiceCharge')),
+    amount,
+    tax,
+    serviceCharge,
     totalAmount,
     useStoreNum: decodeXml(extractTag(block, 'UseStoreNum') || '') || null,
     useStoreCorpNum: decodeXml(extractTag(block, 'UseStoreCorpNum') || '') || null,
@@ -197,13 +213,14 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
       CardNum: cardNum,
       UseKey: useKey,
       UseDT: useDT,
-      ApprovalType: decodeXml(extractTag(block, 'ApprovalType') || ''),
+      ApprovalType: approvalType,
       ApprovalNum: approvalNum,
-      ApprovalAmount: toInt(extractTag(block, 'ApprovalAmount')),
+      ApprovalAmount: approvalAmount,
+      CardApprovalCost: toInt(extractTag(block, 'CardApprovalCost')),
       ForeignApprovalAmount: toFloat(extractTag(block, 'ForeignApprovalAmount')),
-      Amount: toInt(extractTag(block, 'Amount')),
-      Tax: toInt(extractTag(block, 'Tax')),
-      ServiceCharge: toInt(extractTag(block, 'ServiceCharge')),
+      Amount: amount,
+      Tax: tax,
+      ServiceCharge: serviceCharge,
       TotalAmount: totalAmount,
       UseStoreNum: decodeXml(extractTag(block, 'UseStoreNum') || ''),
       UseStoreCorpNum: decodeXml(extractTag(block, 'UseStoreCorpNum') || ''),
