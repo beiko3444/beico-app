@@ -563,7 +563,9 @@ export default function WormOrderPage() {
                                 <div className="w-[120px] h-[3px] bg-slate-100 rounded-full overflow-hidden">
                                     <div className="h-full bg-orange-500 transition-all duration-300 ease-out" style={{ width: `${fetchProgress}%` }} />
                                 </div>
-                                <span className="text-[12px] font-medium text-slate-400 animate-pulse mt-1">Daum 서버의 메일함을 순차 탐색하고 있습니다...</span>
+                                <span className="text-[12px] font-medium text-slate-400 animate-pulse mt-1">
+                                    Daum 서버 메일 및 SKM 첨부문서를 자동 스캔 중입니다...
+                                </span>
                             </div>
                         )}
 
@@ -624,7 +626,7 @@ export default function WormOrderPage() {
                                             <div className="mt-5 p-4 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2">
                                                 <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
                                                     <Sparkles size={14} className="text-blue-500" />
-                                                    Air Waybill Found
+                                                    Air Waybill Extracted (from SKM doc)
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{selectedEmail.extractedAWB}</span>

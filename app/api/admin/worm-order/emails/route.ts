@@ -51,19 +51,18 @@ export async function GET() {
                     if (body.includes('michael@oikki.com')) {
                         let extractedAWB = null;
 
-                        // 첨부파일 중 PDF에서 AIR WAYBILL 번호 추출 시도
+                        // 첨부파일 중 파일명이 SKM으로 시작하는 PDF에서 운송장 번호 추출 시도
                         if (parsed.attachments && parsed.attachments.length > 0) {
                             for (const att of parsed.attachments) {
-                                if (att.contentType === 'application/pdf' && att.content) {
+                                const filename = att.filename || '';
+                                if (att.contentType === 'application/pdf' && att.content && filename.toUpperCase().startsWith('SKM')) {
                                     try {
                                         const data = await pdfParse(att.content);
                                         const text = data.text;
-                                        if (/air\s*waybill/i.test(text) || (att.filename && /waybill|awb/i.test(att.filename))) {
-                                            const match = text.match(/(?<!\d)(\d(?:[\s-]*\d){10})(?!\d)/);
-                                            if (match && match[1]) {
-                                                extractedAWB = match[1].replace(/[\s-]/g, '');
-                                                break;
-                                            }
+                                        const match = text.match(/(?<!\d)(\d(?:[\s-]*\d){10})(?!\d)/);
+                                        if (match && match[1]) {
+                                            extractedAWB = match[1].replace(/[\s-]/g, '');
+                                            break;
                                         }
                                     } catch (err) {
                                         console.error('PDF Parse Error:', err);
