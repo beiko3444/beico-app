@@ -72,12 +72,16 @@ export async function POST(request: Request) {
         success: true,
         fetchedCount: 0,
         storedCount: 0,
+        amountResolvedCount: 0,
+        amountMissingCount: 0,
         targetCards: fetched.targetCards,
         refreshResults: fetched.refreshResults,
         message: '조회된 카드 사용내역이 없습니다.',
       })
     }
 
+    const amountResolvedCount = deduped.filter((row) => resolveTotalAmount(row) > 0).length
+    const amountMissingCount = deduped.length - amountResolvedCount
     const now = new Date()
     const chunks = chunk(deduped, 200)
 
@@ -158,6 +162,8 @@ export async function POST(request: Request) {
       success: true,
       fetchedCount: fetched.logs.length,
       storedCount: deduped.length,
+      amountResolvedCount,
+      amountMissingCount,
       targetCards: fetched.targetCards,
       refreshResults: fetched.refreshResults,
       message: '카드 사용내역 동기화가 완료되었습니다.',
