@@ -3,15 +3,20 @@ import soap from 'soap';
 // 바로빌 테스트 서버 WSDL (운영: https://ws.baroservice.com/TI.asmx?WSDL)
 const WSDL_URL = 'https://testws.baroservice.com/TI.asmx?WSDL';
 
-const CERTKEY = process.env.BAROBILL_CERTKEY || '';
-const CORP_NUM = process.env.BAROBILL_CORP_NUM || '';
-const CORP_NAME = process.env.BAROBILL_CORP_NAME || '';
-const CEO_NAME = process.env.BAROBILL_CEO_NAME || '';
-const ADDR = process.env.BAROBILL_ADDR || '';
-const BIZ_TYPE = process.env.BAROBILL_BIZ_TYPE || '';
-const BIZ_CLASS = process.env.BAROBILL_BIZ_CLASS || '';
-const EMAIL = process.env.BAROBILL_EMAIL || '';
-const CONTACT_ID = process.env.BAROBILL_CONTACT_ID || '';
+// 환경변수를 함수 호출 시점에 읽도록 함 (서버 재시작 없이 반영)
+function getConfig() {
+  return {
+    CERTKEY: process.env.BAROBILL_CERTKEY || '',
+    CORP_NUM: process.env.BAROBILL_CORP_NUM || '',
+    CORP_NAME: process.env.BAROBILL_CORP_NAME || '',
+    CEO_NAME: process.env.BAROBILL_CEO_NAME || '',
+    ADDR: process.env.BAROBILL_ADDR || '',
+    BIZ_TYPE: process.env.BAROBILL_BIZ_TYPE || '',
+    BIZ_CLASS: process.env.BAROBILL_BIZ_CLASS || '',
+    EMAIL: process.env.BAROBILL_EMAIL || '',
+    CONTACT_ID: process.env.BAROBILL_CONTACT_ID || '',
+  };
+}
 
 export interface TradeLineItem {
   name: string;
@@ -56,20 +61,25 @@ export async function issueTaxInvoice(params: IssueTaxInvoiceParams): Promise<{
   message: string;
 }> {
   try {
+    const cfg = getConfig();
+    console.log('[Barobill] CERTKEY:', cfg.CERTKEY ? `${cfg.CERTKEY.substring(0, 8)}...` : '(empty)');
+    console.log('[Barobill] CorpNum:', cfg.CORP_NUM);
+    console.log('[Barobill] MgtKey:', params.mgtKey);
+
     const client = await soap.createClientAsync(WSDL_URL);
 
     // TaxInvoice 객체 구성
     const invoice = {
       InvoicerParty: {
-        CorpNum: CORP_NUM,
-        CorpName: CORP_NAME,
-        CEOName: CEO_NAME,
-        Addr: ADDR,
-        BizType: BIZ_TYPE,
-        BizClass: BIZ_CLASS,
-        ContactID: CONTACT_ID,
-        ContactName: CEO_NAME,
-        Email: EMAIL,
+        CorpNum: cfg.CORP_NUM,
+        CorpName: cfg.CORP_NAME,
+        CEOName: cfg.CEO_NAME,
+        Addr: cfg.ADDR,
+        BizType: cfg.BIZ_TYPE,
+        BizClass: cfg.BIZ_CLASS,
+        ContactID: cfg.CONTACT_ID,
+        ContactName: cfg.CEO_NAME,
+        Email: cfg.EMAIL,
         MgtNum: params.mgtKey,
       },
       InvoiceeParty: {
@@ -108,8 +118,8 @@ export async function issueTaxInvoice(params: IssueTaxInvoiceParams): Promise<{
     };
 
     const args = {
-      CERTKEY: CERTKEY,
-      CorpNum: CORP_NUM,
+      CERTKEY: cfg.CERTKEY,
+      CorpNum: cfg.CORP_NUM,
       Invoice: invoice,
       SendSMS: false,       // SMS 미전송
       ForceIssue: false,    // 가산세 예상 시 발급 안 함
@@ -149,10 +159,11 @@ export async function issueTaxInvoice(params: IssueTaxInvoiceParams): Promise<{
  */
 export async function checkMgtNumExists(mgtKey: string): Promise<boolean> {
   try {
+    const cfg = getConfig();
     const client = await soap.createClientAsync(WSDL_URL);
     const [result] = await client.CheckMgtNumIsExistsAsync({
-      CERTKEY: CERTKEY,
-      CorpNum: CORP_NUM,
+      CERTKEY: cfg.CERTKEY,
+      CorpNum: cfg.CORP_NUM,
       MgtKey: mgtKey,
     });
     // 1: 존재, 0: 미존재, 음수: 오류
