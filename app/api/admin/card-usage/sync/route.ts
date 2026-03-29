@@ -33,6 +33,19 @@ function chunk<T>(arr: T[], size: number) {
   return chunks
 }
 
+function resolveTotalAmount(row: BarobillCardApprovalLog) {
+  if (typeof row.totalAmount === 'number') return row.totalAmount
+  if (typeof row.approvalAmount === 'number') return row.approvalAmount
+  if (
+    typeof row.amount === 'number' ||
+    typeof row.tax === 'number' ||
+    typeof row.serviceCharge === 'number'
+  ) {
+    return (row.amount || 0) + (row.tax || 0) + (row.serviceCharge || 0)
+  }
+  return 0
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -72,6 +85,7 @@ export async function POST(request: Request) {
       await prisma.$transaction(
         rows.map((row) => {
           const raw = row.raw as Prisma.InputJsonValue
+          const normalizedTotalAmount = resolveTotalAmount(row)
           return prisma.cardUsage.upsert({
             where: {
               corpNum_cardNum_useKey: {
@@ -90,7 +104,7 @@ export async function POST(request: Request) {
               amount: row.amount,
               tax: row.tax,
               serviceCharge: row.serviceCharge,
-              totalAmount: row.totalAmount,
+              totalAmount: normalizedTotalAmount,
               useStoreNum: row.useStoreNum,
               useStoreCorpNum: row.useStoreCorpNum,
               useStoreTaxType: row.useStoreTaxType,
@@ -119,7 +133,7 @@ export async function POST(request: Request) {
               amount: row.amount,
               tax: row.tax,
               serviceCharge: row.serviceCharge,
-              totalAmount: row.totalAmount,
+              totalAmount: normalizedTotalAmount,
               useStoreNum: row.useStoreNum,
               useStoreCorpNum: row.useStoreCorpNum,
               useStoreTaxType: row.useStoreTaxType,

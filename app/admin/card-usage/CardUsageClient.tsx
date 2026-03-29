@@ -13,6 +13,10 @@ type CardUsageItem = {
   approvalType: string | null
   approvalNum: string | null
   totalAmount: number | null
+  approvalAmount: number | null
+  amount: number | null
+  tax: number | null
+  serviceCharge: number | null
   useStoreName: string | null
   paymentPlan: string | null
   installmentMonths: string | null
@@ -57,6 +61,19 @@ function maskCard(cardNum: string) {
 function errorMessage(err: unknown) {
   if (err instanceof Error) return err.message
   return '요청 처리 중 오류가 발생했습니다.'
+}
+
+function resolveAmount(item: Pick<CardUsageItem, 'totalAmount' | 'approvalAmount' | 'amount' | 'tax' | 'serviceCharge'>) {
+  if (typeof item.totalAmount === 'number') return item.totalAmount
+  if (typeof item.approvalAmount === 'number') return item.approvalAmount
+  if (
+    typeof item.amount === 'number' ||
+    typeof item.tax === 'number' ||
+    typeof item.serviceCharge === 'number'
+  ) {
+    return (item.amount || 0) + (item.tax || 0) + (item.serviceCharge || 0)
+  }
+  return 0
 }
 
 export default function CardUsageClient() {
@@ -303,7 +320,7 @@ export default function CardUsageClient() {
                       {item.installmentMonths ? ` / ${item.installmentMonths}` : ''}
                     </td>
                     <td className="px-4 py-3 text-right font-bold">
-                      {(item.totalAmount || 0).toLocaleString()}원
+                      {resolveAmount(item).toLocaleString()}원
                     </td>
                     <td className="px-4 py-3 whitespace-nowrap">{item.currencyCode || 'KRW'}</td>
                     <td className="px-4 py-3">

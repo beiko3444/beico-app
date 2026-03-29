@@ -23,6 +23,25 @@ function parseDateInput(input: string | null, endOfDay = false) {
   return null
 }
 
+function resolveAmount(row: {
+  totalAmount: number | null
+  approvalAmount: number | null
+  amount: number | null
+  tax: number | null
+  serviceCharge: number | null
+}) {
+  if (typeof row.totalAmount === 'number') return row.totalAmount
+  if (typeof row.approvalAmount === 'number') return row.approvalAmount
+  if (
+    typeof row.amount === 'number' ||
+    typeof row.tax === 'number' ||
+    typeof row.serviceCharge === 'number'
+  ) {
+    return (row.amount || 0) + (row.tax || 0) + (row.serviceCharge || 0)
+  }
+  return 0
+}
+
 export async function GET(request: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -51,7 +70,7 @@ export async function GET(request: Request) {
       if (endDate) where.usedAt.lte = endDate
     }
 
-    const [items, totalCount, aggregate, maxSyncedAt] = await Promise.all([
+    const [items, totalCount, maxSyncedAt, amountRows] = await Promise.all([
       prisma.cardUsage.findMany({
         where,
         orderBy: [{ usedAt: 'desc' }, { createdAt: 'desc' }],
@@ -60,13 +79,21 @@ export async function GET(request: Request) {
       }),
       prisma.cardUsage.count({ where }),
       prisma.cardUsage.aggregate({
-        where,
-        _sum: { totalAmount: true },
-      }),
-      prisma.cardUsage.aggregate({
         _max: { syncedAt: true },
       }),
+      prisma.cardUsage.findMany({
+        where,
+        select: {
+          totalAmount: true,
+          approvalAmount: true,
+          amount: true,
+          tax: true,
+          serviceCharge: true,
+        },
+      }),
     ])
+
+    const totalAmount = amountRows.reduce((sum, row) => sum + resolveAmount(row), 0)
 
     return NextResponse.json({
       items,
@@ -75,7 +102,7 @@ export async function GET(request: Request) {
       totalCount,
       totalPages: Math.max(1, Math.ceil(totalCount / pageSize)),
       summary: {
-        totalAmount: aggregate._sum.totalAmount || 0,
+        totalAmount,
         lastSyncedAt: maxSyncedAt._max.syncedAt,
       },
     })
