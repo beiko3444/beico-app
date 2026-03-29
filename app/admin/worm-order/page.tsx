@@ -48,6 +48,39 @@ export default function WormOrderPage() {
     const [hasFetched, setHasFetched] = useState(false)
     const [selectedEmailUid, setSelectedEmailUid] = useState<string | null>(null)
 
+    // ── 관세사 메일 전달 관련 State ──
+    const [forwardEmail, setForwardEmail] = useState('')
+    const [forwarding, setForwarding] = useState(false)
+    const [forwardError, setForwardError] = useState('')
+    const [forwardSuccess, setForwardSuccess] = useState('')
+
+    const handleForwardEmail = async (uid: string) => {
+        if (!forwardEmail) {
+            setForwardError('받을 이메일 주소를 입력해주세요.')
+            return
+        }
+        setForwarding(true)
+        setForwardError('')
+        setForwardSuccess('')
+
+        try {
+            const res = await fetch('/api/admin/worm-order/emails/forward', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid, toEmail: forwardEmail })
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || '이메일 전달 실패')
+            setForwardSuccess('메일과 첨부파일이 지정된 주소로 성공적으로 전달되었습니다.')
+            setTimeout(() => setForwardSuccess(''), 5000)
+            setForwardEmail('')
+        } catch (err: any) {
+            setForwardError(err.message)
+        } finally {
+            setForwarding(false)
+        }
+    }
+
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
@@ -556,8 +589,40 @@ export default function WormOrderPage() {
                                                 ))}
                                             </div>
                                         )}
+
+                                        {/* ── [NEW] 관세사 메일 전달 영역 ── */}
+                                        <div className="mt-5 p-4 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col gap-3">
+                                            <label className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5 focus-within:text-orange-600 transition-colors">
+                                                <Send size={15} className="text-orange-600" />
+                                                이 메일의 첨부파일을 지정된 이메일로 바로 전달하기
+                                            </label>
+                                            <div className="flex gap-2 w-full">
+                                                <input 
+                                                    type="email"
+                                                    value={forwardEmail}
+                                                    onChange={(e) => setForwardEmail(e.target.value)}
+                                                    placeholder="수신자 이메일 주소 (예: customs@example.com)" 
+                                                    className="flex-1 px-3 h-10 rounded-lg border border-gray-300 text-[13px] outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-shadow bg-white"
+                                                    disabled={forwarding}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && forwardEmail && !forwarding) {
+                                                            handleForwardEmail(selectedEmail.uid)
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    onClick={() => handleForwardEmail(selectedEmail.uid)}
+                                                    disabled={forwarding || !forwardEmail.includes('@')}
+                                                    className="px-5 h-10 rounded-lg bg-orange-600 text-white font-bold text-[13px] hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm whitespace-nowrap"
+                                                >
+                                                    {forwarding ? <Loader2 size={14} className="animate-spin" /> : null}
+                                                    {forwarding ? '전송중...' : '해당 양식으로 전달'}
+                                                </button>
+                                            </div>
+                                            {forwardError && <p className="text-[12px] font-bold text-red-500">{forwardError}</p>}
+                                            {forwardSuccess && <p className="text-[12px] font-bold text-emerald-600">{forwardSuccess}</p>}
+                                        </div>
                                     </div>
-                                    
                                     {/* 메일 본문 내용 */}
                                     <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
                                         <div 
