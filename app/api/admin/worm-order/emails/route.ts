@@ -54,6 +54,12 @@ export async function GET() {
                             date: parsed.date,
                             text: parsed.html || parsed.textAsHtml || parsed.text || '',
                             hasAttachments: parsed.attachments && parsed.attachments.length > 0,
+                            attachments: (parsed.attachments || []).map((att: any, idx: number) => ({
+                                filename: att.filename || `attachment-${idx}`,
+                                contentType: att.contentType,
+                                size: att.size || 0,
+                                index: idx
+                            }))
                         })
                     }
                 }

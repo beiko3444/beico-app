@@ -495,11 +495,24 @@ export default function WormOrderPage() {
                                 <span className="text-[12px] text-gray-400 font-medium whitespace-nowrap">{new Date(email.date).toLocaleString()}</span>
                             </div>
                             <div className="text-[13px] text-gray-600 line-clamp-3 overflow-hidden text-ellipsis leading-relaxed focus:line-clamp-none hover:line-clamp-none transition-all" dangerouslySetInnerHTML={{ __html: email.text }} />
-                            {email.hasAttachments && (
+                            {email.attachments && email.attachments.length > 0 ? (
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    {email.attachments.map((att: any) => (
+                                        <a
+                                            key={att.index}
+                                            href={`/api/admin/worm-order/emails/attachment?uid=${email.uid}&index=${att.index}`}
+                                            className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#e34219] bg-[#fff7f3] hover:bg-[#ffeadd] px-3 py-1.5 rounded-lg border border-[#ffeadd] transition-colors"
+                                            title="클릭하여 첨부파일 열기/다운로드"
+                                        >
+                                            📎 {att.filename} <span className="font-normal text-[10px] text-orange-400 opacity-80 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
+                                        </a>
+                                    ))}
+                                </div>
+                            ) : email.hasAttachments ? (
                                 <span className="inline-flex items-center gap-1 mt-3 text-[11px] font-bold text-[#e34219] bg-[#fff7f3] px-2 py-0.5 rounded border border-[#ffeadd]">
-                                    📎 첨부파일 있음 (Daum 메일함 직접 확인 필요)
+                                    📎 첨부파일 있음 (이름 불러오기 실패)
                                 </span>
-                            )}
+                            ) : null}
                         </div>
                     ))}
                 </div>
