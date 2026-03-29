@@ -10,7 +10,7 @@ const getCachedTasks = unstable_cache(
         orderBy: { date: 'asc' }
     }),
     ['admin-tasks-page-v1'],
-    { revalidate: 5 }
+    { revalidate: 60 }
 )
 
 export default async function TasksPage() {

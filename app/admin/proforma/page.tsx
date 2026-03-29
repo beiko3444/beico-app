@@ -45,7 +45,7 @@ const getCachedProformaPageData = unstable_cache(
         return { partners, products, issued }
     },
     ['admin-proforma-page-v1'],
-    { revalidate: 5 }
+    { revalidate: 60 }
 )
 
 const readNumber = (value: unknown): number => {
@@ -60,11 +60,24 @@ const readNumber = (value: unknown): number => {
     return 0
 }
 
+type RegionalPriceNode = {
+    wholesale?: unknown
+    cost?: unknown
+}
+
+type RegionalPriceCountry = {
+    US?: RegionalPriceNode
+}
+
+type RegionalPriceRoot = {
+    C?: RegionalPriceCountry
+}
+
 const resolveUsdUnitPrice = (product: { usBuyPrice?: number | null; usSellPrice?: number | null; regionalPrices?: unknown }) => {
     const direct = readNumber(product.usBuyPrice)
     if (direct > 0) return direct
 
-    const regional = product.regionalPrices as Record<string, any> | null | undefined
+    const regional = product.regionalPrices as RegionalPriceRoot | null | undefined
     const fromRegional = readNumber(regional?.C?.US?.wholesale ?? regional?.C?.US?.cost)
     if (fromRegional > 0) return fromRegional
 

@@ -12,7 +12,7 @@ const getCachedProducts = unstable_cache(
         orderBy: { sortOrder: 'asc' }
     }),
     ['admin-products-page-v1'],
-    { revalidate: 5 }
+    { revalidate: 60 }
 )
 
 export default async function ProductsPage() {

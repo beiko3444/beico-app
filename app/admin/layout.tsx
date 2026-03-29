@@ -6,6 +6,10 @@ import { authOptions } from "@/lib/auth"
 import { unstable_cache } from "next/cache"
 import AdminNav from "./AdminNav"
 
+type LowStockCountRow = {
+    count: number | bigint
+}
+
 const getCachedAdminCounts = unstable_cache(
     async () => {
         // 1. Pending Orders
@@ -24,11 +28,14 @@ const getCachedAdminCounts = unstable_cache(
             }
         })
 
-        // 2. Low Stock Products (stock <= safetyStock)
-        const allProducts = await prisma.product.findMany({
-            select: { stock: true, safetyStock: true }
-        })
-        const lowStockCount = allProducts.filter((p) => p.stock <= p.safetyStock).length
+        // 2. Low Stock Products (stock <= safetyStock) - count directly in DB
+        const lowStockRows = await prisma.$queryRaw<LowStockCountRow[]>`
+            SELECT COUNT(*)::int AS count
+            FROM "Product"
+            WHERE "stock" <= "safetyStock"
+        `
+        const lowStockRaw = lowStockRows[0]?.count ?? 0
+        const lowStockCount = typeof lowStockRaw === "bigint" ? Number(lowStockRaw) : lowStockRaw
 
         // 3. Pending Partners
         const pendingPartnerCount = await prisma.user.count({
@@ -57,7 +64,7 @@ const getCachedAdminCounts = unstable_cache(
         }
     },
     ['admin-layout-counts-v1'],
-    { revalidate: 5 }
+    { revalidate: 60 }
 )
 
 export default async function AdminLayout({
@@ -78,7 +85,7 @@ export default async function AdminLayout({
     }
     try {
         counts = await getCachedAdminCounts()
-    } catch (error) {
+    } catch {
         console.warn("Database unreachable in AdminLayout, using default counts.")
     }
 

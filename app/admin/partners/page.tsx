@@ -26,7 +26,7 @@ const getCachedPartnersPageData = unstable_cache(
         return { activePartners, deletedPartners }
     },
     ['admin-partners-page-v1'],
-    { revalidate: 5 }
+    { revalidate: 60 }
 )
 
 export default async function PartnersPage() {
