@@ -1,7 +1,7 @@
 // 바로빌 세금계산서 API - 직접 SOAP XML 방식 (서버리스 호환)
 
-// 바로빌 테스트 서버 (운영: https://ws.baroservice.com/TI.asmx)
-const SOAP_URL = 'https://testws.baroservice.com/TI.asmx';
+// 바로빌 운영 서버 (테스트: https://testws.baroservice.com/TI.asmx)
+const SOAP_URL = 'https://ws.baroservice.com/TI.asmx';
 
 function getConfig() {
   return {
