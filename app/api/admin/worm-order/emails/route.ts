@@ -55,14 +55,34 @@ export async function GET() {
                         if (parsed.attachments && parsed.attachments.length > 0) {
                             for (const att of parsed.attachments) {
                                 const filename = att.filename || '';
-                                if (att.contentType === 'application/pdf' && att.content && filename.toUpperCase().startsWith('SKM')) {
+                                if (att.contentType === 'application/pdf' && att.content && filename.toUpperCase().includes('SKM')) {
                                     try {
                                         const data = await pdfParse(att.content);
                                         const text = data.text;
-                                        const match = text.match(/(?<!\d)(\d(?:[\s-]*\d){10})(?!\d)/);
+                                        const textClean = text.replace(/\n/g, ' ');
+                                        const match = textClean.match(/(?:^|[^0-9])([0-9](?:[\s-]*[0-9]){10})(?![0-9])/);
                                         if (match && match[1]) {
                                             extractedAWB = match[1].replace(/[\s-]/g, '');
                                             break;
+                                        } else {
+                                            // 11자리 숫자가 정규식에 안 걸리는 경우 단순 검색 대체재
+                                            const simpleMatch = textClean.match(/\d{11}/);
+                                            if (simpleMatch) {
+                                                extractedAWB = simpleMatch[0];
+                                                break;
+                                            }
+
+                                            // 실패 원인 디버그 텍스트 반환
+                                            if (text.trim().length < 30) {
+                                                extractedAWB = "오류: 이미지 전용 PDF (텍스트 없음)";
+                                            } else {
+                                                const awbIndex = textClean.toUpperCase().indexOf('WAYBILL');
+                                                if (awbIndex !== -1) {
+                                                    extractedAWB = "실패: " + textClean.substring(awbIndex, awbIndex + 30).trim();
+                                                } else {
+                                                    extractedAWB = "오류: 11자리 숫자 패턴 없음";
+                                                }
+                                            }
                                         }
                                     } catch (err) {
                                         console.error('PDF Parse Error:', err);
