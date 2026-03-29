@@ -97,14 +97,14 @@ export async function issueTaxInvoice(params: IssueTaxInvoiceParams): Promise<{
       <CorpNum>${escapeXml(cfg.CORP_NUM)}</CorpNum>
       <Invoice>
         <InvoicerParty>
+          <ContactID>${escapeXml(cfg.CONTACT_ID)}</ContactID>
           <CorpNum>${escapeXml(cfg.CORP_NUM)}</CorpNum>
           <MgtNum>${escapeXml(params.mgtKey)}</MgtNum>
           <CorpName>${escapeXml(cfg.CORP_NAME)}</CorpName>
           <CEOName>${escapeXml(cfg.CEO_NAME)}</CEOName>
           <Addr>${escapeXml(cfg.ADDR)}</Addr>
-          <BizType>${escapeXml(cfg.BIZ_TYPE)}</BizType>
           <BizClass>${escapeXml(cfg.BIZ_CLASS)}</BizClass>
-          <ContactID>${escapeXml(cfg.CONTACT_ID)}</ContactID>
+          <BizType>${escapeXml(cfg.BIZ_TYPE)}</BizType>
           <ContactName>${escapeXml(cfg.CEO_NAME)}</ContactName>
           <Email>${escapeXml(cfg.EMAIL)}</Email>
         </InvoicerParty>
@@ -113,11 +113,11 @@ export async function issueTaxInvoice(params: IssueTaxInvoiceParams): Promise<{
           <CorpName>${escapeXml(params.invoicee.corpName)}</CorpName>
           <CEOName>${escapeXml(params.invoicee.ceoName)}</CEOName>
           <Addr>${escapeXml(params.invoicee.addr || '')}</Addr>
-          <BizType>${escapeXml(params.invoicee.bizType || '')}</BizType>
           <BizClass>${escapeXml(params.invoicee.bizClass || '')}</BizClass>
+          <BizType>${escapeXml(params.invoicee.bizType || '')}</BizType>
           <ContactName>${escapeXml(params.invoicee.contactName || params.invoicee.ceoName)}</ContactName>
-          <Email>${escapeXml(params.invoicee.email || '')}</Email>
           <TEL>${escapeXml(params.invoicee.tel || '')}</TEL>
+          <Email>${escapeXml(params.invoicee.email || '')}</Email>
         </InvoiceeParty>
         <IssueDirection>1</IssueDirection>
         <TaxInvoiceType>1</TaxInvoiceType>
