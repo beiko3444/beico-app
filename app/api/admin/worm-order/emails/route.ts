@@ -28,8 +28,8 @@ export async function GET() {
         
         const lock = await client.getMailboxLock('INBOX')
         try {
-            // 발신인이 Michael 인 메일 검색 (UID 배열 반환)
-            const uids = await client.search({ from: 'michael@oikki.com' }, { uid: true })
+            // 제목에 'documents'가 포함된 메일 검색 (UID 배열 반환)
+            const uids = await client.search({ subject: 'documents' }, { uid: true })
             
             if (!uids || uids.length === 0) {
                 return NextResponse.json({ emails: [] })
