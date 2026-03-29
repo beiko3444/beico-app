@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { ImapFlow } from 'imapflow'
 import { simpleParser } from 'mailparser'
+const pdfParse = require('pdf-parse')
 
 export const dynamic = 'force-dynamic'
 
@@ -48,12 +49,36 @@ export async function GET() {
                     const body = (parsed.html || parsed.textAsHtml || parsed.text || '').toLowerCase()
                     
                     if (body.includes('michael@oikki.com')) {
+                        let extractedAWB = null;
+
+                        // 첨부파일 중 PDF에서 AIR WAYBILL 번호 추출 시도
+                        if (parsed.attachments && parsed.attachments.length > 0) {
+                            for (const att of parsed.attachments) {
+                                if (att.contentType === 'application/pdf' && att.content) {
+                                    try {
+                                        const data = await pdfParse(att.content);
+                                        const text = data.text;
+                                        if (/air\s*waybill/i.test(text) || (att.filename && /waybill|awb/i.test(att.filename))) {
+                                            const match = text.match(/(?<!\d)(\d(?:[\s-]*\d){10})(?!\d)/);
+                                            if (match && match[1]) {
+                                                extractedAWB = match[1].replace(/[\s-]/g, '');
+                                                break;
+                                            }
+                                        }
+                                    } catch (err) {
+                                        console.error('PDF Parse Error:', err);
+                                    }
+                                }
+                            }
+                        }
+
                         emails.push({
                             uid: message.uid,
                             subject: parsed.subject || '(제목 없음)',
                             date: parsed.date,
                             text: parsed.html || parsed.textAsHtml || parsed.text || '',
                             hasAttachments: parsed.attachments && parsed.attachments.length > 0,
+                            extractedAWB,
                             attachments: (parsed.attachments || []).map((att: any, idx: number) => ({
                                 filename: att.filename || `attachment-${idx}`,
                                 contentType: att.contentType,

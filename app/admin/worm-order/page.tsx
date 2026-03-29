@@ -619,6 +619,28 @@ export default function WormOrderPage() {
                                             <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
                                         </div>
                                         
+                                        {/* 추출된 AIR WAYBILL */}
+                                        {selectedEmail.extractedAWB && (
+                                            <div className="mt-5 p-4 rounded-xl border border-blue-100 bg-blue-50/50 flex flex-col gap-2">
+                                                <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                                                    <Sparkles size={14} className="text-blue-500" />
+                                                    Air Waybill Found
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{selectedEmail.extractedAWB}</span>
+                                                    <button 
+                                                        onClick={() => {
+                                                            navigator.clipboard.writeText(selectedEmail.extractedAWB)
+                                                            alert('운송장 번호 ' + selectedEmail.extractedAWB + ' 이(가) 복사되었습니다.')
+                                                        }}
+                                                        className="h-9 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center shrink-0"
+                                                    >
+                                                        복사하기
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         {/* 첨부파일 다운로드 */}
                                         {selectedEmail.attachments && selectedEmail.attachments.length > 0 && (
                                             <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2">
