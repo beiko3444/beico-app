@@ -106,19 +106,11 @@ export default function AdminOrderCard({ order }: { order: any }) {
                 <table className="w-full text-[12px]">
                     <tbody>
                         <tr className="border-b border-gray-50">
-                            <td className="text-gray-400 py-1.5 pr-3 w-20 align-top">업체명</td>
-                            <td className="text-gray-900 font-bold py-1.5">{partnerName}</td>
-                        </tr>
-                        <tr className="border-b border-gray-50">
-                            <td className="text-gray-400 py-1.5 pr-3 align-top">대표자</td>
-                            <td className="text-gray-900 font-bold py-1.5">{representativeName}</td>
-                        </tr>
-                        <tr className="border-b border-gray-50">
-                            <td className="text-gray-400 py-1.5 pr-3 align-top">사업자번호</td>
+                            <td className="text-gray-400 py-1.5 pr-3 w-20 align-top">사업자번호</td>
                             <td className="py-1.5">
                                 <button
                                     onClick={() => copyToClipboard(order.user.partnerProfile?.businessRegNumber || '', 'biz')}
-                                    className="flex items-center gap-1 text-gray-900 font-bold hover:text-[#d9361b] transition-colors"
+                                    className="flex items-center gap-1 text-gray-900 font-bold hover:text-[#d9361b] transition-colors text-left"
                                 >
                                     {order.user.partnerProfile?.businessRegNumber || '-'}
                                     {copiedField === 'biz' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="text-gray-300" />}
@@ -126,11 +118,35 @@ export default function AdminOrderCard({ order }: { order: any }) {
                             </td>
                         </tr>
                         <tr className="border-b border-gray-50">
+                            <td className="text-gray-400 py-1.5 pr-3 align-top">상호</td>
+                            <td className="py-1.5">
+                                <button
+                                    onClick={() => copyToClipboard(partnerName, 'partnerName')}
+                                    className="flex items-center gap-1 text-gray-900 font-bold hover:text-[#d9361b] transition-colors text-left"
+                                >
+                                    {partnerName}
+                                    {copiedField === 'partnerName' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="text-gray-300" />}
+                                </button>
+                            </td>
+                        </tr>
+                        <tr className="border-b border-gray-50">
+                            <td className="text-gray-400 py-1.5 pr-3 align-top">성명</td>
+                            <td className="py-1.5">
+                                <button
+                                    onClick={() => copyToClipboard(representativeName, 'repName')}
+                                    className="flex items-center gap-1 text-gray-900 font-bold hover:text-[#d9361b] transition-colors text-left"
+                                >
+                                    {representativeName}
+                                    {copiedField === 'repName' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="text-gray-300" />}
+                                </button>
+                            </td>
+                        </tr>
+                        <tr className="border-b border-gray-50">
                             <td className="text-gray-400 py-1.5 pr-3 align-top">이메일</td>
                             <td className="py-1.5">
                                 <button
-                                    onClick={() => copyToClipboard(order.user.partnerProfile?.email || '', 'email')}
-                                    className="flex items-center gap-1 text-gray-900 font-bold hover:text-[#d9361b] transition-colors"
+                                    onClick={() => copyToClipboard(order.user.partnerProfile?.email ? order.user.partnerProfile.email.split('@')[0] : '', 'email')}
+                                    className="flex items-center gap-1 text-gray-900 font-bold hover:text-[#d9361b] transition-colors text-left"
                                 >
                                     <span className="truncate max-w-[220px]">{order.user.partnerProfile?.email || '-'}</span>
                                     {copiedField === 'email' ? <Check size={10} className="text-emerald-500" /> : <Copy size={10} className="text-gray-300" />}
@@ -194,16 +210,28 @@ export default function AdminOrderCard({ order }: { order: any }) {
                                     )}
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <p className="text-[12px] font-bold text-gray-900 truncate leading-tight">{item.product.name}</p>
-                                    <p className="text-[9px] text-gray-400 truncate mb-1.5">{item.product.nameJP || ''}</p>
-                                    <div className="flex items-center text-[10px] text-gray-500 gap-2">
-                                        <span>@{item.price.toLocaleString()}</span>
-                                        <span>×</span>
-                                        <span className="font-bold text-gray-700">{item.quantity}</span>
+                                    <button
+                                        onClick={() => copyToClipboard(item.product.name, `prodName-${item.id}`)}
+                                        className="flex items-center gap-1 text-[12px] font-bold text-gray-900 hover:text-[#d9361b] transition-colors text-left w-full max-w-full"
+                                    >
+                                        <span className="truncate">{item.product.name}</span>
+                                        {copiedField === `prodName-${item.id}` ? <Check size={12} className="text-emerald-500 shrink-0" /> : <Copy size={10} className="text-gray-300 shrink-0" />}
+                                    </button>
+                                    <p className="text-[9px] text-gray-400 truncate mt-0.5">{item.product.nameJP || ''}</p>
+                                    <div className="mt-1.5 flex items-center gap-3 text-[12px]">
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-gray-400 text-[11px]">단가</span>
+                                            <span className="font-bold text-gray-800">{item.price.toLocaleString()}원</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <span className="text-gray-400 text-[11px]">수량</span>
+                                            <span className="font-bold text-[#d9361b]">{item.quantity}개</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center text-[10px] text-gray-400 gap-2 mt-0.5">
+                                        <span>공급가 {supplyPrice.toLocaleString()}원</span>
                                         <span className="text-gray-300">|</span>
-                                        <span>공급 {supplyPrice.toLocaleString()}</span>
-                                        <span className="text-gray-300">|</span>
-                                        <span>VAT {vat.toLocaleString()}</span>
+                                        <span>VAT {vat.toLocaleString()}원</span>
                                     </div>
                                 </div>
                                 <div className="text-right shrink-0 self-center">
