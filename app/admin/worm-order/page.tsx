@@ -101,13 +101,13 @@ export default function WormOrderPage() {
             if (!res.ok) throw new Error('첨부파일 다운로드 실패')
             const blob = await res.blob()
 
-            // 2. PDF → Canvas 이미지 변환 (pdf.js)
+            // 2. PDF → Canvas 이미지 변환 (pdf.js) - 고해상도로 렌더링
             const pdfjsLib = await import('pdfjs-dist')
             pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
             const arrayBuffer = await blob.arrayBuffer()
             const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
             const page = await pdf.getPage(1)
-            const viewport = page.getViewport({ scale: 2.0 })
+            const viewport = page.getViewport({ scale: 3.0 })
             const canvas = document.createElement('canvas')
             canvas.width = viewport.width
             canvas.height = viewport.height
@@ -119,25 +119,56 @@ export default function WormOrderPage() {
                 logger: () => {},
             })
             const ocrText = result.data.text
+            console.log('[AWB OCR Raw Text]', ocrText)
 
-            // 4. 11자리 숫자 추출
-            const cleaned = ocrText.replace(/[OoIl]/g, (c: string) => {
-                if (c === 'O' || c === 'o') return '0'
-                if (c === 'I' || c === 'l') return '1'
-                return c
-            })
-            const match = cleaned.match(/\d[\d\s-]{9,15}\d/)
-            if (match) {
-                const digits = match[0].replace(/[\s-]/g, '')
-                if (digits.length >= 11) {
-                    setAwbNumber(digits.substring(0, 11))
-                    return
+            // 4. OCR 텍스트 정리 (흔한 OCR 오인식 보정)
+            const cleaned = ocrText
+                .replace(/[|]/g, '1')
+                .replace(/\n/g, ' ')
+
+            // 5. 'WAYBILL' or 'MAWB' 키워드 근처에서 번호 추출
+            const lines = ocrText.split('\n')
+            let awbFound: string | null = null
+
+            for (let i = 0; i < lines.length; i++) {
+                const lineUpper = lines[i].toUpperCase()
+                if (lineUpper.includes('WAYBILL') || lineUpper.includes('MAWB') || lineUpper.includes('AWB')) {
+                    // 이 줄과 다음 3줄 내에서 숫자 패턴 탐색
+                    const searchBlock = lines.slice(i, i + 4).join(' ')
+                    const blockCleaned = searchBlock.replace(/[OoQ]/g, '0').replace(/[IilL|]/g, '1').replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[Zz]/g, '2')
+                    
+                    // XXX XXXX XXXX 또는 XXX-XXXX-XXXX 형태 (3+4+4)
+                    const m1 = blockCleaned.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
+                    if (m1) {
+                        awbFound = m1[1] + m1[2] + m1[3]
+                        break
+                    }
+                    // XXX XXXXXXXX 형태 (3+8)
+                    const m2 = blockCleaned.match(/(\d{3})\s*[-.]?\s*(\d{8})/)
+                    if (m2) {
+                        awbFound = m2[1] + m2[2]
+                        break
+                    }
+                    // 연속 11자리
+                    const m3 = blockCleaned.match(/\d{11}/)
+                    if (m3) {
+                        awbFound = m3[0]
+                        break
+                    }
                 }
             }
-            // 단순 11자리 연속 숫자 시도
-            const simpleMatch = cleaned.match(/\d{11}/)
-            if (simpleMatch) {
-                setAwbNumber(simpleMatch[0])
+
+            // 6. 키워드 기반 실패 시 전체 텍스트에서 3+4+4 패턴 탐색
+            if (!awbFound) {
+                const fullCleaned = cleaned.replace(/[OoQ]/g, '0').replace(/[IilL|]/g, '1').replace(/[Ss]/g, '5').replace(/[Bb]/g, '8').replace(/[Zz]/g, '2')
+                const m = fullCleaned.match(/(\d{3})\s*[-.]?\s*(\d{4})\s*[-.]?\s*(\d{4})/)
+                if (m) {
+                    awbFound = m[1] + m[2] + m[3]
+                }
+            }
+
+            if (awbFound) {
+                setAwbNumber(awbFound)
                 return
             }
             setAwbError('OCR 완료했으나 11자리 운송장 번호를 찾지 못했습니다.')
