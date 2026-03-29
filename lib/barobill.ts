@@ -201,8 +201,12 @@ export function buildTaxInvoiceParams(order: any): IssueTaxInvoiceParams {
   const now = new Date();
   const writeDate = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}`;
 
-  const orderNum = order.orderNumber || order.id.slice(0, 8);
-  const mgtKey = `BEICO-${orderNum}-${Date.now().toString(36).toUpperCase()}`;
+  // 관리번호: 영문/숫자, 최대 24자 이내 (Barobill 규칙)
+  const orderNumStr = String(order.orderNumber || order.id).replace(/[^a-zA-Z0-9]/g, '');
+  const prefix = 'BE'; // 2자
+  const ts = Date.now().toString(36).toUpperCase(); // 8자 (예: LTW0YXTK)
+  // 조합: BE(2) + 주문번호(최대 14자) + 시간(8자) = 최대 24자
+  const mgtKey = `${prefix}${orderNumStr.slice(0, 14)}${ts}`;
 
   const partner = order.user?.partnerProfile;
   const invoicee: InvoiceeInfo = {
@@ -254,7 +258,7 @@ export function buildTaxInvoiceParams(order: any): IssueTaxInvoiceParams {
     amountTotal,
     taxTotal,
     totalAmount,
-    remark1: `주문번호: ${orderNum}`,
+    remark1: `주문번호: ${order.orderNumber || order.id.slice(0, 8)}`,
   };
 }
 
