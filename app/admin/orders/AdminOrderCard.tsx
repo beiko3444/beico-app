@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import OrderActions from '@/components/OrderActions'
-import { Trash2, Copy, Check, Package, Truck, MapPin, Phone, Mail, Building2, User, Hash, FileText, ChevronRight } from 'lucide-react'
+import { Copy, Check, Package, Truck, MapPin, Phone, Mail, Building2, User, Hash, FileText, ChevronRight } from 'lucide-react'
 
 // ── 진행 단계 컴포넌트 (라이트 테마 통합형) ──────────────────────────────
 function ProgressSteps({ status, trackingNumber, taxInvoiceIssued }: {
@@ -117,7 +117,6 @@ function InfoRow({ label, value, copyable, copyKey, copiedField, onCopy }: {
 
 // ── 메인 컴포넌트 ──────────────────────────────────────────────────
 export default function AdminOrderCard({ order }: { order: any }) {
-    const [isDeleting, setIsDeleting] = useState(false)
     const [copiedField, setCopiedField] = useState<string | null>(null)
 
     const date = new Date(order.createdAt)
@@ -157,27 +156,12 @@ export default function AdminOrderCard({ order }: { order: any }) {
         setTimeout(() => setCopiedField(null), 1500)
     }
 
-    const handleDelete = async () => {
-        if (!confirm('정말로 이 주문을 삭제하시겠습니까? 삭제 시 재고가 복구됩니다.')) return
-        setIsDeleting(true)
-        try {
-            const res = await fetch(`/api/orders/${order.id}`, { method: 'DELETE' })
-            if (!res.ok) { const e = await res.json(); throw new Error(e.error || '오류') }
-            alert('삭제 완료'); window.location.reload()
-        } catch (error: any) { alert(error.message); setIsDeleting(false) }
-    }
-
     const depositConfirmedAt = formatTimestamp(order.depositConfirmedAt)
     const adminDepositConfirmedAt = formatTimestamp(order.adminDepositConfirmedAt)
 
     return (
         <div className="relative w-full max-w-[480px] mx-auto font-sans">
-            {/* Multiply Blend Layer for Completed */}
-            {order.taxInvoiceIssued && (
-                <div className="absolute inset-[-16px] z-50 bg-[#1e293b]/50 mix-blend-multiply pointer-events-none rounded-[2rem] shadow-[inset_0_0_100px_rgba(30,41,59,0.3)] transition-opacity" />
-            )}
-            
-            <div className={`space-y-4 ${order.taxInvoiceIssued ? 'opacity-95' : ''}`}>
+            <div className={`space-y-4 rounded-3xl ${order.taxInvoiceIssued ? 'bg-emerald-50/50 p-3 -m-3 border border-emerald-100 shadow-[inset_0_2px_10px_rgba(16,185,129,0.05)]' : ''}`}>
                 {/* ── 헤더 카드 (완전 라이트 테마) ── */}
                 <div className="bg-white rounded-2xl border border-gray-200 shadow-[0_4px_20px_rgba(0,0,0,0.04)] overflow-hidden">
                     <div className="px-6 pt-5 pb-4">
@@ -207,13 +191,6 @@ export default function AdminOrderCard({ order }: { order: any }) {
                                     <span>{formattedDate}</span>
                                 </div>
                             </div>
-                            <button
-                                onClick={handleDelete}
-                                disabled={isDeleting}
-                                className="relative z-10 w-8 h-8 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors"
-                            >
-                                <Trash2 size={15} />
-                            </button>
                         </div>
 
                         <div className="mt-5 pt-5 border-t border-gray-100">

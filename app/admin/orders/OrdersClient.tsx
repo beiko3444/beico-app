@@ -18,6 +18,12 @@ export default function OrdersClient({
     const type = searchParams.get('type')
     const [selectedPartner, setSelectedPartner] = useState<string | null>(null)
     const [statSortType, setStatSortType] = useState<'quantity' | 'total'>('quantity')
+    
+    // YYYY-MM 포맷. 기본값은 이번달
+    const [selectedMonth, setSelectedMonth] = useState<string>(() => {
+        const now = new Date()
+        return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    })
 
     // Extract unique partners (Business Name or Name)
     const partners = useMemo(() => {
@@ -28,15 +34,16 @@ export default function OrdersClient({
 
     // Current Month Statistics
     const stats = useMemo(() => {
-        if (!selectedPartner) return null;
+        if (!selectedPartner || !selectedMonth) return null;
 
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const [year, month] = selectedMonth.split('-').map(Number);
+        const startOfMonth = new Date(year, month - 1, 1);
+        const endOfMonth = new Date(year, month, 1);
 
         const partnerOrdersThisMonth = orders.filter(order => {
             const partnerName = order.user.partnerProfile?.businessName || order.user.name;
             const orderDate = new Date(order.createdAt);
-            return partnerName === selectedPartner && orderDate >= startOfMonth;
+            return partnerName === selectedPartner && orderDate >= startOfMonth && orderDate < endOfMonth;
         });
 
         const totalSalesWithVAT = partnerOrdersThisMonth.reduce((sum, order) => {
@@ -68,9 +75,9 @@ export default function OrdersClient({
             totalSales: totalSalesWithVAT,
             products: Object.values(productDataMap).sort((a, b) => b[statSortType] - a[statSortType]),
             orderCount: partnerOrdersThisMonth.length,
-            month: now.getMonth() + 1
+            month: parseInt(selectedMonth.split('-')[1], 10)
         };
-    }, [orders, selectedPartner, statSortType]);
+    }, [orders, selectedPartner, statSortType, selectedMonth]);
 
     const filteredOrders = orders?.filter(order => {
         const matchesType = (() => {
@@ -84,7 +91,14 @@ export default function OrdersClient({
         const partnerName = order.user.partnerProfile?.businessName || order.user.name
         const matchesPartner = !selectedPartner || partnerName === selectedPartner
 
-        return matchesType && matchesPartner
+        let matchesMonth = true
+        if (selectedMonth) {
+            const [year, month] = selectedMonth.split('-').map(Number)
+            const orderDate = new Date(order.createdAt)
+            matchesMonth = orderDate.getFullYear() === year && orderDate.getMonth() + 1 === month
+        }
+
+        return matchesType && matchesPartner && matchesMonth
     }) || []
 
     return (
@@ -117,6 +131,16 @@ export default function OrdersClient({
                             <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#d9361b] opacity-50">
                                 <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                             </div>
+                        </div>
+
+                        {/* Month Picker */}
+                        <div className="relative">
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={(e) => setSelectedMonth(e.target.value)}
+                                className="bg-gray-50/50 border border-gray-100 text-gray-700 text-[11px] font-black rounded-lg focus:ring-gray-300 focus:border-gray-300 block w-full px-2.5 py-1.5 transition-all hover:bg-white cursor-pointer h-[26px]"
+                            />
                         </div>
                     </div>
 
