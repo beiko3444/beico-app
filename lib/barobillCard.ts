@@ -198,7 +198,18 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
   const amount = toInt(extractTag(block, 'Amount')) ?? approvalAmount
   const tax = toInt(extractTag(block, 'Tax'))
   const serviceCharge = toInt(extractTag(block, 'ServiceCharge'))
-  const totalAmount = toInt(extractTag(block, 'TotalAmount')) ?? approvalAmount
+  // TotalAmount 우선, 없으면 Amount+Tax+ServiceCharge 합산, 없으면 ApprovalAmount/CardApprovalCost
+  const rawTotalAmount = toInt(extractTag(block, 'TotalAmount'))
+  const summedAmount =
+    typeof amount === 'number' || typeof tax === 'number' || typeof serviceCharge === 'number'
+      ? (amount || 0) + (tax || 0) + (serviceCharge || 0)
+      : null
+  const totalAmount =
+    (typeof rawTotalAmount === 'number' && rawTotalAmount > 0)
+      ? rawTotalAmount
+      : (typeof summedAmount === 'number' && summedAmount > 0)
+        ? summedAmount
+        : rawTotalAmount ?? approvalAmount
   const useKeyRaw = decodeXml(extractTag(block, 'UseKey') || '')
   const useKey = useKeyRaw || `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
 
@@ -267,7 +278,18 @@ function parseLegacyCardLogEx3(block: string): BarobillCardApprovalLog {
   const amount = toInt(extractTag(block, 'Amount')) ?? approvalAmount
   const tax = toInt(extractTag(block, 'Tax'))
   const serviceCharge = toInt(extractTag(block, 'ServiceCharge'))
-  const totalAmount = toInt(extractTag(block, 'TotalAmount')) ?? approvalAmount
+  // TotalAmount 우선, 없으면 Amount+Tax+ServiceCharge 합산, 없으면 CardApprovalCost
+  const rawTotalAmount = toInt(extractTag(block, 'TotalAmount'))
+  const summedAmount =
+    typeof amount === 'number' || typeof tax === 'number' || typeof serviceCharge === 'number'
+      ? (amount || 0) + (tax || 0) + (serviceCharge || 0)
+      : null
+  const totalAmount =
+    (typeof rawTotalAmount === 'number' && rawTotalAmount > 0)
+      ? rawTotalAmount
+      : (typeof summedAmount === 'number' && summedAmount > 0)
+        ? summedAmount
+        : rawTotalAmount ?? approvalAmount
   const useKeyRaw = decodeXml(extractTag(block, 'UseKey') || '')
   const useKey = useKeyRaw || `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
 
