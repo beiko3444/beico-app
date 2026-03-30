@@ -130,7 +130,6 @@ async function issueNaverAccessToken(forceRefresh = false) {
             Accept: "application/json",
         },
         body: body.toString(),
-        cache: "no-store",
     });
 
     if (!response.ok) {
@@ -162,7 +161,6 @@ async function requestProductPage(accessToken: string, payload: NaverProductSear
             Accept: "application/json",
         },
         body: JSON.stringify(payload),
-        cache: "no-store",
     });
 
     return response;
