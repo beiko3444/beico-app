@@ -79,14 +79,16 @@ async function issueNaverAccessToken(forceRefresh = false) {
 
     const clientId = process.env.NAVER_COMMERCE_CLIENT_ID || "";
     const clientSecret = process.env.NAVER_COMMERCE_CLIENT_SECRET || "";
-    const tokenType = (process.env.NAVER_COMMERCE_TOKEN_TYPE || "SELLER").toUpperCase();
+    // Default to SELF so account_id is not mandatory for single-store integrations.
+    const tokenType = (process.env.NAVER_COMMERCE_TOKEN_TYPE || "").trim().toUpperCase();
     const accountId = process.env.NAVER_COMMERCE_ACCOUNT_ID || "";
+    const resolvedTokenType = tokenType || (accountId ? "SELLER" : "SELF");
 
     if (!clientId || !clientSecret) {
         throw new Error("NAVER_COMMERCE_CLIENT_ID / NAVER_COMMERCE_CLIENT_SECRET 환경변수가 필요합니다.");
     }
-    if (tokenType === "SELLER" && !accountId) {
-        throw new Error("SELLER 토큰 사용 시 NAVER_COMMERCE_ACCOUNT_ID 환경변수가 필요합니다.");
+    if (resolvedTokenType === "SELLER" && !accountId) {
+        throw new Error("SELLER 토큰 사용 시 NAVER_COMMERCE_ACCOUNT_ID(accountUid) 환경변수가 필요합니다. accountUid가 없으면 NAVER_COMMERCE_TOKEN_TYPE=SELF 로 설정하세요.");
     }
 
     const timestamp = now.toString();
@@ -99,9 +101,9 @@ async function issueNaverAccessToken(forceRefresh = false) {
         timestamp,
         client_secret_sign: signature,
         grant_type: "client_credentials",
-        type: tokenType,
+        type: resolvedTokenType,
     });
-    if (tokenType === "SELLER") {
+    if (resolvedTokenType === "SELLER") {
         body.set("account_id", accountId);
     }
 
