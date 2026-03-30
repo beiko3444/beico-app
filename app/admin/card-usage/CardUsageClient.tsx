@@ -352,6 +352,14 @@ export default function CardUsageClient() {
 
   // Group by date
   const groupedItems = useMemo(() => {
+    if (sortMode === 'amount') {
+      return [{
+        date: 'amount',
+        label: '금액순',
+        items: sortedItems,
+      }]
+    }
+
     const groups: { date: string; label: string; items: CardUsageItem[] }[] = []
     const map = new Map<string, CardUsageItem[]>()
     for (const item of sortedItems) {
@@ -363,7 +371,7 @@ export default function CardUsageClient() {
       groups.push({ date: key, label: formatDateGroup(key), items })
     }
     return groups
-  }, [sortedItems])
+  }, [sortedItems, sortMode])
 
   /* ── Styles ── */
   const cardStyle: React.CSSProperties = {
@@ -777,13 +785,15 @@ export default function CardUsageClient() {
           {groupedItems.map(group => (
             <div key={group.date}>
               {/* Date group label */}
-              <p style={{
-                fontSize: 12, fontWeight: 500, color: T.textTertiary,
-                margin: '12px 0 6px', paddingBottom: 6,
-                borderBottom: `1px solid ${T.borderLight}`,
-              }}>
-                {group.label}
-              </p>
+              {sortMode === 'date' && (
+                <p style={{
+                  fontSize: 12, fontWeight: 500, color: T.textTertiary,
+                  margin: '12px 0 6px', paddingBottom: 6,
+                  borderBottom: `1px solid ${T.borderLight}`,
+                }}>
+                  {group.label}
+                </p>
+              )}
 
               {/* Transaction items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
