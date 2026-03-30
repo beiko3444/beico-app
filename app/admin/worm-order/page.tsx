@@ -9,6 +9,16 @@ type WormSize = {
     range: string
 }
 
+type WormTypeId = 'blue' | 'red'
+
+type WormType = {
+    id: WormTypeId
+    label: string
+    cardActiveClass: string
+    cardActiveBorderClass: string
+    cardTagClass: string
+}
+
 type AwbCandidate = {
     value: string
     score: number
@@ -50,11 +60,35 @@ const WORM_SIZES: WormSize[] = [
     { id: 'S', range: '540-600 PCs/kilo' },
 ]
 
+const WORM_TYPES: WormType[] = [
+    {
+        id: 'blue',
+        label: '청갯지렁이',
+        cardActiveClass: 'bg-sky-50',
+        cardActiveBorderClass: 'border-sky-400',
+        cardTagClass: 'bg-sky-100 text-sky-700',
+    },
+    {
+        id: 'red',
+        label: '홍갯지렁이',
+        cardActiveClass: 'bg-red-50',
+        cardActiveBorderClass: 'border-red-400',
+        cardTagClass: 'bg-red-100 text-red-700',
+    },
+]
+
 function createInitialQuantities() {
     return WORM_SIZES.reduce<Record<string, number>>((acc, size) => {
         acc[size.id] = 0
         return acc
     }, {})
+}
+
+function createInitialQuantitiesByType() {
+    return WORM_TYPES.reduce<Record<WormTypeId, Record<string, number>>>((acc, type) => {
+        acc[type.id] = createInitialQuantities()
+        return acc
+    }, {} as Record<WormTypeId, Record<string, number>>)
 }
 
 const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
@@ -195,7 +229,7 @@ function extractAwbCandidatesFromText(ocrText: string, source: string, trustBoos
 
 export default function WormOrderPage() {
     const today = new Date().toISOString().split('T')[0]
-    const [quantities, setQuantities] = useState<Record<string, number>>(createInitialQuantities)
+    const [quantitiesByType, setQuantitiesByType] = useState<Record<WormTypeId, Record<string, number>>>(createInitialQuantitiesByType)
     const [receiveDate, setReceiveDate] = useState(today)
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
@@ -471,20 +505,30 @@ export default function WormOrderPage() {
     }
 
     const selectedOrders = useMemo(() => {
-        return WORM_SIZES
-            .map((size) => ({ ...size, boxes: quantities[size.id] || 0 }))
-            .filter((size) => size.boxes > 0)
-    }, [quantities])
+        return WORM_TYPES.flatMap((wormType) =>
+            WORM_SIZES
+                .map((size) => ({
+                    ...size,
+                    wormTypeId: wormType.id,
+                    wormTypeLabel: wormType.label,
+                    boxes: quantitiesByType[wormType.id]?.[size.id] || 0,
+                }))
+                .filter((size) => size.boxes > 0)
+        )
+    }, [quantitiesByType])
 
     const totalBoxes = useMemo(() => {
         return selectedOrders.reduce((sum, item) => sum + item.boxes, 0)
     }, [selectedOrders])
 
-    const handleQuantityChange = (sizeId: string, nextValue: number) => {
+    const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
-        setQuantities((prev) => ({
+        setQuantitiesByType((prev) => ({
             ...prev,
-            [sizeId]: Math.max(0, nextValue),
+            [wormTypeId]: {
+                ...prev[wormTypeId],
+                [sizeId]: Math.max(0, nextValue),
+            },
         }))
     }
 
@@ -513,7 +557,7 @@ export default function WormOrderPage() {
         const lines = selectedOrders
             .map((item) => {
                 const boxLabel = item.boxes > 1 ? 'boxes' : 'box'
-                return `- ${item.id} (${item.range}): ${item.boxes} ${boxLabel}`
+                return `- [${item.wormTypeLabel}] ${item.id} (${item.range}): ${item.boxes} ${boxLabel}`
             })
             .join('\n')
 
@@ -681,54 +725,69 @@ export default function WormOrderPage() {
                     <Sparkles size={18} className="text-[#e34219]" />
                 </div>
 
-                <div className="p-4 md:p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                    {WORM_SIZES.map((size) => {
-                        const current = quantities[size.id] || 0
-                        const isSelected = current > 0
-
-                        return (
-                            <div
-                                key={size.id}
-                                className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
-                                    isSelected ? 'border-[#e34219] bg-[#fff7f3] shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'
-                                }`}
-                            >
-                                <div className="flex items-center justify-between px-0.5">
-                                    <div className="text-[16px] font-black text-[#111827] leading-none">{size.id}</div>
-                                    <div className="text-[11px] tracking-tight text-gray-500 font-medium">{size.range}</div>
-                                </div>
-
-                                <div className={`flex items-center rounded-lg border overflow-hidden w-full transition-colors ${isSelected ? 'border-[#e34219]/30 bg-white' : 'border-gray-300 bg-white'}`}>
-                                    <button
-                                        type="button"
-                                        onClick={() => handleQuantityChange(size.id, current - 1)}
-                                        className="w-10 h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
-                                        aria-label={`${size.id} decrease`}
-                                    >
-                                        <Minus size={15} />
-                                    </button>
-                                    <input
-                                        type="number"
-                                        min={0}
-                                        value={current}
-                                        onChange={(event) => {
-                                            const next = Number(event.target.value)
-                                            handleQuantityChange(size.id, Number.isFinite(next) ? next : 0)
-                                        }}
-                                        className="flex-1 min-w-0 h-[36px] text-center font-black text-[#111827] outline-none text-[15px]"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => handleQuantityChange(size.id, current + 1)}
-                                        className="w-10 h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
-                                        aria-label={`${size.id} increase`}
-                                    >
-                                        <Plus size={15} />
-                                    </button>
-                                </div>
+                <div className="p-4 md:p-6 space-y-5">
+                    {WORM_TYPES.map((wormType) => (
+                        <section key={wormType.id} className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <span className={`inline-flex h-7 items-center rounded-full px-3 text-sm font-black ${wormType.cardTagClass}`}>
+                                    {wormType.label}
+                                </span>
+                                <span className="text-xs text-gray-500 font-semibold">사이즈별 박스 수량 입력</span>
                             </div>
-                        )
-                    })}
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                                {WORM_SIZES.map((size) => {
+                                    const current = quantitiesByType[wormType.id]?.[size.id] || 0
+                                    const isSelected = current > 0
+
+                                    return (
+                                        <div
+                                            key={`${wormType.id}-${size.id}`}
+                                            className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
+                                                isSelected
+                                                    ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm`
+                                                    : 'border-gray-200 bg-white hover:border-gray-300'
+                                            }`}
+                                        >
+                                            <div className="flex items-center justify-between px-0.5">
+                                                <div className="text-[16px] font-black text-[#111827] leading-none">{size.id}</div>
+                                                <div className="text-[11px] tracking-tight text-gray-500 font-medium">{size.range}</div>
+                                            </div>
+
+                                            <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
+                                                    className="w-10 h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
+                                                    aria-label={`${wormType.label} ${size.id} decrease`}
+                                                >
+                                                    <Minus size={15} />
+                                                </button>
+                                                <input
+                                                    type="number"
+                                                    min={0}
+                                                    value={current}
+                                                    onChange={(event) => {
+                                                        const next = Number(event.target.value)
+                                                        handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
+                                                    }}
+                                                    className="flex-1 min-w-0 h-[36px] text-center font-black text-[#111827] outline-none text-[15px]"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
+                                                    className="w-10 h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
+                                                    aria-label={`${wormType.label} ${size.id} increase`}
+                                                >
+                                                    <Plus size={15} />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        </section>
+                    ))}
                 </div>
             </div>
 
