@@ -125,20 +125,32 @@ export async function PATCH(request: Request) {
 
     const body = await request.json()
     const id = String(body?.id || '').trim()
-    const memoInput = typeof body?.memo === 'string' ? body.memo : ''
+    const memoInput = typeof body?.memo === 'string' ? body.memo : undefined
+    const categoryInput = typeof body?.category === 'string' ? body.category : undefined
 
     if (!id) {
       return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
     }
 
-    const userMemo = memoInput.trim() ? memoInput.trim() : null
+    const data: Record<string, unknown> = {}
+    if (memoInput !== undefined) {
+      data.userMemo = memoInput.trim() ? memoInput.trim() : null
+    }
+    if (categoryInput !== undefined) {
+      data.category = categoryInput.trim() ? categoryInput.trim() : null
+    }
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json({ error: '변경할 내용이 없습니다.' }, { status: 400 })
+    }
 
     const updated = await prisma.cardUsage.update({
       where: { id },
-      data: { userMemo },
+      data,
       select: {
         id: true,
         userMemo: true,
+        category: true,
         updatedAt: true,
       },
     })

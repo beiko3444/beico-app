@@ -221,6 +221,7 @@ model CardUsage {
   currencyCode          String?
   memo                  String?
   userMemo              String?
+  category              String?
   raw                   Json?
   syncedAt              DateTime @default(now())
   createdAt             DateTime @default(now())

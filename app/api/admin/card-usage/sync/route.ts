@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import type { Prisma } from '@prisma/client'
 import { fetchCardUsageByPeriod, type BarobillCardApprovalLog } from '../../../../../lib/barobillCard'
+import { classifyCategory } from '../../../../../lib/cardCategory'
 
 export const dynamic = 'force-dynamic'
 
@@ -133,6 +134,7 @@ export async function POST(request: Request) {
         rows.map((row) => {
           const raw = row.raw as Prisma.InputJsonValue
           const normalizedTotalAmount = resolveTotalAmount(row)
+          const category = classifyCategory(row.useStoreName, row.useStoreBizType)
           return prisma.cardUsage.upsert({
             where: {
               corpNum_cardNum_useKey: {
@@ -164,6 +166,7 @@ export async function POST(request: Request) {
               installmentMonths: row.installmentMonths,
               currencyCode: row.currencyCode,
               memo: row.memo,
+              category,
               raw,
               syncedAt: now,
             },
@@ -193,6 +196,7 @@ export async function POST(request: Request) {
               installmentMonths: row.installmentMonths,
               currencyCode: row.currencyCode,
               memo: row.memo,
+              category,
               raw,
               syncedAt: now,
             },
@@ -233,6 +237,29 @@ export async function POST(request: Request) {
       }
     }
 
+    // ── 3단계: category가 null인 기존 레코드 일괄 분류 ──
+    const uncategorizedRecords = await prisma.cardUsage.findMany({
+      where: { category: null },
+      select: { id: true, useStoreName: true, useStoreBizType: true },
+      take: 2000,
+    })
+
+    let categorizedCount = 0
+    if (uncategorizedRecords.length > 0) {
+      const catChunks = chunk(uncategorizedRecords, 100)
+      for (const catRows of catChunks) {
+        const ops = catRows.map((rec) => {
+          const cat = classifyCategory(rec.useStoreName, rec.useStoreBizType)
+          categorizedCount++
+          return prisma.cardUsage.update({
+            where: { id: rec.id },
+            data: { category: cat },
+          })
+        })
+        await prisma.$transaction(ops)
+      }
+    }
+
     return NextResponse.json({
       success: true,
       fetchedCount: fetched.logs.length,
@@ -240,6 +267,7 @@ export async function POST(request: Request) {
       amountResolvedCount,
       amountMissingCount,
       recalcFixedCount,
+      categorizedCount,
       targetCards: fetched.targetCards,
       refreshResults: fetched.refreshResults,
       message: '카드 사용내역 동기화가 완료되었습니다.',
