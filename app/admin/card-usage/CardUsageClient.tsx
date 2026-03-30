@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Calendar, ChevronDown, Loader2, RefreshCw, Search } from 'lucide-react'
-import { CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Calendar, ChevronDown, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
+import type { CategoryMeta } from '@/lib/cardCategory'
 
 /* ═══════════════════ Types ═══════════════════ */
 type CardUsageItem = {
@@ -120,6 +121,26 @@ function resolveCategory(item: Pick<CardUsageItem, 'category' | 'useStoreName'>)
   return getCategoryMeta(code)
 }
 
+/* ═══════════════════ localStorage helpers ═══════════════════ */
+const STORAGE_KEY = 'beico-card-categories'
+
+function loadUserCategories(): CategoryMeta[] {
+  if (typeof window === 'undefined') return DEFAULT_CATEGORIES
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY)
+    if (raw) {
+      const parsed = JSON.parse(raw) as CategoryMeta[]
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+    }
+  } catch { /* ignore */ }
+  return DEFAULT_CATEGORIES
+}
+
+function saveUserCategories(cats: CategoryMeta[]) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(cats))
+}
+
 /* ═══════════════════ CSS tokens ═══════════════════ */
 const T = {
   bg: '#FAFAF8',
@@ -128,8 +149,8 @@ const T = {
   border: '#E8E6E1',
   borderLight: '#EEECE7',
   text: '#1A1A1A',
-  textSecondary: '#6B6B6B',
-  textTertiary: '#9C9C9C',
+  textSecondary: '#4A4A4A',
+  textTertiary: '#737373',
   success: '#3D8B37',
   successBg: '#EDF7EC',
   successBorder: '#D4EDD2',
@@ -160,8 +181,40 @@ export default function CardUsageClient() {
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<'date' | 'amount'>('date')
-  const [visibleCount, setVisibleCount] = useState(10)
   const [categoryFilter, setCategoryFilter] = useState('')
+
+  /* ── User-managed categories ── */
+  const [categories, setCategories] = useState<CategoryMeta[]>(() => loadUserCategories())
+  const [showCatManager, setShowCatManager] = useState(false)
+  const [newCatLabel, setNewCatLabel] = useState('')
+  const [newCatEmoji, setNewCatEmoji] = useState('')
+
+  const updateCategories = (next: CategoryMeta[]) => {
+    setCategories(next)
+    saveUserCategories(next)
+  }
+  const handleAddCategory = () => {
+    const label = newCatLabel.trim()
+    const emoji = newCatEmoji.trim() || '📌'
+    if (!label) return
+    const code = label.toUpperCase().replace(/\s+/g, '_')
+    if (categories.some(c => c.code === code)) return
+    const bgColors = ['#FFF3E0','#E3F2FD','#E8F5E9','#FCE4EC','#F3E5F5','#E8EAF6','#FFF8E1','#ECEFF1']
+    const bgColor = bgColors[categories.length % bgColors.length]
+    updateCategories([...categories, { code, label, emoji, bgColor }])
+    setNewCatLabel(''); setNewCatEmoji('')
+  }
+  const handleDeleteCategory = (code: string) => {
+    updateCategories(categories.filter(c => c.code !== code))
+  }
+  const handleResetCategories = () => {
+    updateCategories(DEFAULT_CATEGORIES)
+  }
+
+  /* ── Inline category selector state ── */
+  const [catSelectItemId, setCatSelectItemId] = useState<string | null>(null)
+  const [catSelectIdx, setCatSelectIdx] = useState(0)
+  const catListRef = useRef<HTMLDivElement | null>(null)
 
   /* ── Data loading ── */
   const load = useCallback(async (targetPage = page) => {
@@ -170,7 +223,7 @@ export default function CardUsageClient() {
     try {
       const qs = new URLSearchParams({
         page: String(targetPage),
-        pageSize: '500',
+        pageSize: '9999',
         startDate,
         endDate,
       })
@@ -187,7 +240,6 @@ export default function CardUsageClient() {
       })
       setMemoDrafts(nextDrafts)
       setPage(targetPage)
-      setVisibleCount(10)
     } catch (err: unknown) {
       setError(errorMessage(err))
     } finally {
@@ -237,6 +289,23 @@ export default function CardUsageClient() {
     finally { setSavingMemoId(null) }
   }
 
+  /* ── Save category via PATCH ── */
+  const handleSaveCategory = async (item: CardUsageItem, categoryCode: string) => {
+    try {
+      const res = await fetch('/api/admin/card-usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, category: categoryCode }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '카테고리 저장 실패')
+      setData((prev) => {
+        if (!prev) return prev
+        return { ...prev, items: prev.items.map((row) => row.id === item.id ? { ...row, category: json.item?.category ?? null } : row) }
+      })
+    } catch (err: unknown) { setError(errorMessage(err)) }
+  }
+
   /* ── Derived data ── */
   const allItems = data?.items ?? []
   const totalCount = data?.totalCount ?? 0
@@ -267,7 +336,7 @@ export default function CardUsageClient() {
       .slice(0, 6)
   }, [allItems])
 
-  // Sort & group
+  // Sort & group — show all items (no pagination)
   const sortedItems = useMemo(() => {
     let items = [...allItems]
     if (categoryFilter) {
@@ -280,14 +349,11 @@ export default function CardUsageClient() {
     return items
   }, [allItems, sortMode, categoryFilter])
 
-  const visibleItems = sortedItems.slice(0, visibleCount)
-  const remainingCount = sortedItems.length - visibleCount
-
   // Group by date
   const groupedItems = useMemo(() => {
     const groups: { date: string; label: string; items: CardUsageItem[] }[] = []
     const map = new Map<string, CardUsageItem[]>()
-    for (const item of visibleItems) {
+    for (const item of sortedItems) {
       const key = getDateKey(item.usedAt)
       if (!map.has(key)) map.set(key, [])
       map.get(key)!.push(item)
@@ -296,7 +362,7 @@ export default function CardUsageClient() {
       groups.push({ date: key, label: formatDateGroup(key), items })
     }
     return groups
-  }, [visibleItems])
+  }, [sortedItems])
 
   /* ── Styles ── */
   const cardStyle: React.CSSProperties = {
@@ -395,7 +461,7 @@ export default function CardUsageClient() {
 
       {/* ════════ Category Summary ════════ */}
       {categorySummary.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16, alignItems: 'center' }}>
           {categorySummary.map(cat => (
             <button
               key={cat.code}
@@ -431,6 +497,106 @@ export default function CardUsageClient() {
               ✕ 필터 해제
             </button>
           )}
+          {/* Category Manager toggle */}
+          <button
+            type="button"
+            onClick={() => setShowCatManager(prev => !prev)}
+            style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              padding: '6px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500,
+              background: showCatManager ? T.accent : T.surfaceSecondary,
+              color: showCatManager ? '#fff' : T.textSecondary,
+              border: `1px solid ${showCatManager ? T.accent : T.borderLight}`,
+              cursor: 'pointer', transition: 'all .15s',
+            }}
+          >
+            <Settings size={12} />
+            카테고리 관리
+          </button>
+        </div>
+      )}
+
+      {/* ════════ Category Manager Panel ════════ */}
+      {showCatManager && (
+        <div style={{
+          ...cardStyle, padding: '16px 20px', marginBottom: 16,
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: T.text }}>카테고리 관리</span>
+            <button
+              type="button"
+              onClick={handleResetCategories}
+              style={{
+                fontSize: 11, color: T.textTertiary, background: 'none', border: 'none',
+                cursor: 'pointer', textDecoration: 'underline',
+              }}
+            >
+              기본값으로 초기화
+            </button>
+          </div>
+          {/* Add new category */}
+          <div style={{ display: 'flex', gap: 6, marginBottom: 12 }}>
+            <input
+              type="text"
+              value={newCatEmoji}
+              onChange={e => setNewCatEmoji(e.target.value)}
+              placeholder="이모지"
+              maxLength={4}
+              style={{
+                ...flatInputStyle, width: 60, textAlign: 'center', height: 36,
+              }}
+            />
+            <input
+              type="text"
+              value={newCatLabel}
+              onChange={e => setNewCatLabel(e.target.value)}
+              placeholder="카테고리 이름"
+              onKeyDown={e => { if (e.key === 'Enter') handleAddCategory() }}
+              style={{
+                ...flatInputStyle, flex: 1, height: 36,
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleAddCategory}
+              style={{
+                height: 36, padding: '0 14px', borderRadius: 10,
+                background: T.accent, color: '#fff', fontSize: 12, fontWeight: 600,
+                border: 'none', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <Plus size={12} />
+              추가
+            </button>
+          </div>
+          {/* Existing categories */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {categories.map(cat => (
+              <div
+                key={cat.code}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                  padding: '5px 10px', borderRadius: 16, fontSize: 12,
+                  background: cat.bgColor, border: `1px solid ${T.borderLight}`,
+                }}
+              >
+                <span>{cat.emoji}</span>
+                <span style={{ fontWeight: 500, color: T.text }}>{cat.label}</span>
+                <button
+                  type="button"
+                  onClick={() => handleDeleteCategory(cat.code)}
+                  style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: T.textTertiary, padding: 0, display: 'flex', alignItems: 'center',
+                  }}
+                  title={`${cat.label} 삭제`}
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -487,7 +653,7 @@ export default function CardUsageClient() {
             style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 140, fontFamily: 'inherit' }}
           >
             <option value="">카테고리 전체</option>
-            {CATEGORIES.map(c => <option key={c.code} value={c.code}>{c.emoji} {c.label}</option>)}
+            {categories.map(c => <option key={c.code} value={c.code}>{c.emoji} {c.label}</option>)}
           </select>
           <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
         </div>
@@ -582,15 +748,17 @@ export default function CardUsageClient() {
 
               {/* Transaction items */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {group.items.map((item, idx) => {
+                {group.items.map((item) => {
                   const amt = resolveAmount(item)
                   const cat = resolveCategory(item)
                   const displayMemo = memoDrafts[item.id] || item.userMemo || item.memo || ''
                   const globalIdx = sortedItems.indexOf(item)
+                  const isCatSelectOpen = catSelectItemId === item.id
 
                   return (
                     <div
                       key={item.id}
+                      data-item-row={globalIdx}
                       style={{
                         display: 'grid',
                         gridTemplateColumns: '36px 1fr auto',
@@ -601,6 +769,7 @@ export default function CardUsageClient() {
                         borderRadius: 10,
                         padding: '12px 14px',
                         transition: 'border-color .15s',
+                        position: 'relative',
                       }}
                       onMouseEnter={e => (e.currentTarget.style.borderColor = T.border)}
                       onMouseLeave={e => (e.currentTarget.style.borderColor = T.borderLight)}
@@ -625,7 +794,7 @@ export default function CardUsageClient() {
                         <p style={{ fontSize: 12, color: T.textTertiary, margin: '2px 0 0' }}>
                           {formatAmPmTime(item.usedAt)} · {maskCard(item.cardNum)} · {item.approvalNum || '-'}
                         </p>
-                        {/* Memo input (inline, appears on focus or has content) */}
+                        {/* Memo input + inline category selector */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
                           <input
                             type="text"
@@ -637,7 +806,18 @@ export default function CardUsageClient() {
                                 e.preventDefault()
                                 handleSaveMemo(item)
                                 const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
-                                if (nextInput) nextInput.focus()
+                                if (nextInput) {
+                                  nextInput.focus()
+                                  nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                }
+                              }
+                              if (e.key === 'Tab') {
+                                e.preventDefault()
+                                // Save memo first
+                                handleSaveMemo(item)
+                                // Open category selector
+                                setCatSelectItemId(item.id)
+                                setCatSelectIdx(0)
                               }
                             }}
                             placeholder="메모 입력"
@@ -653,6 +833,20 @@ export default function CardUsageClient() {
                               if (!e.currentTarget.value) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.width = '70px' }
                             }}
                           />
+                          {/* Category badge (clickable to open selector) */}
+                          <button
+                            type="button"
+                            onClick={() => { setCatSelectItemId(isCatSelectOpen ? null : item.id); setCatSelectIdx(0) }}
+                            style={{
+                              display: 'inline-flex', alignItems: 'center', gap: 3,
+                              padding: '2px 7px', borderRadius: 10, fontSize: 10, fontWeight: 600,
+                              background: cat.bgColor, color: T.text,
+                              border: `1px solid ${T.borderLight}`, cursor: 'pointer',
+                              whiteSpace: 'nowrap', height: 20,
+                            }}
+                          >
+                            {cat.emoji} {cat.label}
+                          </button>
                           {savingMemoId === item.id && (
                             <Loader2 size={10} className="animate-spin" style={{ color: T.textTertiary }} />
                           )}
@@ -668,6 +862,105 @@ export default function CardUsageClient() {
                           {item.paymentPlan || '일시불'} · {item.currencyCode || 'KRW'}
                         </p>
                       </div>
+
+                      {/* ── Inline category selector dropdown ── */}
+                      {isCatSelectOpen && (
+                        <div
+                          tabIndex={-1}
+                          onKeyDown={e => {
+                            if (e.key === 'ArrowDown') {
+                              e.preventDefault()
+                              setCatSelectIdx(prev => Math.min(prev + 1, categories.length - 1))
+                            } else if (e.key === 'ArrowUp') {
+                              e.preventDefault()
+                              setCatSelectIdx(prev => Math.max(prev - 1, 0))
+                            } else if (e.key === 'Enter') {
+                              e.preventDefault()
+                              const selected = categories[catSelectIdx]
+                              if (selected) {
+                                handleSaveCategory(item, selected.code)
+                                setCatSelectItemId(null)
+                                // Move to next item's memo input
+                                const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
+                                if (nextInput) {
+                                  nextInput.focus()
+                                  nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                }
+                              }
+                            } else if (e.key === 'Escape') {
+                              e.preventDefault()
+                              setCatSelectItemId(null)
+                              // Return focus to memo input
+                              const memoInput = document.querySelector(`input[data-memo-idx="${globalIdx}"]`) as HTMLInputElement | null
+                              if (memoInput) memoInput.focus()
+                            }
+                          }}
+                          onBlur={e => {
+                            // Close if focus leaves the dropdown entirely
+                            if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                              setCatSelectItemId(null)
+                            }
+                          }}
+                          style={{
+                            position: 'absolute',
+                            right: 14,
+                            top: '100%',
+                            zIndex: 50,
+                            background: T.surface,
+                            border: `1px solid ${T.border}`,
+                            borderRadius: 10,
+                            boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                            padding: '6px 0',
+                            maxHeight: 220,
+                            overflowY: 'auto',
+                            minWidth: 160,
+                            marginTop: 4,
+                          }}
+                          // Auto-focus when mounted
+                          ref={el => {
+                            if (el) {
+                              catListRef.current = el
+                              el.focus()
+                            }
+                          }}
+                        >
+                          {categories.map((c, i) => (
+                            <button
+                              key={c.code}
+                              type="button"
+                              tabIndex={-1}
+                              onClick={() => {
+                                handleSaveCategory(item, c.code)
+                                setCatSelectItemId(null)
+                                const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
+                                if (nextInput) {
+                                  nextInput.focus()
+                                  nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                }
+                              }}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8,
+                                width: '100%', padding: '7px 14px', border: 'none',
+                                background: i === catSelectIdx ? T.surfaceSecondary : 'transparent',
+                                cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                                color: T.text, textAlign: 'left',
+                                transition: 'background .1s',
+                              }}
+                              onMouseEnter={() => setCatSelectIdx(i)}
+                            >
+                              <span style={{
+                                width: 24, height: 24, borderRadius: 6,
+                                background: c.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                fontSize: 13,
+                              }}>{c.emoji}</span>
+                              <span>{c.label}</span>
+                              {(item.category || classifyCategory(item.useStoreName)) === c.code && (
+                                <span style={{ marginLeft: 'auto', color: T.success, fontSize: 11 }}>✓</span>
+                              )}
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -677,21 +970,7 @@ export default function CardUsageClient() {
         </div>
       )}
 
-      {/* ════════ Load more ════════ */}
-      {remainingCount > 0 && (
-        <button
-          type="button"
-          onClick={() => setVisibleCount(prev => prev + 20)}
-          style={{
-            display: 'block', width: '100%', textAlign: 'center',
-            padding: '14px 0', marginTop: 12,
-            fontSize: 13, fontWeight: 500, color: T.textTertiary,
-            background: 'transparent', border: 'none', cursor: 'pointer',
-          }}
-        >
-          + {remainingCount.toLocaleString()}건 더 보기
-        </button>
-      )}
+
 
       {/* Bottom spacer */}
       <div style={{ height: 40 }} />

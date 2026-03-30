@@ -18,6 +18,7 @@ export type CategoryCode =
   | 'EDUCATION'
   | 'ENTERTAINMENT'
   | 'OTHER'
+  | (string & {})
 
 export type CategoryMeta = {
   code: CategoryCode
@@ -26,7 +27,7 @@ export type CategoryMeta = {
   bgColor: string
 }
 
-export const CATEGORIES: CategoryMeta[] = [
+export const DEFAULT_CATEGORIES: CategoryMeta[] = [
   { code: 'CAFE',          label: '카페',     emoji: '☕',  bgColor: '#FFF3E0' },
   { code: 'FOOD',          label: '음식',     emoji: '🍽️', bgColor: '#FFF8E1' },
   { code: 'BAKERY',        label: '베이커리', emoji: '🥖',  bgColor: '#FFF8E1' },
@@ -43,8 +44,11 @@ export const CATEGORIES: CategoryMeta[] = [
   { code: 'OTHER',         label: '기타',     emoji: '📦',  bgColor: '#F5F5F5' },
 ]
 
+/** @deprecated 기존 호환용 — DEFAULT_CATEGORIES 사용 권장 */
+export const CATEGORIES = DEFAULT_CATEGORIES
+
 export const CATEGORY_MAP: Record<string, CategoryMeta> = Object.fromEntries(
-  CATEGORIES.map(c => [c.code, c])
+  DEFAULT_CATEGORIES.map(c => [c.code, c])
 )
 
 /* ─── 분류 규칙 (순서 중요: 먼저 매칭된 것 우선) ─── */
