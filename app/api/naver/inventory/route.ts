@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import bcrypt from "bcryptjs";
+import { HttpsProxyAgent } from "https-proxy-agent";
+import fetch from "node-fetch";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
@@ -71,6 +73,19 @@ async function readErrorBody(response: Response) {
     return text.slice(0, 500);
 }
 
+function resolveProxyAgent() {
+    const proxyUrl =
+        process.env.NAVER_HTTP_PROXY ||
+        process.env.QUOTAGUARDSTATIC_URL ||
+        process.env.FIXIE_URL ||
+        process.env.HTTPS_PROXY ||
+        process.env.HTTP_PROXY ||
+        "";
+
+    if (!proxyUrl) return undefined;
+    return new HttpsProxyAgent(proxyUrl);
+}
+
 async function issueNaverAccessToken(forceRefresh = false) {
     const now = Date.now();
     if (!forceRefresh && cachedAccessToken && cachedAccessToken.expiresAt - 60_000 > now) {
@@ -109,6 +124,7 @@ async function issueNaverAccessToken(forceRefresh = false) {
 
     const response = await fetch(NAVER_OAUTH_TOKEN_URL, {
         method: "POST",
+        agent: resolveProxyAgent(),
         headers: {
             "Content-Type": "application/x-www-form-urlencoded",
             Accept: "application/json",
@@ -139,6 +155,7 @@ async function issueNaverAccessToken(forceRefresh = false) {
 async function requestProductPage(accessToken: string, payload: NaverProductSearchRequest) {
     const response = await fetch(NAVER_PRODUCT_SEARCH_URL, {
         method: "POST",
+        agent: resolveProxyAgent(),
         headers: {
             Authorization: `Bearer ${accessToken}`,
             "Content-Type": "application/json",
