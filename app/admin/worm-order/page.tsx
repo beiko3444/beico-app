@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles, Mail, ScanSearch } from 'lucide-react'
+import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles, Mail, ScanSearch, Search } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -49,6 +49,18 @@ type WormEmailDetail = {
     attachments: WormEmailAttachment[]
 }
 
+type CustomsProgressResult = {
+    blNo: string
+    query: {
+        kind: 'mblNo' | 'hblNo'
+        blYy: string
+    }
+    tCnt: number
+    ntceInfo: string
+    summaryRecords: Array<Record<string, string>>
+    detailRecords: Array<Record<string, string>>
+}
+
 const WORM_SIZES: WormSize[] = [
     { id: 'LLLL', range: '160-220 PCs/kilo' },
     { id: 'LLL', range: '240-280 PCs/kilo' },
@@ -89,6 +101,17 @@ function createInitialQuantitiesByType() {
         acc[type.id] = createInitialQuantities()
         return acc
     }, {} as Record<WormTypeId, Record<string, number>>)
+}
+
+function formatYmdOrYmdHm(value?: string) {
+    if (!value) return '-'
+    if (/^\d{8}$/.test(value)) {
+        return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)}`
+    }
+    if (/^\d{12,14}$/.test(value)) {
+        return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)} ${value.slice(8, 10)}:${value.slice(10, 12)}`
+    }
+    return value
 }
 
 const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
@@ -241,6 +264,10 @@ export default function WormOrderPage() {
     const [remittanceError, setRemittanceError] = useState('')
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
+    const [blNumberQuery, setBlNumberQuery] = useState('')
+    const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
+    const [customsProgressError, setCustomsProgressError] = useState('')
+    const [customsProgressLoading, setCustomsProgressLoading] = useState(false)
     const dateInputRef = useRef<HTMLInputElement>(null)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
@@ -648,6 +675,37 @@ export default function WormOrderPage() {
         }
     }
 
+    const handleCustomsProgressSearch = async () => {
+        const blNo = blNumberQuery.replace(/\s+/g, '').trim()
+        setCustomsProgressError('')
+        setCustomsProgressResult(null)
+
+        if (!blNo) {
+            setCustomsProgressError('B/L 번호를 입력해주세요.')
+            return
+        }
+
+        setCustomsProgressLoading(true)
+        try {
+            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(blNo)}`, {
+                method: 'GET',
+                cache: 'no-store',
+            })
+            const result = await response.json()
+
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '화물통관 진행정보 조회에 실패했습니다.')
+            }
+
+            setCustomsProgressResult(result as CustomsProgressResult)
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '화물통관 진행정보 조회에 실패했습니다.'
+            setCustomsProgressError(message)
+        } finally {
+            setCustomsProgressLoading(false)
+        }
+    }
+
     useEffect(() => {
         const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
         if (!input?.showPicker) return
@@ -662,6 +720,9 @@ export default function WormOrderPage() {
 
         return () => window.clearTimeout(timer)
     }, [])
+
+    const firstSummary = customsProgressResult?.summaryRecords?.[0] || null
+    const detailRows = customsProgressResult?.detailRecords || []
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 pb-10">
@@ -1186,6 +1247,117 @@ export default function WormOrderPage() {
                         })()}
                     </div>
                 </div>
+            </div>
+
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">UNI-PASS API001</p>
+                        <h3 className="text-lg font-black text-[#111827]">화물통관진행정보 조회 (B/L)</h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                            B/L 번호만 입력하면 MBL/HBL + 최근 3개년을 자동으로 시도해 조회합니다.
+                        </p>
+                    </div>
+                    <Search size={18} className="text-[#e34219] mt-1" />
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center gap-3">
+                    <input
+                        type="text"
+                        value={blNumberQuery}
+                        onChange={(event) => setBlNumberQuery(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !customsProgressLoading) {
+                                handleCustomsProgressSearch()
+                            }
+                        }}
+                        placeholder="B/L 번호 입력 (예: 94000499505)"
+                        className="flex-1 h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                    />
+                    <button
+                        type="button"
+                        onClick={handleCustomsProgressSearch}
+                        disabled={customsProgressLoading}
+                        className="h-11 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                    >
+                        {customsProgressLoading ? (
+                            <>
+                                <Loader2 size={15} className="animate-spin" />
+                                조회중...
+                            </>
+                        ) : (
+                            '조회하기'
+                        )}
+                    </button>
+                </div>
+
+                {customsProgressError && (
+                    <p className="text-sm font-semibold text-[#e34219]">{customsProgressError}</p>
+                )}
+
+                {customsProgressResult && (
+                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                        <div className="text-xs text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
+                            <span><span className="font-bold text-gray-800">B/L:</span> {customsProgressResult.blNo}</span>
+                            <span><span className="font-bold text-gray-800">조회조건:</span> {customsProgressResult.query.kind} / {customsProgressResult.query.blYy}</span>
+                            <span><span className="font-bold text-gray-800">결과건수(tCnt):</span> {customsProgressResult.tCnt}</span>
+                        </div>
+
+                        {customsProgressResult.ntceInfo && (
+                            <p className="text-xs font-semibold text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                                {customsProgressResult.ntceInfo}
+                            </p>
+                        )}
+
+                        {firstSummary && (
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                                <h4 className="text-sm font-black text-[#111827]">요약정보</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                    <div><span className="font-bold text-gray-700">화물관리번호:</span> {firstSummary.cargMtNo || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">진행상태:</span> {firstSummary.prgsStts || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">통관진행상태:</span> {firstSummary.csclPrgsStts || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">처리일시:</span> {formatYmdOrYmdHm(firstSummary.prcsDttm)}</div>
+                                    <div><span className="font-bold text-gray-700">MBL:</span> {firstSummary.mblNo || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">HBL:</span> {firstSummary.hblNo || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">양륙항:</span> {firstSummary.dsprNm || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">입항일자:</span> {formatYmdOrYmdHm(firstSummary.etprDt)}</div>
+                                    <div><span className="font-bold text-gray-700">선박/항공편:</span> {firstSummary.shipNm || '-'}</div>
+                                    <div><span className="font-bold text-gray-700">품명:</span> {firstSummary.prnm || '-'}</div>
+                                </div>
+                            </div>
+                        )}
+
+                        {detailRows.length > 0 && (
+                            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                                <h4 className="text-sm font-black text-[#111827]">진행이력</h4>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full text-xs">
+                                        <thead>
+                                            <tr className="bg-gray-100 text-gray-700">
+                                                <th className="text-left px-2 py-2 font-bold">처리일시</th>
+                                                <th className="text-left px-2 py-2 font-bold">처리구분</th>
+                                                <th className="text-left px-2 py-2 font-bold">반출입내용</th>
+                                                <th className="text-left px-2 py-2 font-bold">신고번호</th>
+                                                <th className="text-left px-2 py-2 font-bold">장치장</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {detailRows.map((row, index) => (
+                                                <tr key={`${row.prcsDttm || 'row'}-${index}`} className="border-t border-gray-100 text-gray-800">
+                                                    <td className="px-2 py-2">{formatYmdOrYmdHm(row.prcsDttm)}</td>
+                                                    <td className="px-2 py-2">{row.cargTrcnRelaBsopTpcd || '-'}</td>
+                                                    <td className="px-2 py-2">{row.rlbrCn || '-'}</td>
+                                                    <td className="px-2 py-2">{row.dclrNo || '-'}</td>
+                                                    <td className="px-2 py-2">{row.shedNm || '-'}</td>
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </div>
     )
