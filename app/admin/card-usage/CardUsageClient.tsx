@@ -1,8 +1,9 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
-import { Loader2, RefreshCw, Search } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Calendar, ChevronDown, Loader2, RefreshCw, Search } from 'lucide-react'
 
+/* ═══════════════════ Types ═══════════════════ */
 type CardUsageItem = {
   id: string
   corpNum: string
@@ -38,18 +39,12 @@ type CardUsageResponse = {
   }
 }
 
+/* ═══════════════════ Helpers ═══════════════════ */
 function formatInputDate(date: Date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
-}
-
-function formatDateTime(value: string | null) {
-  if (!value) return '-'
-  const d = new Date(value)
-  if (Number.isNaN(d.getTime())) return value
-  return d.toLocaleString()
 }
 
 function maskCard(cardNum: string) {
@@ -64,18 +59,111 @@ function errorMessage(err: unknown) {
 }
 
 function resolveAmount(item: Pick<CardUsageItem, 'totalAmount' | 'approvalAmount' | 'amount' | 'tax' | 'serviceCharge'>) {
-  if (typeof item.totalAmount === 'number') return item.totalAmount
-  if (typeof item.approvalAmount === 'number') return item.approvalAmount
-  if (
-    typeof item.amount === 'number' ||
-    typeof item.tax === 'number' ||
-    typeof item.serviceCharge === 'number'
-  ) {
+  if (typeof item.totalAmount === 'number' && item.totalAmount > 0) return item.totalAmount
+  if (typeof item.approvalAmount === 'number' && item.approvalAmount > 0) return item.approvalAmount
+  if (typeof item.amount === 'number' || typeof item.tax === 'number' || typeof item.serviceCharge === 'number') {
     return (item.amount || 0) + (item.tax || 0) + (item.serviceCharge || 0)
   }
-  return 0
+  return item.totalAmount ?? item.approvalAmount ?? 0
 }
 
+/* ── Date / time formatting ── */
+function formatSyncTime(value: string | null) {
+  if (!value) return '-'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  const y = d.getFullYear()
+  const m = d.getMonth() + 1
+  const day = d.getDate()
+  const ampm = d.getHours() < 12 ? '오전' : '오후'
+  const h = d.getHours() === 0 ? 12 : d.getHours() > 12 ? d.getHours() - 12 : d.getHours()
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${y}. ${m}. ${day}. ${ampm} ${h}:${min}`
+}
+
+function formatAmPmTime(value: string | null) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const ampm = d.getHours() < 12 ? '오전' : '오후'
+  const h = d.getHours() === 0 ? 12 : d.getHours() > 12 ? d.getHours() - 12 : d.getHours()
+  const min = String(d.getMinutes()).padStart(2, '0')
+  return `${ampm} ${h}:${min}`
+}
+
+function formatDateGroup(value: string) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  const days = ['일', '월', '화', '수', '목', '금', '토']
+  return `${d.getMonth() + 1}월 ${d.getDate()}일 (${days[d.getDay()]})`
+}
+
+function getDateKey(value: string | null) {
+  if (!value) return 'unknown'
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return 'unknown'
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
+
+function formatDisplayDate(input: string) {
+  if (!input) return ''
+  const parts = input.split('-')
+  if (parts.length !== 3) return input
+  return `${parts[0]}. ${parts[1]}. ${parts[2]}`
+}
+
+/* ── Store category detection ── */
+function detectCategory(storeName: string | null): { emoji: string; bg: string } {
+  const name = (storeName || '').toLowerCase()
+  // 음식/카페
+  if (/카페|커피|cafe|coffee|미루|스타벅스|이디야|투썸|빽다방|메가|컴포즈|할리스|엔제리너스|폴바셋/.test(name))
+    return { emoji: '☕', bg: '#FFF3E0' }
+  if (/요리사|식당|레스토랑|밥|치킨|피자|버거|맥도날드|롯데리아|bbq|bhc|교촌|한솥|김밥|떡볶이|분식|맘스|배달|요기요|배민|쿠팡이츠|써브웨이|subway|오스루|로스터리/.test(name))
+    return { emoji: '🍽️', bg: '#FFF8E1' }
+  if (/베이커리|빵|파리바게뜨|뚜레쥬르|성심당/.test(name))
+    return { emoji: '🥖', bg: '#FFF8E1' }
+  // 교통
+  if (/코레일|ktx|srt|기차|철도|택시|카카오T|타다|고속|시외|버스/.test(name))
+    return { emoji: '🚆', bg: '#E3F2FD' }
+  // 쇼핑/온라인
+  if (/네이버|쿠팡|gmarket|옥션|11번가|위메프|tmon|아마존|amazon|쇼핑/.test(name))
+    return { emoji: '🛒', bg: '#E8F5E9' }
+  if (/편의점|cu|gs25|세븐일레븐|이마트24|미니스톱/.test(name))
+    return { emoji: '🛍️', bg: '#E8F5E9' }
+  // 주유/차량
+  if (/주유|gs칼텍스|sk에너지|s-oil|현대오일|충전/.test(name))
+    return { emoji: '⛽', bg: '#FFF3E0' }
+  // 금융
+  if (/헥토|바로빌|은행|보험|카드|금융|증권/.test(name))
+    return { emoji: '💳', bg: '#F3E5F5' }
+  // 통신
+  if (/skt|kt|lg유플|알뜰/.test(name))
+    return { emoji: '📱', bg: '#E8EAF6' }
+  return { emoji: '📦', bg: '#F5F5F5' }
+}
+
+/* ═══════════════════ CSS tokens ═══════════════════ */
+const T = {
+  bg: '#FAFAF8',
+  surface: '#FFFFFF',
+  surfaceSecondary: '#F5F5F0',
+  border: '#E8E6E1',
+  borderLight: '#EEECE7',
+  text: '#1A1A1A',
+  textSecondary: '#6B6B6B',
+  textTertiary: '#9C9C9C',
+  success: '#3D8B37',
+  successBg: '#EDF7EC',
+  successBorder: '#D4EDD2',
+  warning: '#9E7B15',
+  warningBg: '#FDF6E3',
+  warningBorder: '#F5E6B8',
+  error: '#C53030',
+  errorBg: '#FFF5F5',
+  accent: '#1A1A1A',
+}
+
+/* ═══════════════════ Component ═══════════════════ */
 export default function CardUsageClient() {
   const [startDate, setStartDate] = useState(() => {
     const now = new Date()
@@ -93,14 +181,17 @@ export default function CardUsageClient() {
   const [syncMessage, setSyncMessage] = useState('')
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
+  const [sortMode, setSortMode] = useState<'date' | 'amount'>('date')
+  const [visibleCount, setVisibleCount] = useState(10)
 
+  /* ── Data loading ── */
   const load = useCallback(async (targetPage = page) => {
     setLoading(true)
     setError('')
     try {
       const qs = new URLSearchParams({
         page: String(targetPage),
-        pageSize: '50',
+        pageSize: '500',
         startDate,
         endDate,
       })
@@ -109,9 +200,7 @@ export default function CardUsageClient() {
 
       const res = await fetch(`/api/admin/card-usage?${qs.toString()}`)
       const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json.error || '카드 사용내역 조회 실패')
-      }
+      if (!res.ok) throw new Error(json.error || '카드 사용내역 조회 실패')
       setData(json)
       const nextDrafts: Record<string, string> = {}
       ;(json.items || []).forEach((item: CardUsageItem) => {
@@ -119,6 +208,7 @@ export default function CardUsageClient() {
       })
       setMemoDrafts(nextDrafts)
       setPage(targetPage)
+      setVisibleCount(10)
     } catch (err: unknown) {
       setError(errorMessage(err))
     } finally {
@@ -131,47 +221,27 @@ export default function CardUsageClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSearch = () => {
-    setSyncMessage('')
-    load(1)
-  }
+  const handleSearch = () => { setSyncMessage(''); load(1) }
 
   const handleSync = async () => {
-    setSyncing(true)
-    setError('')
-    setSyncMessage('')
+    setSyncing(true); setError(''); setSyncMessage('')
     try {
       const res = await fetch('/api/admin/card-usage/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          startDate,
-          endDate,
-          cardNum: cardNum.trim() || undefined,
-          refreshBeforeFetch,
-        }),
+        body: JSON.stringify({ startDate, endDate, cardNum: cardNum.trim() || undefined, refreshBeforeFetch }),
       })
       const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json.error || '카드 사용내역 동기화 실패')
-      }
-
-      setSyncMessage(
-        `동기화 완료: 조회 ${json.fetchedCount?.toLocaleString?.() ?? 0}건 / 저장 ${json.storedCount?.toLocaleString?.() ?? 0}건 / 금액확인 ${json.amountResolvedCount?.toLocaleString?.() ?? 0}건 / 금액없음 ${json.amountMissingCount?.toLocaleString?.() ?? 0}건`,
-      )
+      if (!res.ok) throw new Error(json.error || '카드 사용내역 동기화 실패')
+      setSyncMessage(`동기화 완료 · 조회 ${json.fetchedCount?.toLocaleString?.() ?? 0}건 / 저장 ${json.storedCount?.toLocaleString?.() ?? 0}건 / 금액확인 ${json.amountResolvedCount?.toLocaleString?.() ?? 0}건 / 금액없음 ${json.amountMissingCount?.toLocaleString?.() ?? 0}건`)
       await load(1)
-    } catch (err: unknown) {
-      setError(errorMessage(err))
-    } finally {
-      setSyncing(false)
-    }
+    } catch (err: unknown) { setError(errorMessage(err)) }
+    finally { setSyncing(false) }
   }
 
   const handleSaveMemo = async (item: CardUsageItem) => {
     const memo = memoDrafts[item.id] ?? ''
-    setSavingMemoId(item.id)
-    setError('')
-    setSyncMessage('')
+    setSavingMemoId(item.id); setError('')
     try {
       const res = await fetch('/api/admin/card-usage', {
         method: 'PATCH',
@@ -179,206 +249,403 @@ export default function CardUsageClient() {
         body: JSON.stringify({ id: item.id, memo }),
       })
       const json = await res.json()
-      if (!res.ok) {
-        throw new Error(json.error || '메모 저장 실패')
-      }
-
+      if (!res.ok) throw new Error(json.error || '메모 저장 실패')
       setData((prev) => {
         if (!prev) return prev
-        return {
-          ...prev,
-          items: prev.items.map((row) => (
-            row.id === item.id ? { ...row, userMemo: json.item?.userMemo ?? null } : row
-          )),
-        }
+        return { ...prev, items: prev.items.map((row) => row.id === item.id ? { ...row, userMemo: json.item?.userMemo ?? null } : row) }
       })
-      setSyncMessage('메모가 저장되었습니다.')
-    } catch (err: unknown) {
-      setError(errorMessage(err))
-    } finally {
-      setSavingMemoId(null)
+    } catch (err: unknown) { setError(errorMessage(err)) }
+    finally { setSavingMemoId(null) }
+  }
+
+  /* ── Derived data ── */
+  const allItems = data?.items ?? []
+  const totalCount = data?.totalCount ?? 0
+  const totalAmount = data?.summary?.totalAmount ?? 0
+  const amountResolvedCount = allItems.filter(i => resolveAmount(i) > 0).length
+  const amountMissingCount = allItems.length - amountResolvedCount
+  const daysInRange = useMemo(() => {
+    const s = new Date(startDate); const e = new Date(endDate)
+    const diff = Math.max(1, Math.ceil((e.getTime() - s.getTime()) / 86400000) + 1)
+    return diff
+  }, [startDate, endDate])
+  const dailyAvg = daysInRange > 0 ? Math.round(totalAmount / daysInRange) : 0
+
+  // Unique card numbers & store names for dropdowns
+  const uniqueCards = useMemo(() => [...new Set(allItems.map(i => i.cardNum))], [allItems])
+  const uniqueStores = useMemo(() => [...new Set(allItems.map(i => i.useStoreName).filter(Boolean) as string[])], [allItems])
+
+  // Sort & group
+  const sortedItems = useMemo(() => {
+    const items = [...allItems]
+    if (sortMode === 'amount') {
+      items.sort((a, b) => resolveAmount(b) - resolveAmount(a))
     }
+    // default: already date desc from API
+    return items
+  }, [allItems, sortMode])
+
+  const visibleItems = sortedItems.slice(0, visibleCount)
+  const remainingCount = sortedItems.length - visibleCount
+
+  // Group by date
+  const groupedItems = useMemo(() => {
+    const groups: { date: string; label: string; items: CardUsageItem[] }[] = []
+    const map = new Map<string, CardUsageItem[]>()
+    for (const item of visibleItems) {
+      const key = getDateKey(item.usedAt)
+      if (!map.has(key)) map.set(key, [])
+      map.get(key)!.push(item)
+    }
+    for (const [key, items] of map) {
+      groups.push({ date: key, label: formatDateGroup(key), items })
+    }
+    return groups
+  }, [visibleItems])
+
+  /* ── Styles ── */
+  const cardStyle: React.CSSProperties = {
+    background: T.surface,
+    border: `1px solid ${T.border}`,
+    borderRadius: 14,
+  }
+
+  const flatInputStyle: React.CSSProperties = {
+    background: T.surfaceSecondary,
+    border: `1px solid ${T.borderLight}`,
+    borderRadius: 10,
+    color: T.text,
+    fontSize: 13,
+    height: 42,
+    outline: 'none',
+    paddingLeft: 14,
+    paddingRight: 14,
   }
 
   return (
-    <div className="space-y-5">
-      <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
-            <h1 className="text-xl font-black text-gray-900">카드사용내역</h1>
-            <button
-              type="button"
-              onClick={handleSync}
-              disabled={syncing}
-              className="h-10 px-4 rounded-lg bg-black text-white text-sm font-bold inline-flex items-center gap-2 disabled:opacity-60"
-            >
-              {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-              바로빌 동기화
-            </button>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-            <input
-              type="date"
-              value={startDate}
-              onChange={(e) => setStartDate(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-gray-300 text-sm"
-            />
-            <input
-              type="date"
-              value={endDate}
-              onChange={(e) => setEndDate(e.target.value)}
-              className="h-10 px-3 rounded-lg border border-gray-300 text-sm"
-            />
-            <input
-              type="text"
-              value={cardNum}
-              onChange={(e) => setCardNum(e.target.value)}
-              placeholder="카드번호 필터 (선택)"
-              className="h-10 px-3 rounded-lg border border-gray-300 text-sm"
-            />
-            <input
-              type="text"
-              value={storeName}
-              onChange={(e) => setStoreName(e.target.value)}
-              placeholder="가맹점명 필터 (선택)"
-              className="h-10 px-3 rounded-lg border border-gray-300 text-sm"
-            />
-            <button
-              type="button"
-              onClick={handleSearch}
-              disabled={loading}
-              className="h-10 px-4 rounded-lg border border-gray-300 bg-gray-50 text-sm font-bold inline-flex items-center justify-center gap-2"
-            >
-              {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
-              조회
-            </button>
-          </div>
-
-          <label className="inline-flex items-center gap-2 text-sm font-medium text-gray-700">
-            <input
-              type="checkbox"
-              checked={refreshBeforeFetch}
-              onChange={(e) => setRefreshBeforeFetch(e.target.checked)}
-            />
-            동기화 전 카드 즉시조회 요청(RefreshCard) 실행
+    <div style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
+      {/* ════════ Header ════════ */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
+        <div>
+          <h1 style={{ fontSize: 20, fontWeight: 600, color: T.text, margin: 0, lineHeight: 1.3 }}>카드사용내역</h1>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: '4px 0 0' }}>
+            최근 동기화: {formatSyncTime(data?.summary?.lastSyncedAt || null)}
+          </p>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: T.textTertiary, cursor: 'pointer' }}>
+            <input type="checkbox" checked={refreshBeforeFetch} onChange={e => setRefreshBeforeFetch(e.target.checked)} style={{ accentColor: T.accent }} />
+            즉시조회
           </label>
-
-          <div className="text-xs text-gray-500">
-            최근 동기화: {formatDateTime(data?.summary?.lastSyncedAt || null)}
-            {' · '}
-            조회 합계: {(data?.summary?.totalAmount || 0).toLocaleString()}원
-            {' · '}
-            총 건수: {(data?.totalCount || 0).toLocaleString()}건
-          </div>
-
-          {syncMessage ? (
-            <div className="text-sm font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-lg px-3 py-2">
-              {syncMessage}
-            </div>
-          ) : null}
-          {error ? (
-            <div className="text-sm font-bold text-red-700 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-              {error}
-            </div>
-          ) : null}
+          <button
+            type="button"
+            onClick={handleSync}
+            disabled={syncing}
+            style={{
+              height: 40, padding: '0 18px', borderRadius: 10,
+              background: T.accent, color: '#fff', fontSize: 13, fontWeight: 600,
+              border: 'none', cursor: syncing ? 'wait' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              opacity: syncing ? 0.7 : 1, transition: 'opacity .2s',
+            }}
+          >
+            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            바로빌 동기화
+          </button>
         </div>
       </div>
 
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[980px] text-sm">
-            <thead className="bg-gray-50 text-gray-600">
-              <tr>
-                <th className="text-left px-4 py-3 font-bold">사용일시</th>
-                <th className="text-left px-4 py-3 font-bold">카드번호</th>
-                <th className="text-left px-4 py-3 font-bold">가맹점</th>
-                <th className="text-left px-4 py-3 font-bold">승인번호</th>
-                <th className="text-left px-4 py-3 font-bold">결제수단/할부</th>
-                <th className="text-right px-4 py-3 font-bold">합계금액</th>
-                <th className="text-left px-4 py-3 font-bold">통화</th>
-                <th className="text-left px-4 py-3 font-bold">메모</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                    <Loader2 size={16} className="animate-spin inline-block mr-2" />
-                    불러오는 중...
-                  </td>
-                </tr>
-              ) : (data?.items?.length || 0) > 0 ? (
-                data!.items.map((item) => (
-                  <tr key={item.id} className="border-t border-gray-100 hover:bg-gray-50/60">
-                    <td className="px-4 py-3 whitespace-nowrap">{formatDateTime(item.usedAt)}</td>
-                    <td className="px-4 py-3 whitespace-nowrap font-mono text-xs">{maskCard(item.cardNum)}</td>
-                    <td className="px-4 py-3">{item.useStoreName || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">{item.approvalNum || '-'}</td>
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      {item.paymentPlan || '-'}
-                      {item.installmentMonths ? ` / ${item.installmentMonths}` : ''}
-                    </td>
-                    <td className="px-4 py-3 text-right font-bold">
-                      {resolveAmount(item).toLocaleString()}원
-                    </td>
-                    <td className="px-4 py-3 whitespace-nowrap">{item.currencyCode || 'KRW'}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 min-w-[220px]">
-                        <input
-                          type="text"
-                          value={memoDrafts[item.id] ?? ''}
-                          onChange={(e) => setMemoDrafts((prev) => ({ ...prev, [item.id]: e.target.value }))}
-                          placeholder={item.memo || '메모 입력'}
-                          className="h-8 px-2 w-full rounded-md border border-gray-300 text-xs"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleSaveMemo(item)}
-                          disabled={savingMemoId === item.id}
-                          className="h-8 px-2.5 rounded-md border border-gray-300 bg-gray-50 text-xs font-bold whitespace-nowrap disabled:opacity-60"
-                        >
-                          {savingMemoId === item.id ? '저장중' : '저장'}
-                        </button>
+      {/* ════════ Metric Cards ════════ */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+        {/* 이번 달 총 지출 */}
+        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>이번 달 총 지출</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
+            {totalAmount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
+          </p>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>
+            {formatDisplayDate(startDate)} — {formatDisplayDate(endDate).split('. ').slice(1).join('. ')}
+          </p>
+        </div>
+
+        {/* 거래 건수 */}
+        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>거래 건수</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 8px', lineHeight: 1.2 }}>
+            {totalCount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>건</span>
+          </p>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <span style={{
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+              background: T.successBg, color: T.success, border: `1px solid ${T.successBorder}`,
+            }}>금액확인 {amountResolvedCount}건</span>
+            {amountMissingCount > 0 && (
+              <span style={{
+                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+                background: T.warningBg, color: T.warning, border: `1px solid ${T.warningBorder}`,
+              }}>미확인 {amountMissingCount}건</span>
+            )}
+          </div>
+        </div>
+
+        {/* 일평균 지출 */}
+        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>일평균 지출</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
+            {dailyAvg.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
+          </p>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>{daysInRange}일 기준</p>
+        </div>
+      </div>
+
+      {/* ════════ Filter bar ════════ */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        {/* Date range */}
+        <div style={{
+          ...flatInputStyle, display: 'flex', alignItems: 'center', gap: 8,
+          flex: '1 1 320px', paddingLeft: 12,
+        }}>
+          <Calendar size={14} style={{ color: T.textTertiary, flexShrink: 0 }} />
+          <input
+            type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit' }}
+          />
+          <span style={{ color: T.textTertiary, fontSize: 13, flexShrink: 0 }}>—</span>
+          <input
+            type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
+            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit' }}
+          />
+        </div>
+
+        {/* Card number select */}
+        <div style={{ position: 'relative', flex: '0 1 auto' }}>
+          <select
+            value={cardNum}
+            onChange={e => setCardNum(e.target.value)}
+            style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 180, fontFamily: 'inherit' }}
+          >
+            <option value="">카드번호 전체</option>
+            {uniqueCards.map(c => <option key={c} value={c}>{maskCard(c)}</option>)}
+          </select>
+          <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
+        </div>
+
+        {/* Store name select */}
+        <div style={{ position: 'relative', flex: '0 1 auto' }}>
+          <select
+            value={storeName}
+            onChange={e => setStoreName(e.target.value)}
+            style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 180, fontFamily: 'inherit' }}
+          >
+            <option value="">가맹점 전체</option>
+            {uniqueStores.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
+        </div>
+
+        {/* Search button */}
+        <button
+          type="button"
+          onClick={handleSearch}
+          disabled={loading}
+          style={{
+            ...flatInputStyle, background: T.accent, color: '#fff', border: 'none',
+            cursor: loading ? 'wait' : 'pointer', fontWeight: 600,
+            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+            minWidth: 72, paddingLeft: 16, paddingRight: 16,
+          }}
+        >
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
+          조회
+        </button>
+      </div>
+
+      {/* ════════ Status bar ════════ */}
+      {syncMessage && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: T.successBg, border: `1px solid ${T.successBorder}`, borderRadius: 10,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.success, fontWeight: 500 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.success, flexShrink: 0 }} />
+            {syncMessage}
+          </div>
+          <span style={{ fontSize: 12, color: T.textTertiary }}>저장 완료</span>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          background: T.errorBg, border: `1px solid #FED7D7`, borderRadius: 10,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: T.error, fontWeight: 500,
+        }}>
+          {error}
+        </div>
+      )}
+
+      {/* ════════ Section header ════════ */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+        <span style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500 }}>
+          거래내역 {totalCount.toLocaleString()}건
+        </span>
+        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+          {(['date', 'amount'] as const).map(mode => (
+            <button
+              key={mode}
+              type="button"
+              onClick={() => setSortMode(mode)}
+              style={{
+                padding: '5px 14px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                background: sortMode === mode ? T.accent : T.surface,
+                color: sortMode === mode ? '#fff' : T.textSecondary,
+                transition: 'all .15s',
+              }}
+            >
+              {mode === 'date' ? '날짜순' : '금액순'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ════════ Transaction list ════════ */}
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: '48px 0', color: T.textTertiary, fontSize: 14 }}>
+          <Loader2 size={20} className="animate-spin" style={{ display: 'inline-block', marginRight: 8 }} />
+          불러오는 중...
+        </div>
+      ) : groupedItems.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '48px 0', color: T.textTertiary, fontSize: 14 }}>
+          조회된 카드 사용내역이 없습니다.
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {groupedItems.map(group => (
+            <div key={group.date}>
+              {/* Date group label */}
+              <p style={{
+                fontSize: 12, fontWeight: 500, color: T.textTertiary,
+                margin: '12px 0 6px', paddingBottom: 6,
+                borderBottom: `1px solid ${T.borderLight}`,
+              }}>
+                {group.label}
+              </p>
+
+              {/* Transaction items */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {group.items.map((item, idx) => {
+                  const amt = resolveAmount(item)
+                  const cat = detectCategory(item.useStoreName)
+                  const displayMemo = memoDrafts[item.id] || item.userMemo || item.memo || ''
+                  const globalIdx = sortedItems.indexOf(item)
+
+                  return (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: '36px 1fr auto',
+                        gap: 12,
+                        alignItems: 'center',
+                        background: T.surface,
+                        border: `0.5px solid ${T.borderLight}`,
+                        borderRadius: 10,
+                        padding: '12px 14px',
+                        transition: 'border-color .15s',
+                      }}
+                      onMouseEnter={e => (e.currentTarget.style.borderColor = T.border)}
+                      onMouseLeave={e => (e.currentTarget.style.borderColor = T.borderLight)}
+                    >
+                      {/* Icon */}
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 10,
+                        background: cat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 16,
+                      }}>
+                        {cat.emoji}
                       </div>
-                    </td>
-                  </tr>
-                ))
-              ) : (
-                <tr>
-                  <td colSpan={8} className="px-4 py-8 text-center text-gray-400">
-                    조회된 카드 사용내역이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
 
-        <div className="border-t border-gray-100 px-4 py-3 flex items-center justify-between text-sm">
-          <span className="text-gray-500">
-            페이지 {data?.page || 1} / {data?.totalPages || 1}
-          </span>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => load(Math.max(1, (data?.page || 1) - 1))}
-              disabled={(data?.page || 1) <= 1 || loading}
-              className="h-8 px-3 rounded-md border border-gray-300 text-sm font-bold disabled:opacity-50"
-            >
-              이전
-            </button>
-            <button
-              type="button"
-              onClick={() => load(Math.min(data?.totalPages || 1, (data?.page || 1) + 1))}
-              disabled={(data?.page || 1) >= (data?.totalPages || 1) || loading}
-              className="h-8 px-3 rounded-md border border-gray-300 text-sm font-bold disabled:opacity-50"
-            >
-              다음
-            </button>
-          </div>
+                      {/* Info */}
+                      <div style={{ minWidth: 0 }}>
+                        <p style={{
+                          fontSize: 14, fontWeight: 500, color: T.text, margin: 0,
+                          whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                        }}>
+                          {item.useStoreName || '가맹점 없음'}
+                        </p>
+                        <p style={{ fontSize: 12, color: T.textTertiary, margin: '2px 0 0' }}>
+                          {formatAmPmTime(item.usedAt)} · {maskCard(item.cardNum)} · {item.approvalNum || '-'}
+                        </p>
+                        {/* Memo input (inline, appears on focus or has content) */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4 }}>
+                          <input
+                            type="text"
+                            data-memo-idx={globalIdx}
+                            value={memoDrafts[item.id] ?? ''}
+                            onChange={e => setMemoDrafts(prev => ({ ...prev, [item.id]: e.target.value }))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                handleSaveMemo(item)
+                                const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
+                                if (nextInput) nextInput.focus()
+                              }
+                            }}
+                            placeholder="메모 입력"
+                            style={{
+                              fontSize: 11, color: T.text, background: displayMemo ? T.surfaceSecondary : 'transparent',
+                              border: displayMemo ? `1px solid ${T.borderLight}` : '1px solid transparent',
+                              borderRadius: 6, padding: '2px 8px', height: 22,
+                              outline: 'none', minWidth: 0, width: displayMemo ? 'auto' : 70,
+                              transition: 'all .15s', fontFamily: 'inherit',
+                            }}
+                            onFocus={e => { e.currentTarget.style.background = T.surfaceSecondary; e.currentTarget.style.borderColor = T.border; e.currentTarget.style.width = '200px' }}
+                            onBlur={e => {
+                              if (!e.currentTarget.value) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent'; e.currentTarget.style.width = '70px' }
+                            }}
+                          />
+                          {savingMemoId === item.id && (
+                            <Loader2 size={10} className="animate-spin" style={{ color: T.textTertiary }} />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Amount */}
+                      <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                        <p style={{ fontSize: 15, fontWeight: 600, color: T.text, margin: 0, whiteSpace: 'nowrap' }}>
+                          {amt.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400 }}>원</span>
+                        </p>
+                        <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0', whiteSpace: 'nowrap' }}>
+                          {item.paymentPlan || '일시불'} · {item.currencyCode || 'KRW'}
+                        </p>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+
+      {/* ════════ Load more ════════ */}
+      {remainingCount > 0 && (
+        <button
+          type="button"
+          onClick={() => setVisibleCount(prev => prev + 20)}
+          style={{
+            display: 'block', width: '100%', textAlign: 'center',
+            padding: '14px 0', marginTop: 12,
+            fontSize: 13, fontWeight: 500, color: T.textTertiary,
+            background: 'transparent', border: 'none', cursor: 'pointer',
+          }}
+        >
+          + {remainingCount.toLocaleString()}건 더 보기
+        </button>
+      )}
+
+      {/* Bottom spacer */}
+      <div style={{ height: 40 }} />
     </div>
   )
 }
