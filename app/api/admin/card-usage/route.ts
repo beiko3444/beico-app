@@ -127,6 +127,7 @@ export async function PATCH(request: Request) {
     const id = String(body?.id || '').trim()
     const memoInput = typeof body?.memo === 'string' ? body.memo : undefined
     const categoryInput = typeof body?.category === 'string' ? body.category : undefined
+    const reviewedInput = typeof body?.reviewed === 'boolean' ? body.reviewed : undefined
 
     if (!id) {
       return NextResponse.json({ error: 'id가 필요합니다.' }, { status: 400 })
@@ -138,6 +139,10 @@ export async function PATCH(request: Request) {
     }
     if (categoryInput !== undefined) {
       data.category = categoryInput.trim() ? categoryInput.trim() : null
+    }
+    if (reviewedInput !== undefined) {
+      data.reviewedAt = reviewedInput ? new Date() : null
+      data.reviewedBy = reviewedInput ? (session.user.id || null) : null
     }
 
     if (Object.keys(data).length === 0) {
@@ -151,6 +156,8 @@ export async function PATCH(request: Request) {
         id: true,
         userMemo: true,
         category: true,
+        reviewedAt: true,
+        reviewedBy: true,
         updatedAt: true,
       },
     })

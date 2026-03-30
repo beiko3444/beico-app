@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Calendar, ChevronDown, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { Calendar, CheckCircle2, ChevronDown, Circle, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 import type { CategoryMeta } from '@/lib/cardCategory'
 
@@ -27,6 +27,8 @@ type CardUsageItem = {
   memo: string | null
   userMemo: string | null
   category: string | null
+  reviewedAt: string | null
+  reviewedBy: string | null
   syncedAt: string
 }
 
@@ -70,6 +72,21 @@ function resolveAmount(item: Pick<CardUsageItem, 'totalAmount' | 'approvalAmount
   return item.totalAmount ?? item.approvalAmount ?? 0
 }
 
+function resolveUsedAtTime(item: Pick<CardUsageItem, 'usedAt' | 'useDT'>) {
+  if (item.usedAt) {
+    const t = new Date(item.usedAt).getTime()
+    if (!Number.isNaN(t)) return t
+  }
+  if (item.useDT && /^\d{8}$/.test(item.useDT)) {
+    const y = item.useDT.slice(0, 4)
+    const m = item.useDT.slice(4, 6)
+    const d = item.useDT.slice(6, 8)
+    const t = new Date(`${y}-${m}-${d}T00:00:00+09:00`).getTime()
+    if (!Number.isNaN(t)) return t
+  }
+  return 0
+}
+
 /* ── Date / time formatting ── */
 function formatSyncTime(value: string | null) {
   if (!value) return '-'
@@ -92,6 +109,13 @@ function formatAmPmTime(value: string | null) {
   const h = d.getHours() === 0 ? 12 : d.getHours() > 12 ? d.getHours() - 12 : d.getHours()
   const min = String(d.getMinutes()).padStart(2, '0')
   return `${ampm} ${h}:${min}`
+}
+
+function formatMonthDay(value: string | null) {
+  if (!value) return ''
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${d.getMonth() + 1}월 ${d.getDate()}일`
 }
 
 function formatDateGroup(value: string) {
@@ -160,6 +184,10 @@ const T = {
   error: '#C53030',
   errorBg: '#FFF5F5',
   accent: '#1A1A1A',
+  reviewDoneBg: '#F2F8F0',
+  reviewDoneBorder: '#D4EDD2',
+  reviewPendingBg: '#FFF7F1',
+  reviewPendingBorder: '#F6D7C8',
 }
 
 /* ═══════════════════ Component ═══════════════════ */
@@ -180,8 +208,14 @@ export default function CardUsageClient() {
   const [syncMessage, setSyncMessage] = useState('')
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
-  const [sortMode, setSortMode] = useState<'date' | 'amount'>('date')
+  const [sortField, setSortField] = useState<'date' | 'amount'>('date')
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
+  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [reviewMode, setReviewMode] = useState(false)
+  const [reviewOnlyPending, setReviewOnlyPending] = useState(false)
+  const [reviewSavingId, setReviewSavingId] = useState<string | null>(null)
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
 
   /* ── User-managed categories ── */
   const [categories, setCategories] = useState<CategoryMeta[]>(() => loadUserCategories())
@@ -291,7 +325,7 @@ export default function CardUsageClient() {
   }
 
   /* ── Save category via PATCH ── */
-  const handleSaveCategory = async (item: CardUsageItem, categoryCode: string) => {
+  const handleSaveCategory = useCallback(async (item: CardUsageItem, categoryCode: string) => {
     try {
       const res = await fetch('/api/admin/card-usage', {
         method: 'PATCH',
@@ -305,6 +339,48 @@ export default function CardUsageClient() {
         return { ...prev, items: prev.items.map((row) => row.id === item.id ? { ...row, category: json.item?.category ?? null } : row) }
       })
     } catch (err: unknown) { setError(errorMessage(err)) }
+  }, [])
+
+  const handleSetReviewed = async (item: CardUsageItem, reviewed: boolean) => {
+    setReviewSavingId(item.id)
+    setError('')
+    try {
+      const res = await fetch('/api/admin/card-usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, reviewed }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '리뷰 상태 저장 실패')
+      setData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          items: prev.items.map((row) =>
+            row.id === item.id
+              ? {
+                  ...row,
+                  reviewedAt: json.item?.reviewedAt ?? (reviewed ? new Date().toISOString() : null),
+                  reviewedBy: json.item?.reviewedBy ?? null,
+                }
+              : row,
+          ),
+        }
+      })
+    } catch (err: unknown) {
+      setError(errorMessage(err))
+    } finally {
+      setReviewSavingId(null)
+    }
+  }
+
+  const handleSortClick = (field: 'date' | 'amount') => {
+    if (sortField === field) {
+      setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))
+      return
+    }
+    setSortField(field)
+    setSortOrder('desc')
   }
 
   /* ── Derived data ── */
@@ -313,6 +389,18 @@ export default function CardUsageClient() {
   const totalAmount = data?.summary?.totalAmount ?? 0
   const amountResolvedCount = allItems.filter(i => resolveAmount(i) !== 0).length
   const amountMissingCount = allItems.length - amountResolvedCount
+  const reviewedCount = allItems.filter(i => Boolean(i.reviewedAt)).length
+  const pendingReviewCount = Math.max(0, allItems.length - reviewedCount)
+  const reviewProgress = allItems.length > 0 ? Math.round((reviewedCount / allItems.length) * 100) : 0
+  const reviewPeriodLabel = useMemo(() => {
+    const start = new Date(startDate)
+    const end = new Date(endDate)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return '선택 기간'
+    if (start.getFullYear() === end.getFullYear() && start.getMonth() === end.getMonth()) {
+      return `${start.getFullYear()}년 ${start.getMonth() + 1}월`
+    }
+    return `${formatDisplayDate(startDate)} ~ ${formatDisplayDate(endDate)}`
+  }, [startDate, endDate])
   const daysInRange = useMemo(() => {
     const s = new Date(startDate); const e = new Date(endDate)
     const diff = Math.max(1, Math.ceil((e.getTime() - s.getTime()) / 86400000) + 1)
@@ -337,25 +425,40 @@ export default function CardUsageClient() {
       .slice(0, 6)
   }, [allItems, categories])
 
-  // Sort & group — show all items (no pagination)
-  const sortedItems = useMemo(() => {
+  const filteredItems = useMemo(() => {
     let items = [...allItems]
     if (categoryFilter) {
       items = items.filter(i => (i.category || classifyCategory(i.useStoreName)) === categoryFilter)
     }
-    if (sortMode === 'amount') {
-      items.sort((a, b) => resolveAmount(b) - resolveAmount(a))
+    if (reviewMode && reviewOnlyPending) {
+      items = items.filter(i => !i.reviewedAt)
     }
-    // default: already date desc from API
     return items
-  }, [allItems, sortMode, categoryFilter])
+  }, [allItems, categoryFilter, reviewMode, reviewOnlyPending])
+
+  // Sort — show all items (no pagination)
+  const sortedItems = useMemo(() => {
+    const items = [...filteredItems]
+    if (sortField === 'amount') {
+      items.sort((a, b) => {
+        const delta = resolveAmount(a) - resolveAmount(b)
+        return sortOrder === 'asc' ? delta : -delta
+      })
+    } else {
+      items.sort((a, b) => {
+        const delta = resolveUsedAtTime(a) - resolveUsedAtTime(b)
+        return sortOrder === 'asc' ? delta : -delta
+      })
+    }
+    return items
+  }, [filteredItems, sortField, sortOrder])
 
   // Group by date
   const groupedItems = useMemo(() => {
-    if (sortMode === 'amount') {
+    if (sortField === 'amount') {
       return [{
         date: 'amount',
-        label: '금액순',
+        label: `금액 ${sortOrder === 'desc' ? '내림차순' : '오름차순'}`,
         items: sortedItems,
       }]
     }
@@ -371,7 +474,91 @@ export default function CardUsageClient() {
       groups.push({ date: key, label: formatDateGroup(key), items })
     }
     return groups
-  }, [sortedItems, sortMode])
+  }, [sortedItems, sortField, sortOrder])
+
+  const calendarData = useMemo(() => {
+    const amountByDate = new Map<string, number>()
+    for (const item of filteredItems) {
+      const key = getDateKey(item.usedAt)
+      if (key === 'unknown') continue
+      const amount = Math.max(0, resolveAmount(item))
+      amountByDate.set(key, (amountByDate.get(key) || 0) + amount)
+    }
+
+    const start = new Date(`${startDate}T00:00:00+09:00`)
+    const end = new Date(`${endDate}T00:00:00+09:00`)
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+      return { months: [] as Array<{ key: string; label: string; cells: Array<{ key: string; date: Date; inRange: boolean; amount: number; percent: number } | null> }>, maxDailyAmount: 0 }
+    }
+
+    const maxDailyAmount = Math.max(0, ...Array.from(amountByDate.values()))
+    const months: Array<{ key: string; label: string; cells: Array<{ key: string; date: Date; inRange: boolean; amount: number; percent: number } | null> }> = []
+    const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+    const endMonth = new Date(end.getFullYear(), end.getMonth(), 1)
+
+    while (cursor <= endMonth) {
+      const y = cursor.getFullYear()
+      const m = cursor.getMonth()
+      const firstDay = new Date(y, m, 1)
+      const daysInMonth = new Date(y, m + 1, 0).getDate()
+      const firstWeekday = firstDay.getDay()
+      const cells: Array<{ key: string; date: Date; inRange: boolean; amount: number; percent: number } | null> = []
+
+      for (let i = 0; i < firstWeekday; i += 1) cells.push(null)
+
+      for (let day = 1; day <= daysInMonth; day += 1) {
+        const date = new Date(y, m, day)
+        const key = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        const amount = amountByDate.get(key) || 0
+        const inRange = date >= start && date <= end
+        const percent = maxDailyAmount > 0 ? Math.round((amount / maxDailyAmount) * 100) : 0
+        cells.push({ key, date, inRange, amount, percent })
+      }
+
+      months.push({
+        key: `${y}-${String(m + 1).padStart(2, '0')}`,
+        label: `${y}년 ${m + 1}월`,
+        cells,
+      })
+
+      cursor.setMonth(cursor.getMonth() + 1)
+    }
+
+    return { months, maxDailyAmount }
+  }, [filteredItems, startDate, endDate])
+
+  useEffect(() => {
+    if (!selectedItemId) return
+    if (!filteredItems.some(item => item.id === selectedItemId)) {
+      setSelectedItemId(null)
+    }
+  }, [filteredItems, selectedItemId])
+
+  useEffect(() => {
+    if (!selectedItemId) return
+    const selectedItem = allItems.find(item => item.id === selectedItemId)
+    if (!selectedItem) return
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      const active = document.activeElement as HTMLElement | null
+      if (active) {
+        const tag = active.tagName
+        const isTypingTarget = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || active.isContentEditable
+        if (isTypingTarget) return
+      }
+
+      if (!/^[1-6]$/.test(event.key)) return
+      const idx = Number(event.key) - 1
+      const targetCategory = categories[idx]
+      if (!targetCategory) return
+      event.preventDefault()
+      handleSaveCategory(selectedItem, targetCategory.code)
+    }
+
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [selectedItemId, allItems, categories, handleSaveCategory])
 
   /* ── Styles ── */
   const cardStyle: React.CSSProperties = {
@@ -746,29 +933,148 @@ export default function CardUsageClient() {
         </div>
       )}
 
+      {/* ════════ Review mode panel ════════ */}
+      {reviewMode && (
+        <div style={{ ...cardStyle, padding: '14px 16px', marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <CheckCircle2 size={14} style={{ color: T.success }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: T.text }}>
+                {reviewPeriodLabel} 리뷰 진행률
+              </span>
+            </div>
+            <span style={{ fontSize: 12, color: T.textSecondary, fontWeight: 600 }}>
+              {reviewedCount.toLocaleString()} / {allItems.length.toLocaleString()}건 ({reviewProgress}%)
+            </span>
+          </div>
+          <div style={{ height: 9, borderRadius: 999, background: T.surfaceSecondary, overflow: 'hidden', border: `1px solid ${T.borderLight}` }}>
+            <div
+              style={{
+                width: `${reviewProgress}%`,
+                height: '100%',
+                background: reviewProgress >= 100 ? T.success : '#F05A28',
+                transition: 'width .2s ease',
+              }}
+            />
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 12, color: T.textTertiary }}>
+            미리뷰 {pendingReviewCount.toLocaleString()}건 · 목표 100%
+          </p>
+        </div>
+      )}
+
       {/* ════════ Section header ════════ */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <span style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500 }}>
-          거래내역 {totalCount.toLocaleString()}건
-        </span>
-        <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-          {(['date', 'amount'] as const).map(mode => (
-            <button
-              key={mode}
-              type="button"
-              onClick={() => setSortMode(mode)}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500 }}>
+            거래내역 {sortedItems.length.toLocaleString()}건
+          </span>
+          {reviewMode && (
+            <span
               style={{
-                padding: '5px 14px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
-                background: sortMode === mode ? T.accent : T.surface,
-                color: sortMode === mode ? '#fff' : T.textSecondary,
-                transition: 'all .15s',
+                fontSize: 11,
+                fontWeight: 600,
+                color: pendingReviewCount > 0 ? T.warning : T.success,
+                background: pendingReviewCount > 0 ? T.warningBg : T.successBg,
+                border: `1px solid ${pendingReviewCount > 0 ? T.warningBorder : T.successBorder}`,
+                borderRadius: 999,
+                padding: '2px 8px',
               }}
             >
-              {mode === 'date' ? '날짜순' : '금액순'}
+              {pendingReviewCount > 0 ? `미리뷰 ${pendingReviewCount}건` : '리뷰 완료'}
+            </span>
+          )}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+            {(['list', 'calendar'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => setViewMode(mode)}
+                style={{
+                  padding: '5px 10px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  border: 'none',
+                  cursor: 'pointer',
+                  background: viewMode === mode ? T.accent : T.surface,
+                  color: viewMode === mode ? '#fff' : T.textSecondary,
+                  transition: 'all .15s',
+                }}
+              >
+                {mode === 'list' ? '리스트' : '캘린더'}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setReviewMode(prev => {
+                if (prev) setReviewOnlyPending(false)
+                return !prev
+              })
+            }}
+            style={{
+              height: 30,
+              padding: '0 12px',
+              borderRadius: 8,
+              fontSize: 12,
+              fontWeight: 700,
+              border: `1px solid ${reviewMode ? T.accent : T.border}`,
+              background: reviewMode ? T.accent : T.surface,
+              color: reviewMode ? '#fff' : T.textSecondary,
+              cursor: 'pointer',
+            }}
+          >
+            리뷰 모드 {reviewMode ? 'ON' : 'OFF'}
+          </button>
+          {reviewMode && (
+            <button
+              type="button"
+              onClick={() => setReviewOnlyPending(prev => !prev)}
+              style={{
+                height: 30,
+                padding: '0 12px',
+                borderRadius: 8,
+                fontSize: 12,
+                fontWeight: 600,
+                border: `1px solid ${reviewOnlyPending ? T.warningBorder : T.border}`,
+                background: reviewOnlyPending ? T.warningBg : T.surface,
+                color: reviewOnlyPending ? T.warning : T.textSecondary,
+                cursor: 'pointer',
+              }}
+          >
+              미리뷰만 보기
             </button>
-          ))}
+          )}
+          {viewMode === 'list' && (
+            <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+            {(['date', 'amount'] as const).map(mode => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => handleSortClick(mode)}
+                style={{
+                  padding: '5px 14px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
+                  background: sortField === mode ? T.accent : T.surface,
+                  color: sortField === mode ? '#fff' : T.textSecondary,
+                  transition: 'all .15s',
+                }}
+              >
+                {mode === 'date' ? '날짜순' : '금액순'} {sortField === mode ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
+              </button>
+            ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {viewMode === 'list' && (
+        <p style={{ margin: '-4px 0 10px', fontSize: 12, color: T.textTertiary }}>
+          거래내역을 클릭한 뒤 숫자키 1~6을 누르면 카테고리 순서대로 즉시 적용됩니다.
+        </p>
+      )}
 
       {/* ════════ Transaction list ════════ */}
       {loading ? (
@@ -776,6 +1082,66 @@ export default function CardUsageClient() {
           <Loader2 size={20} className="animate-spin" style={{ display: 'inline-block', marginRight: 8 }} />
           불러오는 중...
         </div>
+      ) : viewMode === 'calendar' ? (
+        calendarData.months.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 0', color: T.textTertiary, fontSize: 14 }}>
+            조회된 카드 사용내역이 없습니다.
+          </div>
+        ) : (
+          <div style={{ ...cardStyle, padding: '14px 14px 6px' }}>
+            <p style={{ margin: '0 0 12px', fontSize: 12, color: T.textTertiary }}>
+              일별 사용액 게이지 (최대 {calendarData.maxDailyAmount.toLocaleString()}원 = 100%)
+            </p>
+            {calendarData.months.map(month => (
+              <div key={month.key} style={{ marginBottom: 14 }}>
+                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: T.text }}>
+                  {month.label}
+                </p>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6, marginBottom: 6 }}>
+                  {['일', '월', '화', '수', '목', '금', '토'].map(day => (
+                    <div key={`${month.key}-${day}`} style={{ textAlign: 'center', fontSize: 11, color: T.textTertiary, fontWeight: 600 }}>
+                      {day}
+                    </div>
+                  ))}
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6 }}>
+                  {month.cells.map((cell, idx) => (
+                    cell ? (
+                      <div
+                        key={cell.key}
+                        style={{
+                          borderRadius: 10,
+                          border: `1px solid ${cell.inRange ? T.borderLight : '#F2F1ED'}`,
+                          background: cell.inRange
+                            ? (cell.percent > 0 ? 'rgba(26,26,26,0.03)' : T.surface)
+                            : '#FCFCFA',
+                          padding: '8px 8px 7px',
+                          minHeight: 66,
+                          opacity: cell.inRange ? 1 : 0.45,
+                        }}
+                      >
+                        <div style={{ fontSize: 11, fontWeight: 700, color: T.text, marginBottom: 4 }}>
+                          {cell.date.getDate()}일
+                        </div>
+                        <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {cell.amount > 0 ? `${cell.amount.toLocaleString()}원` : '-'}
+                        </div>
+                        <div style={{ height: 6, borderRadius: 999, background: T.surfaceSecondary, overflow: 'hidden' }}>
+                          <div style={{ width: `${cell.percent}%`, height: '100%', background: '#2563EB' }} />
+                        </div>
+                        <div style={{ marginTop: 4, fontSize: 10, color: T.textTertiary, textAlign: 'right' }}>
+                          {cell.percent}%
+                        </div>
+                      </div>
+                    ) : (
+                      <div key={`${month.key}-blank-${idx}`} />
+                    )
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )
       ) : groupedItems.length === 0 ? (
         <div style={{ textAlign: 'center', padding: '48px 0', color: T.textTertiary, fontSize: 14 }}>
           조회된 카드 사용내역이 없습니다.
@@ -785,7 +1151,7 @@ export default function CardUsageClient() {
           {groupedItems.map(group => (
             <div key={group.date}>
               {/* Date group label */}
-              {sortMode === 'date' && (
+              {sortField === 'date' && (
                 <p style={{
                   fontSize: 12, fontWeight: 500, color: T.textTertiary,
                   margin: '12px 0 6px', paddingBottom: 6,
@@ -803,26 +1169,151 @@ export default function CardUsageClient() {
                   const displayMemo = memoDrafts[item.id] || item.userMemo || item.memo || ''
                   const globalIdx = sortedItems.indexOf(item)
                   const isCatSelectOpen = catSelectItemId === item.id
+                  const isReviewed = Boolean(item.reviewedAt)
+                  const isSelected = selectedItemId === item.id
+                  const usedMonthDay = formatMonthDay(item.usedAt)
+                  const usedTime = formatAmPmTime(item.usedAt) || '-'
+                  const defaultRowBg = reviewMode ? (isReviewed ? T.reviewDoneBg : T.reviewPendingBg) : T.surface
+                  const defaultRowBorder = reviewMode ? (isReviewed ? T.reviewDoneBorder : T.reviewPendingBorder) : T.borderLight
 
                   return (
                     <div
                       key={item.id}
                       data-item-row={globalIdx}
+                      onClick={() => setSelectedItemId(item.id)}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '1fr auto',
+                        gridTemplateColumns: '56px 1fr auto',
                         gap: 12,
                         alignItems: 'center',
-                        background: T.surface,
-                        border: `0.5px solid ${T.borderLight}`,
+                        background: isSelected ? '#EAF3FF' : defaultRowBg,
+                        border: `1px solid ${isSelected ? '#BFDBFE' : defaultRowBorder}`,
                         borderRadius: 10,
                         padding: '12px 14px',
                         transition: 'border-color .15s',
                         position: 'relative',
+                        cursor: 'pointer',
                       }}
-                      onMouseEnter={e => (e.currentTarget.style.borderColor = T.border)}
-                      onMouseLeave={e => (e.currentTarget.style.borderColor = T.borderLight)}
                     >
+                      <div style={{ position: 'relative' }}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            setSelectedItemId(item.id)
+                            setCatSelectItemId(isCatSelectOpen ? null : item.id)
+                            setCatSelectIdx(0)
+                          }}
+                          title={`${cat.label} 카테고리`}
+                          style={{
+                            width: 44,
+                            height: 44,
+                            borderRadius: 12,
+                            border: `1px solid ${T.borderLight}`,
+                            background: cat.bgColor,
+                            fontSize: 24,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            boxShadow: isSelected ? '0 0 0 2px rgba(59,130,246,0.25)' : 'none',
+                          }}
+                        >
+                          {cat.emoji}
+                        </button>
+
+                        {isCatSelectOpen && (
+                          <div
+                            tabIndex={-1}
+                            onKeyDown={e => {
+                              if (e.key === 'ArrowDown') {
+                                e.preventDefault()
+                                setCatSelectIdx(prev => Math.min(prev + 1, categories.length - 1))
+                              } else if (e.key === 'ArrowUp') {
+                                e.preventDefault()
+                                setCatSelectIdx(prev => Math.max(prev - 1, 0))
+                              } else if (e.key === 'Enter') {
+                                e.preventDefault()
+                                const selected = categories[catSelectIdx]
+                                if (selected) {
+                                  handleSaveCategory(item, selected.code)
+                                  setCatSelectItemId(null)
+                                  const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
+                                  if (nextInput) {
+                                    nextInput.focus()
+                                    nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                  }
+                                }
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault()
+                                setCatSelectItemId(null)
+                              }
+                            }}
+                            onBlur={e => {
+                              if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                                setCatSelectItemId(null)
+                              }
+                            }}
+                            style={{
+                              position: 'absolute',
+                              left: 0,
+                              top: 'calc(100% + 4px)',
+                              zIndex: 100,
+                              background: T.surface,
+                              border: `1px solid ${T.border}`,
+                              borderRadius: 10,
+                              boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+                              padding: '6px 0',
+                              maxHeight: 220,
+                              overflowY: 'auto',
+                              minWidth: 170,
+                            }}
+                            ref={el => {
+                              if (el) {
+                                catListRef.current = el
+                                el.focus()
+                              }
+                            }}
+                          >
+                            {categories.map((c, i) => (
+                              <button
+                                key={c.code}
+                                type="button"
+                                tabIndex={-1}
+                                onClick={() => {
+                                  handleSaveCategory(item, c.code)
+                                  setCatSelectItemId(null)
+                                  const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
+                                  if (nextInput) {
+                                    nextInput.focus()
+                                    nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                  }
+                                }}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 8,
+                                  width: '100%', padding: '7px 14px', border: 'none',
+                                  background: i === catSelectIdx ? T.surfaceSecondary : 'transparent',
+                                  cursor: 'pointer', fontSize: 12, fontWeight: 500,
+                                  color: T.text, textAlign: 'left',
+                                  transition: 'background .1s',
+                                }}
+                                onMouseEnter={() => setCatSelectIdx(i)}
+                              >
+                                <span style={{
+                                  width: 24, height: 24, borderRadius: 6,
+                                  background: c.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                  fontSize: 13,
+                                }}>{c.emoji}</span>
+                                <span>{c.label}</span>
+                                {(item.category || classifyCategory(item.useStoreName)) === c.code && (
+                                  <span style={{ marginLeft: 'auto', color: T.success, fontSize: 11 }}>✓</span>
+                                )}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
                       {/* Info */}
                       <div style={{ minWidth: 0 }}>
                         <p style={{
@@ -832,25 +1323,17 @@ export default function CardUsageClient() {
                           {item.useStoreName || '가맹점 없음'}
                         </p>
                         <p style={{ fontSize: 12, color: T.textTertiary, margin: '2px 0 0' }}>
-                          {formatAmPmTime(item.usedAt)} · {maskCard(item.cardNum)} · {item.approvalNum || '-'}
+                          {usedMonthDay ? `${usedMonthDay} · ` : ''}{usedTime} · {maskCard(item.cardNum)} · {item.approvalNum || '-'}
                         </p>
-                        {/* Memo input + category selector wrapper */}
+                        {reviewMode && (
+                          <p style={{ fontSize: 11, margin: '3px 0 0', color: isReviewed ? T.success : T.warning, fontWeight: 600 }}>
+                            {isReviewed
+                              ? `리뷰완료 ${formatSyncTime(item.reviewedAt || null)}`
+                              : '리뷰 전'}
+                          </p>
+                        )}
+                        {/* Memo input */}
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, position: 'relative' }}>
-                          {/* Category badge (clickable to open selector) */}
-                          <button
-                            type="button"
-                            onClick={() => { setCatSelectItemId(isCatSelectOpen ? null : item.id); setCatSelectIdx(0) }}
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 3,
-                              padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600,
-                              background: cat.bgColor, color: T.text,
-                              border: `1px solid ${T.borderLight}`, cursor: 'pointer',
-                              whiteSpace: 'nowrap', height: 22,
-                            }}
-                          >
-                            {cat.emoji} {cat.label}
-                          </button>
-                          
                           <input
                             type="text"
                             data-memo-idx={globalIdx}
@@ -889,100 +1372,6 @@ export default function CardUsageClient() {
                           {savingMemoId === item.id && (
                             <Loader2 size={12} className="animate-spin" style={{ color: T.textTertiary }} />
                           )}
-
-                          {/* ── Inline category selector dropdown ── */}
-                          {isCatSelectOpen && (
-                            <div
-                              tabIndex={-1}
-                              onKeyDown={e => {
-                                if (e.key === 'ArrowDown') {
-                                  e.preventDefault()
-                                  setCatSelectIdx(prev => Math.min(prev + 1, categories.length - 1))
-                                } else if (e.key === 'ArrowUp') {
-                                  e.preventDefault()
-                                  setCatSelectIdx(prev => Math.max(prev - 1, 0))
-                                } else if (e.key === 'Enter') {
-                                  e.preventDefault()
-                                  const selected = categories[catSelectIdx]
-                                  if (selected) {
-                                    handleSaveCategory(item, selected.code)
-                                    setCatSelectItemId(null)
-                                    const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
-                                    if (nextInput) {
-                                      nextInput.focus()
-                                      nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                    }
-                                  }
-                                } else if (e.key === 'Escape') {
-                                  e.preventDefault()
-                                  setCatSelectItemId(null)
-                                  const memoInput = document.querySelector(`input[data-memo-idx="${globalIdx}"]`) as HTMLInputElement | null
-                                  if (memoInput) memoInput.focus()
-                                }
-                              }}
-                              onBlur={e => {
-                                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
-                                  setCatSelectItemId(null)
-                                }
-                              }}
-                              style={{
-                                position: 'absolute',
-                                left: 0,
-                                top: 'calc(100% + 4px)',
-                                zIndex: 100,
-                                background: T.surface,
-                                border: `1px solid ${T.border}`,
-                                borderRadius: 10,
-                                boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
-                                padding: '6px 0',
-                                maxHeight: 220,
-                                overflowY: 'auto',
-                                minWidth: 160,
-                              }}
-                              ref={el => {
-                                if (el) {
-                                  catListRef.current = el
-                                  el.focus()
-                                }
-                              }}
-                            >
-                              {categories.map((c, i) => (
-                                <button
-                                  key={c.code}
-                                  type="button"
-                                  tabIndex={-1}
-                                  onClick={() => {
-                                    handleSaveCategory(item, c.code)
-                                    setCatSelectItemId(null)
-                                    const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
-                                    if (nextInput) {
-                                      nextInput.focus()
-                                      nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                    }
-                                  }}
-                                  style={{
-                                    display: 'flex', alignItems: 'center', gap: 8,
-                                    width: '100%', padding: '7px 14px', border: 'none',
-                                    background: i === catSelectIdx ? T.surfaceSecondary : 'transparent',
-                                    cursor: 'pointer', fontSize: 12, fontWeight: 500,
-                                    color: T.text, textAlign: 'left',
-                                    transition: 'background .1s',
-                                  }}
-                                  onMouseEnter={() => setCatSelectIdx(i)}
-                                >
-                                  <span style={{
-                                    width: 24, height: 24, borderRadius: 6,
-                                    background: c.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                    fontSize: 13,
-                                  }}>{c.emoji}</span>
-                                  <span>{c.label}</span>
-                                  {(item.category || classifyCategory(item.useStoreName)) === c.code && (
-                                    <span style={{ marginLeft: 'auto', color: T.success, fontSize: 11 }}>✓</span>
-                                  )}
-                                </button>
-                              ))}
-                            </div>
-                          )}
                         </div>
                       </div>
 
@@ -997,6 +1386,47 @@ export default function CardUsageClient() {
                         <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0', whiteSpace: 'nowrap' }}>
                           {item.paymentPlan || '일시불'} · {item.currencyCode || 'KRW'}
                         </p>
+                        {reviewMode && (
+                          <button
+                            type="button"
+                            onClick={() => handleSetReviewed(item, !isReviewed)}
+                            disabled={reviewSavingId === item.id}
+                            style={{
+                              marginTop: 6,
+                              height: 26,
+                              padding: '0 10px',
+                              borderRadius: 8,
+                              border: `1px solid ${isReviewed ? T.successBorder : T.warningBorder}`,
+                              background: isReviewed ? T.successBg : T.warningBg,
+                              color: isReviewed ? T.success : T.warning,
+                              fontSize: 11,
+                              fontWeight: 700,
+                              cursor: reviewSavingId === item.id ? 'wait' : 'pointer',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              gap: 5,
+                              minWidth: 96,
+                            }}
+                          >
+                            {reviewSavingId === item.id ? (
+                              <>
+                                <Loader2 size={11} className="animate-spin" />
+                                저장중
+                              </>
+                            ) : isReviewed ? (
+                              <>
+                                <CheckCircle2 size={11} />
+                                리뷰완료
+                              </>
+                            ) : (
+                              <>
+                                <Circle size={11} />
+                                리뷰하기
+                              </>
+                            )}
+                          </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -1006,8 +1436,6 @@ export default function CardUsageClient() {
           ))}
         </div>
       )}
-
-
 
       {/* Bottom spacer */}
       <div style={{ height: 40 }} />
