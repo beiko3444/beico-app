@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Calendar, ChevronDown, Loader2, RefreshCw, Search } from 'lucide-react'
+import { CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 
 /* ═══════════════════ Types ═══════════════════ */
 type CardUsageItem = {
@@ -24,6 +25,7 @@ type CardUsageItem = {
   currencyCode: string | null
   memo: string | null
   userMemo: string | null
+  category: string | null
   syncedAt: string
 }
 
@@ -112,34 +114,10 @@ function formatDisplayDate(input: string) {
   return `${parts[0]}. ${parts[1]}. ${parts[2]}`
 }
 
-/* ── Store category detection ── */
-function detectCategory(storeName: string | null): { emoji: string; bg: string } {
-  const name = (storeName || '').toLowerCase()
-  // 음식/카페
-  if (/카페|커피|cafe|coffee|미루|스타벅스|이디야|투썸|빽다방|메가|컴포즈|할리스|엔제리너스|폴바셋/.test(name))
-    return { emoji: '☕', bg: '#FFF3E0' }
-  if (/요리사|식당|레스토랑|밥|치킨|피자|버거|맥도날드|롯데리아|bbq|bhc|교촌|한솥|김밥|떡볶이|분식|맘스|배달|요기요|배민|쿠팡이츠|써브웨이|subway|오스루|로스터리/.test(name))
-    return { emoji: '🍽️', bg: '#FFF8E1' }
-  if (/베이커리|빵|파리바게뜨|뚜레쥬르|성심당/.test(name))
-    return { emoji: '🥖', bg: '#FFF8E1' }
-  // 교통
-  if (/코레일|ktx|srt|기차|철도|택시|카카오T|타다|고속|시외|버스/.test(name))
-    return { emoji: '🚆', bg: '#E3F2FD' }
-  // 쇼핑/온라인
-  if (/네이버|쿠팡|gmarket|옥션|11번가|위메프|tmon|아마존|amazon|쇼핑/.test(name))
-    return { emoji: '🛒', bg: '#E8F5E9' }
-  if (/편의점|cu|gs25|세븐일레븐|이마트24|미니스톱/.test(name))
-    return { emoji: '🛍️', bg: '#E8F5E9' }
-  // 주유/차량
-  if (/주유|gs칼텍스|sk에너지|s-oil|현대오일|충전/.test(name))
-    return { emoji: '⛽', bg: '#FFF3E0' }
-  // 금융
-  if (/헥토|바로빌|은행|보험|카드|금융|증권/.test(name))
-    return { emoji: '💳', bg: '#F3E5F5' }
-  // 통신
-  if (/skt|kt|lg유플|알뜰/.test(name))
-    return { emoji: '📱', bg: '#E8EAF6' }
-  return { emoji: '📦', bg: '#F5F5F5' }
+/* ── Resolve category from DB or fallback ── */
+function resolveCategory(item: Pick<CardUsageItem, 'category' | 'useStoreName'>) {
+  const code = item.category || classifyCategory(item.useStoreName)
+  return getCategoryMeta(code)
 }
 
 /* ═══════════════════ CSS tokens ═══════════════════ */
@@ -183,6 +161,7 @@ export default function CardUsageClient() {
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
   const [sortMode, setSortMode] = useState<'date' | 'amount'>('date')
   const [visibleCount, setVisibleCount] = useState(10)
+  const [categoryFilter, setCategoryFilter] = useState('')
 
   /* ── Data loading ── */
   const load = useCallback(async (targetPage = page) => {
@@ -275,15 +254,31 @@ export default function CardUsageClient() {
   const uniqueCards = useMemo(() => [...new Set(allItems.map(i => i.cardNum))], [allItems])
   const uniqueStores = useMemo(() => [...new Set(allItems.map(i => i.useStoreName).filter(Boolean) as string[])], [allItems])
 
+  // Category summary (top spending per category)
+  const categorySummary = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const item of allItems) {
+      const code = item.category || classifyCategory(item.useStoreName)
+      map.set(code, (map.get(code) || 0) + resolveAmount(item))
+    }
+    return [...map.entries()]
+      .map(([code, total]) => ({ ...getCategoryMeta(code), total }))
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 6)
+  }, [allItems])
+
   // Sort & group
   const sortedItems = useMemo(() => {
-    const items = [...allItems]
+    let items = [...allItems]
+    if (categoryFilter) {
+      items = items.filter(i => (i.category || classifyCategory(i.useStoreName)) === categoryFilter)
+    }
     if (sortMode === 'amount') {
       items.sort((a, b) => resolveAmount(b) - resolveAmount(a))
     }
     // default: already date desc from API
     return items
-  }, [allItems, sortMode])
+  }, [allItems, sortMode, categoryFilter])
 
   const visibleItems = sortedItems.slice(0, visibleCount)
   const remainingCount = sortedItems.length - visibleCount
@@ -398,6 +393,47 @@ export default function CardUsageClient() {
         </div>
       </div>
 
+      {/* ════════ Category Summary ════════ */}
+      {categorySummary.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16 }}>
+          {categorySummary.map(cat => (
+            <button
+              key={cat.code}
+              type="button"
+              onClick={() => setCategoryFilter(prev => prev === cat.code ? '' : cat.code)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 5,
+                padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                background: categoryFilter === cat.code ? T.accent : cat.bgColor,
+                color: categoryFilter === cat.code ? '#fff' : T.text,
+                border: categoryFilter === cat.code ? `1px solid ${T.accent}` : `1px solid ${T.borderLight}`,
+                cursor: 'pointer', transition: 'all .15s',
+              }}
+            >
+              <span>{cat.emoji}</span>
+              <span>{cat.label}</span>
+              <span style={{ color: categoryFilter === cat.code ? 'rgba(255,255,255,0.7)' : T.textTertiary, fontWeight: 500 }}>
+                {cat.total.toLocaleString()}원
+              </span>
+            </button>
+          ))}
+          {categoryFilter && (
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('')}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+                padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
+                background: T.surfaceSecondary, color: T.textSecondary,
+                border: `1px solid ${T.borderLight}`, cursor: 'pointer',
+              }}
+            >
+              ✕ 필터 해제
+            </button>
+          )}
+        </div>
+      )}
+
       {/* ════════ Filter bar ════════ */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
         {/* Date range */}
@@ -439,6 +475,19 @@ export default function CardUsageClient() {
           >
             <option value="">가맹점 전체</option>
             {uniqueStores.map(s => <option key={s} value={s}>{s}</option>)}
+          </select>
+          <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
+        </div>
+
+        {/* Category select */}
+        <div style={{ position: 'relative', flex: '0 1 auto' }}>
+          <select
+            value={categoryFilter}
+            onChange={e => setCategoryFilter(e.target.value)}
+            style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 140, fontFamily: 'inherit' }}
+          >
+            <option value="">카테고리 전체</option>
+            {CATEGORIES.map(c => <option key={c.code} value={c.code}>{c.emoji} {c.label}</option>)}
           </select>
           <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
         </div>
@@ -535,7 +584,7 @@ export default function CardUsageClient() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {group.items.map((item, idx) => {
                   const amt = resolveAmount(item)
-                  const cat = detectCategory(item.useStoreName)
+                  const cat = resolveCategory(item)
                   const displayMemo = memoDrafts[item.id] || item.userMemo || item.memo || ''
                   const globalIdx = sortedItems.indexOf(item)
 
@@ -559,7 +608,7 @@ export default function CardUsageClient() {
                       {/* Icon */}
                       <div style={{
                         width: 36, height: 36, borderRadius: 10,
-                        background: cat.bg, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        background: cat.bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center',
                         fontSize: 16,
                       }}>
                         {cat.emoji}
