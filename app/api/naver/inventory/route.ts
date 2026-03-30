@@ -6,6 +6,8 @@ import fetch from "node-fetch";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
+export const runtime = "nodejs";
+
 const NAVER_OAUTH_TOKEN_URL = "https://api.commerce.naver.com/external/v1/oauth2/token";
 const NAVER_PRODUCT_SEARCH_URL = "https://api.commerce.naver.com/external/v1/products/search";
 const DEFAULT_PAGE_SIZE = 200;
@@ -46,6 +48,14 @@ type NaverProductSearchResponse = {
 };
 
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+let cachedProxyAgent: HttpsProxyAgent<string> | null = null;
+let cachedProxyUrl = "";
+
+type ErrorReadableResponse = {
+    status: number;
+    statusText: string;
+    text(): Promise<string>;
+};
 
 function normalizeCode(value: unknown) {
     if (typeof value !== "string") return "";
@@ -57,7 +67,7 @@ function clampNumber(value: number, min: number, max: number) {
     return Math.min(max, Math.max(min, value));
 }
 
-async function readErrorBody(response: Response) {
+async function readErrorBody(response: ErrorReadableResponse) {
     const text = await response.text();
     if (!text) return `${response.status} ${response.statusText}`;
 
@@ -78,12 +88,21 @@ function resolveProxyAgent() {
         process.env.NAVER_HTTP_PROXY ||
         process.env.QUOTAGUARDSTATIC_URL ||
         process.env.FIXIE_URL ||
+        process.env.USEFIXIE_URL ||
         process.env.HTTPS_PROXY ||
         process.env.HTTP_PROXY ||
         "";
 
-    if (!proxyUrl) return undefined;
-    return new HttpsProxyAgent(proxyUrl);
+    const normalizedProxyUrl = proxyUrl.trim().replace(/^['"]|['"]$/g, "");
+    if (!normalizedProxyUrl) return undefined;
+
+    if (cachedProxyAgent && cachedProxyUrl === normalizedProxyUrl) {
+        return cachedProxyAgent;
+    }
+
+    cachedProxyUrl = normalizedProxyUrl;
+    cachedProxyAgent = new HttpsProxyAgent(normalizedProxyUrl);
+    return cachedProxyAgent;
 }
 
 async function issueNaverAccessToken(forceRefresh = false) {
