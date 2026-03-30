@@ -222,6 +222,8 @@ model CardUsage {
   memo                  String?
   userMemo              String?
   category              String?
+  reviewedAt            DateTime?
+  reviewedBy            String?
   raw                   Json?
   syncedAt              DateTime @default(now())
   createdAt             DateTime @default(now())
@@ -231,4 +233,5 @@ model CardUsage {
   @@index([usedAt])
   @@index([cardNum])
   @@index([approvalNum])
+  @@index([reviewedAt])
 }
