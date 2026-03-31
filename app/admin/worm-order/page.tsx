@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { CalendarDays, Copy, FileText, Loader2, Minus, Plus, Send, Sparkles, Mail, ScanSearch, Search } from 'lucide-react'
+import { ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Circle, Clock3, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -70,6 +70,172 @@ type CustomsProgressResult = {
     ntceInfo: string
     summaryRecords: Array<Record<string, string>>
     detailRecords: Array<Record<string, string>>
+}
+
+type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
+type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
+type PipelineFilter = 'all' | PipelineMode
+type PipelineSectionTarget = 'order' | 'inbox' | 'remittance' | 'customs' | 'none'
+
+type PipelineStepDefinition = {
+    id: number
+    title: string
+    summary: string
+    mode: PipelineMode
+    owner: string
+    details: string[]
+    actionLabel: string
+    target: PipelineSectionTarget
+    warning?: string
+}
+
+const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
+    {
+        id: 1,
+        title: '발주 메시지 생성 및 전송',
+        summary: '사이즈/수량 기반 발주 메시지를 생성하고 전송을 승인합니다.',
+        mode: 'SEMI',
+        owner: '관리자',
+        details: ['사이즈별 수량 입력', '발주 메시지 자동 생성', '복사 후 카카오/이메일 전송'],
+        actionLabel: 'Worm Order 작성',
+        target: 'order',
+        warning: '전송 채널(API) 연동 시 완전 자동화로 확장 가능',
+    },
+    {
+        id: 2,
+        title: '마이클 인보이스 이메일 수신',
+        summary: 'INBOX에서 관련 메일을 스캔하고 첨부파일을 확인합니다.',
+        mode: 'AUTO',
+        owner: '시스템',
+        details: ['지정 발신자 메일 스캔', '첨부파일 인덱싱', '오프라인 캐시 복원'],
+        actionLabel: 'Inbox 모니터',
+        target: 'inbox',
+    },
+    {
+        id: 3,
+        title: '모인비즈니스 송금 신청',
+        summary: '송금 금액과 인보이스 PDF를 이용해 모인 송금 신청 자동화를 실행합니다.',
+        mode: 'SEMI',
+        owner: '관리자',
+        details: ['금액/인보이스 입력', '모인 BizPlus 자동 제출', '성공/실패 상태 기록'],
+        actionLabel: 'Moin BizPlus 실행',
+        target: 'remittance',
+    },
+    {
+        id: 4,
+        title: '실제 입금 처리',
+        summary: '은행/앱에서 실제 송금을 완료하고 결과를 확인합니다.',
+        mode: 'MANUAL',
+        owner: '관리자',
+        details: ['외부 결제 채널 접속', '실제 입금 수행', '입금 완료 확인'],
+        actionLabel: '수동 처리',
+        target: 'none',
+        warning: '은행 정책상 시스템 완전 자동화 불가',
+    },
+    {
+        id: 5,
+        title: '입금 완료 통보',
+        summary: '입금 완료 후 거래처 통보를 자동으로 진행합니다.',
+        mode: 'AUTO',
+        owner: '시스템',
+        details: ['완료 알림 메시지 생성', '이메일/메신저 전송', '전송 이력 보관'],
+        actionLabel: '알림 자동화 예정',
+        target: 'none',
+    },
+    {
+        id: 6,
+        title: '선적 서류 수신 및 AWB OCR',
+        summary: 'SKM 문서에서 AWB를 OCR로 추출하고 캐시에 저장합니다.',
+        mode: 'AUTO',
+        owner: '시스템',
+        details: ['첨부 PDF OCR 분석', 'AWB 후보 점수화', 'DB 캐시 저장'],
+        actionLabel: 'AWB OCR 실행',
+        target: 'inbox',
+    },
+    {
+        id: 7,
+        title: '유니패스 수입 통관 조회',
+        summary: 'AWB/B-L 번호로 통관 진행 정보를 조회하고 개입 단계를 강조합니다.',
+        mode: 'SEMI',
+        owner: '관리자 / 관세사',
+        details: ['MBL/HBL + 최근 3개년 자동 조회', '진행이력 개입 단계 강조', '처리주체 표시'],
+        actionLabel: 'UNI-PASS 조회',
+        target: 'customs',
+    },
+    {
+        id: 8,
+        title: '통관 승인 문서 수령',
+        summary: '통관 완료 후 필요한 문서를 수령/정리합니다.',
+        mode: 'MANUAL',
+        owner: '관리자 / 관세사',
+        details: ['통관 완료 확인', '문서 수령', '내부 공유'],
+        actionLabel: '수동 처리',
+        target: 'none',
+    },
+    {
+        id: 9,
+        title: '카고/관세사 문서 전달',
+        summary: '필요 첨부파일을 지정 이메일로 전달합니다.',
+        mode: 'SEMI',
+        owner: '관리자',
+        details: ['첨부파일 선택', '수신자 입력', '메일 전송 확인'],
+        actionLabel: '첨부 전달',
+        target: 'inbox',
+    },
+    {
+        id: 10,
+        title: '창고료 청구 메일 수신',
+        summary: '창고료 관련 메일을 감지하고 처리 대상을 표시합니다.',
+        mode: 'AUTO',
+        owner: '시스템',
+        details: ['INBOX 메일 스캔', '청구 메일 식별', '후속 단계 알림'],
+        actionLabel: 'Inbox 모니터',
+        target: 'inbox',
+    },
+    {
+        id: 11,
+        title: '창고료 결제',
+        summary: '청구 금액을 확인하고 결제를 완료합니다.',
+        mode: 'SEMI',
+        owner: '관리자',
+        details: ['결제 대상 확인', '결제 링크 이동', '완료 체크'],
+        actionLabel: '수동 결제',
+        target: 'none',
+    },
+    {
+        id: 12,
+        title: '카고 현장 픽업',
+        summary: '최종 현장 픽업을 수행하고 다음 사이클로 종료합니다.',
+        mode: 'MANUAL',
+        owner: '관리자',
+        details: ['픽업 일정 확인', '현장 수령', '사이클 종료'],
+        actionLabel: '수동 픽업',
+        target: 'none',
+    },
+]
+
+function getPipelineModeBadgeClass(mode: PipelineMode) {
+    if (mode === 'AUTO') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    if (mode === 'SEMI') return 'bg-amber-100 text-amber-800 border-amber-200'
+    return 'bg-slate-200 text-slate-700 border-slate-300'
+}
+
+function getPipelineModeLabel(mode: PipelineMode) {
+    if (mode === 'AUTO') return '완전자동'
+    if (mode === 'SEMI') return '반자동'
+    return '수동'
+}
+
+function getPipelineRuntimeBadgeClass(status: PipelineRuntimeStatus) {
+    if (status === 'done') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    if (status === 'active') return 'bg-orange-100 text-orange-800 border-orange-200'
+    return 'bg-slate-100 text-slate-600 border-slate-200'
+}
+
+function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
+    if (status === 'done') return '완료'
+    if (status === 'active') return '진행중'
+    return '대기'
 }
 
 const WORM_SIZES: WormSize[] = [
@@ -487,6 +653,9 @@ export default function WormOrderPage() {
     const [customsProgressError, setCustomsProgressError] = useState('')
     const [customsProgressLoading, setCustomsProgressLoading] = useState(false)
     const dateInputRef = useRef<HTMLInputElement>(null)
+    const orderSectionRef = useRef<HTMLDivElement>(null)
+    const inboxSectionRef = useRef<HTMLDivElement>(null)
+    const remittanceSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
@@ -651,6 +820,13 @@ export default function WormOrderPage() {
 
     // ── 자동 페치 & 게이지 관련 State ──
     const [fetchProgress, setFetchProgress] = useState(0)
+    const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>('all')
+    const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>(() => (
+        PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
+            acc[step.id] = step.id <= 3
+            return acc
+        }, {})
+    ))
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
     const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate[]> => {
@@ -1092,15 +1268,383 @@ export default function WormOrderPage() {
 
     const firstSummary = customsProgressResult?.summaryRecords?.[0] || null
     const detailRows = customsProgressResult?.detailRecords || []
+    const selectedEmailFromList = useMemo(
+        () => emails.find((email) => email.uid === selectedEmailUid) || null,
+        [emails, selectedEmailUid],
+    )
+    const fallbackAwbCandidate = useMemo(
+        () => awbNumber || selectedEmailFromList?.awbNumber || emails.find((email) => email.awbNumber)?.awbNumber || '',
+        [awbNumber, emails, selectedEmailFromList],
+    )
+    const hasWarehouseMail = useMemo(
+        () => emails.some((email) => /창고|warehouse|storage/i.test(email.subject)),
+        [emails],
+    )
+
+    const pipelineStatusMap = useMemo<Record<number, PipelineRuntimeStatus>>(() => {
+        const result: Record<number, PipelineRuntimeStatus> = {}
+        for (const step of PIPELINE_STEP_DEFINITIONS) {
+            result[step.id] = 'todo'
+        }
+
+        result[1] = generatedMessage.trim() ? 'done' : totalBoxes > 0 ? 'active' : 'todo'
+        result[2] = hasFetched && emails.length > 0 ? 'done' : loadingEmails ? 'active' : 'todo'
+        result[3] = remittanceSuccess
+            ? 'done'
+            : remittanceSubmitting || Boolean(transferAmountUsd.trim()) || Boolean(invoicePdf)
+                ? 'active'
+                : 'todo'
+        result[4] = result[3] === 'done' ? 'active' : 'todo'
+        result[5] = forwardSuccess ? 'done' : 'todo'
+        result[6] = fallbackAwbCandidate ? 'done' : awbLoading ? 'active' : 'todo'
+        result[7] = customsProgressResult
+            ? 'done'
+            : customsProgressLoading || Boolean(blNumberQuery.trim())
+                ? 'active'
+                : 'todo'
+        result[8] = detailRows.some((row) => {
+            const normalized = normalizeCustomsStepText(row.cargTrcnRelaBsopTpcd, row.rlbrCn)
+            return normalized.includes('\uC218\uC785\uC2E0\uACE0\uC218\uB9AC')
+        })
+            ? 'done'
+            : 'todo'
+        result[9] = forwardSuccess ? 'done' : 'todo'
+        result[10] = hasWarehouseMail ? 'done' : hasFetched ? 'active' : 'todo'
+        result[11] = 'todo'
+        result[12] = 'todo'
+
+        return result
+    }, [
+        awbLoading,
+        blNumberQuery,
+        customsProgressLoading,
+        customsProgressResult,
+        detailRows,
+        emails,
+        fallbackAwbCandidate,
+        forwardSuccess,
+        generatedMessage,
+        hasFetched,
+        hasWarehouseMail,
+        invoicePdf,
+        loadingEmails,
+        remittanceSubmitting,
+        remittanceSuccess,
+        totalBoxes,
+        transferAmountUsd,
+    ])
+
+    const pipelineModeCounts = useMemo(() => {
+        return PIPELINE_STEP_DEFINITIONS.reduce<Record<PipelineMode, number>>((acc, step) => {
+            acc[step.mode] += 1
+            return acc
+        }, { AUTO: 0, SEMI: 0, MANUAL: 0 })
+    }, [])
+
+    const doneStepCount = useMemo(
+        () => Object.values(pipelineStatusMap).filter((status) => status === 'done').length,
+        [pipelineStatusMap],
+    )
+    const activeStepId = useMemo(
+        () => PIPELINE_STEP_DEFINITIONS.find((step) => pipelineStatusMap[step.id] !== 'done')?.id ?? 12,
+        [pipelineStatusMap],
+    )
+    const filteredPipelineSteps = useMemo(
+        () => PIPELINE_STEP_DEFINITIONS.filter((step) => pipelineFilter === 'all' || step.mode === pipelineFilter),
+        [pipelineFilter],
+    )
+
+    const togglePipelineStep = useCallback((stepId: number) => {
+        setExpandedSteps((prev) => ({ ...prev, [stepId]: !prev[stepId] }))
+    }, [])
+
+    const scrollToPipelineSection = useCallback((target: PipelineSectionTarget) => {
+        if (target === 'order') {
+            orderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
+        if (target === 'inbox') {
+            inboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
+        if (target === 'remittance') {
+            remittanceSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
+        if (target === 'customs') {
+            customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+    }, [])
+
+    const handlePipelineStepAction = useCallback((step: PipelineStepDefinition) => {
+        if (step.target !== 'none') {
+            scrollToPipelineSection(step.target)
+        }
+
+        if (step.id === 1 && selectedOrders.length > 0 && !generatedMessage) {
+            handleGenerate()
+            return
+        }
+
+        if (step.id === 2 && !loadingEmails) {
+            void fetchEmails()
+            return
+        }
+
+        if (step.id === 6 && selectedEmailUid && !awbLoading) {
+            void handleRunSelectedAwbOcr()
+            return
+        }
+
+        if (step.id === 7 && fallbackAwbCandidate) {
+            void handleCustomsProgressSearch(fallbackAwbCandidate, { scrollIntoView: true })
+        }
+    }, [
+        awbLoading,
+        fallbackAwbCandidate,
+        generatedMessage,
+        handleCustomsProgressSearch,
+        handleGenerate,
+        handleRunSelectedAwbOcr,
+        loadingEmails,
+        scrollToPipelineSection,
+        selectedEmailUid,
+        selectedOrders.length,
+    ])
+
+    const handleStartNewOrder = useCallback(() => {
+        setQuantitiesByType(createInitialQuantitiesByType())
+        setReceiveDate(today)
+        setGeneratedMessage('')
+        setValidationError('')
+        setCopied(false)
+        setTransferAmountUsd('')
+        setInvoicePdf(null)
+        setRemittanceError('')
+        setRemittanceSuccess('')
+        setBlNumberQuery('')
+        setCustomsProgressResult(null)
+        setCustomsProgressError('')
+        setAwbNumber(null)
+        setAwbCandidates([])
+        setAwbError('')
+        setForwardEmail('')
+        setForwardError('')
+        setForwardSuccess('')
+        setExpandedSteps(
+            PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
+                acc[step.id] = step.id <= 3
+                return acc
+            }, {}),
+        )
+    }, [today])
 
     return (
-        <div className="max-w-4xl mx-auto space-y-6 pb-10">
-            <div className="flex flex-col gap-2">
-                <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">Worm Order</h1>
-                <p className="text-sm text-gray-500 uppercase tracking-wider">Choose boxes by size, then pick receiving date</p>
+        <div className="max-w-5xl mx-auto space-y-6 pb-10">
+            <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-zinc-900 p-5 md:p-7 shadow-2xl text-slate-100">
+                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                    <div className="space-y-1">
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight">지렁이 수입 자동화 파이프라인</h1>
+                        <p className="text-sm text-slate-400 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={handleStartNewOrder}
+                        className="h-10 px-4 rounded-xl border border-slate-600 bg-slate-900/60 hover:bg-slate-800 text-sm font-bold text-slate-100 inline-flex items-center gap-2 w-full md:w-auto justify-center"
+                    >
+                        + 새 발주 시작
+                    </button>
+                </div>
+
+                <div className="mt-6 grid grid-cols-3 gap-2 md:gap-4">
+                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
+                        <div className="text-2xl font-black text-emerald-300">{pipelineModeCounts.AUTO}</div>
+                        <div className="text-xs font-semibold text-emerald-100/90">완전자동</div>
+                    </div>
+                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-center">
+                        <div className="text-2xl font-black text-amber-300">{pipelineModeCounts.SEMI}</div>
+                        <div className="text-xs font-semibold text-amber-100/90">반자동</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-500/40 bg-slate-700/40 p-3 text-center">
+                        <div className="text-2xl font-black text-slate-200">{pipelineModeCounts.MANUAL}</div>
+                        <div className="text-xs font-semibold text-slate-300">수동 필요</div>
+                    </div>
+                </div>
+
+                <div className="mt-5 overflow-x-auto pb-1">
+                    <div className="min-w-max flex items-center">
+                        {PIPELINE_STEP_DEFINITIONS.map((step, index) => {
+                            const runtimeStatus = pipelineStatusMap[step.id]
+                            const isDone = runtimeStatus === 'done'
+                            const isActive = runtimeStatus === 'active' || step.id === activeStepId
+
+                            return (
+                                <div key={step.id} className="flex items-center">
+                                    {index > 0 && (
+                                        <div className={`h-[2px] w-7 md:w-10 ${isDone ? 'bg-emerald-400/70' : 'bg-slate-700'}`} />
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => togglePipelineStep(step.id)}
+                                        className={`h-9 w-9 rounded-full border text-xs font-black transition-colors ${
+                                            isDone
+                                                ? 'border-emerald-300 bg-emerald-200 text-emerald-900'
+                                                : isActive
+                                                    ? 'border-orange-300 bg-orange-500 text-white'
+                                                    : 'border-slate-600 bg-slate-800 text-slate-300'
+                                        }`}
+                                        title={`Step ${step.id} ${step.title}`}
+                                    >
+                                        {step.id}
+                                    </button>
+                                </div>
+                            )
+                        })}
+                    </div>
+                    <div className="mt-2 text-xs font-medium text-slate-400">
+                        완료 {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계
+                    </div>
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setPipelineFilter('all')}
+                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                            pipelineFilter === 'all'
+                                ? 'bg-white text-slate-900 border-white'
+                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                        }`}
+                    >
+                        전체 단계
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPipelineFilter('AUTO')}
+                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                            pipelineFilter === 'AUTO'
+                                ? 'bg-emerald-200 text-emerald-900 border-emerald-200'
+                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                        }`}
+                    >
+                        완전자동
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPipelineFilter('SEMI')}
+                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                            pipelineFilter === 'SEMI'
+                                ? 'bg-amber-200 text-amber-900 border-amber-200'
+                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                        }`}
+                    >
+                        반자동
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setPipelineFilter('MANUAL')}
+                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
+                            pipelineFilter === 'MANUAL'
+                                ? 'bg-slate-100 text-slate-900 border-slate-100'
+                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                        }`}
+                    >
+                        수동 필요
+                    </button>
+                </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="space-y-3">
+                {filteredPipelineSteps.map((step) => {
+                    const runtimeStatus = pipelineStatusMap[step.id]
+                    const isExpanded = expandedSteps[step.id] ?? false
+
+                    return (
+                        <section
+                            key={step.id}
+                            className={`rounded-2xl border bg-white shadow-sm transition-colors ${
+                                runtimeStatus === 'done'
+                                    ? 'border-emerald-200'
+                                    : runtimeStatus === 'active'
+                                        ? 'border-orange-300'
+                                        : 'border-gray-200'
+                            }`}
+                        >
+                            <button
+                                type="button"
+                                onClick={() => togglePipelineStep(step.id)}
+                                className="w-full px-4 py-4 flex items-center justify-between gap-3 text-left"
+                            >
+                                <div className="min-w-0">
+                                    <div className="flex items-center gap-2">
+                                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-black px-2">
+                                            {step.id}
+                                        </span>
+                                        <h2 className="text-base md:text-lg font-black text-slate-900 truncate">{step.title}</h2>
+                                    </div>
+                                    <p className="mt-2 text-sm text-slate-600">{step.summary}</p>
+                                </div>
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                        {getPipelineModeLabel(step.mode)}
+                                    </span>
+                                    <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                        {getPipelineRuntimeLabel(runtimeStatus)}
+                                    </span>
+                                    {isExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                                </div>
+                            </button>
+
+                            {isExpanded && (
+                                <div className="border-t border-gray-100 px-4 py-4 space-y-3">
+                                    <div className="text-sm text-slate-600 font-medium">처리주체: {step.owner}</div>
+                                    <div className="space-y-1.5">
+                                        {step.details.map((item) => (
+                                            <div key={`${step.id}-${item}`} className="flex items-start gap-2 text-sm text-slate-700">
+                                                {runtimeStatus === 'done' ? (
+                                                    <CheckCircle2 size={15} className="text-emerald-600 mt-0.5 shrink-0" />
+                                                ) : runtimeStatus === 'active' ? (
+                                                    <Clock3 size={15} className="text-orange-600 mt-0.5 shrink-0" />
+                                                ) : (
+                                                    <Circle size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                                                )}
+                                                <span>{item}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {step.warning && (
+                                        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+                                            {step.warning}
+                                        </div>
+                                    )}
+
+                                    <button
+                                        type="button"
+                                        onClick={() => handlePipelineStepAction(step)}
+                                        className={`h-9 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 ${
+                                            step.target === 'none'
+                                                ? 'bg-slate-100 text-slate-500 cursor-default'
+                                                : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
+                                        }`}
+                                        disabled={step.target === 'none'}
+                                    >
+                                        {step.actionLabel}
+                                        {step.target !== 'none' && <ArrowRight size={14} />}
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+                    )
+                })}
+            </div>
+
+            <div className="flex flex-col gap-1 px-1">
+                <h2 className="text-xl font-black text-slate-900">실행 도구</h2>
+                <p className="text-xs text-slate-500">아래 기존 기능을 단계별 카드와 연동했습니다.</p>
+            </div>
+
+            <div ref={orderSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex flex-col md:flex-row md:items-end gap-4">
                     <div className="min-w-0">
                         <label htmlFor="receiveDate" className="block text-xs font-black text-gray-600 uppercase tracking-[0.15em] mb-2">
@@ -1239,7 +1783,7 @@ export default function WormOrderPage() {
                 </div>
             )}
 
-            <div ref={customsProgressSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <div ref={remittanceSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
@@ -1349,7 +1893,7 @@ export default function WormOrderPage() {
             </div>
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+            <div ref={inboxSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -1651,7 +2195,7 @@ export default function WormOrderPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <div ref={customsProgressSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">UNI-PASS API001</p>
