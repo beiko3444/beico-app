@@ -125,6 +125,49 @@ function formatYmdOrYmdHm(value?: string) {
     return value
 }
 
+function normalizeCustomsStepText(...values: Array<string | undefined>) {
+    return values.join(' ').replace(/\s+/g, '').trim()
+}
+
+function getAdminActionStep(row: Record<string, string>) {
+    const importDeclaration = '\uC218\uC785\uC2E0\uACE0'
+    const importAccepted = '\uC218\uC785\uC2E0\uACE0\uC218\uB9AC'
+    const taxNotice = '\uACB0\uC7AC\uD1B5\uBCF4'
+    const releaseDeclaration = '\uBC18\uCD9C\uC2E0\uACE0'
+    const releaseAfterImport = '\uC218\uC785\uC2E0\uACE0\uC218\uB9AC\uD6C4\uBC18\uCD9C'
+
+    const normalized = normalizeCustomsStepText(
+        row.cargTrcnRelaBsopTpcd,
+        row.rlbrCn,
+    )
+
+    if (normalized.includes(taxNotice)) {
+        return {
+            label: '\uAD00\uC138/\uBD80\uAC00\uC138 \uB0A9\uBD80 \uD544\uC694',
+            rowClassName: 'bg-amber-50',
+            badgeClassName: 'bg-amber-100 text-amber-800 border-amber-200',
+        }
+    }
+
+    if (normalized.includes(releaseDeclaration) || normalized.includes(releaseAfterImport)) {
+        return {
+            label: '\uBC18\uCD9C/\uAD6D\uB0B4 \uC6B4\uC1A1 \uC870\uCE58 \uD544\uC694',
+            rowClassName: 'bg-sky-50',
+            badgeClassName: 'bg-sky-100 text-sky-800 border-sky-200',
+        }
+    }
+
+    if (normalized.includes(importDeclaration) && !normalized.includes(importAccepted)) {
+        return {
+            label: '\uD1B5\uAD00 \uC11C\uB958/\uC2E0\uACE0 \uC9C4\uD589 \uD544\uC694',
+            rowClassName: 'bg-yellow-50',
+            badgeClassName: 'bg-yellow-100 text-yellow-800 border-yellow-200',
+        }
+    }
+
+    return null
+}
+
 const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
 const NON_AWB_CONTEXT_REGEX = /\b(?:TEL|PHONE|MOBILE|FAX|EMAIL|E-?MAIL|CONTACT|INVOICE|DATE|TOTAL|QTY|PCS|KILO)\b/i
 const PHONE_LIKE_PREFIX_REGEX = /^(010|011|016|017|018|019|070|080)/
@@ -1667,6 +1710,9 @@ export default function WormOrderPage() {
 
                         {firstSummary && (
                             <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                                <p className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                                    관리자 또는 관세사가 직접 챙겨야 하는 단계는 배경색으로 강조됩니다.
+                                </p>
                                 <h4 className="text-sm font-black text-[#111827]">요약정보</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                     <div><span className="font-bold text-gray-700">화물관리번호:</span> {firstSummary.cargMtNo || '-'}</div>
@@ -1686,6 +1732,9 @@ export default function WormOrderPage() {
                         {detailRows.length > 0 && (
                             <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
                                 <h4 className="text-sm font-black text-[#111827]">진행이력</h4>
+                                <p className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
+                                    Highlighted rows require admin or customs-broker action.
+                                </p>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full text-xs">
                                         <thead>
@@ -1698,15 +1747,31 @@ export default function WormOrderPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {detailRows.map((row, index) => (
-                                                <tr key={`${row.prcsDttm || 'row'}-${index}`} className="border-t border-gray-100 text-gray-800">
-                                                    <td className="px-2 py-2">{formatYmdOrYmdHm(row.prcsDttm)}</td>
-                                                    <td className="px-2 py-2">{row.cargTrcnRelaBsopTpcd || '-'}</td>
-                                                    <td className="px-2 py-2">{row.rlbrCn || '-'}</td>
-                                                    <td className="px-2 py-2">{row.dclrNo || '-'}</td>
-                                                    <td className="px-2 py-2">{row.shedNm || '-'}</td>
-                                                </tr>
-                                            ))}
+                                            {detailRows.map((row, index) => {
+                                                const adminStep = getAdminActionStep(row)
+
+                                                return (
+                                                    <tr
+                                                        key={`${row.prcsDttm || 'row'}-${index}`}
+                                                        className={`border-t border-gray-100 text-gray-800 ${adminStep?.rowClassName || ''}`}
+                                                    >
+                                                        <td className="px-2 py-2">{formatYmdOrYmdHm(row.prcsDttm)}</td>
+                                                        <td className="px-2 py-2">
+                                                            <div className="flex flex-col gap-1">
+                                                                <span>{row.cargTrcnRelaBsopTpcd || '-'}</span>
+                                                                {adminStep && (
+                                                                    <span className={`inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${adminStep.badgeClassName}`}>
+                                                                        {adminStep.label}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-2 py-2">{row.rlbrCn || '-'}</td>
+                                                        <td className="px-2 py-2">{row.dclrNo || '-'}</td>
+                                                        <td className="px-2 py-2">{row.shedNm || '-'}</td>
+                                                    </tr>
+                                                )
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
