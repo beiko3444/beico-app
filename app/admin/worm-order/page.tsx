@@ -49,6 +49,15 @@ type WormEmailDetail = {
     attachments: WormEmailAttachment[]
 }
 
+type WormEmailOfflineCache = {
+    version: 1
+    savedAt: string | null
+    hasFetched: boolean
+    emails: WormEmailListItem[]
+    emailDetails: Record<string, WormEmailDetail>
+    selectedEmailUid: string | null
+}
+
 type CustomsProgressResult = {
     blNo: string
     query: {
@@ -117,6 +126,165 @@ function formatYmdOrYmdHm(value?: string) {
 const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
 const NON_AWB_CONTEXT_REGEX = /\b(?:TEL|PHONE|MOBILE|FAX|EMAIL|E-?MAIL|CONTACT|INVOICE|DATE|TOTAL|QTY|PCS|KILO)\b/i
 const PHONE_LIKE_PREFIX_REGEX = /^(010|011|016|017|018|019|070|080)/
+const WORM_EMAIL_CACHE_STORAGE_KEY = 'beico-worm-order-email-cache-v1'
+const WORM_EMAIL_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
+
+function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
+    if (!value || typeof value !== 'object') return null
+
+    const candidate = value as Partial<WormEmailListItem>
+    if (
+        typeof candidate.uid !== 'string' ||
+        typeof candidate.subject !== 'string' ||
+        typeof candidate.date !== 'string' ||
+        typeof candidate.hasAttachments !== 'boolean'
+    ) {
+        return null
+    }
+
+    return {
+        uid: candidate.uid,
+        subject: candidate.subject,
+        date: candidate.date,
+        hasAttachments: candidate.hasAttachments,
+    }
+}
+
+function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
+    if (!value || typeof value !== 'object') return null
+
+    const candidate = value as Partial<WormEmailAttachment>
+    if (
+        typeof candidate.filename !== 'string' ||
+        typeof candidate.contentType !== 'string' ||
+        typeof candidate.size !== 'number' ||
+        typeof candidate.index !== 'number'
+    ) {
+        return null
+    }
+
+    return {
+        filename: candidate.filename,
+        contentType: candidate.contentType,
+        size: candidate.size,
+        index: candidate.index,
+    }
+}
+
+function sanitizeWormEmailDetail(value: unknown): WormEmailDetail | null {
+    if (!value || typeof value !== 'object') return null
+
+    const candidate = value as Partial<WormEmailDetail>
+    if (
+        typeof candidate.uid !== 'string' ||
+        typeof candidate.subject !== 'string' ||
+        typeof candidate.date !== 'string' ||
+        typeof candidate.text !== 'string' ||
+        typeof candidate.hasAttachments !== 'boolean' ||
+        !Array.isArray(candidate.skmIndices) ||
+        !Array.isArray(candidate.attachments)
+    ) {
+        return null
+    }
+
+    const skmIndices = candidate.skmIndices.filter((index): index is number => typeof index === 'number')
+    const attachments = candidate.attachments
+        .map((attachment) => sanitizeWormEmailAttachment(attachment))
+        .filter((attachment): attachment is WormEmailAttachment => attachment !== null)
+
+    return {
+        uid: candidate.uid,
+        subject: candidate.subject,
+        date: candidate.date,
+        text: candidate.text,
+        hasAttachments: candidate.hasAttachments,
+        skmIndices,
+        attachments,
+    }
+}
+
+function pruneEmailDetails(
+    details: Record<string, WormEmailDetail>,
+    emails: WormEmailListItem[],
+) {
+    const allowedUids = new Set(emails.map((email) => email.uid))
+    return Object.fromEntries(
+        Object.entries(details).filter(([uid]) => allowedUids.has(uid)),
+    ) as Record<string, WormEmailDetail>
+}
+
+function readWormEmailOfflineCache(): WormEmailOfflineCache | null {
+    if (typeof window === 'undefined') return null
+
+    try {
+        const raw = window.localStorage.getItem(WORM_EMAIL_CACHE_STORAGE_KEY)
+        if (!raw) return null
+
+        const parsed = JSON.parse(raw) as Partial<WormEmailOfflineCache> & {
+            emails?: unknown[]
+            emailDetails?: Record<string, unknown>
+        }
+
+        if (parsed.version !== 1) return null
+
+        const savedAt = typeof parsed.savedAt === 'string' ? parsed.savedAt : null
+        if (savedAt) {
+            const savedAtMs = new Date(savedAt).getTime()
+            if (Number.isFinite(savedAtMs) && Date.now() - savedAtMs > WORM_EMAIL_CACHE_MAX_AGE_MS) {
+                window.localStorage.removeItem(WORM_EMAIL_CACHE_STORAGE_KEY)
+                return null
+            }
+        }
+
+        const emails = Array.isArray(parsed.emails)
+            ? parsed.emails
+                .map((email) => sanitizeWormEmailListItem(email))
+                .filter((email): email is WormEmailListItem => email !== null)
+            : []
+
+        const rawDetails =
+            parsed.emailDetails && typeof parsed.emailDetails === 'object'
+                ? parsed.emailDetails
+                : {}
+
+        const emailDetails = Object.fromEntries(
+            Object.entries(rawDetails)
+                .map(([uid, detail]) => {
+                    const sanitized = sanitizeWormEmailDetail(detail)
+                    if (!sanitized || sanitized.uid !== uid) return null
+                    return [uid, sanitized] as const
+                })
+                .filter((entry): entry is readonly [string, WormEmailDetail] => entry !== null),
+        ) as Record<string, WormEmailDetail>
+
+        const selectedEmailUid =
+            typeof parsed.selectedEmailUid === 'string' && emails.some((email) => email.uid === parsed.selectedEmailUid)
+                ? parsed.selectedEmailUid
+                : emails[0]?.uid || null
+
+        return {
+            version: 1,
+            savedAt,
+            hasFetched: Boolean(parsed.hasFetched),
+            emails,
+            emailDetails: pruneEmailDetails(emailDetails, emails),
+            selectedEmailUid,
+        }
+    } catch (error) {
+        console.error('Failed to restore worm inbox cache', error)
+        return null
+    }
+}
+
+function writeWormEmailOfflineCache(cache: WormEmailOfflineCache) {
+    if (typeof window === 'undefined') return
+
+    try {
+        window.localStorage.setItem(WORM_EMAIL_CACHE_STORAGE_KEY, JSON.stringify(cache))
+    } catch (error) {
+        console.error('Failed to persist worm inbox cache', error)
+    }
+}
 
 function normalizeOcrPatternText(input: string) {
     return input
@@ -277,6 +445,64 @@ export default function WormOrderPage() {
     const [emailError, setEmailError] = useState('')
     const [hasFetched, setHasFetched] = useState(false)
     const [selectedEmailUid, setSelectedEmailUid] = useState<string | null>(null)
+    const [emailCacheSavedAt, setEmailCacheSavedAt] = useState<string | null>(null)
+    const [usingOfflineEmailCache, setUsingOfflineEmailCache] = useState(false)
+    const hasHydratedEmailCacheRef = useRef(false)
+    const skipEmailCachePersistRef = useRef(false)
+
+    const persistEmailOfflineCache = useCallback(() => {
+        if (!hasHydratedEmailCacheRef.current) return
+
+        if (!hasFetched && emails.length === 0 && Object.keys(emailDetails).length === 0 && !selectedEmailUid) {
+            if (typeof window !== 'undefined') {
+                window.localStorage.removeItem(WORM_EMAIL_CACHE_STORAGE_KEY)
+            }
+            return
+        }
+
+        const normalizedSelectedEmailUid =
+            selectedEmailUid && emails.some((email) => email.uid === selectedEmailUid)
+                ? selectedEmailUid
+                : emails[0]?.uid || null
+
+        writeWormEmailOfflineCache({
+            version: 1,
+            savedAt: emailCacheSavedAt,
+            hasFetched,
+            emails,
+            emailDetails: pruneEmailDetails(emailDetails, emails),
+            selectedEmailUid: normalizedSelectedEmailUid,
+        })
+    }, [emailCacheSavedAt, emailDetails, emails, hasFetched, selectedEmailUid])
+
+    useEffect(() => {
+        const restoredCache = readWormEmailOfflineCache()
+        hasHydratedEmailCacheRef.current = true
+
+        if (!restoredCache) return
+
+        skipEmailCachePersistRef.current = true
+        setEmails(restoredCache.emails)
+        setEmailDetails(restoredCache.emailDetails)
+        setHasFetched(restoredCache.hasFetched)
+        setSelectedEmailUid(restoredCache.selectedEmailUid)
+        setEmailCacheSavedAt(restoredCache.savedAt)
+        setUsingOfflineEmailCache(
+            restoredCache.hasFetched &&
+            (restoredCache.emails.length > 0 || Object.keys(restoredCache.emailDetails).length > 0),
+        )
+    }, [])
+
+    useEffect(() => {
+        if (!hasHydratedEmailCacheRef.current) return
+
+        if (skipEmailCachePersistRef.current) {
+            skipEmailCachePersistRef.current = false
+            return
+        }
+
+        persistEmailOfflineCache()
+    }, [persistEmailOfflineCache])
 
     // ── AWB OCR 관련 State ──
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
@@ -452,6 +678,9 @@ export default function WormOrderPage() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || '메일 상세 조회 실패')
 
+            setEmailError('')
+            setUsingOfflineEmailCache(false)
+            setEmailCacheSavedAt(new Date().toISOString())
             setEmailDetails(prev => ({ ...prev, [uid]: data }))
             return data
         } catch (err: any) {
@@ -490,9 +719,6 @@ export default function WormOrderPage() {
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
-        setHasFetched(false)
-        setSelectedEmailUid(null)
-        setEmailDetails({})
         setFetchProgress(0)
 
         // 가짜(Fake) 프로그레스 메이커 (로딩 중일 때 90%까지 꾸준히 증가)
@@ -511,21 +737,33 @@ export default function WormOrderPage() {
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to fetch emails')
             
-            const fetchedEmails: WormEmailListItem[] = data.emails || []
+            const fetchedEmails: WormEmailListItem[] = Array.isArray(data.emails)
+                ? data.emails
+                    .map((email: unknown) => sanitizeWormEmailListItem(email))
+                    .filter((email: WormEmailListItem | null): email is WormEmailListItem => email !== null)
+                : []
+            const nextSelectedEmailUid =
+                selectedEmailUid && fetchedEmails.some((email) => email.uid === selectedEmailUid)
+                    ? selectedEmailUid
+                    : fetchedEmails[0]?.uid || null
+
             setEmails(fetchedEmails)
-            if (fetchedEmails.length > 0) {
-                setSelectedEmailUid(fetchedEmails[0].uid)
-            }
-            
+            setEmailDetails((prev) => pruneEmailDetails(prev, fetchedEmails))
+            setSelectedEmailUid(nextSelectedEmailUid)
             setHasFetched(true)
+            setUsingOfflineEmailCache(false)
+            setEmailCacheSavedAt(new Date().toISOString())
             
             // 0.5초 뒤 게이지 숨김
             setTimeout(() => setFetchProgress(0), 500)
         } catch (err: any) {
             clearInterval(interval)
             setFetchProgress(0)
-            setEmailError(err.message)
+            const message = err.message || 'Failed to fetch emails'
+            const hasCachedEmails = emails.length > 0 || Object.keys(emailDetails).length > 0
+            setEmailError(hasCachedEmails ? `${message} Showing saved email cache.` : message)
             setHasFetched(true)
+            setUsingOfflineEmailCache(hasCachedEmails)
         } finally {
             setLoadingEmails(false)
         }
@@ -1000,6 +1238,11 @@ export default function WormOrderPage() {
                         <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
                             <Mail size={18} className="text-slate-500" /> Documents
                         </h2>
+                        {emailCacheSavedAt && (
+                            <p className={`mt-1 text-[11px] font-medium ${usingOfflineEmailCache ? 'text-amber-600' : 'text-slate-500'}`}>
+                                {usingOfflineEmailCache ? 'Offline cache active' : 'Last cached'} / {new Date(emailCacheSavedAt).toLocaleString()}
+                            </p>
+                        )}
                     </div>
                     <button
                         onClick={fetchEmails}
