@@ -1244,7 +1244,13 @@ export default function WormOrderPage() {
             setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
-            if (message.toLowerCase().includes('playwright')) {
+            const lower = message.toLowerCase()
+            const missingBrowserRuntime =
+                lower.includes('no server browser runtime available') ||
+                lower.includes('playwright_chromium_executable_path is not set') ||
+                (lower.includes('cannot find module') && (lower.includes('playwright-core') || lower.includes('@sparticuz/chromium')))
+
+            if (missingBrowserRuntime) {
                 setRemittanceError(`${message} (Install deps and redeploy: npm install playwright-core @sparticuz/chromium)`)
             } else {
                 setRemittanceError(message)

@@ -286,6 +286,52 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
+    const navigationErrors: string[] = []
+    const waitStrategies: Array<'domcontentloaded' | 'load'> = ['domcontentloaded', 'load']
+    const loginSelectors = [
+        'input[name="email"]',
+        'input[type="email"]',
+        'input[name="username"]',
+        'input[autocomplete="username"]',
+        'input[autocomplete="email"]',
+    ]
+
+    for (const waitUntil of waitStrategies) {
+        try {
+            await page.goto(MOIN_BIZPLUS_LOGIN_URL, {
+                waitUntil,
+                timeout: timeoutMs,
+            })
+
+            let loginInputVisible = false
+            for (const selector of loginSelectors) {
+                try {
+                    await page.locator(selector).first().waitFor({ state: 'visible', timeout: 8000 })
+                    loginInputVisible = true
+                    break
+                } catch {
+                    // Try the next selector.
+                }
+            }
+
+            if (!loginInputVisible) {
+                throw new Error('Login input fields were not visible after navigation.')
+            }
+
+            return waitUntil
+        } catch (error) {
+            const reason = error instanceof Error ? error.message : String(error)
+            navigationErrors.push(`${waitUntil}: ${reason}`)
+        }
+    }
+
+    throw new MoinAutomationError(
+        'Open login page',
+        `Could not open MOIN login page. ${navigationErrors.join(' | ')}`
+    )
+}
+
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
     let browser: BrowserLike | null = null
     const steps: string[] = []
@@ -301,8 +347,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
         // ── Step 1: Go directly to login page ─────────────────────────────
-        await page.goto(MOIN_BIZPLUS_LOGIN_URL, { waitUntil: 'networkidle' })
-        steps.push('open-login-page')
+        const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
+        steps.push(`open-login-page:${loginWaitUntil}`)
 
         // ── Step 2: Fill login credentials (type char-by-char for React) ──
         await typeFirstVisible(
