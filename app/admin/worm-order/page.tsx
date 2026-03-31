@@ -643,11 +643,15 @@ export default function WormOrderPage() {
     const [copied, setCopied] = useState(false)
     const [moinLoginId, setMoinLoginId] = useState(process.env.NEXT_PUBLIC_MOIN_ID || '')
     const [moinPassword, setMoinPassword] = useState(process.env.NEXT_PUBLIC_MOIN_PW || '')
+    const [showMoinPassword, setShowMoinPassword] = useState(false)
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
     const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
     const [remittanceError, setRemittanceError] = useState('')
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
+    const [remittanceAttemptsRemaining, setRemittanceAttemptsRemaining] = useState<number | null>(null)
+    const [remittanceLockedUntil, setRemittanceLockedUntil] = useState<number | null>(null)
+    const [remittanceLockTick, setRemittanceLockTick] = useState(0)
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -1012,6 +1016,23 @@ export default function WormOrderPage() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
+    useEffect(() => {
+        if (!remittanceLockedUntil) return
+        if (remittanceLockedUntil <= Date.now()) {
+            setRemittanceLockedUntil(null)
+            return
+        }
+
+        const timer = window.setInterval(() => {
+            setRemittanceLockTick((prev) => prev + 1)
+            if (remittanceLockedUntil <= Date.now()) {
+                setRemittanceLockedUntil(null)
+            }
+        }, 1000)
+
+        return () => window.clearInterval(timer)
+    }, [remittanceLockedUntil])
+
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
@@ -1081,6 +1102,22 @@ export default function WormOrderPage() {
     const totalBoxes = useMemo(() => {
         return selectedOrders.reduce((sum, item) => sum + item.boxes, 0)
     }, [selectedOrders])
+
+    const remittanceLockRemainingMs = useMemo(() => {
+        if (!remittanceLockedUntil) return 0
+        const remaining = remittanceLockedUntil - Date.now()
+        return remaining > 0 ? remaining : 0
+    }, [remittanceLockedUntil, remittanceLockTick])
+
+    const remittanceLockRemainingText = useMemo(() => {
+        if (remittanceLockRemainingMs <= 0) return ''
+        const totalSeconds = Math.ceil(remittanceLockRemainingMs / 1000)
+        const minutes = Math.floor(totalSeconds / 60)
+        const seconds = totalSeconds % 60
+        return `${minutes}:${String(seconds).padStart(2, '0')}`
+    }, [remittanceLockRemainingMs])
+
+    const isRemittanceLocked = remittanceLockRemainingMs > 0
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
@@ -1153,9 +1190,20 @@ export default function WormOrderPage() {
     const handleRemittanceApply = async () => {
         setRemittanceError('')
         setRemittanceSuccess('')
+        setRemittanceAttemptsRemaining(null)
+
+        if (isRemittanceLocked) {
+            setRemittanceError(`비밀번호 보호 잠금이 활성화되어 있습니다. ${remittanceLockRemainingText} 후 다시 시도해 주세요.`)
+            return
+        }
 
         if (!moinLoginId.trim() || !moinPassword.trim()) {
             setRemittanceError('Please enter MOIN login ID and password.')
+            return
+        }
+
+        if (moinPassword.startsWith(' ') || moinPassword.endsWith(' ')) {
+            setRemittanceError('비밀번호 앞/뒤 공백이 포함되어 있습니다. 공백을 제거한 뒤 다시 시도해 주세요.')
             return
         }
 
@@ -1192,9 +1240,22 @@ export default function WormOrderPage() {
             const result = await response.json()
 
             if (!response.ok) {
+                if (typeof result?.attemptsRemaining === 'number') {
+                    setRemittanceAttemptsRemaining(result.attemptsRemaining)
+                }
+
+                if (typeof result?.lockedUntil === 'string') {
+                    const lockedUntilMs = Date.parse(result.lockedUntil)
+                    if (Number.isFinite(lockedUntilMs) && lockedUntilMs > Date.now()) {
+                        setRemittanceLockedUntil(lockedUntilMs)
+                    }
+                }
+
                 throw new Error(typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.')
             }
 
+            setRemittanceAttemptsRemaining(null)
+            setRemittanceLockedUntil(null)
             setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
             setMoinPassword('')
         } catch (error) {
@@ -1422,6 +1483,9 @@ export default function WormOrderPage() {
         setInvoicePdf(null)
         setRemittanceError('')
         setRemittanceSuccess('')
+        setRemittanceAttemptsRemaining(null)
+        setRemittanceLockedUntil(null)
+        setShowMoinPassword(false)
         setBlNumberQuery('')
         setCustomsProgressResult(null)
         setCustomsProgressError('')
@@ -1803,7 +1867,12 @@ export default function WormOrderPage() {
                         <input
                             type="text"
                             value={moinLoginId}
-                            onChange={(event) => setMoinLoginId(event.target.value)}
+                            onChange={(event) => {
+                                setMoinLoginId(event.target.value)
+                                setRemittanceError('')
+                                setRemittanceAttemptsRemaining(null)
+                                setRemittanceLockedUntil(null)
+                            }}
                             className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
                             placeholder="Enter MOIN login ID"
                             autoComplete="username"
@@ -1813,14 +1882,30 @@ export default function WormOrderPage() {
                         <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
                             MOIN Password
                         </label>
-                        <input
-                            type="password"
-                            value={moinPassword}
-                            onChange={(event) => setMoinPassword(event.target.value)}
-                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                            placeholder="Enter MOIN password"
-                            autoComplete="current-password"
-                        />
+                        <div className="relative">
+                            <input
+                                type={showMoinPassword ? 'text' : 'password'}
+                                value={moinPassword}
+                                onChange={(event) => {
+                                    setMoinPassword(event.target.value)
+                                    setRemittanceError('')
+                                    setRemittanceAttemptsRemaining(null)
+                                }}
+                                className="w-full h-11 px-3 pr-16 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                                placeholder="Enter MOIN password"
+                                autoComplete="current-password"
+                            />
+                            <button
+                                type="button"
+                                onClick={() => setShowMoinPassword((prev) => !prev)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 px-2 rounded-md border border-gray-200 bg-white text-[11px] font-bold text-slate-600 hover:bg-slate-50"
+                            >
+                                {showMoinPassword ? '숨김' : '보기'}
+                            </button>
+                        </div>
+                        <p className="text-[11px] text-slate-500">
+                            비밀번호 오입력 보호: 실패 누적 시 자동 잠금(서버 가드)으로 추가 시도를 차단합니다.
+                        </p>
                     </div>
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
@@ -1870,10 +1955,12 @@ export default function WormOrderPage() {
                     <button
                         type="button"
                         onClick={handleRemittanceApply}
-                        disabled={remittanceSubmitting}
+                        disabled={remittanceSubmitting || isRemittanceLocked}
                         className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                     >
-                        {remittanceSubmitting ? (
+                        {isRemittanceLocked ? (
+                            `잠금 ${remittanceLockRemainingText}`
+                        ) : remittanceSubmitting ? (
                             <>
                                 <Loader2 size={15} className="animate-spin" />
                                 Applying...
@@ -1886,6 +1973,16 @@ export default function WormOrderPage() {
 
                 {remittanceError && (
                     <p className="text-sm font-semibold text-[#e34219]">{remittanceError}</p>
+                )}
+                {isRemittanceLocked && (
+                    <p className="text-sm font-semibold text-amber-700">
+                        보호 잠금 활성화: {remittanceLockRemainingText} 후 재시도 가능합니다.
+                    </p>
+                )}
+                {remittanceAttemptsRemaining !== null && remittanceAttemptsRemaining > 0 && !isRemittanceLocked && (
+                    <p className="text-xs font-semibold text-amber-700">
+                        비밀번호 실패 남은 시도: {remittanceAttemptsRemaining}회 (계정 보호를 위해 제한됨)
+                    </p>
                 )}
                 {remittanceSuccess && (
                     <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
