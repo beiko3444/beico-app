@@ -216,6 +216,7 @@ export default function CardUsageClient() {
   const [reviewOnlyPending, setReviewOnlyPending] = useState(false)
   const [reviewSavingId, setReviewSavingId] = useState<string | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [showShortcutDock, setShowShortcutDock] = useState(false)
 
   /* ── User-managed categories ── */
   const [categories, setCategories] = useState<CategoryMeta[]>(() => loadUserCategories())
@@ -535,6 +536,21 @@ export default function CardUsageClient() {
   }, [filteredItems, selectedItemId])
 
   useEffect(() => {
+    if (typeof window === 'undefined') return
+    const media = window.matchMedia('(min-width: 1320px)')
+    const apply = () => setShowShortcutDock(media.matches)
+    apply()
+
+    if (typeof media.addEventListener === 'function') {
+      media.addEventListener('change', apply)
+      return () => media.removeEventListener('change', apply)
+    }
+
+    media.addListener(apply)
+    return () => media.removeListener(apply)
+  }, [])
+
+  useEffect(() => {
     if (!selectedItemId) return
     const selectedItem = allItems.find(item => item.id === selectedItemId)
     if (!selectedItem) return
@@ -560,6 +576,12 @@ export default function CardUsageClient() {
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [selectedItemId, allItems, categories, handleSaveCategory])
 
+  const selectedItem = useMemo(() => {
+    if (!selectedItemId) return null
+    return allItems.find(item => item.id === selectedItemId) || null
+  }, [allItems, selectedItemId])
+  const shortcutCategories = useMemo(() => categories.slice(0, 6), [categories])
+
   /* ── Styles ── */
   const cardStyle: React.CSSProperties = {
     background: T.surface,
@@ -581,6 +603,58 @@ export default function CardUsageClient() {
 
   return (
     <div style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
+      {viewMode === 'list' && showShortcutDock && shortcutCategories.length > 0 && (
+        <div
+          style={{
+            position: 'fixed',
+            left: 14,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            width: 188,
+            borderRadius: 12,
+            border: `1px solid ${T.border}`,
+            background: 'rgba(255,255,255,0.95)',
+            boxShadow: '0 10px 24px rgba(0,0,0,0.08)',
+            padding: '10px 10px 8px',
+            zIndex: 60,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: T.text }}>
+            카테고리 단축키
+          </p>
+          <p style={{ margin: '3px 0 8px', fontSize: 11, color: T.textTertiary }}>
+            행 선택 후 숫자키
+          </p>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {shortcutCategories.map((cat, idx) => (
+              <div
+                key={cat.code}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '20px 18px 1fr',
+                  alignItems: 'center',
+                  gap: 6,
+                  background: cat.bgColor,
+                  border: `1px solid ${T.borderLight}`,
+                  borderRadius: 8,
+                  padding: '4px 6px',
+                }}
+              >
+                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary }}>{idx + 1}</span>
+                <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
+                <span style={{ fontSize: 11, color: T.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                  {cat.label}
+                </span>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '8px 0 0', fontSize: 10, color: T.textTertiary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            선택됨: {selectedItem?.useStoreName || '-'}
+          </p>
+        </div>
+      )}
+
       {/* ════════ Header ════════ */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
         <div>
@@ -1183,7 +1257,7 @@ export default function CardUsageClient() {
                       onClick={() => setSelectedItemId(item.id)}
                       style={{
                         display: 'grid',
-                        gridTemplateColumns: '56px 1fr auto',
+                        gridTemplateColumns: '72px 1fr auto',
                         gap: 12,
                         alignItems: 'center',
                         background: isSelected ? '#EAF3FF' : defaultRowBg,
@@ -1221,6 +1295,23 @@ export default function CardUsageClient() {
                         >
                           {cat.emoji}
                         </button>
+                        <p
+                          style={{
+                            margin: '4px 0 0',
+                            fontSize: 10,
+                            color: T.textSecondary,
+                            lineHeight: 1.2,
+                            textAlign: 'center',
+                            wordBreak: 'keep-all',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            whiteSpace: 'nowrap',
+                            maxWidth: 58,
+                          }}
+                          title={cat.label}
+                        >
+                          {cat.label}
+                        </p>
 
                         {isCatSelectOpen && (
                           <div
