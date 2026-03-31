@@ -91,14 +91,16 @@ export async function POST(request: Request) {
     try {
         const formData = await request.formData()
 
-        const moinLoginId = readString(formData.get('moinLoginId'))
-        const passwordEntry = formData.get('moinPassword')
-        const moinPassword = typeof passwordEntry === 'string' ? passwordEntry : ''
+        const moinLoginId = (process.env.MOIN_BIZPLUS_LOGIN_ID || '').trim()
+        const moinPassword = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
         const amountRaw = readString(formData.get('amountUsd'))
         const invoicePdf = formData.get('invoicePdf')
 
         if (!moinLoginId || !moinPassword) {
-            return NextResponse.json({ error: 'MOIN login ID and password are required.' }, { status: 400 })
+            return NextResponse.json(
+                { error: 'Server is not configured: set MOIN_BIZPLUS_LOGIN_ID and MOIN_BIZPLUS_LOGIN_PASSWORD.' },
+                { status: 500 }
+            )
         }
 
         if (moinPassword.startsWith(' ') || moinPassword.endsWith(' ')) {

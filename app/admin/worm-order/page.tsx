@@ -641,9 +641,6 @@ export default function WormOrderPage() {
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
     const [copied, setCopied] = useState(false)
-    const [moinLoginId, setMoinLoginId] = useState(process.env.NEXT_PUBLIC_MOIN_ID || '')
-    const [moinPassword, setMoinPassword] = useState(process.env.NEXT_PUBLIC_MOIN_PW || '')
-    const [showMoinPassword, setShowMoinPassword] = useState(false)
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
     const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
     const [remittanceError, setRemittanceError] = useState('')
@@ -1197,16 +1194,6 @@ export default function WormOrderPage() {
             return
         }
 
-        if (!moinLoginId.trim() || !moinPassword.trim()) {
-            setRemittanceError('Please enter MOIN login ID and password.')
-            return
-        }
-
-        if (moinPassword.startsWith(' ') || moinPassword.endsWith(' ')) {
-            setRemittanceError('비밀번호 앞/뒤 공백이 포함되어 있습니다. 공백을 제거한 뒤 다시 시도해 주세요.')
-            return
-        }
-
         const normalizedAmount = transferAmountUsd.replace(/,/g, '').trim()
         const parsedAmount = Number(normalizedAmount)
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
@@ -1228,8 +1215,6 @@ export default function WormOrderPage() {
         setRemittanceSubmitting(true)
         try {
             const submitData = new FormData()
-            submitData.append('moinLoginId', moinLoginId.trim())
-            submitData.append('moinPassword', moinPassword)
             submitData.append('amountUsd', parsedAmount.toFixed(2))
             submitData.append('invoicePdf', invoicePdf)
 
@@ -1257,7 +1242,6 @@ export default function WormOrderPage() {
             setRemittanceAttemptsRemaining(null)
             setRemittanceLockedUntil(null)
             setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
-            setMoinPassword('')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
             if (message.toLowerCase().includes('playwright')) {
@@ -1853,60 +1837,13 @@ export default function WormOrderPage() {
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
                         <h3 className="text-lg font-black text-[#111827]">Auto Remittance Application</h3>
                         <p className="text-xs text-gray-500 mt-1">
-                            Fill amount + invoice PDF, then click apply to complete transfer submission automatically.
+                            Uses server env credentials. Fill amount + invoice PDF, then click apply.
                         </p>
                     </div>
                     <Send size={18} className="text-[#e34219] mt-1" />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
-                            MOIN Login ID
-                        </label>
-                        <input
-                            type="text"
-                            value={moinLoginId}
-                            onChange={(event) => {
-                                setMoinLoginId(event.target.value)
-                                setRemittanceError('')
-                                setRemittanceAttemptsRemaining(null)
-                                setRemittanceLockedUntil(null)
-                            }}
-                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                            placeholder="Enter MOIN login ID"
-                            autoComplete="username"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
-                            MOIN Password
-                        </label>
-                        <div className="relative">
-                            <input
-                                type={showMoinPassword ? 'text' : 'password'}
-                                value={moinPassword}
-                                onChange={(event) => {
-                                    setMoinPassword(event.target.value)
-                                    setRemittanceError('')
-                                    setRemittanceAttemptsRemaining(null)
-                                }}
-                                className="w-full h-11 px-3 pr-16 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                                placeholder="Enter MOIN password"
-                                autoComplete="current-password"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => setShowMoinPassword((prev) => !prev)}
-                                className="absolute right-2 top-1/2 -translate-y-1/2 h-7 px-2 rounded-md border border-gray-200 bg-white text-[11px] font-bold text-slate-600 hover:bg-slate-50"
-                            >
-                                {showMoinPassword ? '숨김' : '보기'}
-                            </button>
-                        </div>
-                        <p className="text-[11px] text-slate-500">
-                            비밀번호 오입력 보호: 실패 누적 시 자동 잠금(서버 가드)으로 추가 시도를 차단합니다.
-                        </p>
-                    </div>
                     <div className="space-y-1">
                         <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
                             Transfer Amount (USD)
@@ -1950,7 +1887,7 @@ export default function WormOrderPage() {
 
                 <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                        The automation will log in, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
+                        The automation will log in with server credentials, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
                     </p>
                     <button
                         type="button"
