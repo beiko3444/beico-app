@@ -89,6 +89,11 @@ type PipelineStepDefinition = {
     warning?: string
 }
 
+type RemittanceProgressStage = {
+    percent: number
+    label: string
+}
+
 const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 1,
@@ -213,6 +218,56 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'none',
     },
 ]
+
+const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
+    { percent: 6, label: '브라우저 런타임을 준비하는 중...' },
+    { percent: 14, label: '모인 로그인 페이지에 접속하는 중...' },
+    { percent: 24, label: '로그인 계정 정보를 입력하는 중...' },
+    { percent: 33, label: '로그인을 제출하고 확인하는 중...' },
+    { percent: 44, label: '수취인/거래처를 찾는 중...' },
+    { percent: 56, label: '송금 신청 화면으로 이동하는 중...' },
+    { percent: 68, label: '송금 금액을 입력하는 중...' },
+    { percent: 78, label: '인보이스 PDF를 업로드하는 중...' },
+    { percent: 88, label: '약관 동의 및 최종 제출을 준비하는 중...' },
+    { percent: 94, label: '모인 응답을 확인하는 중...' },
+]
+
+const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressStage }> = [
+    { keys: ['runtime:'], stage: { percent: 6, label: '브라우저 런타임을 준비하는 중...' } },
+    { keys: ['open-login-page'], stage: { percent: 14, label: '모인 로그인 페이지에 접속하는 중...' } },
+    { keys: ['fill-login-id', 'fill-login-password'], stage: { percent: 24, label: '로그인 계정 정보를 입력하는 중...' } },
+    { keys: ['submit-login', 'post-login-url'], stage: { percent: 33, label: '로그인을 제출하고 확인하는 중...' } },
+    { keys: ['select-company', 'select-company-after-nav'], stage: { percent: 44, label: '수취인/거래처를 찾는 중...' } },
+    { keys: ['open-remittance-popup'], stage: { percent: 56, label: '송금 신청 화면으로 이동하는 중...' } },
+    { keys: ['fill-usd-amount', 'next-after-amount'], stage: { percent: 68, label: '송금 금액을 입력하는 중...' } },
+    { keys: ['upload-invoice', 'next-after-upload'], stage: { percent: 78, label: '인보이스 PDF를 업로드하는 중...' } },
+    { keys: ['check-agreement'], stage: { percent: 88, label: '약관 동의 및 제출 준비 중...' } },
+    { keys: ['submit-remittance'], stage: { percent: 96, label: '최종 제출 중...' } },
+]
+
+const resolveRemittanceStageFromStep = (stepLike: string | null | undefined): RemittanceProgressStage | null => {
+    if (!stepLike) return null
+    const normalized = stepLike.trim().toLowerCase()
+    if (!normalized) return null
+
+    for (const hint of REMITTANCE_STEP_HINTS) {
+        if (hint.keys.some((key) => normalized.includes(key.toLowerCase()))) {
+            return hint.stage
+        }
+    }
+
+    return null
+}
+
+const extractLatestAutomationStep = (message: string): string | null => {
+    const stepsMatch = message.match(/\[steps:\s*([^\]]+)\]/i)
+    if (!stepsMatch || !stepsMatch[1]) return null
+    const parts = stepsMatch[1]
+        .split('→')
+        .map((part) => part.trim())
+        .filter(Boolean)
+    return parts.length > 0 ? parts[parts.length - 1] : null
+}
 
 function getPipelineModeBadgeClass(mode: PipelineMode) {
     if (mode === 'AUTO') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
@@ -646,6 +701,8 @@ export default function WormOrderPage() {
     const [remittanceError, setRemittanceError] = useState('')
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
+    const [remittanceProgress, setRemittanceProgress] = useState(0)
+    const [remittanceProgressLabel, setRemittanceProgressLabel] = useState('대기 중')
     const [remittanceAttemptsRemaining, setRemittanceAttemptsRemaining] = useState<number | null>(null)
     const [remittanceLockedUntil, setRemittanceLockedUntil] = useState<number | null>(null)
     const [remittanceLockTick, setRemittanceLockTick] = useState(0)
@@ -658,6 +715,7 @@ export default function WormOrderPage() {
     const inboxSectionRef = useRef<HTMLDivElement>(null)
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
+    const remittanceProgressTimerRef = useRef<number | null>(null)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -1030,6 +1088,15 @@ export default function WormOrderPage() {
         return () => window.clearInterval(timer)
     }, [remittanceLockedUntil])
 
+    useEffect(() => {
+        return () => {
+            if (remittanceProgressTimerRef.current) {
+                window.clearInterval(remittanceProgressTimerRef.current)
+                remittanceProgressTimerRef.current = null
+            }
+        }
+    }, [])
+
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
@@ -1188,6 +1255,8 @@ export default function WormOrderPage() {
         setRemittanceError('')
         setRemittanceSuccess('')
         setRemittanceAttemptsRemaining(null)
+        setRemittanceProgress(0)
+        setRemittanceProgressLabel('대기 중')
 
         if (isRemittanceLocked) {
             setRemittanceError(`비밀번호 보호 잠금이 활성화되어 있습니다. ${remittanceLockRemainingText} 후 다시 시도해 주세요.`)
@@ -1211,6 +1280,22 @@ export default function WormOrderPage() {
             setRemittanceError('Only PDF files are allowed.')
             return
         }
+
+        if (remittanceProgressTimerRef.current) {
+            window.clearInterval(remittanceProgressTimerRef.current)
+            remittanceProgressTimerRef.current = null
+        }
+
+        setRemittanceProgress(REMITTANCE_SIMULATED_STAGES[0]?.percent ?? 5)
+        setRemittanceProgressLabel(REMITTANCE_SIMULATED_STAGES[0]?.label ?? '자동화 시작 중...')
+
+        let simulatedStageIndex = 0
+        remittanceProgressTimerRef.current = window.setInterval(() => {
+            simulatedStageIndex = Math.min(simulatedStageIndex + 1, REMITTANCE_SIMULATED_STAGES.length - 1)
+            const stage = REMITTANCE_SIMULATED_STAGES[simulatedStageIndex]
+            setRemittanceProgress((prev) => Math.max(prev, stage.percent))
+            setRemittanceProgressLabel(stage.label)
+        }, 3500)
 
         setRemittanceSubmitting(true)
         try {
@@ -1239,12 +1324,28 @@ export default function WormOrderPage() {
                 throw new Error(typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.')
             }
 
+            const automationSteps = Array.isArray(result?.result?.steps) ? result.result.steps as string[] : []
+            const lastAutomationStep = automationSteps.length > 0 ? automationSteps[automationSteps.length - 1] : null
+            const resolvedStage = resolveRemittanceStageFromStep(lastAutomationStep)
+
             setRemittanceAttemptsRemaining(null)
             setRemittanceLockedUntil(null)
             setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
+            setRemittanceProgress(100)
+            setRemittanceProgressLabel(resolvedStage?.label || '송금 신청이 완료되었습니다.')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
             const lower = message.toLowerCase()
+            const latestStep = extractLatestAutomationStep(message)
+            const resolvedStage = resolveRemittanceStageFromStep(latestStep)
+
+            if (resolvedStage) {
+                setRemittanceProgress((prev) => Math.max(prev, resolvedStage.percent))
+                setRemittanceProgressLabel(`${resolvedStage.label} 단계에서 오류가 발생했습니다.`)
+            } else {
+                setRemittanceProgressLabel('진행 중 오류가 발생했습니다.')
+            }
+
             const missingBrowserRuntime =
                 lower.includes('no server browser runtime available') ||
                 lower.includes('playwright_chromium_executable_path is not set') ||
@@ -1256,6 +1357,10 @@ export default function WormOrderPage() {
                 setRemittanceError(message)
             }
         } finally {
+            if (remittanceProgressTimerRef.current) {
+                window.clearInterval(remittanceProgressTimerRef.current)
+                remittanceProgressTimerRef.current = null
+            }
             setRemittanceSubmitting(false)
         }
     }
@@ -1477,6 +1582,8 @@ export default function WormOrderPage() {
         setInvoicePdf(null)
         setRemittanceError('')
         setRemittanceSuccess('')
+        setRemittanceProgress(0)
+        setRemittanceProgressLabel('대기 중')
         setRemittanceAttemptsRemaining(null)
         setRemittanceLockedUntil(null)
         setBlNumberQuery('')
@@ -1931,6 +2038,27 @@ export default function WormOrderPage() {
                         )}
                     </button>
                 </div>
+
+                {(remittanceSubmitting || remittanceProgress > 0 || !!remittanceSuccess) && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-semibold">
+                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-600'}>
+                                {remittanceProgressLabel}
+                            </span>
+                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-500'}>
+                                {Math.max(0, Math.min(100, Math.round(remittanceProgress)))}%
+                            </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                            <div
+                                className={`h-full transition-all duration-500 ${
+                                    remittanceError ? 'bg-red-500' : remittanceSuccess ? 'bg-emerald-500' : 'bg-[#e34219]'
+                                }`}
+                                style={{ width: `${Math.max(0, Math.min(100, remittanceProgress))}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 {remittanceError && (
                     <p className="text-sm font-semibold text-[#e34219]">{remittanceError}</p>
