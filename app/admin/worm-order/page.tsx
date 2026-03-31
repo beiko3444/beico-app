@@ -144,6 +144,7 @@ function getAdminActionStep(row: Record<string, string>) {
     if (normalized.includes(taxNotice)) {
         return {
             label: '\uAD00\uC138/\uBD80\uAC00\uC138 \uB0A9\uBD80 \uD544\uC694',
+            owner: '\uAD00\uB9AC\uC790(\uC218\uC785\uC790) / \uAD00\uC138\uC0AC \uC120\uB0A9',
             rowClassName: 'bg-amber-50',
             badgeClassName: 'bg-amber-100 text-amber-800 border-amber-200',
         }
@@ -152,6 +153,7 @@ function getAdminActionStep(row: Record<string, string>) {
     if (normalized.includes(releaseDeclaration) || normalized.includes(releaseAfterImport)) {
         return {
             label: '\uBC18\uCD9C/\uAD6D\uB0B4 \uC6B4\uC1A1 \uC870\uCE58 \uD544\uC694',
+            owner: '\uAD00\uB9AC\uC790 / \uAD00\uC138\uC0AC / \uAD6D\uB0B4 \uC6B4\uC1A1\uC0AC',
             rowClassName: 'bg-sky-50',
             badgeClassName: 'bg-sky-100 text-sky-800 border-sky-200',
         }
@@ -160,6 +162,7 @@ function getAdminActionStep(row: Record<string, string>) {
     if (normalized.includes(importDeclaration) && !normalized.includes(importAccepted)) {
         return {
             label: '\uD1B5\uAD00 \uC11C\uB958/\uC2E0\uACE0 \uC9C4\uD589 \uD544\uC694',
+            owner: '\uAD00\uB9AC\uC790 / \uAD00\uC138\uC0AC',
             rowClassName: 'bg-yellow-50',
             badgeClassName: 'bg-yellow-100 text-yellow-800 border-yellow-200',
         }
@@ -1733,7 +1736,7 @@ export default function WormOrderPage() {
                             <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
                                 <h4 className="text-sm font-black text-[#111827]">진행이력</h4>
                                 <p className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
-                                    Highlighted rows require admin or customs-broker action.
+                                    강조된 행은 관리자나 관세사가 직접 챙겨야 하는 단계이며, 각 행에 처리주체를 함께 표시합니다.
                                 </p>
                                 <div className="overflow-x-auto">
                                     <table className="min-w-full text-xs">
@@ -1760,9 +1763,14 @@ export default function WormOrderPage() {
                                                             <div className="flex flex-col gap-1">
                                                                 <span>{row.cargTrcnRelaBsopTpcd || '-'}</span>
                                                                 {adminStep && (
-                                                                    <span className={`inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${adminStep.badgeClassName}`}>
-                                                                        {adminStep.label}
-                                                                    </span>
+                                                                    <>
+                                                                        <span className={`inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${adminStep.badgeClassName}`}>
+                                                                            {adminStep.label}
+                                                                        </span>
+                                                                        <span className="text-[11px] font-medium text-slate-600">
+                                                                            처리주체: {adminStep.owner}
+                                                                        </span>
+                                                                    </>
                                                                 )}
                                                             </div>
                                                         </td>
