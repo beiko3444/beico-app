@@ -156,6 +156,18 @@ model Task {
   updatedAt   DateTime @updatedAt
 }
 
+model WormEmailAwbCache {
+  id        String   @id @default(uuid())
+  uid       String   @unique
+  subject   String?
+  emailDate DateTime?
+  awbNumber String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([updatedAt])
+}
+
 model CoupangSyncHistory {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())

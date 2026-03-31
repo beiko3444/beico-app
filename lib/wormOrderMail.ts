@@ -1,5 +1,6 @@
 import { ImapFlow } from 'imapflow'
 import { simpleParser, type ParsedMail } from 'mailparser'
+import { prisma } from '@/lib/prisma'
 
 type ParsedMailCacheEntry = {
   expiresAt: number
@@ -35,6 +36,7 @@ export type WormEmailListItem = {
   subject: string
   date: string
   hasAttachments: boolean
+  awbNumber: string | null
 }
 
 export type WormEmailAttachment = {
@@ -52,6 +54,7 @@ export type WormEmailDetail = {
   hasAttachments: boolean
   skmIndices: number[]
   attachments: WormEmailAttachment[]
+  awbNumber: string | null
 }
 
 function getDaumImapCredentials() {
@@ -115,6 +118,89 @@ function setEmailListCache(key: string, emails: WormEmailListItem[]) {
   }
 }
 
+function normalizeAwbNumber(value: string) {
+  return value.replace(/\s+/g, '').trim()
+}
+
+async function getWormEmailAwbCacheMap(uids: string[]) {
+  const normalizedUids = Array.from(new Set(uids.map((uid) => uid.trim()).filter(Boolean)))
+  if (normalizedUids.length === 0) return new Map<string, string>()
+
+  try {
+    const rows = await prisma.wormEmailAwbCache.findMany({
+      where: { uid: { in: normalizedUids } },
+      select: { uid: true, awbNumber: true },
+    })
+
+    return new Map(rows.map((row) => [row.uid, row.awbNumber]))
+  } catch (error) {
+    console.error('Failed to load worm AWB cache map:', error)
+    return new Map<string, string>()
+  }
+}
+
+async function hydrateEmailsWithAwbCache(emails: WormEmailListItem[]) {
+  const awbMap = await getWormEmailAwbCacheMap(emails.map((email) => email.uid))
+  return emails.map((email) => ({
+    ...email,
+    awbNumber: awbMap.get(email.uid) || email.awbNumber || null,
+  }))
+}
+
+async function getWormEmailAwbCacheByUid(uid: string) {
+  const normalizedUid = uid.trim()
+  if (!normalizedUid) return null
+
+  try {
+    return await prisma.wormEmailAwbCache.findUnique({
+      where: { uid: normalizedUid },
+      select: { awbNumber: true },
+    })
+  } catch (error) {
+    console.error('Failed to load worm AWB cache:', error)
+    return null
+  }
+}
+
+function toOptionalDate(value?: string | null) {
+  if (!value) return null
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+export async function upsertWormEmailAwbCache(input: {
+  uid: string
+  subject?: string | null
+  date?: string | null
+  awbNumber: string
+}) {
+  const uid = input.uid.trim()
+  const awbNumber = normalizeAwbNumber(input.awbNumber)
+
+  if (!uid) {
+    throw new Error('uid is required.')
+  }
+
+  if (!awbNumber) {
+    throw new Error('awbNumber is required.')
+  }
+
+  return prisma.wormEmailAwbCache.upsert({
+    where: { uid },
+    update: {
+      subject: input.subject?.trim() || null,
+      emailDate: toOptionalDate(input.date),
+      awbNumber,
+    },
+    create: {
+      uid,
+      subject: input.subject?.trim() || null,
+      emailDate: toOptionalDate(input.date),
+      awbNumber,
+    },
+  })
+}
+
 export async function loadWormEmailList(options?: {
   keyword?: string
   scanLimit?: number
@@ -127,7 +213,7 @@ export async function loadWormEmailList(options?: {
   const cacheKey = `${keyword}|${scanLimit}|${listLimit}`
 
   const cached = getEmailListCache(cacheKey)
-  if (cached) return cached
+  if (cached) return hydrateEmailsWithAwbCache(cached)
 
   const emails = await withInboxLock(async (client) => {
     const status = await client.status('INBOX', { messages: true })
@@ -159,6 +245,7 @@ export async function loadWormEmailList(options?: {
         subject,
         date: new Date(dateObj).toISOString(),
         hasAttachments,
+        awbNumber: null,
       })
     }
 
@@ -167,7 +254,7 @@ export async function loadWormEmailList(options?: {
   })
 
   setEmailListCache(cacheKey, emails)
-  return emails
+  return hydrateEmailsWithAwbCache(emails)
 }
 
 export async function getParsedMailByUid(uid: string) {
@@ -195,6 +282,7 @@ export async function getParsedMailByUid(uid: string) {
 
 export async function getWormEmailDetail(uid: string): Promise<WormEmailDetail> {
   const parsed = await getParsedMailByUid(uid)
+  const awbCache = await getWormEmailAwbCacheByUid(uid)
   const attachments = (parsed.attachments || []).map((att, idx: number) => ({
     filename: att.filename || `attachment-${idx}`,
     contentType: att.contentType || 'application/octet-stream',
@@ -213,6 +301,7 @@ export async function getWormEmailDetail(uid: string): Promise<WormEmailDetail> 
     hasAttachments: attachments.length > 0,
     skmIndices,
     attachments,
+    awbNumber: awbCache?.awbNumber || null,
   }
 }
 

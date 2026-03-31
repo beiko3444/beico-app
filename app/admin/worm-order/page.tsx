@@ -37,6 +37,7 @@ type WormEmailListItem = {
     subject: string
     date: string
     hasAttachments: boolean
+    awbNumber: string | null
 }
 
 type WormEmailDetail = {
@@ -47,6 +48,7 @@ type WormEmailDetail = {
     hasAttachments: boolean
     skmIndices: number[]
     attachments: WormEmailAttachment[]
+    awbNumber: string | null
 }
 
 type WormEmailOfflineCache = {
@@ -147,6 +149,7 @@ function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
         subject: candidate.subject,
         date: candidate.date,
         hasAttachments: candidate.hasAttachments,
+        awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
     }
 }
 
@@ -200,6 +203,7 @@ function sanitizeWormEmailDetail(value: unknown): WormEmailDetail | null {
         hasAttachments: candidate.hasAttachments,
         skmIndices,
         attachments,
+        awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
     }
 }
 
@@ -504,6 +508,61 @@ export default function WormOrderPage() {
         persistEmailOfflineCache()
     }, [persistEmailOfflineCache])
 
+    const applyAwbNumberToEmailState = useCallback((uid: string, awb: string) => {
+        const normalizedAwb = awb.replace(/\s+/g, '').trim()
+        if (!uid || !normalizedAwb) return
+
+        setEmails((prev) => prev.map((email) => (
+            email.uid === uid
+                ? { ...email, awbNumber: normalizedAwb }
+                : email
+        )))
+        setEmailDetails((prev) => (
+            prev[uid]
+                ? {
+                    ...prev,
+                    [uid]: {
+                        ...prev[uid],
+                        awbNumber: normalizedAwb,
+                    },
+                }
+                : prev
+        ))
+    }, [])
+
+    const persistAwbCache = useCallback(async (
+        uid: string,
+        awb: string,
+        emailMeta?: Pick<WormEmailDetail, 'subject' | 'date'> | null,
+    ) => {
+        const normalizedAwb = awb.replace(/\s+/g, '').trim()
+        if (!uid || !normalizedAwb) return
+
+        const fallbackEmail = emails.find((email) => email.uid === uid)
+        applyAwbNumberToEmailState(uid, normalizedAwb)
+        setEmailCacheSavedAt(new Date().toISOString())
+
+        try {
+            const response = await fetch('/api/admin/worm-order/emails/awb-cache', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uid,
+                    awbNumber: normalizedAwb,
+                    subject: emailMeta?.subject || fallbackEmail?.subject || '',
+                    date: emailMeta?.date || fallbackEmail?.date || '',
+                }),
+            })
+
+            if (!response.ok) {
+                const result = await response.json().catch(() => null)
+                throw new Error(typeof result?.error === 'string' ? result.error : 'Failed to save AWB cache.')
+            }
+        } catch (error) {
+            console.warn('Failed to persist AWB cache:', error)
+        }
+    }, [applyAwbNumberToEmailState, emails])
+
     // ── AWB OCR 관련 State ──
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
     const [awbLoading, setAwbLoading] = useState(false)
@@ -633,7 +692,7 @@ export default function WormOrderPage() {
         return Array.from(byValue.values()).sort((a, b) => b.score - a.score)
     }, [])
 
-    const runAwbOcr = useCallback(async (uid: string, skmIndices: number[]) => {
+    const runAwbOcr = useCallback(async (emailMeta: Pick<WormEmailDetail, 'uid' | 'subject' | 'date' | 'skmIndices'>) => {
         setAwbNumber(null)
         setAwbLoading(true)
         setAwbError('')
@@ -642,8 +701,8 @@ export default function WormOrderPage() {
             const byValue = new Map<string, AwbCandidate>()
 
             // 모든 SKM 파일을 순차적으로 시도해서 점수가 가장 높은 후보를 채택
-            for (const idx of skmIndices) {
-                const foundList = await ocrOnePdf(uid, idx)
+            for (const idx of emailMeta.skmIndices) {
+                const foundList = await ocrOnePdf(emailMeta.uid, idx)
                 for (const c of foundList) {
                     mergeAwbCandidate(byValue, c)
                 }
@@ -653,7 +712,9 @@ export default function WormOrderPage() {
             setAwbCandidates(ranked.slice(0, 6))
 
             if (ranked.length > 0) {
-                setAwbNumber(ranked[0].value)
+                const resolvedAwb = ranked[0].value
+                setAwbNumber(resolvedAwb)
+                await persistAwbCache(emailMeta.uid, resolvedAwb, emailMeta)
                 if (ranked[0].score < 350) {
                     setAwbError('OCR 신뢰도가 낮습니다. 아래 대안 후보에서 번호를 직접 선택해주세요.')
                 }
@@ -667,7 +728,7 @@ export default function WormOrderPage() {
         } finally {
             setAwbLoading(false)
         }
-    }, [ocrOnePdf])
+    }, [ocrOnePdf, persistAwbCache])
 
     const fetchEmailDetail = useCallback(async (uid: string): Promise<WormEmailDetail | null> => {
         if (emailDetails[uid]) return emailDetails[uid]
@@ -682,6 +743,12 @@ export default function WormOrderPage() {
             setUsingOfflineEmailCache(false)
             setEmailCacheSavedAt(new Date().toISOString())
             setEmailDetails(prev => ({ ...prev, [uid]: data }))
+            if (typeof data?.awbNumber === 'string' && data.awbNumber) {
+                applyAwbNumberToEmailState(uid, data.awbNumber)
+                if (uid === selectedEmailUid) {
+                    setAwbNumber(data.awbNumber)
+                }
+            }
             return data
         } catch (err: any) {
             setEmailError(err.message || '메일 상세 조회 실패')
@@ -689,7 +756,7 @@ export default function WormOrderPage() {
         } finally {
             setLoadingEmailDetail(false)
         }
-    }, [emailDetails])
+    }, [applyAwbNumberToEmailState, emailDetails, selectedEmailUid])
 
     const handleRunSelectedAwbOcr = useCallback(async () => {
         if (!selectedEmailUid) return
@@ -699,17 +766,23 @@ export default function WormOrderPage() {
             setAwbError('선택한 메일에 SKM 첨부파일이 없어 OCR을 실행할 수 없습니다.')
             return
         }
-        runAwbOcr(selectedEmailUid, detail.skmIndices)
+        runAwbOcr({
+            uid: selectedEmailUid,
+            subject: detail.subject,
+            date: detail.date,
+            skmIndices: detail.skmIndices,
+        })
     }, [selectedEmailUid, emailDetails, fetchEmailDetail, runAwbOcr])
 
     useEffect(() => {
         if (!selectedEmailUid) return
-        setAwbNumber(null)
+        const selectedEmail = emails.find((email) => email.uid === selectedEmailUid)
+        setAwbNumber(emailDetails[selectedEmailUid]?.awbNumber || selectedEmail?.awbNumber || null)
         setAwbCandidates([])
         setAwbLoading(false)
         setAwbError('')
         fetchEmailDetail(selectedEmailUid)
-    }, [selectedEmailUid, fetchEmailDetail])
+    }, [emails, emailDetails, selectedEmailUid, fetchEmailDetail])
 
     useEffect(() => {
         // fetchEmails() // Removed auto fetch
@@ -1278,7 +1351,7 @@ export default function WormOrderPage() {
 
                         {!loadingEmails && emails.length > 0 && (
                             <div className="divide-y divide-gray-100">
-                                {emails.map((email) => {
+                                {emails.map((email, index) => {
                                     const isSelected = selectedEmailUid === email.uid
                                     return (
                                         <button
@@ -1295,8 +1368,13 @@ export default function WormOrderPage() {
                                                 {email.hasAttachments && <span className="text-[11px]">📎</span>}
                                             </div>
                                             <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                                                {email.subject}
+                                                {index + 1}. {email.subject}
                                             </h3>
+                                            {email.awbNumber && (
+                                                <p className={`mt-1 text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
+                                                    AWB {email.awbNumber}
+                                                </p>
+                                            )}
                                         </button>
                                     )
                                 })}
@@ -1312,6 +1390,7 @@ export default function WormOrderPage() {
                             </div>
                         ) : (() => {
                             const selectedEmailBase = emails.find(e => e.uid === selectedEmailUid)
+                            const selectedEmailIndex = emails.findIndex((email) => email.uid === selectedEmailUid)
                             const selectedEmailDetail = selectedEmailUid ? emailDetails[selectedEmailUid] : null
                             if (!selectedEmailBase) return null
 
@@ -1323,12 +1402,22 @@ export default function WormOrderPage() {
                                 hasAttachments: selectedEmailDetail?.hasAttachments ?? selectedEmailBase.hasAttachments,
                                 skmIndices: selectedEmailDetail?.skmIndices || [],
                                 attachments: selectedEmailDetail?.attachments || [],
+                                awbNumber: selectedEmailDetail?.awbNumber ?? selectedEmailBase.awbNumber ?? null,
+                                sequence: selectedEmailIndex >= 0 ? selectedEmailIndex + 1 : null,
                             }
                             return (
                                 <div className="flex flex-col h-full max-h-[600px]">
                                     {/* 상세 헤더 */}
                                     <div className="p-6 bg-white border-b border-gray-100 shrink-0">
-                                        <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">{selectedEmail.subject}</h2>
+                                        <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">
+                                            {selectedEmail.sequence ? `${selectedEmail.sequence}. ` : ''}
+                                            {selectedEmail.subject}
+                                        </h2>
+                                        {selectedEmail.awbNumber && (
+                                            <p className="mt-2 text-[12px] font-semibold tracking-wide text-blue-700">
+                                                AWB {selectedEmail.awbNumber}
+                                            </p>
+                                        )}
                                         <div className="flex items-center gap-3 text-[12px] text-gray-500 font-medium tracking-tight">
                                             <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
                                         </div>
@@ -1399,6 +1488,7 @@ export default function WormOrderPage() {
                                                                 onClick={() => {
                                                                     setAwbNumber(candidate.value)
                                                                     setAwbError('')
+                                                                    persistAwbCache(selectedEmail.uid, candidate.value, selectedEmail)
                                                                 }}
                                                                 className="h-7 px-2.5 rounded-md border border-slate-200 bg-white text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
                                                                 title={`source: ${candidate.source}, score: ${candidate.score}`}
