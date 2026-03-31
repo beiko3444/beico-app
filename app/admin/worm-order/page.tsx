@@ -1398,6 +1398,10 @@ export default function WormOrderPage() {
         () => PIPELINE_STEP_DEFINITIONS.filter((step) => pipelineFilter === 'all' || step.mode === pipelineFilter),
         [pipelineFilter],
     )
+    const visibleStepIdSet = useMemo(
+        () => new Set(filteredPipelineSteps.map((step) => step.id)),
+        [filteredPipelineSteps],
+    )
 
     const togglePipelineStep = useCallback((stepId: number) => {
         setExpandedSteps((prev) => ({ ...prev, [stepId]: !prev[stepId] }))
@@ -1469,7 +1473,6 @@ export default function WormOrderPage() {
         setRemittanceSuccess('')
         setRemittanceAttemptsRemaining(null)
         setRemittanceLockedUntil(null)
-        setShowMoinPassword(false)
         setBlNumberQuery('')
         setCustomsProgressResult(null)
         setCustomsProgressError('')
@@ -1487,8 +1490,15 @@ export default function WormOrderPage() {
         )
     }, [today])
 
+    const showOrderTools = visibleStepIdSet.has(1)
+    const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(6) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
+    const showRemittanceTools = visibleStepIdSet.has(3)
+    const showCustomsTools = visibleStepIdSet.has(7)
+    const showAnyTools = showOrderTools || showInboxTools || showRemittanceTools || showCustomsTools
+    const toolHeaderOrder = showOrderTools ? 14 : showInboxTools ? 24 : showRemittanceTools ? 34 : 74
+
     return (
-        <div className="max-w-5xl mx-auto space-y-6 pb-10">
+        <div className="max-w-5xl mx-auto pb-10 flex flex-col gap-6">
             <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-zinc-900 p-5 md:p-7 shadow-2xl text-slate-100">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="space-y-1">
@@ -1602,7 +1612,7 @@ export default function WormOrderPage() {
                 </div>
             </div>
 
-            <div className="space-y-3">
+            <div className="contents">
                 {filteredPipelineSteps.map((step) => {
                     const runtimeStatus = pipelineStatusMap[step.id]
                     const isExpanded = expandedSteps[step.id] ?? false
@@ -1610,6 +1620,7 @@ export default function WormOrderPage() {
                     return (
                         <section
                             key={step.id}
+                            style={{ order: step.id * 10 }}
                             className={`rounded-2xl border bg-white shadow-sm transition-colors ${
                                 runtimeStatus === 'done'
                                     ? 'border-emerald-200'
@@ -1687,12 +1698,15 @@ export default function WormOrderPage() {
                 })}
             </div>
 
-            <div className="flex flex-col gap-1 px-1">
+            {showAnyTools && (
+                <div className="flex flex-col gap-1 px-1" style={{ order: toolHeaderOrder }}>
                 <h2 className="text-xl font-black text-slate-900">실행 도구</h2>
                 <p className="text-xs text-slate-500">아래 기존 기능을 단계별 카드와 연동했습니다.</p>
-            </div>
+                </div>
+            )}
 
-            <div ref={orderSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            {showOrderTools && (
+                <div ref={orderSectionRef} style={{ order: 15 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex flex-col md:flex-row md:items-end gap-4">
                     <div className="min-w-0">
                         <label htmlFor="receiveDate" className="block text-xs font-black text-gray-600 uppercase tracking-[0.15em] mb-2">
@@ -1736,9 +1750,11 @@ export default function WormOrderPage() {
                 {validationError && (
                     <p className="text-sm font-semibold text-[#e34219] mt-3">{validationError}</p>
                 )}
-            </div>
+                </div>
+            )}
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+            {showOrderTools && (
+                <div style={{ order: 16 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">WORM ORDER SHEET</p>
@@ -1811,10 +1827,11 @@ export default function WormOrderPage() {
                         </section>
                     ))}
                 </div>
-            </div>
+                </div>
+            )}
 
-            {generatedMessage && (
-                <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
+            {showOrderTools && generatedMessage && (
+                <div style={{ order: 17 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
                     <textarea
                         readOnly
                         value={generatedMessage}
@@ -1831,7 +1848,8 @@ export default function WormOrderPage() {
                 </div>
             )}
 
-            <div ref={remittanceSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            {showRemittanceTools && (
+                <div ref={remittanceSectionRef} style={{ order: 35 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
@@ -1924,10 +1942,12 @@ export default function WormOrderPage() {
                 {remittanceSuccess && (
                     <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
                 )}
-            </div>
+                </div>
+            )}
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
-            <div ref={inboxSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+            {showInboxTools && (
+                <div ref={inboxSectionRef} style={{ order: 25 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -2227,9 +2247,11 @@ export default function WormOrderPage() {
                         })()}
                     </div>
                 </div>
-            </div>
+                </div>
+            )}
 
-            <div ref={customsProgressSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            {showCustomsTools && (
+                <div ref={customsProgressSectionRef} style={{ order: 75 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">UNI-PASS API001</p>
@@ -2365,7 +2387,8 @@ export default function WormOrderPage() {
                         )}
                     </div>
                 )}
-            </div>
+                </div>
+            )}
         </div>
     )
 }

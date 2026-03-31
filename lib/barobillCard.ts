@@ -111,6 +111,13 @@ function parseUseDate(useDT: string) {
   const raw = useDT.trim()
   if (!raw) return null
 
+  if (/^\d{8}$/.test(raw)) {
+    const y = raw.slice(0, 4)
+    const m = raw.slice(4, 6)
+    const d = raw.slice(6, 8)
+    return new Date(`${y}-${m}-${d}T00:00:00+09:00`)
+  }
+
   if (/^\d{14}$/.test(raw)) {
     const y = raw.slice(0, 4)
     const m = raw.slice(4, 6)
@@ -128,6 +135,12 @@ function parseUseDate(useDT: string) {
     const hh = raw.slice(8, 10)
     const mm = raw.slice(10, 12)
     return new Date(`${y}-${m}-${d}T${hh}:${mm}:00+09:00`)
+  }
+
+  const compact = raw.match(/^(\d{4})[-/.](\d{2})[-/.](\d{2})(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$/)
+  if (compact) {
+    const [, y, m, d, hh = '00', mm = '00', ss = '00'] = compact
+    return new Date(`${y}-${m}-${d}T${hh}:${mm}:${ss}+09:00`)
   }
 
   const direct = new Date(raw)

@@ -23,6 +23,20 @@ function parseDateInput(input: string | null, endOfDay = false) {
   return null
 }
 
+function parseYmdInput(input: string | null) {
+  if (!input) return null
+  const value = input.trim()
+  if (!value) return null
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return value.replace(/-/g, '')
+  }
+  if (/^\d{8}$/.test(value)) {
+    return value
+  }
+  return null
+}
+
 function resolveAmount(row: {
   totalAmount: number | null
   approvalAmount: number | null
@@ -56,6 +70,8 @@ export async function GET(request: Request) {
     const storeName = (searchParams.get('storeName') || '').trim()
     const startDate = parseDateInput(searchParams.get('startDate'), false)
     const endDate = parseDateInput(searchParams.get('endDate'), true)
+    const startYmd = parseYmdInput(searchParams.get('startDate'))
+    const endYmd = parseYmdInput(searchParams.get('endDate'))
 
     const where: Prisma.CardUsageWhereInput = {}
     if (cardNum) {
@@ -65,9 +81,20 @@ export async function GET(request: Request) {
       where.useStoreName = { contains: storeName }
     }
     if (startDate || endDate) {
-      where.usedAt = {}
-      if (startDate) where.usedAt.gte = startDate
-      if (endDate) where.usedAt.lte = endDate
+      const usedAtFilter: { gte?: Date; lte?: Date } = {}
+      if (startDate) usedAtFilter.gte = startDate
+      if (endDate) usedAtFilter.lte = endDate
+      const filters: Prisma.CardUsageWhereInput[] = [{ usedAt: usedAtFilter }]
+
+      // Backward compatibility: include rows where usedAt is null but useDT exists.
+      if (startYmd || endYmd) {
+        const useDTFilter: { gte?: string; lte?: string } = {}
+        if (startYmd) useDTFilter.gte = startYmd
+        if (endYmd) useDTFilter.lte = `${endYmd}999999`
+        filters.push({ useDT: useDTFilter })
+      }
+
+      where.OR = filters
     }
 
     const [items, totalCount, maxSyncedAt, amountRows] = await Promise.all([
