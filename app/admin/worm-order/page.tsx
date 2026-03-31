@@ -441,6 +441,7 @@ export default function WormOrderPage() {
     const [customsProgressError, setCustomsProgressError] = useState('')
     const [customsProgressLoading, setCustomsProgressLoading] = useState(false)
     const dateInputRef = useRef<HTMLInputElement>(null)
+    const customsProgressSectionRef = useRef<HTMLDivElement>(null)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -986,8 +987,19 @@ export default function WormOrderPage() {
         }
     }
 
-    const handleCustomsProgressSearch = async () => {
-        const blNo = blNumberQuery.replace(/\s+/g, '').trim()
+    const handleCustomsProgressSearch = async (
+        nextBlNo?: string,
+        options?: { scrollIntoView?: boolean },
+    ) => {
+        const blNo = (nextBlNo ?? blNumberQuery).replace(/\s+/g, '').trim()
+        if (nextBlNo) {
+            setBlNumberQuery(blNo)
+        }
+
+        if (options?.scrollIntoView) {
+            customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
+
         setCustomsProgressError('')
         setCustomsProgressResult(null)
 
@@ -1181,7 +1193,7 @@ export default function WormOrderPage() {
                 </div>
             )}
 
-            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+            <div ref={customsProgressSectionRef} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
@@ -1371,9 +1383,20 @@ export default function WormOrderPage() {
                                                 {index + 1}. {email.subject}
                                             </h3>
                                             {email.awbNumber && (
-                                                <p className={`mt-1 text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
-                                                    AWB {email.awbNumber}
-                                                </p>
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
+                                                        }}
+                                                        className="inline-flex h-6 items-center rounded-md bg-[#e34219] px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-[#cd3b17] transition-colors"
+                                                    >
+                                                        조회하기
+                                                    </span>
+                                                    <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
+                                                        AWB {email.awbNumber}
+                                                    </p>
+                                                </div>
                                             )}
                                         </button>
                                     )
@@ -1609,7 +1632,7 @@ export default function WormOrderPage() {
                     />
                     <button
                         type="button"
-                        onClick={handleCustomsProgressSearch}
+                        onClick={() => handleCustomsProgressSearch()}
                         disabled={customsProgressLoading}
                         className="h-11 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
                     >
