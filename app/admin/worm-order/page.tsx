@@ -483,7 +483,7 @@ export default function WormOrderPage() {
     }, [selectedEmailUid, fetchEmailDetail])
 
     useEffect(() => {
-        fetchEmails()
+        // fetchEmails() // Removed auto fetch
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [])
 
