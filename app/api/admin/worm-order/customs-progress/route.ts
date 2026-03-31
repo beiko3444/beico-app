@@ -13,6 +13,10 @@ type Api001ParseResult = {
     detailRecords: Array<Record<string, string>>
 }
 
+function formatBlYear(year: number) {
+    return String(year % 100).padStart(2, '0')
+}
+
 function decodeXmlValue(input: string) {
     return input
         .replace(/&lt;/g, '<')
@@ -103,7 +107,7 @@ export async function GET(request: NextRequest) {
     const attempts: Array<{ kind: QueryKind; blYy: string; tCnt: number; ntceInfo: string }> = []
 
     for (let delta = 0; delta < LOOKBACK_YEARS; delta += 1) {
-        const blYy = String(currentYear - delta)
+        const blYy = formatBlYear(currentYear - delta)
 
         for (const kind of ['mblNo', 'hblNo'] as const) {
             try {
