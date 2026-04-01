@@ -192,14 +192,22 @@ model WormOrder {
 }
 
 model WormOrderEmailMatch {
-  id        String   @id @default(uuid())
-  uid       String   @unique
-  subject   String?
-  emailDate DateTime?
-  orderId   String
-  matchedAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  order     WormOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  id                    String    @id @default(uuid())
+  uid                   String    @unique
+  subject               String?
+  emailDate             DateTime?
+  orderId               String
+  matchedAt             DateTime  @default(now())
+  invoiceUnitPriceUsd   Float?
+  invoiceTotalAmountUsd Float?
+  usdKrwRate            Float?
+  invoiceUnitPriceKrw   Float?
+  invoiceTotalAmountKrw Float?
+  invoiceExtractedAt    DateTime?
+  invoiceSourceFile     String?
+  invoiceOcrError       String?
+  updatedAt             DateTime  @updatedAt
+  order                 WormOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
   @@index([updatedAt])

@@ -41,6 +41,14 @@ type WormEmailListItem = {
     matchedOrderId: string | null
     matchedOrderNumber: string | null
     matchedAt: string | null
+    invoiceUnitPriceUsd: number | null
+    invoiceTotalAmountUsd: number | null
+    usdKrwRate: number | null
+    invoiceUnitPriceKrw: number | null
+    invoiceTotalAmountKrw: number | null
+    invoiceExtractedAt: string | null
+    invoiceSourceFile: string | null
+    invoiceOcrError: string | null
 }
 
 type WormEmailDetail = {
@@ -470,7 +478,38 @@ function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
         matchedOrderId: typeof candidate.matchedOrderId === 'string' ? candidate.matchedOrderId : null,
         matchedOrderNumber: typeof candidate.matchedOrderNumber === 'string' ? candidate.matchedOrderNumber : null,
         matchedAt: typeof candidate.matchedAt === 'string' ? candidate.matchedAt : null,
+        invoiceUnitPriceUsd: typeof candidate.invoiceUnitPriceUsd === 'number' && Number.isFinite(candidate.invoiceUnitPriceUsd) ? candidate.invoiceUnitPriceUsd : null,
+        invoiceTotalAmountUsd: typeof candidate.invoiceTotalAmountUsd === 'number' && Number.isFinite(candidate.invoiceTotalAmountUsd) ? candidate.invoiceTotalAmountUsd : null,
+        usdKrwRate: typeof candidate.usdKrwRate === 'number' && Number.isFinite(candidate.usdKrwRate) ? candidate.usdKrwRate : null,
+        invoiceUnitPriceKrw: typeof candidate.invoiceUnitPriceKrw === 'number' && Number.isFinite(candidate.invoiceUnitPriceKrw) ? candidate.invoiceUnitPriceKrw : null,
+        invoiceTotalAmountKrw: typeof candidate.invoiceTotalAmountKrw === 'number' && Number.isFinite(candidate.invoiceTotalAmountKrw) ? candidate.invoiceTotalAmountKrw : null,
+        invoiceExtractedAt: typeof candidate.invoiceExtractedAt === 'string' ? candidate.invoiceExtractedAt : null,
+        invoiceSourceFile: typeof candidate.invoiceSourceFile === 'string' ? candidate.invoiceSourceFile : null,
+        invoiceOcrError: typeof candidate.invoiceOcrError === 'string' ? candidate.invoiceOcrError : null,
     }
+}
+
+const usdAmountFormatter = new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+})
+
+const krwAmountFormatter = new Intl.NumberFormat('ko-KR', {
+    style: 'currency',
+    currency: 'KRW',
+    maximumFractionDigits: 0,
+})
+
+function formatUsdAmount(value: number | null) {
+    if (value === null || !Number.isFinite(value)) return '-'
+    return usdAmountFormatter.format(value)
+}
+
+function formatKrwAmount(value: number | null) {
+    if (value === null || !Number.isFinite(value)) return '-'
+    return krwAmountFormatter.format(value)
 }
 
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
@@ -1510,6 +1549,9 @@ export default function WormOrderPage() {
         setEmailError('')
         setEmailMatchMessage('')
         try {
+            const toNullableNumber = (value: unknown) =>
+                typeof value === 'number' && Number.isFinite(value) ? value : null
+
             const response = await fetch('/api/admin/worm-order/emails/match', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -1525,8 +1567,42 @@ export default function WormOrderPage() {
                 throw new Error(typeof result?.error === 'string' ? result.error : '메일 매칭에 실패했습니다.')
             }
 
-            setEmailMatchMessage(`메일 매칭 완료: ${result?.match?.orderNumber || activeWormOrder.orderNumber}`)
-            await fetchEmails()
+            const matched = result?.match
+            const matchedOrderNumber =
+                typeof matched?.orderNumber === 'string' && matched.orderNumber
+                    ? matched.orderNumber
+                    : activeWormOrder.orderNumber
+            const matchedAt =
+                typeof matched?.matchedAt === 'string' ? matched.matchedAt : new Date().toISOString()
+
+            setEmails((prev) =>
+                prev.map((item) =>
+                    item.uid === email.uid
+                        ? {
+                            ...item,
+                            matchedOrderId: activeWormOrder.id,
+                            matchedOrderNumber,
+                            matchedAt,
+                            invoiceUnitPriceUsd: toNullableNumber(matched?.invoiceUnitPriceUsd),
+                            invoiceTotalAmountUsd: toNullableNumber(matched?.invoiceTotalAmountUsd),
+                            usdKrwRate: toNullableNumber(matched?.usdKrwRate),
+                            invoiceUnitPriceKrw: toNullableNumber(matched?.invoiceUnitPriceKrw),
+                            invoiceTotalAmountKrw: toNullableNumber(matched?.invoiceTotalAmountKrw),
+                            invoiceExtractedAt: typeof matched?.invoiceExtractedAt === 'string' ? matched.invoiceExtractedAt : null,
+                            invoiceSourceFile: typeof matched?.invoiceSourceFile === 'string' ? matched.invoiceSourceFile : null,
+                            invoiceOcrError: typeof matched?.invoiceOcrError === 'string' ? matched.invoiceOcrError : null,
+                        }
+                        : item,
+                ),
+            )
+            setEmailCacheSavedAt(new Date().toISOString())
+
+            const ocrError = typeof matched?.invoiceOcrError === 'string' ? matched.invoiceOcrError : ''
+            if (ocrError) {
+                setEmailMatchMessage(`메일 매칭 완료: ${matchedOrderNumber} (인보이스 OCR 경고: ${ocrError})`)
+            } else {
+                setEmailMatchMessage(`메일 매칭 완료: ${matchedOrderNumber}`)
+            }
         } catch (error) {
             setEmailError(error instanceof Error ? error.message : '메일 매칭 중 오류가 발생했습니다.')
         } finally {
@@ -2749,6 +2825,24 @@ export default function WormOrderPage() {
                                                     </span>
                                                 )}
                                             </div>
+                                            {email.matchedOrderId && (
+                                                <div className="mt-1.5 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-2 space-y-1">
+                                                    <p className="text-[10px] font-semibold text-emerald-700 tracking-wide">
+                                                        유닛프라이스 달러 {formatUsdAmount(email.invoiceUnitPriceUsd)} / 원화 {formatKrwAmount(email.invoiceUnitPriceKrw)}
+                                                    </p>
+                                                    <p className="text-[10px] font-semibold text-emerald-700 tracking-wide">
+                                                        토탈어마운트 달러 {formatUsdAmount(email.invoiceTotalAmountUsd)} / 원화 {formatKrwAmount(email.invoiceTotalAmountKrw)}
+                                                    </p>
+                                                    <p className="text-[10px] text-emerald-800/90 font-medium tracking-wide">
+                                                        실시간환율 1 USD = {email.usdKrwRate !== null ? `₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}
+                                                    </p>
+                                                    {email.invoiceOcrError && (
+                                                        <p className="text-[10px] font-semibold text-rose-600">
+                                                            {email.invoiceOcrError}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            )}
                                             {email.awbNumber && (
                                                 <div className="mt-2 flex items-center gap-2">
                                                     <span

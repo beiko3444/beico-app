@@ -40,6 +40,14 @@ export type WormEmailListItem = {
   matchedOrderId: string | null
   matchedOrderNumber: string | null
   matchedAt: string | null
+  invoiceUnitPriceUsd: number | null
+  invoiceTotalAmountUsd: number | null
+  usdKrwRate: number | null
+  invoiceUnitPriceKrw: number | null
+  invoiceTotalAmountKrw: number | null
+  invoiceExtractedAt: string | null
+  invoiceSourceFile: string | null
+  invoiceOcrError: string | null
 }
 
 export type WormEmailAttachment = {
@@ -144,7 +152,24 @@ async function getWormEmailAwbCacheMap(uids: string[]) {
 
 async function getWormOrderEmailMatchMap(uids: string[]) {
   const normalizedUids = Array.from(new Set(uids.map((uid) => uid.trim()).filter(Boolean)))
-  if (normalizedUids.length === 0) return new Map<string, { orderId: string; orderNumber: string; matchedAt: string | null }>()
+  if (normalizedUids.length === 0) {
+    return new Map<
+      string,
+      {
+        orderId: string
+        orderNumber: string
+        matchedAt: string | null
+        invoiceUnitPriceUsd: number | null
+        invoiceTotalAmountUsd: number | null
+        usdKrwRate: number | null
+        invoiceUnitPriceKrw: number | null
+        invoiceTotalAmountKrw: number | null
+        invoiceExtractedAt: string | null
+        invoiceSourceFile: string | null
+        invoiceOcrError: string | null
+      }
+    >()
+  }
 
   try {
     const rows = await prisma.wormOrderEmailMatch.findMany({
@@ -153,6 +178,14 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
         uid: true,
         orderId: true,
         matchedAt: true,
+        invoiceUnitPriceUsd: true,
+        invoiceTotalAmountUsd: true,
+        usdKrwRate: true,
+        invoiceUnitPriceKrw: true,
+        invoiceTotalAmountKrw: true,
+        invoiceExtractedAt: true,
+        invoiceSourceFile: true,
+        invoiceOcrError: true,
         order: {
           select: {
             orderNumber: true,
@@ -168,12 +201,35 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
           orderId: row.orderId,
           orderNumber: row.order?.orderNumber || '',
           matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
+          invoiceUnitPriceUsd: row.invoiceUnitPriceUsd,
+          invoiceTotalAmountUsd: row.invoiceTotalAmountUsd,
+          usdKrwRate: row.usdKrwRate,
+          invoiceUnitPriceKrw: row.invoiceUnitPriceKrw,
+          invoiceTotalAmountKrw: row.invoiceTotalAmountKrw,
+          invoiceExtractedAt: row.invoiceExtractedAt ? row.invoiceExtractedAt.toISOString() : null,
+          invoiceSourceFile: row.invoiceSourceFile || null,
+          invoiceOcrError: row.invoiceOcrError || null,
         },
       ]),
     )
   } catch (error) {
     console.error('Failed to load worm email match map:', error)
-    return new Map<string, { orderId: string; orderNumber: string; matchedAt: string | null }>()
+    return new Map<
+      string,
+      {
+        orderId: string
+        orderNumber: string
+        matchedAt: string | null
+        invoiceUnitPriceUsd: number | null
+        invoiceTotalAmountUsd: number | null
+        usdKrwRate: number | null
+        invoiceUnitPriceKrw: number | null
+        invoiceTotalAmountKrw: number | null
+        invoiceExtractedAt: string | null
+        invoiceSourceFile: string | null
+        invoiceOcrError: string | null
+      }
+    >()
   }
 }
 
@@ -186,6 +242,14 @@ async function hydrateEmailsWithAwbCache(emails: WormEmailListItem[]) {
     matchedOrderId: matchMap.get(email.uid)?.orderId || null,
     matchedOrderNumber: matchMap.get(email.uid)?.orderNumber || null,
     matchedAt: matchMap.get(email.uid)?.matchedAt || null,
+    invoiceUnitPriceUsd: matchMap.get(email.uid)?.invoiceUnitPriceUsd ?? email.invoiceUnitPriceUsd ?? null,
+    invoiceTotalAmountUsd: matchMap.get(email.uid)?.invoiceTotalAmountUsd ?? email.invoiceTotalAmountUsd ?? null,
+    usdKrwRate: matchMap.get(email.uid)?.usdKrwRate ?? email.usdKrwRate ?? null,
+    invoiceUnitPriceKrw: matchMap.get(email.uid)?.invoiceUnitPriceKrw ?? email.invoiceUnitPriceKrw ?? null,
+    invoiceTotalAmountKrw: matchMap.get(email.uid)?.invoiceTotalAmountKrw ?? email.invoiceTotalAmountKrw ?? null,
+    invoiceExtractedAt: matchMap.get(email.uid)?.invoiceExtractedAt ?? email.invoiceExtractedAt ?? null,
+    invoiceSourceFile: matchMap.get(email.uid)?.invoiceSourceFile ?? email.invoiceSourceFile ?? null,
+    invoiceOcrError: matchMap.get(email.uid)?.invoiceOcrError ?? email.invoiceOcrError ?? null,
   }))
 }
 
@@ -248,6 +312,14 @@ export async function upsertWormOrderEmailMatch(input: {
   orderId: string
   subject?: string | null
   date?: string | null
+  invoiceUnitPriceUsd?: number | null
+  invoiceTotalAmountUsd?: number | null
+  usdKrwRate?: number | null
+  invoiceUnitPriceKrw?: number | null
+  invoiceTotalAmountKrw?: number | null
+  invoiceExtractedAt?: string | null
+  invoiceSourceFile?: string | null
+  invoiceOcrError?: string | null
 }) {
   const uid = input.uid.trim()
   const orderId = input.orderId.trim()
@@ -266,6 +338,14 @@ export async function upsertWormOrderEmailMatch(input: {
       subject: input.subject?.trim() || null,
       emailDate: toOptionalDate(input.date),
       matchedAt: new Date(),
+      invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
+      invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
+      usdKrwRate: input.usdKrwRate ?? null,
+      invoiceUnitPriceKrw: input.invoiceUnitPriceKrw ?? null,
+      invoiceTotalAmountKrw: input.invoiceTotalAmountKrw ?? null,
+      invoiceExtractedAt: toOptionalDate(input.invoiceExtractedAt),
+      invoiceSourceFile: input.invoiceSourceFile?.trim() || null,
+      invoiceOcrError: input.invoiceOcrError?.trim() || null,
     },
     create: {
       uid,
@@ -273,11 +353,27 @@ export async function upsertWormOrderEmailMatch(input: {
       subject: input.subject?.trim() || null,
       emailDate: toOptionalDate(input.date),
       matchedAt: new Date(),
+      invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
+      invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
+      usdKrwRate: input.usdKrwRate ?? null,
+      invoiceUnitPriceKrw: input.invoiceUnitPriceKrw ?? null,
+      invoiceTotalAmountKrw: input.invoiceTotalAmountKrw ?? null,
+      invoiceExtractedAt: toOptionalDate(input.invoiceExtractedAt),
+      invoiceSourceFile: input.invoiceSourceFile?.trim() || null,
+      invoiceOcrError: input.invoiceOcrError?.trim() || null,
     },
     select: {
       uid: true,
       orderId: true,
       matchedAt: true,
+      invoiceUnitPriceUsd: true,
+      invoiceTotalAmountUsd: true,
+      usdKrwRate: true,
+      invoiceUnitPriceKrw: true,
+      invoiceTotalAmountKrw: true,
+      invoiceExtractedAt: true,
+      invoiceSourceFile: true,
+      invoiceOcrError: true,
       order: {
         select: {
           orderNumber: true,
@@ -338,6 +434,14 @@ export async function loadWormEmailList(options?: {
         matchedOrderId: null,
         matchedOrderNumber: null,
         matchedAt: null,
+        invoiceUnitPriceUsd: null,
+        invoiceTotalAmountUsd: null,
+        usdKrwRate: null,
+        invoiceUnitPriceKrw: null,
+        invoiceTotalAmountKrw: null,
+        invoiceExtractedAt: null,
+        invoiceSourceFile: null,
+        invoiceOcrError: null,
       })
     }
 
