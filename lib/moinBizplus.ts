@@ -367,6 +367,82 @@ const inspectTransferInputs = async (page: PageLike) => {
     return result
 }
 
+const inspectAmountFieldValue = async (page: PageLike, expectedAmount: string) => {
+    const rawResult = await page.evaluate(`
+        (() => {
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const expectedAmountText = ${JSON.stringify(expectedAmount)};
+            const parseNumeric = (value) => {
+                if (value === null || value === undefined) return null;
+                const cleaned = String(value).replace(/[^\\d.-]/g, '');
+                if (!cleaned || cleaned === '.' || cleaned === '-' || cleaned === '-.') return null;
+                const parsed = Number(cleaned);
+                return Number.isFinite(parsed) ? parsed : null;
+            };
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+
+            const expectedNumeric = parseNumeric(expectedAmountText);
+            const blockedTokens = [String(recipientPlaceholder || '').toLowerCase(), 'recipient', 'alias', 'company', 'name'];
+            const candidates = Array.from(document.querySelectorAll('input'))
+                .filter((inp) => isVisible(inp))
+                .filter((inp) => ['text', 'number', 'tel', ''].includes((inp.type || '').toLowerCase()))
+                .map((inp) => {
+                    const hint = [inp.name || '', inp.id || '', inp.placeholder || '', inp.getAttribute('aria-label') || '']
+                        .join(' ')
+                        .toLowerCase();
+                    const value = inp.value || '';
+                    const numeric = parseNumeric(value);
+                    const blocked = blockedTokens.some((token) => token && hint.includes(token));
+                    return {
+                        hint: hint.slice(0, 120),
+                        value: value.slice(0, 50),
+                        numeric,
+                        blocked,
+                        readOnly: Boolean(inp.readOnly),
+                        disabled: Boolean(inp.disabled),
+                    };
+                });
+
+            const usableCandidates = candidates.filter((row) => !row.blocked && !row.disabled);
+            const matched = usableCandidates.some((row) => {
+                if (row.numeric === null || expectedNumeric === null) return false;
+                return Math.abs(row.numeric - expectedNumeric) < 0.000001;
+            });
+            const bestCandidate = usableCandidates.find((row) => row.numeric !== null) || usableCandidates[0] || null;
+            return JSON.stringify({
+                matched,
+                expectedNumeric,
+                bestValue: bestCandidate ? bestCandidate.value : '',
+                bestNumeric: bestCandidate ? bestCandidate.numeric : null,
+                candidates: usableCandidates.slice(0, 6),
+            });
+        })()
+    `) as string
+
+    try {
+        return JSON.parse(rawResult) as {
+            matched: boolean
+            expectedNumeric: number | null
+            bestValue: string
+            bestNumeric: number | null
+            candidates: Array<{ hint: string; value: string; numeric: number | null; blocked: boolean; readOnly: boolean; disabled: boolean }>
+        }
+    } catch {
+        return {
+            matched: false,
+            expectedNumeric: null,
+            bestValue: '',
+            bestNumeric: null,
+            candidates: [],
+        }
+    }
+}
+
 const inspectRemittanceCompletion = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
@@ -982,9 +1058,16 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 const target = page.locator(sel).first()
                 await target.waitFor({ state: 'visible', timeout: 3000 })
                 await target.click({ timeout: 3000 })
-                await target.fill(input.amountUsd)
-                amountFilled = true
-                steps.push(`fill-usd:${sel.slice(0, 40)}`)
+                await target.fill('')
+                await target.pressSequentially(input.amountUsd, { delay: 30 })
+                await page.waitForTimeout(200)
+                const inspect = await inspectAmountFieldValue(page, input.amountUsd)
+                if (inspect.matched) {
+                    amountFilled = true
+                    steps.push(`fill-usd:${sel.slice(0, 40)}:ok`)
+                } else {
+                    steps.push(`fill-usd:${sel.slice(0, 40)}:mismatch:${inspect.bestValue || 'empty'}`)
+                }
             } catch {
                 // Continue
             }
@@ -1026,7 +1109,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     if (targetInfo.id) {
                         selector = `input#${targetInfo.id}`
                     } else if (targetInfo.name) {
-                        selector = `input[name="${targetInfo.name}"]`
+                        selector = `input[name=${JSON.stringify(targetInfo.name)}]`
                     } else {
                         // Use nth-of-type or generic
                         selector = `input[type="${targetInfo.type || 'text'}"]`
@@ -1034,9 +1117,16 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
                     const target = page.locator(selector).first()
                     await target.click({ timeout: 3000, force: true })
-                    await target.fill(input.amountUsd)
-                    amountFilled = true
-                    steps.push(`fill-usd-generic:${selector}:candidate`)
+                    await target.fill('')
+                    await target.pressSequentially(input.amountUsd, { delay: 30 })
+                    await page.waitForTimeout(200)
+                    const inspect = await inspectAmountFieldValue(page, input.amountUsd)
+                    if (inspect.matched) {
+                        amountFilled = true
+                        steps.push(`fill-usd-generic:${selector}:ok`)
+                    } else {
+                        steps.push(`fill-usd-generic:${selector}:mismatch:${inspect.bestValue || 'empty'}`)
+                    }
                 }
             } catch (err) {
                 steps.push(`fill-usd-generic-error:${err instanceof Error ? err.message.slice(0, 100) : 'unknown'}`)
@@ -1053,7 +1143,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         const visible = inputs.filter(inp => {
                             const rect = inp.getBoundingClientRect();
                             return rect.width > 0 && rect.height > 0 
-                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === ');
+                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
                         });
                         if (visible.length === 0) return 'no-visible-inputs';
                         const blocked = [${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)}, 'recipient', 'alias', 'company', 'name'];
@@ -1071,8 +1161,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     })()
                 `) as string
                 if (jsResult && !jsResult.startsWith('no-')) {
-                    amountFilled = true
-                    steps.push(`fill-usd-js:${jsResult}`)
+                    const inspect = await inspectAmountFieldValue(page, input.amountUsd)
+                    if (inspect.matched) {
+                        amountFilled = true
+                        steps.push(`fill-usd-js:${jsResult}:ok`)
+                    } else {
+                        steps.push(`fill-usd-js:${jsResult}:mismatch:${inspect.bestValue || 'empty'}`)
+                    }
                 }
             } catch {
                 // Continue
@@ -1083,6 +1178,14 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             throw new MoinAutomationError(
                 'Fill USD amount',
                 `Could not find a fillable input for step: Fill USD amount (url: ${page.url()})`
+            )
+        }
+
+        const finalAmountInspect = await inspectAmountFieldValue(page, input.amountUsd)
+        if (!finalAmountInspect.matched) {
+            throw new MoinAutomationError(
+                'Fill USD amount',
+                `USD amount did not apply as expected. expected=${input.amountUsd}, actual=${finalAmountInspect.bestValue || 'empty'}, url=${page.url()}`
             )
         }
         steps.push('fill-usd-amount')
