@@ -259,62 +259,64 @@ export default function AdminNav({
                     })}
                 </nav>
 
-                <div className="shrink-0 flex items-center gap-2">
-                    <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-2.5 py-1.5">
-                        <input
-                            type="number"
-                            min={1}
-                            inputMode="numeric"
-                            value={shipmentCount}
-                            onChange={(event) => setShipmentCount(event.target.value)}
-                            className="w-[68px] border-none bg-transparent p-0 text-xs font-black outline-none focus:outline-none"
-                            placeholder="1"
-                            aria-label="출고 건수"
-                        />
-                        <span className="ml-1 text-xs font-black text-slate-600">건 출고</span>
+                <div className="shrink-0 flex flex-col items-end gap-1">
+                    <div className="flex items-center gap-2">
+                        <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-2.5 py-1.5">
+                            <input
+                                type="number"
+                                min={1}
+                                inputMode="numeric"
+                                value={shipmentCount}
+                                onChange={(event) => setShipmentCount(event.target.value)}
+                                className="w-[68px] border-none bg-transparent p-0 text-xs font-black outline-none focus:outline-none"
+                                placeholder="1"
+                                aria-label="출고 건수"
+                            />
+                            <span className="ml-1 text-xs font-black text-slate-600">건 출고</span>
+                        </div>
+
+                        <button
+                            onClick={handleSendSms}
+                            disabled={sendingSms || loadingFromNumber}
+                            className="px-3 py-2 text-xs font-black text-white bg-red-500 hover:bg-red-600 disabled:bg-gray-300 rounded-xl transition-all"
+                        >
+                            {sendingSms ? '요청중...' : '집하요청'}
+                        </button>
+
+                        <button
+                            onClick={() => signOut({ callbackUrl: '/login' })}
+                            className="px-3 py-2 text-xs font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                        >
+                            로그아웃
+                        </button>
                     </div>
 
-                    <button
-                        onClick={handleSendSms}
-                        disabled={sendingSms || loadingFromNumber}
-                        className="px-3 py-2 text-xs font-black text-white bg-red-500 hover:bg-red-600 disabled:bg-gray-300 rounded-xl transition-all"
-                    >
-                        {sendingSms ? '요청중...' : '집하요청'}
-                    </button>
+                    {smsStatus ? (
+                        <div className={`text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                            {smsStatus.message}
+                        </div>
+                    ) : null}
 
-                    <button
-                        onClick={() => signOut({ callbackUrl: '/login' })}
-                        className="px-3 py-2 text-xs font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
-                    >
-                        로그아웃
-                    </button>
+                    {smsSendLogs.length > 0 ? (
+                        <div className="flex flex-wrap justify-end gap-1.5">
+                            {smsSendLogs.slice(0, 6).map((log) => (
+                                <div
+                                    key={`${log.seq}-${log.completedAt}`}
+                                    className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${log.status === 'success'
+                                        ? 'border-green-200 bg-green-50 text-green-700'
+                                        : 'border-red-200 bg-red-50 text-red-700'
+                                        }`}
+                                    title={log.detail}
+                                >
+                                    <span className="font-black text-slate-700">{log.seq}번</span>
+                                    <span className="font-semibold text-slate-500">{formatSmsCompletedHm(log.completedAt)} 완료</span>
+                                    <span className="font-black">{log.status === 'success' ? '성공' : '실패'}</span>
+                                </div>
+                            ))}
+                        </div>
+                    ) : null}
                 </div>
             </div>
-
-            {smsStatus ? (
-                <div className={`max-w-7xl mx-auto mt-1 text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
-                    {smsStatus.message}
-                </div>
-            ) : null}
-
-            {smsSendLogs.length > 0 ? (
-                <div className="max-w-7xl mx-auto mt-1 flex flex-wrap gap-1.5">
-                    {smsSendLogs.slice(0, 6).map((log) => (
-                        <div
-                            key={`${log.seq}-${log.completedAt}`}
-                            className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${log.status === 'success'
-                                ? 'border-green-200 bg-green-50 text-green-700'
-                                : 'border-red-200 bg-red-50 text-red-700'
-                                }`}
-                            title={log.detail}
-                        >
-                            <span className="font-black text-slate-700">{log.seq}번</span>
-                            <span className="font-semibold text-slate-500">{formatSmsCompletedHm(log.completedAt)} 완료</span>
-                            <span className="font-black">{log.status === 'success' ? '성공' : '실패'}</span>
-                        </div>
-                    ))}
-                </div>
-            ) : null}
         </div>
     )
 }
