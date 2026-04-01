@@ -212,7 +212,7 @@ const typeFirstVisible = async (
             await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 9000) })
             await target.click({ timeout: 5000 })
             // Clear any existing value first
-            await target.fill(')
+            await target.fill('')
             // Type character-by-character to trigger React onChange and avoid bot detection
             // Randomize delay between 80ms and 150ms per character to mimic human typing
             const typingDelay = 80 + Math.floor(Math.random() * 70)
@@ -313,6 +313,11 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
 const inspectTransferInputs = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const amountEntry = ${JSON.stringify(KO_AMOUNT_ENTRY)};
+            const receiveAmount = ${JSON.stringify(KO_RECEIVE_AMOUNT)};
+            const sendAmount = ${JSON.stringify(KO_SEND_AMOUNT)};
+
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
@@ -320,101 +325,105 @@ const inspectTransferInputs = async (page: PageLike) => {
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
 
-            const getText = () => (document.body?.innerText || ').replace(/\\s+/g, ' ').trim();
-            const bodyText = getText();
-            const inputs = Array.from(document.querySelectorAll('input'));
-            const visibleInputs = inputs
+            const bodyText = ((document.body && document.body.innerText) || '').replace(/\\s+/g, ' ').trim();
+            const inputNodes = Array.from(document.querySelectorAll('input'));
+            const visibleInputs = inputNodes
                 .filter((inp) => isVisible(inp))
                 .map((inp, i) => ({
                     i,
-                    type: inp.type || ',
-                    name: inp.name || ',
-                    id: inp.id || ',
-                    placeholder: inp.placeholder || ',
+                    type: inp.type || '',
+                    name: inp.name || '',
+                    id: inp.id || '',
+                    placeholder: inp.placeholder || '',
                 }));
 
             const nextButtons = Array.from(document.querySelectorAll('button, [role="button"], a'))
                 .filter((el) => isVisible(el))
-                .map((el) => (el.textContent || ').replace(/\\s+/g, ' ').trim())
+                .map((el) => ((el.textContent || '').replace(/\\s+/g, ' ').trim()))
                 .filter(Boolean)
                 .slice(0, 20);
 
-            return JSON.stringify({
+            return {
                 bodyText: bodyText.slice(0, 1200),
                 visibleInputs,
                 nextButtons,
-                aliasSearchVisible: visibleInputs.some((inp) => (inp.placeholder || ').includes(${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)})),
+                aliasSearchVisible: visibleInputs.some((inp) => (inp.placeholder || '').includes(recipientPlaceholder)),
                 amountKeywordVisible:
-                    bodyText.includes(${JSON.stringify(KO_AMOUNT_ENTRY)}) ||
-                    bodyText.includes(${JSON.stringify(KO_RECEIVE_AMOUNT)}) ||
-                    bodyText.includes(${JSON.stringify(KO_SEND_AMOUNT)}) ||
+                    bodyText.includes(amountEntry) ||
+                    bodyText.includes(receiveAmount) ||
+                    bodyText.includes(sendAmount) ||
                     bodyText.includes('USD') ||
                     bodyText.includes('KRW'),
-            });
+            };
         })()
-    `) as string
-
-    return JSON.parse(result) as {
+    `) as {
         bodyText: string
         visibleInputs: Array<{ i: number; type: string; name: string; id: string; placeholder: string }>
         nextButtons: string[]
         aliasSearchVisible: boolean
         amountKeywordVisible: boolean
     }
+
+    return result
 }
 
 const inspectRemittanceCompletion = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
+            const successKeywords = ${JSON.stringify(KO_SUCCESS_KEYWORDS)};
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const remitRequest = ${JSON.stringify(KO_REMIT_REQUEST)};
+            const remitRequestCompact = ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)};
+            const nextStep = ${JSON.stringify(KO_NEXT_STEP)};
+            const nextStepSpaced = ${JSON.stringify(KO_NEXT_STEP_SPACED)};
+            const applyLabel = ${JSON.stringify(KO_APPLY)};
+            const submitLabel = ${JSON.stringify(KO_SUBMIT)};
+
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
-            const normalize = (s) => (s || ').replace(/\\s+/g, ' ').trim();
-            const bodyText = normalize(document.body?.innerText || ');
+            const normalize = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+            const bodyText = normalize((document.body && document.body.innerText) || '');
 
             const buttons = Array.from(document.querySelectorAll('button, [role="button"], a'))
                 .filter((el) => isVisible(el))
-                .map((el) => normalize(el.textContent || '))
+                .map((el) => normalize(el.textContent || ''))
                 .filter(Boolean)
                 .slice(0, 30);
 
             const visibleInputs = Array.from(document.querySelectorAll('input'))
                 .filter((el) => isVisible(el))
                 .map((el) => ({
-                    type: el.type || ',
-                    name: el.name || ',
-                    id: el.id || ',
-                    placeholder: el.placeholder || ',
+                    type: el.type || '',
+                    name: el.name || '',
+                    id: el.id || '',
+                    placeholder: el.placeholder || '',
                 }));
 
-            const hasSuccessKeyword = ${JSON.stringify(KO_SUCCESS_KEYWORDS)}.some((kw) => bodyText.includes(String(kw)));
-            const hasRecipientSearchInput = visibleInputs.some((inp) =>
-                (inp.placeholder || ').includes(${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)})
-            );
+            const hasSuccessKeyword = successKeywords.some((kw) => bodyText.includes(String(kw)));
+            const hasRecipientSearchInput = visibleInputs.some((inp) => (inp.placeholder || '').includes(recipientPlaceholder));
             const hasSubmitLikeButton = buttons.some((txt) =>
-                txt.includes(${JSON.stringify(KO_REMIT_REQUEST)}) ||
-                txt.includes(${JSON.stringify(KO_REMIT_REQUEST_COMPACT)}) ||
-                txt.includes(${JSON.stringify(KO_NEXT_STEP)}) ||
-                txt.includes(${JSON.stringify(KO_NEXT_STEP_SPACED)}) ||
-                txt === ${JSON.stringify(KO_APPLY)} ||
-                txt === ${JSON.stringify(KO_SUBMIT)}
+                txt.includes(remitRequest) ||
+                txt.includes(remitRequestCompact) ||
+                txt.includes(nextStep) ||
+                txt.includes(nextStepSpaced) ||
+                txt === applyLabel ||
+                txt === submitLabel
             );
 
-            return JSON.stringify({
+            return {
                 url: location.href,
                 hasSuccessKeyword,
                 hasRecipientSearchInput,
                 hasSubmitLikeButton,
                 buttons,
                 bodyPreview: bodyText.slice(0, 500),
-            });
+            };
         })()
-    `) as string
-
-    return JSON.parse(result) as {
+    `) as {
         url: string
         hasSuccessKeyword: boolean
         hasRecipientSearchInput: boolean
@@ -422,10 +431,12 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
         buttons: string[]
         bodyPreview: string
     }
+
+    return result
 }
 
 const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: string; placeholder?: string }) => {
-    const haystack = `${input.type || '} ${input.name || '} ${input.id || '} ${input.placeholder || '}`.toLowerCase()
+    const haystack = `${input.type || ''} ${input.name || ''} ${input.id || ''} ${input.placeholder || ''}`.toLowerCase()
     return haystack.includes('\uC218\uCDE8\uC778'.toLowerCase())
         || haystack.includes('\uD68C\uC0AC\uBA85'.toLowerCase())
         || haystack.includes('\uBCC4\uCE6D'.toLowerCase())
@@ -436,10 +447,6 @@ const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: 
         || haystack.includes('name')
 }
 
-/**
- * Click "송금하기" only within the target company's context (modal/card),
- * to avoid clicking unrelated global nav buttons with the same label.
- */
 const clickCompanyScopedRemit = async (
     page: PageLike,
     companyName: string,
@@ -450,31 +457,25 @@ const clickCompanyScopedRemit = async (
             const company = ${JSON.stringify(companyName)};
             const remit = ${JSON.stringify(remitText)};
 
-            const norm = (s) => (s || ').replace(/\\s+/g, ' ').trim();
-            const textOf = (el) => norm(el?.textContent || ');
+            const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+            const textOf = (el) => norm((el && el.textContent) || '');
             const hasText = (el, text) => textOf(el).includes(norm(text));
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
-                return rect.width > 0
-                    && rect.height > 0
-                    && style.display !== 'none'
-                    && style.visibility !== 'hidden'
-                    && style.opacity !== '0';
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
             };
             const isClickable = (el) => {
                 if (!el) return false;
-                const tag = (el.tagName || ').toLowerCase();
-                const role = (el.getAttribute('role') || ').toLowerCase();
+                const tag = (el.tagName || '').toLowerCase();
+                const role = (el.getAttribute('role') || '').toLowerCase();
                 const cursor = window.getComputedStyle(el).cursor;
-                return tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer' || !!el.onclick;
+                return tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer' || typeof el.onclick === 'function';
             };
             const findRemitInScope = (scope) => {
                 if (!scope) return null;
-                const candidates = Array.from(
-                    scope.querySelectorAll('button, a, [role="button"], div, span')
-                );
+                const candidates = Array.from(scope.querySelectorAll('button, a, [role="button"], div, span'));
                 for (const el of candidates) {
                     if (!isVisible(el)) continue;
                     if (!isClickable(el)) continue;
@@ -484,13 +485,9 @@ const clickCompanyScopedRemit = async (
                 return null;
             };
 
-            // 1) Prefer a modal/dialog that contains both company and remit text.
-            const modalScopes = Array.from(
-                document.querySelectorAll(
-                    '[role="dialog"], [class*="modal" i], [class*="popup" i], [class*="drawer" i], [class*="overlay" i]'
-                )
-            ).filter(isVisible);
-
+            const modalScopes = Array.from(document.querySelectorAll(
+                '[role="dialog"], [class*="modal"], [class*="Modal"], [class*="popup"], [class*="Popup"], [class*="drawer"], [class*="Drawer"], [class*="overlay"], [class*="Overlay"]'
+            )).filter(isVisible);
             for (const scope of modalScopes) {
                 if (!hasText(scope, company) || !hasText(scope, remit)) continue;
                 const remitEl = findRemitInScope(scope);
@@ -500,7 +497,6 @@ const clickCompanyScopedRemit = async (
                 }
             }
 
-            // 2) Try company card scope.
             const companyScopes = Array.from(document.querySelectorAll('article, li, section, div'))
                 .filter(isVisible)
                 .filter((el) => hasText(el, company))
@@ -509,7 +505,6 @@ const clickCompanyScopedRemit = async (
                     const rb = b.getBoundingClientRect();
                     return (ra.width * ra.height) - (rb.width * rb.height);
                 });
-
             for (const scope of companyScopes) {
                 const directRemit = findRemitInScope(scope);
                 if (directRemit) {
@@ -526,9 +521,7 @@ const clickCompanyScopedRemit = async (
                 }
             }
 
-            // 3) Nearest visible remit element to target company text as last resort.
-            const companyNode = Array.from(document.querySelectorAll('*'))
-                .find((el) => isVisible(el) && hasText(el, company));
+            const companyNode = Array.from(document.querySelectorAll('*')).find((el) => isVisible(el) && hasText(el, company));
             if (companyNode) {
                 const baseRect = companyNode.getBoundingClientRect();
                 const bx = baseRect.left + baseRect.width / 2;
@@ -556,7 +549,6 @@ const clickCompanyScopedRemit = async (
 
     return String(result || 'unknown')
 }
-
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
     const waitStrategies: Array<'domcontentloaded' | 'load'> = ['domcontentloaded', 'load']
@@ -617,11 +609,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
-        // ?? Step 1: Go directly to login page ?????????????????????????????
+        // ???? Step 1: Go directly to login page ??????????????????????????????????????????????????????????
         const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
         steps.push(`open-login-page:${loginWaitUntil}`)
 
-        // ?? Step 2: Fill login credentials (type char-by-char for React) ??
+        // ???? Step 2: Fill login credentials (type char-by-char for React) ????
         await typeFirstVisible(
             page,
             [
@@ -651,7 +643,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const clickDelay = 1500 + Math.floor(Math.random() * 1000)
         await page.waitForTimeout(clickDelay)
 
-        // ?? Step 3: Submit login ???????????????????????????????????????????
+        // ???? Step 3: Submit login ??????????????????????????????????????????????????????????????????????????????????????
         const loginUrlBefore = page.url()
 
         // Wait for login button to become enabled
@@ -692,7 +684,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
         steps.push('submit-login')
 
-        // ?? Step 3.5: Check for explicit login errors ???????????????????????
+        // ???? Step 3.5: Check for explicit login errors ??????????????????????????????????????????????
         // MOIN bizplus shows a red banner for invalid password or locked accounts.
         // We wait up to 10 seconds to see if the URL changes OR an error banner appears.
         let loginFailed = false
@@ -715,7 +707,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         if (loginFailed || page.url().includes('/login')) {
             // Extract text from the page to see the exact error for the user
-            const bodyText = await page.locator('body').textContent().catch(() => ') || '
+            const bodyText = await page.locator('body').textContent().catch(() => '') || ''
 
             if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
                 throw new MoinAutomationError(
@@ -738,9 +730,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const postLoginUrl = page.url()
         steps.push(`post-login-url:${postLoginUrl}`)
 
-        // ?? Step 4: Navigate to recipient page ?????????????????????????????
+        // ???? Step 4: Navigate to recipient page ??????????????????????????????????????????????????????????
         // After login, we should be on /transfer/recipient.
-        // If not, navigate there via the "?↔툑?섍린" nav link.
+        // If not, navigate there via the "??酉????얄뵛" nav link.
 
         const postLoginPage = page.url()
 
@@ -748,7 +740,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push('navigating-to-recipient-page')
 
             const recipientNavSelectors = [
-                `a:has-text("${KO_REMIT}")`,      // "?↔툑?섍린" nav link
+                `a:has-text("${KO_REMIT}")`,      // "??酉????얄뵛" nav link
                 'a[href*="/transfer/recipient"]',
                 'a[href*="/transfer"]',
                 `a:has-text("${KO_REMIT_SHORT}")`,
@@ -783,10 +775,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         await page.waitForTimeout(2000)
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
 
-        // ?? Step 4.5: Find the company card and click it ????????????????????
+        // ???? Step 4.5: Find the company card and click it ????????????????????????????????????????
         // The recipient page shows cards with company names.
         // Clicking a card opens a MODAL POPUP (not a page navigation!).
-        // The modal shows recipient details and has "?섏젙?섍린" / "?↔툑?섍린" buttons.
+        // The modal shows recipient details and has "??瑜곸젧???얄뵛" / "??酉????얄뵛" buttons.
 
         // First, check if company name is visible (may need to scroll)
         let companyTextEl
@@ -878,7 +870,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
             const urlAfterRemit = page.url()
             transferInspection = await inspectTransferInputs(page)
-            steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', ')}:attempt${attempt}`)
+            steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', '')}:attempt${attempt}`)
             steps.push(`transfer-inspection:${JSON.stringify({
                 aliasSearchVisible: transferInspection.aliasSearchVisible,
                 amountKeywordVisible: transferInspection.amountKeywordVisible,
@@ -931,10 +923,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // Give the input fields extra time to render (React hydration)
         await page.waitForTimeout(2000)
 
-        // ?? Step 6: Fill USD amount ????????????????????????????????????????
+        // ???? Step 6: Fill USD amount ????????????????????????????????????????????????????????????????????????????????
         // The amount page has two sections:
-        //   - "蹂대궡??湲덉븸" (KRW) ??auto-calculated
-        //   - "諛쏅뒗 湲덉븸" (USD) ??this is where we enter our amount
+        //   - "?곌랜?亦???ル?녽뇡? (KRW) ??auto-calculated
+        //   - "?꾩룇猷???ル?녽뇡? (USD) ??this is where we enter our amount
         // We need to fill the USD/receiving amount input.
 
         // First, try to find any visible input and log diagnostic info
@@ -953,7 +945,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                             id: inp.id,
                             placeholder: inp.placeholder,
                             visible,
-                            cls: (inp.className || ').slice(0, 50),
+                            cls: (inp.className || '').slice(0, 50),
                         });
                     }
                 });
@@ -967,7 +959,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // Strategy 1: Specific selectors for the receiving amount
         const usdSelectors = [
-            // Near "諛쏅뒗 湲덉븸" / "USD" text
+            // Near "?꾩룇猷???ル?녽뇡? / "USD" text
             `xpath=//*[contains(normalize-space(),"${KO_RECEIVE_AMOUNT}")]/following::input[1]`,
             'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
             'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
@@ -1010,7 +1002,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                             const style = window.getComputedStyle(inp);
                             return rect.width > 0 && rect.height > 0 
                                 && style.display !== 'none' && style.visibility !== 'hidden'
-                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === ');
+                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
                         });
                         // Return info about visible inputs
                         return JSON.stringify(visible.map((inp, i) => ({
@@ -1030,7 +1022,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         return hint.includes('usd') || hint.includes('amount') || hint.includes('receive')
                     }) || candidateInputs[Math.min(1, candidateInputs.length - 1)]
                     
-                    let selector = '
+                    let selector = ''
                     if (targetInfo.id) {
                         selector = `input#${targetInfo.id}`
                     } else if (targetInfo.name) {
@@ -1066,7 +1058,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         if (visible.length === 0) return 'no-visible-inputs';
                         const blocked = [${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)}, 'recipient', 'alias', 'company', 'name'];
                         const target = visible.find((inp) => {
-                            const hint = [inp.name || ', inp.id || ', inp.placeholder || '].join(' ').toLowerCase();
+                            const hint = [inp.name || '', inp.id || '', inp.placeholder || ''].join(' ').toLowerCase();
                             return !blocked.some((token) => hint.includes(String(token).toLowerCase()));
                         });
                         if (!target) return 'no-amount-candidate';
@@ -1095,11 +1087,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
         steps.push('fill-usd-amount')
 
-        // ?? Step 7: Next step after amount ?????????????????????????????????
+        // ???? Step 7: Next step after amount ??????????????????????????????????????????????????????????????????
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-amount')
 
-        // ?? Step 8: Upload invoice PDF ?????????????????????????????????????
+        // ???? Step 8: Upload invoice PDF ??????????????????????????????????????????????????????????????????????????
         await uploadFirstFileInput(
             page,
             ['input[type="file"][accept*="pdf" i]', 'input[type="file"]'],
@@ -1112,16 +1104,16 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('upload-invoice')
 
-        // ?? Step 9: Next step after upload ?????????????????????????????????
+        // ???? Step 9: Next step after upload ??????????????????????????????????????????????????????????????????
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-upload')
 
-        // ?? Step 10: Check agreement ???????????????????????????????????????
+        // ???? Step 10: Check agreement ??????????????????????????????????????????????????????????????????????????????
         await checkAgreement(page, DEFAULT_TIMEOUT_MS)
         steps.push('check-agreement')
 
-        // ?? Step 11: Submit remittance ?????????????????????????????????????
-        // On the ?뺣낫 ?뺤씤 page, the submit button says "?↔툑 ?좎껌" (not "?ㅼ쓬 ?④퀎")
+        // ???? Step 11: Submit remittance ??????????????????????????????????????????????????????????????????????????
+        // On the ?筌먲퐢沅??筌먦끉逾?page, the submit button says "??酉????ル―?? (not "???깅쾳 ??節띉?)
         await clickFirstVisible(
             page,
             [

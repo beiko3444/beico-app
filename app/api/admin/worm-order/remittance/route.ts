@@ -55,10 +55,10 @@ const isAuthRelatedAutomationError = (error: MoinAutomationError) => {
     const combined = `${error.step} ${error.message}`.toLowerCase()
     return (
         combined.includes('login failed') ||
-        combined.includes('비밀번호') ||
-        combined.includes('잠금') ||
-        combined.includes('계정') ||
-        combined.includes('로그인')
+        combined.includes('password') ||
+        combined.includes('account locked') ||
+        combined.includes('locked') ||
+        combined.includes('credential')
     )
 }
 
