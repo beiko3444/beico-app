@@ -299,7 +299,7 @@ function getPipelineModeLabel(mode: PipelineMode) {
 
 function getPipelineRuntimeBadgeClass(status: PipelineRuntimeStatus) {
     if (status === 'done') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    if (status === 'active') return 'bg-orange-100 text-orange-800 border-orange-200'
+    if (status === 'active') return 'bg-red-100 text-red-800 border-red-200'
     return 'bg-slate-100 text-slate-600 border-slate-200'
 }
 
@@ -1825,17 +1825,17 @@ export default function WormOrderPage() {
 
     return (
         <div className="max-w-5xl mx-auto pb-10 flex flex-col gap-6">
-            <div className="rounded-3xl border border-slate-800 bg-gradient-to-br from-slate-950 via-slate-900 to-zinc-900 p-5 md:p-7 shadow-2xl text-slate-100">
+            <div className="rounded-3xl border border-[#f3ddd8] bg-gradient-to-br from-white via-[#fff8f6] to-[#fff3ef] p-5 md:p-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)] text-slate-900">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="space-y-1">
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight">지렁이 수입 자동화 파이프라인</h1>
-                        <p className="text-sm text-slate-400 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">지렁이 수입 자동화 파이프라인</h1>
+                        <p className="text-sm text-slate-600 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
                     </div>
                     <button
                         type="button"
                         onClick={handleStartNewOrder}
                         disabled={creatingOrder}
-                        className="h-10 px-4 rounded-xl border border-slate-600 bg-slate-900/60 hover:bg-slate-800 text-sm font-bold text-slate-100 inline-flex items-center gap-2 w-full md:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="h-10 px-4 rounded-xl border border-[#e34219] bg-white hover:bg-[#fff3ef] text-sm font-bold text-[#e34219] inline-flex items-center gap-2 w-full md:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {creatingOrder ? (
                             <>
@@ -1849,28 +1849,28 @@ export default function WormOrderPage() {
                 </div>
 
                 {orderCreateNotice && (
-                    <p className="mt-3 text-xs font-semibold text-emerald-300">
+                    <p className="mt-3 text-xs font-semibold text-emerald-700">
                         {orderCreateNotice}
                     </p>
                 )}
                 {orderCreateError && (
-                    <p className="mt-3 text-xs font-semibold text-rose-300">
+                    <p className="mt-3 text-xs font-semibold text-rose-600">
                         {orderCreateError}
                     </p>
                 )}
 
                 <div className="mt-6 grid grid-cols-3 gap-2 md:gap-4">
-                    <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
-                        <div className="text-2xl font-black text-emerald-300">{pipelineModeCounts.AUTO}</div>
-                        <div className="text-xs font-semibold text-emerald-100/90">완전자동</div>
+                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-center">
+                        <div className="text-2xl font-black text-sky-700">{pipelineModeCounts.AUTO}</div>
+                        <div className="text-xs font-semibold text-sky-800">완전자동</div>
                     </div>
-                    <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-center">
-                        <div className="text-2xl font-black text-amber-300">{pipelineModeCounts.SEMI}</div>
-                        <div className="text-xs font-semibold text-amber-100/90">반자동</div>
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center">
+                        <div className="text-2xl font-black text-red-700">{pipelineModeCounts.SEMI}</div>
+                        <div className="text-xs font-semibold text-red-700">반자동</div>
                     </div>
-                    <div className="rounded-xl border border-slate-500/40 bg-slate-700/40 p-3 text-center">
-                        <div className="text-2xl font-black text-slate-200">{pipelineModeCounts.MANUAL}</div>
-                        <div className="text-xs font-semibold text-slate-300">수동 필요</div>
+                    <div className="rounded-xl border border-slate-200 bg-slate-100 p-3 text-center">
+                        <div className="text-2xl font-black text-slate-700">{pipelineModeCounts.MANUAL}</div>
+                        <div className="text-xs font-semibold text-slate-600">수동 필요</div>
                     </div>
                 </div>
 
@@ -1884,17 +1884,17 @@ export default function WormOrderPage() {
                             return (
                                 <div key={step.id} className="flex items-center">
                                     {index > 0 && (
-                                        <div className={`h-[2px] w-7 md:w-10 ${isDone ? 'bg-emerald-400/70' : 'bg-slate-700'}`} />
+                                        <div className={`h-[2px] w-7 md:w-10 ${isDone ? 'bg-red-300' : 'bg-slate-300'}`} />
                                     )}
                                     <button
                                         type="button"
                                         onClick={() => togglePipelineStep(step.id)}
                                         className={`h-9 w-9 rounded-full border text-xs font-black transition-colors ${
                                             isDone
-                                                ? 'border-emerald-300 bg-emerald-200 text-emerald-900'
+                                                ? 'border-red-300 bg-red-100 text-red-700'
                                                 : isActive
-                                                    ? 'border-orange-300 bg-orange-500 text-white'
-                                                    : 'border-slate-600 bg-slate-800 text-slate-300'
+                                                    ? 'border-[#e34219] bg-[#e34219] text-white'
+                                                    : 'border-slate-300 bg-white text-slate-500'
                                         }`}
                                         title={`Step ${step.id} ${step.title}`}
                                     >
@@ -1904,7 +1904,7 @@ export default function WormOrderPage() {
                             )
                         })}
                     </div>
-                    <div className="mt-2 text-xs font-medium text-slate-400">
+                    <div className="mt-2 text-xs font-medium text-slate-600">
                         완료 {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계
                     </div>
                 </div>
@@ -1915,8 +1915,8 @@ export default function WormOrderPage() {
                         onClick={() => setPipelineFilter('all')}
                         className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
                             pipelineFilter === 'all'
-                                ? 'bg-white text-slate-900 border-white'
-                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                                ? 'bg-[#e34219] text-white border-[#e34219]'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                         }`}
                     >
                         전체 단계
@@ -1926,8 +1926,8 @@ export default function WormOrderPage() {
                         onClick={() => setPipelineFilter('AUTO')}
                         className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
                             pipelineFilter === 'AUTO'
-                                ? 'bg-emerald-200 text-emerald-900 border-emerald-200'
-                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                                ? 'bg-[#e34219] text-white border-[#e34219]'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                         }`}
                     >
                         완전자동
@@ -1937,8 +1937,8 @@ export default function WormOrderPage() {
                         onClick={() => setPipelineFilter('SEMI')}
                         className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
                             pipelineFilter === 'SEMI'
-                                ? 'bg-amber-200 text-amber-900 border-amber-200'
-                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                                ? 'bg-[#e34219] text-white border-[#e34219]'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                         }`}
                     >
                         반자동
@@ -1948,8 +1948,8 @@ export default function WormOrderPage() {
                         onClick={() => setPipelineFilter('MANUAL')}
                         className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
                             pipelineFilter === 'MANUAL'
-                                ? 'bg-slate-100 text-slate-900 border-slate-100'
-                                : 'bg-slate-900/60 text-slate-300 border-slate-600 hover:bg-slate-800'
+                                ? 'bg-[#e34219] text-white border-[#e34219]'
+                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
                         }`}
                     >
                         수동 필요
@@ -1971,14 +1971,14 @@ export default function WormOrderPage() {
                             return (
                                 <section
                                     key={step.id}
-                                    className={`rounded-2xl border bg-white shadow-sm transition-colors ${
-                                        runtimeStatus === 'done'
-                                            ? 'border-emerald-200'
-                                            : runtimeStatus === 'active'
-                                                ? 'border-orange-300'
-                                                : 'border-gray-200'
-                                    }`}
-                                >
+                                className={`rounded-2xl border bg-white shadow-sm transition-colors ${
+                                    runtimeStatus === 'done'
+                                        ? 'border-emerald-200'
+                                        : runtimeStatus === 'active'
+                                            ? 'border-red-300'
+                                            : 'border-gray-200'
+                                }`}
+                            >
                                     <button
                                         type="button"
                                         onClick={() => togglePipelineStep(step.id)}
