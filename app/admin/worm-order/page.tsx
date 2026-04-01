@@ -1744,8 +1744,6 @@ export default function WormOrderPage() {
     const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(6) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
     const showRemittanceTools = visibleStepIdSet.has(3)
     const showCustomsTools = visibleStepIdSet.has(7)
-    const showAnyTools = showOrderTools || showInboxTools || showRemittanceTools || showCustomsTools
-    const toolHeaderOrder = showOrderTools ? 14 : showInboxTools ? 24 : showRemittanceTools ? 34 : 74
 
     return (
         <div className="max-w-5xl mx-auto pb-10 flex flex-col gap-6">
@@ -1974,11 +1972,12 @@ export default function WormOrderPage() {
                 </aside>
 
                 <div className="min-w-0 flex flex-col gap-6">
-
-            {showAnyTools && (
-                <div className="flex flex-col gap-1 px-1" style={{ order: toolHeaderOrder }}>
-                <h2 className="text-xl font-black text-slate-900">실행 도구</h2>
-                <p className="text-xs text-slate-500">아래 기존 기능을 단계별 카드와 연동했습니다.</p>
+            {showOrderTools && (
+                <div className="px-1" style={{ order: 14 }}>
+                    <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
+                        <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 1 EXECUTION</p>
+                        <h3 className="text-sm font-black text-slate-900 mt-1">발주 메시지 생성 및 전송</h3>
+                    </div>
                 </div>
             )}
 
@@ -2125,140 +2124,12 @@ export default function WormOrderPage() {
                 </div>
             )}
 
-            {showRemittanceTools && (
-                <div ref={remittanceSectionRef} style={{ order: 35 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
-                        <h3 className="text-lg font-black text-[#111827]">Auto Remittance Application</h3>
-                        <p className="text-xs text-gray-500 mt-1">
-                            Uses server env credentials. Fill amount + invoice PDF, then click apply.
-                        </p>
+            {showInboxTools && (
+                <div className="px-1" style={{ order: 24 }}>
+                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+                        <p className="text-[11px] font-black text-slate-600 tracking-[0.2em]">STEP 2 / 6 / 9 / 10 EXECUTION</p>
+                        <h3 className="text-sm font-black text-slate-900 mt-1">INBOX 수신 · OCR · 첨부전달 · 창고료 메일 확인</h3>
                     </div>
-                    <Send size={18} className="text-[#e34219] mt-1" />
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
-                            Transfer Amount (USD)
-                        </label>
-                        <input
-                            type="text"
-                            inputMode="decimal"
-                            value={transferAmountUsd}
-                            onChange={(event) => {
-                                const cleaned = event.target.value.replace(/[^0-9.,]/g, '')
-                                setTransferAmountUsd(cleaned)
-                            }}
-                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                            placeholder="Ex. 1250.50"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
-                            Invoice PDF
-                        </label>
-                        <div className="space-y-2">
-                            <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <FileText size={16} className="shrink-0 text-gray-500" />
-                                    <span className="text-sm truncate">{invoicePdf?.name || 'Upload invoice PDF'}</span>
-                                </div>
-                                <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
-                                <input
-                                    type="file"
-                                    accept=".pdf,application/pdf"
-                                    className="hidden"
-                                    onChange={(event) => {
-                                        setRemittanceError('')
-                                        setRemittanceSuccess('')
-                                        const file = event.target.files?.[0] || null
-                                        setInvoicePdf(file)
-                                    }}
-                                />
-                            </label>
-
-                            {invoicePreviewLoading && (
-                                <p className="text-[11px] font-semibold text-slate-500">인보이스 미리보기 생성 중...</p>
-                            )}
-                            {invoicePreviewError && (
-                                <p className="text-[11px] font-semibold text-[#e34219]">{invoicePreviewError}</p>
-                            )}
-                            {invoicePreviewUrl && !invoicePreviewLoading && (
-                                <div className="rounded-lg border border-gray-200 bg-slate-50 p-2">
-                                    <div
-                                        role="img"
-                                        aria-label="Invoice preview"
-                                        className="w-full h-[260px] rounded bg-center bg-no-repeat bg-contain"
-                                        style={{ backgroundImage: `url(${invoicePreviewUrl})` }}
-                                    />
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
-
-                <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
-                    <p className="text-[11px] text-gray-500 leading-relaxed">
-                        The automation will log in with server credentials, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
-                    </p>
-                    <button
-                        type="button"
-                        onClick={handleRemittanceApply}
-                        disabled={remittanceSubmitting || isRemittanceLocked}
-                        className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                    >
-                        {isRemittanceLocked ? (
-                            `잠금 ${remittanceLockRemainingText}`
-                        ) : remittanceSubmitting ? (
-                            <>
-                                <Loader2 size={15} className="animate-spin" />
-                                Applying...
-                            </>
-                        ) : (
-                            '신청하기'
-                        )}
-                    </button>
-                </div>
-
-                {(remittanceSubmitting || remittanceProgress > 0 || !!remittanceSuccess) && (
-                    <div className="space-y-1.5">
-                        <div className="flex items-center justify-between text-[11px] font-semibold">
-                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-600'}>
-                                {remittanceProgressLabel}
-                            </span>
-                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-500'}>
-                                {Math.max(0, Math.min(100, Math.round(remittanceProgress)))}%
-                            </span>
-                        </div>
-                        <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
-                            <div
-                                className={`h-full transition-all duration-500 ${
-                                    remittanceError ? 'bg-red-500' : remittanceSuccess ? 'bg-emerald-500' : 'bg-[#e34219]'
-                                }`}
-                                style={{ width: `${Math.max(0, Math.min(100, remittanceProgress))}%` }}
-                            />
-                        </div>
-                    </div>
-                )}
-
-                {remittanceError && (
-                    <p className="text-sm font-semibold text-[#e34219]">{remittanceError}</p>
-                )}
-                {isRemittanceLocked && (
-                    <p className="text-sm font-semibold text-amber-700">
-                        보호 잠금 활성화: {remittanceLockRemainingText} 후 재시도 가능합니다.
-                    </p>
-                )}
-                {remittanceAttemptsRemaining !== null && remittanceAttemptsRemaining > 0 && !isRemittanceLocked && (
-                    <p className="text-xs font-semibold text-amber-700">
-                        비밀번호 실패 남은 시도: {remittanceAttemptsRemaining}회 (계정 보호를 위해 제한됨)
-                    </p>
-                )}
-                {remittanceSuccess && (
-                    <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
-                )}
                 </div>
             )}
 
@@ -2564,6 +2435,160 @@ export default function WormOrderPage() {
                         })()}
                     </div>
                 </div>
+                </div>
+            )}
+
+            {showRemittanceTools && (
+                <div className="px-1" style={{ order: 34 }}>
+                    <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
+                        <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 3 EXECUTION</p>
+                        <h3 className="text-sm font-black text-slate-900 mt-1">모인비즈니스 송금 신청 자동화</h3>
+                    </div>
+                </div>
+            )}
+
+            {showRemittanceTools && (
+                <div ref={remittanceSectionRef} style={{ order: 35 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div className="flex items-start justify-between gap-3">
+                    <div>
+                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
+                        <h3 className="text-lg font-black text-[#111827]">Auto Remittance Application</h3>
+                        <p className="text-xs text-gray-500 mt-1">
+                            Uses server env credentials. Fill amount + invoice PDF, then click apply.
+                        </p>
+                    </div>
+                    <Send size={18} className="text-[#e34219] mt-1" />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
+                            Transfer Amount (USD)
+                        </label>
+                        <input
+                            type="text"
+                            inputMode="decimal"
+                            value={transferAmountUsd}
+                            onChange={(event) => {
+                                const cleaned = event.target.value.replace(/[^0-9.,]/g, '')
+                                setTransferAmountUsd(cleaned)
+                            }}
+                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
+                            placeholder="Ex. 1250.50"
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
+                            Invoice PDF
+                        </label>
+                        <div className="space-y-2">
+                            <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <FileText size={16} className="shrink-0 text-gray-500" />
+                                    <span className="text-sm truncate">{invoicePdf?.name || 'Upload invoice PDF'}</span>
+                                </div>
+                                <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
+                                <input
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    className="hidden"
+                                    onChange={(event) => {
+                                        setRemittanceError('')
+                                        setRemittanceSuccess('')
+                                        const file = event.target.files?.[0] || null
+                                        setInvoicePdf(file)
+                                    }}
+                                />
+                            </label>
+
+                            {invoicePreviewLoading && (
+                                <p className="text-[11px] font-semibold text-slate-500">인보이스 미리보기 생성 중...</p>
+                            )}
+                            {invoicePreviewError && (
+                                <p className="text-[11px] font-semibold text-[#e34219]">{invoicePreviewError}</p>
+                            )}
+                            {invoicePreviewUrl && !invoicePreviewLoading && (
+                                <div className="rounded-lg border border-gray-200 bg-slate-50 p-2">
+                                    <div
+                                        role="img"
+                                        aria-label="Invoice preview"
+                                        className="w-full h-[260px] rounded bg-center bg-no-repeat bg-contain"
+                                        style={{ backgroundImage: `url(${invoicePreviewUrl})` }}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
+                    <p className="text-[11px] text-gray-500 leading-relaxed">
+                        The automation will log in with server credentials, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
+                    </p>
+                    <button
+                        type="button"
+                        onClick={handleRemittanceApply}
+                        disabled={remittanceSubmitting || isRemittanceLocked}
+                        className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                    >
+                        {isRemittanceLocked ? (
+                            `잠금 ${remittanceLockRemainingText}`
+                        ) : remittanceSubmitting ? (
+                            <>
+                                <Loader2 size={15} className="animate-spin" />
+                                Applying...
+                            </>
+                        ) : (
+                            '신청하기'
+                        )}
+                    </button>
+                </div>
+
+                {(remittanceSubmitting || remittanceProgress > 0 || !!remittanceSuccess) && (
+                    <div className="space-y-1.5">
+                        <div className="flex items-center justify-between text-[11px] font-semibold">
+                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-600'}>
+                                {remittanceProgressLabel}
+                            </span>
+                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-500'}>
+                                {Math.max(0, Math.min(100, Math.round(remittanceProgress)))}%
+                            </span>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                            <div
+                                className={`h-full transition-all duration-500 ${
+                                    remittanceError ? 'bg-red-500' : remittanceSuccess ? 'bg-emerald-500' : 'bg-[#e34219]'
+                                }`}
+                                style={{ width: `${Math.max(0, Math.min(100, remittanceProgress))}%` }}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {remittanceError && (
+                    <p className="text-sm font-semibold text-[#e34219]">{remittanceError}</p>
+                )}
+                {isRemittanceLocked && (
+                    <p className="text-sm font-semibold text-amber-700">
+                        보호 잠금 활성화: {remittanceLockRemainingText} 후 재시도 가능합니다.
+                    </p>
+                )}
+                {remittanceAttemptsRemaining !== null && remittanceAttemptsRemaining > 0 && !isRemittanceLocked && (
+                    <p className="text-xs font-semibold text-amber-700">
+                        비밀번호 실패 남은 시도: {remittanceAttemptsRemaining}회 (계정 보호를 위해 제한됨)
+                    </p>
+                )}
+                {remittanceSuccess && (
+                    <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
+                )}
+                </div>
+            )}
+            {showCustomsTools && (
+                <div className="px-1" style={{ order: 74 }}>
+                    <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
+                        <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 7 EXECUTION</p>
+                        <h3 className="text-sm font-black text-slate-900 mt-1">유니패스 화물통관진행정보 조회</h3>
+                    </div>
                 </div>
             )}
 
