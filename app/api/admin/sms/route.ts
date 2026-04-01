@@ -150,6 +150,7 @@ export async function POST(request: Request) {
       message: result.message,
       sendType: Buffer.byteLength(contents, 'utf8') <= 90 ? 'SMS' : 'LMS',
       scheduled: Boolean(sendDT),
+      completedAt: new Date().toISOString(),
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : '문자 발송에 실패했습니다.'
