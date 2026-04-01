@@ -27,7 +27,12 @@ let pdfJsModulePromise: Promise<PdfJsModule> | null = null
 
 async function getPdfJsModule() {
   if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs')
+    pdfJsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs').then((module) => {
+      // In Next Node runtime, the default "./pdf.worker.mjs" can resolve to a missing chunk path.
+      // Force a resolvable package path to prevent fake worker setup failures.
+      module.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs'
+      return module
+    })
   }
   return pdfJsModulePromise
 }
