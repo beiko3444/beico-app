@@ -25,7 +25,15 @@ const KO_RECEIVE_AMOUNT = '\uBC1B\uB294 \uAE08\uC561'
 const KO_SEND_AMOUNT = '\uBCF4\uB0B4\uB294 \uAE08\uC561'
 const KO_RECIPIENT_SEARCH_PLACEHOLDER = '\uBC1B\uB294 \uBD84 \uC774\uB984, \uD68C\uC0AC\uBA85, \uC218\uCDE8\uC778 \uBCC4\uCE6D'
 const KO_SUCCESS_PATTERN =
-    /\uC2E0\uCCAD \uC644\uB8CC|\uC1A1\uAE08 \uC2E0\uCCAD|\uC811\uC218 \uC644\uB8CC|\uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4/
+    /\uC2E0\uCCAD \uC644\uB8CC|\uC811\uC218 \uC644\uB8CC|\uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4|\uC1A1\uAE08 \uC644\uB8CC|\uC2E0\uCCAD\uC774 \uC644\uB8CC|\uC811\uC218\uB418\uC5C8/
+const KO_SUCCESS_KEYWORDS = [
+    '\uC2E0\uCCAD \uC644\uB8CC',
+    '\uC811\uC218 \uC644\uB8CC',
+    '\uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4',
+    '\uC1A1\uAE08 \uC644\uB8CC',
+    '\uC2E0\uCCAD\uC774 \uC644\uB8CC',
+    '\uC811\uC218\uB418\uC5C8',
+]
 
 type BrowserLike = {
     newContext: (options?: Record<string, unknown>) => Promise<BrowserContextLike>
@@ -204,7 +212,7 @@ const typeFirstVisible = async (
             await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 9000) })
             await target.click({ timeout: 5000 })
             // Clear any existing value first
-            await target.fill('')
+            await target.fill(')
             // Type character-by-character to trigger React onChange and avoid bot detection
             // Randomize delay between 80ms and 150ms per character to mimic human typing
             const typingDelay = 80 + Math.floor(Math.random() * 70)
@@ -312,22 +320,22 @@ const inspectTransferInputs = async (page: PageLike) => {
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
 
-            const getText = () => (document.body?.innerText || '').replace(/\\s+/g, ' ').trim();
+            const getText = () => (document.body?.innerText || ').replace(/\\s+/g, ' ').trim();
             const bodyText = getText();
             const inputs = Array.from(document.querySelectorAll('input'));
             const visibleInputs = inputs
                 .filter((inp) => isVisible(inp))
                 .map((inp, i) => ({
                     i,
-                    type: inp.type || '',
-                    name: inp.name || '',
-                    id: inp.id || '',
-                    placeholder: inp.placeholder || '',
+                    type: inp.type || ',
+                    name: inp.name || ',
+                    id: inp.id || ',
+                    placeholder: inp.placeholder || ',
                 }));
 
             const nextButtons = Array.from(document.querySelectorAll('button, [role="button"], a'))
                 .filter((el) => isVisible(el))
-                .map((el) => (el.textContent || '').replace(/\\s+/g, ' ').trim())
+                .map((el) => (el.textContent || ').replace(/\\s+/g, ' ').trim())
                 .filter(Boolean)
                 .slice(0, 20);
 
@@ -335,7 +343,7 @@ const inspectTransferInputs = async (page: PageLike) => {
                 bodyText: bodyText.slice(0, 1200),
                 visibleInputs,
                 nextButtons,
-                aliasSearchVisible: visibleInputs.some((inp) => (inp.placeholder || '').includes(${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)})),
+                aliasSearchVisible: visibleInputs.some((inp) => (inp.placeholder || ').includes(${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)})),
                 amountKeywordVisible:
                     bodyText.includes(${JSON.stringify(KO_AMOUNT_ENTRY)}) ||
                     bodyText.includes(${JSON.stringify(KO_RECEIVE_AMOUNT)}) ||
@@ -355,8 +363,69 @@ const inspectTransferInputs = async (page: PageLike) => {
     }
 }
 
+const inspectRemittanceCompletion = async (page: PageLike) => {
+    const result = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const normalize = (s) => (s || ').replace(/\\s+/g, ' ').trim();
+            const bodyText = normalize(document.body?.innerText || ');
+
+            const buttons = Array.from(document.querySelectorAll('button, [role="button"], a'))
+                .filter((el) => isVisible(el))
+                .map((el) => normalize(el.textContent || '))
+                .filter(Boolean)
+                .slice(0, 30);
+
+            const visibleInputs = Array.from(document.querySelectorAll('input'))
+                .filter((el) => isVisible(el))
+                .map((el) => ({
+                    type: el.type || ',
+                    name: el.name || ',
+                    id: el.id || ',
+                    placeholder: el.placeholder || ',
+                }));
+
+            const hasSuccessKeyword = ${JSON.stringify(KO_SUCCESS_KEYWORDS)}.some((kw) => bodyText.includes(String(kw)));
+            const hasRecipientSearchInput = visibleInputs.some((inp) =>
+                (inp.placeholder || ').includes(${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)})
+            );
+            const hasSubmitLikeButton = buttons.some((txt) =>
+                txt.includes(${JSON.stringify(KO_REMIT_REQUEST)}) ||
+                txt.includes(${JSON.stringify(KO_REMIT_REQUEST_COMPACT)}) ||
+                txt.includes(${JSON.stringify(KO_NEXT_STEP)}) ||
+                txt.includes(${JSON.stringify(KO_NEXT_STEP_SPACED)}) ||
+                txt === ${JSON.stringify(KO_APPLY)} ||
+                txt === ${JSON.stringify(KO_SUBMIT)}
+            );
+
+            return JSON.stringify({
+                url: location.href,
+                hasSuccessKeyword,
+                hasRecipientSearchInput,
+                hasSubmitLikeButton,
+                buttons,
+                bodyPreview: bodyText.slice(0, 500),
+            });
+        })()
+    `) as string
+
+    return JSON.parse(result) as {
+        url: string
+        hasSuccessKeyword: boolean
+        hasRecipientSearchInput: boolean
+        hasSubmitLikeButton: boolean
+        buttons: string[]
+        bodyPreview: string
+    }
+}
+
 const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: string; placeholder?: string }) => {
-    const haystack = `${input.type || ''} ${input.name || ''} ${input.id || ''} ${input.placeholder || ''}`.toLowerCase()
+    const haystack = `${input.type || '} ${input.name || '} ${input.id || '} ${input.placeholder || '}`.toLowerCase()
     return haystack.includes('\uC218\uCDE8\uC778'.toLowerCase())
         || haystack.includes('\uD68C\uC0AC\uBA85'.toLowerCase())
         || haystack.includes('\uBCC4\uCE6D'.toLowerCase())
@@ -381,8 +450,8 @@ const clickCompanyScopedRemit = async (
             const company = ${JSON.stringify(companyName)};
             const remit = ${JSON.stringify(remitText)};
 
-            const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
-            const textOf = (el) => norm(el?.textContent || '');
+            const norm = (s) => (s || ').replace(/\\s+/g, ' ').trim();
+            const textOf = (el) => norm(el?.textContent || ');
             const hasText = (el, text) => textOf(el).includes(norm(text));
             const isVisible = (el) => {
                 if (!el) return false;
@@ -396,8 +465,8 @@ const clickCompanyScopedRemit = async (
             };
             const isClickable = (el) => {
                 if (!el) return false;
-                const tag = (el.tagName || '').toLowerCase();
-                const role = (el.getAttribute('role') || '').toLowerCase();
+                const tag = (el.tagName || ').toLowerCase();
+                const role = (el.getAttribute('role') || ').toLowerCase();
                 const cursor = window.getComputedStyle(el).cursor;
                 return tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer' || !!el.onclick;
             };
@@ -646,7 +715,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         if (loginFailed || page.url().includes('/login')) {
             // Extract text from the page to see the exact error for the user
-            const bodyText = await page.locator('body').textContent().catch(() => '') || ''
+            const bodyText = await page.locator('body').textContent().catch(() => ') || '
 
             if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
                 throw new MoinAutomationError(
@@ -809,7 +878,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
             const urlAfterRemit = page.url()
             transferInspection = await inspectTransferInputs(page)
-            steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', '')}:attempt${attempt}`)
+            steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', ')}:attempt${attempt}`)
             steps.push(`transfer-inspection:${JSON.stringify({
                 aliasSearchVisible: transferInspection.aliasSearchVisible,
                 amountKeywordVisible: transferInspection.amountKeywordVisible,
@@ -884,7 +953,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                             id: inp.id,
                             placeholder: inp.placeholder,
                             visible,
-                            cls: (inp.className || '').slice(0, 50),
+                            cls: (inp.className || ').slice(0, 50),
                         });
                     }
                 });
@@ -941,7 +1010,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                             const style = window.getComputedStyle(inp);
                             return rect.width > 0 && rect.height > 0 
                                 && style.display !== 'none' && style.visibility !== 'hidden'
-                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
+                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === ');
                         });
                         // Return info about visible inputs
                         return JSON.stringify(visible.map((inp, i) => ({
@@ -961,7 +1030,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         return hint.includes('usd') || hint.includes('amount') || hint.includes('receive')
                     }) || candidateInputs[Math.min(1, candidateInputs.length - 1)]
                     
-                    let selector = ''
+                    let selector = '
                     if (targetInfo.id) {
                         selector = `input#${targetInfo.id}`
                     } else if (targetInfo.name) {
@@ -992,12 +1061,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         const visible = inputs.filter(inp => {
                             const rect = inp.getBoundingClientRect();
                             return rect.width > 0 && rect.height > 0 
-                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
+                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === ');
                         });
                         if (visible.length === 0) return 'no-visible-inputs';
                         const blocked = [${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)}, 'recipient', 'alias', 'company', 'name'];
                         const target = visible.find((inp) => {
-                            const hint = [inp.name || '', inp.id || '', inp.placeholder || ''].join(' ').toLowerCase();
+                            const hint = [inp.name || ', inp.id || ', inp.placeholder || '].join(' ').toLowerCase();
                             return !blocked.some((token) => hint.includes(String(token).toLowerCase()));
                         });
                         if (!target) return 'no-amount-candidate';
@@ -1069,14 +1138,50 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('submit-remittance')
 
-        // ?? Step 12: Wait for completion ???????????????????????????????????
-        await Promise.race([
-            page.getByText(KO_SUCCESS_PATTERN).first().waitFor({
-                state: 'visible',
-                timeout: 20000,
-            }),
-            page.waitForLoadState('networkidle', { timeout: 20000 }),
-        ]).catch(() => undefined)
+        // Step 12: Verify completion strictly to avoid false positives.
+        // Do not treat simple network idle as success.
+        let completionConfirmed = false
+        const submitUrl = page.url()
+        let completionSnapshot = await inspectRemittanceCompletion(page)
+        for (let attempt = 0; attempt < 8; attempt++) {
+            await page.waitForTimeout(2500)
+            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+
+            const textMatched = await page.getByText(KO_SUCCESS_PATTERN).first().isVisible().catch(() => false)
+            completionSnapshot = await inspectRemittanceCompletion(page)
+            steps.push(`completion-check:${JSON.stringify({
+                attempt,
+                url: completionSnapshot.url.replace('https://www.moinbizplus.com', ''),
+                textMatched,
+                hasSuccessKeyword: completionSnapshot.hasSuccessKeyword,
+                hasRecipientSearchInput: completionSnapshot.hasRecipientSearchInput,
+                hasSubmitLikeButton: completionSnapshot.hasSubmitLikeButton,
+                buttons: completionSnapshot.buttons.slice(0, 6),
+            }).slice(0, 350)}`)
+
+            if (textMatched || completionSnapshot.hasSuccessKeyword) {
+                completionConfirmed = true
+                break
+            }
+
+            const urlChanged = completionSnapshot.url !== submitUrl
+            const movedOutOfSubmitState =
+                !completionSnapshot.hasRecipientSearchInput &&
+                !completionSnapshot.hasSubmitLikeButton
+            if (urlChanged && movedOutOfSubmitState) {
+                completionConfirmed = true
+                steps.push('completion-inferred-by-state-change')
+                break
+            }
+        }
+
+        if (!completionConfirmed) {
+            throw new MoinAutomationError(
+                'Verify completion',
+                `Submission was clicked, but no reliable completion signal was detected. url: ${completionSnapshot.url}, preview: ${completionSnapshot.bodyPreview.slice(0, 220)}`
+            )
+        }
+        steps.push('completion-confirmed')
 
         return {
             finalUrl: page.url(),
