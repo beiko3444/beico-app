@@ -94,6 +94,19 @@ type RemittanceProgressStage = {
     label: string
 }
 
+type RemittancePricingSummary = {
+    finalReceiveAmount: string
+    sendAmount: string
+    totalFee: string
+    exchangeRate: string
+}
+
+type WormOrderSnapshot = {
+    id: string
+    orderNumber: string
+    receiveDate: string
+}
+
 const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 1,
@@ -565,6 +578,32 @@ function writeWormEmailOfflineCache(cache: WormEmailOfflineCache) {
     }
 }
 
+function sanitizeRemittancePricingSummary(value: unknown): RemittancePricingSummary | null {
+    if (!value || typeof value !== 'object') return null
+    const candidate = value as Partial<RemittancePricingSummary>
+    if (
+        typeof candidate.finalReceiveAmount !== 'string' ||
+        typeof candidate.sendAmount !== 'string' ||
+        typeof candidate.totalFee !== 'string' ||
+        typeof candidate.exchangeRate !== 'string'
+    ) {
+        return null
+    }
+
+    const result: RemittancePricingSummary = {
+        finalReceiveAmount: candidate.finalReceiveAmount.trim(),
+        sendAmount: candidate.sendAmount.trim(),
+        totalFee: candidate.totalFee.trim(),
+        exchangeRate: candidate.exchangeRate.trim(),
+    }
+
+    if (!result.finalReceiveAmount && !result.sendAmount && !result.totalFee && !result.exchangeRate) {
+        return null
+    }
+
+    return result
+}
+
 function normalizeOcrPatternText(input: string) {
     return input
         .toUpperCase()
@@ -720,6 +759,10 @@ export default function WormOrderPage() {
     const [remittanceAttemptsRemaining, setRemittanceAttemptsRemaining] = useState<number | null>(null)
     const [remittanceLockedUntil, setRemittanceLockedUntil] = useState<number | null>(null)
     const [remittanceLockTick, setRemittanceLockTick] = useState(0)
+    const [remittancePricingSummary, setRemittancePricingSummary] = useState<RemittancePricingSummary | null>(null)
+    const [remittanceSaveInfo, setRemittanceSaveInfo] = useState<{ orderNumber: string; savedAt: string } | null>(null)
+    const [remittanceSaveWarning, setRemittanceSaveWarning] = useState('')
+    const [activeWormOrder, setActiveWormOrder] = useState<WormOrderSnapshot | null>(null)
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -1367,6 +1410,9 @@ export default function WormOrderPage() {
         setRemittanceAttemptsRemaining(null)
         setRemittanceProgress(0)
         setRemittanceProgressLabel('대기 중')
+        setRemittancePricingSummary(null)
+        setRemittanceSaveInfo(null)
+        setRemittanceSaveWarning('')
 
         if (isRemittanceLocked) {
             setRemittanceError(`비밀번호 보호 잠금이 활성화되어 있습니다. ${remittanceLockRemainingText} 후 다시 시도해 주세요.`)
@@ -1412,6 +1458,12 @@ export default function WormOrderPage() {
             const submitData = new FormData()
             submitData.append('amountUsd', parsedAmount.toFixed(2))
             submitData.append('invoicePdf', invoicePdf)
+            if (activeWormOrder?.id) {
+                submitData.append('orderId', activeWormOrder.id)
+            }
+            if (receiveDate) {
+                submitData.append('receiveDate', receiveDate)
+            }
 
             const response = await fetch('/api/admin/worm-order/remittance', {
                 method: 'POST',
@@ -1437,12 +1489,28 @@ export default function WormOrderPage() {
             const automationSteps = Array.isArray(result?.result?.steps) ? result.result.steps as string[] : []
             const lastAutomationStep = automationSteps.length > 0 ? automationSteps[automationSteps.length - 1] : null
             const resolvedStage = resolveRemittanceStageFromStep(lastAutomationStep)
+            const pricingSummary = sanitizeRemittancePricingSummary(result?.result?.pricingSummary)
+            const savedOrder = result?.savedOrder
 
             setRemittanceAttemptsRemaining(null)
             setRemittanceLockedUntil(null)
             setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
             setRemittanceProgress(100)
             setRemittanceProgressLabel(resolvedStage?.label || '송금 신청이 완료되었습니다.')
+            setRemittancePricingSummary(pricingSummary)
+
+            if (savedOrder?.orderNumber) {
+                setRemittanceSaveInfo({
+                    orderNumber: savedOrder.orderNumber,
+                    savedAt: typeof savedOrder.remittanceAppliedAt === 'string'
+                        ? savedOrder.remittanceAppliedAt
+                        : new Date().toISOString(),
+                })
+            } else {
+                setRemittanceSaveInfo(null)
+            }
+
+            setRemittanceSaveWarning(typeof result?.saveWarning === 'string' ? result.saveWarning : '')
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
             const lower = message.toLowerCase()
@@ -1702,6 +1770,13 @@ export default function WormOrderPage() {
             }
 
             setOrderCreateNotice(`새 발주 생성 완료 · ${result?.order?.orderNumber || 'WO 생성'} (${targetReceiveDate})`)
+            if (result?.order?.id && result?.order?.orderNumber) {
+                setActiveWormOrder({
+                    id: result.order.id,
+                    orderNumber: result.order.orderNumber,
+                    receiveDate: targetReceiveDate,
+                })
+            }
         } catch (error) {
             setOrderCreateError(error instanceof Error ? error.message : '새 발주 생성 중 오류가 발생했습니다.')
             setCreatingOrder(false)
@@ -1722,6 +1797,9 @@ export default function WormOrderPage() {
         setRemittanceProgressLabel('대기 중')
         setRemittanceAttemptsRemaining(null)
         setRemittanceLockedUntil(null)
+        setRemittancePricingSummary(null)
+        setRemittanceSaveInfo(null)
+        setRemittanceSaveWarning('')
         setBlNumberQuery('')
         setCustomsProgressResult(null)
         setCustomsProgressError('')
@@ -2008,6 +2086,7 @@ export default function WormOrderPage() {
                                 onChange={(event) => {
                                     setCopied(false)
                                     setReceiveDate(event.target.value)
+                                    setActiveWormOrder(null)
                                 }}
                                 min={today}
                                 className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
@@ -2456,6 +2535,11 @@ export default function WormOrderPage() {
                         <p className="text-xs text-gray-500 mt-1">
                             Uses server env credentials. Fill amount + invoice PDF, then click apply.
                         </p>
+                        {activeWormOrder && (
+                            <p className="text-[11px] font-semibold text-slate-600 mt-1">
+                                대상 발주: {activeWormOrder.orderNumber} / 수령일 {activeWormOrder.receiveDate}
+                            </p>
+                        )}
                     </div>
                     <Send size={18} className="text-[#e34219] mt-1" />
                 </div>
@@ -2580,6 +2664,37 @@ export default function WormOrderPage() {
                 )}
                 {remittanceSuccess && (
                     <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
+                )}
+                {remittancePricingSummary && (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
+                        <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">송금 확정 정보</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                                <p className="text-[11px] text-slate-500 font-semibold">최종 수취금액</p>
+                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.finalReceiveAmount || '-'}</p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                                <p className="text-[11px] text-slate-500 font-semibold">보내는 돈</p>
+                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.sendAmount || '-'}</p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                                <p className="text-[11px] text-slate-500 font-semibold">총수수료</p>
+                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.totalFee || '-'}</p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                                <p className="text-[11px] text-slate-500 font-semibold">적용환율</p>
+                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.exchangeRate || '-'}</p>
+                            </div>
+                        </div>
+                        {remittanceSaveInfo && (
+                            <p className="text-xs font-semibold text-emerald-700">
+                                발주 DB 저장 완료: {remittanceSaveInfo.orderNumber} / {new Date(remittanceSaveInfo.savedAt).toLocaleString()}
+                            </p>
+                        )}
+                    </div>
+                )}
+                {remittanceSaveWarning && (
+                    <p className="text-xs font-semibold text-amber-700">{remittanceSaveWarning}</p>
                 )}
                 </div>
             )}

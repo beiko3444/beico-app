@@ -24,6 +24,9 @@ const KO_AGREEMENT_DESCRIPTION = '\uC1A1\uAE08 \uC815\uBCF4\uB97C \uD655\uC778\u
 const KO_AMOUNT_ENTRY = '\uAE08\uC561 \uC785\uB825'
 const KO_RECEIVE_AMOUNT = '\uBC1B\uB294 \uAE08\uC561'
 const KO_SEND_AMOUNT = '\uBCF4\uB0B4\uB294 \uAE08\uC561'
+const KO_FINAL_RECEIVE_AMOUNT = '\uCD5C\uC885 \uC218\uCDE8\uAE08\uC561'
+const KO_TOTAL_FEE = '\uCD1D\uC218\uC218\uB8CC'
+const KO_EXCHANGE_RATE = '\uC801\uC6A9\uD658\uC728'
 const KO_RECIPIENT_SEARCH_PLACEHOLDER = '\uBC1B\uB294 \uBD84 \uC774\uB984, \uD68C\uC0AC\uBA85, \uC218\uCDE8\uC778 \uBCC4\uCE6D'
 const KO_SUCCESS_PATTERN =
     /\uC2E0\uCCAD \uC644\uB8CC|\uC811\uC218 \uC644\uB8CC|\uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4|\uC1A1\uAE08 \uC644\uB8CC|\uC2E0\uCCAD\uC774 \uC644\uB8CC|\uC811\uC218\uB418\uC5C8/
@@ -89,6 +92,14 @@ export type MoinRemittanceResult = {
     finalUrl: string
     completedAt: string
     steps: string[]
+    pricingSummary: MoinRemittancePricingSummary | null
+}
+
+export type MoinRemittancePricingSummary = {
+    finalReceiveAmount: string
+    sendAmount: string
+    totalFee: string
+    exchangeRate: string
 }
 
 export class MoinAutomationError extends Error {
@@ -582,6 +593,153 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
     }
 
     return result
+}
+
+const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemittancePricingSummary> => {
+    const rawResult = await page.evaluate(`
+        (() => {
+            const labels = {
+                finalReceiveAmount: [${JSON.stringify(KO_FINAL_RECEIVE_AMOUNT)}, ${JSON.stringify(KO_RECEIVE_AMOUNT)}, 'final receive amount', 'receive amount'],
+                sendAmount: [${JSON.stringify(KO_SEND_AMOUNT)}, 'send amount', 'sending amount'],
+                totalFee: [${JSON.stringify(KO_TOTAL_FEE)}, 'total fee', 'fee'],
+                exchangeRate: [${JSON.stringify(KO_EXCHANGE_RATE)}, 'exchange rate', 'rate'],
+            };
+
+            const clean = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const normalize = (value) => clean(value).toLowerCase().replace(/\\s+/g, '');
+            const hasDigit = (value) => /\\d/.test(value || '');
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+
+            const extractSameLine = (line, words) => {
+                const escapeRegex = (input) => String(input).replace(/[\\^$.*+?()[\\]{}|]/g, '\\\\$&');
+                for (const word of words) {
+                    const pattern = new RegExp(escapeRegex(word) + '\\\\s*[:：-]?\\\\s*(.+)$', 'i');
+                    const match = line.match(pattern);
+                    if (match && hasDigit(match[1])) return clean(match[1]);
+                }
+                return '';
+            };
+
+            const moneySnippet = (line, key) => {
+                if (!line) return '';
+                if (key === 'exchangeRate') {
+                    const exchangeExpr = line.match(/1\\s*USD\\s*=\\s*[0-9][0-9,]*(?:\\.\\d+)?\\s*(?:KRW|원)?/i);
+                    if (exchangeExpr) return clean(exchangeExpr[0]);
+                    const rateExpr = line.match(/[0-9][0-9,]*(?:\\.\\d+)?\\s*(?:KRW|원|USD|US\\$)?/i);
+                    if (rateExpr) return clean(rateExpr[0]);
+                    return '';
+                }
+                const amountExpr = line.match(/(?:US\\$|USD|KRW|₩|원)?\\s*[0-9][0-9,]*(?:\\.\\d+)?\\s*(?:US\\$|USD|KRW|₩|원)?/i);
+                return amountExpr ? clean(amountExpr[0]) : '';
+            };
+
+            const lines = clean((document.body && document.body.innerText) || '')
+                .split(/\\n+/)
+                .map((line) => clean(line))
+                .filter(Boolean);
+
+            const visibleElements = Array.from(document.querySelectorAll('th,td,dt,dd,label,strong,b,span,p,div,li'))
+                .filter((el) => isVisible(el))
+                .slice(0, 2000);
+
+            const findByDom = (key, words) => {
+                const normalizedWords = words.map((word) => normalize(word));
+                const candidates = visibleElements
+                    .map((el) => ({ el, text: clean(el.textContent || '') }))
+                    .filter((row) => row.text.length > 0 && row.text.length <= 80)
+                    .filter((row) => normalizedWords.some((word) => normalize(row.text).includes(word)));
+
+                for (const candidate of candidates) {
+                    const direct = extractSameLine(candidate.text, words);
+                    if (direct) return direct;
+                    const directSnippet = moneySnippet(candidate.text, key);
+                    if (directSnippet) return directSnippet;
+
+                    const nextSibling = candidate.el.nextElementSibling;
+                    if (nextSibling) {
+                        const siblingText = clean(nextSibling.textContent || '');
+                        if (hasDigit(siblingText)) return siblingText;
+                    }
+
+                    const parent = candidate.el.parentElement;
+                    if (parent) {
+                        const siblings = Array.from(parent.children);
+                        const idx = siblings.indexOf(candidate.el);
+                        if (idx >= 0 && idx + 1 < siblings.length) {
+                            const nextText = clean(siblings[idx + 1].textContent || '');
+                            if (hasDigit(nextText)) return nextText;
+                        }
+                    }
+                }
+
+                return '';
+            };
+
+            const findByLine = (key, words) => {
+                const normalizedWords = words.map((word) => normalize(word));
+                for (let i = 0; i < lines.length; i += 1) {
+                    const line = lines[i];
+                    const normalizedLine = normalize(line);
+                    if (!normalizedWords.some((word) => normalizedLine.includes(word))) continue;
+
+                    const sameLine = extractSameLine(line, words);
+                    if (sameLine) return sameLine;
+
+                    const sameLineSnippet = moneySnippet(line, key);
+                    if (sameLineSnippet) return sameLineSnippet;
+
+                    const nextLine = lines[i + 1] || '';
+                    if (hasDigit(nextLine)) return nextLine;
+                }
+                return '';
+            };
+
+            const result = {
+                finalReceiveAmount: '',
+                sendAmount: '',
+                totalFee: '',
+                exchangeRate: '',
+            };
+
+            for (const key of Object.keys(result)) {
+                const words = labels[key] || [];
+                const domValue = findByDom(key, words);
+                if (domValue) {
+                    result[key] = domValue;
+                    continue;
+                }
+
+                const lineValue = findByLine(key, words);
+                if (lineValue) {
+                    result[key] = lineValue;
+                }
+            }
+
+            return JSON.stringify(result);
+        })()
+    `) as string
+
+    try {
+        const parsed = JSON.parse(rawResult) as Partial<MoinRemittancePricingSummary>
+        return {
+            finalReceiveAmount: typeof parsed.finalReceiveAmount === 'string' ? parsed.finalReceiveAmount.trim() : '',
+            sendAmount: typeof parsed.sendAmount === 'string' ? parsed.sendAmount.trim() : '',
+            totalFee: typeof parsed.totalFee === 'string' ? parsed.totalFee.trim() : '',
+            exchangeRate: typeof parsed.exchangeRate === 'string' ? parsed.exchangeRate.trim() : '',
+        }
+    } catch {
+        return {
+            finalReceiveAmount: '',
+            sendAmount: '',
+            totalFee: '',
+            exchangeRate: '',
+        }
+    }
 }
 
 const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: string; placeholder?: string }) => {
@@ -1324,6 +1482,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         await checkAgreement(page, DEFAULT_TIMEOUT_MS)
         steps.push('check-agreement')
 
+        const pricingSummary = await inspectRemittancePricingSummary(page)
+        steps.push(`pricing-summary:${JSON.stringify(pricingSummary).slice(0, 220)}`)
+
         // ???? Step 11: Submit remittance ??????????????????????????????????????????????????????????????????????????
         // On the ?筌먲퐢沅??筌먦끉逾?page, the submit button says "??酉????ル―?? (not "???깅쾳 ??節띉?)
         await clickFirstVisible(
@@ -1391,6 +1552,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             finalUrl: page.url(),
             completedAt: new Date().toISOString(),
             steps,
+            pricingSummary,
         }
     } catch (error) {
         if (error instanceof MoinAutomationError) {

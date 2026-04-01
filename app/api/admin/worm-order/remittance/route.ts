@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
+import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -33,6 +34,28 @@ const readString = (value: FormDataEntryValue | null) => {
     return ''
 }
 
+const normalizeSummaryText = (value: string) => {
+    const normalized = value.trim()
+    return normalized ? normalized : null
+}
+
+const parseSummaryNumber = (value: string | null, mode: 'default' | 'rate' = 'default') => {
+    if (!value) return null
+    const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
+    if (!matches || matches.length === 0) return null
+    const candidate = mode === 'rate' ? matches[matches.length - 1] : matches[0]
+    const parsed = Number(candidate.replace(/,/g, ''))
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+const resolveReceiveDateRange = (receiveDateText: string) => {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(receiveDateText)) return null
+    return {
+        gte: new Date(`${receiveDateText}T00:00:00+09:00`),
+        lte: new Date(`${receiveDateText}T23:59:59.999+09:00`),
+    }
+}
+
 const getRemittanceGuardState = (): RemittanceAuthGuardState => {
     if (!globalRemittanceGuard.wormRemittanceAuthGuard) {
         globalRemittanceGuard.wormRemittanceAuthGuard = {
@@ -44,6 +67,7 @@ const getRemittanceGuardState = (): RemittanceAuthGuardState => {
 }
 
 const normalizeCredentialKey = (loginId: string) => loginId.trim().toLowerCase()
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
 
 const resolveActiveLock = (entry: RemittanceAuthGuardEntry | undefined, now: number) => {
     if (!entry?.lockedUntil) return null
@@ -94,6 +118,8 @@ export async function POST(request: Request) {
         const moinLoginId = (process.env.MOIN_BIZPLUS_LOGIN_ID || '').trim()
         const moinPassword = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
         const amountRaw = readString(formData.get('amountUsd'))
+        const orderIdRaw = readString(formData.get('orderId'))
+        const receiveDateRaw = readString(formData.get('receiveDate'))
         const invoicePdf = formData.get('invoicePdf')
 
         if (!moinLoginId || !moinPassword) {
@@ -171,10 +197,105 @@ export async function POST(request: Request) {
 
             clearAuthFailure(guardState, credentialKey)
 
+            const pricingSummary = result.pricingSummary
+            let savedOrder:
+                | {
+                    id: string
+                    orderNumber: string
+                    status: string
+                    remittanceAppliedAt: Date | null
+                    updatedAt: Date
+                  }
+                | null = null
+            let saveWarning: string | null = null
+
+            try {
+                const sessionUserId = session.user.id || null
+                let targetOrder:
+                    | {
+                        id: string
+                        orderNumber: string
+                      }
+                    | null = null
+
+                if (orderIdRaw && isUuid(orderIdRaw)) {
+                    targetOrder = await prisma.wormOrder.findUnique({
+                        where: { id: orderIdRaw },
+                        select: { id: true, orderNumber: true },
+                    })
+                }
+
+                if (!targetOrder) {
+                    const receiveDateRange = resolveReceiveDateRange(receiveDateRaw)
+                    if (receiveDateRange) {
+                        targetOrder = await prisma.wormOrder.findFirst({
+                            where: {
+                                receiveDate: receiveDateRange,
+                                ...(sessionUserId ? { createdById: sessionUserId } : {}),
+                            },
+                            orderBy: { createdAt: 'desc' },
+                            select: { id: true, orderNumber: true },
+                        })
+                    }
+                }
+
+                if (!targetOrder && sessionUserId) {
+                    targetOrder = await prisma.wormOrder.findFirst({
+                        where: { createdById: sessionUserId },
+                        orderBy: { createdAt: 'desc' },
+                        select: { id: true, orderNumber: true },
+                    })
+                }
+
+                if (!targetOrder) {
+                    targetOrder = await prisma.wormOrder.findFirst({
+                        orderBy: { createdAt: 'desc' },
+                        select: { id: true, orderNumber: true },
+                    })
+                }
+
+                if (!targetOrder) {
+                    saveWarning = '연결할 발주를 찾지 못해 송금 결과를 저장하지 못했습니다.'
+                } else {
+                    const finalReceiveAmountText = normalizeSummaryText(pricingSummary?.finalReceiveAmount || '')
+                    const sendAmountText = normalizeSummaryText(pricingSummary?.sendAmount || '')
+                    const totalFeeText = normalizeSummaryText(pricingSummary?.totalFee || '')
+                    const exchangeRateText = normalizeSummaryText(pricingSummary?.exchangeRate || '')
+
+                    savedOrder = await prisma.wormOrder.update({
+                        where: { id: targetOrder.id },
+                        data: {
+                            status: 'REMITTANCE_APPLIED',
+                            remittanceAppliedAt: new Date(result.completedAt),
+                            remittanceFinalReceiveAmountText: finalReceiveAmountText,
+                            remittanceFinalReceiveAmount: parseSummaryNumber(finalReceiveAmountText, 'default'),
+                            remittanceSendAmountText: sendAmountText,
+                            remittanceSendAmount: parseSummaryNumber(sendAmountText, 'default'),
+                            remittanceTotalFeeText: totalFeeText,
+                            remittanceTotalFee: parseSummaryNumber(totalFeeText, 'default'),
+                            remittanceExchangeRateText: exchangeRateText,
+                            remittanceExchangeRate: parseSummaryNumber(exchangeRateText, 'rate'),
+                        },
+                        select: {
+                            id: true,
+                            orderNumber: true,
+                            status: true,
+                            remittanceAppliedAt: true,
+                            updatedAt: true,
+                        },
+                    })
+                }
+            } catch (saveError) {
+                console.error('Failed to persist worm remittance summary:', saveError)
+                saveWarning = '송금 신청은 완료되었지만 발주 DB 저장에 실패했습니다.'
+            }
+
             return NextResponse.json({
                 ok: true,
                 message: 'Remittance application completed.',
                 result,
+                savedOrder,
+                saveWarning,
             })
         } catch (error) {
             if (error instanceof MoinAutomationError) {
