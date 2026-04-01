@@ -168,6 +168,19 @@ model WormEmailAwbCache {
   @@index([updatedAt])
 }
 
+model WormOrder {
+  id          String   @id @default(uuid())
+  orderNumber String   @unique
+  receiveDate DateTime
+  status      String   @default("DRAFT")
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([receiveDate])
+  @@index([createdAt])
+}
+
 model CoupangSyncHistory {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())

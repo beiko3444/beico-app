@@ -270,6 +270,7 @@ export async function POST(request: Request) {
       categorizedCount,
       targetCards: fetched.targetCards,
       refreshResults: fetched.refreshResults,
+      syncedAt: new Date().toISOString(),
       message: '카드 사용내역 동기화가 완료되었습니다.',
     })
   } catch (error: unknown) {

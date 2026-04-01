@@ -44,12 +44,52 @@ type CardUsageResponse = {
   }
 }
 
+type CategoryEditSource = 'summary' | 'manager' | 'row'
+type CategoryEditTarget = {
+  code: string
+  source: CategoryEditSource
+  itemId?: string
+}
+
 /* ═══════════════════ Helpers ═══════════════════ */
 function formatInputDate(date: Date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+function parseYmd(input: string) {
+  const match = input.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!year || month < 1 || month > 12 || day < 1 || day > 31) return null
+  return { year, month, day }
+}
+
+function resolveMonthRange(monthValue: string) {
+  const match = monthValue.match(/^(\d{4})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  if (!year || month < 1 || month > 12) return null
+
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 0)
+  return {
+    startDate: formatInputDate(start),
+    endDate: formatInputDate(end),
+  }
+}
+
+function resolveMonthValueFromRange(startDate: string, endDate: string) {
+  const start = parseYmd(startDate)
+  const end = parseYmd(endDate)
+  if (!start || !end) return ''
+  if (start.year !== end.year || start.month !== end.month) return ''
+  return `${start.year}-${String(start.month).padStart(2, '0')}`
 }
 
 function maskCard(cardNum: string) {
@@ -206,6 +246,7 @@ export default function CardUsageClient() {
   const [refreshBeforeFetch, setRefreshBeforeFetch] = useState(false)
   const [error, setError] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
+  const [syncCompletedAt, setSyncCompletedAt] = useState<string | null>(null)
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
   const [sortField, setSortField] = useState<'date' | 'amount'>('date')
@@ -224,6 +265,8 @@ export default function CardUsageClient() {
   const [newCatLabel, setNewCatLabel] = useState('')
   const [newCatEmoji, setNewCatEmoji] = useState('')
   const [draggedCatIdx, setDraggedCatIdx] = useState<number | null>(null)
+  const [editingCategoryTarget, setEditingCategoryTarget] = useState<CategoryEditTarget | null>(null)
+  const [editingCategoryLabel, setEditingCategoryLabel] = useState('')
 
   const updateCategories = (next: CategoryMeta[]) => {
     setCategories(next)
@@ -246,6 +289,37 @@ export default function CardUsageClient() {
   const handleResetCategories = () => {
     updateCategories(DEFAULT_CATEGORIES)
   }
+  const startCategoryLabelEdit = useCallback((category: CategoryMeta, source: CategoryEditSource, itemId?: string) => {
+    setEditingCategoryTarget({ code: category.code, source, itemId })
+    setEditingCategoryLabel(category.label)
+  }, [])
+  const cancelCategoryLabelEdit = useCallback(() => {
+    setEditingCategoryTarget(null)
+    setEditingCategoryLabel('')
+  }, [])
+  const commitCategoryLabelEdit = useCallback(() => {
+    if (!editingCategoryTarget) return
+    const nextLabel = editingCategoryLabel.trim()
+    if (!nextLabel) {
+      cancelCategoryLabelEdit()
+      return
+    }
+
+    const targetCategory = categories.find(c => c.code === editingCategoryTarget.code)
+    if (!targetCategory) {
+      cancelCategoryLabelEdit()
+      return
+    }
+
+    if (targetCategory.label === nextLabel) {
+      cancelCategoryLabelEdit()
+      return
+    }
+
+    const nextCategories = categories.map(c => c.code === editingCategoryTarget.code ? { ...c, label: nextLabel } : c)
+    updateCategories(nextCategories)
+    cancelCategoryLabelEdit()
+  }, [editingCategoryLabel, editingCategoryTarget, categories, cancelCategoryLabelEdit])
 
   /* ── Inline category selector state ── */
   const [catSelectItemId, setCatSelectItemId] = useState<string | null>(null)
@@ -288,10 +362,10 @@ export default function CardUsageClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleSearch = () => { setSyncMessage(''); load(1) }
+  const handleSearch = () => { setSyncMessage(''); setSyncCompletedAt(null); load(1) }
 
   const handleSync = async () => {
-    setSyncing(true); setError(''); setSyncMessage('')
+    setSyncing(true); setError(''); setSyncMessage(''); setSyncCompletedAt(null)
     try {
       const res = await fetch('/api/admin/card-usage/sync', {
         method: 'POST',
@@ -301,6 +375,7 @@ export default function CardUsageClient() {
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || '카드 사용내역 동기화 실패')
       setSyncMessage(`동기화 완료 · 조회 ${json.fetchedCount?.toLocaleString?.() ?? 0}건 / 저장 ${json.storedCount?.toLocaleString?.() ?? 0}건 / 금액확인 ${json.amountResolvedCount?.toLocaleString?.() ?? 0}건 / 금액없음 ${json.amountMissingCount?.toLocaleString?.() ?? 0}건`)
+      setSyncCompletedAt(typeof json.syncedAt === 'string' ? json.syncedAt : new Date().toISOString())
       await load(1)
     } catch (err: unknown) { setError(errorMessage(err)) }
     finally { setSyncing(false) }
@@ -382,6 +457,18 @@ export default function CardUsageClient() {
     }
     setSortField(field)
     setSortOrder('desc')
+  }
+
+  const selectedMonth = useMemo(
+    () => resolveMonthValueFromRange(startDate, endDate),
+    [startDate, endDate],
+  )
+
+  const handleMonthChange = (value: string) => {
+    const range = resolveMonthRange(value)
+    if (!range) return
+    setStartDate(range.startDate)
+    setEndDate(range.endDate)
   }
 
   /* ── Derived data ── */
@@ -534,6 +621,13 @@ export default function CardUsageClient() {
       setSelectedItemId(null)
     }
   }, [filteredItems, selectedItemId])
+
+  useEffect(() => {
+    if (!editingCategoryTarget) return
+    if (!categories.some(c => c.code === editingCategoryTarget.code)) {
+      cancelCategoryLabelEdit()
+    }
+  }, [categories, editingCategoryTarget, cancelCategoryLabelEdit])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -729,6 +823,32 @@ export default function CardUsageClient() {
         </div>
       </div>
 
+      {/* ════════ Status bar ════════ */}
+      {syncMessage && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          background: T.successBg, border: `1px solid ${T.successBorder}`, borderRadius: 10,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.success, fontWeight: 500 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.success, flexShrink: 0 }} />
+            {syncMessage}
+          </div>
+          <span style={{ fontSize: 12, color: T.textTertiary }}>
+            동기화 일시 {formatSyncTime(syncCompletedAt)}
+          </span>
+        </div>
+      )}
+
+      {error && (
+        <div style={{
+          background: T.errorBg, border: `1px solid #FED7D7`, borderRadius: 10,
+          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: T.error, fontWeight: 500,
+        }}>
+          {error}
+        </div>
+      )}
+
       {/* ════════ Category Summary ════════ */}
       {categorySummary.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 16, alignItems: 'center' }}>
@@ -747,7 +867,52 @@ export default function CardUsageClient() {
               }}
             >
               <span>{cat.emoji}</span>
-              <span>{cat.label}</span>
+              {editingCategoryTarget?.source === 'summary' && editingCategoryTarget.code === cat.code ? (
+                <input
+                  type="text"
+                  value={editingCategoryLabel}
+                  autoFocus
+                  onChange={e => setEditingCategoryLabel(e.target.value)}
+                  onClick={e => e.stopPropagation()}
+                  onDoubleClick={e => e.stopPropagation()}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      commitCategoryLabelEdit()
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault()
+                      e.stopPropagation()
+                      cancelCategoryLabelEdit()
+                    }
+                  }}
+                  onBlur={() => commitCategoryLabelEdit()}
+                  style={{
+                    height: 22,
+                    minWidth: 78,
+                    borderRadius: 6,
+                    border: `1px solid ${T.borderLight}`,
+                    padding: '0 6px',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: T.text,
+                    background: '#fff',
+                    outline: 'none',
+                  }}
+                />
+              ) : (
+                <span
+                  onDoubleClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    startCategoryLabelEdit(cat, 'summary')
+                  }}
+                  title="더블클릭해서 카테고리명 수정"
+                  style={{ cursor: 'text' }}
+                >
+                  {cat.label}
+                </span>
+              )}
               <span style={{ color: categoryFilter === cat.code ? 'rgba(255,255,255,0.7)' : T.textTertiary, fontWeight: 500 }}>
                 {cat.total.toLocaleString()}원
               </span>
@@ -804,6 +969,9 @@ export default function CardUsageClient() {
               기본값으로 초기화
             </button>
           </div>
+          <p style={{ margin: '-4px 0 10px', fontSize: 11, color: T.textTertiary }}>
+            카테고리명을 더블클릭하면 바로 수정됩니다.
+          </p>
           {/* Add new category */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -868,7 +1036,7 @@ export default function CardUsageClient() {
             {categories.map((cat, idx) => (
               <div
                 key={cat.code}
-                draggable
+                draggable={!(editingCategoryTarget?.source === 'manager' && editingCategoryTarget.code === cat.code)}
                 onDragStart={() => setDraggedCatIdx(idx)}
                 onDragOver={e => e.preventDefault()}
                 onDrop={e => {
@@ -890,7 +1058,48 @@ export default function CardUsageClient() {
                 }}
               >
                 <span>{cat.emoji}</span>
-                <span style={{ fontWeight: 500, color: T.text }}>{cat.label}</span>
+                {editingCategoryTarget?.source === 'manager' && editingCategoryTarget.code === cat.code ? (
+                  <input
+                    type="text"
+                    value={editingCategoryLabel}
+                    autoFocus
+                    onChange={e => setEditingCategoryLabel(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        commitCategoryLabelEdit()
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault()
+                        cancelCategoryLabelEdit()
+                      }
+                    }}
+                    onBlur={() => commitCategoryLabelEdit()}
+                    onClick={e => e.stopPropagation()}
+                    style={{
+                      height: 22,
+                      borderRadius: 6,
+                      border: `1px solid ${T.borderLight}`,
+                      padding: '0 6px',
+                      fontSize: 12,
+                      fontWeight: 500,
+                      color: T.text,
+                      background: '#fff',
+                      minWidth: 72,
+                      outline: 'none',
+                    }}
+                  />
+                ) : (
+                  <span
+                    onDoubleClick={e => {
+                      e.stopPropagation()
+                      startCategoryLabelEdit(cat, 'manager')
+                    }}
+                    title="더블클릭해서 카테고리명 수정"
+                    style={{ fontWeight: 500, color: T.text, cursor: 'text' }}
+                  >
+                    {cat.label}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => handleDeleteCategory(cat.code)}
@@ -910,6 +1119,20 @@ export default function CardUsageClient() {
 
       {/* ════════ Filter bar ════════ */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
+        {/* Month select */}
+        <div style={{
+          ...flatInputStyle, display: 'flex', alignItems: 'center', gap: 8,
+          flex: '0 1 180px', paddingLeft: 12,
+        }}>
+          <Calendar size={14} style={{ color: T.textTertiary, flexShrink: 0 }} />
+          <input
+            type="month"
+            value={selectedMonth}
+            onChange={e => handleMonthChange(e.target.value)}
+            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit' }}
+          />
+        </div>
+
         {/* Date range */}
         <div style={{
           ...flatInputStyle, display: 'flex', alignItems: 'center', gap: 8,
@@ -982,30 +1205,6 @@ export default function CardUsageClient() {
           조회
         </button>
       </div>
-
-      {/* ════════ Status bar ════════ */}
-      {syncMessage && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: T.successBg, border: `1px solid ${T.successBorder}`, borderRadius: 10,
-          padding: '10px 16px', marginBottom: 16, fontSize: 13,
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: T.success, fontWeight: 500 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: T.success, flexShrink: 0 }} />
-            {syncMessage}
-          </div>
-          <span style={{ fontSize: 12, color: T.textTertiary }}>저장 완료</span>
-        </div>
-      )}
-
-      {error && (
-        <div style={{
-          background: T.errorBg, border: `1px solid #FED7D7`, borderRadius: 10,
-          padding: '10px 16px', marginBottom: 16, fontSize: 13, color: T.error, fontWeight: 500,
-        }}>
-          {error}
-        </div>
-      )}
 
       {/* ════════ Review mode panel ════════ */}
       {reviewMode && (
@@ -1295,23 +1494,67 @@ export default function CardUsageClient() {
                         >
                           {cat.emoji}
                         </button>
-                        <p
-                          style={{
-                            margin: '4px 0 0',
-                            fontSize: 10,
-                            color: T.textSecondary,
-                            lineHeight: 1.2,
-                            textAlign: 'center',
-                            wordBreak: 'keep-all',
-                            overflow: 'hidden',
-                            textOverflow: 'ellipsis',
-                            whiteSpace: 'nowrap',
-                            maxWidth: 58,
-                          }}
-                          title={cat.label}
-                        >
-                          {cat.label}
-                        </p>
+                        {editingCategoryTarget?.source === 'row' && editingCategoryTarget.code === cat.code && editingCategoryTarget.itemId === item.id ? (
+                          <input
+                            type="text"
+                            value={editingCategoryLabel}
+                            autoFocus
+                            onChange={e => setEditingCategoryLabel(e.target.value)}
+                            onClick={e => e.stopPropagation()}
+                            onDoubleClick={e => e.stopPropagation()}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                commitCategoryLabelEdit()
+                              } else if (e.key === 'Escape') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                cancelCategoryLabelEdit()
+                              }
+                            }}
+                            onBlur={() => commitCategoryLabelEdit()}
+                            style={{
+                              marginTop: 4,
+                              width: 58,
+                              height: 20,
+                              borderRadius: 6,
+                              border: `1px solid ${T.borderLight}`,
+                              background: '#fff',
+                              color: T.text,
+                              fontSize: 10,
+                              lineHeight: 1.2,
+                              textAlign: 'center',
+                              padding: '0 4px',
+                              outline: 'none',
+                            }}
+                          />
+                        ) : (
+                          <p
+                            onDoubleClick={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedItemId(item.id)
+                              startCategoryLabelEdit(cat, 'row', item.id)
+                            }}
+                            style={{
+                              margin: '4px 0 0',
+                              fontSize: 10,
+                              color: T.textSecondary,
+                              lineHeight: 1.2,
+                              textAlign: 'center',
+                              wordBreak: 'keep-all',
+                              overflow: 'hidden',
+                              textOverflow: 'ellipsis',
+                              whiteSpace: 'nowrap',
+                              maxWidth: 58,
+                              cursor: 'text',
+                            }}
+                            title={`${cat.label} (더블클릭 수정)`}
+                          >
+                            {cat.label}
+                          </p>
+                        )}
 
                         {isCatSelectOpen && (
                           <div

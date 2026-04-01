@@ -695,6 +695,9 @@ export default function WormOrderPage() {
     const [receiveDate, setReceiveDate] = useState(today)
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
+    const [orderCreateError, setOrderCreateError] = useState('')
+    const [orderCreateNotice, setOrderCreateNotice] = useState('')
+    const [creatingOrder, setCreatingOrder] = useState(false)
     const [copied, setCopied] = useState(false)
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
     const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
@@ -1572,11 +1575,37 @@ export default function WormOrderPage() {
         selectedOrders.length,
     ])
 
-    const handleStartNewOrder = useCallback(() => {
+    const handleStartNewOrder = useCallback(async () => {
+        if (creatingOrder) return
+        const targetReceiveDate = /^\d{4}-\d{2}-\d{2}$/.test(receiveDate) ? receiveDate : today
+
+        setOrderCreateError('')
+        setOrderCreateNotice('')
+        setCreatingOrder(true)
+
+        try {
+            const response = await fetch('/api/admin/worm-order/orders', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ receiveDate: targetReceiveDate }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '새 발주를 생성하지 못했습니다.')
+            }
+
+            setOrderCreateNotice(`새 발주 생성 완료 · ${result?.order?.orderNumber || 'WO 생성'} (${targetReceiveDate})`)
+        } catch (error) {
+            setOrderCreateError(error instanceof Error ? error.message : '새 발주 생성 중 오류가 발생했습니다.')
+            setCreatingOrder(false)
+            return
+        }
+
         setQuantitiesByType(createInitialQuantitiesByType())
-        setReceiveDate(today)
+        setReceiveDate(targetReceiveDate)
         setGeneratedMessage('')
         setValidationError('')
+        setOrderCreateError('')
         setCopied(false)
         setTransferAmountUsd('')
         setInvoicePdf(null)
@@ -1601,7 +1630,8 @@ export default function WormOrderPage() {
                 return acc
             }, {}),
         )
-    }, [today])
+        setCreatingOrder(false)
+    }, [creatingOrder, receiveDate, today])
 
     const showOrderTools = visibleStepIdSet.has(1)
     const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(6) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
@@ -1621,11 +1651,30 @@ export default function WormOrderPage() {
                     <button
                         type="button"
                         onClick={handleStartNewOrder}
-                        className="h-10 px-4 rounded-xl border border-slate-600 bg-slate-900/60 hover:bg-slate-800 text-sm font-bold text-slate-100 inline-flex items-center gap-2 w-full md:w-auto justify-center"
+                        disabled={creatingOrder}
+                        className="h-10 px-4 rounded-xl border border-slate-600 bg-slate-900/60 hover:bg-slate-800 text-sm font-bold text-slate-100 inline-flex items-center gap-2 w-full md:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                     >
-                        + 새 발주 시작
+                        {creatingOrder ? (
+                            <>
+                                <Loader2 size={14} className="animate-spin" />
+                                생성중...
+                            </>
+                        ) : (
+                            '+ 새 발주 시작'
+                        )}
                     </button>
                 </div>
+
+                {orderCreateNotice && (
+                    <p className="mt-3 text-xs font-semibold text-emerald-300">
+                        {orderCreateNotice}
+                    </p>
+                )}
+                {orderCreateError && (
+                    <p className="mt-3 text-xs font-semibold text-rose-300">
+                        {orderCreateError}
+                    </p>
+                )}
 
                 <div className="mt-6 grid grid-cols-3 gap-2 md:gap-4">
                     <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
@@ -1725,91 +1774,99 @@ export default function WormOrderPage() {
                 </div>
             </div>
 
-            <div className="contents">
-                {filteredPipelineSteps.map((step) => {
-                    const runtimeStatus = pipelineStatusMap[step.id]
-                    const isExpanded = expandedSteps[step.id] ?? false
+            <div className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start">
+                <aside className="xl:sticky xl:top-20 self-start">
+                    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 mb-4">
+                        <h2 className="text-lg font-black text-slate-900">프로세스 리스트</h2>
+                        <p className="mt-1 text-xs text-slate-500">좌측에서 단계 확인, 우측에서 실행 도구를 사용합니다.</p>
+                    </div>
+                    <div className="flex flex-col gap-4">
+                        {filteredPipelineSteps.map((step) => {
+                            const runtimeStatus = pipelineStatusMap[step.id]
+                            const isExpanded = expandedSteps[step.id] ?? false
 
-                    return (
-                        <section
-                            key={step.id}
-                            style={{ order: step.id * 10 }}
-                            className={`rounded-2xl border bg-white shadow-sm transition-colors ${
-                                runtimeStatus === 'done'
-                                    ? 'border-emerald-200'
-                                    : runtimeStatus === 'active'
-                                        ? 'border-orange-300'
-                                        : 'border-gray-200'
-                            }`}
-                        >
-                            <button
-                                type="button"
-                                onClick={() => togglePipelineStep(step.id)}
-                                className="w-full px-4 py-4 flex items-center justify-between gap-3 text-left"
-                            >
-                                <div className="min-w-0">
-                                    <div className="flex items-center gap-2">
-                                        <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-black px-2">
-                                            {step.id}
-                                        </span>
-                                        <h2 className="text-base md:text-lg font-black text-slate-900 truncate">{step.title}</h2>
-                                    </div>
-                                    <p className="mt-2 text-sm text-slate-600">{step.summary}</p>
-                                </div>
-                                <div className="flex items-center gap-2 shrink-0">
-                                    <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
-                                        {getPipelineModeLabel(step.mode)}
-                                    </span>
-                                    <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                        {getPipelineRuntimeLabel(runtimeStatus)}
-                                    </span>
-                                    {isExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
-                                </div>
-                            </button>
-
-                            {isExpanded && (
-                                <div className="border-t border-gray-100 px-4 py-4 space-y-3">
-                                    <div className="text-sm text-slate-600 font-medium">처리주체: {step.owner}</div>
-                                    <div className="space-y-1.5">
-                                        {step.details.map((item) => (
-                                            <div key={`${step.id}-${item}`} className="flex items-start gap-2 text-sm text-slate-700">
-                                                {runtimeStatus === 'done' ? (
-                                                    <CheckCircle2 size={15} className="text-emerald-600 mt-0.5 shrink-0" />
-                                                ) : runtimeStatus === 'active' ? (
-                                                    <Clock3 size={15} className="text-orange-600 mt-0.5 shrink-0" />
-                                                ) : (
-                                                    <Circle size={15} className="text-slate-400 mt-0.5 shrink-0" />
-                                                )}
-                                                <span>{item}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-
-                                    {step.warning && (
-                                        <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
-                                            {step.warning}
-                                        </div>
-                                    )}
-
+                            return (
+                                <section
+                                    key={step.id}
+                                    className={`rounded-2xl border bg-white shadow-sm transition-colors ${
+                                        runtimeStatus === 'done'
+                                            ? 'border-emerald-200'
+                                            : runtimeStatus === 'active'
+                                                ? 'border-orange-300'
+                                                : 'border-gray-200'
+                                    }`}
+                                >
                                     <button
                                         type="button"
-                                        onClick={() => handlePipelineStepAction(step)}
-                                        className={`h-9 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 ${
-                                            step.target === 'none'
-                                                ? 'bg-slate-100 text-slate-500 cursor-default'
-                                                : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
-                                        }`}
-                                        disabled={step.target === 'none'}
+                                        onClick={() => togglePipelineStep(step.id)}
+                                        className="w-full px-4 py-4 flex items-center justify-between gap-3 text-left"
                                     >
-                                        {step.actionLabel}
-                                        {step.target !== 'none' && <ArrowRight size={14} />}
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2">
+                                                <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-black px-2">
+                                                    {step.id}
+                                                </span>
+                                                <h2 className="text-base md:text-lg font-black text-slate-900 truncate">{step.title}</h2>
+                                            </div>
+                                            <p className="mt-2 text-sm text-slate-600">{step.summary}</p>
+                                        </div>
+                                        <div className="flex items-center gap-2 shrink-0">
+                                            <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                                {getPipelineModeLabel(step.mode)}
+                                            </span>
+                                            <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                                {getPipelineRuntimeLabel(runtimeStatus)}
+                                            </span>
+                                            {isExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                                        </div>
                                     </button>
-                                </div>
-                            )}
-                        </section>
-                    )
-                })}
-            </div>
+
+                                    {isExpanded && (
+                                        <div className="border-t border-gray-100 px-4 py-4 space-y-3">
+                                            <div className="text-sm text-slate-600 font-medium">처리주체: {step.owner}</div>
+                                            <div className="space-y-1.5">
+                                                {step.details.map((item) => (
+                                                    <div key={`${step.id}-${item}`} className="flex items-start gap-2 text-sm text-slate-700">
+                                                        {runtimeStatus === 'done' ? (
+                                                            <CheckCircle2 size={15} className="text-emerald-600 mt-0.5 shrink-0" />
+                                                        ) : runtimeStatus === 'active' ? (
+                                                            <Clock3 size={15} className="text-orange-600 mt-0.5 shrink-0" />
+                                                        ) : (
+                                                            <Circle size={15} className="text-slate-400 mt-0.5 shrink-0" />
+                                                        )}
+                                                        <span>{item}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+
+                                            {step.warning && (
+                                                <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
+                                                    {step.warning}
+                                                </div>
+                                            )}
+
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePipelineStepAction(step)}
+                                                className={`h-9 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 ${
+                                                    step.target === 'none'
+                                                        ? 'bg-slate-100 text-slate-500 cursor-default'
+                                                        : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
+                                                }`}
+                                                disabled={step.target === 'none'}
+                                            >
+                                                {step.actionLabel}
+                                                {step.target !== 'none' && <ArrowRight size={14} />}
+                                            </button>
+                                        </div>
+                                    )}
+                                </section>
+                            )
+                        })}
+                    </div>
+                </aside>
+
+                <div className="min-w-0 flex flex-col gap-6">
 
             {showAnyTools && (
                 <div className="flex flex-col gap-1 px-1" style={{ order: toolHeaderOrder }}>
@@ -2523,6 +2580,8 @@ export default function WormOrderPage() {
                 )}
                 </div>
             )}
+                </div>
+            </div>
         </div>
     )
 }
