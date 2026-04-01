@@ -1,7 +1,8 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getBarobillSmsFromNumbers, sendBarobillMessage } from '@/lib/barobillSms'
+import { getBarobillSmsFromNumbers, getBarobillSmsSendMessagesByPaging, sendBarobillMessage } from '@/lib/barobillSms'
+import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,15 +28,69 @@ function createRefKey() {
   return `SMS${y}${m}${d}${time}${Math.random().toString(36).slice(2, 8).toUpperCase()}`
 }
 
-export async function GET() {
+function toCompactDate(value: string) {
+  const digits = value.replace(/\D/g, '')
+  return digits.length === 8 ? digits : ''
+}
+
+function formatDate(date: Date) {
+  const year = String(date.getFullYear())
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}${month}${day}`
+}
+
+function getDefaultHistoryRange() {
+  const toDate = new Date()
+  const fromDate = new Date()
+  fromDate.setDate(fromDate.getDate() - 30)
+
+  return {
+    fromDate: formatDate(fromDate),
+    toDate: formatDate(toDate),
+  }
+}
+
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
-    const result = await getBarobillSmsFromNumbers()
-    return NextResponse.json(result)
+    const { searchParams } = new URL(request.url)
+    const defaultRange = getDefaultHistoryRange()
+    const fromDate = toCompactDate(searchParams.get('fromDate') || '') || defaultRange.fromDate
+    const toDate = toCompactDate(searchParams.get('toDate') || '') || defaultRange.toDate
+    const countPerPage = Math.min(Math.max(Number.parseInt(searchParams.get('countPerPage') || '20', 10) || 20, 1), 100)
+    const currentPage = Math.max(Number.parseInt(searchParams.get('currentPage') || '1', 10) || 1, 1)
+
+    if (fromDate > toDate) {
+      return NextResponse.json({ error: '조회 시작일은 종료일보다 늦을 수 없습니다.' }, { status: 400 })
+    }
+
+    const [senderInfo, history, recipients] = await Promise.all([
+      getBarobillSmsFromNumbers(),
+      getBarobillSmsSendMessagesByPaging({
+        fromDate,
+        toDate,
+        countPerPage,
+        currentPage,
+      }),
+      prisma.smsRecipient.findMany({
+        orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+      }),
+    ])
+
+    return NextResponse.json({
+      ...senderInfo,
+      history: {
+        ...history,
+        fromDate,
+        toDate,
+      },
+      recipients,
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : '발신번호 목록을 불러오지 못했습니다.'
     return NextResponse.json({ error: message }, { status: 500 })

@@ -181,6 +181,17 @@ model WormOrder {
   @@index([createdAt])
 }
 
+model SmsRecipient {
+  id          String   @id @default(uuid())
+  name        String
+  phoneNumber String   @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([name])
+  @@index([updatedAt])
+}
+
 model CoupangSyncHistory {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())

@@ -85,6 +85,26 @@ export type BarobillSmsFromNumber = {
   validDate: string
 }
 
+export type BarobillSmsHistoryItem = {
+  sendKey: string
+  id: string
+  senderNum: string
+  receiverName: string
+  receiverNum: string
+  message: string
+  sendDT: string
+  refKey: string
+  sendState: number
+}
+
+export type BarobillSmsHistoryResponse = {
+  currentPage: number
+  maxIndex: number
+  countPerPage: number
+  maxPageNum: number
+  messages: BarobillSmsHistoryItem[]
+}
+
 export async function getBarobillSmsFromNumbers() {
   const config = ensureConfig()
   const xml = await callSoapAction(
@@ -118,6 +138,61 @@ export async function getBarobillSmsFromNumbers() {
     senderId: config.SENDER_ID,
     defaultFromNumber: config.DEFAULT_FROM || deduped[0]?.number || '',
     fromNumbers: deduped,
+  }
+}
+
+function parseInteger(value: string, fallback = 0) {
+  const parsed = Number.parseInt(value, 10)
+  return Number.isFinite(parsed) ? parsed : fallback
+}
+
+export async function getBarobillSmsSendMessagesByPaging(params: {
+  fromDate: string
+  toDate: string
+  countPerPage: number
+  currentPage: number
+}): Promise<BarobillSmsHistoryResponse> {
+  const config = ensureConfig()
+  const xml = await callSoapAction(
+    'GetSMSSendMessagesByPaging',
+    `
+      <CERTKEY>${escapeXml(config.CERTKEY)}</CERTKEY>
+      <CorpNum>${escapeXml(config.CORP_NUM)}</CorpNum>
+      <FromDate>${escapeXml(params.fromDate)}</FromDate>
+      <ToDate>${escapeXml(params.toDate)}</ToDate>
+      <CountPerPage>${params.countPerPage}</CountPerPage>
+      <CurrentPage>${params.currentPage}</CurrentPage>
+    `
+  )
+
+  const resultBlock = extractFirstTag(xml, 'GetSMSSendMessagesByPagingResult')
+  if (!resultBlock) {
+    throw new Error('Barobill SMS history response did not include GetSMSSendMessagesByPagingResult.')
+  }
+
+  const messages: BarobillSmsHistoryItem[] = []
+  const matches = resultBlock.matchAll(/<SMSMessage>([\s\S]*?)<\/SMSMessage>/gi)
+  for (const match of matches) {
+    const block = match[1]
+    messages.push({
+      sendKey: extractFirstTag(block, 'SendKey'),
+      id: extractFirstTag(block, 'ID'),
+      senderNum: extractFirstTag(block, 'SenderNum'),
+      receiverName: extractFirstTag(block, 'ReceiverName'),
+      receiverNum: extractFirstTag(block, 'ReceiverNum'),
+      message: extractFirstTag(block, 'Message'),
+      sendDT: extractFirstTag(block, 'SendDT'),
+      refKey: extractFirstTag(block, 'RefKey'),
+      sendState: parseInteger(extractFirstTag(block, 'SendState')),
+    })
+  }
+
+  return {
+    currentPage: parseInteger(extractFirstTag(resultBlock, 'CurrentPage'), params.currentPage),
+    maxIndex: parseInteger(extractFirstTag(resultBlock, 'MaxIndex')),
+    countPerPage: parseInteger(extractFirstTag(resultBlock, 'CountPerPage'), params.countPerPage),
+    maxPageNum: parseInteger(extractFirstTag(resultBlock, 'MaxPageNum'), 1),
+    messages,
   }
 }
 
