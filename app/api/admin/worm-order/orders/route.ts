@@ -25,6 +25,44 @@ function resolveReceiveDate(input: unknown) {
   return getTodayKstString()
 }
 
+function resolveListLimit(input: string | null) {
+  if (!input) return 30
+  const parsed = Number(input)
+  if (!Number.isFinite(parsed) || parsed <= 0) return 30
+  return Math.min(Math.floor(parsed), 100)
+}
+
+export async function GET(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: '권한이 없습니다.' }, { status: 401 })
+  }
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const limit = resolveListLimit(searchParams.get('limit'))
+
+    const orders = await prisma.wormOrder.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: limit,
+      select: {
+        id: true,
+        orderNumber: true,
+        receiveDate: true,
+        status: true,
+        remittanceAppliedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    })
+
+    return NextResponse.json({ success: true, orders })
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : '발주 리스트 조회 중 오류가 발생했습니다.'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {

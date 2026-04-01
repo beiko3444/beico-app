@@ -107,6 +107,16 @@ type WormOrderSnapshot = {
     receiveDate: string
 }
 
+type WormOrderListItem = {
+    id: string
+    orderNumber: string
+    receiveDate: string
+    status: string
+    remittanceAppliedAt: string | null
+    createdAt: string
+    updatedAt: string
+}
+
 const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 1,
@@ -307,6 +317,18 @@ function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
     if (status === 'done') return '완료'
     if (status === 'active') return '진행중'
     return '대기'
+}
+
+function getWormOrderStatusLabel(status: string) {
+    if (status === 'REMITTANCE_APPLIED') return '송금완료'
+    if (status === 'DRAFT') return '작성중'
+    return status
+}
+
+function getWormOrderStatusClass(status: string) {
+    if (status === 'REMITTANCE_APPLIED') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    if (status === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200'
+    return 'bg-amber-100 text-amber-800 border-amber-200'
 }
 
 const WORM_SIZES: WormSize[] = [
@@ -604,6 +626,48 @@ function sanitizeRemittancePricingSummary(value: unknown): RemittancePricingSumm
     return result
 }
 
+function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
+    if (!value || typeof value !== 'object') return null
+
+    const candidate = value as Partial<WormOrderListItem>
+    if (
+        typeof candidate.id !== 'string' ||
+        typeof candidate.orderNumber !== 'string' ||
+        typeof candidate.receiveDate !== 'string' ||
+        typeof candidate.status !== 'string' ||
+        typeof candidate.createdAt !== 'string' ||
+        typeof candidate.updatedAt !== 'string'
+    ) {
+        return null
+    }
+
+    return {
+        id: candidate.id,
+        orderNumber: candidate.orderNumber,
+        receiveDate: candidate.receiveDate,
+        status: candidate.status,
+        remittanceAppliedAt: typeof candidate.remittanceAppliedAt === 'string' ? candidate.remittanceAppliedAt : null,
+        createdAt: candidate.createdAt,
+        updatedAt: candidate.updatedAt,
+    }
+}
+
+function toKstDateInputString(value: string) {
+    const date = new Date(value)
+    if (Number.isNaN(date.getTime())) return ''
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date)
+
+    const year = parts.find((part) => part.type === 'year')?.value ?? ''
+    const month = parts.find((part) => part.type === 'month')?.value ?? ''
+    const day = parts.find((part) => part.type === 'day')?.value ?? ''
+    return year && month && day ? `${year}-${month}-${day}` : ''
+}
+
 function normalizeOcrPatternText(input: string) {
     return input
         .toUpperCase()
@@ -763,6 +827,9 @@ export default function WormOrderPage() {
     const [remittanceSaveInfo, setRemittanceSaveInfo] = useState<{ orderNumber: string; savedAt: string } | null>(null)
     const [remittanceSaveWarning, setRemittanceSaveWarning] = useState('')
     const [activeWormOrder, setActiveWormOrder] = useState<WormOrderSnapshot | null>(null)
+    const [wormOrderList, setWormOrderList] = useState<WormOrderListItem[]>([])
+    const [wormOrderListLoading, setWormOrderListLoading] = useState(false)
+    const [wormOrderListError, setWormOrderListError] = useState('')
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -1247,6 +1314,77 @@ export default function WormOrderPage() {
         }
     }, [])
 
+    const fetchWormOrders = useCallback(async (options?: { silent?: boolean }) => {
+        const silent = Boolean(options?.silent)
+        if (!silent) {
+            setWormOrderListLoading(true)
+        }
+        setWormOrderListError('')
+
+        try {
+            const response = await fetch('/api/admin/worm-order/orders?limit=40', {
+                method: 'GET',
+                cache: 'no-store',
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '발주 리스트를 불러오지 못했습니다.')
+            }
+
+            const nextList: WormOrderListItem[] = Array.isArray(result?.orders)
+                ? result.orders
+                    .map((item: unknown) => sanitizeWormOrderListItem(item))
+                    .filter((item: WormOrderListItem | null): item is WormOrderListItem => item !== null)
+                : []
+
+            setWormOrderList(nextList)
+            setActiveWormOrder((prev) => {
+                if (prev) {
+                    const matched = nextList.find((item) => item.id === prev.id)
+                    if (matched) {
+                        const receiveDateText = toKstDateInputString(matched.receiveDate) || prev.receiveDate
+                        return {
+                            id: matched.id,
+                            orderNumber: matched.orderNumber,
+                            receiveDate: receiveDateText,
+                        }
+                    }
+                    return null
+                }
+
+                const latest = nextList[0]
+                if (!latest) return null
+                return {
+                    id: latest.id,
+                    orderNumber: latest.orderNumber,
+                    receiveDate: toKstDateInputString(latest.receiveDate) || '',
+                }
+            })
+        } catch (error) {
+            setWormOrderListError(error instanceof Error ? error.message : '발주 리스트를 불러오지 못했습니다.')
+        } finally {
+            if (!silent) {
+                setWormOrderListLoading(false)
+            }
+        }
+    }, [])
+
+    const handleSelectWormOrder = useCallback((order: WormOrderListItem) => {
+        const receiveDateText = toKstDateInputString(order.receiveDate)
+        setActiveWormOrder({
+            id: order.id,
+            orderNumber: order.orderNumber,
+            receiveDate: receiveDateText || '',
+        })
+        if (receiveDateText) {
+            setReceiveDate(receiveDateText)
+        }
+    }, [])
+
+    useEffect(() => {
+        void fetchWormOrders()
+    }, [fetchWormOrders])
+
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
@@ -1511,6 +1649,7 @@ export default function WormOrderPage() {
             }
 
             setRemittanceSaveWarning(typeof result?.saveWarning === 'string' ? result.saveWarning : '')
+            void fetchWormOrders({ silent: true })
         } catch (error) {
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
             const lower = message.toLowerCase()
@@ -1777,6 +1916,7 @@ export default function WormOrderPage() {
                     receiveDate: targetReceiveDate,
                 })
             }
+            void fetchWormOrders({ silent: true })
         } catch (error) {
             setOrderCreateError(error instanceof Error ? error.message : '새 발주 생성 중 오류가 발생했습니다.')
             setCreatingOrder(false)
@@ -1816,7 +1956,7 @@ export default function WormOrderPage() {
             }, {}),
         )
         setCreatingOrder(false)
-    }, [creatingOrder, receiveDate, today])
+    }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
     const showOrderTools = visibleStepIdSet.has(1)
     const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(6) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
@@ -1956,6 +2096,74 @@ export default function WormOrderPage() {
                     </button>
                 </div>
             </div>
+
+            <section className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 md:p-5">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div>
+                        <h2 className="text-lg font-black text-slate-900">발주 리스트</h2>
+                        <p className="text-xs text-slate-500 mt-1">새 발주 생성 시 DB에 저장되며, 아래에서 바로 선택할 수 있습니다.</p>
+                    </div>
+                    <button
+                        type="button"
+                        onClick={() => { void fetchWormOrders() }}
+                        disabled={wormOrderListLoading}
+                        className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                    >
+                        {wormOrderListLoading && <Loader2 size={14} className="animate-spin" />}
+                        리스트 새로고침
+                    </button>
+                </div>
+
+                {wormOrderListError && (
+                    <p className="mt-3 text-xs font-semibold text-red-600">{wormOrderListError}</p>
+                )}
+
+                <div className="mt-3 overflow-x-auto">
+                    <table className="min-w-full text-sm">
+                        <thead>
+                            <tr className="bg-slate-50 text-slate-600">
+                                <th className="text-left px-3 py-2 font-bold">발주번호</th>
+                                <th className="text-left px-3 py-2 font-bold">수령일</th>
+                                <th className="text-left px-3 py-2 font-bold">상태</th>
+                                <th className="text-left px-3 py-2 font-bold">최근수정</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {wormOrderList.map((order) => {
+                                const isActiveOrder = activeWormOrder?.id === order.id
+                                const receiveDateText = toKstDateInputString(order.receiveDate)
+                                return (
+                                    <tr
+                                        key={order.id}
+                                        onClick={() => handleSelectWormOrder(order)}
+                                        className={`border-t border-slate-100 cursor-pointer transition-colors ${
+                                            isActiveOrder ? 'bg-[#fff3ef]' : 'hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <td className="px-3 py-2.5 font-bold text-slate-900">{order.orderNumber}</td>
+                                        <td className="px-3 py-2.5 text-slate-700">{receiveDateText || '-'}</td>
+                                        <td className="px-3 py-2.5">
+                                            <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-bold ${getWormOrderStatusClass(order.status)}`}>
+                                                {getWormOrderStatusLabel(order.status)}
+                                            </span>
+                                        </td>
+                                        <td className="px-3 py-2.5 text-xs text-slate-500">
+                                            {new Date(order.updatedAt).toLocaleString()}
+                                        </td>
+                                    </tr>
+                                )
+                            })}
+                            {!wormOrderListLoading && wormOrderList.length === 0 && (
+                                <tr>
+                                    <td colSpan={4} className="px-3 py-6 text-center text-sm text-slate-500">
+                                        저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.
+                                    </td>
+                                </tr>
+                            )}
+                        </tbody>
+                    </table>
+                </div>
+            </section>
 
             <div className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start">
                 <aside className="xl:sticky xl:top-20 self-start">
