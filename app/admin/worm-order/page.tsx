@@ -2621,7 +2621,7 @@ export default function WormOrderPage() {
                                 <span className="text-xs text-gray-500 font-semibold">사이즈별 박스 수량 입력</span>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 gap-3 md:gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 md:gap-4">
                                 {WORM_SIZES.map((size) => {
                                     const current = quantitiesByType[wormType.id]?.[size.id] || 0
                                     const isSelected = current > 0
@@ -2635,16 +2635,16 @@ export default function WormOrderPage() {
                                                     : 'border-gray-200 bg-white hover:border-gray-300'
                                             }`}
                                         >
-                                            <div className="flex items-center justify-between px-0.5">
+                                            <div className="flex flex-col items-start gap-0.5 px-0.5">
                                                 <div className="text-[16px] font-black text-[#111827] leading-none">{size.id}</div>
-                                                <div className="text-[11px] tracking-tight text-gray-500 font-medium">{size.range}</div>
+                                                <div className="text-[11px] tracking-tight text-gray-500 font-medium leading-none">{size.range}</div>
                                             </div>
 
-                                            <div className="flex items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
+                                            <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
                                                 <button
                                                     type="button"
                                                     onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
-                                                    className="w-10 h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
+                                                    className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
                                                     aria-label={`${wormType.label} ${size.id} decrease`}
                                                 >
                                                     <Minus size={15} />
@@ -2657,12 +2657,12 @@ export default function WormOrderPage() {
                                                         const next = Number(event.target.value)
                                                         handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
                                                     }}
-                                                    className="flex-1 min-w-0 h-[36px] text-center font-black text-[#111827] outline-none text-[15px]"
+                                                    className="h-[36px] min-w-[44px] px-1 text-center font-black tabular-nums text-[#111827] outline-none text-[15px]"
                                                 />
                                                 <button
                                                     type="button"
                                                     onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
-                                                    className="w-10 h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50 flex-shrink-0"
+                                                    className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
                                                     aria-label={`${wormType.label} ${size.id} increase`}
                                                 >
                                                     <Plus size={15} />
