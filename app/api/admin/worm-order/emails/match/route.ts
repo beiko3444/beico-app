@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { PDFParse } from 'pdf-parse'
 import { getParsedMailByUid, upsertWormOrderEmailMatch } from '@/lib/wormOrderMail'
 
 function isUuid(value: string) {
@@ -21,6 +20,20 @@ type InvoiceOcrResult = {
   invoiceExtractedAt: string | null
   invoiceSourceFile: string | null
   invoiceOcrError: string | null
+}
+
+type PdfParseCtor = new (params: { data: Buffer }) => {
+  getText: () => Promise<{ text?: string }>
+  destroy: () => Promise<void>
+}
+
+let pdfParseCtorPromise: Promise<PdfParseCtor> | null = null
+
+async function getPdfParseCtor() {
+  if (!pdfParseCtorPromise) {
+    pdfParseCtorPromise = import('pdf-parse').then((mod) => mod.PDFParse)
+  }
+  return pdfParseCtorPromise
 }
 
 function parseAmountTokens(line: string) {
@@ -149,6 +162,23 @@ async function runInvoicePdfOcr(uid: string): Promise<InvoiceOcrResult> {
   let totalAmount: number | null = null
   let sourceFile: string | null = null
   const parseErrors: string[] = []
+  let PdfParseClass: PdfParseCtor | null = null
+
+  try {
+    PdfParseClass = await getPdfParseCtor()
+  } catch (error) {
+    const reason = error instanceof Error ? error.message : 'unknown pdf parser load error'
+    return {
+      invoiceUnitPriceUsd: null,
+      invoiceTotalAmountUsd: null,
+      usdKrwRate: null,
+      invoiceUnitPriceKrw: null,
+      invoiceTotalAmountKrw: null,
+      invoiceExtractedAt: null,
+      invoiceSourceFile: null,
+      invoiceOcrError: `PDF OCR 엔진 로딩 실패: ${reason}`,
+    }
+  }
 
   for (const { attachment, index } of attachments) {
     try {
@@ -159,7 +189,7 @@ async function runInvoicePdfOcr(uid: string): Promise<InvoiceOcrResult> {
         continue
       }
 
-      const parser = new PDFParse({ data: buffer })
+      const parser = new PdfParseClass({ data: buffer })
       let text = ''
       try {
         const parsedPdf = await parser.getText()

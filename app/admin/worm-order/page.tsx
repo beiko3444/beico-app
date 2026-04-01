@@ -1637,9 +1637,18 @@ export default function WormOrderPage() {
                 date: email.date,
             }),
         })
-        const result = await response.json().catch(() => null)
+        const raw = await response.text()
+        const result = (() => {
+            if (!raw) return null
+            try {
+                return JSON.parse(raw)
+            } catch {
+                return null
+            }
+        })()
         if (!response.ok) {
-            throw new Error(typeof result?.error === 'string' ? result.error : '메일 매칭에 실패했습니다.')
+            const fallbackMessage = raw.trim() || `메일 매칭에 실패했습니다. (status ${response.status})`
+            throw new Error(typeof result?.error === 'string' ? result.error : fallbackMessage)
         }
         return result
     }, [])
@@ -3049,6 +3058,13 @@ export default function WormOrderPage() {
                                 invoiceSourceFile: selectedEmailBase.invoiceSourceFile,
                                 invoiceOcrError: selectedEmailBase.invoiceOcrError,
                                 sequence: selectedEmailIndex >= 0 ? selectedEmailIndex + 1 : null,
+                                invoicePdfCount: (selectedEmailDetail?.attachments || [])
+                                    .filter((att) => {
+                                        const name = att.filename.toLowerCase()
+                                        const type = att.contentType.toLowerCase()
+                                        return name.endsWith('.pdf') || type.includes('pdf')
+                                    })
+                                    .length,
                             }
                             return (
                                 <div className="flex flex-col h-full max-h-[600px]">
@@ -3090,11 +3106,16 @@ export default function WormOrderPage() {
                                             {loadingEmailDetail ? (
                                                 <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
                                             ) : (
-                                                <span className="text-[12px] text-slate-500 font-medium">
-                                                    {selectedEmail.skmIndices.length > 0
-                                                        ? `SKM 첨부파일 ${selectedEmail.skmIndices.length}개`
-                                                        : 'SKM 첨부파일이 없습니다.'}
-                                                </span>
+                                                <div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-500 font-medium">
+                                                    <span>
+                                                        {selectedEmail.skmIndices.length > 0
+                                                            ? `SKM 첨부파일 ${selectedEmail.skmIndices.length}개`
+                                                            : 'SKM 첨부파일이 없습니다.'}
+                                                    </span>
+                                                    <span className="text-emerald-700 font-semibold">
+                                                        PDF 첨부파일 {selectedEmail.invoicePdfCount}개 (파일명/확장자 기준 OCR)
+                                                    </span>
+                                                </div>
                                             )}
                                         </div>
 
