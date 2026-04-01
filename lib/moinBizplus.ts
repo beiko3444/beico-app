@@ -5,11 +5,25 @@ const LONG_TIMEOUT_MS = 60000
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
+const KO_REMIT_SHORT = '\uC1A1\uAE08'
+const KO_PASSWORD_MISMATCH = '\uBE44\uBC00\uBC88\uD638\uAC00 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4'
+const KO_ATTEMPT_EXCEEDED = '\uCD08\uACFC'
+const KO_LOCK = '\uC7A0\uAE08'
+const KO_LOCKED = '\uC7A0\uACA8'
+const KO_REMIT_REQUEST = '\uC1A1\uAE08 \uC2E0\uCCAD'
+const KO_REMIT_REQUEST_COMPACT = '\uC1A1\uAE08\uC2E0\uCCAD'
+const KO_APPLY = '\uC2E0\uCCAD'
+const KO_SUBMIT = '\uC81C\uCD9C'
+const KO_AMOUNT = '\uAE08\uC561'
 const KO_NEXT_STEP = '\uB2E4\uC74C\uB2E8\uACC4'
 const KO_NEXT_STEP_SPACED = '\uB2E4\uC74C \uB2E8\uACC4'
 const KO_NEXT = '\uB2E4\uC74C'
 const KO_AGREEMENT = '\uD658\uBD88 \uADDC\uC815\uC5D0 \uB3D9\uC758'
 const KO_AGREEMENT_DESCRIPTION = '\uC1A1\uAE08 \uC815\uBCF4\uB97C \uD655\uC778\uD558\uC600\uC73C\uBA70'
+const KO_AMOUNT_ENTRY = '\uAE08\uC561 \uC785\uB825'
+const KO_RECEIVE_AMOUNT = '\uBC1B\uB294 \uAE08\uC561'
+const KO_SEND_AMOUNT = '\uBCF4\uB0B4\uB294 \uAE08\uC561'
+const KO_RECIPIENT_SEARCH_PLACEHOLDER = '\uBC1B\uB294 \uBD84 \uC774\uB984, \uD68C\uC0AC\uBA85, \uC218\uCDE8\uC778 \uBCC4\uCE6D'
 const KO_SUCCESS_PATTERN =
     /\uC2E0\uCCAD \uC644\uB8CC|\uC1A1\uAE08 \uC2E0\uCCAD|\uC811\uC218 \uC644\uB8CC|\uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4/
 
@@ -288,6 +302,71 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const inspectTransferInputs = async (page: PageLike) => {
+    const result = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+
+            const getText = () => (document.body?.innerText || '').replace(/\\s+/g, ' ').trim();
+            const bodyText = getText();
+            const inputs = Array.from(document.querySelectorAll('input'));
+            const visibleInputs = inputs
+                .filter((inp) => isVisible(inp))
+                .map((inp, i) => ({
+                    i,
+                    type: inp.type || '',
+                    name: inp.name || '',
+                    id: inp.id || '',
+                    placeholder: inp.placeholder || '',
+                }));
+
+            const nextButtons = Array.from(document.querySelectorAll('button, [role="button"], a'))
+                .filter((el) => isVisible(el))
+                .map((el) => (el.textContent || '').replace(/\\s+/g, ' ').trim())
+                .filter(Boolean)
+                .slice(0, 20);
+
+            return JSON.stringify({
+                bodyText: bodyText.slice(0, 1200),
+                visibleInputs,
+                nextButtons,
+                aliasSearchVisible: visibleInputs.some((inp) => (inp.placeholder || '').includes(${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)})),
+                amountKeywordVisible:
+                    bodyText.includes(${JSON.stringify(KO_AMOUNT_ENTRY)}) ||
+                    bodyText.includes(${JSON.stringify(KO_RECEIVE_AMOUNT)}) ||
+                    bodyText.includes(${JSON.stringify(KO_SEND_AMOUNT)}) ||
+                    bodyText.includes('USD') ||
+                    bodyText.includes('KRW'),
+            });
+        })()
+    `) as string
+
+    return JSON.parse(result) as {
+        bodyText: string
+        visibleInputs: Array<{ i: number; type: string; name: string; id: string; placeholder: string }>
+        nextButtons: string[]
+        aliasSearchVisible: boolean
+        amountKeywordVisible: boolean
+    }
+}
+
+const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: string; placeholder?: string }) => {
+    const haystack = `${input.type || ''} ${input.name || ''} ${input.id || ''} ${input.placeholder || ''}`.toLowerCase()
+    return haystack.includes('\uC218\uCDE8\uC778'.toLowerCase())
+        || haystack.includes('\uD68C\uC0AC\uBA85'.toLowerCase())
+        || haystack.includes('\uBCC4\uCE6D'.toLowerCase())
+        || haystack.includes('\uBC1B\uB294 \uBD84'.toLowerCase())
+        || haystack.includes('recipient')
+        || haystack.includes('alias')
+        || haystack.includes('company')
+        || haystack.includes('name')
+}
+
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
     const waitStrategies: Array<'domcontentloaded' | 'load'> = ['domcontentloaded', 'load']
@@ -348,11 +427,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
-        // ── Step 1: Go directly to login page ─────────────────────────────
+        // ?? Step 1: Go directly to login page ?????????????????????????????
         const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
         steps.push(`open-login-page:${loginWaitUntil}`)
 
-        // ── Step 2: Fill login credentials (type char-by-char for React) ──
+        // ?? Step 2: Fill login credentials (type char-by-char for React) ??
         await typeFirstVisible(
             page,
             [
@@ -382,7 +461,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const clickDelay = 1500 + Math.floor(Math.random() * 1000)
         await page.waitForTimeout(clickDelay)
 
-        // ── Step 3: Submit login ───────────────────────────────────────────
+        // ?? Step 3: Submit login ???????????????????????????????????????????
         const loginUrlBefore = page.url()
 
         // Wait for login button to become enabled
@@ -423,7 +502,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
         steps.push('submit-login')
 
-        // ── Step 3.5: Check for explicit login errors ───────────────────────
+        // ?? Step 3.5: Check for explicit login errors ???????????????????????
         // MOIN bizplus shows a red banner for invalid password or locked accounts.
         // We wait up to 10 seconds to see if the URL changes OR an error banner appears.
         let loginFailed = false
@@ -432,10 +511,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 waitForUrlChange(page, loginUrlBefore, 10000).then((url) => {
                     if (url.includes('/login')) loginFailed = true
                 }),
-                page.getByText('비밀번호가 일치하지 않습니다').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
-                page.getByText('초과').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
-                page.getByText('잠금').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
-                page.getByText('잠겨').first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true })
+                page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+                page.getByText(KO_ATTEMPT_EXCEEDED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+                page.getByText(KO_LOCK).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+                page.getByText(KO_LOCKED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true })
             ])
         } catch {
             // Ignore timeouts from race
@@ -448,20 +527,20 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             // Extract text from the page to see the exact error for the user
             const bodyText = await page.locator('body').textContent().catch(() => '') || ''
 
-            if (bodyText.includes('초과') || bodyText.includes('잠금') || bodyText.includes('잠겨')) {
+            if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
                 throw new MoinAutomationError(
                     'Login Failed',
-                    '[계정 잠금] 로그인 시도 횟수를 초과했습니다. 보안을 위해 모인 비즈플러스 웹사이트(www.moinbizplus.com)에 직접 접속하여 "비밀번호 재설정"을 진행해 주세요.'
+                    '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.'
                 )
-            } else if (bodyText.includes('비밀번호가 일치하지 않습니다')) {
+            } else if (bodyText.includes(KO_PASSWORD_MISMATCH)) {
                 throw new MoinAutomationError(
                     'Login Failed',
-                    '[비밀번호 오류] 비밀번호가 일치하지 않습니다. 정확한 비밀번호를 입력해 주세요. (계속 틀리면 계정이 잠깁니다)'
+                    '[Password mismatch] The password is incorrect. Please verify the password before trying again.'
                 )
             } else {
                 throw new MoinAutomationError(
                     'Login Failed',
-                    `로그인에 실패했습니다 (URL: ${page.url()}). 계정 정보를 확인해 주세요.`
+                    `Login failed (URL: ${page.url()}). Please verify the account credentials.`
                 )
             }
         }
@@ -469,9 +548,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const postLoginUrl = page.url()
         steps.push(`post-login-url:${postLoginUrl}`)
 
-        // ── Step 4: Navigate to recipient page ─────────────────────────────
+        // ?? Step 4: Navigate to recipient page ?????????????????????????????
         // After login, we should be on /transfer/recipient.
-        // If not, navigate there via the "송금하기" nav link.
+        // If not, navigate there via the "?↔툑?섍린" nav link.
 
         const postLoginPage = page.url()
 
@@ -479,10 +558,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push('navigating-to-recipient-page')
 
             const recipientNavSelectors = [
-                `a:has-text("${KO_REMIT}")`,      // "송금하기" nav link
+                `a:has-text("${KO_REMIT}")`,      // "?↔툑?섍린" nav link
                 'a[href*="/transfer/recipient"]',
                 'a[href*="/transfer"]',
-                'a:has-text("송금")',
+                `a:has-text("${KO_REMIT_SHORT}")`,
             ]
 
             let navigated = false
@@ -514,10 +593,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         await page.waitForTimeout(2000)
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
 
-        // ── Step 4.5: Find the company card and click it ────────────────────
+        // ?? Step 4.5: Find the company card and click it ????????????????????
         // The recipient page shows cards with company names.
         // Clicking a card opens a MODAL POPUP (not a page navigation!).
-        // The modal shows recipient details and has "수정하기" / "송금하기" buttons.
+        // The modal shows recipient details and has "?섏젙?섍린" / "?↔툑?섍린" buttons.
 
         // First, check if company name is visible (may need to scroll)
         let companyTextEl
@@ -526,7 +605,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             await companyTextEl.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
             steps.push('company-text-visible')
         } catch {
-            // Maybe not visible due to scrolling — try JS scroll
+            // Maybe not visible due to scrolling ??try JS scroll
             try {
                 await page.evaluate(`
                     (() => {
@@ -565,7 +644,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // The card area containing the company name is clickable (cursor:pointer)
         let modalOpened = false
 
-        // Strategy 1: Click the company text directly — this should open the modal
+        // Strategy 1: Click the company text directly ??this should open the modal
         try {
             await companyTextEl.click({ timeout: 5000 })
             await page.waitForTimeout(1500)
@@ -574,16 +653,16 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push('company-text-click-failed')
         }
 
-        // ── Step 5: Wait for the modal popup and click "송금하기" ────────────
+        // ?? Step 5: Wait for the modal popup and click "?↔툑?섍린" ????????????
         // After clicking a recipient card, a modal popup appears with:
         //   - Title: company name
-        //   - Recipient details (수취인 정보)
-        //   - Bottom buttons: "수정하기" (edit) and "송금하기" (remit)
-        // The "송금하기" button inside the modal advances to Step 2 (금액 입력).
+        //   - Recipient details (?섏랬???뺣낫)
+        //   - Bottom buttons: "?섏젙?섍린" (edit) and "?↔툑?섍린" (remit)
+        // The "?↔툑?섍린" button inside the modal advances to Step 2 (湲덉븸 ?낅젰).
 
         // Wait for the modal to appear
         const modalSelectors = [
-            // The "송금하기" button inside the modal
+            // The "?↔툑?섍린" button inside the modal
             `button:has-text("${KO_REMIT}")`,
             // Modal overlay/dialog patterns
             '[role="dialog"]',
@@ -595,14 +674,14 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             '[class*="Overlay"]',
         ]
 
-        // Check if modal appeared (look for "송금하기" button)
+        // Check if modal appeared (look for "?↔툑?섍린" button)
         const remitBtnInModal = page.getByText(KO_REMIT, { exact: false }).first()
         try {
             await remitBtnInModal.waitFor({ state: 'visible', timeout: 8000 })
             modalOpened = true
             steps.push('modal-opened-remit-btn-visible')
         } catch {
-            // Modal may not have opened — try clicking the parent card element
+            // Modal may not have opened ??try clicking the parent card element
             steps.push('modal-not-opened-retrying')
 
             // Try clicking parent card with JavaScript
@@ -653,13 +732,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         if (!modalOpened) {
-            // Last resort: look for the 송금하기 button anywhere on the page
+            // Last resort: look for the ?↔툑?섍린 button anywhere on the page
             // (maybe the UI changed and there's no modal, just inline buttons)
             const fallbackBtnSelectors = [
                 `button:has-text("${KO_REMIT}")`,
                 `a:has-text("${KO_REMIT}")`,
                 `[role="button"]:has-text("${KO_REMIT}")`,
-                'button:has-text("송금")',
+                `button:has-text("${KO_REMIT_SHORT}")`,
             ]
 
             for (const selector of fallbackBtnSelectors) {
@@ -694,9 +773,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             )
         }
 
-        // ── Step 5.5: Click "송금하기" button in the modal ──────────────────
-        // This transitions from Step 1 (수취인 선택) to Step 2 (금액 입력)
-        // The element may not be a <button> — could be <a>, <div>, <span>, etc.
+        // ?? Step 5.5: Click "?↔툑?섍린" button in the modal ??????????????????
+        // This transitions from Step 1 (?섏랬???좏깮) to Step 2 (湲덉븸 ?낅젰)
+        // The element may not be a <button> ??could be <a>, <div>, <span>, etc.
         let remitClicked = false
 
         // Strategy A: Try clicking any element with the text (broader than just button)
@@ -734,7 +813,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             }
         }
 
-        // Strategy C: JavaScript force-click — find the element with "송금하기" text and click it
+        // Strategy C: JavaScript force-click ??find the element with "?↔툑?섍린" text and click it
         if (!remitClicked) {
             try {
                 const jsResult = await page.evaluate(`
@@ -781,49 +860,85 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         if (!remitClicked) {
             throw new MoinAutomationError(
                 'Click remit button in modal',
-                `Could not click the "송금하기" button in the modal. (url: ${page.url()})`
+                `Could not click the "${KO_REMIT}" button in the modal. (url: ${page.url()})`
             )
         }
 
-        // Wait for Step 2 (금액 입력) to load
-        await page.waitForTimeout(3000)
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-
-        // Check if URL changed after clicking 송금하기
-        const urlAfterRemit = page.url()
-        steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', '')}`)
-
-        // Wait for the amount form to appear — it may load via SPA
-        // Try multiple indicators that the amount page is ready
+        // Wait for Step 2 (amount entry) to load and recover if we are still on recipient search.
         let step2Ready = false
-        for (let attempt = 0; attempt < 5; attempt++) {
-            const hasAmountText = await page.getByText('금액 입력').first().isVisible().catch(() => false)
-                || await page.getByText('받는 금액').first().isVisible().catch(() => false)
-                || await page.getByText('보내는 금액').first().isVisible().catch(() => false)
-                || await page.getByText('USD').first().isVisible().catch(() => false)
-                || await page.getByText('KRW').first().isVisible().catch(() => false)
+        let transferInspection = await inspectTransferInputs(page)
 
-            if (hasAmountText) {
+        for (let attempt = 0; attempt < 4; attempt++) {
+            await page.waitForTimeout(2000)
+            await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
+
+            const urlAfterRemit = page.url()
+            transferInspection = await inspectTransferInputs(page)
+            steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', '')}:attempt${attempt}`)
+            steps.push(`transfer-inspection:${JSON.stringify({
+                aliasSearchVisible: transferInspection.aliasSearchVisible,
+                amountKeywordVisible: transferInspection.amountKeywordVisible,
+                visibleInputs: transferInspection.visibleInputs.slice(0, 5),
+                nextButtons: transferInspection.nextButtons.slice(0, 6),
+            }).slice(0, 350)}`)
+
+            const nonRecipientInputs = transferInspection.visibleInputs.filter((visibleInput) => !isRecipientSearchInputInfo(visibleInput))
+            if (transferInspection.amountKeywordVisible && nonRecipientInputs.length > 0) {
                 step2Ready = true
                 break
             }
-            await page.waitForTimeout(2000)
+
+            if (transferInspection.aliasSearchVisible && attempt < 3) {
+                steps.push(`step2-recovery-attempt:${attempt + 1}`)
+
+                try {
+                    await companyTextEl.click({ timeout: 4000 })
+                    await page.waitForTimeout(1000)
+                    steps.push('recovery-clicked-company-text')
+                } catch {
+                    steps.push('recovery-company-text-click-failed')
+                }
+
+                let recoveryRemitClicked = false
+                for (const selector of [
+                    `button:has-text("${KO_REMIT}")`,
+                    `a:has-text("${KO_REMIT}")`,
+                    `[role="button"]:has-text("${KO_REMIT}")`,
+                    `div:has-text("${KO_REMIT}")`,
+                ]) {
+                    try {
+                        const target = page.locator(selector).first()
+                        await target.waitFor({ state: 'visible', timeout: 3000 })
+                        await target.click({ timeout: 3000, force: true })
+                        recoveryRemitClicked = true
+                        steps.push(`recovery-clicked-remit:${selector}`)
+                        break
+                    } catch {
+                        // Try next selector.
+                    }
+                }
+
+                if (!recoveryRemitClicked) {
+                    steps.push('recovery-remit-click-not-found')
+                }
+            }
         }
 
         if (!step2Ready) {
-            // Maybe the page navigated to a different URL
-            await page.waitForTimeout(3000)
-            steps.push('step2-text-not-found-continuing')
+            throw new MoinAutomationError(
+                'Open amount step',
+                `Could not reach the amount-entry step after clicking remit. Visible inputs: ${JSON.stringify(transferInspection.visibleInputs.slice(0, 5))}`
+            )
         }
         steps.push('step2-amount-form-loaded')
 
         // Give the input fields extra time to render (React hydration)
         await page.waitForTimeout(2000)
 
-        // ── Step 6: Fill USD amount ────────────────────────────────────────
+        // ?? Step 6: Fill USD amount ????????????????????????????????????????
         // The amount page has two sections:
-        //   - "보내는 금액" (KRW) — auto-calculated
-        //   - "받는 금액" (USD) — this is where we enter our amount
+        //   - "蹂대궡??湲덉븸" (KRW) ??auto-calculated
+        //   - "諛쏅뒗 湲덉븸" (USD) ??this is where we enter our amount
         // We need to fill the USD/receiving amount input.
 
         // First, try to find any visible input and log diagnostic info
@@ -856,8 +971,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // Strategy 1: Specific selectors for the receiving amount
         const usdSelectors = [
-            // Near "받는 금액" / "USD" text
-            'xpath=//*[contains(normalize-space(),"받는 금액")]/following::input[1]',
+            // Near "諛쏅뒗 湲덉븸" / "USD" text
+            `xpath=//*[contains(normalize-space(),"${KO_RECEIVE_AMOUNT}")]/following::input[1]`,
             'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
             'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
             // By attribute
@@ -870,7 +985,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             'input[id*="amount" i]',
             // By label/text proximity
             'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
-            'xpath=//*[contains(normalize-space(),"금액")]/following::input[1]',
+            `xpath=//*[contains(normalize-space(),"${KO_AMOUNT}")]/following::input[1]`,
         ]
 
         for (const sel of usdSelectors) {
@@ -910,14 +1025,14 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 `) as string
                 steps.push(`visible-fillable-inputs:${result.slice(0, 200)}`)
 
-                // Try to fill the second visible input (assumed USD)
-                // or the first if there's only one
+                // Try to fill a visible input that does not look like the recipient search box.
                 const visibleInputs = JSON.parse(result) as Array<{i: number; type: string; name: string; id: string; placeholder: string}>
-                
-                if (visibleInputs.length > 0) {
-                    // Try the second input first (usually USD), then the first
-                    const targetIndex = visibleInputs.length >= 2 ? 1 : 0
-                    const targetInfo = visibleInputs[targetIndex]
+                const candidateInputs = visibleInputs.filter((visibleInput) => !isRecipientSearchInputInfo(visibleInput))
+                if (candidateInputs.length > 0) {
+                    const targetInfo = candidateInputs.find((visibleInput) => {
+                        const hint = `${visibleInput.name} ${visibleInput.id} ${visibleInput.placeholder}`.toLowerCase()
+                        return hint.includes('usd') || hint.includes('amount') || hint.includes('receive')
+                    }) || candidateInputs[Math.min(1, candidateInputs.length - 1)]
                     
                     let selector = ''
                     if (targetInfo.id) {
@@ -933,7 +1048,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     await target.click({ timeout: 3000, force: true })
                     await target.fill(input.amountUsd)
                     amountFilled = true
-                    steps.push(`fill-usd-generic:${selector}:idx${targetIndex}`)
+                    steps.push(`fill-usd-generic:${selector}:candidate`)
                 }
             } catch (err) {
                 steps.push(`fill-usd-generic-error:${err instanceof Error ? err.message.slice(0, 100) : 'unknown'}`)
@@ -953,8 +1068,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                                 && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
                         });
                         if (visible.length === 0) return 'no-visible-inputs';
-                        // Try second input (USD) or first
-                        const target = visible.length >= 2 ? visible[1] : visible[0];
+                        const blocked = [${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)}, 'recipient', 'alias', 'company', 'name'];
+                        const target = visible.find((inp) => {
+                            const hint = [inp.name || '', inp.id || '', inp.placeholder || ''].join(' ').toLowerCase();
+                            return !blocked.some((token) => hint.includes(String(token).toLowerCase()));
+                        });
+                        if (!target) return 'no-amount-candidate';
                         // Set value using React-compatible method
                         const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
                         nativeInputValueSetter.call(target, amount);
@@ -980,11 +1099,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
         steps.push('fill-usd-amount')
 
-        // ── Step 7: Next step after amount ─────────────────────────────────
+        // ?? Step 7: Next step after amount ?????????????????????????????????
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-amount')
 
-        // ── Step 8: Upload invoice PDF ─────────────────────────────────────
+        // ?? Step 8: Upload invoice PDF ?????????????????????????????????????
         await uploadFirstFileInput(
             page,
             ['input[type="file"][accept*="pdf" i]', 'input[type="file"]'],
@@ -997,33 +1116,33 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('upload-invoice')
 
-        // ── Step 9: Next step after upload ─────────────────────────────────
+        // ?? Step 9: Next step after upload ?????????????????????????????????
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-upload')
 
-        // ── Step 10: Check agreement ───────────────────────────────────────
+        // ?? Step 10: Check agreement ???????????????????????????????????????
         await checkAgreement(page, DEFAULT_TIMEOUT_MS)
         steps.push('check-agreement')
 
-        // ── Step 11: Submit remittance ─────────────────────────────────────
-        // On the 정보 확인 page, the submit button says "송금 신청" (not "다음 단계")
+        // ?? Step 11: Submit remittance ?????????????????????????????????????
+        // On the ?뺣낫 ?뺤씤 page, the submit button says "?↔툑 ?좎껌" (not "?ㅼ쓬 ?④퀎")
         await clickFirstVisible(
             page,
             [
-                'button:has-text("송금 신청")',
-                'button:has-text("송금신청")',
+                `button:has-text("${KO_REMIT_REQUEST}")`,
+                `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
                 `button:has-text("${KO_REMIT}")`,
                 `button:has-text("${KO_NEXT_STEP}")`,
                 `button:has-text("${KO_NEXT_STEP_SPACED}")`,
-                'button:has-text("신청")',
-                'button:has-text("제출")',
+                `button:has-text("${KO_APPLY}")`,
+                `button:has-text("${KO_SUBMIT}")`,
             ],
             'Submit remittance',
             DEFAULT_TIMEOUT_MS
         )
         steps.push('submit-remittance')
 
-        // ── Step 12: Wait for completion ───────────────────────────────────
+        // ?? Step 12: Wait for completion ???????????????????????????????????
         await Promise.race([
             page.getByText(KO_SUCCESS_PATTERN).first().waitFor({
                 state: 'visible',
@@ -1040,13 +1159,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
     } catch (error) {
         if (error instanceof MoinAutomationError) {
             // Append accumulated steps to help debugging
-            error.message = `${error.message} [steps: ${steps.join(' → ')}]`
+            error.message = `${error.message} [steps: ${steps.join(' -> ')}]`
             throw error
         }
 
         throw new MoinAutomationError(
             'Automation',
-            `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' → ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`
+            `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' -> ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`
         )
     } finally {
         if (browser) {
