@@ -1245,7 +1245,7 @@ export default function WormOrderPage() {
             '',
             lines,
             '',
-            'Please send the invoice to contact@beiko.co.kr.',
+            'Please send the invoice to contact@beiko.co.kr',
             '',
             'Thanks.',
         ].join('\n')
