@@ -2535,7 +2535,7 @@ export default function WormOrderPage() {
                     <Sparkles size={18} className="text-[#e34219]" />
                 </div>
 
-                <div className="p-4 md:p-6 space-y-5">
+                <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-2 gap-5">
                     {WORM_TYPES.map((wormType) => (
                         <section key={wormType.id} className="space-y-3">
                             <div className="flex items-center gap-2">
@@ -2545,7 +2545,7 @@ export default function WormOrderPage() {
                                 <span className="text-xs text-gray-500 font-semibold">사이즈별 박스 수량 입력</span>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 gap-3 md:gap-4">
                                 {WORM_SIZES.map((size) => {
                                     const current = quantitiesByType[wormType.id]?.[size.id] || 0
                                     const isSelected = current > 0
