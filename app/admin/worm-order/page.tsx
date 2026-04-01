@@ -709,6 +709,9 @@ export default function WormOrderPage() {
     const [copied, setCopied] = useState(false)
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
     const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
+    const [invoicePreviewUrl, setInvoicePreviewUrl] = useState('')
+    const [invoicePreviewLoading, setInvoicePreviewLoading] = useState(false)
+    const [invoicePreviewError, setInvoicePreviewError] = useState('')
     const [remittanceError, setRemittanceError] = useState('')
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
@@ -727,6 +730,8 @@ export default function WormOrderPage() {
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
+    const invoicePreviewUrlRef = useRef<string | null>(null)
+    const invoicePreviewTaskIdRef = useRef(0)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -1099,11 +1104,102 @@ export default function WormOrderPage() {
         return () => window.clearInterval(timer)
     }, [remittanceLockedUntil])
 
+    const replaceInvoicePreviewUrl = useCallback((nextUrl: string | null) => {
+        if (invoicePreviewUrlRef.current) {
+            URL.revokeObjectURL(invoicePreviewUrlRef.current)
+            invoicePreviewUrlRef.current = null
+        }
+
+        if (!nextUrl) {
+            setInvoicePreviewUrl('')
+            return
+        }
+
+        invoicePreviewUrlRef.current = nextUrl
+        setInvoicePreviewUrl(nextUrl)
+    }, [])
+
+    const buildInvoicePreview = useCallback(async (file: File | null) => {
+        const taskId = ++invoicePreviewTaskIdRef.current
+        setInvoicePreviewError('')
+
+        if (!file) {
+            setInvoicePreviewLoading(false)
+            replaceInvoicePreviewUrl(null)
+            return
+        }
+
+        const isPdf = file.type === 'application/pdf' || file.name.toLowerCase().endsWith('.pdf')
+        if (!isPdf) {
+            setInvoicePreviewLoading(false)
+            replaceInvoicePreviewUrl(null)
+            setInvoicePreviewError('PDF 파일만 업로드할 수 있습니다.')
+            return
+        }
+
+        setInvoicePreviewLoading(true)
+
+        try {
+            const pdfjsLib = await import('pdfjs-dist')
+            pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
+
+            const arrayBuffer = await file.arrayBuffer()
+            const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+            const page = await pdf.getPage(1)
+            const viewport = page.getViewport({ scale: 1.45 })
+            const canvas = document.createElement('canvas')
+            canvas.width = viewport.width
+            canvas.height = viewport.height
+            const canvasContext = canvas.getContext('2d')
+            if (!canvasContext) {
+                throw new Error('Canvas context unavailable')
+            }
+
+            await page.render({ canvasContext, viewport } as any).promise
+            const previewBlob = await new Promise<Blob>((resolve, reject) => {
+                canvas.toBlob((blob) => {
+                    if (!blob) {
+                        reject(new Error('PDF preview blob generation failed'))
+                        return
+                    }
+                    resolve(blob)
+                }, 'image/png')
+            })
+
+            const nextPreviewUrl = URL.createObjectURL(previewBlob)
+            if (invoicePreviewTaskIdRef.current !== taskId) {
+                URL.revokeObjectURL(nextPreviewUrl)
+                return
+            }
+
+            replaceInvoicePreviewUrl(nextPreviewUrl)
+        } catch (error) {
+            if (invoicePreviewTaskIdRef.current !== taskId) return
+            replaceInvoicePreviewUrl(null)
+            setInvoicePreviewError('인보이스 미리보기를 생성하지 못했습니다.')
+            console.warn('Failed to build invoice preview:', error)
+        } finally {
+            if (invoicePreviewTaskIdRef.current === taskId) {
+                setInvoicePreviewLoading(false)
+            }
+        }
+    }, [replaceInvoicePreviewUrl])
+
+    useEffect(() => {
+        void buildInvoicePreview(invoicePdf)
+    }, [buildInvoicePreview, invoicePdf])
+
     useEffect(() => {
         return () => {
             if (remittanceProgressTimerRef.current) {
                 window.clearInterval(remittanceProgressTimerRef.current)
                 remittanceProgressTimerRef.current = null
+            }
+
+            invoicePreviewTaskIdRef.current += 1
+            if (invoicePreviewUrlRef.current) {
+                URL.revokeObjectURL(invoicePreviewUrlRef.current)
+                invoicePreviewUrlRef.current = null
             }
         }
     }, [])
@@ -2063,24 +2159,43 @@ export default function WormOrderPage() {
                         <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
                             Invoice PDF
                         </label>
-                        <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                            <div className="flex items-center gap-2 min-w-0">
-                                <FileText size={16} className="shrink-0 text-gray-500" />
-                                <span className="text-sm truncate">{invoicePdf?.name || 'Upload invoice PDF'}</span>
-                            </div>
-                            <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
-                            <input
-                                type="file"
-                                accept=".pdf,application/pdf"
-                                className="hidden"
-                                onChange={(event) => {
-                                    setRemittanceError('')
-                                    setRemittanceSuccess('')
-                                    const file = event.target.files?.[0] || null
-                                    setInvoicePdf(file)
-                                }}
-                            />
-                        </label>
+                        <div className="space-y-2">
+                            <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
+                                <div className="flex items-center gap-2 min-w-0">
+                                    <FileText size={16} className="shrink-0 text-gray-500" />
+                                    <span className="text-sm truncate">{invoicePdf?.name || 'Upload invoice PDF'}</span>
+                                </div>
+                                <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
+                                <input
+                                    type="file"
+                                    accept=".pdf,application/pdf"
+                                    className="hidden"
+                                    onChange={(event) => {
+                                        setRemittanceError('')
+                                        setRemittanceSuccess('')
+                                        const file = event.target.files?.[0] || null
+                                        setInvoicePdf(file)
+                                    }}
+                                />
+                            </label>
+
+                            {invoicePreviewLoading && (
+                                <p className="text-[11px] font-semibold text-slate-500">인보이스 미리보기 생성 중...</p>
+                            )}
+                            {invoicePreviewError && (
+                                <p className="text-[11px] font-semibold text-[#e34219]">{invoicePreviewError}</p>
+                            )}
+                            {invoicePreviewUrl && !invoicePreviewLoading && (
+                                <div className="rounded-lg border border-gray-200 bg-slate-50 p-2">
+                                    <div
+                                        role="img"
+                                        aria-label="Invoice preview"
+                                        className="w-full h-[260px] rounded bg-center bg-no-repeat bg-contain"
+                                        style={{ backgroundImage: `url(${invoicePreviewUrl})` }}
+                                    />
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
