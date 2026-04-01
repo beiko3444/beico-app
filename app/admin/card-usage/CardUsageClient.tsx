@@ -188,13 +188,39 @@ function resolveCategory(item: Pick<CardUsageItem, 'category' | 'useStoreName'>,
 /* ═══════════════════ localStorage helpers ═══════════════════ */
 const STORAGE_KEY = 'beico-card-categories'
 
+function sanitizeCategory(input: unknown, index: number): CategoryMeta | null {
+  if (!input || typeof input !== 'object') return null
+  const row = input as Record<string, unknown>
+  const code = typeof row.code === 'string' ? row.code.trim() : ''
+  const label = typeof row.label === 'string' ? row.label.trim() : ''
+  if (!code || !label) return null
+  const fallback = getCategoryMeta(code)
+  const emoji = typeof row.emoji === 'string' && row.emoji.trim() ? row.emoji.trim() : fallback.emoji
+  const bgColor = typeof row.bgColor === 'string' && row.bgColor.trim()
+    ? row.bgColor.trim()
+    : fallback.bgColor || ['#FFF3E0','#E3F2FD','#E8F5E9','#FCE4EC','#F3E5F5','#E8EAF6','#FFF8E1','#ECEFF1'][index % 8]
+  return { code, label, emoji, bgColor }
+}
+
+function sanitizeCategoryList(input: unknown): CategoryMeta[] {
+  if (!Array.isArray(input)) return []
+  const parsed = input
+    .map((row, idx) => sanitizeCategory(row, idx))
+    .filter((row): row is CategoryMeta => Boolean(row))
+  if (parsed.length === 0) return []
+  const deduped = new Map<string, CategoryMeta>()
+  for (const row of parsed) deduped.set(row.code, row)
+  return Array.from(deduped.values())
+}
+
 function loadUserCategories(): CategoryMeta[] {
   if (typeof window === 'undefined') return DEFAULT_CATEGORIES
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw) {
-      const parsed = JSON.parse(raw) as CategoryMeta[]
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed
+      const parsed = JSON.parse(raw)
+      const categories = sanitizeCategoryList(parsed)
+      if (categories.length > 0) return categories
     }
   } catch { /* ignore */ }
   return DEFAULT_CATEGORIES
@@ -202,7 +228,12 @@ function loadUserCategories(): CategoryMeta[] {
 
 function saveUserCategories(cats: CategoryMeta[]) {
   if (typeof window === 'undefined') return
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(cats))
+  try {
+    const safe = sanitizeCategoryList(cats)
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(safe.length > 0 ? safe : DEFAULT_CATEGORIES))
+  } catch {
+    // ignore persistence failures (private mode/quota exceeded)
+  }
 }
 
 /* ═══════════════════ CSS tokens ═══════════════════ */
@@ -306,17 +337,23 @@ export default function CardUsageClient() {
     }
 
     const targetCategory = categories.find(c => c.code === editingCategoryTarget.code)
-    if (!targetCategory) {
+    if (targetCategory && targetCategory.label === nextLabel) {
       cancelCategoryLabelEdit()
       return
     }
 
-    if (targetCategory.label === nextLabel) {
-      cancelCategoryLabelEdit()
-      return
-    }
-
-    const nextCategories = categories.map(c => c.code === editingCategoryTarget.code ? { ...c, label: nextLabel } : c)
+    const fallback = getCategoryMeta(editingCategoryTarget.code)
+    const nextCategories = targetCategory
+      ? categories.map(c => c.code === editingCategoryTarget.code ? { ...c, label: nextLabel } : c)
+      : [
+          ...categories,
+          {
+            code: editingCategoryTarget.code,
+            label: nextLabel,
+            emoji: fallback.emoji,
+            bgColor: fallback.bgColor,
+          },
+        ]
     updateCategories(nextCategories)
     cancelCategoryLabelEdit()
   }, [editingCategoryLabel, editingCategoryTarget, categories, cancelCategoryLabelEdit])
@@ -327,18 +364,26 @@ export default function CardUsageClient() {
   const catListRef = useRef<HTMLDivElement | null>(null)
 
   /* ── Data loading ── */
-  const load = useCallback(async (targetPage = page) => {
+  const load = useCallback(async (
+    targetPage = page,
+    overrides?: { startDate?: string; endDate?: string; cardNum?: string; storeName?: string },
+  ) => {
     setLoading(true)
     setError('')
     try {
+      const requestStartDate = overrides?.startDate ?? startDate
+      const requestEndDate = overrides?.endDate ?? endDate
+      const requestCardNum = overrides?.cardNum ?? cardNum
+      const requestStoreName = overrides?.storeName ?? storeName
+
       const qs = new URLSearchParams({
         page: String(targetPage),
         pageSize: '9999',
-        startDate,
-        endDate,
+        startDate: requestStartDate,
+        endDate: requestEndDate,
       })
-      if (cardNum.trim()) qs.set('cardNum', cardNum.trim())
-      if (storeName.trim()) qs.set('storeName', storeName.trim())
+      if (requestCardNum.trim()) qs.set('cardNum', requestCardNum.trim())
+      if (requestStoreName.trim()) qs.set('storeName', requestStoreName.trim())
 
       const res = await fetch(`/api/admin/card-usage?${qs.toString()}`)
       const json = await res.json()
@@ -360,6 +405,15 @@ export default function CardUsageClient() {
   useEffect(() => {
     load(1)
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  useEffect(() => {
+    const hydrated = loadUserCategories()
+    setCategories(prev => {
+      const prevJson = JSON.stringify(prev)
+      const nextJson = JSON.stringify(hydrated)
+      return prevJson === nextJson ? prev : hydrated
+    })
   }, [])
 
   const handleSearch = () => { setSyncMessage(''); setSyncCompletedAt(null); load(1) }
@@ -469,6 +523,9 @@ export default function CardUsageClient() {
     if (!range) return
     setStartDate(range.startDate)
     setEndDate(range.endDate)
+    setSyncMessage('')
+    setSyncCompletedAt(null)
+    void load(1, { startDate: range.startDate, endDate: range.endDate })
   }
 
   /* ── Derived data ── */
