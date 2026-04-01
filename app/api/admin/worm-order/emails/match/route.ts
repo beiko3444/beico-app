@@ -22,18 +22,44 @@ type InvoiceOcrResult = {
   invoiceOcrError: string | null
 }
 
-type PdfParseCtor = new (params: { data: Buffer }) => {
-  getText: () => Promise<{ text?: string }>
-  destroy: () => Promise<void>
+type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs')
+let pdfJsModulePromise: Promise<PdfJsModule> | null = null
+
+async function getPdfJsModule() {
+  if (!pdfJsModulePromise) {
+    pdfJsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs')
+  }
+  return pdfJsModulePromise
 }
 
-let pdfParseCtorPromise: Promise<PdfParseCtor> | null = null
+async function extractPdfText(buffer: Buffer) {
+  const pdfjs = await getPdfJsModule()
+  const loadingTask = pdfjs.getDocument({
+    data: new Uint8Array(buffer),
+    isEvalSupported: false,
+    useSystemFonts: true,
+    disableFontFace: true,
+  })
 
-async function getPdfParseCtor() {
-  if (!pdfParseCtorPromise) {
-    pdfParseCtorPromise = import('pdf-parse').then((mod) => mod.PDFParse)
+  const doc = await loadingTask.promise
+  try {
+    const pagesToRead = Math.min(doc.numPages, 12)
+    const chunks: string[] = []
+
+    for (let pageNo = 1; pageNo <= pagesToRead; pageNo++) {
+      const page = await doc.getPage(pageNo)
+      const textContent = await page.getTextContent()
+      const pageText = (textContent.items as Array<{ str?: string }>)
+        .map((item) => item?.str || '')
+        .join(' ')
+        .trim()
+      if (pageText) chunks.push(pageText)
+    }
+
+    return chunks.join('\n').trim()
+  } finally {
+    await doc.destroy().catch(() => undefined)
   }
-  return pdfParseCtorPromise
 }
 
 function parseAmountTokens(line: string) {
@@ -162,23 +188,6 @@ async function runInvoicePdfOcr(uid: string): Promise<InvoiceOcrResult> {
   let totalAmount: number | null = null
   let sourceFile: string | null = null
   const parseErrors: string[] = []
-  let PdfParseClass: PdfParseCtor | null = null
-
-  try {
-    PdfParseClass = await getPdfParseCtor()
-  } catch (error) {
-    const reason = error instanceof Error ? error.message : 'unknown pdf parser load error'
-    return {
-      invoiceUnitPriceUsd: null,
-      invoiceTotalAmountUsd: null,
-      usdKrwRate: null,
-      invoiceUnitPriceKrw: null,
-      invoiceTotalAmountKrw: null,
-      invoiceExtractedAt: null,
-      invoiceSourceFile: null,
-      invoiceOcrError: `PDF OCR 엔진 로딩 실패: ${reason}`,
-    }
-  }
 
   for (const { attachment, index } of attachments) {
     try {
@@ -189,14 +198,7 @@ async function runInvoicePdfOcr(uid: string): Promise<InvoiceOcrResult> {
         continue
       }
 
-      const parser = new PdfParseClass({ data: buffer })
-      let text = ''
-      try {
-        const parsedPdf = await parser.getText()
-        text = (parsedPdf.text || '').trim()
-      } finally {
-        await parser.destroy().catch(() => undefined)
-      }
+      const text = await extractPdfText(buffer)
 
       if (!text) {
         parseErrors.push(`${attachment.filename || `attachment-${index}`}: no text`)
