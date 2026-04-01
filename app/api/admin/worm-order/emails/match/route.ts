@@ -22,48 +22,24 @@ type InvoiceOcrResult = {
   invoiceOcrError: string | null
 }
 
-type PdfJsModule = typeof import('pdfjs-dist/legacy/build/pdf.mjs')
-let pdfJsModulePromise: Promise<PdfJsModule> | null = null
+type PdfParseModule = typeof import('pdf-parse')
+let pdfParseModulePromise: Promise<PdfParseModule> | null = null
 
-async function getPdfJsModule() {
-  if (!pdfJsModulePromise) {
-    pdfJsModulePromise = import('pdfjs-dist/legacy/build/pdf.mjs').then((module) => {
-      // In Next Node runtime, the default "./pdf.worker.mjs" can resolve to a missing chunk path.
-      // Force a resolvable package path to prevent fake worker setup failures.
-      module.GlobalWorkerOptions.workerSrc = 'pdfjs-dist/legacy/build/pdf.worker.mjs'
-      return module
-    })
+async function getPdfParseModule() {
+  if (!pdfParseModulePromise) {
+    pdfParseModulePromise = import('pdf-parse')
   }
-  return pdfJsModulePromise
+  return pdfParseModulePromise
 }
 
 async function extractPdfText(buffer: Buffer) {
-  const pdfjs = await getPdfJsModule()
-  const loadingTask = pdfjs.getDocument({
-    data: new Uint8Array(buffer),
-    isEvalSupported: false,
-    useSystemFonts: true,
-    disableFontFace: true,
-  })
-
-  const doc = await loadingTask.promise
+  const { PDFParse } = await getPdfParseModule()
+  const parser = new PDFParse({ data: buffer })
   try {
-    const pagesToRead = Math.min(doc.numPages, 12)
-    const chunks: string[] = []
-
-    for (let pageNo = 1; pageNo <= pagesToRead; pageNo++) {
-      const page = await doc.getPage(pageNo)
-      const textContent = await page.getTextContent()
-      const pageText = (textContent.items as Array<{ str?: string }>)
-        .map((item) => item?.str || '')
-        .join(' ')
-        .trim()
-      if (pageText) chunks.push(pageText)
-    }
-
-    return chunks.join('\n').trim()
+    const result = await parser.getText({ first: 12 })
+    return typeof result?.text === 'string' ? result.text.trim() : ''
   } finally {
-    await doc.destroy().catch(() => undefined)
+    await parser.destroy().catch(() => undefined)
   }
 }
 
