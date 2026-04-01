@@ -260,23 +260,26 @@ export default function AdminNav({
                 </nav>
 
                 <div className="shrink-0 flex items-center gap-2">
-                    <input
-                        type="number"
-                        min={1}
-                        inputMode="numeric"
-                        value={shipmentCount}
-                        onChange={(event) => setShipmentCount(event.target.value)}
-                        className="w-[92px] px-3 py-2 text-xs font-black rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-red-500/30"
-                        placeholder="건수"
-                        aria-label="출고 건수"
-                    />
+                    <div className="inline-flex items-center rounded-xl border border-gray-200 bg-white px-2.5 py-1.5">
+                        <input
+                            type="number"
+                            min={1}
+                            inputMode="numeric"
+                            value={shipmentCount}
+                            onChange={(event) => setShipmentCount(event.target.value)}
+                            className="w-[68px] border-none bg-transparent p-0 text-xs font-black outline-none focus:outline-none"
+                            placeholder="1"
+                            aria-label="출고 건수"
+                        />
+                        <span className="ml-1 text-xs font-black text-slate-600">건 출고</span>
+                    </div>
 
                     <button
                         onClick={handleSendSms}
                         disabled={sendingSms || loadingFromNumber}
                         className="px-3 py-2 text-xs font-black text-white bg-red-500 hover:bg-red-600 disabled:bg-gray-300 rounded-xl transition-all"
                     >
-                        {sendingSms ? '발송중...' : '문자발송'}
+                        {sendingSms ? '요청중...' : '집하요청'}
                     </button>
 
                     <button

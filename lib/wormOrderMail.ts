@@ -37,6 +37,9 @@ export type WormEmailListItem = {
   date: string
   hasAttachments: boolean
   awbNumber: string | null
+  matchedOrderId: string | null
+  matchedOrderNumber: string | null
+  matchedAt: string | null
 }
 
 export type WormEmailAttachment = {
@@ -139,11 +142,50 @@ async function getWormEmailAwbCacheMap(uids: string[]) {
   }
 }
 
+async function getWormOrderEmailMatchMap(uids: string[]) {
+  const normalizedUids = Array.from(new Set(uids.map((uid) => uid.trim()).filter(Boolean)))
+  if (normalizedUids.length === 0) return new Map<string, { orderId: string; orderNumber: string; matchedAt: string | null }>()
+
+  try {
+    const rows = await prisma.wormOrderEmailMatch.findMany({
+      where: { uid: { in: normalizedUids } },
+      select: {
+        uid: true,
+        orderId: true,
+        matchedAt: true,
+        order: {
+          select: {
+            orderNumber: true,
+          },
+        },
+      },
+    })
+
+    return new Map(
+      rows.map((row) => [
+        row.uid,
+        {
+          orderId: row.orderId,
+          orderNumber: row.order?.orderNumber || '',
+          matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
+        },
+      ]),
+    )
+  } catch (error) {
+    console.error('Failed to load worm email match map:', error)
+    return new Map<string, { orderId: string; orderNumber: string; matchedAt: string | null }>()
+  }
+}
+
 async function hydrateEmailsWithAwbCache(emails: WormEmailListItem[]) {
   const awbMap = await getWormEmailAwbCacheMap(emails.map((email) => email.uid))
+  const matchMap = await getWormOrderEmailMatchMap(emails.map((email) => email.uid))
   return emails.map((email) => ({
     ...email,
     awbNumber: awbMap.get(email.uid) || email.awbNumber || null,
+    matchedOrderId: matchMap.get(email.uid)?.orderId || null,
+    matchedOrderNumber: matchMap.get(email.uid)?.orderNumber || null,
+    matchedAt: matchMap.get(email.uid)?.matchedAt || null,
   }))
 }
 
@@ -201,16 +243,61 @@ export async function upsertWormEmailAwbCache(input: {
   })
 }
 
+export async function upsertWormOrderEmailMatch(input: {
+  uid: string
+  orderId: string
+  subject?: string | null
+  date?: string | null
+}) {
+  const uid = input.uid.trim()
+  const orderId = input.orderId.trim()
+
+  if (!uid) {
+    throw new Error('uid is required.')
+  }
+  if (!orderId) {
+    throw new Error('orderId is required.')
+  }
+
+  return prisma.wormOrderEmailMatch.upsert({
+    where: { uid },
+    update: {
+      orderId,
+      subject: input.subject?.trim() || null,
+      emailDate: toOptionalDate(input.date),
+      matchedAt: new Date(),
+    },
+    create: {
+      uid,
+      orderId,
+      subject: input.subject?.trim() || null,
+      emailDate: toOptionalDate(input.date),
+      matchedAt: new Date(),
+    },
+    select: {
+      uid: true,
+      orderId: true,
+      matchedAt: true,
+      order: {
+        select: {
+          orderNumber: true,
+        },
+      },
+    },
+  })
+}
+
 export async function loadWormEmailList(options?: {
-  keyword?: string
+  subjectKeyword?: string
   scanLimit?: number
   listLimit?: number
+  orderId?: string | null
 }) {
-  const keyword = (options?.keyword || 'michael@oikki.com').toLowerCase()
-  const keywordBuf = Buffer.from(keyword, 'utf8')
+  const subjectKeyword = (options?.subjectKeyword || 'invoice').toLowerCase().trim()
   const scanLimit = Math.max(5, Math.min(80, options?.scanLimit || 20))
   const listLimit = Math.max(1, Math.min(30, options?.listLimit || 10))
-  const cacheKey = `${keyword}|${scanLimit}|${listLimit}`
+  const orderId = options?.orderId?.trim() || ''
+  const cacheKey = `${subjectKeyword}|${scanLimit}|${listLimit}`
 
   const cached = getEmailListCache(cacheKey)
   if (cached) return hydrateEmailsWithAwbCache(cached)
@@ -234,9 +321,11 @@ export async function loadWormEmailList(options?: {
 
       const sourceBuf = toBuffer(msg.source)
       if (sourceBuf.length === 0) continue
-      if (!sourceBuf.includes(keywordBuf)) continue
 
       const subject = msg.envelope?.subject || '(제목 없음)'
+      if (subjectKeyword && !subject.toLowerCase().includes(subjectKeyword)) {
+        continue
+      }
       const dateObj = msg.envelope?.date || msg.internalDate || new Date()
       const hasAttachments = hasAttachmentBySource(sourceBuf)
 
@@ -246,6 +335,9 @@ export async function loadWormEmailList(options?: {
         date: new Date(dateObj).toISOString(),
         hasAttachments,
         awbNumber: null,
+        matchedOrderId: null,
+        matchedOrderNumber: null,
+        matchedAt: null,
       })
     }
 
@@ -254,7 +346,12 @@ export async function loadWormEmailList(options?: {
   })
 
   setEmailListCache(cacheKey, emails)
-  return hydrateEmailsWithAwbCache(emails)
+  const hydrated = await hydrateEmailsWithAwbCache(emails)
+  return hydrated.filter((email) => {
+    if (!email.matchedOrderId) return true
+    if (!orderId) return false
+    return email.matchedOrderId === orderId
+  })
 }
 
 export async function getParsedMailByUid(uid: string) {

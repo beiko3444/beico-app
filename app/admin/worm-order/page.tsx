@@ -38,6 +38,9 @@ type WormEmailListItem = {
     date: string
     hasAttachments: boolean
     awbNumber: string | null
+    matchedOrderId: string | null
+    matchedOrderNumber: string | null
+    matchedAt: string | null
 }
 
 type WormEmailDetail = {
@@ -464,6 +467,9 @@ function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
         date: candidate.date,
         hasAttachments: candidate.hasAttachments,
         awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
+        matchedOrderId: typeof candidate.matchedOrderId === 'string' ? candidate.matchedOrderId : null,
+        matchedOrderNumber: typeof candidate.matchedOrderNumber === 'string' ? candidate.matchedOrderNumber : null,
+        matchedAt: typeof candidate.matchedAt === 'string' ? candidate.matchedAt : null,
     }
 }
 
@@ -858,6 +864,8 @@ export default function WormOrderPage() {
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
     const [loadingEmails, setLoadingEmails] = useState(false)
+    const [matchingEmailUid, setMatchingEmailUid] = useState<string | null>(null)
+    const [emailMatchMessage, setEmailMatchMessage] = useState('')
     const [loadingEmailDetail, setLoadingEmailDetail] = useState(false)
     const [emailError, setEmailError] = useState('')
     const [hasFetched, setHasFetched] = useState(false)
@@ -1391,6 +1399,12 @@ export default function WormOrderPage() {
         if (receiveDateText) {
             setReceiveDate(receiveDateText)
         }
+        setEmails([])
+        setEmailDetails({})
+        setSelectedEmailUid(null)
+        setHasFetched(false)
+        setEmailError('')
+        setEmailMatchMessage('')
     }, [])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
@@ -1424,6 +1438,7 @@ export default function WormOrderPage() {
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
+        setEmailMatchMessage('')
         setFetchProgress(0)
 
         // 가짜(Fake) 프로그레스 메이커 (로딩 중일 때 90%까지 꾸준히 증가)
@@ -1435,7 +1450,13 @@ export default function WormOrderPage() {
         }, 400)
 
         try {
-            const res = await fetch('/api/admin/worm-order/emails')
+            const params = new URLSearchParams()
+            params.set('subjectKeyword', 'invoice')
+            if (activeWormOrder?.id) {
+                params.set('orderId', activeWormOrder.id)
+            }
+
+            const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`)
             clearInterval(interval)
             setFetchProgress(100) // 100% 꽉 채우기
 
@@ -1471,6 +1492,45 @@ export default function WormOrderPage() {
             setUsingOfflineEmailCache(hasCachedEmails)
         } finally {
             setLoadingEmails(false)
+        }
+    }
+
+    const handleMatchEmailToActiveOrder = async (email: WormEmailListItem) => {
+        if (!activeWormOrder?.id) {
+            setEmailError('발주리스트에서 매칭할 발주를 먼저 선택해 주세요.')
+            return
+        }
+
+        if (email.matchedOrderId === activeWormOrder.id) {
+            setEmailMatchMessage(`이미 현재 발주(${activeWormOrder.orderNumber})에 매칭된 메일입니다.`)
+            return
+        }
+
+        setMatchingEmailUid(email.uid)
+        setEmailError('')
+        setEmailMatchMessage('')
+        try {
+            const response = await fetch('/api/admin/worm-order/emails/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uid: email.uid,
+                    orderId: activeWormOrder.id,
+                    subject: email.subject,
+                    date: email.date,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '메일 매칭에 실패했습니다.')
+            }
+
+            setEmailMatchMessage(`메일 매칭 완료: ${result?.match?.orderNumber || activeWormOrder.orderNumber}`)
+            await fetchEmails()
+        } catch (error) {
+            setEmailError(error instanceof Error ? error.message : '메일 매칭 중 오류가 발생했습니다.')
+        } finally {
+            setMatchingEmailUid(null)
         }
     }
 
@@ -2589,8 +2649,16 @@ export default function WormOrderPage() {
                             {loadingEmails && <span className="absolute -top-1 -right-3 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </p>
                         <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
-                            <Mail size={18} className="text-slate-500" /> Documents
+                            <Mail size={18} className="text-slate-500" /> Invoice Mails
                         </h2>
+                        <p className="mt-1 text-[11px] font-medium text-slate-500">
+                            제목에 `invoice`가 포함된 메일만 조회합니다.
+                        </p>
+                        {activeWormOrder && (
+                            <p className="mt-1 text-[11px] font-semibold text-slate-600">
+                                현재 발주: {activeWormOrder.orderNumber}
+                            </p>
+                        )}
                         {emailCacheSavedAt && (
                             <p className={`mt-1 text-[11px] font-medium ${usingOfflineEmailCache ? 'text-amber-600' : 'text-slate-500'}`}>
                                 {usingOfflineEmailCache ? 'Offline cache active' : 'Last cached'} / {new Date(emailCacheSavedAt).toLocaleString()}
@@ -2603,13 +2671,14 @@ export default function WormOrderPage() {
                         className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
                         {loadingEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : 'Fetch Emails'}</span>
+                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : '인박스 모니터'}</span>
                     </button>
                 </div>
                 <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100">
                     {/* 좌측 리스트 패널 */}
                     <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px] relative">
                         {emailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{emailError}</div>}
+                        {emailMatchMessage && <div className="px-4 py-2 text-[12px] text-emerald-700 font-semibold text-center">{emailMatchMessage}</div>}
                         
                         {loadingEmails && (
                             <div className="p-10 flex flex-col items-center justify-center gap-4 text-slate-400 h-full mt-20">
@@ -2625,7 +2694,7 @@ export default function WormOrderPage() {
 
                         {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
                             <div className="p-10 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50 mt-10">
-                                메일 본문에 <span className="font-bold text-gray-700">'michael@oikki.com'</span>이 포함된<br />최근 메일이 없습니다.
+                                현재 발주에서 매칭 가능한 `invoice` 제목 메일이 없습니다.
                             </div>
                         )}
 
@@ -2650,6 +2719,36 @@ export default function WormOrderPage() {
                                             <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                                                 {index + 1}. {email.subject}
                                             </h3>
+                                            <div className="mt-2 flex items-center gap-2">
+                                                <span
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        void handleMatchEmailToActiveOrder(email)
+                                                    }}
+                                                    className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
+                                                        email.matchedOrderId === activeWormOrder?.id
+                                                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
+                                                            : matchingEmailUid === email.uid
+                                                                ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-progress'
+                                                                : activeWormOrder?.id
+                                                                    ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
+                                                                    : 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                                                    }`}
+                                                    role="button"
+                                                    aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
+                                                >
+                                                    {email.matchedOrderId === activeWormOrder?.id
+                                                        ? '매칭완료'
+                                                        : matchingEmailUid === email.uid
+                                                            ? '매칭중...'
+                                                            : '매칭하기'}
+                                                </span>
+                                                {email.matchedOrderNumber && (
+                                                    <span className="text-[10px] font-semibold text-emerald-700">
+                                                        {email.matchedOrderNumber}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {email.awbNumber && (
                                                 <div className="mt-2 flex items-center gap-2">
                                                     <span

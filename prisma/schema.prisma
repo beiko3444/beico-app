@@ -183,11 +183,26 @@ model WormOrder {
   remittanceTotalFeeText          String?
   remittanceExchangeRate          Float?
   remittanceExchangeRateText      String?
+  emailMatches WormOrderEmailMatch[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([receiveDate])
   @@index([createdAt])
+}
+
+model WormOrderEmailMatch {
+  id        String   @id @default(uuid())
+  uid       String   @unique
+  subject   String?
+  emailDate DateTime?
+  orderId   String
+  matchedAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  order     WormOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
+  @@index([updatedAt])
 }
 
 model SmsRecipient {

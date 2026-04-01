@@ -3,12 +3,22 @@ import { loadWormEmailList } from '@/lib/wormOrderMail'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET() {
+function isUuid(value: string) {
+    return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+export async function GET(request: Request) {
     try {
+        const { searchParams } = new URL(request.url)
+        const orderIdRaw = (searchParams.get('orderId') || '').trim()
+        const orderId = isUuid(orderIdRaw) ? orderIdRaw : null
+        const subjectKeyword = (searchParams.get('subjectKeyword') || 'invoice').trim() || 'invoice'
+
         const emails = await loadWormEmailList({
-            keyword: 'michael@oikki.com',
-            scanLimit: 20,
-            listLimit: 10,
+            subjectKeyword,
+            scanLimit: 40,
+            listLimit: 20,
+            orderId,
         })
         return NextResponse.json({ emails })
     } catch (error: unknown) {
