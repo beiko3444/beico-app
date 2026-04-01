@@ -789,44 +789,195 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         await page.waitForTimeout(3000)
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
 
-        // Verify we're on Step 2 by looking for the amount input fields
-        // The page shows "보내는 금액" (KRW) and "받는 금액" (USD) sections
-        const step2Loaded = await page.getByText('금액 입력').first().isVisible().catch(() => false)
-            || await page.getByText('받는 금액').first().isVisible().catch(() => false)
-            || await page.getByText('보내는 금액').first().isVisible().catch(() => false)
+        // Check if URL changed after clicking 송금하기
+        const urlAfterRemit = page.url()
+        steps.push(`url-after-remit:${urlAfterRemit.replace('https://www.moinbizplus.com', '')}`)
 
-        if (!step2Loaded) {
-            // Maybe the page still needs more time
+        // Wait for the amount form to appear — it may load via SPA
+        // Try multiple indicators that the amount page is ready
+        let step2Ready = false
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const hasAmountText = await page.getByText('금액 입력').first().isVisible().catch(() => false)
+                || await page.getByText('받는 금액').first().isVisible().catch(() => false)
+                || await page.getByText('보내는 금액').first().isVisible().catch(() => false)
+                || await page.getByText('USD').first().isVisible().catch(() => false)
+                || await page.getByText('KRW').first().isVisible().catch(() => false)
+
+            if (hasAmountText) {
+                step2Ready = true
+                break
+            }
+            await page.waitForTimeout(2000)
+        }
+
+        if (!step2Ready) {
+            // Maybe the page navigated to a different URL
             await page.waitForTimeout(3000)
+            steps.push('step2-text-not-found-continuing')
         }
         steps.push('step2-amount-form-loaded')
+
+        // Give the input fields extra time to render (React hydration)
+        await page.waitForTimeout(2000)
 
         // ── Step 6: Fill USD amount ────────────────────────────────────────
         // The amount page has two sections:
         //   - "보내는 금액" (KRW) — auto-calculated
         //   - "받는 금액" (USD) — this is where we enter our amount
         // We need to fill the USD/receiving amount input.
-        await fillFirstVisible(
-            page,
-            [
-                // Try to find the input near "받는 금액" / "USD" text
-                'xpath=//*[contains(normalize-space(),"받는 금액")]/following::input[1]',
-                'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
-                'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
-                'input[name*="usd" i]',
-                'input[id*="usd" i]',
-                'input[placeholder*="USD"]',
-                'input[aria-label*="USD"]',
-                'input[name*="receive" i]',
-                'input[name*="amount" i]',
-                'input[id*="amount" i]',
-                'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
-                'xpath=//*[contains(normalize-space(),"금액")]/following::input[1]',
-            ],
-            input.amountUsd,
-            'Fill USD amount',
-            DEFAULT_TIMEOUT_MS
-        )
+
+        // First, try to find any visible input and log diagnostic info
+        const inputDiag = await page.evaluate(`
+            (() => {
+                const inputs = document.querySelectorAll('input');
+                const info = [];
+                inputs.forEach((inp, i) => {
+                    if (i < 15) {
+                        const rect = inp.getBoundingClientRect();
+                        const visible = rect.width > 0 && rect.height > 0;
+                        info.push({
+                            i,
+                            type: inp.type,
+                            name: inp.name,
+                            id: inp.id,
+                            placeholder: inp.placeholder,
+                            visible,
+                            cls: (inp.className || '').slice(0, 50),
+                        });
+                    }
+                });
+                return JSON.stringify(info);
+            })()
+        `).catch(() => '[]') as string
+        steps.push(`inputs-on-page:${inputDiag.slice(0, 300)}`)
+
+        // Try to fill the USD amount with various selectors
+        let amountFilled = false
+
+        // Strategy 1: Specific selectors for the receiving amount
+        const usdSelectors = [
+            // Near "받는 금액" / "USD" text
+            'xpath=//*[contains(normalize-space(),"받는 금액")]/following::input[1]',
+            'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
+            'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
+            // By attribute
+            'input[name*="usd" i]',
+            'input[id*="usd" i]',
+            'input[placeholder*="USD"]',
+            'input[aria-label*="USD"]',
+            'input[name*="receive" i]',
+            'input[name*="amount" i]',
+            'input[id*="amount" i]',
+            // By label/text proximity
+            'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
+            'xpath=//*[contains(normalize-space(),"금액")]/following::input[1]',
+        ]
+
+        for (const sel of usdSelectors) {
+            if (amountFilled) break
+            try {
+                const target = page.locator(sel).first()
+                await target.waitFor({ state: 'visible', timeout: 3000 })
+                await target.click({ timeout: 3000 })
+                await target.fill(input.amountUsd)
+                amountFilled = true
+                steps.push(`fill-usd:${sel.slice(0, 40)}`)
+            } catch {
+                // Continue
+            }
+        }
+
+        // Strategy 2: Find the second visible text/number input on the page
+        // (first is usually KRW, second is USD)
+        if (!amountFilled) {
+            try {
+                const result = await page.evaluate(`
+                    (() => {
+                        const inputs = Array.from(document.querySelectorAll('input'));
+                        const visible = inputs.filter(inp => {
+                            const rect = inp.getBoundingClientRect();
+                            const style = window.getComputedStyle(inp);
+                            return rect.width > 0 && rect.height > 0 
+                                && style.display !== 'none' && style.visibility !== 'hidden'
+                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
+                        });
+                        // Return info about visible inputs
+                        return JSON.stringify(visible.map((inp, i) => ({
+                            i, type: inp.type, name: inp.name, id: inp.id, 
+                            placeholder: inp.placeholder
+                        })));
+                    })()
+                `) as string
+                steps.push(`visible-fillable-inputs:${result.slice(0, 200)}`)
+
+                // Try to fill the second visible input (assumed USD)
+                // or the first if there's only one
+                const visibleInputs = JSON.parse(result) as Array<{i: number; type: string; name: string; id: string; placeholder: string}>
+                
+                if (visibleInputs.length > 0) {
+                    // Try the second input first (usually USD), then the first
+                    const targetIndex = visibleInputs.length >= 2 ? 1 : 0
+                    const targetInfo = visibleInputs[targetIndex]
+                    
+                    let selector = ''
+                    if (targetInfo.id) {
+                        selector = `input#${targetInfo.id}`
+                    } else if (targetInfo.name) {
+                        selector = `input[name="${targetInfo.name}"]`
+                    } else {
+                        // Use nth-of-type or generic
+                        selector = `input[type="${targetInfo.type || 'text'}"]`
+                    }
+
+                    const target = page.locator(selector).first()
+                    await target.click({ timeout: 3000, force: true })
+                    await target.fill(input.amountUsd)
+                    amountFilled = true
+                    steps.push(`fill-usd-generic:${selector}:idx${targetIndex}`)
+                }
+            } catch (err) {
+                steps.push(`fill-usd-generic-error:${err instanceof Error ? err.message.slice(0, 100) : 'unknown'}`)
+            }
+        }
+
+        // Strategy 3: JavaScript direct value set on the input
+        if (!amountFilled) {
+            try {
+                const jsResult = await page.evaluate(`
+                    (() => {
+                        const amount = ${JSON.stringify(input.amountUsd)};
+                        const inputs = Array.from(document.querySelectorAll('input'));
+                        const visible = inputs.filter(inp => {
+                            const rect = inp.getBoundingClientRect();
+                            return rect.width > 0 && rect.height > 0 
+                                && (inp.type === 'text' || inp.type === 'number' || inp.type === 'tel' || inp.type === '');
+                        });
+                        if (visible.length === 0) return 'no-visible-inputs';
+                        // Try second input (USD) or first
+                        const target = visible.length >= 2 ? visible[1] : visible[0];
+                        // Set value using React-compatible method
+                        const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set;
+                        nativeInputValueSetter.call(target, amount);
+                        target.dispatchEvent(new Event('input', { bubbles: true }));
+                        target.dispatchEvent(new Event('change', { bubbles: true }));
+                        return 'js-filled-' + (target.name || target.id || 'unknown');
+                    })()
+                `) as string
+                if (jsResult && !jsResult.startsWith('no-')) {
+                    amountFilled = true
+                    steps.push(`fill-usd-js:${jsResult}`)
+                }
+            } catch {
+                // Continue
+            }
+        }
+
+        if (!amountFilled) {
+            throw new MoinAutomationError(
+                'Fill USD amount',
+                `Could not find a fillable input for step: Fill USD amount (url: ${page.url()})`
+            )
+        }
         steps.push('fill-usd-amount')
 
         // ── Step 7: Next step after amount ─────────────────────────────────
