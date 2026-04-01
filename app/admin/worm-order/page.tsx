@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Circle, Clock3, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles } from 'lucide-react'
+import { ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Circle, Clock3, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles, Trash2 } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -113,6 +113,10 @@ type WormOrderListItem = {
     receiveDate: string
     status: string
     remittanceAppliedAt: string | null
+    remittanceFinalReceiveAmountText: string | null
+    remittanceSendAmountText: string | null
+    remittanceTotalFeeText: string | null
+    remittanceExchangeRateText: string | null
     createdAt: string
     updatedAt: string
 }
@@ -647,6 +651,10 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         receiveDate: candidate.receiveDate,
         status: candidate.status,
         remittanceAppliedAt: typeof candidate.remittanceAppliedAt === 'string' ? candidate.remittanceAppliedAt : null,
+        remittanceFinalReceiveAmountText: typeof candidate.remittanceFinalReceiveAmountText === 'string' ? candidate.remittanceFinalReceiveAmountText : null,
+        remittanceSendAmountText: typeof candidate.remittanceSendAmountText === 'string' ? candidate.remittanceSendAmountText : null,
+        remittanceTotalFeeText: typeof candidate.remittanceTotalFeeText === 'string' ? candidate.remittanceTotalFeeText : null,
+        remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
         createdAt: candidate.createdAt,
         updatedAt: candidate.updatedAt,
     }
@@ -818,6 +826,7 @@ export default function WormOrderPage() {
     const [remittanceError, setRemittanceError] = useState('')
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
+    const [remittanceCancelling, setRemittanceCancelling] = useState(false)
     const [remittanceProgress, setRemittanceProgress] = useState(0)
     const [remittanceProgressLabel, setRemittanceProgressLabel] = useState('대기 중')
     const [remittanceAttemptsRemaining, setRemittanceAttemptsRemaining] = useState<number | null>(null)
@@ -830,6 +839,7 @@ export default function WormOrderPage() {
     const [wormOrderList, setWormOrderList] = useState<WormOrderListItem[]>([])
     const [wormOrderListLoading, setWormOrderListLoading] = useState(false)
     const [wormOrderListError, setWormOrderListError] = useState('')
+    const [deletingWormOrderId, setDeletingWormOrderId] = useState<string | null>(null)
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -840,6 +850,8 @@ export default function WormOrderPage() {
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
+    const remittanceRequestAbortControllerRef = useRef<AbortController | null>(null)
+    const remittanceCancelRequestedRef = useRef(false)
     const invoicePreviewUrlRef = useRef<string | null>(null)
     const invoicePreviewTaskIdRef = useRef(0)
 
@@ -1381,6 +1393,30 @@ export default function WormOrderPage() {
         }
     }, [])
 
+    const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
+        const shouldDelete = window.confirm(`삭제할까요?\n${order.orderNumber}`)
+        if (!shouldDelete) return
+
+        setWormOrderListError('')
+        setDeletingWormOrderId(order.id)
+        try {
+            const response = await fetch(`/api/admin/worm-order/orders?id=${encodeURIComponent(order.id)}`, {
+                method: 'DELETE',
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '발주 삭제에 실패했습니다.')
+            }
+
+            setWormOrderList((prev) => prev.filter((item) => item.id !== order.id))
+            setActiveWormOrder((prev) => (prev?.id === order.id ? null : prev))
+        } catch (error) {
+            setWormOrderListError(error instanceof Error ? error.message : '발주 삭제 중 오류가 발생했습니다.')
+        } finally {
+            setDeletingWormOrderId(null)
+        }
+    }, [])
+
     useEffect(() => {
         void fetchWormOrders()
     }, [fetchWormOrders])
@@ -1470,6 +1506,17 @@ export default function WormOrderPage() {
     }, [remittanceLockRemainingMs])
 
     const isRemittanceLocked = remittanceLockRemainingMs > 0
+    const activeWormOrderRecord = useMemo(
+        () => wormOrderList.find((order) => order.id === activeWormOrder?.id) || null,
+        [activeWormOrder?.id, wormOrderList],
+    )
+    const isActiveOrderRemittanceApplied = Boolean(
+        activeWormOrderRecord &&
+        (activeWormOrderRecord.status === 'REMITTANCE_APPLIED' || activeWormOrderRecord.remittanceAppliedAt),
+    )
+    const activeOrderRemittanceAppliedAtText = activeWormOrderRecord?.remittanceAppliedAt
+        ? new Date(activeWormOrderRecord.remittanceAppliedAt).toLocaleString()
+        : ''
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
@@ -1545,15 +1592,27 @@ export default function WormOrderPage() {
     const handleRemittanceApply = async () => {
         setRemittanceError('')
         setRemittanceSuccess('')
+        setRemittanceCancelling(false)
         setRemittanceAttemptsRemaining(null)
         setRemittanceProgress(0)
         setRemittanceProgressLabel('대기 중')
         setRemittancePricingSummary(null)
         setRemittanceSaveInfo(null)
         setRemittanceSaveWarning('')
+        remittanceCancelRequestedRef.current = false
 
         if (isRemittanceLocked) {
             setRemittanceError(`비밀번호 보호 잠금이 활성화되어 있습니다. ${remittanceLockRemainingText} 후 다시 시도해 주세요.`)
+            return
+        }
+
+        if (!activeWormOrderRecord) {
+            setRemittanceError('먼저 발주리스트에서 송금 신청할 발주를 선택해 주세요.')
+            return
+        }
+
+        if (isActiveOrderRemittanceApplied) {
+            setRemittanceError(`선택한 발주는 이미 송금 신청이 완료되었습니다. (${activeWormOrderRecord.orderNumber})`)
             return
         }
 
@@ -1591,8 +1650,12 @@ export default function WormOrderPage() {
             setRemittanceProgressLabel(stage.label)
         }, 3500)
 
+        let requestAbortController: AbortController | null = null
         setRemittanceSubmitting(true)
         try {
+            requestAbortController = new AbortController()
+            remittanceRequestAbortControllerRef.current = requestAbortController
+
             const submitData = new FormData()
             submitData.append('amountUsd', parsedAmount.toFixed(2))
             submitData.append('invoicePdf', invoicePdf)
@@ -1606,6 +1669,7 @@ export default function WormOrderPage() {
             const response = await fetch('/api/admin/worm-order/remittance', {
                 method: 'POST',
                 body: submitData,
+                signal: requestAbortController.signal,
             })
             const result = await response.json()
 
@@ -1651,6 +1715,18 @@ export default function WormOrderPage() {
             setRemittanceSaveWarning(typeof result?.saveWarning === 'string' ? result.saveWarning : '')
             void fetchWormOrders({ silent: true })
         } catch (error) {
+            const canceledByUser =
+                remittanceCancelRequestedRef.current ||
+                requestAbortController?.signal.aborted === true ||
+                (error instanceof DOMException && error.name === 'AbortError') ||
+                (error instanceof Error && /(cancel|canceled|cancelled|취소)/i.test(error.message))
+
+            if (canceledByUser) {
+                setRemittanceProgressLabel('사용자 취소')
+                setRemittanceError('송금 신청이 취소되었습니다.')
+                return
+            }
+
             const message = error instanceof Error ? error.message : 'Failed to submit remittance.'
             const lower = message.toLowerCase()
             const latestStep = extractLatestAutomationStep(message)
@@ -1678,9 +1754,40 @@ export default function WormOrderPage() {
                 window.clearInterval(remittanceProgressTimerRef.current)
                 remittanceProgressTimerRef.current = null
             }
+            if (
+                requestAbortController &&
+                remittanceRequestAbortControllerRef.current === requestAbortController
+            ) {
+                remittanceRequestAbortControllerRef.current = null
+            }
+            remittanceCancelRequestedRef.current = false
+            setRemittanceCancelling(false)
             setRemittanceSubmitting(false)
         }
     }
+
+    const handleCancelRemittance = useCallback(async () => {
+        if (!remittanceSubmitting) return
+
+        remittanceCancelRequestedRef.current = true
+        setRemittanceCancelling(true)
+        setRemittanceSuccess('')
+        setRemittanceProgressLabel('취소 요청 전송 중...')
+
+        const activeController = remittanceRequestAbortControllerRef.current
+        if (activeController && !activeController.signal.aborted) {
+            activeController.abort()
+        }
+
+        try {
+            const cancelUrl = activeWormOrder?.id
+                ? `/api/admin/worm-order/remittance?orderId=${encodeURIComponent(activeWormOrder.id)}`
+                : '/api/admin/worm-order/remittance'
+            await fetch(cancelUrl, { method: 'DELETE' })
+        } catch {
+            // Ignore transport errors here; local abort already requested.
+        }
+    }, [activeWormOrder?.id, remittanceSubmitting])
 
     const handleCustomsProgressSearch = async (
         nextBlNo?: string,
@@ -1962,6 +2069,25 @@ export default function WormOrderPage() {
     const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(6) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
     const showRemittanceTools = visibleStepIdSet.has(3)
     const showCustomsTools = visibleStepIdSet.has(7)
+    const stepRenderOrderMap = useMemo(() => {
+        const next = new Map<number, number>()
+        filteredPipelineSteps.forEach((step, index) => {
+            next.set(step.id, (index + 1) * 10)
+        })
+        return next
+    }, [filteredPipelineSteps])
+    const fallbackOrderBase = filteredPipelineSteps.length * 10 + 10
+    const getAnchorOrderBase = useCallback((stepIds: number[], defaultStepId: number) => {
+        for (const stepId of stepIds) {
+            const mapped = stepRenderOrderMap.get(stepId)
+            if (mapped) return mapped
+        }
+        return stepRenderOrderMap.get(defaultStepId) ?? fallbackOrderBase
+    }, [fallbackOrderBase, stepRenderOrderMap])
+    const orderToolOrderBase = getAnchorOrderBase([1], 1)
+    const inboxToolOrderBase = getAnchorOrderBase([2, 6, 9, 10], 2)
+    const remittanceToolOrderBase = getAnchorOrderBase([3], 3)
+    const customsToolOrderBase = getAnchorOrderBase([7], 7)
 
     return (
         <div className="max-w-5xl mx-auto pb-10 flex flex-col gap-6">
@@ -2126,6 +2252,7 @@ export default function WormOrderPage() {
                                 <th className="text-left px-3 py-2 font-bold">수령일</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
                                 <th className="text-left px-3 py-2 font-bold">최근수정</th>
+                                <th className="text-right px-3 py-2 font-bold">관리</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -2143,19 +2270,46 @@ export default function WormOrderPage() {
                                         <td className="px-3 py-2.5 font-bold text-slate-900">{order.orderNumber}</td>
                                         <td className="px-3 py-2.5 text-slate-700">{receiveDateText || '-'}</td>
                                         <td className="px-3 py-2.5">
-                                            <span className={`inline-flex h-6 items-center rounded-md border px-2 text-xs font-bold ${getWormOrderStatusClass(order.status)}`}>
-                                                {getWormOrderStatusLabel(order.status)}
-                                            </span>
+                                            <div className="flex flex-col gap-1">
+                                                <span className={`inline-flex h-6 w-fit items-center rounded-md border px-2 text-xs font-bold ${getWormOrderStatusClass(order.status)}`}>
+                                                    {getWormOrderStatusLabel(order.status)}
+                                                </span>
+                                                {order.remittanceAppliedAt && (
+                                                    <span className="text-[11px] font-semibold text-emerald-700">
+                                                        신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
+                                                        {order.remittanceSendAmountText ? ` / ${order.remittanceSendAmountText}` : ''}
+                                                    </span>
+                                                )}
+                                            </div>
                                         </td>
                                         <td className="px-3 py-2.5 text-xs text-slate-500">
                                             {new Date(order.updatedAt).toLocaleString()}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-right">
+                                            <button
+                                                type="button"
+                                                onClick={(event) => {
+                                                    event.stopPropagation()
+                                                    void handleDeleteWormOrder(order)
+                                                }}
+                                                disabled={deletingWormOrderId === order.id}
+                                                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                aria-label={`${order.orderNumber} 삭제`}
+                                            >
+                                                {deletingWormOrderId === order.id ? (
+                                                    <Loader2 size={13} className="animate-spin" />
+                                                ) : (
+                                                    <Trash2 size={13} />
+                                                )}
+                                                삭제
+                                            </button>
                                         </td>
                                     </tr>
                                 )
                             })}
                             {!wormOrderListLoading && wormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={4} className="px-3 py-6 text-center text-sm text-slate-500">
+                                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-slate-500">
                                         저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.
                                     </td>
                                 </tr>
@@ -2165,13 +2319,11 @@ export default function WormOrderPage() {
                 </div>
             </section>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[360px_minmax(0,1fr)] gap-6 items-start">
-                <aside className="xl:sticky xl:top-20 self-start">
+            <div className="flex flex-col gap-4">
                     <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 mb-4">
                         <h2 className="text-lg font-black text-slate-900">프로세스 리스트</h2>
-                        <p className="mt-1 text-xs text-slate-500">좌측에서 단계 확인, 우측에서 실행 도구를 사용합니다.</p>
+                        <p className="mt-1 text-xs text-slate-500">각 단계 카드 사이에 실행 도구가 순서대로 배치됩니다.</p>
                     </div>
-                    <div className="flex flex-col gap-4">
                         {filteredPipelineSteps.map((step) => {
                             const runtimeStatus = pipelineStatusMap[step.id]
                             const isExpanded = expandedSteps[step.id] ?? false
@@ -2179,14 +2331,15 @@ export default function WormOrderPage() {
                             return (
                                 <section
                                     key={step.id}
-                                className={`rounded-2xl border bg-white shadow-sm transition-colors ${
+                                    style={{ order: stepRenderOrderMap.get(step.id) ?? fallbackOrderBase }}
+                                    className={`rounded-2xl border bg-white shadow-sm transition-colors ${
                                     runtimeStatus === 'done'
                                         ? 'border-emerald-200'
                                         : runtimeStatus === 'active'
                                             ? 'border-red-300'
                                             : 'border-gray-200'
                                 }`}
-                            >
+                                >
                                     <button
                                         type="button"
                                         onClick={() => togglePipelineStep(step.id)}
@@ -2254,12 +2407,8 @@ export default function WormOrderPage() {
                                 </section>
                             )
                         })}
-                    </div>
-                </aside>
-
-                <div className="min-w-0 flex flex-col gap-6">
             {showOrderTools && (
-                <div className="px-1" style={{ order: 14 }}>
+                <div className="px-1" style={{ order: orderToolOrderBase + 4 }}>
                     <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
                         <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 1 EXECUTION</p>
                         <h3 className="text-sm font-black text-slate-900 mt-1">발주 메시지 생성 및 전송</h3>
@@ -2268,7 +2417,7 @@ export default function WormOrderPage() {
             )}
 
             {showOrderTools && (
-                <div ref={orderSectionRef} style={{ order: 15 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+                <div ref={orderSectionRef} style={{ order: orderToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
                 <div className="flex flex-col md:flex-row md:items-end gap-4">
                     <div className="min-w-0">
                         <label htmlFor="receiveDate" className="block text-xs font-black text-gray-600 uppercase tracking-[0.15em] mb-2">
@@ -2317,7 +2466,7 @@ export default function WormOrderPage() {
             )}
 
             {showOrderTools && (
-                <div style={{ order: 16 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                <div style={{ order: orderToolOrderBase + 6 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
                 <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">WORM ORDER SHEET</p>
@@ -2394,7 +2543,7 @@ export default function WormOrderPage() {
             )}
 
             {showOrderTools && generatedMessage && (
-                <div style={{ order: 17 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
+                <div style={{ order: orderToolOrderBase + 7 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
                     <textarea
                         readOnly
                         value={generatedMessage}
@@ -2412,7 +2561,7 @@ export default function WormOrderPage() {
             )}
 
             {showInboxTools && (
-                <div className="px-1" style={{ order: 24 }}>
+                <div className="px-1" style={{ order: inboxToolOrderBase + 4 }}>
                     <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                         <p className="text-[11px] font-black text-slate-600 tracking-[0.2em]">STEP 2 / 6 / 9 / 10 EXECUTION</p>
                         <h3 className="text-sm font-black text-slate-900 mt-1">INBOX 수신 · OCR · 첨부전달 · 창고료 메일 확인</h3>
@@ -2422,7 +2571,7 @@ export default function WormOrderPage() {
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
             {showInboxTools && (
-                <div ref={inboxSectionRef} style={{ order: 25 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+                <div ref={inboxSectionRef} style={{ order: inboxToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -2726,7 +2875,7 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div className="px-1" style={{ order: 34 }}>
+                <div className="px-1" style={{ order: remittanceToolOrderBase + 4 }}>
                     <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
                         <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 3 EXECUTION</p>
                         <h3 className="text-sm font-black text-slate-900 mt-1">모인비즈니스 송금 신청 자동화</h3>
@@ -2735,7 +2884,7 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div ref={remittanceSectionRef} style={{ order: 35 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
@@ -2746,6 +2895,12 @@ export default function WormOrderPage() {
                         {activeWormOrder && (
                             <p className="text-[11px] font-semibold text-slate-600 mt-1">
                                 대상 발주: {activeWormOrder.orderNumber} / 수령일 {activeWormOrder.receiveDate}
+                            </p>
+                        )}
+                        {isActiveOrderRemittanceApplied && activeWormOrderRecord && (
+                            <p className="text-[11px] font-semibold text-emerald-700 mt-1">
+                                송금신청 완료: {activeOrderRemittanceAppliedAtText || '-'}
+                                {activeWormOrderRecord.remittanceSendAmountText ? ` / 보내는 돈 ${activeWormOrderRecord.remittanceSendAmountText}` : ''}
                             </p>
                         )}
                     </div>
@@ -2817,24 +2972,59 @@ export default function WormOrderPage() {
                     <p className="text-[11px] text-gray-500 leading-relaxed">
                         The automation will log in with server credentials, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
                     </p>
-                    <button
-                        type="button"
-                        onClick={handleRemittanceApply}
-                        disabled={remittanceSubmitting || isRemittanceLocked}
-                        className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                    >
-                        {isRemittanceLocked ? (
-                            `잠금 ${remittanceLockRemainingText}`
-                        ) : remittanceSubmitting ? (
-                            <>
-                                <Loader2 size={15} className="animate-spin" />
-                                Applying...
-                            </>
-                        ) : (
-                            '신청하기'
+                    <div className="flex items-center gap-2 w-full md:w-auto">
+                        <button
+                            type="button"
+                            onClick={handleRemittanceApply}
+                            disabled={remittanceSubmitting || isRemittanceLocked || isActiveOrderRemittanceApplied || !activeWormOrderRecord}
+                            className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 w-full md:w-auto"
+                        >
+                            {!activeWormOrderRecord ? (
+                                '발주선택'
+                            ) : isActiveOrderRemittanceApplied ? (
+                                '신청완료'
+                            ) : isRemittanceLocked ? (
+                                `잠금 ${remittanceLockRemainingText}`
+                            ) : remittanceSubmitting ? (
+                                <>
+                                    <Loader2 size={15} className="animate-spin" />
+                                    Applying...
+                                </>
+                            ) : (
+                                '신청하기'
+                            )}
+                        </button>
+
+                        {(remittanceSubmitting || remittanceCancelling) && (
+                            <button
+                                type="button"
+                                onClick={handleCancelRemittance}
+                                disabled={remittanceCancelling}
+                                className="h-11 px-5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shrink-0"
+                            >
+                                {remittanceCancelling ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        취소중...
+                                    </>
+                                ) : (
+                                    '취소'
+                                )}
+                            </button>
                         )}
-                    </button>
+                    </div>
                 </div>
+
+                {isActiveOrderRemittanceApplied && (
+                    <p className="text-xs font-semibold text-emerald-700">
+                        해당 발주는 송금 신청이 완료되어 재신청할 수 없습니다.
+                    </p>
+                )}
+                {!activeWormOrderRecord && (
+                    <p className="text-xs font-semibold text-slate-600">
+                        발주리스트에서 대상 발주를 먼저 선택해 주세요.
+                    </p>
+                )}
 
                 {(remittanceSubmitting || remittanceProgress > 0 || !!remittanceSuccess) && (
                     <div className="space-y-1.5">
@@ -2907,7 +3097,7 @@ export default function WormOrderPage() {
                 </div>
             )}
             {showCustomsTools && (
-                <div className="px-1" style={{ order: 74 }}>
+                <div className="px-1" style={{ order: customsToolOrderBase + 4 }}>
                     <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
                         <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 7 EXECUTION</p>
                         <h3 className="text-sm font-black text-slate-900 mt-1">유니패스 화물통관진행정보 조회</h3>
@@ -2916,7 +3106,7 @@ export default function WormOrderPage() {
             )}
 
             {showCustomsTools && (
-                <div ref={customsProgressSectionRef} style={{ order: 75 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">UNI-PASS API001</p>
@@ -3053,9 +3243,8 @@ export default function WormOrderPage() {
                     </div>
                 )}
                 </div>
-            )}
+                )}
                 </div>
             </div>
-        </div>
     )
 }

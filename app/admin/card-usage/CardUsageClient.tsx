@@ -14,6 +14,7 @@ type CardUsageItem = {
   useDT: string
   usedAt: string | null
   approvalType: string | null
+  approvalStatus?: 'APPROVED' | 'CANCELED' | 'UNKNOWN' | null
   approvalNum: string | null
   totalAmount: number | null
   approvalAmount: number | null
@@ -31,6 +32,8 @@ type CardUsageItem = {
   reviewedBy: string | null
   syncedAt: string
 }
+
+type CardApprovalStatus = 'APPROVED' | 'CANCELED' | 'UNKNOWN'
 
 type CardUsageResponse = {
   items: CardUsageItem[]
@@ -110,6 +113,49 @@ function resolveAmount(item: Pick<CardUsageItem, 'totalAmount' | 'approvalAmount
     return (item.amount || 0) + (item.tax || 0) + (item.serviceCharge || 0)
   }
   return item.totalAmount ?? item.approvalAmount ?? 0
+}
+
+function normalizeApprovalStatus(item: Pick<CardUsageItem, 'approvalStatus' | 'approvalType' | 'totalAmount' | 'approvalAmount' | 'amount' | 'tax' | 'serviceCharge'>): CardApprovalStatus {
+  if (item.approvalStatus === 'APPROVED' || item.approvalStatus === 'CANCELED' || item.approvalStatus === 'UNKNOWN') {
+    return item.approvalStatus
+  }
+
+  const compact = String(item.approvalType || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]/g, '')
+
+  if (compact) {
+    if (
+      compact === 'CANCELED' ||
+      compact.includes('CANCEL') ||
+      compact.includes('\uCDE8\uC18C') ||
+      compact === '2' ||
+      compact === 'C'
+    ) {
+      return 'CANCELED'
+    }
+    if (
+      compact === 'APPROVED' ||
+      compact.includes('APPROV') ||
+      compact.includes('\uC2B9\uC778') ||
+      compact === '1' ||
+      compact === 'A'
+    ) {
+      return 'APPROVED'
+    }
+  }
+
+  const amount = resolveAmount(item)
+  if (amount < 0) return 'CANCELED'
+  if (amount > 0) return 'APPROVED'
+  return 'UNKNOWN'
+}
+
+function approvalStatusLabel(status: CardApprovalStatus) {
+  if (status === 'CANCELED') return '\uCDE8\uC18C'
+  if (status === 'APPROVED') return '\uC2B9\uC778'
+  return '\uBBF8\uD655\uC778'
 }
 
 function resolveUsedAtTime(item: Pick<CardUsageItem, 'usedAt' | 'useDT'>) {
@@ -1495,6 +1541,8 @@ export default function CardUsageClient() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 {group.items.map((item) => {
                   const amt = resolveAmount(item)
+                  const approvalStatus = normalizeApprovalStatus(item)
+                  const approvalStatusText = approvalStatusLabel(approvalStatus)
                   const cat = resolveCategory(item, categories)
                   const displayMemo = memoDrafts[item.id] || item.userMemo || item.memo || ''
                   const globalIdx = sortedItems.indexOf(item)
@@ -1714,7 +1762,7 @@ export default function CardUsageClient() {
                           {item.useStoreName || '가맹점 없음'}
                         </p>
                         <p style={{ fontSize: 12, color: T.textTertiary, margin: '2px 0 0' }}>
-                          {usedMonthDay ? `${usedMonthDay} · ` : ''}{usedTime} · {maskCard(item.cardNum)} · {item.approvalNum || '-'}
+                          {usedMonthDay ? `${usedMonthDay} · ` : ''}{usedTime} · {maskCard(item.cardNum)} · {item.approvalNum || '-'} · {`\uAD6C\uBD84 ${approvalStatusText}`}
                         </p>
                         {reviewMode && (
                           <p style={{ fontSize: 11, margin: '3px 0 0', color: isReviewed ? T.success : T.warning, fontWeight: 600 }}>
@@ -1770,7 +1818,7 @@ export default function CardUsageClient() {
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <p style={{
                           fontSize: 15, fontWeight: 600, margin: 0, whiteSpace: 'nowrap',
-                          color: amt < 0 ? '#2563EB' : T.text // Blue for negative amounts/cancellations
+                          color: approvalStatus === 'CANCELED' ? '#DC2626' : T.text
                         }}>
                           {amt.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400 }}>원</span>
                         </p>

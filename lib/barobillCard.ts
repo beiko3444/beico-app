@@ -177,6 +177,58 @@ export type BarobillCardApprovalLog = {
   raw: Record<string, string | number | null>
 }
 
+type NormalizedApprovalType = 'APPROVED' | 'CANCELED' | 'UNKNOWN'
+
+function normalizeCardApprovalType(rawType: string, amountHints: Array<number | null | undefined>): NormalizedApprovalType {
+  const compact = String(rawType || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]/g, '')
+
+  if (compact) {
+    if (
+      compact.includes('CANCEL') ||
+      compact.includes('\uCDE8\uC18C') ||
+      compact === '2' ||
+      compact === 'C'
+    ) {
+      return 'CANCELED'
+    }
+    if (
+      compact.includes('APPROV') ||
+      compact.includes('\uC2B9\uC778') ||
+      compact === '1' ||
+      compact === 'A'
+    ) {
+      return 'APPROVED'
+    }
+  }
+
+  for (const n of amountHints) {
+    if (typeof n !== 'number' || !Number.isFinite(n) || n === 0) continue
+    return n < 0 ? 'CANCELED' : 'APPROVED'
+  }
+
+  return 'UNKNOWN'
+}
+
+function buildStoredUseKey(
+  useKeyRaw: string,
+  fallbackUseKey: string,
+  normalizedType: NormalizedApprovalType,
+  amountHints: Array<number | null | undefined>,
+) {
+  const base = (useKeyRaw || fallbackUseKey || '').trim()
+  if (!base) return fallbackUseKey
+
+  const hasNegativeAmount = amountHints.some((n) => typeof n === 'number' && Number.isFinite(n) && n < 0)
+  const shouldSuffixCancel = normalizedType === 'CANCELED' || hasNegativeAmount
+
+  if (!shouldSuffixCancel) return base
+  if (base.endsWith(':CANCEL')) return base
+  return `${base}:CANCEL`
+}
+
 function resolveBarobillLogAmount(log: Pick<BarobillCardApprovalLog, 'totalAmount' | 'approvalAmount' | 'amount' | 'tax' | 'serviceCharge'>) {
   if (typeof log.totalAmount === 'number' && log.totalAmount > 0) return log.totalAmount
   if (typeof log.approvalAmount === 'number' && log.approvalAmount > 0) return log.approvalAmount
@@ -202,7 +254,7 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
   const cardNum = decodeXml(extractTag(block, 'CardNum') || '')
   const useDT = decodeXml(extractTag(block, 'UseDT') || '')
   const approvalNum = decodeXml(extractTag(block, 'ApprovalNum') || extractTag(block, 'CardApprovalNum') || '')
-  const approvalType = decodeXml(extractTag(block, 'ApprovalType') || extractTag(block, 'CardApprovalType') || '')
+  const approvalTypeRaw = decodeXml(extractTag(block, 'ApprovalType') || extractTag(block, 'CardApprovalType') || '')
   const approvalAmount = toInt(
     extractTag(block, 'ApprovalAmount') ||
     extractTag(block, 'CardApprovalCost') ||
@@ -223,8 +275,15 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
       : (typeof summedAmount === 'number' && summedAmount > 0)
         ? summedAmount
         : rawTotalAmount ?? approvalAmount
+  const normalizedApprovalType = normalizeCardApprovalType(approvalTypeRaw, [totalAmount, approvalAmount, amount])
   const useKeyRaw = decodeXml(extractTag(block, 'UseKey') || '')
-  const useKey = useKeyRaw || `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
+  const fallbackUseKey = `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
+  const useKey = buildStoredUseKey(
+    useKeyRaw,
+    fallbackUseKey,
+    normalizedApprovalType,
+    [totalAmount, approvalAmount, amount],
+  )
 
   return {
     corpNum,
@@ -232,7 +291,7 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
     useKey,
     useDT,
     usedAt: parseUseDate(useDT),
-    approvalType: approvalType || null,
+    approvalType: normalizedApprovalType,
     approvalNum: approvalNum || null,
     approvalAmount,
     foreignApprovalAmount: toFloat(extractTag(block, 'ForeignApprovalAmount')),
@@ -257,7 +316,8 @@ function parseCardApprovalLog(block: string): BarobillCardApprovalLog {
       CardNum: cardNum,
       UseKey: useKey,
       UseDT: useDT,
-      ApprovalType: approvalType,
+      ApprovalTypeRaw: approvalTypeRaw || null,
+      ApprovalTypeNormalized: normalizedApprovalType,
       ApprovalNum: approvalNum,
       ApprovalAmount: approvalAmount,
       ForeignApprovalAmount: toFloat(extractTag(block, 'ForeignApprovalAmount')),
@@ -286,7 +346,7 @@ function parseLegacyCardLogEx3(block: string): BarobillCardApprovalLog {
   const cardNum = decodeXml(extractTag(block, 'CardNum') || '')
   const useDT = decodeXml(extractTag(block, 'UseDT') || '')
   const approvalNum = decodeXml(extractTag(block, 'CardApprovalNum') || '')
-  const approvalType = decodeXml(extractTag(block, 'CardApprovalType') || '')
+  const approvalTypeRaw = decodeXml(extractTag(block, 'CardApprovalType') || '')
   const approvalAmount = toInt(extractTag(block, 'CardApprovalCost'))
   const amount = toInt(extractTag(block, 'Amount')) ?? approvalAmount
   const tax = toInt(extractTag(block, 'Tax'))
@@ -303,8 +363,15 @@ function parseLegacyCardLogEx3(block: string): BarobillCardApprovalLog {
       : (typeof summedAmount === 'number' && summedAmount > 0)
         ? summedAmount
         : rawTotalAmount ?? approvalAmount
+  const normalizedApprovalType = normalizeCardApprovalType(approvalTypeRaw, [totalAmount, approvalAmount, amount])
   const useKeyRaw = decodeXml(extractTag(block, 'UseKey') || '')
-  const useKey = useKeyRaw || `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
+  const fallbackUseKey = `${cardNum}:${useDT}:${approvalNum}:${totalAmount || 0}`
+  const useKey = buildStoredUseKey(
+    useKeyRaw,
+    fallbackUseKey,
+    normalizedApprovalType,
+    [totalAmount, approvalAmount, amount],
+  )
 
   return {
     corpNum,
@@ -312,7 +379,7 @@ function parseLegacyCardLogEx3(block: string): BarobillCardApprovalLog {
     useKey,
     useDT,
     usedAt: parseUseDate(useDT),
-    approvalType: approvalType || null,
+    approvalType: normalizedApprovalType,
     approvalNum: approvalNum || null,
     approvalAmount,
     foreignApprovalAmount: null,
@@ -337,7 +404,8 @@ function parseLegacyCardLogEx3(block: string): BarobillCardApprovalLog {
       CardNum: cardNum,
       UseKey: useKey,
       UseDT: useDT,
-      CardApprovalType: approvalType,
+      CardApprovalTypeRaw: approvalTypeRaw || null,
+      ApprovalTypeNormalized: normalizedApprovalType,
       CardApprovalNum: approvalNum,
       CardApprovalCost: approvalAmount,
       Amount: amount,

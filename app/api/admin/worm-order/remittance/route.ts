@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
+import { MoinAutomationCanceledError, MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -20,9 +20,18 @@ type RemittanceAuthGuardEntry = {
     lockedUntil: number | null
 }
 
+type RemittanceRunningJob = {
+    credentialKey: string
+    orderId: string
+    startedAt: number
+    abortController: AbortController
+}
+
 type RemittanceAuthGuardState = {
     inFlight: Set<string>
     failures: Map<string, RemittanceAuthGuardEntry>
+    runningJobsByCredential: Map<string, RemittanceRunningJob>
+    runningJobsByOrderId: Map<string, RemittanceRunningJob>
 }
 
 const globalRemittanceGuard = globalThis as typeof globalThis & {
@@ -48,19 +57,13 @@ const parseSummaryNumber = (value: string | null, mode: 'default' | 'rate' = 'de
     return Number.isFinite(parsed) ? parsed : null
 }
 
-const resolveReceiveDateRange = (receiveDateText: string) => {
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(receiveDateText)) return null
-    return {
-        gte: new Date(`${receiveDateText}T00:00:00+09:00`),
-        lte: new Date(`${receiveDateText}T23:59:59.999+09:00`),
-    }
-}
-
 const getRemittanceGuardState = (): RemittanceAuthGuardState => {
     if (!globalRemittanceGuard.wormRemittanceAuthGuard) {
         globalRemittanceGuard.wormRemittanceAuthGuard = {
             inFlight: new Set<string>(),
             failures: new Map<string, RemittanceAuthGuardEntry>(),
+            runningJobsByCredential: new Map<string, RemittanceRunningJob>(),
+            runningJobsByOrderId: new Map<string, RemittanceRunningJob>(),
         }
     }
     return globalRemittanceGuard.wormRemittanceAuthGuard
@@ -106,6 +109,44 @@ const clearAuthFailure = (state: RemittanceAuthGuardState, credentialKey: string
     state.failures.delete(credentialKey)
 }
 
+export async function DELETE(request: Request) {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const guardState = getRemittanceGuardState()
+    const { searchParams } = new URL(request.url)
+    const orderIdRaw = readString(searchParams.get('orderId'))
+    const moinLoginId = (process.env.MOIN_BIZPLUS_LOGIN_ID || '').trim()
+
+    let runningJob: RemittanceRunningJob | null = null
+    if (orderIdRaw && isUuid(orderIdRaw)) {
+        runningJob = guardState.runningJobsByOrderId.get(orderIdRaw) || null
+    }
+
+    if (!runningJob && moinLoginId) {
+        const credentialKey = normalizeCredentialKey(moinLoginId)
+        runningJob = guardState.runningJobsByCredential.get(credentialKey) || null
+    }
+
+    if (!runningJob) {
+        return NextResponse.json({
+            ok: true,
+            canceled: false,
+            message: '현재 진행 중인 송금 신청이 없습니다.',
+        })
+    }
+
+    runningJob.abortController.abort()
+    return NextResponse.json({
+        ok: true,
+        canceled: true,
+        message: '송금 신청 취소 요청을 접수했습니다.',
+        orderId: runningJob.orderId,
+    })
+}
+
 export async function POST(request: Request) {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -119,7 +160,6 @@ export async function POST(request: Request) {
         const moinPassword = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
         const amountRaw = readString(formData.get('amountUsd'))
         const orderIdRaw = readString(formData.get('orderId'))
-        const receiveDateRaw = readString(formData.get('receiveDate'))
         const invoicePdf = formData.get('invoicePdf')
 
         if (!moinLoginId || !moinPassword) {
@@ -157,6 +197,58 @@ export async function POST(request: Request) {
             )
         }
 
+        if (!orderIdRaw || !isUuid(orderIdRaw)) {
+            return NextResponse.json(
+                { error: '발주리스트에서 유효한 발주를 선택한 뒤 다시 시도해 주세요.' },
+                { status: 400 }
+            )
+        }
+
+        let targetOrder:
+            | {
+                id: string
+                orderNumber: string
+                status: string
+                remittanceAppliedAt: Date | null
+                remittanceFinalReceiveAmountText: string | null
+                remittanceSendAmountText: string | null
+                remittanceTotalFeeText: string | null
+                remittanceExchangeRateText: string | null
+              }
+            | null = null
+
+        targetOrder = await prisma.wormOrder.findUnique({
+            where: { id: orderIdRaw },
+            select: {
+                id: true,
+                orderNumber: true,
+                status: true,
+                remittanceAppliedAt: true,
+                remittanceFinalReceiveAmountText: true,
+                remittanceSendAmountText: true,
+                remittanceTotalFeeText: true,
+                remittanceExchangeRateText: true,
+            },
+        })
+
+        if (!targetOrder) {
+            return NextResponse.json(
+                { error: '송금 신청 대상 발주를 찾지 못했습니다. 발주리스트에서 다시 선택해 주세요.' },
+                { status: 400 }
+            )
+        }
+
+        if (targetOrder.status === 'REMITTANCE_APPLIED' || targetOrder.remittanceAppliedAt) {
+            return NextResponse.json(
+                {
+                    error: `이미 송금 신청이 완료된 발주입니다 (${targetOrder.orderNumber}).`,
+                    alreadyApplied: true,
+                    order: targetOrder,
+                },
+                { status: 409 }
+            )
+        }
+
         const guardState = getRemittanceGuardState()
         const credentialKey = normalizeCredentialKey(moinLoginId)
         const now = Date.now()
@@ -181,7 +273,24 @@ export async function POST(request: Request) {
             )
         }
 
+        const runningByOrder = guardState.runningJobsByOrderId.get(targetOrder.id)
+        if (runningByOrder) {
+            return NextResponse.json(
+                { error: `해당 발주는 이미 송금 신청이 진행 중입니다. (${targetOrder.orderNumber})` },
+                { status: 409 }
+            )
+        }
+
+        const runningJob: RemittanceRunningJob = {
+            credentialKey,
+            orderId: targetOrder.id,
+            startedAt: Date.now(),
+            abortController: new AbortController(),
+        }
+
         guardState.inFlight.add(credentialKey)
+        guardState.runningJobsByCredential.set(credentialKey, runningJob)
+        guardState.runningJobsByOrderId.set(targetOrder.id, runningJob)
 
         const invoiceBuffer = Buffer.from(await invoicePdf.arrayBuffer())
         try {
@@ -193,6 +302,7 @@ export async function POST(request: Request) {
                 invoiceMimeType: invoicePdf.type || 'application/pdf',
                 invoiceBuffer,
                 headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
+                abortSignal: runningJob.abortController.signal,
             })
 
             clearAuthFailure(guardState, credentialKey)
@@ -210,81 +320,33 @@ export async function POST(request: Request) {
             let saveWarning: string | null = null
 
             try {
-                const sessionUserId = session.user.id || null
-                let targetOrder:
-                    | {
-                        id: string
-                        orderNumber: string
-                      }
-                    | null = null
+                const finalReceiveAmountText = normalizeSummaryText(pricingSummary?.finalReceiveAmount || '')
+                const sendAmountText = normalizeSummaryText(pricingSummary?.sendAmount || parsedAmount.toFixed(2))
+                const totalFeeText = normalizeSummaryText(pricingSummary?.totalFee || '')
+                const exchangeRateText = normalizeSummaryText(pricingSummary?.exchangeRate || '')
 
-                if (orderIdRaw && isUuid(orderIdRaw)) {
-                    targetOrder = await prisma.wormOrder.findUnique({
-                        where: { id: orderIdRaw },
-                        select: { id: true, orderNumber: true },
-                    })
-                }
-
-                if (!targetOrder) {
-                    const receiveDateRange = resolveReceiveDateRange(receiveDateRaw)
-                    if (receiveDateRange) {
-                        targetOrder = await prisma.wormOrder.findFirst({
-                            where: {
-                                receiveDate: receiveDateRange,
-                                ...(sessionUserId ? { createdById: sessionUserId } : {}),
-                            },
-                            orderBy: { createdAt: 'desc' },
-                            select: { id: true, orderNumber: true },
-                        })
-                    }
-                }
-
-                if (!targetOrder && sessionUserId) {
-                    targetOrder = await prisma.wormOrder.findFirst({
-                        where: { createdById: sessionUserId },
-                        orderBy: { createdAt: 'desc' },
-                        select: { id: true, orderNumber: true },
-                    })
-                }
-
-                if (!targetOrder) {
-                    targetOrder = await prisma.wormOrder.findFirst({
-                        orderBy: { createdAt: 'desc' },
-                        select: { id: true, orderNumber: true },
-                    })
-                }
-
-                if (!targetOrder) {
-                    saveWarning = '연결할 발주를 찾지 못해 송금 결과를 저장하지 못했습니다.'
-                } else {
-                    const finalReceiveAmountText = normalizeSummaryText(pricingSummary?.finalReceiveAmount || '')
-                    const sendAmountText = normalizeSummaryText(pricingSummary?.sendAmount || '')
-                    const totalFeeText = normalizeSummaryText(pricingSummary?.totalFee || '')
-                    const exchangeRateText = normalizeSummaryText(pricingSummary?.exchangeRate || '')
-
-                    savedOrder = await prisma.wormOrder.update({
-                        where: { id: targetOrder.id },
-                        data: {
-                            status: 'REMITTANCE_APPLIED',
-                            remittanceAppliedAt: new Date(result.completedAt),
-                            remittanceFinalReceiveAmountText: finalReceiveAmountText,
-                            remittanceFinalReceiveAmount: parseSummaryNumber(finalReceiveAmountText, 'default'),
-                            remittanceSendAmountText: sendAmountText,
-                            remittanceSendAmount: parseSummaryNumber(sendAmountText, 'default'),
-                            remittanceTotalFeeText: totalFeeText,
-                            remittanceTotalFee: parseSummaryNumber(totalFeeText, 'default'),
-                            remittanceExchangeRateText: exchangeRateText,
-                            remittanceExchangeRate: parseSummaryNumber(exchangeRateText, 'rate'),
-                        },
-                        select: {
-                            id: true,
-                            orderNumber: true,
-                            status: true,
-                            remittanceAppliedAt: true,
-                            updatedAt: true,
-                        },
-                    })
-                }
+                savedOrder = await prisma.wormOrder.update({
+                    where: { id: targetOrder.id },
+                    data: {
+                        status: 'REMITTANCE_APPLIED',
+                        remittanceAppliedAt: new Date(result.completedAt),
+                        remittanceFinalReceiveAmountText: finalReceiveAmountText,
+                        remittanceFinalReceiveAmount: parseSummaryNumber(finalReceiveAmountText, 'default'),
+                        remittanceSendAmountText: sendAmountText,
+                        remittanceSendAmount: parseSummaryNumber(sendAmountText, 'default'),
+                        remittanceTotalFeeText: totalFeeText,
+                        remittanceTotalFee: parseSummaryNumber(totalFeeText, 'default'),
+                        remittanceExchangeRateText: exchangeRateText,
+                        remittanceExchangeRate: parseSummaryNumber(exchangeRateText, 'rate'),
+                    },
+                    select: {
+                        id: true,
+                        orderNumber: true,
+                        status: true,
+                        remittanceAppliedAt: true,
+                        updatedAt: true,
+                    },
+                })
             } catch (saveError) {
                 console.error('Failed to persist worm remittance summary:', saveError)
                 saveWarning = '송금 신청은 완료되었지만 발주 DB 저장에 실패했습니다.'
@@ -298,6 +360,16 @@ export async function POST(request: Request) {
                 saveWarning,
             })
         } catch (error) {
+            if (error instanceof MoinAutomationCanceledError) {
+                return NextResponse.json(
+                    {
+                        error: '송금 신청이 사용자 요청으로 취소되었습니다.',
+                        canceled: true,
+                    },
+                    { status: 409 }
+                )
+            }
+
             if (error instanceof MoinAutomationError) {
                 if (isAuthRelatedAutomationError(error)) {
                     const failure = registerAuthFailure(guardState, credentialKey, Date.now())
@@ -333,6 +405,8 @@ export async function POST(request: Request) {
                 { status: 500 }
             )
         } finally {
+            guardState.runningJobsByCredential.delete(credentialKey)
+            guardState.runningJobsByOrderId.delete(targetOrder.id)
             guardState.inFlight.delete(credentialKey)
         }
     } catch (error) {

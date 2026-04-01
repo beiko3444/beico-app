@@ -51,6 +51,10 @@ export async function GET(request: NextRequest) {
         receiveDate: true,
         status: true,
         remittanceAppliedAt: true,
+        remittanceFinalReceiveAmountText: true,
+        remittanceSendAmountText: true,
+        remittanceTotalFeeText: true,
+        remittanceExchangeRateText: true,
         createdAt: true,
         updatedAt: true,
       },
@@ -75,8 +79,6 @@ export async function POST(request: NextRequest) {
 
     const dayStart = new Date(`${receiveDateText}T00:00:00+09:00`)
     const dayEnd = new Date(`${receiveDateText}T23:59:59.999+09:00`)
-    const compactDate = receiveDateText.replace(/-/g, '')
-
     const existingCount = await prisma.wormOrder.count({
       where: {
         receiveDate: {
@@ -97,8 +99,8 @@ export async function POST(request: NextRequest) {
       | null = null
 
     for (let offset = 1; offset <= 20; offset += 1) {
-      const nextSeq = String(existingCount + offset).padStart(3, '0')
-      const orderNumber = `WO-${compactDate}-${nextSeq}`
+      const nextSeq = String(existingCount + offset).padStart(2, '0')
+      const orderNumber = `${receiveDateText}-${nextSeq}`
 
       try {
         order = await prisma.wormOrder.create({
@@ -135,6 +137,37 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true, order })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '새 발주 생성 중 오류가 발생했습니다.'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: '권한이 없습니다.' }, { status: 401 })
+  }
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')?.trim()
+    if (!id) {
+      return NextResponse.json({ error: '삭제할 발주 ID가 필요합니다.' }, { status: 400 })
+    }
+
+    await prisma.wormOrder.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({ success: true })
+  } catch (error: unknown) {
+    if (
+      error instanceof Prisma.PrismaClientKnownRequestError &&
+      error.code === 'P2025'
+    ) {
+      return NextResponse.json({ error: '이미 삭제되었거나 존재하지 않는 발주입니다.' }, { status: 404 })
+    }
+
+    const message = error instanceof Error ? error.message : '발주 삭제 중 오류가 발생했습니다.'
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }

@@ -86,6 +86,7 @@ export type MoinRemittanceInput = {
     invoiceMimeType: string
     invoiceBuffer: Buffer
     headless?: boolean
+    abortSignal?: AbortSignal
 }
 
 export type MoinRemittanceResult = {
@@ -112,9 +113,22 @@ export class MoinAutomationError extends Error {
     }
 }
 
+export class MoinAutomationCanceledError extends MoinAutomationError {
+    constructor(step: string, message = 'Remittance automation was canceled by user.') {
+        super(step, message)
+        this.name = 'MoinAutomationCanceledError'
+    }
+}
+
 const getErrorMessage = (error: unknown) => {
     if (error instanceof Error && error.message) return error.message
     return String(error)
+}
+
+const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) => {
+    if (signal?.aborted) {
+        throw new MoinAutomationCanceledError(step)
+    }
 }
 
 const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
@@ -906,22 +920,41 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
     let browser: BrowserLike | null = null
     const steps: string[] = []
+    const abortSignal = input.abortSignal
+    let abortListenerCleanup: (() => void) | null = null
 
     try {
+        throwIfAbortRequested(abortSignal, 'Launch browser')
         const launched = await launchBrowser(input.headless ?? true)
         browser = launched.browser
         steps.push(`runtime:${launched.runtime}`)
+        throwIfAbortRequested(abortSignal, 'Launch browser')
 
+        if (abortSignal) {
+            const onAbort = () => {
+                steps.push('cancel-requested')
+                if (browser) {
+                    void browser.close().catch(() => undefined)
+                }
+            }
+            abortSignal.addEventListener('abort', onAbort, { once: true })
+            abortListenerCleanup = () => abortSignal.removeEventListener('abort', onAbort)
+            throwIfAbortRequested(abortSignal, 'Initialize browser')
+        }
+
+        throwIfAbortRequested(abortSignal, 'Create browser context')
         const context = await browser.newContext({ locale: 'ko-KR' })
         const page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
         // ???? Step 1: Go directly to login page ??????????????????????????????????????????????????????????
+        throwIfAbortRequested(abortSignal, 'Open login page')
         const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
         steps.push(`open-login-page:${loginWaitUntil}`)
 
         // ???? Step 2: Fill login credentials (type char-by-char for React) ????
+        throwIfAbortRequested(abortSignal, 'Fill login ID')
         await typeFirstVisible(
             page,
             [
@@ -937,6 +970,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('fill-login-id')
 
+        throwIfAbortRequested(abortSignal, 'Fill login password')
         await typeFirstVisible(
             page,
             ['input[name="password"]', 'input[type="password"]', 'input[autocomplete="current-password"]'],
@@ -949,6 +983,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // Wait for React to process input events and enable the login button
         // Add a random human-like delay before clicking submit (1.5 to 2.5 seconds)
         const clickDelay = 1500 + Math.floor(Math.random() * 1000)
+        throwIfAbortRequested(abortSignal, 'Submit login')
         await page.waitForTimeout(clickDelay)
 
         // ???? Step 3: Submit login ??????????????????????????????????????????????????????????????????????????????????????
@@ -964,6 +999,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         let loginClicked = false
         for (const selector of loginBtnSelectors) {
+            throwIfAbortRequested(abortSignal, 'Submit login')
             try {
                 const btn = page.locator(selector).first()
                 await btn.waitFor({ state: 'visible', timeout: 5000 })
@@ -976,6 +1012,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     } catch {
                         break // isDisabled not available, just proceed
                     }
+                    throwIfAbortRequested(abortSignal, 'Submit login')
                     await page.waitForTimeout(500)
                 }
 
@@ -997,6 +1034,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // We wait up to 10 seconds to see if the URL changes OR an error banner appears.
         let loginFailed = false
         try {
+            throwIfAbortRequested(abortSignal, 'Verify login')
             await Promise.race([
                 waitForUrlChange(page, loginUrlBefore, 10000).then((url) => {
                     if (url.includes('/login')) loginFailed = true
@@ -1011,6 +1049,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         // Wait for page to settle
+        throwIfAbortRequested(abortSignal, 'Verify login')
         await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
 
         if (loginFailed || page.url().includes('/login')) {
@@ -1056,11 +1095,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
             let navigated = false
             for (const selector of recipientNavSelectors) {
+                throwIfAbortRequested(abortSignal, 'Navigate recipient page')
                 try {
                     const link = page.locator(selector).first()
                     const isVisible = await link.isVisible()
                     if (isVisible) {
                         await link.click({ timeout: 8000 })
+                        throwIfAbortRequested(abortSignal, 'Navigate recipient page')
                         await page.waitForTimeout(2000)
                         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
                         navigated = true
@@ -1080,6 +1121,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         // Wait for the recipient list to load
+        throwIfAbortRequested(abortSignal, 'Load recipient list')
         await page.waitForTimeout(2000)
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
 
@@ -1155,6 +1197,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         let remitClickReason = 'not-attempted'
 
         for (let attempt = 0; attempt < 3 && !remitClicked; attempt++) {
+            throwIfAbortRequested(abortSignal, 'Open remit modal')
             try {
                 const companyEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
                 await companyEl.waitFor({ state: 'visible', timeout: 5000 })
@@ -1164,6 +1207,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 steps.push(`company-text-click-failed:attempt${attempt}`)
             }
 
+            throwIfAbortRequested(abortSignal, 'Open remit modal')
             await page.waitForTimeout(1000)
 
             try {
@@ -1177,6 +1221,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 steps.push(`company-scoped-remit-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}:attempt${attempt}`)
             }
 
+            throwIfAbortRequested(abortSignal, 'Open remit modal')
             await page.waitForTimeout(1000)
         }
 
@@ -1192,6 +1237,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         let transferInspection = await inspectTransferInputs(page)
 
         for (let attempt = 0; attempt < 4; attempt++) {
+            throwIfAbortRequested(abortSignal, 'Open amount step')
             await page.waitForTimeout(2000)
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
 
@@ -1215,6 +1261,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 steps.push(`step2-recovery-attempt:${attempt + 1}`)
 
                 try {
+                    throwIfAbortRequested(abortSignal, 'Open amount step')
                     const recoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
                     steps.push(`recovery-company-scoped-remit:${recoveryReason}`)
                     if (!recoveryReason.startsWith('clicked-')) {
@@ -1227,6 +1274,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 }
 
                 try {
+                    throwIfAbortRequested(abortSignal, 'Open amount step')
                     const secondRecoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
                     steps.push(`recovery-company-scoped-remit-2:${secondRecoveryReason}`)
                     if (!secondRecoveryReason.startsWith('clicked-')) {
@@ -1248,6 +1296,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('step2-amount-form-loaded')
 
         // Give the input fields extra time to render (React hydration)
+        throwIfAbortRequested(abortSignal, 'Fill USD amount')
         await page.waitForTimeout(2000)
 
         // ???? Step 6: Fill USD amount ????????????????????????????????????????????????????????????????????????????????
@@ -1304,6 +1353,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         ]
 
         for (const sel of usdSelectors) {
+            throwIfAbortRequested(abortSignal, 'Fill USD amount')
             if (amountFilled) break
             try {
                 const target = page.locator(sel).first()
@@ -1328,6 +1378,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // (first is usually KRW, second is USD)
         if (!amountFilled) {
             try {
+                throwIfAbortRequested(abortSignal, 'Fill USD amount')
                 const result = await page.evaluate(`
                     (() => {
                         const inputs = Array.from(document.querySelectorAll('input'));
@@ -1387,6 +1438,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // Strategy 3: JavaScript direct value set on the input
         if (!amountFilled) {
             try {
+                throwIfAbortRequested(abortSignal, 'Fill USD amount')
                 const jsResult = await page.evaluate(`
                     (() => {
                         const amount = ${JSON.stringify(input.amountUsd)};
@@ -1444,6 +1496,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // ???? Step 7: Next step after amount ??????????????????????????????????????????????????????????????????
         let uploadStepReady = false
         for (let attempt = 0; attempt < 4; attempt += 1) {
+            throwIfAbortRequested(abortSignal, 'Next after amount')
             const beforeUrl = page.url()
             await clickNextStep(page, DEFAULT_TIMEOUT_MS)
             await page.waitForTimeout(1200)
@@ -1462,6 +1515,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('next-after-amount')
 
         // ???? Step 8: Upload invoice PDF ??????????????????????????????????????????????????????????????????????????
+        throwIfAbortRequested(abortSignal, 'Upload invoice')
         await uploadFirstFileInput(
             page,
             ['input[type="file"][accept*="pdf" i]', 'input[type="file"]'],
@@ -1475,18 +1529,22 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('upload-invoice')
 
         // ???? Step 9: Next step after upload ??????????????????????????????????????????????????????????????????
+        throwIfAbortRequested(abortSignal, 'Next after upload')
         await clickNextStep(page, DEFAULT_TIMEOUT_MS)
         steps.push('next-after-upload')
 
         // ???? Step 10: Check agreement ??????????????????????????????????????????????????????????????????????????????
+        throwIfAbortRequested(abortSignal, 'Agreement')
         await checkAgreement(page, DEFAULT_TIMEOUT_MS)
         steps.push('check-agreement')
 
+        throwIfAbortRequested(abortSignal, 'Inspect pricing summary')
         const pricingSummary = await inspectRemittancePricingSummary(page)
         steps.push(`pricing-summary:${JSON.stringify(pricingSummary).slice(0, 220)}`)
 
         // ???? Step 11: Submit remittance ??????????????????????????????????????????????????????????????????????????
         // On the ?筌먲퐢沅??筌먦끉逾?page, the submit button says "??酉????ル―?? (not "???깅쾳 ??節띉?)
+        throwIfAbortRequested(abortSignal, 'Submit remittance')
         await clickFirstVisible(
             page,
             [
@@ -1509,6 +1567,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const submitUrl = page.url()
         let completionSnapshot = await inspectRemittanceCompletion(page)
         for (let attempt = 0; attempt < 8; attempt++) {
+            throwIfAbortRequested(abortSignal, 'Verify completion')
             await page.waitForTimeout(2500)
             await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
 
@@ -1555,6 +1614,18 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             pricingSummary,
         }
     } catch (error) {
+        if (error instanceof MoinAutomationCanceledError) {
+            error.message = `${error.message} [steps: ${steps.join(' -> ')}]`
+            throw error
+        }
+
+        if (abortSignal?.aborted) {
+            throw new MoinAutomationCanceledError(
+                'Automation',
+                `Remittance automation was canceled by user. [steps: ${steps.join(' -> ')}]`
+            )
+        }
+
         if (error instanceof MoinAutomationError) {
             // Append accumulated steps to help debugging
             error.message = `${error.message} [steps: ${steps.join(' -> ')}]`
@@ -1566,6 +1637,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' -> ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`
         )
     } finally {
+        if (abortListenerCleanup) {
+            abortListenerCleanup()
+            abortListenerCleanup = null
+        }
         if (browser) {
             await browser.close().catch(() => undefined)
         }

@@ -6,6 +6,8 @@ import type { Prisma } from '@prisma/client'
 
 export const dynamic = 'force-dynamic'
 
+type ApprovalStatus = 'APPROVED' | 'CANCELED' | 'UNKNOWN'
+
 function parseDateInput(input: string | null, endOfDay = false) {
   if (!input) return null
   const value = input.trim()
@@ -54,6 +56,46 @@ function resolveAmount(row: {
     return (row.amount || 0) + (row.tax || 0) + (row.serviceCharge || 0)
   }
   return 0
+}
+
+function normalizeApprovalStatus(row: {
+  approvalType: string | null
+  totalAmount: number | null
+  approvalAmount: number | null
+  amount: number | null
+  tax: number | null
+  serviceCharge: number | null
+}): ApprovalStatus {
+  const compact = String(row.approvalType || '')
+    .trim()
+    .toUpperCase()
+    .replace(/[\s_-]/g, '')
+
+  if (compact) {
+    if (
+      compact === 'CANCELED' ||
+      compact.includes('CANCEL') ||
+      compact.includes('\uCDE8\uC18C') ||
+      compact === '2' ||
+      compact === 'C'
+    ) {
+      return 'CANCELED'
+    }
+    if (
+      compact === 'APPROVED' ||
+      compact.includes('APPROV') ||
+      compact.includes('\uC2B9\uC778') ||
+      compact === '1' ||
+      compact === 'A'
+    ) {
+      return 'APPROVED'
+    }
+  }
+
+  const amount = resolveAmount(row)
+  if (amount < 0) return 'CANCELED'
+  if (amount > 0) return 'APPROVED'
+  return 'UNKNOWN'
 }
 
 export async function GET(request: Request) {
@@ -120,10 +162,15 @@ export async function GET(request: Request) {
       }),
     ])
 
+    const normalizedItems = items.map((item) => ({
+      ...item,
+      approvalStatus: normalizeApprovalStatus(item),
+    }))
+
     const totalAmount = amountRows.reduce((sum, row) => sum + resolveAmount(row), 0)
 
     return NextResponse.json({
-      items,
+      items: normalizedItems,
       page,
       pageSize,
       totalCount,

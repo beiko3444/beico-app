@@ -178,11 +178,9 @@ export default function AdminNav({
         }
 
         const now = new Date()
-        const dateLine = `${now.getFullYear()}년 ${now.getMonth() + 1}월 ${now.getDate()}일`
         const contents = [
-            '안녕하세요 사장님 오이키입니다.',
-            dateLine,
-            `${parsedShipmentCount}건 출고 진행 부탁드립니다.`,
+            '소장님, 엑스트래커입니다.',
+            `${now.getMonth() + 1}/${now.getDate()} 출고 ${parsedShipmentCount}건 집하 부탁드립니다.`,
             '감사합니다.',
         ].join('\n')
 
@@ -195,7 +193,7 @@ export default function AdminNav({
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     fromNumber,
-                    toName: '사장님',
+                    toName: '소장님',
                     toNumber: '01034443467',
                     contents,
                 }),
