@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, CalendarDays, CheckCircle2, ChevronDown, ChevronUp, Circle, Clock3, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Clock3, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles, Trash2 } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -402,6 +402,37 @@ function formatYmdOrYmdHm(value?: string) {
         return `${value.slice(0, 4)}-${value.slice(4, 6)}-${value.slice(6, 8)} ${value.slice(8, 10)}:${value.slice(10, 12)}`
     }
     return value
+}
+
+function parseYmdToLocalDate(value: string) {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+    const [yearText, monthText, dayText] = value.split('-')
+    const year = Number(yearText)
+    const month = Number(monthText)
+    const day = Number(dayText)
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) return null
+    return new Date(year, month - 1, day)
+}
+
+function formatLocalDateToYmd(date: Date) {
+    const year = String(date.getFullYear())
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+}
+
+function buildMonthCalendarDays(year: number, month: number) {
+    const firstDay = new Date(year, month, 1)
+    const firstWeekday = firstDay.getDay()
+    const start = new Date(year, month, 1 - firstWeekday)
+    return Array.from({ length: 42 }, (_, index) => {
+        const date = new Date(start)
+        date.setDate(start.getDate() + index)
+        return {
+            date,
+            isCurrentMonth: date.getMonth() === month,
+        }
+    })
 }
 
 function normalizeCustomsStepText(...values: Array<string | undefined>) {
@@ -857,6 +888,10 @@ export default function WormOrderPage() {
     const today = new Date().toISOString().split('T')[0]
     const [quantitiesByType, setQuantitiesByType] = useState<Record<WormTypeId, Record<string, number>>>(createInitialQuantitiesByType)
     const [receiveDate, setReceiveDate] = useState(today)
+    const [calendarCursor, setCalendarCursor] = useState(() => {
+        const base = parseYmdToLocalDate(today) || new Date()
+        return { year: base.getFullYear(), month: base.getMonth() }
+    })
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
     const [orderCreateError, setOrderCreateError] = useState('')
@@ -889,7 +924,6 @@ export default function WormOrderPage() {
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
     const [customsProgressLoading, setCustomsProgressLoading] = useState(false)
-    const dateInputRef = useRef<HTMLInputElement>(null)
     const orderSectionRef = useRef<HTMLDivElement>(null)
     const inboxSectionRef = useRef<HTMLDivElement>(null)
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
@@ -904,6 +938,7 @@ export default function WormOrderPage() {
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
     const [loadingEmails, setLoadingEmails] = useState(false)
     const [matchingEmailUid, setMatchingEmailUid] = useState<string | null>(null)
+    const [invoiceOcrRunningUid, setInvoiceOcrRunningUid] = useState<string | null>(null)
     const [emailMatchMessage, setEmailMatchMessage] = useState('')
     const [loadingEmailDetail, setLoadingEmailDetail] = useState(false)
     const [emailError, setEmailError] = useState('')
@@ -1474,6 +1509,12 @@ export default function WormOrderPage() {
         void fetchWormOrders()
     }, [fetchWormOrders])
 
+    useEffect(() => {
+        const selected = parseYmdToLocalDate(receiveDate)
+        if (!selected) return
+        setCalendarCursor({ year: selected.getFullYear(), month: selected.getMonth() })
+    }, [receiveDate])
+
     const fetchEmails = async () => {
         setLoadingEmails(true)
         setEmailError('')
@@ -1534,6 +1575,75 @@ export default function WormOrderPage() {
         }
     }
 
+    const applyMatchResultToEmailState = useCallback((uid: string, fallbackOrder: WormOrderSnapshot, rawMatch: unknown) => {
+        const matched = rawMatch as {
+            orderNumber?: unknown
+            matchedAt?: unknown
+            invoiceUnitPriceUsd?: unknown
+            invoiceTotalAmountUsd?: unknown
+            usdKrwRate?: unknown
+            invoiceUnitPriceKrw?: unknown
+            invoiceTotalAmountKrw?: unknown
+            invoiceExtractedAt?: unknown
+            invoiceSourceFile?: unknown
+            invoiceOcrError?: unknown
+        } | null
+
+        const toNullableNumber = (value: unknown) =>
+            typeof value === 'number' && Number.isFinite(value) ? value : null
+
+        const matchedOrderNumber =
+            typeof matched?.orderNumber === 'string' && matched.orderNumber
+                ? matched.orderNumber
+                : fallbackOrder.orderNumber
+        const matchedAt =
+            typeof matched?.matchedAt === 'string' ? matched.matchedAt : new Date().toISOString()
+
+        setEmails((prev) =>
+            prev.map((item) =>
+                item.uid === uid
+                    ? {
+                        ...item,
+                        matchedOrderId: fallbackOrder.id,
+                        matchedOrderNumber,
+                        matchedAt,
+                        invoiceUnitPriceUsd: toNullableNumber(matched?.invoiceUnitPriceUsd),
+                        invoiceTotalAmountUsd: toNullableNumber(matched?.invoiceTotalAmountUsd),
+                        usdKrwRate: toNullableNumber(matched?.usdKrwRate),
+                        invoiceUnitPriceKrw: toNullableNumber(matched?.invoiceUnitPriceKrw),
+                        invoiceTotalAmountKrw: toNullableNumber(matched?.invoiceTotalAmountKrw),
+                        invoiceExtractedAt: typeof matched?.invoiceExtractedAt === 'string' ? matched.invoiceExtractedAt : null,
+                        invoiceSourceFile: typeof matched?.invoiceSourceFile === 'string' ? matched.invoiceSourceFile : null,
+                        invoiceOcrError: typeof matched?.invoiceOcrError === 'string' ? matched.invoiceOcrError : null,
+                    }
+                    : item,
+            ),
+        )
+        setEmailCacheSavedAt(new Date().toISOString())
+        return {
+            matchedOrderNumber,
+            ocrError: typeof matched?.invoiceOcrError === 'string' ? matched.invoiceOcrError : '',
+        }
+    }, [])
+
+    const requestEmailMatchAndInvoiceOcr = useCallback(async (email: WormEmailListItem, targetOrder: WormOrderSnapshot) => {
+        const response = await fetch('/api/admin/worm-order/emails/match', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                uid: email.uid,
+                orderId: targetOrder.id,
+                subject: email.subject,
+                date: email.date,
+            }),
+        })
+        const result = await response.json().catch(() => null)
+        if (!response.ok) {
+            throw new Error(typeof result?.error === 'string' ? result.error : '메일 매칭에 실패했습니다.')
+        }
+        return result
+    }, [])
+
     const handleMatchEmailToActiveOrder = async (email: WormEmailListItem) => {
         if (!activeWormOrder?.id) {
             setEmailError('발주리스트에서 매칭할 발주를 먼저 선택해 주세요.')
@@ -1549,55 +1659,9 @@ export default function WormOrderPage() {
         setEmailError('')
         setEmailMatchMessage('')
         try {
-            const toNullableNumber = (value: unknown) =>
-                typeof value === 'number' && Number.isFinite(value) ? value : null
+            const result = await requestEmailMatchAndInvoiceOcr(email, activeWormOrder)
+            const { matchedOrderNumber, ocrError } = applyMatchResultToEmailState(email.uid, activeWormOrder, result?.match ?? null)
 
-            const response = await fetch('/api/admin/worm-order/emails/match', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    uid: email.uid,
-                    orderId: activeWormOrder.id,
-                    subject: email.subject,
-                    date: email.date,
-                }),
-            })
-            const result = await response.json().catch(() => null)
-            if (!response.ok) {
-                throw new Error(typeof result?.error === 'string' ? result.error : '메일 매칭에 실패했습니다.')
-            }
-
-            const matched = result?.match
-            const matchedOrderNumber =
-                typeof matched?.orderNumber === 'string' && matched.orderNumber
-                    ? matched.orderNumber
-                    : activeWormOrder.orderNumber
-            const matchedAt =
-                typeof matched?.matchedAt === 'string' ? matched.matchedAt : new Date().toISOString()
-
-            setEmails((prev) =>
-                prev.map((item) =>
-                    item.uid === email.uid
-                        ? {
-                            ...item,
-                            matchedOrderId: activeWormOrder.id,
-                            matchedOrderNumber,
-                            matchedAt,
-                            invoiceUnitPriceUsd: toNullableNumber(matched?.invoiceUnitPriceUsd),
-                            invoiceTotalAmountUsd: toNullableNumber(matched?.invoiceTotalAmountUsd),
-                            usdKrwRate: toNullableNumber(matched?.usdKrwRate),
-                            invoiceUnitPriceKrw: toNullableNumber(matched?.invoiceUnitPriceKrw),
-                            invoiceTotalAmountKrw: toNullableNumber(matched?.invoiceTotalAmountKrw),
-                            invoiceExtractedAt: typeof matched?.invoiceExtractedAt === 'string' ? matched.invoiceExtractedAt : null,
-                            invoiceSourceFile: typeof matched?.invoiceSourceFile === 'string' ? matched.invoiceSourceFile : null,
-                            invoiceOcrError: typeof matched?.invoiceOcrError === 'string' ? matched.invoiceOcrError : null,
-                        }
-                        : item,
-                ),
-            )
-            setEmailCacheSavedAt(new Date().toISOString())
-
-            const ocrError = typeof matched?.invoiceOcrError === 'string' ? matched.invoiceOcrError : ''
             if (ocrError) {
                 setEmailMatchMessage(`메일 매칭 완료: ${matchedOrderNumber} (인보이스 OCR 경고: ${ocrError})`)
             } else {
@@ -1609,6 +1673,38 @@ export default function WormOrderPage() {
             setMatchingEmailUid(null)
         }
     }
+
+    const handleRunInvoiceOcrForEmail = useCallback(async (email: WormEmailListItem) => {
+        if (!activeWormOrder?.id) {
+            setEmailError('발주리스트에서 매칭할 발주를 먼저 선택해 주세요.')
+            return
+        }
+
+        const targetOrder: WormOrderSnapshot = {
+            id: email.matchedOrderId || activeWormOrder.id,
+            orderNumber: email.matchedOrderNumber || activeWormOrder.orderNumber,
+            receiveDate: activeWormOrder.receiveDate,
+        }
+
+        setInvoiceOcrRunningUid(email.uid)
+        setEmailError('')
+        setEmailMatchMessage('')
+
+        try {
+            const result = await requestEmailMatchAndInvoiceOcr(email, targetOrder)
+            const { matchedOrderNumber, ocrError } = applyMatchResultToEmailState(email.uid, targetOrder, result?.match ?? null)
+
+            if (ocrError) {
+                setEmailMatchMessage(`인보이스 OCR 재실행 완료: ${matchedOrderNumber} (경고: ${ocrError})`)
+            } else {
+                setEmailMatchMessage(`인보이스 OCR 재실행 완료: ${matchedOrderNumber}`)
+            }
+        } catch (error) {
+            setEmailError(error instanceof Error ? error.message : '인보이스 OCR 실행 중 오류가 발생했습니다.')
+        } finally {
+            setInvoiceOcrRunningUid(null)
+        }
+    }, [activeWormOrder, applyMatchResultToEmailState, requestEmailMatchAndInvoiceOcr])
 
     const selectedOrders = useMemo(() => {
         return WORM_TYPES.flatMap((wormType) =>
@@ -1626,6 +1722,24 @@ export default function WormOrderPage() {
     const totalBoxes = useMemo(() => {
         return selectedOrders.reduce((sum, item) => sum + item.boxes, 0)
     }, [selectedOrders])
+
+    const todayDate = useMemo(() => {
+        const parsed = parseYmdToLocalDate(today)
+        const base = parsed || new Date()
+        return new Date(base.getFullYear(), base.getMonth(), base.getDate())
+    }, [today])
+
+    const calendarDays = useMemo(
+        () => buildMonthCalendarDays(calendarCursor.year, calendarCursor.month),
+        [calendarCursor.month, calendarCursor.year],
+    )
+
+    const calendarMonthLabel = useMemo(() => {
+        return new Intl.DateTimeFormat('ko-KR', {
+            year: 'numeric',
+            month: 'long',
+        }).format(new Date(calendarCursor.year, calendarCursor.month, 1))
+    }, [calendarCursor.month, calendarCursor.year])
 
     const remittanceLockRemainingMs = useMemo(() => {
         if (!remittanceLockedUntil) return 0
@@ -1966,21 +2080,6 @@ export default function WormOrderPage() {
             setCustomsProgressLoading(false)
         }
     }
-
-    useEffect(() => {
-        const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
-        if (!input?.showPicker) return
-
-        const timer = window.setTimeout(() => {
-            try {
-                input.showPicker?.()
-            } catch {
-                // Ignore browsers that block programmatic picker open.
-            }
-        }, 120)
-
-        return () => window.clearTimeout(timer)
-    }, [])
 
     const firstSummary = customsProgressResult?.summaryRecords?.[0] || null
     const detailRows = customsProgressResult?.detailRecords || []
@@ -2385,7 +2484,7 @@ export default function WormOrderPage() {
                         <thead>
                             <tr className="bg-slate-50 text-slate-600">
                                 <th className="text-left px-3 py-2 font-bold">발주번호</th>
-                                <th className="text-left px-3 py-2 font-bold">수령일</th>
+                                <th className="text-left px-3 py-2 font-bold">작성일</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
                                 <th className="text-left px-3 py-2 font-bold">최근수정</th>
                                 <th className="text-right px-3 py-2 font-bold">관리</th>
@@ -2394,7 +2493,7 @@ export default function WormOrderPage() {
                         <tbody>
                             {wormOrderList.map((order) => {
                                 const isActiveOrder = activeWormOrder?.id === order.id
-                                const receiveDateText = toKstDateInputString(order.receiveDate)
+                                const createdDateText = toKstDateInputString(order.createdAt)
                                 return (
                                     <tr
                                         key={order.id}
@@ -2404,7 +2503,7 @@ export default function WormOrderPage() {
                                         }`}
                                     >
                                         <td className="px-3 py-2.5 font-bold text-slate-900">{order.orderNumber}</td>
-                                        <td className="px-3 py-2.5 text-slate-700">{receiveDateText || '-'}</td>
+                                        <td className="px-3 py-2.5 text-slate-700">{createdDateText || '-'}</td>
                                         <td className="px-3 py-2.5">
                                             <div className="flex flex-col gap-1">
                                                 <span className={`inline-flex h-6 w-fit items-center rounded-md border px-2 text-xs font-bold ${getWormOrderStatusClass(order.status)}`}>
@@ -2553,128 +2652,180 @@ export default function WormOrderPage() {
             )}
 
             {showOrderTools && (
-                <div ref={orderSectionRef} style={{ order: orderToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
-                <div className="flex flex-col md:flex-row md:items-end gap-4">
-                    <div className="min-w-0">
-                        <label htmlFor="receiveDate" className="block text-xs font-black text-gray-600 uppercase tracking-[0.15em] mb-2">
-                            Receiving Date
-                        </label>
-                        <div
-                            className="relative w-full md:w-[260px]"
-                            onClick={() => {
-                                const input = dateInputRef.current as (HTMLInputElement & { showPicker?: () => void }) | null
-                                try {
-                                    input?.showPicker?.()
-                                } catch {
-                                    // Ignore unsupported browser behavior.
-                                }
-                            }}
-                        >
-                            <CalendarDays className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                            <input
-                                ref={dateInputRef}
-                                id="receiveDate"
-                                type="date"
-                                value={receiveDate}
-                                onChange={(event) => {
-                                    setCopied(false)
-                                    setReceiveDate(event.target.value)
-                                    setActiveWormOrder(null)
-                                }}
-                                min={today}
-                                className="w-full h-11 pl-10 pr-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                            />
+                <div
+                    ref={orderSectionRef}
+                    style={{ order: orderToolOrderBase + 5 }}
+                    className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+                >
+                    <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
+                        <div>
+                            <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">WORM ORDER SHEET</p>
+                            <h2 className="text-lg font-black text-[#1f2937]">How many boxes do you want to order?</h2>
                         </div>
+                        <Sparkles size={18} className="text-[#e34219]" />
                     </div>
 
-                    <button
-                        type="button"
-                        onClick={handleGenerate}
-                        className="h-11 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide w-full md:w-auto"
-                    >
-                        Generate Message
-                    </button>
-                </div>
-                {validationError && (
-                    <p className="text-sm font-semibold text-[#e34219] mt-3">{validationError}</p>
-                )}
-                </div>
-            )}
+                    <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
+                        <aside className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5 flex flex-col">
+                            <p className="text-[11px] font-black text-slate-600 uppercase tracking-[0.2em]">작성일 달력</p>
 
-            {showOrderTools && (
-                <div style={{ order: orderToolOrderBase + 6 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
-                    <div>
-                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">WORM ORDER SHEET</p>
-                        <h2 className="text-lg font-black text-[#1f2937]">How many boxes do you want to order?</h2>
-                    </div>
-                    <Sparkles size={18} className="text-[#e34219]" />
-                </div>
-
-                <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-2 gap-5">
-                    {WORM_TYPES.map((wormType) => (
-                        <section key={wormType.id} className="space-y-3">
-                            <div className="flex items-center gap-2">
-                                <span className={`inline-flex h-7 items-center rounded-full px-3 text-sm font-black ${wormType.cardTagClass}`}>
-                                    {wormType.label}
-                                </span>
-                                <span className="text-xs text-gray-500 font-semibold">사이즈별 박스 수량 입력</span>
+                            <div className="mt-3 flex items-center justify-between">
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCalendarCursor((prev) => {
+                                            const nextMonth = prev.month - 1
+                                            if (nextMonth < 0) return { year: prev.year - 1, month: 11 }
+                                            return { year: prev.year, month: nextMonth }
+                                        })
+                                    }
+                                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 inline-flex items-center justify-center"
+                                    aria-label="이전 달"
+                                >
+                                    <ChevronLeft size={14} />
+                                </button>
+                                <p className="text-sm font-black text-slate-900">{calendarMonthLabel}</p>
+                                <button
+                                    type="button"
+                                    onClick={() =>
+                                        setCalendarCursor((prev) => {
+                                            const nextMonth = prev.month + 1
+                                            if (nextMonth > 11) return { year: prev.year + 1, month: 0 }
+                                            return { year: prev.year, month: nextMonth }
+                                        })
+                                    }
+                                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 inline-flex items-center justify-center"
+                                    aria-label="다음 달"
+                                >
+                                    <ChevronRight size={14} />
+                                </button>
                             </div>
 
-                            <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-3 md:gap-4">
-                                {WORM_SIZES.map((size) => {
-                                    const current = quantitiesByType[wormType.id]?.[size.id] || 0
-                                    const isSelected = current > 0
-
+                            <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-slate-400 text-center">
+                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday) => (
+                                    <span key={weekday}>{weekday}</span>
+                                ))}
+                            </div>
+                            <div className="mt-1 grid grid-cols-7 gap-1">
+                                {calendarDays.map((dayCell) => {
+                                    const ymd = formatLocalDateToYmd(dayCell.date)
+                                    const isSelected = receiveDate === ymd
+                                    const dayStart = new Date(
+                                        dayCell.date.getFullYear(),
+                                        dayCell.date.getMonth(),
+                                        dayCell.date.getDate(),
+                                    )
+                                    const isPast = dayStart.getTime() < todayDate.getTime()
                                     return (
-                                        <div
-                                            key={`${wormType.id}-${size.id}`}
-                                            className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
+                                        <button
+                                            key={ymd}
+                                            type="button"
+                                            onClick={() => {
+                                                setCopied(false)
+                                                setReceiveDate(ymd)
+                                                setActiveWormOrder(null)
+                                            }}
+                                            disabled={isPast}
+                                            className={`h-9 rounded-lg text-xs font-bold transition-colors ${
                                                 isSelected
-                                                    ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm`
-                                                    : 'border-gray-200 bg-white hover:border-gray-300'
-                                            }`}
+                                                    ? 'bg-[#e34219] text-white'
+                                                    : dayCell.isCurrentMonth
+                                                        ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
+                                                        : 'bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200'
+                                            } ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
-                                            <div className="flex flex-col items-start gap-0.5 px-0.5">
-                                                <div className="text-[16px] font-black text-[#111827] leading-none">{size.id}</div>
-                                                <div className="text-[11px] tracking-tight text-gray-500 font-medium leading-none">{size.range}</div>
-                                            </div>
-
-                                            <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
-                                                    className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
-                                                    aria-label={`${wormType.label} ${size.id} decrease`}
-                                                >
-                                                    <Minus size={15} />
-                                                </button>
-                                                <input
-                                                    type="number"
-                                                    min={0}
-                                                    value={current}
-                                                    onChange={(event) => {
-                                                        const next = Number(event.target.value)
-                                                        handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
-                                                    }}
-                                                    className="h-[36px] min-w-[44px] px-1 text-center font-black tabular-nums text-[#111827] outline-none text-[15px]"
-                                                />
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
-                                                    className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
-                                                    aria-label={`${wormType.label} ${size.id} increase`}
-                                                >
-                                                    <Plus size={15} />
-                                                </button>
-                                            </div>
-                                        </div>
+                                            {dayCell.date.getDate()}
+                                        </button>
                                     )
                                 })}
                             </div>
-                        </section>
-                    ))}
-                </div>
+
+                            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+                                선택된 작성일: {receiveDate || '-'}
+                            </div>
+
+                            <div className="mt-auto pt-4">
+                                <button
+                                    type="button"
+                                    onClick={handleGenerate}
+                                    className="h-11 w-full bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide"
+                                >
+                                    Generate Message
+                                </button>
+                            </div>
+                        </aside>
+
+                        <div className="space-y-5">
+                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                                {WORM_TYPES.map((wormType) => (
+                                    <section key={wormType.id} className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`inline-flex h-7 items-center rounded-full px-3 text-sm font-black ${wormType.cardTagClass}`}>
+                                                {wormType.label}
+                                            </span>
+                                            <span className="text-xs text-gray-500 font-semibold">사이즈별 박스 수량 입력</span>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                            {WORM_SIZES.map((size) => {
+                                                const current = quantitiesByType[wormType.id]?.[size.id] || 0
+                                                const isSelected = current > 0
+
+                                                return (
+                                                    <div
+                                                        key={`${wormType.id}-${size.id}`}
+                                                        className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
+                                                            isSelected
+                                                                ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm`
+                                                                : 'border-gray-200 bg-white hover:border-gray-300'
+                                                        }`}
+                                                    >
+                                                        <div className="flex flex-col items-start gap-0.5 px-0.5">
+                                                            <div className="text-[16px] font-black text-[#111827] leading-none">{size.id}</div>
+                                                            <div className="text-[11px] tracking-tight text-gray-500 font-medium leading-none">{size.range}</div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
+                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                                                aria-label={`${wormType.label} ${size.id} decrease`}
+                                                            >
+                                                                <Minus size={15} />
+                                                            </button>
+                                                            <input
+                                                                type="number"
+                                                                min={0}
+                                                                value={current}
+                                                                onChange={(event) => {
+                                                                    const next = Number(event.target.value)
+                                                                    handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
+                                                                }}
+                                                                className="h-[36px] min-w-[44px] px-1 text-center font-black tabular-nums text-[#111827] outline-none text-[15px]"
+                                                            />
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
+                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                                                aria-label={`${wormType.label} ${size.id} increase`}
+                                                            >
+                                                                <Plus size={15} />
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                )
+                                            })}
+                                        </div>
+                                    </section>
+                                ))}
+                            </div>
+
+                            {validationError && (
+                                <p className="text-sm font-semibold text-[#e34219]">{validationError}</p>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -2887,6 +3038,16 @@ export default function WormOrderPage() {
                                 skmIndices: selectedEmailDetail?.skmIndices || [],
                                 attachments: selectedEmailDetail?.attachments || [],
                                 awbNumber: selectedEmailDetail?.awbNumber ?? selectedEmailBase.awbNumber ?? null,
+                                matchedOrderId: selectedEmailBase.matchedOrderId,
+                                matchedOrderNumber: selectedEmailBase.matchedOrderNumber,
+                                invoiceUnitPriceUsd: selectedEmailBase.invoiceUnitPriceUsd,
+                                invoiceTotalAmountUsd: selectedEmailBase.invoiceTotalAmountUsd,
+                                usdKrwRate: selectedEmailBase.usdKrwRate,
+                                invoiceUnitPriceKrw: selectedEmailBase.invoiceUnitPriceKrw,
+                                invoiceTotalAmountKrw: selectedEmailBase.invoiceTotalAmountKrw,
+                                invoiceExtractedAt: selectedEmailBase.invoiceExtractedAt,
+                                invoiceSourceFile: selectedEmailBase.invoiceSourceFile,
+                                invoiceOcrError: selectedEmailBase.invoiceOcrError,
                                 sequence: selectedEmailIndex >= 0 ? selectedEmailIndex + 1 : null,
                             }
                             return (
@@ -2914,6 +3075,18 @@ export default function WormOrderPage() {
                                             >
                                                 {awbLoading ? 'OCR 실행중...' : 'AWB OCR 실행'}
                                             </button>
+                                            <button
+                                                onClick={() => { void handleRunInvoiceOcrForEmail(selectedEmailBase) }}
+                                                disabled={
+                                                    loadingEmailDetail ||
+                                                    invoiceOcrRunningUid === selectedEmail.uid ||
+                                                    matchingEmailUid === selectedEmail.uid ||
+                                                    (!selectedEmail.matchedOrderId && !activeWormOrder?.id)
+                                                }
+                                                className="h-9 px-3 rounded-lg bg-emerald-700 text-white text-[12px] font-bold disabled:opacity-50"
+                                            >
+                                                {invoiceOcrRunningUid === selectedEmail.uid ? '인보이스 OCR 실행중...' : '인보이스 OCR 실행'}
+                                            </button>
                                             {loadingEmailDetail ? (
                                                 <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
                                             ) : (
@@ -2924,6 +3097,35 @@ export default function WormOrderPage() {
                                                 </span>
                                             )}
                                         </div>
+
+                                        {(selectedEmail.matchedOrderId || selectedEmail.invoiceOcrError) && (
+                                            <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5 space-y-1.5">
+                                                <p className="text-[11px] font-semibold text-emerald-800">
+                                                    유닛프라이스 달러 {formatUsdAmount(selectedEmail.invoiceUnitPriceUsd)} / 원화 {formatKrwAmount(selectedEmail.invoiceUnitPriceKrw)}
+                                                </p>
+                                                <p className="text-[11px] font-semibold text-emerald-800">
+                                                    토탈어마운트 달러 {formatUsdAmount(selectedEmail.invoiceTotalAmountUsd)} / 원화 {formatKrwAmount(selectedEmail.invoiceTotalAmountKrw)}
+                                                </p>
+                                                <p className="text-[11px] font-medium text-emerald-900/90">
+                                                    실시간환율 1 USD = {selectedEmail.usdKrwRate !== null ? `₩${Math.round(selectedEmail.usdKrwRate).toLocaleString()}` : '-'}
+                                                </p>
+                                                {selectedEmail.invoiceSourceFile && (
+                                                    <p className="text-[10px] font-medium text-emerald-700">
+                                                        소스 파일: {selectedEmail.invoiceSourceFile}
+                                                    </p>
+                                                )}
+                                                {selectedEmail.invoiceExtractedAt && (
+                                                    <p className="text-[10px] font-medium text-emerald-700">
+                                                        OCR 시각: {new Date(selectedEmail.invoiceExtractedAt).toLocaleString()}
+                                                    </p>
+                                                )}
+                                                {selectedEmail.invoiceOcrError && (
+                                                    <p className="text-[11px] font-semibold text-rose-600">
+                                                        {selectedEmail.invoiceOcrError}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                         
                                         {/* AIR WAYBILL OCR 결과 */}
                                         {(awbLoading || awbNumber || awbError || awbCandidates.length > 0) && (

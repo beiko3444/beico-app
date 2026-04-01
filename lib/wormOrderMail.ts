@@ -68,6 +68,37 @@ export type WormEmailDetail = {
   awbNumber: string | null
 }
 
+type WormOrderEmailMatchHydrated = {
+  orderId: string
+  orderNumber: string
+  matchedAt: string | null
+  invoiceUnitPriceUsd: number | null
+  invoiceTotalAmountUsd: number | null
+  usdKrwRate: number | null
+  invoiceUnitPriceKrw: number | null
+  invoiceTotalAmountKrw: number | null
+  invoiceExtractedAt: string | null
+  invoiceSourceFile: string | null
+  invoiceOcrError: string | null
+}
+
+type WormOrderEmailMatchUpsertResult = {
+  uid: string
+  orderId: string
+  matchedAt: Date
+  invoiceUnitPriceUsd: number | null
+  invoiceTotalAmountUsd: number | null
+  usdKrwRate: number | null
+  invoiceUnitPriceKrw: number | null
+  invoiceTotalAmountKrw: number | null
+  invoiceExtractedAt: Date | null
+  invoiceSourceFile: string | null
+  invoiceOcrError: string | null
+  order: {
+    orderNumber: string
+  }
+}
+
 function getDaumImapCredentials() {
   const user = process.env.DAUM_IMAP_USER
   const pass = process.env.DAUM_IMAP_PASS
@@ -153,22 +184,7 @@ async function getWormEmailAwbCacheMap(uids: string[]) {
 async function getWormOrderEmailMatchMap(uids: string[]) {
   const normalizedUids = Array.from(new Set(uids.map((uid) => uid.trim()).filter(Boolean)))
   if (normalizedUids.length === 0) {
-    return new Map<
-      string,
-      {
-        orderId: string
-        orderNumber: string
-        matchedAt: string | null
-        invoiceUnitPriceUsd: number | null
-        invoiceTotalAmountUsd: number | null
-        usdKrwRate: number | null
-        invoiceUnitPriceKrw: number | null
-        invoiceTotalAmountKrw: number | null
-        invoiceExtractedAt: string | null
-        invoiceSourceFile: string | null
-        invoiceOcrError: string | null
-      }
-    >()
+    return new Map<string, WormOrderEmailMatchHydrated>()
   }
 
   try {
@@ -197,7 +213,7 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
     return new Map(
       rows.map((row) => [
         row.uid,
-        {
+        <WormOrderEmailMatchHydrated>{
           orderId: row.orderId,
           orderNumber: row.order?.orderNumber || '',
           matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
@@ -214,22 +230,45 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
     )
   } catch (error) {
     console.error('Failed to load worm email match map:', error)
-    return new Map<
-      string,
-      {
-        orderId: string
-        orderNumber: string
-        matchedAt: string | null
-        invoiceUnitPriceUsd: number | null
-        invoiceTotalAmountUsd: number | null
-        usdKrwRate: number | null
-        invoiceUnitPriceKrw: number | null
-        invoiceTotalAmountKrw: number | null
-        invoiceExtractedAt: string | null
-        invoiceSourceFile: string | null
-        invoiceOcrError: string | null
-      }
-    >()
+
+    // Backward compatibility before DB columns are migrated.
+    try {
+      const legacyRows = await prisma.wormOrderEmailMatch.findMany({
+        where: { uid: { in: normalizedUids } },
+        select: {
+          uid: true,
+          orderId: true,
+          matchedAt: true,
+          order: {
+            select: {
+              orderNumber: true,
+            },
+          },
+        },
+      })
+
+      return new Map(
+        legacyRows.map((row) => [
+          row.uid,
+          <WormOrderEmailMatchHydrated>{
+            orderId: row.orderId,
+            orderNumber: row.order?.orderNumber || '',
+            matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
+            invoiceUnitPriceUsd: null,
+            invoiceTotalAmountUsd: null,
+            usdKrwRate: null,
+            invoiceUnitPriceKrw: null,
+            invoiceTotalAmountKrw: null,
+            invoiceExtractedAt: null,
+            invoiceSourceFile: null,
+            invoiceOcrError: null,
+          },
+        ]),
+      )
+    } catch (legacyError) {
+      console.error('Failed to load legacy worm email match map:', legacyError)
+      return new Map<string, WormOrderEmailMatchHydrated>()
+    }
   }
 }
 
@@ -331,56 +370,100 @@ export async function upsertWormOrderEmailMatch(input: {
     throw new Error('orderId is required.')
   }
 
-  return prisma.wormOrderEmailMatch.upsert({
-    where: { uid },
-    update: {
-      orderId,
-      subject: input.subject?.trim() || null,
-      emailDate: toOptionalDate(input.date),
-      matchedAt: new Date(),
-      invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
-      invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
-      usdKrwRate: input.usdKrwRate ?? null,
-      invoiceUnitPriceKrw: input.invoiceUnitPriceKrw ?? null,
-      invoiceTotalAmountKrw: input.invoiceTotalAmountKrw ?? null,
-      invoiceExtractedAt: toOptionalDate(input.invoiceExtractedAt),
-      invoiceSourceFile: input.invoiceSourceFile?.trim() || null,
-      invoiceOcrError: input.invoiceOcrError?.trim() || null,
-    },
-    create: {
-      uid,
-      orderId,
-      subject: input.subject?.trim() || null,
-      emailDate: toOptionalDate(input.date),
-      matchedAt: new Date(),
-      invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
-      invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
-      usdKrwRate: input.usdKrwRate ?? null,
-      invoiceUnitPriceKrw: input.invoiceUnitPriceKrw ?? null,
-      invoiceTotalAmountKrw: input.invoiceTotalAmountKrw ?? null,
-      invoiceExtractedAt: toOptionalDate(input.invoiceExtractedAt),
-      invoiceSourceFile: input.invoiceSourceFile?.trim() || null,
-      invoiceOcrError: input.invoiceOcrError?.trim() || null,
-    },
-    select: {
-      uid: true,
-      orderId: true,
-      matchedAt: true,
-      invoiceUnitPriceUsd: true,
-      invoiceTotalAmountUsd: true,
-      usdKrwRate: true,
-      invoiceUnitPriceKrw: true,
-      invoiceTotalAmountKrw: true,
-      invoiceExtractedAt: true,
-      invoiceSourceFile: true,
-      invoiceOcrError: true,
-      order: {
-        select: {
-          orderNumber: true,
+  try {
+    return await prisma.wormOrderEmailMatch.upsert({
+      where: { uid },
+      update: {
+        orderId,
+        subject: input.subject?.trim() || null,
+        emailDate: toOptionalDate(input.date),
+        matchedAt: new Date(),
+        invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
+        invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
+        usdKrwRate: input.usdKrwRate ?? null,
+        invoiceUnitPriceKrw: input.invoiceUnitPriceKrw ?? null,
+        invoiceTotalAmountKrw: input.invoiceTotalAmountKrw ?? null,
+        invoiceExtractedAt: toOptionalDate(input.invoiceExtractedAt),
+        invoiceSourceFile: input.invoiceSourceFile?.trim() || null,
+        invoiceOcrError: input.invoiceOcrError?.trim() || null,
+      },
+      create: {
+        uid,
+        orderId,
+        subject: input.subject?.trim() || null,
+        emailDate: toOptionalDate(input.date),
+        matchedAt: new Date(),
+        invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
+        invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
+        usdKrwRate: input.usdKrwRate ?? null,
+        invoiceUnitPriceKrw: input.invoiceUnitPriceKrw ?? null,
+        invoiceTotalAmountKrw: input.invoiceTotalAmountKrw ?? null,
+        invoiceExtractedAt: toOptionalDate(input.invoiceExtractedAt),
+        invoiceSourceFile: input.invoiceSourceFile?.trim() || null,
+        invoiceOcrError: input.invoiceOcrError?.trim() || null,
+      },
+      select: {
+        uid: true,
+        orderId: true,
+        matchedAt: true,
+        invoiceUnitPriceUsd: true,
+        invoiceTotalAmountUsd: true,
+        usdKrwRate: true,
+        invoiceUnitPriceKrw: true,
+        invoiceTotalAmountKrw: true,
+        invoiceExtractedAt: true,
+        invoiceSourceFile: true,
+        invoiceOcrError: true,
+        order: {
+          select: {
+            orderNumber: true,
+          },
         },
       },
-    },
-  })
+    }) as WormOrderEmailMatchUpsertResult
+  } catch (error) {
+    // Backward compatibility before DB columns are migrated.
+    console.error('Failed to upsert worm email match with invoice fields, retrying legacy:', error)
+
+    const legacy = await prisma.wormOrderEmailMatch.upsert({
+      where: { uid },
+      update: {
+        orderId,
+        subject: input.subject?.trim() || null,
+        emailDate: toOptionalDate(input.date),
+        matchedAt: new Date(),
+      },
+      create: {
+        uid,
+        orderId,
+        subject: input.subject?.trim() || null,
+        emailDate: toOptionalDate(input.date),
+        matchedAt: new Date(),
+      },
+      select: {
+        uid: true,
+        orderId: true,
+        matchedAt: true,
+        order: {
+          select: {
+            orderNumber: true,
+          },
+        },
+      },
+    })
+
+    return {
+      ...legacy,
+      invoiceUnitPriceUsd: null,
+      invoiceTotalAmountUsd: null,
+      usdKrwRate: null,
+      invoiceUnitPriceKrw: null,
+      invoiceTotalAmountKrw: null,
+      invoiceExtractedAt: null,
+      invoiceSourceFile: null,
+      invoiceOcrError: input.invoiceOcrError?.trim() || 'DB 컬럼 미적용 상태로 인보이스 OCR 결과를 저장하지 못했습니다.',
+    } as WormOrderEmailMatchUpsertResult
+  }
 }
 
 export async function loadWormEmailList(options?: {

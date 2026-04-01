@@ -240,7 +240,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '매칭할 발주를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    const invoiceOcr = await runInvoicePdfOcr(uid)
+    let invoiceOcr: InvoiceOcrResult
+    try {
+      invoiceOcr = await runInvoicePdfOcr(uid)
+    } catch (ocrError) {
+      const message = ocrError instanceof Error ? ocrError.message : 'unknown OCR error'
+      console.error('Invoice OCR failed during email match:', ocrError)
+      invoiceOcr = {
+        invoiceUnitPriceUsd: null,
+        invoiceTotalAmountUsd: null,
+        usdKrwRate: null,
+        invoiceUnitPriceKrw: null,
+        invoiceTotalAmountKrw: null,
+        invoiceExtractedAt: null,
+        invoiceSourceFile: null,
+        invoiceOcrError: `인보이스 OCR 실행 실패: ${message}`,
+      }
+    }
 
     const saved = await upsertWormOrderEmailMatch({
       uid,
