@@ -544,18 +544,138 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             }
         }
 
+        // Wait for page to settle after company/recipient selection
+        await page.waitForTimeout(2000)
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+
         // ── Step 5: Click "송금하기" (remittance button in popup/detail) ────
-        await clickFirstVisible(
-            page,
-            [
+        // After selecting a company, the site may:
+        //  a) Show a "송금하기" / "송금" button to start remittance
+        //  b) Redirect directly to the remittance form (amount input visible)
+        //  c) Show the recipient page where a different button text is used
+        const currentUrl = page.url()
+        steps.push(`pre-remittance-url:${currentUrl}`)
+
+        // Check if we're already on a page with an amount/remittance form input
+        let alreadyOnForm = false
+        const formIndicatorSelectors = [
+            'input[name*="amount" i]',
+            'input[name*="usd" i]',
+            'input[id*="usd" i]',
+            'input[id*="amount" i]',
+            'input[placeholder*="USD"]',
+            'input[placeholder*="금액"]',
+        ]
+        for (const selector of formIndicatorSelectors) {
+            try {
+                const visible = await page.locator(selector).first().isVisible()
+                if (visible) {
+                    alreadyOnForm = true
+                    steps.push('already-on-remittance-form')
+                    break
+                }
+            } catch {
+                // Not visible, continue checking
+            }
+        }
+
+        if (!alreadyOnForm) {
+            // Try multiple button text variations
+            const remitButtonSelectors = [
                 `button:has-text("${KO_REMIT}")`,
                 `a:has-text("${KO_REMIT}")`,
                 `[role="button"]:has-text("${KO_REMIT}")`,
-            ],
-            'Click remittance button',
-            DEFAULT_TIMEOUT_MS
-        )
-        steps.push('open-remittance-popup')
+                'button:has-text("송금")',
+                'a:has-text("송금")',
+                'button:has-text("송금 신청")',
+                'a:has-text("송금 신청")',
+                'button:has-text("신청하기")',
+                'a:has-text("신청하기")',
+                'button:has-text("보내기")',
+                'a:has-text("보내기")',
+                'button:has-text("Send")',
+                'a:has-text("Send")',
+                // Structural selectors for primary action buttons
+                'button.primary',
+                'button[class*="primary"]',
+                'button[class*="submit"]',
+                'a[class*="primary"]',
+                // Try buttons near the selected company
+                `button:near(:text("${TARGET_COMPANY_NAME}"))`,
+            ]
+
+            let remitClicked = false
+            for (const selector of remitButtonSelectors) {
+                try {
+                    const target = page.locator(selector).first()
+                    await target.waitFor({ state: 'visible', timeout: 5000 })
+
+                    // Make sure it's actually a clickable button, not a heading
+                    const tagName = await target.textContent().catch(() => '')
+                    await target.click({ timeout: 5000 })
+                    remitClicked = true
+                    steps.push(`open-remittance-popup:${selector}`)
+                    break
+                } catch {
+                    // Try next selector
+                }
+            }
+
+            if (!remitClicked) {
+                // Fallback: try navigating directly to possible remittance URLs
+                const remittanceUrls = [
+                    'https://www.moinbizplus.com/transfer/remittance',
+                    'https://www.moinbizplus.com/transfer/send',
+                    'https://www.moinbizplus.com/transfer/amount',
+                ]
+
+                let directNavSuccess = false
+                for (const url of remittanceUrls) {
+                    try {
+                        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 })
+                        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
+
+                        // Check if we landed on a form
+                        for (const formSelector of formIndicatorSelectors) {
+                            try {
+                                const visible = await page.locator(formSelector).first().isVisible()
+                                if (visible) {
+                                    directNavSuccess = true
+                                    steps.push(`direct-nav-remittance:${url}`)
+                                    break
+                                }
+                            } catch { /* continue */ }
+                        }
+                        if (directNavSuccess) break
+                    } catch {
+                        // Try next URL
+                    }
+                }
+
+                if (!directNavSuccess) {
+                    // Last resort: just proceed and hope the form is on the current page
+                    // Capture debugging info
+                    let pageInfo = `url: ${page.url()}`
+                    try {
+                        const html = await page.content()
+                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+                        if (bodyMatch) {
+                            const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                            pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
+                        }
+                    } catch { /* ignore */ }
+
+                    throw new MoinAutomationError(
+                        'Click remittance button',
+                        `Could not find remittance button or form after selecting company. ${pageInfo}`
+                    )
+                }
+            }
+
+            // Wait for the remittance form to load
+            await page.waitForTimeout(1500)
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+        }
 
         // ── Step 6: Fill USD amount ────────────────────────────────────────
         await fillFirstVisible(
