@@ -33,10 +33,12 @@ type PageLike = {
     waitForURL: (url: string | RegExp, options?: Record<string, unknown>) => Promise<void>
     waitForTimeout: (ms: number) => Promise<void>
     content: () => Promise<string>
+    evaluate: (fn: string | ((...args: unknown[]) => unknown), ...args: unknown[]) => Promise<unknown>
 }
 
 type LocatorLike = {
     first: () => LocatorLike
+    locator: (selector: string) => LocatorLike
     waitFor: (options?: Record<string, unknown>) => Promise<void>
     click: (options?: Record<string, unknown>) => Promise<void>
     fill: (value: string) => Promise<void>
@@ -467,228 +469,288 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const postLoginUrl = page.url()
         steps.push(`post-login-url:${postLoginUrl}`)
 
-        // ── Step 4: Find and select the company/recipient ──────────────────
-        // After login, the company might be visible on the dashboard, or we may
-        // need to look for a "송금하기" or transfer link first.
-        try {
-            const companyCandidate = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
-            await companyCandidate.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
-            await companyCandidate.click({ timeout: DEFAULT_TIMEOUT_MS })
-            steps.push('select-company')
-        } catch {
-            // Company not visible on current page. Try navigating to remittance page
-            // or looking for transfer/recipient navigation links.
-            steps.push('company-not-on-dashboard')
+        // ── Step 4: Navigate to recipient page ─────────────────────────────
+        // After login, we should be on /transfer/recipient.
+        // If not, navigate there via the "송금하기" nav link.
 
-            // Try clicking "송금하기" or a transfer tab/link first
-            const transferSelectors = [
-                `a:has-text("${KO_REMIT}")`,
-                `button:has-text("${KO_REMIT}")`,
-                `[role="button"]:has-text("${KO_REMIT}")`,
+        const postLoginPage = page.url()
+
+        if (!postLoginPage.includes('/transfer/recipient')) {
+            steps.push('navigating-to-recipient-page')
+
+            const recipientNavSelectors = [
+                `a:has-text("${KO_REMIT}")`,      // "송금하기" nav link
+                'a[href*="/transfer/recipient"]',
+                'a[href*="/transfer"]',
                 'a:has-text("송금")',
-                'button:has-text("송금")',
-                'a:has-text("해외송금")',
-                'a:has-text("수취인")',
-                'a[href*="transfer"]',
-                'a[href*="remit"]',
-                'a[href*="recipient"]',
-                'a[href*="beneficiary"]',
             ]
 
-            let navigatedToTransfer = false
-            for (const selector of transferSelectors) {
+            let navigated = false
+            for (const selector of recipientNavSelectors) {
                 try {
                     const link = page.locator(selector).first()
                     const isVisible = await link.isVisible()
                     if (isVisible) {
-                        await link.click({ timeout: 5000 })
-                        await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
-                        navigatedToTransfer = true
-                        steps.push(`nav-transfer:${selector}`)
+                        await link.click({ timeout: 8000 })
+                        await page.waitForTimeout(2000)
+                        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+                        navigated = true
+                        steps.push(`nav-to-recipient:${selector}`)
                         break
                     }
                 } catch {
-                    // Next selector
+                    // Try next
                 }
             }
 
-            if (!navigatedToTransfer) {
-                steps.push('no-transfer-link-found')
+            if (!navigated) {
+                steps.push('nav-failed-staying-on-current')
             }
+        } else {
+            steps.push('already-on-recipient-page')
+        }
 
-            // Now try to find the company again after navigating
+        // Wait for the recipient list to load
+        await page.waitForTimeout(2000)
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+
+        // ── Step 4.5: Find the company card and click it ────────────────────
+        // The recipient page shows cards with company names.
+        // Clicking a card opens a MODAL POPUP (not a page navigation!).
+        // The modal shows recipient details and has "수정하기" / "송금하기" buttons.
+
+        // First, check if company name is visible (may need to scroll)
+        let companyTextEl
+        try {
+            companyTextEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+            await companyTextEl.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+            steps.push('company-text-visible')
+        } catch {
+            // Maybe not visible due to scrolling — try JS scroll
             try {
-                const companyCandidate = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
-                await companyCandidate.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
-                await companyCandidate.click({ timeout: DEFAULT_TIMEOUT_MS })
-                steps.push('select-company-after-nav')
+                await page.evaluate(`
+                    (() => {
+                        const companyName = ${JSON.stringify(TARGET_COMPANY_NAME)};
+                        const walker = document.createTreeWalker(
+                            document.body, NodeFilter.SHOW_TEXT,
+                            { acceptNode: (n) => n.textContent && n.textContent.includes(companyName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+                        );
+                        const node = walker.nextNode();
+                        if (node && node.parentElement) node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    })()
+                `)
+                await page.waitForTimeout(1000)
+                companyTextEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+                await companyTextEl.waitFor({ state: 'visible', timeout: 10000 })
+                steps.push('company-text-visible-after-scroll')
             } catch {
-                // Include page URL and partial content for debugging
                 let pageInfo = `url: ${page.url()}`
                 try {
                     const html = await page.content()
-                    // Extract first 500 chars of body text for debugging
                     const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
                     if (bodyMatch) {
                         const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                        pageInfo += ` | page-text(first 500): ${textContent.slice(0, 500)}`
+                        pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
                     }
-                } catch {
-                    // Ignore content extraction errors
-                }
+                } catch { /* ignore */ }
 
                 throw new MoinAutomationError(
                     'Select company',
-                    `Could not find "${TARGET_COMPANY_NAME}" on page after login. ${pageInfo}`
+                    `Could not find "${TARGET_COMPANY_NAME}" on page. ${pageInfo}`
                 )
             }
         }
 
-        // Wait for page to settle after company/recipient selection
-        await page.waitForTimeout(2000)
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+        // Click the company card to open the modal popup
+        // The card area containing the company name is clickable (cursor:pointer)
+        let modalOpened = false
 
-        // ── Step 5: Click "송금하기" (remittance button in popup/detail) ────
-        // After selecting a company, the site may:
-        //  a) Show a "송금하기" / "송금" button to start remittance
-        //  b) Redirect directly to the remittance form (amount input visible)
-        //  c) Show the recipient page where a different button text is used
-        const currentUrl = page.url()
-        steps.push(`pre-remittance-url:${currentUrl}`)
+        // Strategy 1: Click the company text directly — this should open the modal
+        try {
+            await companyTextEl.click({ timeout: 5000 })
+            await page.waitForTimeout(1500)
+            steps.push('clicked-company-text')
+        } catch {
+            steps.push('company-text-click-failed')
+        }
 
-        // Check if we're already on a page with an amount/remittance form input
-        let alreadyOnForm = false
-        const formIndicatorSelectors = [
-            'input[name*="amount" i]',
-            'input[name*="usd" i]',
-            'input[id*="usd" i]',
-            'input[id*="amount" i]',
-            'input[placeholder*="USD"]',
-            'input[placeholder*="금액"]',
+        // ── Step 5: Wait for the modal popup and click "송금하기" ────────────
+        // After clicking a recipient card, a modal popup appears with:
+        //   - Title: company name
+        //   - Recipient details (수취인 정보)
+        //   - Bottom buttons: "수정하기" (edit) and "송금하기" (remit)
+        // The "송금하기" button inside the modal advances to Step 2 (금액 입력).
+
+        // Wait for the modal to appear
+        const modalSelectors = [
+            // The "송금하기" button inside the modal
+            `button:has-text("${KO_REMIT}")`,
+            // Modal overlay/dialog patterns
+            '[role="dialog"]',
+            '[class*="modal"]',
+            '[class*="Modal"]',
+            '[class*="popup"]',
+            '[class*="Popup"]',
+            '[class*="overlay"]',
+            '[class*="Overlay"]',
         ]
-        for (const selector of formIndicatorSelectors) {
+
+        // Check if modal appeared (look for "송금하기" button)
+        const remitBtnInModal = page.getByText(KO_REMIT, { exact: false }).first()
+        try {
+            await remitBtnInModal.waitFor({ state: 'visible', timeout: 8000 })
+            modalOpened = true
+            steps.push('modal-opened-remit-btn-visible')
+        } catch {
+            // Modal may not have opened — try clicking the parent card element
+            steps.push('modal-not-opened-retrying')
+
+            // Try clicking parent card with JavaScript
             try {
-                const visible = await page.locator(selector).first().isVisible()
-                if (visible) {
-                    alreadyOnForm = true
-                    steps.push('already-on-remittance-form')
-                    break
+                const jsClickResult = await page.evaluate(`
+                    (() => {
+                        const companyName = ${JSON.stringify(TARGET_COMPANY_NAME)};
+                        const walker = document.createTreeWalker(
+                            document.body, NodeFilter.SHOW_TEXT,
+                            { acceptNode: (n) => n.textContent && n.textContent.includes(companyName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+                        );
+                        const node = walker.nextNode();
+                        if (!node) return 'no-text-node';
+                        // Walk up to find the clickable card element
+                        let el = node.parentElement;
+                        let depth = 0;
+                        while (el && depth < 10) {
+                            const cursor = window.getComputedStyle(el).cursor;
+                            if (cursor === 'pointer') {
+                                el.click();
+                                return 'clicked-pointer-' + el.tagName + '-depth-' + depth;
+                            }
+                            el = el.parentElement;
+                            depth++;
+                        }
+                        // Fallback: click the text's parent anyway
+                        if (node.parentElement) {
+                            node.parentElement.click();
+                            return 'clicked-parent-fallback';
+                        }
+                        return 'nothing-clicked';
+                    })()
+                `) as string
+                steps.push(`js-card-click:${jsClickResult}`)
+                await page.waitForTimeout(2000)
+
+                // Check again for the modal
+                try {
+                    await remitBtnInModal.waitFor({ state: 'visible', timeout: 8000 })
+                    modalOpened = true
+                    steps.push('modal-opened-after-js-click')
+                } catch {
+                    steps.push('modal-still-not-opened')
                 }
-            } catch {
-                // Not visible, continue checking
+            } catch (err) {
+                steps.push(`js-card-click-error:${err instanceof Error ? err.message : 'unknown'}`)
             }
         }
 
-        if (!alreadyOnForm) {
-            // Try multiple button text variations
-            const remitButtonSelectors = [
+        if (!modalOpened) {
+            // Last resort: look for the 송금하기 button anywhere on the page
+            // (maybe the UI changed and there's no modal, just inline buttons)
+            const fallbackBtnSelectors = [
                 `button:has-text("${KO_REMIT}")`,
                 `a:has-text("${KO_REMIT}")`,
                 `[role="button"]:has-text("${KO_REMIT}")`,
                 'button:has-text("송금")',
-                'a:has-text("송금")',
-                'button:has-text("송금 신청")',
-                'a:has-text("송금 신청")',
-                'button:has-text("신청하기")',
-                'a:has-text("신청하기")',
-                'button:has-text("보내기")',
-                'a:has-text("보내기")',
-                'button:has-text("Send")',
-                'a:has-text("Send")',
-                // Structural selectors for primary action buttons
-                'button.primary',
-                'button[class*="primary"]',
-                'button[class*="submit"]',
-                'a[class*="primary"]',
-                // Try buttons near the selected company
-                `button:near(:text("${TARGET_COMPANY_NAME}"))`,
             ]
 
-            let remitClicked = false
-            for (const selector of remitButtonSelectors) {
+            for (const selector of fallbackBtnSelectors) {
                 try {
-                    const target = page.locator(selector).first()
-                    await target.waitFor({ state: 'visible', timeout: 5000 })
-
-                    // Make sure it's actually a clickable button, not a heading
-                    const tagName = await target.textContent().catch(() => '')
-                    await target.click({ timeout: 5000 })
-                    remitClicked = true
-                    steps.push(`open-remittance-popup:${selector}`)
-                    break
-                } catch {
-                    // Try next selector
-                }
-            }
-
-            if (!remitClicked) {
-                // Fallback: try navigating directly to possible remittance URLs
-                const remittanceUrls = [
-                    'https://www.moinbizplus.com/transfer/remittance',
-                    'https://www.moinbizplus.com/transfer/send',
-                    'https://www.moinbizplus.com/transfer/amount',
-                ]
-
-                let directNavSuccess = false
-                for (const url of remittanceUrls) {
-                    try {
-                        await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 20000 })
-                        await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
-
-                        // Check if we landed on a form
-                        for (const formSelector of formIndicatorSelectors) {
-                            try {
-                                const visible = await page.locator(formSelector).first().isVisible()
-                                if (visible) {
-                                    directNavSuccess = true
-                                    steps.push(`direct-nav-remittance:${url}`)
-                                    break
-                                }
-                            } catch { /* continue */ }
-                        }
-                        if (directNavSuccess) break
-                    } catch {
-                        // Try next URL
+                    const btn = page.locator(selector).first()
+                    const isVisible = await btn.isVisible()
+                    if (isVisible) {
+                        modalOpened = true
+                        steps.push(`remit-btn-found-without-modal:${selector}`)
+                        break
                     }
-                }
-
-                if (!directNavSuccess) {
-                    // Last resort: just proceed and hope the form is on the current page
-                    // Capture debugging info
-                    let pageInfo = `url: ${page.url()}`
-                    try {
-                        const html = await page.content()
-                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-                        if (bodyMatch) {
-                            const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                            pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
-                        }
-                    } catch { /* ignore */ }
-
-                    throw new MoinAutomationError(
-                        'Click remittance button',
-                        `Could not find remittance button or form after selecting company. ${pageInfo}`
-                    )
+                } catch {
+                    // Continue
                 }
             }
-
-            // Wait for the remittance form to load
-            await page.waitForTimeout(1500)
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
         }
 
+        if (!modalOpened) {
+            let pageInfo = `url: ${page.url()}`
+            try {
+                const html = await page.content()
+                const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+                if (bodyMatch) {
+                    const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                    pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
+                }
+            } catch { /* ignore */ }
+
+            throw new MoinAutomationError(
+                'Open recipient modal',
+                `Could not open the recipient modal popup after clicking "${TARGET_COMPANY_NAME}". ${pageInfo}`
+            )
+        }
+
+        // ── Step 5.5: Click "송금하기" button in the modal ──────────────────
+        // This transitions from Step 1 (수취인 선택) to Step 2 (금액 입력)
+        try {
+            const remitBtn = page.locator(`button:has-text("${KO_REMIT}")`).first()
+            await remitBtn.waitFor({ state: 'visible', timeout: 8000 })
+            await remitBtn.click({ timeout: 5000 })
+            steps.push('clicked-remit-btn-in-modal')
+        } catch {
+            // Try broader selectors for the button
+            try {
+                const anyRemitBtn = page.getByText(KO_REMIT, { exact: false }).first()
+                await anyRemitBtn.click({ timeout: 5000 })
+                steps.push('clicked-remit-text-fallback')
+            } catch {
+                throw new MoinAutomationError(
+                    'Click remit button in modal',
+                    `Could not click the "송금하기" button in the modal. (url: ${page.url()})`
+                )
+            }
+        }
+
+        // Wait for Step 2 (금액 입력) to load
+        await page.waitForTimeout(3000)
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+
+        // Verify we're on Step 2 by looking for the amount input fields
+        // The page shows "보내는 금액" (KRW) and "받는 금액" (USD) sections
+        const step2Loaded = await page.getByText('금액 입력').first().isVisible().catch(() => false)
+            || await page.getByText('받는 금액').first().isVisible().catch(() => false)
+            || await page.getByText('보내는 금액').first().isVisible().catch(() => false)
+
+        if (!step2Loaded) {
+            // Maybe the page still needs more time
+            await page.waitForTimeout(3000)
+        }
+        steps.push('step2-amount-form-loaded')
+
         // ── Step 6: Fill USD amount ────────────────────────────────────────
+        // The amount page has two sections:
+        //   - "보내는 금액" (KRW) — auto-calculated
+        //   - "받는 금액" (USD) — this is where we enter our amount
+        // We need to fill the USD/receiving amount input.
         await fillFirstVisible(
             page,
             [
+                // Try to find the input near "받는 금액" / "USD" text
+                'xpath=//*[contains(normalize-space(),"받는 금액")]/following::input[1]',
+                'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
+                'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
                 'input[name*="usd" i]',
                 'input[id*="usd" i]',
                 'input[placeholder*="USD"]',
                 'input[aria-label*="USD"]',
+                'input[name*="receive" i]',
                 'input[name*="amount" i]',
                 'input[id*="amount" i]',
                 'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
-                'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
                 'xpath=//*[contains(normalize-space(),"금액")]/following::input[1]',
             ],
             input.amountUsd,
@@ -723,7 +785,21 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('check-agreement')
 
         // ── Step 11: Submit remittance ─────────────────────────────────────
-        await clickNextStep(page, DEFAULT_TIMEOUT_MS)
+        // On the 정보 확인 page, the submit button says "송금 신청" (not "다음 단계")
+        await clickFirstVisible(
+            page,
+            [
+                'button:has-text("송금 신청")',
+                'button:has-text("송금신청")',
+                `button:has-text("${KO_REMIT}")`,
+                `button:has-text("${KO_NEXT_STEP}")`,
+                `button:has-text("${KO_NEXT_STEP_SPACED}")`,
+                'button:has-text("신청")',
+                'button:has-text("제출")',
+            ],
+            'Submit remittance',
+            DEFAULT_TIMEOUT_MS
+        )
         steps.push('submit-remittance')
 
         // ── Step 12: Wait for completion ───────────────────────────────────

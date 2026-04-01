@@ -233,16 +233,19 @@ const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
 ]
 
 const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressStage }> = [
-    { keys: ['runtime:'], stage: { percent: 6, label: '브라우저 런타임을 준비하는 중...' } },
-    { keys: ['open-login-page'], stage: { percent: 14, label: '모인 로그인 페이지에 접속하는 중...' } },
-    { keys: ['fill-login-id', 'fill-login-password'], stage: { percent: 24, label: '로그인 계정 정보를 입력하는 중...' } },
-    { keys: ['submit-login', 'post-login-url'], stage: { percent: 33, label: '로그인을 제출하고 확인하는 중...' } },
-    { keys: ['select-company', 'select-company-after-nav', 'pre-remittance-url'], stage: { percent: 44, label: '수취인/거래처를 찾는 중...' } },
-    { keys: ['open-remittance-popup', 'already-on-remittance-form', 'direct-nav-remittance'], stage: { percent: 56, label: '송금 신청 화면으로 이동하는 중...' } },
+    { keys: ['runtime:'], stage: { percent: 5, label: '브라우저 런타임을 준비하는 중...' } },
+    { keys: ['open-login-page'], stage: { percent: 12, label: '모인 로그인 페이지에 접속하는 중...' } },
+    { keys: ['fill-login-id', 'fill-login-password'], stage: { percent: 20, label: '로그인 계정 정보를 입력하는 중...' } },
+    { keys: ['submit-login', 'post-login-url'], stage: { percent: 28, label: '로그인을 제출하고 확인하는 중...' } },
+    { keys: ['company-text-visible', 'nav-to-recipient', 'already-on-recipient-page'], stage: { percent: 36, label: '수취인/거래처를 찾는 중...' } },
+    { keys: ['clicked-company-text', 'js-card-click'], stage: { percent: 42, label: '수취인 카드를 클릭하는 중...' } },
+    { keys: ['modal-opened', 'remit-btn'], stage: { percent: 48, label: '수취인 정보 팝업이 열렸습니다...' } },
+    { keys: ['clicked-remit-btn', 'clicked-remit-text'], stage: { percent: 54, label: '송금하기 버튼을 클릭하는 중...' } },
+    { keys: ['step2-amount-form-loaded'], stage: { percent: 60, label: '금액 입력 화면이 로드되었습니다...' } },
     { keys: ['fill-usd-amount', 'next-after-amount'], stage: { percent: 68, label: '송금 금액을 입력하는 중...' } },
     { keys: ['upload-invoice', 'next-after-upload'], stage: { percent: 78, label: '인보이스 PDF를 업로드하는 중...' } },
     { keys: ['check-agreement'], stage: { percent: 88, label: '약관 동의 및 제출 준비 중...' } },
-    { keys: ['submit-remittance'], stage: { percent: 96, label: '최종 제출 중...' } },
+    { keys: ['submit-remittance'], stage: { percent: 96, label: '최종 송금 신청 중...' } },
 ]
 
 const resolveRemittanceStageFromStep = (stepLike: string | null | undefined): RemittanceProgressStage | null => {
