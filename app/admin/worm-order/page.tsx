@@ -324,6 +324,11 @@ const WORM_TYPES: WormType[] = [
     },
 ]
 
+const WORM_TYPE_MESSAGE_LABELS: Record<WormTypeId, string> = {
+    blue: 'Green lugworm',
+    red: 'Red lugworm',
+}
+
 function createInitialQuantities() {
     return WORM_SIZES.reduce<Record<string, number>>((acc, size) => {
         acc[size.id] = 0
@@ -1225,7 +1230,8 @@ export default function WormOrderPage() {
         const lines = selectedOrders
             .map((item) => {
                 const boxLabel = item.boxes > 1 ? 'boxes' : 'box'
-                return `- [${item.wormTypeLabel}] ${item.id} (${item.range}): ${item.boxes} ${boxLabel}`
+                const wormName = WORM_TYPE_MESSAGE_LABELS[item.wormTypeId] || item.wormTypeLabel
+                return `- ${wormName} ${item.id} (${item.range}): ${item.boxes} ${boxLabel}`
             })
             .join('\n')
 
@@ -1238,6 +1244,8 @@ export default function WormOrderPage() {
             `Total requested: ${totalBoxes} ${totalLabel}.`,
             '',
             lines,
+            '',
+            'Please send the invoice to contact@beiko.co.kr.',
             '',
             'Thanks.',
         ].join('\n')
