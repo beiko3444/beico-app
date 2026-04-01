@@ -696,23 +696,93 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // ── Step 5.5: Click "송금하기" button in the modal ──────────────────
         // This transitions from Step 1 (수취인 선택) to Step 2 (금액 입력)
-        try {
-            const remitBtn = page.locator(`button:has-text("${KO_REMIT}")`).first()
-            await remitBtn.waitFor({ state: 'visible', timeout: 8000 })
-            await remitBtn.click({ timeout: 5000 })
-            steps.push('clicked-remit-btn-in-modal')
-        } catch {
-            // Try broader selectors for the button
+        // The element may not be a <button> — could be <a>, <div>, <span>, etc.
+        let remitClicked = false
+
+        // Strategy A: Try clicking any element with the text (broader than just button)
+        const remitSelectors = [
+            `button:has-text("${KO_REMIT}")`,
+            `a:has-text("${KO_REMIT}")`,
+            `[role="button"]:has-text("${KO_REMIT}")`,
+            `div:has-text("${KO_REMIT}")`,
+        ]
+
+        for (const sel of remitSelectors) {
+            if (remitClicked) break
+            try {
+                const el = page.locator(sel).first()
+                const isVis = await el.isVisible().catch(() => false)
+                if (isVis) {
+                    await el.click({ timeout: 5000, force: true })
+                    remitClicked = true
+                    steps.push(`clicked-remit:${sel}`)
+                }
+            } catch {
+                // Continue to next selector
+            }
+        }
+
+        // Strategy B: Use getByText with force click
+        if (!remitClicked) {
             try {
                 const anyRemitBtn = page.getByText(KO_REMIT, { exact: false }).first()
-                await anyRemitBtn.click({ timeout: 5000 })
-                steps.push('clicked-remit-text-fallback')
+                await anyRemitBtn.click({ timeout: 5000, force: true })
+                remitClicked = true
+                steps.push('clicked-remit-getByText-force')
             } catch {
-                throw new MoinAutomationError(
-                    'Click remit button in modal',
-                    `Could not click the "송금하기" button in the modal. (url: ${page.url()})`
-                )
+                // Continue
             }
+        }
+
+        // Strategy C: JavaScript force-click — find the element with "송금하기" text and click it
+        if (!remitClicked) {
+            try {
+                const jsResult = await page.evaluate(`
+                    (() => {
+                        const remitText = ${JSON.stringify(KO_REMIT)};
+                        // Find all elements containing the text
+                        const walker = document.createTreeWalker(
+                            document.body, NodeFilter.SHOW_TEXT,
+                            { acceptNode: (n) => n.textContent && n.textContent.includes(remitText) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
+                        );
+                        const textNode = walker.nextNode();
+                        if (!textNode) return 'no-text-node';
+                        // Walk up to find a clickable parent
+                        let el = textNode.parentElement;
+                        let depth = 0;
+                        while (el && depth < 8) {
+                            const tag = el.tagName.toLowerCase();
+                            const role = el.getAttribute('role');
+                            const cursor = window.getComputedStyle(el).cursor;
+                            if (tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer') {
+                                el.click();
+                                return 'js-clicked-' + tag + '-depth-' + depth;
+                            }
+                            el = el.parentElement;
+                            depth++;
+                        }
+                        // Fallback: click the text node's direct parent
+                        if (textNode.parentElement) {
+                            textNode.parentElement.click();
+                            return 'js-clicked-parent-fallback';
+                        }
+                        return 'no-clickable-parent';
+                    })()
+                `) as string
+                if (jsResult && !jsResult.startsWith('no-')) {
+                    remitClicked = true
+                    steps.push(`remit-js-click:${jsResult}`)
+                }
+            } catch {
+                // Continue
+            }
+        }
+
+        if (!remitClicked) {
+            throw new MoinAutomationError(
+                'Click remit button in modal',
+                `Could not click the "송금하기" button in the modal. (url: ${page.url()})`
+            )
         }
 
         // Wait for Step 2 (금액 입력) to load
