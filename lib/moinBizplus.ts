@@ -14,6 +14,7 @@ const KO_REMIT_REQUEST = '\uC1A1\uAE08 \uC2E0\uCCAD'
 const KO_REMIT_REQUEST_COMPACT = '\uC1A1\uAE08\uC2E0\uCCAD'
 const KO_APPLY = '\uC2E0\uCCAD'
 const KO_SUBMIT = '\uC81C\uCD9C'
+const KO_PURCHASE_REMIT = '\uAD6C\uB9E4\uB300\uD589\uC1A1\uAE08'
 const KO_AMOUNT = '\uAE08\uC561'
 const KO_NEXT_STEP = '\uB2E4\uC74C\uB2E8\uACC4'
 const KO_NEXT_STEP_SPACED = '\uB2E4\uC74C \uB2E8\uACC4'
@@ -162,6 +163,9 @@ const clickFirstVisible = async (
         try {
             const target = page.locator(selector).first()
             await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 9000) })
+            const disabled = await target.isDisabled().catch(() => false)
+            const enabled = await target.isEnabled().catch(() => !disabled)
+            if (disabled || !enabled) continue
             await target.click({ timeout: 5000 })
             return
         } catch {
@@ -232,18 +236,77 @@ const uploadFirstFileInput = async (
     file: { name: string; mimeType: string; buffer: Buffer },
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
-    for (const selector of selectors) {
+    const trySetFiles = async () => {
+        for (const selector of selectors) {
+            try {
+                const target = page.locator(selector).first()
+                await target.waitFor({ state: 'attached', timeout: Math.min(timeoutMs, 12000) })
+                await target.setInputFiles(file)
+                return true
+            } catch {
+                // Try next selector.
+            }
+        }
+        return false
+    }
+
+    if (await trySetFiles()) return
+
+    // Some screens render file input after clicking an upload/attach trigger.
+    for (const trigger of [
+        'button:has-text("파일")',
+        'button:has-text("첨부")',
+        'button:has-text("업로드")',
+        '[role="button"]:has-text("파일")',
+        '[role="button"]:has-text("첨부")',
+        '[role="button"]:has-text("업로드")',
+    ]) {
         try {
-            const target = page.locator(selector).first()
-            await target.waitFor({ state: 'attached', timeout: Math.min(timeoutMs, 12000) })
-            await target.setInputFiles(file)
-            return
+            const btn = page.locator(trigger).first()
+            await btn.waitFor({ state: 'visible', timeout: 2000 })
+            const disabled = await btn.isDisabled().catch(() => false)
+            if (disabled) continue
+            await btn.click({ timeout: 3000 })
+            await page.waitForTimeout(500)
+            if (await trySetFiles()) return
         } catch {
-            // Try next selector.
+            // Continue
         }
     }
 
-    throw new MoinAutomationError('Upload invoice', `Could not find file upload input. (url: ${page.url()})`)
+    // Last attempt after short wait (lazy render).
+    await page.waitForTimeout(1000)
+    if (await trySetFiles()) return
+
+    const uploadDiag = await page.evaluate(`
+        (() => {
+            const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const fileInputs = Array.from(document.querySelectorAll('input[type="file"]')).map((el, i) => ({
+                i,
+                name: el.getAttribute('name') || '',
+                id: el.getAttribute('id') || '',
+                accept: el.getAttribute('accept') || '',
+                visible: isVisible(el),
+            }));
+            const candidateButtons = Array.from(document.querySelectorAll('button, [role="button"], a'))
+                .filter((el) => isVisible(el))
+                .map((el) => ({
+                    text: norm(el.textContent || ''),
+                    disabled: Boolean(el.disabled) || el.getAttribute('aria-disabled') === 'true',
+                }))
+                .filter((row) => row.text)
+                .slice(0, 20);
+            return JSON.stringify({ fileInputs, candidateButtons });
+        })()
+    `).catch(() => 'diag-failed') as string
+
+    throw new MoinAutomationError('Upload invoice', `Could not find file upload input. (url: ${page.url()}) diag=${uploadDiag}`)
 }
 
 const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
@@ -443,6 +506,16 @@ const inspectAmountFieldValue = async (page: PageLike, expectedAmount: string) =
     }
 }
 
+const hasUploadInput = async (page: PageLike) => {
+    const result = await page.evaluate(`
+        (() => {
+            const input = document.querySelector('input[type="file"]');
+            return Boolean(input);
+        })()
+    `).catch(() => false)
+    return Boolean(result)
+}
+
 const inspectRemittanceCompletion = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
@@ -536,86 +609,87 @@ const clickCompanyScopedRemit = async (
             const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
             const textOf = (el) => norm((el && el.textContent) || '');
             const hasText = (el, text) => textOf(el).includes(norm(text));
+            const describe = (el) => {
+                if (!el) return 'none';
+                const tag = (el.tagName || '').toLowerCase();
+                const text = textOf(el).slice(0, 50);
+                const href = tag === 'a' ? (el.getAttribute('href') || '') : '';
+                const cls = ((el.className || '') + '').replace(/\\s+/g, '.').slice(0, 60);
+                return tag + ':' + text + (href ? ':href=' + href : '') + (cls ? ':cls=' + cls : '');
+            };
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
             };
-            const isClickable = (el) => {
+            const isSemanticButton = (el) => {
                 if (!el) return false;
                 const tag = (el.tagName || '').toLowerCase();
                 const role = (el.getAttribute('role') || '').toLowerCase();
-                const cursor = window.getComputedStyle(el).cursor;
-                return tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer' || typeof el.onclick === 'function';
-            };
-            const findRemitInScope = (scope) => {
-                if (!scope) return null;
-                const candidates = Array.from(scope.querySelectorAll('button, a, [role="button"], div, span'));
-                for (const el of candidates) {
-                    if (!isVisible(el)) continue;
-                    if (!isClickable(el)) continue;
-                    if (!hasText(el, remit)) continue;
-                    return el;
-                }
-                return null;
+                return tag === 'button' || role === 'button';
             };
 
             const modalScopes = Array.from(document.querySelectorAll(
-                '[role="dialog"], [class*="modal"], [class*="Modal"], [class*="popup"], [class*="Popup"], [class*="drawer"], [class*="Drawer"], [class*="overlay"], [class*="Overlay"]'
+                '[role="dialog"], [class*="modal"], [class*="Modal"], [class*="drawer"], [class*="Drawer"], [class*="popup"], [class*="Popup"]'
             )).filter(isVisible);
             for (const scope of modalScopes) {
-                if (!hasText(scope, company) || !hasText(scope, remit)) continue;
-                const remitEl = findRemitInScope(scope);
-                if (remitEl) {
-                    remitEl.click();
-                    return 'clicked-modal-remit';
+                const remitInModal = Array.from(scope.querySelectorAll('button, [role="button"], div, span'))
+                    .filter((el) => isVisible(el) && hasText(el, remit))
+                    .sort((a, b) => {
+                        const ta = textOf(a).length
+                        const tb = textOf(b).length
+                        return ta - tb
+                    });
+                if (remitInModal.length > 0) {
+                    remitInModal[0].click();
+                    return 'clicked-modal-remit:' + describe(remitInModal[0]);
                 }
             }
-
-            const companyScopes = Array.from(document.querySelectorAll('article, li, section, div'))
-                .filter(isVisible)
-                .filter((el) => hasText(el, company))
+            const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+            const companyLeaves = Array.from(document.querySelectorAll('*'))
+                .filter((el) => isVisible(el) && hasText(el, company))
                 .sort((a, b) => {
                     const ra = a.getBoundingClientRect();
                     const rb = b.getBoundingClientRect();
                     return (ra.width * ra.height) - (rb.width * rb.height);
-                });
-            for (const scope of companyScopes) {
-                const directRemit = findRemitInScope(scope);
-                if (directRemit) {
-                    directRemit.click();
-                    return 'clicked-company-scope-remit';
-                }
-                if (isClickable(scope)) {
-                    scope.click();
-                    const afterClickRemit = findRemitInScope(scope);
-                    if (afterClickRemit) {
-                        afterClickRemit.click();
-                        return 'clicked-company-scope-then-remit';
-                    }
-                }
-            }
+                })
+                .slice(0, 8);
 
-            const companyNode = Array.from(document.querySelectorAll('*')).find((el) => isVisible(el) && hasText(el, company));
-            if (companyNode) {
-                const baseRect = companyNode.getBoundingClientRect();
-                const bx = baseRect.left + baseRect.width / 2;
-                const by = baseRect.top + baseRect.height / 2;
-                const remitCandidates = Array.from(document.querySelectorAll('button, a, [role="button"], div, span'))
-                    .filter((el) => isVisible(el) && isClickable(el) && hasText(el, remit));
-                remitCandidates.sort((a, b) => {
-                    const ra = a.getBoundingClientRect();
-                    const rb = b.getBoundingClientRect();
-                    const dax = (ra.left + ra.width / 2) - bx;
-                    const day = (ra.top + ra.height / 2) - by;
-                    const dbx = (rb.left + rb.width / 2) - bx;
-                    const dby = (rb.top + rb.height / 2) - by;
-                    return (dax * dax + day * day) - (dbx * dbx + dby * dby);
-                });
-                if (remitCandidates.length > 0) {
-                    remitCandidates[0].click();
-                    return 'clicked-nearest-remit-to-company';
+            for (const leaf of companyLeaves) {
+                let scope = leaf;
+                for (let depth = 0; depth < 6 && scope; depth += 1) {
+                    const rect = scope.getBoundingClientRect();
+                    const area = rect.width * rect.height;
+                    // Skip huge containers like page wrapper/header.
+                    if (area > viewportArea * 0.55) {
+                        scope = scope.parentElement;
+                        continue;
+                    }
+
+                    const remitCandidates = Array.from(scope.querySelectorAll('button, [role="button"]'))
+                        .filter((el) => isVisible(el) && isSemanticButton(el) && hasText(el, remit));
+
+                    if (remitCandidates.length > 0) {
+                        // Pick closest button to company text to avoid top banner actions.
+                        const baseRect = leaf.getBoundingClientRect();
+                        const bx = baseRect.left + baseRect.width / 2;
+                        const by = baseRect.top + baseRect.height / 2;
+                        remitCandidates.sort((a, b) => {
+                            const ra = a.getBoundingClientRect();
+                            const rb = b.getBoundingClientRect();
+                            const dax = (ra.left + ra.width / 2) - bx;
+                            const day = (ra.top + ra.height / 2) - by;
+                            const dbx = (rb.left + rb.width / 2) - bx;
+                            const dby = (rb.top + rb.height / 2) - by;
+                            return (dax * dax + day * day) - (dbx * dbx + dby * dby);
+                        });
+                        const target = remitCandidates[0];
+                        target.click();
+                        return 'clicked-company-scope-remit:' + describe(target);
+                    }
+
+                    scope = scope.parentElement;
                 }
             }
 
@@ -850,6 +924,25 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // Wait for the recipient list to load
         await page.waitForTimeout(2000)
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+
+        // New flow: the recipient list can be behind the "구매대행송금" tab.
+        try {
+            await clickFirstVisible(
+                page,
+                [
+                    `button:has-text("${KO_PURCHASE_REMIT}")`,
+                    `[role="button"]:has-text("${KO_PURCHASE_REMIT}")`,
+                    `a:has-text("${KO_PURCHASE_REMIT}")`,
+                ],
+                'Open purchase-remit tab',
+                6000
+            )
+            steps.push('open-purchase-remit-tab')
+            await page.waitForTimeout(1200)
+            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+        } catch {
+            steps.push('purchase-remit-tab-not-found')
+        }
 
         // ???? Step 4.5: Find the company card and click it ????????????????????????????????????????
         // The recipient page shows cards with company names.
@@ -1191,7 +1284,23 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('fill-usd-amount')
 
         // ???? Step 7: Next step after amount ??????????????????????????????????????????????????????????????????
-        await clickNextStep(page, DEFAULT_TIMEOUT_MS)
+        let uploadStepReady = false
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+            const beforeUrl = page.url()
+            await clickNextStep(page, DEFAULT_TIMEOUT_MS)
+            await page.waitForTimeout(1200)
+            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+            const afterUrl = page.url()
+            const uploadInputPresent = await hasUploadInput(page)
+            steps.push(`next-after-amount-attempt:${attempt + 1}:url:${afterUrl.replace('https://www.moinbizplus.com', '')}:uploadInput:${uploadInputPresent}`)
+            if (uploadInputPresent || afterUrl !== beforeUrl || !afterUrl.includes('/transfer/amount')) {
+                uploadStepReady = true
+                break
+            }
+        }
+        if (!uploadStepReady) {
+            throw new MoinAutomationError('Next after amount', `Failed to move to upload step after amount entry. (url: ${page.url()})`)
+        }
         steps.push('next-after-amount')
 
         // ???? Step 8: Upload invoice PDF ??????????????????????????????????????????????????????????????????????????

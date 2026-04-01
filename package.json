@@ -31,7 +31,7 @@
     "nodemailer": "^7.0.13",
     "pdf-parse": "^2.4.5",
     "pdfjs-dist": "^4.8.69",
-    "playwright-core": "^1.58.2",
+    "playwright-core": "^1.59.0",
     "prisma": "^5.10.2",
     "react": "19.2.3",
     "react-barcode": "^1.6.1",
