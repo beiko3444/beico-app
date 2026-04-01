@@ -367,6 +367,127 @@ const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: 
         || haystack.includes('name')
 }
 
+/**
+ * Click "송금하기" only within the target company's context (modal/card),
+ * to avoid clicking unrelated global nav buttons with the same label.
+ */
+const clickCompanyScopedRemit = async (
+    page: PageLike,
+    companyName: string,
+    remitText: string
+): Promise<string> => {
+    const result = await page.evaluate(`
+        (() => {
+            const company = ${JSON.stringify(companyName)};
+            const remit = ${JSON.stringify(remitText)};
+
+            const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+            const textOf = (el) => norm(el?.textContent || '');
+            const hasText = (el, text) => textOf(el).includes(norm(text));
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0
+                    && rect.height > 0
+                    && style.display !== 'none'
+                    && style.visibility !== 'hidden'
+                    && style.opacity !== '0';
+            };
+            const isClickable = (el) => {
+                if (!el) return false;
+                const tag = (el.tagName || '').toLowerCase();
+                const role = (el.getAttribute('role') || '').toLowerCase();
+                const cursor = window.getComputedStyle(el).cursor;
+                return tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer' || !!el.onclick;
+            };
+            const findRemitInScope = (scope) => {
+                if (!scope) return null;
+                const candidates = Array.from(
+                    scope.querySelectorAll('button, a, [role="button"], div, span')
+                );
+                for (const el of candidates) {
+                    if (!isVisible(el)) continue;
+                    if (!isClickable(el)) continue;
+                    if (!hasText(el, remit)) continue;
+                    return el;
+                }
+                return null;
+            };
+
+            // 1) Prefer a modal/dialog that contains both company and remit text.
+            const modalScopes = Array.from(
+                document.querySelectorAll(
+                    '[role="dialog"], [class*="modal" i], [class*="popup" i], [class*="drawer" i], [class*="overlay" i]'
+                )
+            ).filter(isVisible);
+
+            for (const scope of modalScopes) {
+                if (!hasText(scope, company) || !hasText(scope, remit)) continue;
+                const remitEl = findRemitInScope(scope);
+                if (remitEl) {
+                    remitEl.click();
+                    return 'clicked-modal-remit';
+                }
+            }
+
+            // 2) Try company card scope.
+            const companyScopes = Array.from(document.querySelectorAll('article, li, section, div'))
+                .filter(isVisible)
+                .filter((el) => hasText(el, company))
+                .sort((a, b) => {
+                    const ra = a.getBoundingClientRect();
+                    const rb = b.getBoundingClientRect();
+                    return (ra.width * ra.height) - (rb.width * rb.height);
+                });
+
+            for (const scope of companyScopes) {
+                const directRemit = findRemitInScope(scope);
+                if (directRemit) {
+                    directRemit.click();
+                    return 'clicked-company-scope-remit';
+                }
+                if (isClickable(scope)) {
+                    scope.click();
+                    const afterClickRemit = findRemitInScope(scope);
+                    if (afterClickRemit) {
+                        afterClickRemit.click();
+                        return 'clicked-company-scope-then-remit';
+                    }
+                }
+            }
+
+            // 3) Nearest visible remit element to target company text as last resort.
+            const companyNode = Array.from(document.querySelectorAll('*'))
+                .find((el) => isVisible(el) && hasText(el, company));
+            if (companyNode) {
+                const baseRect = companyNode.getBoundingClientRect();
+                const bx = baseRect.left + baseRect.width / 2;
+                const by = baseRect.top + baseRect.height / 2;
+                const remitCandidates = Array.from(document.querySelectorAll('button, a, [role="button"], div, span'))
+                    .filter((el) => isVisible(el) && isClickable(el) && hasText(el, remit));
+                remitCandidates.sort((a, b) => {
+                    const ra = a.getBoundingClientRect();
+                    const rb = b.getBoundingClientRect();
+                    const dax = (ra.left + ra.width / 2) - bx;
+                    const day = (ra.top + ra.height / 2) - by;
+                    const dbx = (rb.left + rb.width / 2) - bx;
+                    const dby = (rb.top + rb.height / 2) - by;
+                    return (dax * dax + day * day) - (dbx * dbx + dby * dby);
+                });
+                if (remitCandidates.length > 0) {
+                    remitCandidates[0].click();
+                    return 'clicked-nearest-remit-to-company';
+                }
+            }
+
+            return 'no-company-scoped-remit';
+        })()
+    `) as string
+
+    return String(result || 'unknown')
+}
+
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
     const waitStrategies: Array<'domcontentloaded' | 'load'> = ['domcontentloaded', 'load']
@@ -642,225 +763,39 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // Click the company card to open the modal popup
         // The card area containing the company name is clickable (cursor:pointer)
-        let modalOpened = false
+        let remitClicked = false
+        let remitClickReason = 'not-attempted'
 
-        // Strategy 1: Click the company text directly ??this should open the modal
-        try {
-            await companyTextEl.click({ timeout: 5000 })
-            await page.waitForTimeout(1500)
-            steps.push('clicked-company-text')
-        } catch {
-            steps.push('company-text-click-failed')
-        }
-
-        // ?? Step 5: Wait for the modal popup and click "?↔툑?섍린" ????????????
-        // After clicking a recipient card, a modal popup appears with:
-        //   - Title: company name
-        //   - Recipient details (?섏랬???뺣낫)
-        //   - Bottom buttons: "?섏젙?섍린" (edit) and "?↔툑?섍린" (remit)
-        // The "?↔툑?섍린" button inside the modal advances to Step 2 (湲덉븸 ?낅젰).
-
-        // Wait for the modal to appear
-        const modalSelectors = [
-            // The "?↔툑?섍린" button inside the modal
-            `button:has-text("${KO_REMIT}")`,
-            // Modal overlay/dialog patterns
-            '[role="dialog"]',
-            '[class*="modal"]',
-            '[class*="Modal"]',
-            '[class*="popup"]',
-            '[class*="Popup"]',
-            '[class*="overlay"]',
-            '[class*="Overlay"]',
-        ]
-
-        // Check if modal appeared (look for "?↔툑?섍린" button)
-        const remitBtnInModal = page.getByText(KO_REMIT, { exact: false }).first()
-        try {
-            await remitBtnInModal.waitFor({ state: 'visible', timeout: 8000 })
-            modalOpened = true
-            steps.push('modal-opened-remit-btn-visible')
-        } catch {
-            // Modal may not have opened ??try clicking the parent card element
-            steps.push('modal-not-opened-retrying')
-
-            // Try clicking parent card with JavaScript
+        for (let attempt = 0; attempt < 3 && !remitClicked; attempt++) {
             try {
-                const jsClickResult = await page.evaluate(`
-                    (() => {
-                        const companyName = ${JSON.stringify(TARGET_COMPANY_NAME)};
-                        const walker = document.createTreeWalker(
-                            document.body, NodeFilter.SHOW_TEXT,
-                            { acceptNode: (n) => n.textContent && n.textContent.includes(companyName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
-                        );
-                        const node = walker.nextNode();
-                        if (!node) return 'no-text-node';
-                        // Walk up to find the clickable card element
-                        let el = node.parentElement;
-                        let depth = 0;
-                        while (el && depth < 10) {
-                            const cursor = window.getComputedStyle(el).cursor;
-                            if (cursor === 'pointer') {
-                                el.click();
-                                return 'clicked-pointer-' + el.tagName + '-depth-' + depth;
-                            }
-                            el = el.parentElement;
-                            depth++;
-                        }
-                        // Fallback: click the text's parent anyway
-                        if (node.parentElement) {
-                            node.parentElement.click();
-                            return 'clicked-parent-fallback';
-                        }
-                        return 'nothing-clicked';
-                    })()
-                `) as string
-                steps.push(`js-card-click:${jsClickResult}`)
-                await page.waitForTimeout(2000)
+                const companyEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+                await companyEl.waitFor({ state: 'visible', timeout: 5000 })
+                await companyEl.click({ timeout: 5000 })
+                steps.push(`clicked-company-text:attempt${attempt}`)
+            } catch {
+                steps.push(`company-text-click-failed:attempt${attempt}`)
+            }
 
-                // Check again for the modal
-                try {
-                    await remitBtnInModal.waitFor({ state: 'visible', timeout: 8000 })
-                    modalOpened = true
-                    steps.push('modal-opened-after-js-click')
-                } catch {
-                    steps.push('modal-still-not-opened')
+            await page.waitForTimeout(1000)
+
+            try {
+                remitClickReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
+                steps.push(`company-scoped-remit:${remitClickReason}:attempt${attempt}`)
+                if (remitClickReason.startsWith('clicked-')) {
+                    remitClicked = true
+                    break
                 }
             } catch (err) {
-                steps.push(`js-card-click-error:${err instanceof Error ? err.message : 'unknown'}`)
+                steps.push(`company-scoped-remit-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}:attempt${attempt}`)
             }
-        }
 
-        if (!modalOpened) {
-            // Last resort: look for the ?↔툑?섍린 button anywhere on the page
-            // (maybe the UI changed and there's no modal, just inline buttons)
-            const fallbackBtnSelectors = [
-                `button:has-text("${KO_REMIT}")`,
-                `a:has-text("${KO_REMIT}")`,
-                `[role="button"]:has-text("${KO_REMIT}")`,
-                `button:has-text("${KO_REMIT_SHORT}")`,
-            ]
-
-            for (const selector of fallbackBtnSelectors) {
-                try {
-                    const btn = page.locator(selector).first()
-                    const isVisible = await btn.isVisible()
-                    if (isVisible) {
-                        modalOpened = true
-                        steps.push(`remit-btn-found-without-modal:${selector}`)
-                        break
-                    }
-                } catch {
-                    // Continue
-                }
-            }
-        }
-
-        if (!modalOpened) {
-            let pageInfo = `url: ${page.url()}`
-            try {
-                const html = await page.content()
-                const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-                if (bodyMatch) {
-                    const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                    pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
-                }
-            } catch { /* ignore */ }
-
-            throw new MoinAutomationError(
-                'Open recipient modal',
-                `Could not open the recipient modal popup after clicking "${TARGET_COMPANY_NAME}". ${pageInfo}`
-            )
-        }
-
-        // ?? Step 5.5: Click "?↔툑?섍린" button in the modal ??????????????????
-        // This transitions from Step 1 (?섏랬???좏깮) to Step 2 (湲덉븸 ?낅젰)
-        // The element may not be a <button> ??could be <a>, <div>, <span>, etc.
-        let remitClicked = false
-
-        // Strategy A: Try clicking any element with the text (broader than just button)
-        const remitSelectors = [
-            `button:has-text("${KO_REMIT}")`,
-            `a:has-text("${KO_REMIT}")`,
-            `[role="button"]:has-text("${KO_REMIT}")`,
-            `div:has-text("${KO_REMIT}")`,
-        ]
-
-        for (const sel of remitSelectors) {
-            if (remitClicked) break
-            try {
-                const el = page.locator(sel).first()
-                const isVis = await el.isVisible().catch(() => false)
-                if (isVis) {
-                    await el.click({ timeout: 5000, force: true })
-                    remitClicked = true
-                    steps.push(`clicked-remit:${sel}`)
-                }
-            } catch {
-                // Continue to next selector
-            }
-        }
-
-        // Strategy B: Use getByText with force click
-        if (!remitClicked) {
-            try {
-                const anyRemitBtn = page.getByText(KO_REMIT, { exact: false }).first()
-                await anyRemitBtn.click({ timeout: 5000, force: true })
-                remitClicked = true
-                steps.push('clicked-remit-getByText-force')
-            } catch {
-                // Continue
-            }
-        }
-
-        // Strategy C: JavaScript force-click ??find the element with "?↔툑?섍린" text and click it
-        if (!remitClicked) {
-            try {
-                const jsResult = await page.evaluate(`
-                    (() => {
-                        const remitText = ${JSON.stringify(KO_REMIT)};
-                        // Find all elements containing the text
-                        const walker = document.createTreeWalker(
-                            document.body, NodeFilter.SHOW_TEXT,
-                            { acceptNode: (n) => n.textContent && n.textContent.includes(remitText) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
-                        );
-                        const textNode = walker.nextNode();
-                        if (!textNode) return 'no-text-node';
-                        // Walk up to find a clickable parent
-                        let el = textNode.parentElement;
-                        let depth = 0;
-                        while (el && depth < 8) {
-                            const tag = el.tagName.toLowerCase();
-                            const role = el.getAttribute('role');
-                            const cursor = window.getComputedStyle(el).cursor;
-                            if (tag === 'button' || tag === 'a' || role === 'button' || cursor === 'pointer') {
-                                el.click();
-                                return 'js-clicked-' + tag + '-depth-' + depth;
-                            }
-                            el = el.parentElement;
-                            depth++;
-                        }
-                        // Fallback: click the text node's direct parent
-                        if (textNode.parentElement) {
-                            textNode.parentElement.click();
-                            return 'js-clicked-parent-fallback';
-                        }
-                        return 'no-clickable-parent';
-                    })()
-                `) as string
-                if (jsResult && !jsResult.startsWith('no-')) {
-                    remitClicked = true
-                    steps.push(`remit-js-click:${jsResult}`)
-                }
-            } catch {
-                // Continue
-            }
+            await page.waitForTimeout(1000)
         }
 
         if (!remitClicked) {
             throw new MoinAutomationError(
                 'Click remit button in modal',
-                `Could not click the "${KO_REMIT}" button in the modal. (url: ${page.url()})`
+                `Could not click the "${KO_REMIT}" button in the target company context. Last result: ${remitClickReason}. (url: ${page.url()})`
             )
         }
 
@@ -892,33 +827,25 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 steps.push(`step2-recovery-attempt:${attempt + 1}`)
 
                 try {
-                    await companyTextEl.click({ timeout: 4000 })
-                    await page.waitForTimeout(1000)
-                    steps.push('recovery-clicked-company-text')
-                } catch {
-                    steps.push('recovery-company-text-click-failed')
-                }
-
-                let recoveryRemitClicked = false
-                for (const selector of [
-                    `button:has-text("${KO_REMIT}")`,
-                    `a:has-text("${KO_REMIT}")`,
-                    `[role="button"]:has-text("${KO_REMIT}")`,
-                    `div:has-text("${KO_REMIT}")`,
-                ]) {
-                    try {
-                        const target = page.locator(selector).first()
-                        await target.waitFor({ state: 'visible', timeout: 3000 })
-                        await target.click({ timeout: 3000, force: true })
-                        recoveryRemitClicked = true
-                        steps.push(`recovery-clicked-remit:${selector}`)
-                        break
-                    } catch {
-                        // Try next selector.
+                    const recoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
+                    steps.push(`recovery-company-scoped-remit:${recoveryReason}`)
+                    if (!recoveryReason.startsWith('clicked-')) {
+                        const recoveryCompanyEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+                        await recoveryCompanyEl.click({ timeout: 3000 })
+                        steps.push('recovery-clicked-company-text')
                     }
+                } catch (err) {
+                    steps.push(`recovery-remit-click-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`)
                 }
 
-                if (!recoveryRemitClicked) {
+                try {
+                    const secondRecoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
+                    steps.push(`recovery-company-scoped-remit-2:${secondRecoveryReason}`)
+                    if (!secondRecoveryReason.startsWith('clicked-')) {
+                        steps.push('recovery-remit-click-not-found')
+                    }
+                } catch (err) {
+                    steps.push(`recovery-remit-click-error-2:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`)
                     steps.push('recovery-remit-click-not-found')
                 }
             }
