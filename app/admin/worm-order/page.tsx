@@ -962,6 +962,9 @@ export default function WormOrderPage() {
     const [selectedDocEmailUid, setSelectedDocEmailUid] = useState<string | null>(null)
     const [docFetchProgress, setDocFetchProgress] = useState(0)
     const [loadingDocEmailDetail, setLoadingDocEmailDetail] = useState(false)
+    const [matchingDocEmailUid, setMatchingDocEmailUid] = useState<string | null>(null)
+    const [unmatchingDocEmailUid, setUnmatchingDocEmailUid] = useState<string | null>(null)
+    const [docEmailMatchMessage, setDocEmailMatchMessage] = useState('')
 
     const persistEmailOfflineCache = useCallback(() => {
         if (!hasHydratedEmailCacheRef.current) return
@@ -1854,6 +1857,73 @@ export default function WormOrderPage() {
         }
     }, [docEmailDetails, selectedDocEmailUid])
 
+    // ── Document 메일 매칭/해제 ──
+    const handleMatchDocEmailToOrder = async (email: WormEmailListItem) => {
+        if (!activeWormOrder?.id) {
+            setDocEmailError('발주리스트에서 매칭할 발주를 먼저 선택해 주세요.')
+            return
+        }
+        if (email.matchedOrderId === activeWormOrder.id) {
+            setDocEmailMatchMessage(`이미 현재 발주(${activeWormOrder.orderNumber})에 매칭된 메일입니다.`)
+            return
+        }
+        setMatchingDocEmailUid(email.uid)
+        setDocEmailError('')
+        setDocEmailMatchMessage('')
+        try {
+            const res = await fetch('/api/admin/worm-order/emails/match', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    uid: email.uid,
+                    orderId: activeWormOrder.id,
+                    subject: email.subject,
+                    date: email.date,
+                }),
+            })
+            const result = await res.json().catch(() => null)
+            if (!res.ok) throw new Error(result?.error || '매칭에 실패했습니다.')
+            setDocEmails(prev => prev.map(item =>
+                item.uid === email.uid
+                    ? { ...item, matchedOrderId: activeWormOrder.id, matchedOrderNumber: activeWormOrder.orderNumber, matchedAt: new Date().toISOString() }
+                    : item
+            ))
+            setDocEmailMatchMessage(`매칭 완료: ${activeWormOrder.orderNumber}`)
+        } catch (error) {
+            setDocEmailError(error instanceof Error ? error.message : '매칭 중 오류가 발생했습니다.')
+        } finally {
+            setMatchingDocEmailUid(null)
+        }
+    }
+
+    const handleUnmatchDocEmail = async (email: WormEmailListItem) => {
+        if (!email.matchedOrderId) return
+        setUnmatchingDocEmailUid(email.uid)
+        setDocEmailError('')
+        setDocEmailMatchMessage('')
+        try {
+            const res = await fetch('/api/admin/worm-order/emails/unmatch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: email.uid }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || '매칭 해제에 실패했습니다.')
+            }
+            setDocEmails(prev => prev.map(item =>
+                item.uid === email.uid
+                    ? { ...item, matchedOrderId: null, matchedOrderNumber: null, matchedAt: null }
+                    : item
+            ))
+            setDocEmailMatchMessage(`매칭 해제 완료: ${email.matchedOrderNumber || email.uid}`)
+        } catch (error) {
+            setDocEmailError(error instanceof Error ? error.message : '매칭 해제 중 오류가 발생했습니다.')
+        } finally {
+            setUnmatchingDocEmailUid(null)
+        }
+    }
+
     // ── Document 메일 선택 시 상세 자동 로드 ──
     useEffect(() => {
         if (!selectedDocEmailUid) return
@@ -1951,6 +2021,14 @@ export default function WormOrderPage() {
     }, [emails, activeWormOrder?.id])
 
     const autoTransferAmountUsd = matchedInvoiceEmail?.invoiceTotalAmountUsd ?? null
+
+    // 현재 발주에 매칭된 AWB 메일에서 AWB 번호 자동 추출
+    const matchedAwbEmail = useMemo(() => {
+        if (!activeWormOrder?.id) return null
+        return docEmails.find(e => e.matchedOrderId === activeWormOrder.id) || null
+    }, [docEmails, activeWormOrder?.id])
+
+    const autoBlNumber = matchedAwbEmail?.awbNumber ?? null
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
@@ -2521,6 +2599,7 @@ export default function WormOrderPage() {
         setDocHasFetched(false)
         setSelectedDocEmailUid(null)
         setDocEmailError('')
+        setDocEmailMatchMessage('')
         setPaymentNotificationCopied(false)
         setExpandedSteps(
             PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
@@ -3353,6 +3432,7 @@ export default function WormOrderPage() {
                     {/* 좌측 리스트 패널 */}
                     <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px] relative">
                         {docEmailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{docEmailError}</div>}
+                        {docEmailMatchMessage && <div className="px-4 py-2 text-[12px] text-emerald-700 font-semibold text-center">{docEmailMatchMessage}</div>}
 
                         {loadingDocEmails && (
                             <div className="p-10 flex flex-col items-center justify-center gap-4 text-slate-400 h-full mt-20">
@@ -3393,8 +3473,55 @@ export default function WormOrderPage() {
                                             <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                                                 {index + 1}. {email.subject}
                                             </h3>
+                                            {/* 매칭/해제 버튼 */}
+                                            <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                                <span
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        void handleMatchDocEmailToOrder(email)
+                                                    }}
+                                                    className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
+                                                        email.matchedOrderId === activeWormOrder?.id
+                                                            ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
+                                                            : matchingDocEmailUid === email.uid
+                                                                ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-progress'
+                                                                : activeWormOrder?.id
+                                                                    ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
+                                                                    : 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                                                    }`}
+                                                    role="button"
+                                                    aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
+                                                >
+                                                    {email.matchedOrderId === activeWormOrder?.id
+                                                        ? '매칭완료'
+                                                        : matchingDocEmailUid === email.uid
+                                                            ? '매칭중...'
+                                                            : '매칭하기'}
+                                                </span>
+                                                {email.matchedOrderNumber && (
+                                                    <span className="text-[10px] font-semibold text-emerald-700">
+                                                        {email.matchedOrderNumber}
+                                                    </span>
+                                                )}
+                                                {email.matchedOrderId && (
+                                                    <span
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            void handleUnmatchDocEmail(email)
+                                                        }}
+                                                        className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
+                                                            unmatchingDocEmailUid === email.uid
+                                                                ? 'bg-slate-100 text-slate-400 cursor-progress'
+                                                                : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
+                                                        }`}
+                                                        role="button"
+                                                    >
+                                                        {unmatchingDocEmailUid === email.uid ? '해제중...' : '매칭해제'}
+                                                    </span>
+                                                )}
+                                            </div>
                                             {email.awbNumber && (
-                                                <div className="mt-2 flex items-center gap-2">
+                                                <div className="mt-1.5 flex items-center gap-2">
                                                     <span
                                                         onClick={(event) => {
                                                             event.stopPropagation()
@@ -3806,6 +3933,20 @@ export default function WormOrderPage() {
                     <Search size={18} className="text-[#e34219] mt-1" />
                 </div>
 
+                {autoBlNumber && !blNumberQuery && (
+                    <div className="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50/60 px-3 py-2">
+                        <p className="text-[12px] font-semibold text-blue-700 flex-1">
+                            매칭된 AWB: <span className="font-black">{autoBlNumber}</span>
+                        </p>
+                        <button
+                            type="button"
+                            onClick={() => setBlNumberQuery(autoBlNumber)}
+                            className="h-7 px-3 rounded-md bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 transition-colors shrink-0"
+                        >
+                            번호 불러오기
+                        </button>
+                    </div>
+                )}
                 <div className="flex flex-col md:flex-row md:items-center gap-3">
                     <input
                         type="text"
@@ -3816,7 +3957,7 @@ export default function WormOrderPage() {
                                 handleCustomsProgressSearch()
                             }
                         }}
-                        placeholder="B/L 번호 입력 (예: 94000499505)"
+                        placeholder={autoBlNumber ? `매칭된 AWB: ${autoBlNumber} (위 버튼으로 불러오기)` : 'B/L 번호 입력 (예: 94000499505)'}
                         className="flex-1 h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
                     />
                     <button
