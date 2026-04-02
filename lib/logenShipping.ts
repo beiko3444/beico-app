@@ -168,7 +168,7 @@ const dumpAllInputs = async (page: PageLike): Promise<string> => {
                         id: inp.id || '',
                         placeholder: inp.placeholder || '',
                         className: (inp.className || '').slice(0, 60),
-                        visible: el.offsetParent !== null,
+                        visible: (el as HTMLElement).offsetParent !== null,
                         value: (inp.value || '').slice(0, 30),
                     }
                 })
