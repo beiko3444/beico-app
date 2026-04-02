@@ -1320,7 +1320,8 @@ async function main() {
     if (effectiveChecked === 0) {
       throw new Error('미출력 체크가 적용되지 않아 운송장출력 진행 중단');
     }
-    await sleep(260);
+    // 전체 체크 후 IBSheet가 CheckData를 완전히 등록할 때까지 대기
+    await sleep(1800);
 
     const beforePrintRows = await waitForNoPrintRowsByApi(frame, 2000);
     const beforeCounts = await getSlipSummaryCounts(page, frame);
@@ -1379,30 +1380,38 @@ async function main() {
         modalWrap: pick('.modalWrap'),
         uiDialog: pick('.ui-dialog'),
         popupModal1Html: (document.querySelector('#popupModal1')?.innerHTML || '').slice(0, 300),
+      popupModal1Text: (document.querySelector('#popupModal1')?.innerText || '').replace(/\s+/g, ' ').trim().slice(0, 200),
       };
     }).catch(() => null);
     console.log(`[Live] Print popup debug: ${JSON.stringify(popupButtonDebug)}`);
 
-    // popupModal1 우선으로 "예"/"확인" 클릭
-    const popupConfirmClicked = await clickFirstVisibleAny([page, frame], [
-      '#popupModal1 button:has-text("예")',
-      '#popupModal1 button:has-text("예(Y)")',
-      '#popupModal1 input[type="button"][value="예"]',
-      '#popupModal1 input[type="button"][value*="예"]',
-      '#popupModal1 button:has-text("확인")',
-      '#popupModal1 input[type="button"][value="확인"]',
-      '#popupModal button:has-text("예")',
-      '#popupModal button:has-text("예(Y)")',
-      'button:has-text("예")',
-      'button:has-text("예(Y)")',
-      'input[type="button"][value="예"]',
-      'button:has-text("확인")',
-      '.ui-dialog button:has-text("예")',
-      '.ui-dialog button:has-text("확인")',
-      '.modalWrap button:has-text("예")',
-      '.modalWrap button:has-text("확인")',
-      'button:has-text("OK")',
-    ], 3000);
+    // popupModal1 확인 버튼 클릭 (타임아웃 짧게 - 빠른 순서로 시도)
+    let popupConfirmClicked = false;
+
+    if (printConfirmPopupVisible) {
+      // 팝업이 이미 visible 확인됨 → 바로 클릭 (timeout 짧게)
+      popupConfirmClicked = await clickFirstVisibleAny([page, frame], [
+        '#popupModal1 button:has-text("확인")',
+        '#popupModal1 input[type="button"][value="확인"]',
+        '#popupModal1 button:has-text("예")',
+        '#popupModal1 input[type="button"][value="예"]',
+      ], 800);
+    }
+
+    if (!popupConfirmClicked) {
+      // 팝업이 없거나 클릭 실패 → 더 넓은 범위 시도
+      popupConfirmClicked = await clickFirstVisibleAny([page, frame], [
+        '#popupModal1 button',
+        '#popupModal button:has-text("예")',
+        'button:has-text("예")',
+        'button:has-text("예(Y)")',
+        'input[type="button"][value="예"]',
+        'button:has-text("확인")',
+        '.ui-dialog button:has-text("예")',
+        '.modalWrap button:has-text("예")',
+        'button:has-text("OK")',
+      ], 1500);
+    }
 
     if (!popupConfirmClicked) {
       // JS API 직접 호출 fallback
