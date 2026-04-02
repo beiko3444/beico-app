@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Circle, Clock3, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronUp, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles, Trash2 } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -1794,12 +1794,12 @@ export default function WormOrderPage() {
         setCopied(false)
 
         if (!receiveDate) {
-            setValidationError('Please choose a receiving date.')
+            setValidationError('납품 예정일을 선택해주세요.')
             return
         }
 
         if (selectedOrders.length === 0) {
-            setValidationError('Please choose at least one worm size and box quantity.')
+            setValidationError('최소 한 가지 사이즈의 수량을 입력해주세요.')
             return
         }
 
@@ -1846,7 +1846,7 @@ export default function WormOrderPage() {
             setCopied(true)
         } catch {
             setCopied(false)
-            alert('Copy failed. Please copy the message manually.')
+            alert('복사에 실패했습니다. 메시지를 직접 복사해주세요.')
         }
     }
 
@@ -1880,18 +1880,18 @@ export default function WormOrderPage() {
         const normalizedAmount = transferAmountUsd.replace(/,/g, '').trim()
         const parsedAmount = Number(normalizedAmount)
         if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-            setRemittanceError('Please enter a valid USD amount.')
+            setRemittanceError('올바른 USD 금액을 입력해주세요.')
             return
         }
 
         if (!invoicePdf) {
-            setRemittanceError('Please upload an invoice PDF file.')
+            setRemittanceError('인보이스 PDF 파일을 업로드해주세요.')
             return
         }
 
         const isPdf = invoicePdf.type === 'application/pdf' || invoicePdf.name.toLowerCase().endsWith('.pdf')
         if (!isPdf) {
-            setRemittanceError('Only PDF files are allowed.')
+            setRemittanceError('PDF 파일만 업로드할 수 있습니다.')
             return
         }
 
@@ -1957,7 +1957,7 @@ export default function WormOrderPage() {
 
             setRemittanceAttemptsRemaining(null)
             setRemittanceLockedUntil(null)
-            setRemittanceSuccess('Remittance application completed on MOIN BizPlus.')
+            setRemittanceSuccess('모인 BizPlus 송금 신청이 완료되었습니다.')
             setRemittanceProgress(100)
             setRemittanceProgressLabel(resolvedStage?.label || '송금 신청이 완료되었습니다.')
             setRemittancePricingSummary(pricingSummary)
@@ -2387,101 +2387,16 @@ export default function WormOrderPage() {
                     </p>
                 )}
 
-                <div className="mt-6 grid grid-cols-3 gap-2 md:gap-4">
-                    <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 text-center">
-                        <div className="text-2xl font-black text-sky-700">{pipelineModeCounts.AUTO}</div>
-                        <div className="text-xs font-semibold text-sky-800">완전자동</div>
+                <div className="mt-4 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 rounded-full bg-slate-200 overflow-hidden">
+                        <div
+                            className="h-full bg-[#e34219] rounded-full transition-all duration-500"
+                            style={{ width: `${Math.round((doneStepCount / PIPELINE_STEP_DEFINITIONS.length) * 100)}%` }}
+                        />
                     </div>
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center">
-                        <div className="text-2xl font-black text-red-700">{pipelineModeCounts.SEMI}</div>
-                        <div className="text-xs font-semibold text-red-700">반자동</div>
-                    </div>
-                    <div className="rounded-xl border border-slate-200 bg-slate-100 p-3 text-center">
-                        <div className="text-2xl font-black text-slate-700">{pipelineModeCounts.MANUAL}</div>
-                        <div className="text-xs font-semibold text-slate-600">수동 필요</div>
-                    </div>
-                </div>
-
-                <div className="mt-5 overflow-x-auto pb-1">
-                    <div className="min-w-max flex items-center">
-                        {PIPELINE_STEP_DEFINITIONS.map((step, index) => {
-                            const runtimeStatus = pipelineStatusMap[step.id]
-                            const isDone = runtimeStatus === 'done'
-                            const isActive = runtimeStatus === 'active' || step.id === activeStepId
-
-                            return (
-                                <div key={step.id} className="flex items-center">
-                                    {index > 0 && (
-                                        <div className={`h-[2px] w-7 md:w-10 ${isDone ? 'bg-red-300' : 'bg-slate-300'}`} />
-                                    )}
-                                    <button
-                                        type="button"
-                                        onClick={() => togglePipelineStep(step.id)}
-                                        className={`h-9 w-9 rounded-full border text-xs font-black transition-colors ${
-                                            isDone
-                                                ? 'border-red-300 bg-red-100 text-red-700'
-                                                : isActive
-                                                    ? 'border-[#e34219] bg-[#e34219] text-white'
-                                                    : 'border-slate-300 bg-white text-slate-500'
-                                        }`}
-                                        title={`Step ${step.id} ${step.title}`}
-                                    >
-                                        {step.id}
-                                    </button>
-                                </div>
-                            )
-                        })}
-                    </div>
-                    <div className="mt-2 text-xs font-medium text-slate-600">
-                        완료 {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계
-                    </div>
-                </div>
-
-                <div className="mt-4 flex flex-wrap gap-2">
-                    <button
-                        type="button"
-                        onClick={() => setPipelineFilter('all')}
-                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
-                            pipelineFilter === 'all'
-                                ? 'bg-[#e34219] text-white border-[#e34219]'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                        }`}
-                    >
-                        전체 단계
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setPipelineFilter('AUTO')}
-                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
-                            pipelineFilter === 'AUTO'
-                                ? 'bg-[#e34219] text-white border-[#e34219]'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                        }`}
-                    >
-                        완전자동
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setPipelineFilter('SEMI')}
-                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
-                            pipelineFilter === 'SEMI'
-                                ? 'bg-[#e34219] text-white border-[#e34219]'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                        }`}
-                    >
-                        반자동
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setPipelineFilter('MANUAL')}
-                        className={`h-8 px-3 rounded-lg text-xs font-bold border transition-colors ${
-                            pipelineFilter === 'MANUAL'
-                                ? 'bg-[#e34219] text-white border-[#e34219]'
-                                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-50'
-                        }`}
-                    >
-                        수동 필요
-                    </button>
+                    <span className="text-xs font-semibold text-slate-500 shrink-0">
+                        {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
+                    </span>
                 </div>
             </div>
 
@@ -2582,10 +2497,6 @@ export default function WormOrderPage() {
             </section>
 
             <div className="flex flex-col gap-4">
-                    <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 mb-4">
-                        <h2 className="text-lg font-black text-slate-900">프로세스 리스트</h2>
-                        <p className="mt-1 text-xs text-slate-500">각 단계 카드 사이에 실행 도구가 순서대로 배치됩니다.</p>
-                    </div>
                         {filteredPipelineSteps.map((step) => {
                             const runtimeStatus = pipelineStatusMap[step.id]
                             const isExpanded = expandedSteps[step.id] ?? false
@@ -2598,86 +2509,60 @@ export default function WormOrderPage() {
                                     runtimeStatus === 'done'
                                         ? 'border-emerald-200'
                                         : runtimeStatus === 'active'
-                                            ? 'border-red-300'
+                                            ? 'border-[#e34219]'
                                             : 'border-gray-200'
                                 }`}
                                 >
                                     <button
                                         type="button"
                                         onClick={() => togglePipelineStep(step.id)}
-                                        className="w-full px-4 py-4 flex items-center justify-between gap-3 text-left"
+                                        className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left"
                                     >
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-slate-800 text-white text-xs font-black px-2">
-                                                    {step.id}
-                                                </span>
-                                                <h2 className="text-base md:text-lg font-black text-slate-900 truncate">{step.title}</h2>
-                                            </div>
-                                            <p className="mt-2 text-sm text-slate-600">{step.summary}</p>
+                                        <div className="flex items-center gap-2 min-w-0">
+                                            <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-black px-1.5 shrink-0 ${
+                                                runtimeStatus === 'done'
+                                                    ? 'bg-emerald-500 text-white'
+                                                    : runtimeStatus === 'active'
+                                                        ? 'bg-[#e34219] text-white'
+                                                        : 'bg-slate-200 text-slate-600'
+                                            }`}>
+                                                {step.id}
+                                            </span>
+                                            <h2 className="text-sm font-bold text-slate-900 truncate">{step.title}</h2>
                                         </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                        <div className="flex items-center gap-1.5 shrink-0">
+                                            <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
                                                 {getPipelineModeLabel(step.mode)}
                                             </span>
-                                            <span className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                            <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
                                                 {getPipelineRuntimeLabel(runtimeStatus)}
                                             </span>
-                                            {isExpanded ? <ChevronUp size={16} className="text-slate-500" /> : <ChevronDown size={16} className="text-slate-500" />}
+                                            {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
                                         </div>
                                     </button>
 
                                     {isExpanded && (
-                                        <div className="border-t border-gray-100 px-4 py-4 space-y-3">
-                                            <div className="text-sm text-slate-600 font-medium">처리주체: {step.owner}</div>
-                                            <div className="space-y-1.5">
-                                                {step.details.map((item) => (
-                                                    <div key={`${step.id}-${item}`} className="flex items-start gap-2 text-sm text-slate-700">
-                                                        {runtimeStatus === 'done' ? (
-                                                            <CheckCircle2 size={15} className="text-emerald-600 mt-0.5 shrink-0" />
-                                                        ) : runtimeStatus === 'active' ? (
-                                                            <Clock3 size={15} className="text-orange-600 mt-0.5 shrink-0" />
-                                                        ) : (
-                                                            <Circle size={15} className="text-slate-400 mt-0.5 shrink-0" />
-                                                        )}
-                                                        <span>{item}</span>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                        <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
+                                            <p className="text-xs text-slate-500">
+                                                <span className="font-semibold text-slate-600">처리주체</span> {step.owner}
+                                                {step.warning && <span className="ml-2 text-orange-600">· {step.warning}</span>}
+                                            </p>
 
-                                            {step.warning && (
-                                                <div className="rounded-lg border border-orange-200 bg-orange-50 px-3 py-2 text-xs font-semibold text-orange-700">
-                                                    {step.warning}
-                                                </div>
+                                            {step.target !== 'none' && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handlePipelineStepAction(step)}
+                                                    className="h-8 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 bg-[#e34219] text-white hover:bg-[#cd3b17]"
+                                                >
+                                                    {step.actionLabel}
+                                                    <ArrowRight size={13} />
+                                                </button>
                                             )}
-
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePipelineStepAction(step)}
-                                                className={`h-9 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 ${
-                                                    step.target === 'none'
-                                                        ? 'bg-slate-100 text-slate-500 cursor-default'
-                                                        : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
-                                                }`}
-                                                disabled={step.target === 'none'}
-                                            >
-                                                {step.actionLabel}
-                                                {step.target !== 'none' && <ArrowRight size={14} />}
-                                            </button>
                                         </div>
                                     )}
                                 </section>
                             )
                         })}
-            {showOrderTools && (
-                <div className="px-1" style={{ order: orderToolOrderBase + 4 }}>
-                    <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
-                        <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 1 EXECUTION</p>
-                        <h3 className="text-sm font-black text-slate-900 mt-1">발주 메시지 생성 및 전송</h3>
-                    </div>
-                </div>
-            )}
-
             {showOrderTools && (
                 <div
                     ref={orderSectionRef}
@@ -2686,104 +2571,37 @@ export default function WormOrderPage() {
                 >
                     <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
                         <div>
-                            <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">WORM ORDER SHEET</p>
-                            <h2 className="text-lg font-black text-[#1f2937]">How many boxes do you want to order?</h2>
+                            <h2 className="text-lg font-black text-[#1f2937]">발주서 작성</h2>
+                            <p className="text-xs text-slate-500 mt-0.5">사이즈별 수량을 입력하고 발주 메시지를 생성합니다.</p>
                         </div>
                         <Sparkles size={18} className="text-[#e34219]" />
                     </div>
 
-                    <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
-                        <aside className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5 flex flex-col">
-                            <p className="text-[11px] font-black text-slate-600 uppercase tracking-[0.2em]">작성일 달력</p>
-
-                            <div className="mt-3 flex items-center justify-between">
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setCalendarCursor((prev) => {
-                                            const nextMonth = prev.month - 1
-                                            if (nextMonth < 0) return { year: prev.year - 1, month: 11 }
-                                            return { year: prev.year, month: nextMonth }
-                                        })
-                                    }
-                                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 inline-flex items-center justify-center"
-                                    aria-label="이전 달"
-                                >
-                                    <ChevronLeft size={14} />
-                                </button>
-                                <p className="text-sm font-black text-slate-900">{calendarMonthLabel}</p>
-                                <button
-                                    type="button"
-                                    onClick={() =>
-                                        setCalendarCursor((prev) => {
-                                            const nextMonth = prev.month + 1
-                                            if (nextMonth > 11) return { year: prev.year + 1, month: 0 }
-                                            return { year: prev.year, month: nextMonth }
-                                        })
-                                    }
-                                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 inline-flex items-center justify-center"
-                                    aria-label="다음 달"
-                                >
-                                    <ChevronRight size={14} />
-                                </button>
+                    <div className="p-4 md:p-6 space-y-5">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+                            <div className="flex items-center gap-2">
+                                <label className="text-xs font-bold text-slate-600 shrink-0">납품 예정일</label>
+                                <input
+                                    type="date"
+                                    value={receiveDate}
+                                    min={today}
+                                    onChange={(e) => {
+                                        setCopied(false)
+                                        setReceiveDate(e.target.value)
+                                    }}
+                                    className="h-9 px-3 rounded-lg border border-slate-300 text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#e34219]"
+                                />
                             </div>
+                            <button
+                                type="button"
+                                onClick={handleGenerate}
+                                className="h-9 px-5 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm"
+                            >
+                                발주 메시지 생성
+                            </button>
+                        </div>
 
-                            <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-slate-400 text-center">
-                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday) => (
-                                    <span key={weekday}>{weekday}</span>
-                                ))}
-                            </div>
-                            <div className="mt-1 grid grid-cols-7 gap-1">
-                                {calendarDays.map((dayCell) => {
-                                    const ymd = formatLocalDateToYmd(dayCell.date)
-                                    const isSelected = receiveDate === ymd
-                                    const dayStart = new Date(
-                                        dayCell.date.getFullYear(),
-                                        dayCell.date.getMonth(),
-                                        dayCell.date.getDate(),
-                                    )
-                                    const isPast = dayStart.getTime() < todayDate.getTime()
-                                    return (
-                                        <button
-                                            key={ymd}
-                                            type="button"
-                                            onClick={() => {
-                                                setCopied(false)
-                                                setReceiveDate(ymd)
-                                                setActiveWormOrder(null)
-                                            }}
-                                            disabled={isPast}
-                                            className={`h-9 rounded-lg text-xs font-bold transition-colors ${
-                                                isSelected
-                                                    ? 'bg-[#e34219] text-white'
-                                                    : dayCell.isCurrentMonth
-                                                        ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                                                        : 'bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200'
-                                            } ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
-                                        >
-                                            {dayCell.date.getDate()}
-                                        </button>
-                                    )
-                                })}
-                            </div>
-
-                            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
-                                선택된 작성일: {receiveDate || '-'}
-                            </div>
-
-                            <div className="mt-auto pt-4">
-                                <button
-                                    type="button"
-                                    onClick={handleGenerate}
-                                    className="h-11 w-full bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide"
-                                >
-                                    Generate Message
-                                </button>
-                            </div>
-                        </aside>
-
-                        <div className="space-y-5">
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                                 {WORM_TYPES.map((wormType) => (
                                     <section key={wormType.id} className="space-y-3">
                                         <div className="flex items-center gap-2">
@@ -2852,33 +2670,24 @@ export default function WormOrderPage() {
                                 <p className="text-sm font-semibold text-[#e34219]">{validationError}</p>
                             )}
                         </div>
-                    </div>
-                </div>
-            )}
 
-            {showOrderTools && generatedMessage && (
-                <div style={{ order: orderToolOrderBase + 7 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-3">
-                    <textarea
-                        readOnly
-                        value={generatedMessage}
-                        className="w-full h-60 border border-gray-300 rounded-xl p-4 text-sm leading-6 text-gray-800 bg-gray-50"
-                    />
-                    <button
-                        type="button"
-                        onClick={handleCopy}
-                        className="inline-flex items-center gap-2 h-10 px-4 border border-gray-300 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50"
-                    >
-                        <Copy size={15} />
-                        {copied ? 'Copied' : 'Copy Message'}
-                    </button>
-                </div>
-            )}
-
-            {showInboxTools && (
-                <div className="px-1" style={{ order: inboxToolOrderBase + 4 }}>
-                    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-                        <p className="text-[11px] font-black text-slate-600 tracking-[0.2em]">STEP 2 / 6 / 9 / 10 EXECUTION</p>
-                        <h3 className="text-sm font-black text-slate-900 mt-1">INBOX 수신 · OCR · 첨부전달 · 창고료 메일 확인</h3>
+                        {generatedMessage && (
+                            <div className="space-y-3">
+                                <textarea
+                                    readOnly
+                                    value={generatedMessage}
+                                    className="w-full h-52 border border-gray-300 rounded-xl p-4 text-sm leading-6 text-gray-800 bg-gray-50"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleCopy}
+                                    className="inline-flex items-center gap-2 h-9 px-4 border border-gray-300 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50"
+                                >
+                                    <Copy size={15} />
+                                    {copied ? '복사 완료' : '메시지 복사'}
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -2899,23 +2708,18 @@ export default function WormOrderPage() {
 
                 <div className="px-6 py-4 border-b border-gray-100 bg-[#f8fafc] flex items-center justify-between mt-[2px]">
                     <div>
-                        <p className="text-[11px] font-bold text-slate-500 uppercase tracking-[0.2em] relative">INBOX
-                            {loadingEmails && <span className="absolute -top-1 -right-3 flex h-2 w-2"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
-                        </p>
                         <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
-                            <Mail size={18} className="text-slate-500" /> Invoice Mails
+                            <Mail size={18} className="text-slate-500" />
+                            인보이스 메일 수신
+                            {loadingEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </h2>
-                        <p className="mt-1 text-[11px] font-medium text-slate-500">
-                            제목에 `invoice`가 포함된 메일만 조회합니다.
+                        <p className="mt-0.5 text-xs text-slate-500">
+                            제목에 &apos;invoice&apos;가 포함된 메일만 조회합니다.
+                            {activeWormOrder && <span className="ml-2 font-semibold text-slate-600">현재 발주: {activeWormOrder.orderNumber}</span>}
                         </p>
-                        {activeWormOrder && (
-                            <p className="mt-1 text-[11px] font-semibold text-slate-600">
-                                현재 발주: {activeWormOrder.orderNumber}
-                            </p>
-                        )}
                         {emailCacheSavedAt && (
-                            <p className={`mt-1 text-[11px] font-medium ${usingOfflineEmailCache ? 'text-amber-600' : 'text-slate-500'}`}>
-                                {usingOfflineEmailCache ? 'Offline cache active' : 'Last cached'} / {new Date(emailCacheSavedAt).toLocaleString()}
+                            <p className={`mt-1 text-[11px] font-medium ${usingOfflineEmailCache ? 'text-amber-600' : 'text-slate-400'}`}>
+                                {usingOfflineEmailCache ? '오프라인 캐시 사용 중' : '캐시 저장'} · {new Date(emailCacheSavedAt).toLocaleString()}
                             </p>
                         )}
                     </div>
@@ -3309,22 +3113,12 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div className="px-1" style={{ order: remittanceToolOrderBase + 4 }}>
-                    <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
-                        <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 3 EXECUTION</p>
-                        <h3 className="text-sm font-black text-slate-900 mt-1">모인비즈니스 송금 신청 자동화</h3>
-                    </div>
-                </div>
-            )}
-
-            {showRemittanceTools && (
                 <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">MOIN BIZPLUS</p>
-                        <h3 className="text-lg font-black text-[#111827]">Auto Remittance Application</h3>
+                        <h3 className="text-lg font-black text-[#111827]">모인 자동 송금 신청</h3>
                         <p className="text-xs text-gray-500 mt-1">
-                            Uses server env credentials. Fill amount + invoice PDF, then click apply.
+                            서버 환경변수에 저장된 계정으로 자동 로그인 후 송금을 신청합니다.
                         </p>
                         {activeWormOrder && (
                             <p className="text-[11px] font-semibold text-slate-600 mt-1">
@@ -3343,8 +3137,8 @@ export default function WormOrderPage() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
-                            Transfer Amount (USD)
+                        <label className="text-xs font-bold text-gray-600">
+                            송금 금액 (USD)
                         </label>
                         <input
                             type="text"
@@ -3359,14 +3153,14 @@ export default function WormOrderPage() {
                         />
                     </div>
                     <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-[0.12em]">
-                            Invoice PDF
+                        <label className="text-xs font-bold text-gray-600">
+                            인보이스 PDF
                         </label>
                         <div className="space-y-2">
                             <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
                                 <div className="flex items-center gap-2 min-w-0">
                                     <FileText size={16} className="shrink-0 text-gray-500" />
-                                    <span className="text-sm truncate">{invoicePdf?.name || 'Upload invoice PDF'}</span>
+                                    <span className="text-sm truncate">{invoicePdf?.name || '인보이스 PDF 업로드'}</span>
                                 </div>
                                 <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
                                 <input
@@ -3404,7 +3198,7 @@ export default function WormOrderPage() {
 
                 <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                        The automation will log in with server credentials, select Shanghai Oikki Trading Co.,Ltd, upload your PDF, check consent, and complete submission.
+                        자동으로 모인 로그인 후 Shanghai Oikki Trading Co.,Ltd를 선택하고 인보이스를 업로드하여 송금 신청을 완료합니다.
                     </p>
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <button
@@ -3422,7 +3216,7 @@ export default function WormOrderPage() {
                             ) : remittanceSubmitting ? (
                                 <>
                                     <Loader2 size={15} className="animate-spin" />
-                                    Applying...
+                                    신청 중...
                                 </>
                             ) : (
                                 '신청하기'
@@ -3531,20 +3325,10 @@ export default function WormOrderPage() {
                 </div>
             )}
             {showCustomsTools && (
-                <div className="px-1" style={{ order: customsToolOrderBase + 4 }}>
-                    <div className="rounded-xl border border-orange-100 bg-orange-50/60 px-4 py-3">
-                        <p className="text-[11px] font-black text-[#e34219] tracking-[0.2em]">STEP 7 EXECUTION</p>
-                        <h3 className="text-sm font-black text-slate-900 mt-1">유니패스 화물통관진행정보 조회</h3>
-                    </div>
-                </div>
-            )}
-
-            {showCustomsTools && (
                 <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">UNI-PASS API001</p>
-                        <h3 className="text-lg font-black text-[#111827]">화물통관진행정보 조회 (B/L)</h3>
+                        <h3 className="text-lg font-black text-[#111827]">유니패스 수입 통관 조회</h3>
                         <p className="text-xs text-gray-500 mt-1">
                             B/L 번호만 입력하면 MBL/HBL + 최근 3개년을 자동으로 시도해 조회합니다.
                         </p>
