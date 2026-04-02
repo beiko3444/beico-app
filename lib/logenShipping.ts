@@ -1937,35 +1937,28 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
 
         // Do not touch utility checkbox near 관내우선; it can switch sheet context.
 
-        // Check the checkbox (IBSheet-aware with CSS fallback) and verify checked rows.
+        // DOM 헤더 체크박스 클릭 (API 강제 체크 사용 안 함 - 삭제된 주문 포함 오류 방지)
         let checkedRows = 0
         let checkedRowsByApi = 0
         for (let attempt = 0; attempt < 3; attempt++) {
-            const apiSelected = await selectNoPrintRowsByApi(page)
-            checkedRowsByApi = Math.max(checkedRowsByApi, apiSelected.checkedCount)
-            console.log(`[LogenShipping] Print prep: CheckData attempt#${attempt + 1} ok=${apiSelected.ok} checked=${apiSelected.checkedCount} reason=${apiSelected.reason}`)
-            if (apiSelected.ok) {
-                checkedRows = apiSelected.checkedCount
-                break
-            }
-
             try {
                 await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
             } catch {
                 // retry after short wait
             }
-            await page.waitForTimeout(220)
+            await page.waitForTimeout(500)
+            const state = await getUnprintedGridState(page)
             const apiAfterDom = await waitForNoPrintRowsByApi(page, 2500)
             checkedRowsByApi = Math.max(checkedRowsByApi, apiAfterDom.checkedCount)
-            const state = await getUnprintedGridState(page)
             checkedRows = Math.max(state.checkedCount, checkedRowsByApi)
+            console.log(`[LogenShipping] Print prep: DOM check attempt#${attempt + 1} dom=${state.checkedCount} api=${checkedRowsByApi}`)
             if (checkedRows > 0) break
             await waitForUnprintedGridReady(page, 2500)
         }
         if (checkedRows === 0) {
             throw new LogenAutomationError('Select Order Checkbox', '미출력 체크가 적용되지 않아 운송장출력을 진행할 수 없습니다.')
         }
-        await page.waitForTimeout(260)
+        await page.waitForTimeout(1800)
 
         // Click 운송장출력
         reportStep('운송장 출력')
