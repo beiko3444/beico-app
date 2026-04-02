@@ -302,308 +302,264 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         await page.waitForTimeout(2000)
         await page.waitForLoadState('networkidle')
 
-        // Step 3: Close any popup/modal that might appear after login
+        // Step 3: Close any popup/modal that might appear after login (유통판매채널 등)
         throwIfAbortRequested(signal, 'Close Popup')
         reportStep('팝업 닫기')
 
-        try {
-            const closeButtons = [
-                'button:has-text("닫기")',
-                '.modal button:has-text("닫기")',
-                '.popup button:has-text("닫기")',
-                'button:has-text("확인")',
-                '.modal .close',
-                'button.close',
-                '[class*="close"]:has-text("닫기")',
-            ]
-            for (const selector of closeButtons) {
-                try {
-                    const btn = page.locator(selector).first()
-                    const visible = await btn.isVisible().catch(() => false)
-                    if (visible) {
-                        await btn.click({ timeout: 3000 })
-                        await page.waitForTimeout(500)
+        // LOGEN shows a 유통판매채널 popup or notice after login. Try closing all visible modals.
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                const closeSelectors = [
+                    'button:has-text("닫기")',
+                    'input[type="button"][value="닫기"]',
+                    'a:has-text("닫기")',
+                    '.popup-close',
+                    'button.close',
+                    '.btn-close',
+                ]
+                for (const selector of closeSelectors) {
+                    try {
+                        const btn = page.locator(selector).first()
+                        const visible = await btn.isVisible().catch(() => false)
+                        if (visible) {
+                            await btn.click({ timeout: 3000 })
+                            await page.waitForTimeout(800)
+                        }
+                    } catch {
+                        // Popup button not found, continue
                     }
-                } catch {
-                    // Popup might not exist, continue
                 }
+            } catch {
+                // No popup
             }
-        } catch {
-            // No popup to close
+            await page.waitForTimeout(500)
         }
-
-        await page.waitForTimeout(500)
 
         // Step 4: Navigate to 예약관리 > 주문등록/출력(단건)
         throwIfAbortRequested(signal, 'Navigate Menu')
         reportStep('메뉴 이동: 예약관리 > 주문등록/출력(단건)')
 
+        // LOGEN sidebar uses dynamic menu - click parent first to expand, then submenu
         await clickFirstVisible(
             page,
             [
                 'a:has-text("예약관리")',
                 'span:has-text("예약관리")',
                 'li:has-text("예약관리") > a',
-                '[class*="menu"]:has-text("예약관리")',
+                'li:has-text("예약관리")',
             ],
             'Navigate - 예약관리 Menu'
         )
 
-        await page.waitForTimeout(1000)
+        await page.waitForTimeout(1500)
 
         await clickFirstVisible(
             page,
             [
                 'a:has-text("주문등록/출력(단건)")',
                 'span:has-text("주문등록/출력(단건)")',
-                'a:has-text("주문등록")',
-                'li:has-text("주문등록/출력") a',
-                '[class*="sub"] a:has-text("주문등록")',
+                'a:has-text("주문등록/출력(단건")',
+                'li a:has-text("주문등록")',
             ],
             'Navigate - 주문등록/출력(단건) Submenu'
         )
 
-        await page.waitForTimeout(2000)
+        await page.waitForTimeout(3000)
         await page.waitForLoadState('networkidle')
 
-        // Step 5: Fill sender info
-        throwIfAbortRequested(signal, 'Fill Sender Info')
-        reportStep('보내는 분 정보 입력')
-
-        try {
-            await fillFirstVisible(
-                page,
-                [
-                    'input[name*="send"][name*="tel"]',
-                    'input[name*="send"][name*="phone"]',
-                    'input[name*="s_tel"]',
-                    'input[name*="snd_tel"]',
-                ],
-                senderPhone,
-                'Sender Phone',
-                15000
-            )
-        } catch {
-            console.log('[LogenShipping] Sender phone field not found or pre-filled, skipping')
-        }
-
-        try {
-            await fillFirstVisible(
-                page,
-                [
-                    'input[name*="send"][name*="nm"]',
-                    'input[name*="send"][name*="name"]',
-                    'input[name*="s_nm"]',
-                    'input[name*="snd_nm"]',
-                ],
-                senderName,
-                'Sender Name',
-                15000
-            )
-        } catch {
-            console.log('[LogenShipping] Sender name field not found or pre-filled, skipping')
-        }
-
-        // Step 6: Fill recipient info
+        // Step 5: Fill recipient info (수하인 / 받으시는 분)
+        // LOGEN form fields are inside the main content area (may be iframe-based)
         throwIfAbortRequested(signal, 'Fill Recipient Info')
-        reportStep('받으시는 분 정보 입력')
+        reportStep('수하인(받으시는 분) 정보 입력')
 
+        // Fill recipient phone - 전화번호 in 수하인 section
         await fillFirstVisible(
             page,
             [
-                'input[name*="rec"][name*="tel"]',
-                'input[name*="rec"][name*="phone"]',
-                'input[name*="r_tel"]',
+                'input[name*="rcvTelNo"]',
                 'input[name*="rcv_tel"]',
                 'input[name*="recv"][name*="tel"]',
+                'input[name*="rec"][name*="tel"]',
+                'input[name*="r_tel"]',
             ],
             recipientPhone,
             'Recipient Phone'
         )
 
+        // Fill recipient name - 수하인명
         await fillFirstVisible(
             page,
             [
-                'input[name*="rec"][name*="nm"]',
-                'input[name*="rec"][name*="name"]',
-                'input[name*="r_nm"]',
+                'input[name*="rcvNm"]',
                 'input[name*="rcv_nm"]',
                 'input[name*="recv"][name*="nm"]',
+                'input[name*="rec"][name*="nm"]',
+                'input[name*="r_nm"]',
             ],
             recipientName,
             'Recipient Name'
         )
 
-        // Step 7: Address search
+        // Step 6: Address search - click magnifying glass below phone field
         throwIfAbortRequested(signal, 'Address Search')
         reportStep('주소 검색')
 
-        // Click the address search button (magnifying glass icon or search button in recipient section)
+        // Click the address search button (돋보기 icon under 전화번호 in 수하인 section)
         await clickFirstVisible(
             page,
             [
-                'button:has-text("주소")',
-                'a:has-text("주소")',
+                'img[src*="search"][alt*="주소"]',
                 'button[onclick*="addr"]',
                 'a[onclick*="addr"]',
                 'img[src*="search"]',
                 'button[onclick*="zip"]',
                 'a[onclick*="zip"]',
-                'input[type="button"][value*="주소"]',
-                'input[type="button"][value*="검색"]',
-                'button:has-text("검색")',
-                '.btn_search',
-                '[class*="addr"] button',
                 'button[title*="주소"]',
+                'a[title*="주소"]',
+                'img[alt*="검색"]',
             ],
             'Address Search - Open Dialog'
         )
 
+        await page.waitForTimeout(2500)
+
+        // The address search popup (주소 검색(입력)) opens as a modal dialog
+        // Fill address in the popup input
+        await fillFirstVisible(
+            page,
+            [
+                'input[placeholder*="주소를 입력"]',
+                'input[placeholder*="주소"]',
+                'input[placeholder*="도로명"]',
+                '#keyword',
+                'input[name="keyword"]',
+                'input[name="searchAddr"]',
+                'input[name="newAddr"]',
+            ],
+            recipientAddress,
+            'Address Search - Fill Address',
+            15000
+        )
+
+        // Click 검색 button in the popup
+        await clickFirstVisible(
+            page,
+            [
+                'button:has-text("검색")',
+                'input[type="button"][value="검색"]',
+                'a:has-text("검색")',
+                '#searchBtn',
+            ],
+            'Address Search - Click Search'
+        )
+
+        await page.waitForTimeout(2500)
+
+        // Double-click the first search result row
+        try {
+            const resultSelectors = [
+                'table tbody tr:first-child td',
+                'table tbody tr td',
+                '.search-result tr:first-child',
+                'ul.list li:first-child',
+            ]
+            let clicked = false
+            for (const selector of resultSelectors) {
+                try {
+                    const row = page.locator(selector).first()
+                    const visible = await row.isVisible().catch(() => false)
+                    if (visible) {
+                        await row.dblclick({ timeout: 5000 })
+                        clicked = true
+                        break
+                    }
+                } catch {
+                    // Try next
+                }
+            }
+            if (!clicked) {
+                console.log('[LogenShipping] Could not double-click search result, trying single click')
+                await clickFirstVisible(page, resultSelectors, 'Address Search - Select Result')
+            }
+        } catch (error) {
+            console.log(`[LogenShipping] Address result selection: ${getErrorMessage(error)}`)
+        }
+
         await page.waitForTimeout(2000)
 
-        // Handle address search in popup or same page
-        // The LOGEN site may open a popup window or inline dialog
-        try {
-            // Try to fill the address search input in a dialog/popup
-            await fillFirstVisible(
-                page,
-                [
-                    '.modal input[type="text"]',
-                    '#keyword',
-                    'input[name="keyword"]',
-                    'input[name="searchAddr"]',
-                    'input[name="addr"]',
-                    'input[name="newAddr"]',
-                    'input[placeholder*="주소"]',
-                    'input[placeholder*="도로명"]',
-                    '.popup input[type="text"]',
-                    '[class*="addr"] input[type="text"]',
-                    'input[id*="addr"]',
-                    'input[name*="query"]',
-                ],
-                recipientAddress,
-                'Address Search - Fill Address',
-                15000
-            )
-
-            // Click search button in the dialog
-            await clickFirstVisible(
-                page,
-                [
-                    '.modal button:has-text("검색")',
-                    '.popup button:has-text("검색")',
-                    'button:has-text("검색")',
-                    'input[type="button"][value="검색"]',
-                    'a:has-text("검색")',
-                    '#searchBtn',
-                    '[class*="addr"] button:has-text("검색")',
-                ],
-                'Address Search - Click Search'
-            )
-
-            await page.waitForTimeout(2000)
-
-            // Double-click the first result
+        // Fill detail address if prompted
+        if (recipientDetailAddress) {
             try {
-                const resultSelectors = [
-                    '.modal table tbody tr',
-                    '.popup table tbody tr',
-                    'table tbody tr',
-                    '.search_result tr',
-                    '[class*="result"] tr',
-                    '.list_area tr',
-                    'ul.list li',
-                ]
-                let clicked = false
-                for (const selector of resultSelectors) {
-                    try {
-                        const row = page.locator(selector).first()
-                        const visible = await row.isVisible().catch(() => false)
-                        if (visible) {
-                            await row.dblclick({ timeout: 5000 })
-                            clicked = true
-                            break
-                        }
-                    } catch {
-                        // Try next
-                    }
-                }
-                if (!clicked) {
-                    // Fallback: try clicking the first result
-                    await clickFirstVisible(
-                        page,
-                        resultSelectors,
-                        'Address Search - Select Result'
-                    )
-                }
-            } catch {
-                console.log('[LogenShipping] Could not double-click address result, trying single click')
-            }
-
-            await page.waitForTimeout(1500)
-
-            // Fill detail address if there is a detail address input
-            if (recipientDetailAddress) {
-                try {
-                    await fillFirstVisible(
-                        page,
-                        [
-                            'input[name*="detail"]',
-                            'input[name*="addr2"]',
-                            'input[name*="addrDetail"]',
-                            'input[placeholder*="상세"]',
-                            'input[placeholder*="나머지"]',
-                            '.modal input[name*="detail"]',
-                            '#detailAddr',
-                        ],
-                        recipientDetailAddress,
-                        'Address Search - Detail Address',
-                        10000
-                    )
-                } catch {
-                    console.log('[LogenShipping] Detail address input not found, may not be required')
-                }
-            }
-
-            // Close the address dialog
-            try {
-                await clickFirstVisible(
+                await fillFirstVisible(
                     page,
                     [
-                        '.modal button:has-text("확인")',
-                        '.popup button:has-text("확인")',
-                        'button:has-text("확인")',
-                        'input[type="button"][value="확인"]',
-                        '.modal button:has-text("적용")',
+                        'input[name*="detail"]',
+                        'input[name*="addr2"]',
+                        'input[placeholder*="상세"]',
+                        'input[placeholder*="나머지"]',
+                        '#detailAddr',
                     ],
-                    'Address Search - Confirm',
+                    recipientDetailAddress,
+                    'Address Search - Detail Address',
                     10000
                 )
             } catch {
-                console.log('[LogenShipping] Address confirm button not found, dialog may have auto-closed')
+                console.log('[LogenShipping] Detail address input not found, may not be required')
             }
-        } catch (error) {
-            console.log(`[LogenShipping] Address search dialog handling: ${getErrorMessage(error)}`)
         }
 
-        await page.waitForTimeout(1500)
+        // Close the address popup by clicking 확인
+        try {
+            await clickFirstVisible(
+                page,
+                [
+                    'button:has-text("확인")',
+                    'input[type="button"][value="확인"]',
+                    'a:has-text("확인")',
+                ],
+                'Address Search - Confirm',
+                10000
+            )
+        } catch {
+            console.log('[LogenShipping] Address confirm auto-closed')
+        }
 
-        // Step 8: Save the order (F5 key)
+        await page.waitForTimeout(2000)
+
+        // Step 7: Save the order - click 저장(F5) button or press F5
         throwIfAbortRequested(signal, 'Save Order')
-        reportStep('주문 저장 (F5)')
+        reportStep('주문 저장')
 
-        await page.keyboard.press('F5')
+        // Try clicking the 저장 button first (more reliable than F5 key)
+        try {
+            await clickFirstVisible(
+                page,
+                [
+                    'button:has-text("저장")',
+                    'a:has-text("저장(F5)")',
+                    'a:has-text("저장")',
+                    'input[type="button"][value*="저장"]',
+                    'span:has-text("저장(F5)")',
+                ],
+                'Save Order - Button',
+                10000
+            )
+        } catch {
+            // Fallback: press F5 key
+            console.log('[LogenShipping] Save button not found, pressing F5')
+            await page.keyboard.press('F5')
+        }
+
         await page.waitForTimeout(3000)
         await page.waitForLoadState('networkidle')
 
-        // Handle any confirmation dialog that appears after F5
+        // Handle confirmation dialog after save
         try {
             await clickFirstVisible(
                 page,
                 [
                     'button:has-text("예")',
                     'button:has-text("확인")',
-                    'button:has-text("Yes")',
                     'input[type="button"][value="예"]',
                     'input[type="button"][value="확인"]',
                 ],
@@ -615,7 +571,7 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             // No confirmation dialog
         }
 
-        // Step 9: Print shipping label - click 미출력 tab
+        // Step 8: Click 미출력 tab and select the order
         throwIfAbortRequested(signal, 'Print Label')
         reportStep('운송장 출력 준비')
 
@@ -626,26 +582,23 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                     'a:has-text("미출력")',
                     'span:has-text("미출력")',
                     'li:has-text("미출력")',
-                    '[class*="tab"]:has-text("미출력")',
                     'button:has-text("미출력")',
                 ],
                 'Print - 미출력 Tab',
                 10000
             )
-            await page.waitForTimeout(1500)
+            await page.waitForTimeout(2000)
         } catch {
-            console.log('[LogenShipping] 미출력 tab not found or already selected')
+            console.log('[LogenShipping] 미출력 tab already selected or not found')
         }
 
-        // Check the checkbox for the newly created order
+        // Check the checkbox for the order row
         await clickFirstVisible(
             page,
             [
-                'table tbody tr:first-child input[type="checkbox"]',
-                'table tbody tr:last-child input[type="checkbox"]',
+                'table tbody tr input[type="checkbox"]',
                 'input[type="checkbox"][name*="chk"]',
                 'input[type="checkbox"][name*="select"]',
-                'table input[type="checkbox"]',
             ],
             'Print - Select Order Checkbox'
         )
@@ -659,49 +612,49 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             [
                 'button:has-text("운송장출력")',
                 'a:has-text("운송장출력")',
+                'span:has-text("운송장출력")',
                 'input[type="button"][value*="운송장출력"]',
                 'button:has-text("운송장 출력")',
-                'a:has-text("운송장 출력")',
             ],
             'Print - 운송장출력 Button'
         )
 
-        await page.waitForTimeout(2000)
+        await page.waitForTimeout(3000)
 
-        // Step 10: In the 운송장 발행 popup, click 운송장출력 button
+        // Step 9: In 운송장 발행 popup, click 운송장출력 button
         throwIfAbortRequested(signal, 'Print Confirmation')
-        reportStep('운송장 발행 확인')
+        reportStep('운송장 발행 팝업에서 출력')
 
         try {
+            // The 운송장 발행 popup has its own 운송장출력 button at the bottom
             await clickFirstVisible(
                 page,
                 [
-                    '.modal button:has-text("운송장출력")',
-                    '.popup button:has-text("운송장출력")',
-                    '.modal button:has-text("운송장 출력")',
-                    'button:has-text("출력")',
-                    'input[type="button"][value*="출력"]',
+                    'button:has-text("운송장출력")',
+                    'a:has-text("운송장출력")',
+                    'input[type="button"][value*="운송장출력"]',
+                    'button:has-text("운송장 출력")',
+                    'span:has-text("운송장출력")',
                 ],
                 'Print Popup - 운송장출력',
                 15000
             )
         } catch {
-            console.log('[LogenShipping] Print popup button not found, may have auto-proceeded')
+            console.log('[LogenShipping] Print popup button not found')
         }
 
         await page.waitForTimeout(2000)
 
-        // Step 11: Confirmation dialog - Click 예 (Yes) on "출력하시겠습니까?"
+        // Step 10: Confirmation dialog "출력하시겠습니까?" - Click 예
         try {
             await clickFirstVisible(
                 page,
                 [
                     'button:has-text("예")',
-                    'button:has-text("Yes")',
                     'input[type="button"][value="예"]',
                     'button:has-text("확인")',
                 ],
-                'Print Confirm - Yes',
+                'Print Confirm - 예',
                 10000
             )
         } catch {
