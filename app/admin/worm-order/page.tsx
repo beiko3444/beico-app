@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, FileText, Loader2, Mail, Minus, Plus, ScanSearch, Search, Send, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -86,7 +86,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'remittance' | 'customs' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'customs' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -192,8 +192,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'AUTO',
         owner: '시스템',
         details: ['첨부 PDF OCR 분석', 'AWB 후보 점수화', 'DB 캐시 저장'],
-        actionLabel: 'AWB OCR 실행',
-        target: 'inbox',
+        actionLabel: 'AWB 메일 조회',
+        target: 'docInbox',
     },
     {
         id: 7,
@@ -927,6 +927,7 @@ export default function WormOrderPage() {
     const [customsProgressLoading, setCustomsProgressLoading] = useState(false)
     const orderSectionRef = useRef<HTMLDivElement>(null)
     const inboxSectionRef = useRef<HTMLDivElement>(null)
+    const docInboxSectionRef = useRef<HTMLDivElement>(null)
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
@@ -950,6 +951,16 @@ export default function WormOrderPage() {
     const [usingOfflineEmailCache, setUsingOfflineEmailCache] = useState(false)
     const hasHydratedEmailCacheRef = useRef(false)
     const skipEmailCachePersistRef = useRef(false)
+
+    // ── AWB Documents 메일 State ──
+    const [docEmails, setDocEmails] = useState<WormEmailListItem[]>([])
+    const [docEmailDetails, setDocEmailDetails] = useState<Record<string, WormEmailDetail>>({})
+    const [loadingDocEmails, setLoadingDocEmails] = useState(false)
+    const [docEmailError, setDocEmailError] = useState('')
+    const [docHasFetched, setDocHasFetched] = useState(false)
+    const [selectedDocEmailUid, setSelectedDocEmailUid] = useState<string | null>(null)
+    const [docFetchProgress, setDocFetchProgress] = useState(0)
+    const [loadingDocEmailDetail, setLoadingDocEmailDetail] = useState(false)
 
     const persistEmailOfflineCache = useCallback(() => {
         if (!hasHydratedEmailCacheRef.current) return
@@ -1717,6 +1728,159 @@ export default function WormOrderPage() {
         }
     }, [activeWormOrder, applyMatchResultToEmailState, requestEmailMatchAndInvoiceOcr])
 
+    // ── 매칭 해제 ──
+    const [unmatchingEmailUid, setUnmatchingEmailUid] = useState<string | null>(null)
+    const handleUnmatchEmail = async (email: WormEmailListItem) => {
+        if (!email.matchedOrderId) return
+        setUnmatchingEmailUid(email.uid)
+        setEmailError('')
+        setEmailMatchMessage('')
+        try {
+            const res = await fetch('/api/admin/worm-order/emails/unmatch', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ uid: email.uid }),
+            })
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}))
+                throw new Error(data.error || '매칭 해제에 실패했습니다.')
+            }
+            setEmails((prev) =>
+                prev.map((item) =>
+                    item.uid === email.uid
+                        ? {
+                            ...item,
+                            matchedOrderId: null,
+                            matchedOrderNumber: null,
+                            matchedAt: null,
+                            invoiceUnitPriceUsd: null,
+                            invoiceTotalAmountUsd: null,
+                            usdKrwRate: null,
+                            invoiceUnitPriceKrw: null,
+                            invoiceTotalAmountKrw: null,
+                            invoiceExtractedAt: null,
+                            invoiceSourceFile: null,
+                            invoiceOcrError: null,
+                        }
+                        : item,
+                ),
+            )
+            setEmailCacheSavedAt(new Date().toISOString())
+            setEmailMatchMessage(`매칭 해제 완료: ${email.matchedOrderNumber || email.uid}`)
+        } catch (error) {
+            setEmailError(error instanceof Error ? error.message : '매칭 해제 중 오류가 발생했습니다.')
+        } finally {
+            setUnmatchingEmailUid(null)
+        }
+    }
+
+    // ── Document 메일 페치 ──
+    const fetchDocumentEmails = async () => {
+        setLoadingDocEmails(true)
+        setDocEmailError('')
+        setDocFetchProgress(0)
+
+        let currentProgress = 0
+        const interval = setInterval(() => {
+            currentProgress += Math.random() * 15
+            if (currentProgress > 90) currentProgress = 90
+            setDocFetchProgress(currentProgress)
+        }, 400)
+
+        try {
+            const params = new URLSearchParams()
+            params.set('subjectKeyword', 'documents,documets')
+            if (activeWormOrder?.id) {
+                params.set('orderId', activeWormOrder.id)
+            }
+
+            const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`)
+            clearInterval(interval)
+            setDocFetchProgress(100)
+
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || 'Failed to fetch document emails')
+
+            const fetchedEmails: WormEmailListItem[] = Array.isArray(data.emails)
+                ? data.emails
+                    .map((email: unknown) => sanitizeWormEmailListItem(email))
+                    .filter((email: WormEmailListItem | null): email is WormEmailListItem => email !== null)
+                : []
+            const nextSelectedUid =
+                selectedDocEmailUid && fetchedEmails.some((e) => e.uid === selectedDocEmailUid)
+                    ? selectedDocEmailUid
+                    : fetchedEmails[0]?.uid || null
+
+            setDocEmails(fetchedEmails)
+            setDocEmailDetails((prev) => pruneEmailDetails(prev, fetchedEmails))
+            setSelectedDocEmailUid(nextSelectedUid)
+            setDocHasFetched(true)
+            setTimeout(() => setDocFetchProgress(0), 500)
+        } catch (err: any) {
+            clearInterval(interval)
+            setDocFetchProgress(0)
+            setDocEmailError(err.message || 'Failed to fetch document emails')
+            setDocHasFetched(true)
+        } finally {
+            setLoadingDocEmails(false)
+        }
+    }
+
+    // ── Document 메일 상세 조회 ──
+    const fetchDocEmailDetail = useCallback(async (uid: string): Promise<WormEmailDetail | null> => {
+        if (docEmailDetails[uid]) return docEmailDetails[uid]
+
+        setLoadingDocEmailDetail(true)
+        try {
+            const res = await fetch(`/api/admin/worm-order/emails/detail?uid=${encodeURIComponent(uid)}`)
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || '메일 상세 조회 실패')
+
+            setDocEmailError('')
+            setDocEmailDetails(prev => ({ ...prev, [uid]: data }))
+            if (typeof data?.awbNumber === 'string' && data.awbNumber) {
+                setDocEmails((prev) => prev.map((e) => e.uid === uid ? { ...e, awbNumber: data.awbNumber } : e))
+                if (uid === selectedDocEmailUid) {
+                    setAwbNumber(data.awbNumber)
+                }
+            }
+            return data
+        } catch (err: any) {
+            setDocEmailError(err.message || '메일 상세 조회 실패')
+            return null
+        } finally {
+            setLoadingDocEmailDetail(false)
+        }
+    }, [docEmailDetails, selectedDocEmailUid])
+
+    // ── Document 메일 선택 시 상세 자동 로드 ──
+    useEffect(() => {
+        if (!selectedDocEmailUid) return
+        const selectedDoc = docEmails.find((e) => e.uid === selectedDocEmailUid)
+        setAwbNumber(docEmailDetails[selectedDocEmailUid]?.awbNumber || selectedDoc?.awbNumber || null)
+        setAwbCandidates([])
+        setAwbLoading(false)
+        setAwbError('')
+        fetchDocEmailDetail(selectedDocEmailUid)
+    }, [docEmails, docEmailDetails, selectedDocEmailUid, fetchDocEmailDetail])
+
+    // ── Document 메일에서 AWB OCR 실행 ──
+    const handleRunDocAwbOcr = useCallback(async () => {
+        if (!selectedDocEmailUid) return
+        const detail = docEmailDetails[selectedDocEmailUid] || await fetchDocEmailDetail(selectedDocEmailUid)
+        if (!detail) return
+        if (!detail.skmIndices || detail.skmIndices.length === 0) {
+            setAwbError('선택한 메일에 SKM 첨부파일이 없어 OCR을 실행할 수 없습니다.')
+            return
+        }
+        runAwbOcr({
+            uid: selectedDocEmailUid,
+            subject: detail.subject,
+            date: detail.date,
+            skmIndices: detail.skmIndices,
+        })
+    }, [selectedDocEmailUid, docEmailDetails, fetchDocEmailDetail, runAwbOcr])
+
     const selectedOrders = useMemo(() => {
         return WORM_TYPES.flatMap((wormType) =>
             WORM_SIZES
@@ -1778,6 +1942,14 @@ export default function WormOrderPage() {
     const activeOrderRemittanceAppliedAtText = activeWormOrderRecord?.remittanceAppliedAt
         ? new Date(activeWormOrderRecord.remittanceAppliedAt).toLocaleString()
         : ''
+
+    // 현재 발주에 매칭된 인보이스 메일 자동 추출
+    const matchedInvoiceEmail = useMemo(() => {
+        if (!activeWormOrder?.id) return null
+        return emails.find(e => e.matchedOrderId === activeWormOrder.id) || null
+    }, [emails, activeWormOrder?.id])
+
+    const autoTransferAmountUsd = matchedInvoiceEmail?.invoiceTotalAmountUsd ?? null
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
@@ -1877,21 +2049,14 @@ export default function WormOrderPage() {
             return
         }
 
-        const normalizedAmount = transferAmountUsd.replace(/,/g, '').trim()
-        const parsedAmount = Number(normalizedAmount)
-        if (!Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-            setRemittanceError('올바른 USD 금액을 입력해주세요.')
+        if (!autoTransferAmountUsd || autoTransferAmountUsd <= 0) {
+            setRemittanceError('매칭된 인보이스의 토탈어마운트가 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
             return
         }
+        const parsedAmount = autoTransferAmountUsd
 
-        if (!invoicePdf) {
-            setRemittanceError('인보이스 PDF 파일을 업로드해주세요.')
-            return
-        }
-
-        const isPdf = invoicePdf.type === 'application/pdf' || invoicePdf.name.toLowerCase().endsWith('.pdf')
-        if (!isPdf) {
-            setRemittanceError('PDF 파일만 업로드할 수 있습니다.')
+        if (!matchedInvoiceEmail) {
+            setRemittanceError('매칭된 인보이스 메일이 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
             return
         }
 
@@ -1917,9 +2082,39 @@ export default function WormOrderPage() {
             requestAbortController = new AbortController()
             remittanceRequestAbortControllerRef.current = requestAbortController
 
+            // 매칭된 인보이스 메일에서 PDF 첨부파일 자동 다운로드
+            setRemittanceProgressLabel('인보이스 PDF 다운로드 중...')
+            const matchedDetail = emailDetails[matchedInvoiceEmail.uid] || await fetchEmailDetail(matchedInvoiceEmail.uid)
+            const pdfAtt = matchedDetail?.attachments?.find(att => {
+                const name = att.filename.toLowerCase()
+                const type = att.contentType.toLowerCase()
+                return name.endsWith('.pdf') || type.includes('pdf')
+            })
+            if (!pdfAtt) {
+                setRemittanceError('매칭된 인보이스 메일에 PDF 첨부파일이 없습니다.')
+                if (remittanceProgressTimerRef.current) {
+                    window.clearInterval(remittanceProgressTimerRef.current)
+                    remittanceProgressTimerRef.current = null
+                }
+                setRemittanceSubmitting(false)
+                return
+            }
+            const pdfRes = await fetch(`/api/admin/worm-order/emails/attachment?uid=${matchedInvoiceEmail.uid}&index=${pdfAtt.index}`)
+            if (!pdfRes.ok) {
+                setRemittanceError('인보이스 PDF 다운로드에 실패했습니다.')
+                if (remittanceProgressTimerRef.current) {
+                    window.clearInterval(remittanceProgressTimerRef.current)
+                    remittanceProgressTimerRef.current = null
+                }
+                setRemittanceSubmitting(false)
+                return
+            }
+            const pdfBlob = await pdfRes.blob()
+            const invoicePdfFile = new File([pdfBlob], pdfAtt.filename, { type: 'application/pdf' })
+
             const submitData = new FormData()
             submitData.append('amountUsd', parsedAmount.toFixed(2))
-            submitData.append('invoicePdf', invoicePdf)
+            submitData.append('invoicePdf', invoicePdfFile)
             if (activeWormOrder?.id) {
                 submitData.append('orderId', activeWormOrder.id)
             }
@@ -2217,6 +2412,10 @@ export default function WormOrderPage() {
             remittanceSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
         }
+        if (target === 'docInbox') {
+            docInboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
         if (target === 'customs') {
             customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
@@ -2237,8 +2436,8 @@ export default function WormOrderPage() {
             return
         }
 
-        if (step.id === 6 && selectedEmailUid && !awbLoading) {
-            void handleRunSelectedAwbOcr()
+        if (step.id === 6 && !loadingDocEmails) {
+            void fetchDocumentEmails()
             return
         }
 
@@ -2246,15 +2445,13 @@ export default function WormOrderPage() {
             void handleCustomsProgressSearch(fallbackAwbCandidate, { scrollIntoView: true })
         }
     }, [
-        awbLoading,
         fallbackAwbCandidate,
         generatedMessage,
         handleCustomsProgressSearch,
         handleGenerate,
-        handleRunSelectedAwbOcr,
+        loadingDocEmails,
         loadingEmails,
         scrollToPipelineSection,
-        selectedEmailUid,
         selectedOrders.length,
     ])
 
@@ -2318,6 +2515,11 @@ export default function WormOrderPage() {
         setForwardEmail('')
         setForwardError('')
         setForwardSuccess('')
+        setDocEmails([])
+        setDocEmailDetails({})
+        setDocHasFetched(false)
+        setSelectedDocEmailUid(null)
+        setDocEmailError('')
         setExpandedSteps(
             PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
                 acc[step.id] = step.id <= 3
@@ -2328,7 +2530,8 @@ export default function WormOrderPage() {
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
     const showOrderTools = visibleStepIdSet.has(1)
-    const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(6) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
+    const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
+    const showDocInboxTools = visibleStepIdSet.has(6)
     const showRemittanceTools = visibleStepIdSet.has(3)
     const showCustomsTools = visibleStepIdSet.has(7)
     const stepRenderOrderMap = useMemo(() => {
@@ -2347,7 +2550,8 @@ export default function WormOrderPage() {
         return stepRenderOrderMap.get(defaultStepId) ?? fallbackOrderBase
     }, [fallbackOrderBase, stepRenderOrderMap])
     const orderToolOrderBase = getAnchorOrderBase([1], 1)
-    const inboxToolOrderBase = getAnchorOrderBase([2, 6, 9, 10], 2)
+    const inboxToolOrderBase = getAnchorOrderBase([2, 9, 10], 2)
+    const docInboxToolOrderBase = getAnchorOrderBase([6], 6)
     const remittanceToolOrderBase = getAnchorOrderBase([3], 3)
     const customsToolOrderBase = getAnchorOrderBase([7], 7)
 
@@ -2873,6 +3077,22 @@ export default function WormOrderPage() {
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
+                                                {email.matchedOrderId && (
+                                                    <span
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            void handleUnmatchEmail(email)
+                                                        }}
+                                                        className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
+                                                            unmatchingEmailUid === email.uid
+                                                                ? 'bg-slate-100 text-slate-400 cursor-progress'
+                                                                : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
+                                                        }`}
+                                                        role="button"
+                                                    >
+                                                        {unmatchingEmailUid === email.uid ? '해제중...' : '매칭해제'}
+                                                    </span>
+                                                )}
                                             </div>
                                             {email.matchedOrderId && (
                                                 <div className="mt-1.5 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-2 space-y-1">
@@ -2974,13 +3194,6 @@ export default function WormOrderPage() {
 
                                         <div className="mt-4 flex items-center gap-2">
                                             <button
-                                                onClick={handleRunSelectedAwbOcr}
-                                                disabled={loadingEmailDetail || awbLoading || selectedEmail.skmIndices.length === 0}
-                                                className="h-9 px-3 rounded-lg bg-slate-800 text-white text-[12px] font-bold disabled:opacity-50"
-                                            >
-                                                {awbLoading ? 'OCR 실행중...' : 'AWB OCR 실행'}
-                                            </button>
-                                            <button
                                                 onClick={() => { void handleRunInvoiceOcrForEmail(selectedEmailBase) }}
                                                 disabled={
                                                     loadingEmailDetail ||
@@ -2995,16 +3208,9 @@ export default function WormOrderPage() {
                                             {loadingEmailDetail ? (
                                                 <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
                                             ) : (
-                                                <div className="flex flex-wrap items-center gap-2 text-[12px] text-slate-500 font-medium">
-                                                    <span>
-                                                        {selectedEmail.skmIndices.length > 0
-                                                            ? `SKM 첨부파일 ${selectedEmail.skmIndices.length}개`
-                                                            : 'SKM 첨부파일이 없습니다.'}
-                                                    </span>
-                                                    <span className="text-emerald-700 font-semibold">
-                                                        PDF 첨부파일 {selectedEmail.invoicePdfCount}개 (파일명/확장자 기준 OCR)
-                                                    </span>
-                                                </div>
+                                                <span className="text-[12px] text-emerald-700 font-semibold">
+                                                    PDF 첨부파일 {selectedEmail.invoicePdfCount}개 (파일명/확장자 기준 OCR)
+                                                </span>
                                             )}
                                         </div>
 
@@ -3033,74 +3239,6 @@ export default function WormOrderPage() {
                                                     <p className="text-[11px] font-semibold text-rose-600">
                                                         {selectedEmail.invoiceOcrError}
                                                     </p>
-                                                )}
-                                            </div>
-                                        )}
-                                        
-                                        {/* AIR WAYBILL OCR 결과 */}
-                                        {(awbLoading || awbNumber || awbError || awbCandidates.length > 0) && (
-                                            <div className={`mt-5 p-4 rounded-xl border flex flex-col gap-2 ${
-                                                awbLoading
-                                                    ? 'border-orange-100 bg-orange-50/50'
-                                                    : awbError
-                                                    ? (awbNumber ? 'border-amber-100 bg-amber-50/60' : 'border-red-100 bg-red-50/50')
-                                                    : awbNumber
-                                                    ? 'border-blue-100 bg-blue-50/50'
-                                                    : 'border-orange-100 bg-orange-50/50'
-                                            }`}>
-                                                {awbLoading && (
-                                                    <div className="flex items-center gap-2 text-orange-600">
-                                                        <ScanSearch size={16} className="animate-pulse" />
-                                                        <span className="text-[13px] font-bold">SKM 문서에서 Air Waybill 번호를 OCR 스캔 중...</span>
-                                                        <Loader2 size={14} className="animate-spin ml-auto" />
-                                                    </div>
-                                                )}
-                                                {awbNumber && !awbLoading && (
-                                                    <>
-                                                        <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
-                                                            <Sparkles size={14} className="text-blue-500" />
-                                                            Air Waybill Extracted (OCR from SKM doc)
-                                                        </div>
-                                                        <div className="flex items-center justify-between">
-                                                            <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{awbNumber}</span>
-                                                            <button 
-                                                                onClick={() => {
-                                                                    navigator.clipboard.writeText(awbNumber)
-                                                                    alert('운송장 번호 ' + awbNumber + ' 이(가) 복사되었습니다.')
-                                                                }}
-                                                                className="h-9 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center shrink-0"
-                                                            >
-                                                                복사하기
-                                                            </button>
-                                                        </div>
-                                                    </>
-                                                )}
-                                                {awbCandidates.length > 1 && !awbLoading && (
-                                                    <div className="mt-1 pt-2 border-t border-blue-100/70 flex flex-wrap items-center gap-2">
-                                                        <span className="text-[11px] font-bold text-slate-500">대안 후보</span>
-                                                        {awbCandidates.slice(1, 6).map((candidate) => (
-                                                            <button
-                                                                key={`${candidate.value}-${candidate.source}`}
-                                                                onClick={() => {
-                                                                    setAwbNumber(candidate.value)
-                                                                    setAwbError('')
-                                                                    persistAwbCache(selectedEmail.uid, candidate.value, selectedEmail)
-                                                                }}
-                                                                className="h-7 px-2.5 rounded-md border border-slate-200 bg-white text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
-                                                                title={`source: ${candidate.source}, score: ${candidate.score}`}
-                                                            >
-                                                                {candidate.value}
-                                                            </button>
-                                                        ))}
-                                                    </div>
-                                                )}
-                                                {awbError && !awbLoading && (
-                                                    <div className={`text-[12px] font-bold flex items-center gap-1.5 ${
-                                                        awbNumber ? 'text-amber-700' : 'text-red-600'
-                                                    }`}>
-                                                        <ScanSearch size={14} />
-                                                        {awbError}
-                                                    </div>
                                                 )}
                                             </div>
                                         )}
@@ -3179,6 +3317,267 @@ export default function WormOrderPage() {
                 </div>
             )}
 
+            {/* ── AWB Documents 메일 조회 ── */}
+            {showDocInboxTools && (
+                <div ref={docInboxSectionRef} style={{ order: docInboxToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+
+                {docFetchProgress > 0 && (
+                    <div className="absolute top-0 left-0 w-full h-[4px] bg-slate-100 z-10 overflow-hidden">
+                        <div className="h-full bg-blue-500 transition-all duration-300 ease-out" style={{ width: `${docFetchProgress}%` }} />
+                    </div>
+                )}
+
+                <div className="px-6 py-4 border-b border-gray-100 bg-[#f0f5ff] flex items-center justify-between mt-[2px]">
+                    <div>
+                        <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
+                            <Package size={18} className="text-blue-500" />
+                            AWB 메일 수신
+                            {loadingDocEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span>}
+                        </h2>
+                        <p className="mt-0.5 text-xs text-slate-500">
+                            제목에 &apos;documents&apos;가 포함된 선적 서류 메일을 조회합니다.
+                        </p>
+                    </div>
+                    <button
+                        onClick={fetchDocumentEmails}
+                        disabled={loadingDocEmails}
+                        className="h-9 px-4 bg-blue-700 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
+                    >
+                        {loadingDocEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
+                        <span className="relative z-10">{loadingDocEmails ? '스캔 중...' : '메일 스캔'}</span>
+                    </button>
+                </div>
+                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100">
+                    {/* 좌측 리스트 패널 */}
+                    <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px] relative">
+                        {docEmailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{docEmailError}</div>}
+
+                        {loadingDocEmails && (
+                            <div className="p-10 flex flex-col items-center justify-center gap-4 text-slate-400 h-full mt-20">
+                                <span className="text-[13px] font-bold text-blue-500 tracking-wider">스캔 진행률 {Math.round(docFetchProgress)}%</span>
+                                <div className="w-[120px] h-[3px] bg-slate-100 rounded-full overflow-hidden">
+                                    <div className="h-full bg-blue-500 transition-all duration-300 ease-out" style={{ width: `${docFetchProgress}%` }} />
+                                </div>
+                                <span className="text-[12px] font-medium text-slate-400 animate-pulse mt-1">
+                                    선적 서류 메일을 자동 스캔 중입니다...
+                                </span>
+                            </div>
+                        )}
+
+                        {docHasFetched && !loadingDocEmails && docEmails.length === 0 && !docEmailError && (
+                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50 mt-10">
+                                &apos;documents&apos; 제목 메일이 없습니다.
+                            </div>
+                        )}
+
+                        {!loadingDocEmails && docEmails.length > 0 && (
+                            <div className="divide-y divide-gray-100">
+                                {docEmails.map((email, index) => {
+                                    const isSelected = selectedDocEmailUid === email.uid
+                                    return (
+                                        <button
+                                            key={email.uid}
+                                            onClick={() => setSelectedDocEmailUid(email.uid)}
+                                            className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${
+                                                isSelected ? 'bg-blue-50/50 border-l-[3px] border-blue-500 pl-[13px]' : 'border-l-[3px] border-transparent pl-4'
+                                            }`}
+                                        >
+                                            <div className="flex justify-between items-start mb-2">
+                                                <span className={`text-[11px] font-bold ${isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
+                                                    {new Date(email.date).toLocaleDateString()}
+                                                </span>
+                                                {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                            </div>
+                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                {index + 1}. {email.subject}
+                                            </h3>
+                                            {email.awbNumber && (
+                                                <div className="mt-2 flex items-center gap-2">
+                                                    <span
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
+                                                        }}
+                                                        className="inline-flex h-6 items-center rounded-md bg-blue-600 px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-blue-700 transition-colors"
+                                                    >
+                                                        통관조회
+                                                    </span>
+                                                    <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
+                                                        AWB {email.awbNumber}
+                                                    </p>
+                                                </div>
+                                            )}
+                                        </button>
+                                    )
+                                })}
+                            </div>
+                        )}
+                    </div>
+
+                    {/* 우측 본문 렌더링 패널 */}
+                    <div className="w-full md:w-[65%] bg-gray-50/30 flex flex-col">
+                        {!selectedDocEmailUid ? (
+                            <div className="flex-1 flex items-center justify-center p-10 text-[13px] text-gray-400 font-medium">
+                                {docEmails.length > 0 ? '좌측에서 메일을 선택하시면 내용이 표시됩니다.' : ''}
+                            </div>
+                        ) : (() => {
+                            const selectedDocBase = docEmails.find(e => e.uid === selectedDocEmailUid)
+                            const selectedDocDetail = selectedDocEmailUid ? docEmailDetails[selectedDocEmailUid] : null
+                            if (!selectedDocBase) return null
+
+                            const selectedDoc = {
+                                uid: selectedDocBase.uid,
+                                subject: selectedDocDetail?.subject || selectedDocBase.subject,
+                                date: selectedDocDetail?.date || selectedDocBase.date,
+                                text: selectedDocDetail?.text || '',
+                                hasAttachments: selectedDocDetail?.hasAttachments ?? selectedDocBase.hasAttachments,
+                                skmIndices: selectedDocDetail?.skmIndices || [],
+                                attachments: selectedDocDetail?.attachments || [],
+                                awbNumber: selectedDocDetail?.awbNumber ?? selectedDocBase.awbNumber ?? null,
+                            }
+                            return (
+                                <div className="flex flex-col h-full max-h-[600px]">
+                                    <div className="p-6 bg-white border-b border-gray-100 shrink-0">
+                                        <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">
+                                            {selectedDoc.subject}
+                                        </h2>
+                                        {selectedDoc.awbNumber && (
+                                            <p className="mt-2 text-[12px] font-semibold tracking-wide text-blue-700">
+                                                AWB {selectedDoc.awbNumber}
+                                            </p>
+                                        )}
+                                        <div className="flex items-center gap-3 text-[12px] text-gray-500 font-medium tracking-tight">
+                                            <span>수신일시: {new Date(selectedDoc.date).toLocaleString()}</span>
+                                        </div>
+
+                                        <div className="mt-4 flex items-center gap-2">
+                                            <button
+                                                onClick={handleRunDocAwbOcr}
+                                                disabled={loadingDocEmailDetail || awbLoading || selectedDoc.skmIndices.length === 0}
+                                                className="h-9 px-3 rounded-lg bg-blue-700 text-white text-[12px] font-bold disabled:opacity-50"
+                                            >
+                                                {awbLoading ? 'OCR 실행중...' : 'AWB OCR 실행'}
+                                            </button>
+                                            {loadingDocEmailDetail ? (
+                                                <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
+                                            ) : (
+                                                <span className="text-[12px] text-slate-500 font-medium">
+                                                    {selectedDoc.skmIndices.length > 0
+                                                        ? `SKM 첨부파일 ${selectedDoc.skmIndices.length}개`
+                                                        : 'SKM 첨부파일이 없습니다.'}
+                                                </span>
+                                            )}
+                                        </div>
+
+                                        {/* AWB OCR 결과 */}
+                                        {(awbLoading || awbNumber || awbError || awbCandidates.length > 0) && (
+                                            <div className={`mt-5 p-4 rounded-xl border flex flex-col gap-2 ${
+                                                awbLoading
+                                                    ? 'border-blue-100 bg-blue-50/50'
+                                                    : awbError
+                                                    ? (awbNumber ? 'border-amber-100 bg-amber-50/60' : 'border-red-100 bg-red-50/50')
+                                                    : awbNumber
+                                                    ? 'border-blue-100 bg-blue-50/50'
+                                                    : 'border-blue-100 bg-blue-50/50'
+                                            }`}>
+                                                {awbLoading && (
+                                                    <div className="flex items-center gap-2 text-blue-600">
+                                                        <ScanSearch size={16} className="animate-pulse" />
+                                                        <span className="text-[13px] font-bold">SKM 문서에서 Air Waybill 번호를 OCR 스캔 중...</span>
+                                                        <Loader2 size={14} className="animate-spin ml-auto" />
+                                                    </div>
+                                                )}
+                                                {awbNumber && !awbLoading && (
+                                                    <>
+                                                        <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                                                            <Sparkles size={14} className="text-blue-500" />
+                                                            Air Waybill 추출 완료 (OCR)
+                                                        </div>
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{awbNumber}</span>
+                                                            <button
+                                                                onClick={() => {
+                                                                    navigator.clipboard.writeText(awbNumber)
+                                                                    alert('운송장 번호 ' + awbNumber + ' 이(가) 복사되었습니다.')
+                                                                }}
+                                                                className="h-9 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center shrink-0"
+                                                            >
+                                                                복사하기
+                                                            </button>
+                                                        </div>
+                                                    </>
+                                                )}
+                                                {awbCandidates.length > 1 && !awbLoading && (
+                                                    <div className="mt-1 pt-2 border-t border-blue-100/70 flex flex-wrap items-center gap-2">
+                                                        <span className="text-[11px] font-bold text-slate-500">대안 후보</span>
+                                                        {awbCandidates.slice(1, 6).map((candidate) => (
+                                                            <button
+                                                                key={`${candidate.value}-${candidate.source}`}
+                                                                onClick={() => {
+                                                                    setAwbNumber(candidate.value)
+                                                                    setAwbError('')
+                                                                    persistAwbCache(selectedDoc.uid, candidate.value, selectedDoc)
+                                                                }}
+                                                                className="h-7 px-2.5 rounded-md border border-slate-200 bg-white text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                                                                title={`source: ${candidate.source}, score: ${candidate.score}`}
+                                                            >
+                                                                {candidate.value}
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {awbError && !awbLoading && (
+                                                    <div className={`text-[12px] font-bold flex items-center gap-1.5 ${
+                                                        awbNumber ? 'text-amber-700' : 'text-red-600'
+                                                    }`}>
+                                                        <ScanSearch size={14} />
+                                                        {awbError}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* 첨부파일 다운로드 */}
+                                        {selectedDoc.attachments.length > 0 && (
+                                            <div className="mt-4 pt-4 border-t border-gray-100 flex flex-wrap gap-2">
+                                                {selectedDoc.attachments.map((att) => (
+                                                    <a
+                                                        key={att.index}
+                                                        href={`/api/admin/worm-order/emails/attachment?uid=${selectedDoc.uid}&index=${att.index}`}
+                                                        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                                                        title="새 탭에서 열거나 다운로드하려면 클릭하세요"
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                    >
+                                                        📎 {att.filename} <span className="font-normal text-[10px] text-blue-400 opacity-80 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {/* 메일 본문 */}
+                                    <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
+                                        {loadingDocEmailDetail && !selectedDoc.text ? (
+                                            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
+                                                <Loader2 size={16} className="animate-spin mr-2" />
+                                                메일 본문을 불러오는 중...
+                                            </div>
+                                        ) : (
+                                            <div
+                                                className="w-full text-gray-800 break-words leading-relaxed max-w-none"
+                                                style={{ whiteSpace: selectedDoc.text.includes('<html') ? 'normal' : 'pre-wrap' }}
+                                                dangerouslySetInnerHTML={{ __html: selectedDoc.text || '' }}
+                                            />
+                                        )}
+                                    </div>
+                                </div>
+                            )
+                        })()}
+                    </div>
+                </div>
+                </div>
+            )}
+
             {showRemittanceTools && (
                 <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
@@ -3202,91 +3601,54 @@ export default function WormOrderPage() {
                     <Send size={18} className="text-[#e34219] mt-1" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600">
-                            송금 금액 (USD)
-                        </label>
-                        <input
-                            type="text"
-                            inputMode="decimal"
-                            value={transferAmountUsd}
-                            onChange={(event) => {
-                                const cleaned = event.target.value.replace(/[^0-9.,]/g, '')
-                                setTransferAmountUsd(cleaned)
-                            }}
-                            className="w-full h-11 px-3 rounded-lg border border-gray-300 text-[#111827] font-medium"
-                            placeholder="Ex. 1250.50"
-                        />
-                    </div>
-                    <div className="space-y-1">
-                        <label className="text-xs font-bold text-gray-600">
-                            인보이스 PDF
-                        </label>
-                        <div className="space-y-2">
-                            <label className="h-11 px-3 rounded-lg border border-dashed border-gray-300 text-[#111827] font-medium flex items-center justify-between cursor-pointer hover:bg-gray-50">
-                                <div className="flex items-center gap-2 min-w-0">
-                                    <FileText size={16} className="shrink-0 text-gray-500" />
-                                    <span className="text-sm truncate">{invoicePdf?.name || '인보이스 PDF 업로드'}</span>
-                                </div>
-                                <span className="text-[11px] text-gray-500 font-bold uppercase">PDF</span>
-                                <input
-                                    type="file"
-                                    accept=".pdf,application/pdf"
-                                    className="hidden"
-                                    onChange={(event) => {
-                                        setRemittanceError('')
-                                        setRemittanceSuccess('')
-                                        const file = event.target.files?.[0] || null
-                                        setInvoicePdf(file)
-                                    }}
-                                />
-                            </label>
-
-                            {invoicePreviewLoading && (
-                                <p className="text-[11px] font-semibold text-slate-500">인보이스 미리보기 생성 중...</p>
-                            )}
-                            {invoicePreviewError && (
-                                <p className="text-[11px] font-semibold text-[#e34219]">{invoicePreviewError}</p>
-                            )}
-                            {invoicePreviewUrl && !invoicePreviewLoading && (
-                                <div className="rounded-lg border border-gray-200 bg-slate-50 p-2">
-                                    <div
-                                        role="img"
-                                        aria-label="Invoice preview"
-                                        className="w-full h-[260px] rounded bg-center bg-no-repeat bg-contain"
-                                        style={{ backgroundImage: `url(${invoicePreviewUrl})` }}
-                                    />
-                                </div>
-                            )}
+                {matchedInvoiceEmail ? (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
+                        <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">인보이스 자동 연동</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                                <p className="text-[11px] text-slate-500 font-semibold">송금 금액 (USD)</p>
+                                <p className="text-[15px] font-black text-slate-900">
+                                    {autoTransferAmountUsd !== null ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                </p>
+                            </div>
+                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
+                                <p className="text-[11px] text-slate-500 font-semibold">인보이스 PDF</p>
+                                <p className="text-[13px] font-bold text-slate-700 truncate">{matchedInvoiceEmail.subject}</p>
+                            </div>
                         </div>
                     </div>
-                </div>
+                ) : (
+                    <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-[12px] font-semibold text-amber-700">
+                        인보이스 메일을 발주에 매칭하면 송금 금액과 PDF가 자동으로 연동됩니다.
+                    </div>
+                )}
 
                 <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                        자동으로 모인 로그인 후 Shanghai Oikki Trading Co.,Ltd를 선택하고 인보이스를 업로드하여 송금 신청을 완료합니다.
+                        매칭된 인보이스의 토탈어마운트(USD)와 PDF 첨부파일로 자동 송금 신청합니다.
                     </p>
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <button
                             type="button"
                             onClick={handleRemittanceApply}
-                            disabled={remittanceSubmitting || isRemittanceLocked || isActiveOrderRemittanceApplied || !activeWormOrderRecord}
+                            disabled={remittanceSubmitting || isRemittanceLocked || isActiveOrderRemittanceApplied || !activeWormOrderRecord || !matchedInvoiceEmail}
                             className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 w-full md:w-auto"
                         >
                             {!activeWormOrderRecord ? (
                                 '발주선택'
+                            ) : !matchedInvoiceEmail ? (
+                                '인보이스 매칭 필요'
                             ) : isActiveOrderRemittanceApplied ? (
-                                '신청완료'
+                                '송금완료'
                             ) : isRemittanceLocked ? (
                                 `잠금 ${remittanceLockRemainingText}`
                             ) : remittanceSubmitting ? (
                                 <>
                                     <Loader2 size={15} className="animate-spin" />
-                                    신청 중...
+                                    송금 실행중...
                                 </>
                             ) : (
-                                '신청하기'
+                                '송금 실행'
                             )}
                         </button>
 

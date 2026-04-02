@@ -466,17 +466,33 @@ export async function upsertWormOrderEmailMatch(input: {
   }
 }
 
+export async function deleteWormOrderEmailMatch(uid: string) {
+  const trimmedUid = uid.trim()
+  if (!trimmedUid) throw new Error('uid is required.')
+
+  try {
+    await prisma.wormOrderEmailMatch.delete({ where: { uid: trimmedUid } })
+    return { ok: true, uid: trimmedUid }
+  } catch (error: unknown) {
+    if (error && typeof error === 'object' && 'code' in error && (error as { code: string }).code === 'P2025') {
+      return { ok: true, uid: trimmedUid }
+    }
+    throw error
+  }
+}
+
 export async function loadWormEmailList(options?: {
   subjectKeyword?: string
   scanLimit?: number
   listLimit?: number
   orderId?: string | null
 }) {
-  const subjectKeyword = (options?.subjectKeyword || 'invoice').toLowerCase().trim()
+  const rawKeyword = (options?.subjectKeyword || 'invoice').toLowerCase().trim()
+  const keywords = rawKeyword.split(',').map(k => k.trim()).filter(Boolean)
   const scanLimit = Math.max(5, Math.min(80, options?.scanLimit || 20))
   const listLimit = Math.max(1, Math.min(30, options?.listLimit || 10))
   const orderId = options?.orderId?.trim() || ''
-  const cacheKey = `${subjectKeyword}|${scanLimit}|${listLimit}`
+  const cacheKey = `${rawKeyword}|${scanLimit}|${listLimit}`
 
   const cached = getEmailListCache(cacheKey)
   if (cached) return hydrateEmailsWithAwbCache(cached)
@@ -502,7 +518,7 @@ export async function loadWormEmailList(options?: {
       if (sourceBuf.length === 0) continue
 
       const subject = msg.envelope?.subject || '(제목 없음)'
-      if (subjectKeyword && !subject.toLowerCase().includes(subjectKeyword)) {
+      if (keywords.length > 0 && !keywords.some(kw => subject.toLowerCase().includes(kw))) {
         continue
       }
       const dateObj = msg.envelope?.date || msg.internalDate || new Date()
