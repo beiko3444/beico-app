@@ -145,64 +145,60 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
     )
 }
 
-/** Find the active content frame in LOGEN's iframe-based layout. Falls back to main page. */
-const getContentFrame = (page: PageLike): FrameLike => {
+/** Get all browsing contexts: main page + all frames */
+const getAllContexts = (page: PageLike): FrameLike[] => {
     const frames = page.frames()
-    // LOGEN loads content in iframes - look for the one that's NOT the main frame
-    for (const frame of frames) {
-        const url = frame.url()
-        // Skip about:blank and the main login page
-        if (url === 'about:blank' || url === LOGEN_LOGIN_URL) continue
-        // Look for LOGEN's content frames (reservation pages, etc.)
-        if (url.includes('ilogen.com') && !url.endsWith('/')) {
-            return frame
-        }
-    }
-    return page
+    // Main page first, then all frames (skip about:blank)
+    return [page as FrameLike, ...frames.filter(f => f.url() !== 'about:blank')]
 }
 
+/** Click the first visible element matching any selector across ALL frames */
 const clickFirstVisible = async (
-    ctx: FrameLike,
+    page: PageLike,
     selectors: string[],
     step: string,
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
-    for (const selector of selectors) {
-        try {
-            const target = ctx.locator(selector).first()
-            await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 9000) })
-            const disabled = await target.isDisabled().catch(() => false)
-            const enabled = await target.isEnabled().catch(() => !disabled)
-            if (disabled || !enabled) continue
-            await target.click({ timeout: 5000 })
-            return
-        } catch {
-            // Try next selector.
+    const contexts = getAllContexts(page)
+    for (const ctx of contexts) {
+        for (const selector of selectors) {
+            try {
+                const target = ctx.locator(selector).first()
+                await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 4000) })
+                const disabled = await target.isDisabled().catch(() => false)
+                if (disabled) continue
+                await target.click({ timeout: 5000 })
+                return
+            } catch {
+                // Try next selector/frame
+            }
         }
     }
-
     throw new LogenAutomationError(step, `Could not find a clickable element for step: ${step}`)
 }
 
+/** Fill the first visible input matching any selector across ALL frames */
 const fillFirstVisible = async (
-    ctx: FrameLike,
+    page: PageLike,
     selectors: string[],
     value: string,
     step: string,
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
-    for (const selector of selectors) {
-        try {
-            const target = ctx.locator(selector).first()
-            await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 9000) })
-            await target.click({ timeout: 5000 })
-            await target.fill(value)
-            return
-        } catch {
-            // Try next selector.
+    const contexts = getAllContexts(page)
+    for (const ctx of contexts) {
+        for (const selector of selectors) {
+            try {
+                const target = ctx.locator(selector).first()
+                await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 4000) })
+                await target.click({ timeout: 5000 })
+                await target.fill(value)
+                return
+            } catch {
+                // Try next selector/frame
+            }
         }
     }
-
     throw new LogenAutomationError(step, `Could not find a fillable input for step: ${step}`)
 }
 
@@ -379,66 +375,59 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
 
         await page.waitForTimeout(4000)
 
-        // Step 5: Find the content frame where the form is loaded
-        // LOGEN loads the order form in an iframe after menu click
+        // Log available frames for debugging
+        console.log(`[LogenShipping] Found ${page.frames().length} frames:`)
+        for (const f of page.frames()) { console.log(`  - ${f.url()}`) }
+
+        // Step 5: Fill recipient info
+        // All clickFirstVisible/fillFirstVisible now search ALL frames automatically
         throwIfAbortRequested(signal, 'Fill Recipient Info')
         reportStep('수하인(받으시는 분) 정보 입력')
 
-        // Log available frames for debugging
-        const allFrames = page.frames()
-        console.log(`[LogenShipping] Found ${allFrames.length} frames:`)
-        for (const f of allFrames) {
-            console.log(`  - ${f.url()}`)
-        }
+        await page.waitForTimeout(1000)
 
-        const contentFrame = getContentFrame(page)
-        const isFrame = contentFrame !== page
-        console.log(`[LogenShipping] Using ${isFrame ? 'iframe' : 'main page'} for form interaction`)
-
-        // Wait for form to be ready
-        await contentFrame.waitForTimeout(1000)
-
-        // Fill recipient phone - 전화번호 in 수하인 section
+        // Fill recipient phone
         await fillFirstVisible(
-            contentFrame,
+            page,
             [
                 'input[name*="rcvTelNo"]',
                 'input[name*="rcv_tel"]',
-                'input[name*="recv"][name*="tel"]',
                 'input[name*="rcvHpNo"]',
                 'input[name*="rcv_hp"]',
+                'input[name*="recv"][name*="tel"]',
+                'input[name*="rec"][name*="tel"]',
+                'input[name*="r_tel"]',
             ],
             recipientPhone,
             'Recipient Phone'
         )
 
-        // Fill recipient name - 수하인명
+        // Fill recipient name
         await fillFirstVisible(
-            contentFrame,
+            page,
             [
                 'input[name*="rcvNm"]',
                 'input[name*="rcv_nm"]',
-                'input[name*="recv"][name*="nm"]',
                 'input[name*="rcvName"]',
+                'input[name*="recv"][name*="nm"]',
+                'input[name*="rec"][name*="nm"]',
             ],
             recipientName,
             'Recipient Name'
         )
 
-        // Step 6: Address search - click magnifying glass
+        // Step 6: Address search
         throwIfAbortRequested(signal, 'Address Search')
         reportStep('주소 검색')
 
         await clickFirstVisible(
-            contentFrame,
+            page,
             [
                 'img[src*="search"]',
                 'button[onclick*="addr"]',
                 'a[onclick*="addr"]',
                 'button[onclick*="zip"]',
                 'a[onclick*="zip"]',
-                'button[title*="주소"]',
-                'a[title*="주소"]',
                 'img[alt*="검색"]',
                 'img[alt*="주소"]',
             ],
@@ -447,59 +436,25 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
 
         await page.waitForTimeout(3000)
 
-        // Address search popup may open in a new frame or as a layer
-        // Check all frames for the address search input
-        let addrCtx: FrameLike = contentFrame
-        const addrInputSelectors = [
-            'input[name="keyword"]',
-            'input[name="searchAddr"]',
-            'input[name="newAddr"]',
-            'input[placeholder*="주소"]',
-            'input[placeholder*="도로명"]',
-            '#keyword',
-        ]
-
-        // Search in all frames for the address popup
-        for (const frame of page.frames()) {
-            for (const sel of addrInputSelectors) {
-                try {
-                    const el = frame.locator(sel).first()
-                    const visible = await el.isVisible().catch(() => false)
-                    if (visible) {
-                        addrCtx = frame
-                        break
-                    }
-                } catch { /* continue */ }
-            }
-            if (addrCtx !== contentFrame) break
-        }
-        // Also check the main page
-        if (addrCtx === contentFrame) {
-            for (const sel of addrInputSelectors) {
-                try {
-                    const el = page.locator(sel).first()
-                    const visible = await el.isVisible().catch(() => false)
-                    if (visible) {
-                        addrCtx = page
-                        break
-                    }
-                } catch { /* continue */ }
-            }
-        }
-
-        console.log(`[LogenShipping] Address popup context: ${addrCtx === page ? 'main page' : addrCtx === contentFrame ? 'content frame' : 'popup frame'}`)
-
+        // Fill address in popup (searches all frames)
         await fillFirstVisible(
-            addrCtx,
-            addrInputSelectors,
+            page,
+            [
+                'input[name="keyword"]',
+                'input[name="searchAddr"]',
+                'input[name="newAddr"]',
+                'input[placeholder*="주소"]',
+                'input[placeholder*="도로명"]',
+                '#keyword',
+            ],
             recipientAddress,
             'Address Search - Fill Address',
             15000
         )
 
-        // Click 검색 button in the popup
+        // Click 검색
         await clickFirstVisible(
-            addrCtx,
+            page,
             [
                 'button:has-text("검색")',
                 'input[type="button"][value="검색"]',
@@ -511,250 +466,168 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
 
         await page.waitForTimeout(3000)
 
-        // Double-click the first search result row
+        // Double-click first search result (search all frames)
         const resultSelectors = [
             'table tbody tr:first-child td',
             'table tbody tr td',
-            '.search-result tr:first-child',
-            'ul.list li:first-child',
         ]
-
         let resultClicked = false
-        // Try in the address context first
-        for (const selector of resultSelectors) {
-            try {
-                const row = addrCtx.locator(selector).first()
-                const visible = await row.isVisible().catch(() => false)
-                if (visible) {
-                    await row.dblclick({ timeout: 5000 })
-                    resultClicked = true
-                    break
-                }
-            } catch { /* next */ }
+        for (const ctx of getAllContexts(page)) {
+            for (const selector of resultSelectors) {
+                try {
+                    const row = ctx.locator(selector).first()
+                    const visible = await row.isVisible().catch(() => false)
+                    if (visible) {
+                        await row.dblclick({ timeout: 5000 })
+                        resultClicked = true
+                        break
+                    }
+                } catch { /* next */ }
+            }
+            if (resultClicked) break
         }
         if (!resultClicked) {
-            console.log('[LogenShipping] Could not double-click search result, trying single click')
-            try {
-                await clickFirstVisible(addrCtx, resultSelectors, 'Address Search - Select Result')
-            } catch (err) {
-                console.log(`[LogenShipping] Address result click failed: ${getErrorMessage(err)}`)
-            }
+            console.log('[LogenShipping] Could not double-click search result')
         }
 
         await page.waitForTimeout(2000)
 
-        // Fill detail address if prompted
+        // Fill detail address
         if (recipientDetailAddress) {
-            const detailSelectors = [
-                'input[name*="detail"]',
-                'input[name*="addr2"]',
-                'input[placeholder*="상세"]',
-                'input[placeholder*="나머지"]',
-                '#detailAddr',
-            ]
-            // Try in all frames
-            let detailFilled = false
-            for (const frame of page.frames()) {
-                try {
-                    await fillFirstVisible(frame, detailSelectors, recipientDetailAddress, 'Detail Address', 5000)
-                    detailFilled = true
-                    break
-                } catch { /* next frame */ }
-            }
-            if (!detailFilled) {
-                try {
-                    await fillFirstVisible(addrCtx, detailSelectors, recipientDetailAddress, 'Detail Address', 5000)
-                } catch {
-                    console.log('[LogenShipping] Detail address input not found, may not be required')
-                }
+            try {
+                await fillFirstVisible(
+                    page,
+                    [
+                        'input[name*="detail"]',
+                        'input[name*="addr2"]',
+                        'input[placeholder*="상세"]',
+                        'input[placeholder*="나머지"]',
+                        '#detailAddr',
+                    ],
+                    recipientDetailAddress,
+                    'Detail Address',
+                    8000
+                )
+            } catch {
+                console.log('[LogenShipping] Detail address input not found')
             }
         }
 
-        // Close the address popup by clicking 확인
+        // Close address popup
         try {
-            // Try in address context first, then all frames
             await clickFirstVisible(
-                addrCtx,
-                [
-                    'button:has-text("확인")',
-                    'input[type="button"][value="확인"]',
-                    'a:has-text("확인")',
-                ],
-                'Address Search - Confirm',
+                page,
+                ['button:has-text("확인")', 'input[type="button"][value="확인"]', 'a:has-text("확인")'],
+                'Address Confirm',
                 8000
             )
         } catch {
-            console.log('[LogenShipping] Address confirm auto-closed or not found')
+            console.log('[LogenShipping] Address confirm auto-closed')
         }
 
         await page.waitForTimeout(2000)
 
-        // Step 7: Save the order - click 저장(F5) button
+        // Step 7: Save
         throwIfAbortRequested(signal, 'Save Order')
         reportStep('주문 저장')
 
-        // Re-get content frame in case it changed
-        const saveFrame = getContentFrame(page)
-
         try {
             await clickFirstVisible(
-                saveFrame,
+                page,
                 [
                     'button:has-text("저장")',
                     'a:has-text("저장(F5)")',
                     'a:has-text("저장")',
                     'input[type="button"][value*="저장"]',
-                    'span:has-text("저장(F5)")',
                 ],
-                'Save Order - Button',
+                'Save Order',
                 10000
             )
         } catch {
-            // Also try the main page
-            try {
-                await clickFirstVisible(
-                    page,
-                    [
-                        'button:has-text("저장")',
-                        'a:has-text("저장(F5)")',
-                        'a:has-text("저장")',
-                    ],
-                    'Save Order - Button (main)',
-                    5000
-                )
-            } catch {
-                // Fallback: press F5 key
-                console.log('[LogenShipping] Save button not found, pressing F5')
-                await page.keyboard.press('F5')
-            }
+            console.log('[LogenShipping] Save button not found, pressing F5')
+            await page.keyboard.press('F5')
         }
 
         await page.waitForTimeout(4000)
 
-        // Handle confirmation dialog after save (note: dialog handler already accepts automatically)
-        // But also check for HTML-based confirm buttons
+        // Save confirmation (dialog handler auto-accepts, check HTML buttons too)
         try {
-            for (const frame of page.frames()) {
-                try {
-                    await clickFirstVisible(
-                        frame,
-                        [
-                            'button:has-text("예")',
-                            'button:has-text("확인")',
-                            'input[type="button"][value="예"]',
-                        ],
-                        'Save Confirm',
-                        3000
-                    )
-                    break
-                } catch { /* next frame */ }
-            }
-        } catch {
-            // No confirmation dialog
-        }
+            await clickFirstVisible(
+                page,
+                ['button:has-text("예")', 'button:has-text("확인")', 'input[type="button"][value="예"]'],
+                'Save Confirm',
+                3000
+            )
+        } catch { /* no dialog */ }
 
         await page.waitForTimeout(2000)
 
-        // Step 8: Click 미출력 tab and select the order
+        // Step 8: 미출력 tab → checkbox → 운송장출력
         throwIfAbortRequested(signal, 'Print Label')
         reportStep('운송장 출력 준비')
 
-        const printFrame = getContentFrame(page)
-
         try {
             await clickFirstVisible(
-                printFrame,
-                [
-                    'a:has-text("미출력")',
-                    'span:has-text("미출력")',
-                    'li:has-text("미출력")',
-                    'button:has-text("미출력")',
-                ],
-                'Print - 미출력 Tab',
+                page,
+                ['a:has-text("미출력")', 'span:has-text("미출력")', 'li:has-text("미출력")'],
+                '미출력 Tab',
                 10000
             )
             await page.waitForTimeout(2000)
         } catch {
-            // Also try main page
-            try {
-                await clickFirstVisible(page, ['a:has-text("미출력")'], 'Print - 미출력 Tab (main)', 5000)
-                await page.waitForTimeout(2000)
-            } catch {
-                console.log('[LogenShipping] 미출력 tab already selected or not found')
-            }
+            console.log('[LogenShipping] 미출력 tab already selected or not found')
         }
 
-        // Check the checkbox for the order row - search in all frames
-        let checkboxClicked = false
-        const checkboxSelectors = [
-            'table tbody tr input[type="checkbox"]',
-            'input[type="checkbox"][name*="chk"]',
-            'input[type="checkbox"][name*="select"]',
-        ]
-        for (const frame of page.frames()) {
-            try {
-                await clickFirstVisible(frame, checkboxSelectors, 'Checkbox', 5000)
-                checkboxClicked = true
-                break
-            } catch { /* next frame */ }
-        }
-        if (!checkboxClicked) {
-            await clickFirstVisible(printFrame, checkboxSelectors, 'Print - Select Order Checkbox')
-        }
-
+        // Check the checkbox
+        await clickFirstVisible(
+            page,
+            [
+                'table tbody tr input[type="checkbox"]',
+                'input[type="checkbox"][name*="chk"]',
+                'input[type="checkbox"][name*="select"]',
+            ],
+            'Select Order Checkbox'
+        )
         await page.waitForTimeout(500)
 
-        // Click 운송장출력 button
+        // Click 운송장출력
         reportStep('운송장 출력')
-        const printBtnSelectors = [
-            'button:has-text("운송장출력")',
-            'a:has-text("운송장출력")',
-            'span:has-text("운송장출력")',
-            'input[type="button"][value*="운송장출력"]',
-            'button:has-text("운송장 출력")',
-        ]
-        try {
-            await clickFirstVisible(printFrame, printBtnSelectors, '운송장출력 Button')
-        } catch {
-            await clickFirstVisible(page, printBtnSelectors, '운송장출력 Button (main)')
-        }
-
+        await clickFirstVisible(
+            page,
+            [
+                'button:has-text("운송장출력")',
+                'a:has-text("운송장출력")',
+                'input[type="button"][value*="운송장출력"]',
+            ],
+            '운송장출력 Button'
+        )
         await page.waitForTimeout(3000)
 
-        // Step 9: In 운송장 발행 popup, click 운송장출력 button
+        // Step 9: Print popup → 운송장출력 → 예
         throwIfAbortRequested(signal, 'Print Confirmation')
-        reportStep('운송장 발행 팝업에서 출력')
+        reportStep('운송장 발행 확인')
 
         try {
-            // The popup may appear in a new frame
-            for (const frame of page.frames()) {
-                try {
-                    await clickFirstVisible(frame, printBtnSelectors, 'Print Popup - 운송장출력', 8000)
-                    break
-                } catch { /* next frame */ }
-            }
+            await clickFirstVisible(
+                page,
+                ['button:has-text("운송장출력")', 'a:has-text("운송장출력")', 'input[type="button"][value*="운송장출력"]'],
+                'Print Popup - 운송장출력',
+                10000
+            )
         } catch {
             console.log('[LogenShipping] Print popup button not found')
         }
-
         await page.waitForTimeout(2000)
 
-        // Step 10: Confirmation dialog "출력하시겠습니까?" - Click 예
-        // (dialog handler auto-accepts, but also check HTML buttons)
         try {
-            for (const frame of page.frames()) {
-                try {
-                    await clickFirstVisible(
-                        frame,
-                        ['button:has-text("예")', 'input[type="button"][value="예")', 'button:has-text("확인")'],
-                        'Print Confirm',
-                        5000
-                    )
-                    break
-                } catch { /* next frame */ }
-            }
+            await clickFirstVisible(
+                page,
+                ['button:has-text("예")', 'input[type="button"][value="예"]', 'button:has-text("확인")'],
+                'Print Confirm - 예',
+                8000
+            )
         } catch {
-            console.log('[LogenShipping] Print confirmation dialog not found')
+            console.log('[LogenShipping] Print confirmation not found')
         }
 
         await page.waitForTimeout(3000)

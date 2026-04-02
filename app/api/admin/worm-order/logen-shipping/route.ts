@@ -84,67 +84,76 @@ export async function POST(request: Request) {
         globalLogenGuard.logenShippingInFlight = true
         globalLogenGuard.logenShippingRunningJob = runningJob
 
-        const steps: string[] = []
+        // SSE stream for real-time progress
+        const encoder = new TextEncoder()
+        const stream = new ReadableStream({
+            async start(controller) {
+                const send = (event: string, data: unknown) => {
+                    controller.enqueue(encoder.encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`))
+                }
 
-        try {
-            const result = await submitLogenShipping({
-                loginId,
-                loginPassword,
-                recipientPhone: recipientPhone.trim(),
-                recipientName: recipientName.trim(),
-                recipientAddress: recipientAddress.trim(),
-                recipientDetailAddress: (recipientDetailAddress || '').trim(),
-                senderPhone,
-                senderName,
-                headless: process.env.LOGEN_HEADLESS !== 'false',
-                signal: abortController.signal,
-                onStep: (step) => {
-                    steps.push(step)
-                    console.log(`[LogenShipping API] Step: ${step}`)
-                },
-            })
+                const steps: string[] = []
 
-            return NextResponse.json({
-                ok: true,
-                message: '로젠 운송장 발행이 완료되었습니다.',
-                trackingNumber: result.trackingNumber,
-                steps,
-            })
-        } catch (error) {
-            if (error instanceof LogenAutomationCanceledError) {
-                return NextResponse.json(
-                    {
-                        error: '로젠 운송장 발행이 사용자 요청으로 취소되었습니다.',
-                        canceled: true,
+                try {
+                    const result = await submitLogenShipping({
+                        loginId,
+                        loginPassword,
+                        recipientPhone: recipientPhone.trim(),
+                        recipientName: recipientName.trim(),
+                        recipientAddress: recipientAddress.trim(),
+                        recipientDetailAddress: (recipientDetailAddress || '').trim(),
+                        senderPhone,
+                        senderName,
+                        headless: process.env.LOGEN_HEADLESS !== 'false',
+                        signal: abortController.signal,
+                        onStep: (step) => {
+                            steps.push(step)
+                            console.log(`[LogenShipping API] Step: ${step}`)
+                            send('step', { step })
+                        },
+                    })
+
+                    send('done', {
+                        ok: true,
+                        message: '로젠 운송장 발행이 완료되었습니다.',
+                        trackingNumber: result.trackingNumber,
                         steps,
-                    },
-                    { status: 409 }
-                )
-            }
+                    })
+                } catch (error) {
+                    if (error instanceof LogenAutomationCanceledError) {
+                        send('error', {
+                            error: '로젠 운송장 발행이 사용자 요청으로 취소되었습니다.',
+                            canceled: true,
+                            steps,
+                        })
+                    } else if (error instanceof LogenAutomationError) {
+                        send('error', {
+                            error: `${error.step}: ${error.message}`,
+                            steps,
+                        })
+                    } else {
+                        console.error('Failed to submit Logen shipping:', error)
+                        const detail = error instanceof Error ? error.message : 'Unknown error'
+                        send('error', {
+                            error: `로젠 운송장 자동화 실패: ${detail}`,
+                            steps,
+                        })
+                    }
+                } finally {
+                    globalLogenGuard.logenShippingInFlight = false
+                    globalLogenGuard.logenShippingRunningJob = null
+                    controller.close()
+                }
+            },
+        })
 
-            if (error instanceof LogenAutomationError) {
-                return NextResponse.json(
-                    {
-                        error: `${error.step}: ${error.message}`,
-                        steps,
-                    },
-                    { status: 502 }
-                )
-            }
-
-            console.error('Failed to submit Logen shipping:', error)
-            const detail = error instanceof Error ? error.message : 'Unknown error'
-            return NextResponse.json(
-                {
-                    error: `로젠 운송장 자동화 실패: ${detail}`,
-                    steps,
-                },
-                { status: 500 }
-            )
-        } finally {
-            globalLogenGuard.logenShippingInFlight = false
-            globalLogenGuard.logenShippingRunningJob = null
-        }
+        return new Response(stream, {
+            headers: {
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+            },
+        })
     } catch (error) {
         console.error('Failed to process Logen shipping request:', error)
         const detail = error instanceof Error ? error.message : 'Unknown error'

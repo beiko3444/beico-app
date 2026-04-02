@@ -25,6 +25,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     const [logenLoading, setLogenLoading] = useState(false)
     const [logenError, setLogenError] = useState<string | null>(null)
     const [logenTrackingNumber, setLogenTrackingNumber] = useState<string | null>(null)
+    const [logenStep, setLogenStep] = useState<string | null>(null)
     const partnerAddress = order.user?.partnerProfile?.address || ''
     const { main: defaultMainAddr, detail: defaultDetailAddr } = splitAddress(partnerAddress)
     const [logenPhone, setLogenPhone] = useState(order.user?.partnerProfile?.contact || '')
@@ -36,6 +37,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
         setLogenLoading(true)
         setLogenError(null)
         setLogenTrackingNumber(null)
+        setLogenStep(null)
         try {
             const res = await fetch('/api/admin/worm-order/logen-shipping', {
                 method: 'POST',
@@ -47,20 +49,53 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                     recipientDetailAddress: logenDetailAddress,
                 }),
             })
-            const data = await res.json()
+
             if (!res.ok) {
+                const data = await res.json().catch(() => ({ error: '송장 출력 실패' }))
                 setLogenError(data.error || '송장 출력 실패')
-            } else {
-                setLogenTrackingNumber(data.trackingNumber)
-                if (data.trackingNumber && !trackingNumber) {
-                    await fetch(`/api/orders/${order.id}`, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ trackingNumber: data.trackingNumber, courier: 'Rosen', status: 'SHIPPED' }),
-                    })
-                    setTrackingNumber(data.trackingNumber)
-                    setStatus('SHIPPED')
-                    router.refresh()
+                return
+            }
+
+            // SSE stream
+            const reader = res.body?.getReader()
+            if (!reader) { setLogenError('스트림 연결 실패'); return }
+
+            const decoder = new TextDecoder()
+            let buffer = ''
+
+            while (true) {
+                const { done, value } = await reader.read()
+                if (done) break
+
+                buffer += decoder.decode(value, { stream: true })
+                const lines = buffer.split('\n')
+                buffer = lines.pop() || ''
+
+                let currentEvent = ''
+                for (const line of lines) {
+                    if (line.startsWith('event: ')) {
+                        currentEvent = line.slice(7).trim()
+                    } else if (line.startsWith('data: ')) {
+                        const data = JSON.parse(line.slice(6))
+                        if (currentEvent === 'step') {
+                            setLogenStep(data.step)
+                        } else if (currentEvent === 'done') {
+                            setLogenTrackingNumber(data.trackingNumber)
+                            setLogenStep('완료!')
+                            if (data.trackingNumber && !trackingNumber) {
+                                await fetch(`/api/orders/${order.id}`, {
+                                    method: 'PATCH',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ trackingNumber: data.trackingNumber, courier: 'Rosen', status: 'SHIPPED' }),
+                                })
+                                setTrackingNumber(data.trackingNumber)
+                                setStatus('SHIPPED')
+                                router.refresh()
+                            }
+                        } else if (currentEvent === 'error') {
+                            setLogenError(data.error)
+                        }
+                    }
                 }
             }
         } catch (e) {
@@ -367,6 +402,12 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                         )}
                         {logenTrackingNumber && (
                             <p className="text-[11px] text-blue-700 font-bold">✅ 송장번호: {logenTrackingNumber}</p>
+                        )}
+                        {logenLoading && logenStep && (
+                            <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-100 border border-blue-200 rounded-lg">
+                                <Loader2 size={12} className="animate-spin text-blue-600 shrink-0" />
+                                <span className="text-[10px] font-bold text-blue-700">{logenStep}</span>
+                            </div>
                         )}
                         <button
                             onClick={submitLogenShipping}
