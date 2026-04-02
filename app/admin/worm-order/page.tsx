@@ -916,6 +916,7 @@ export default function WormOrderPage() {
     const [remittancePricingSummary, setRemittancePricingSummary] = useState<RemittancePricingSummary | null>(null)
     const [remittanceSaveInfo, setRemittanceSaveInfo] = useState<{ orderNumber: string; savedAt: string } | null>(null)
     const [remittanceSaveWarning, setRemittanceSaveWarning] = useState('')
+    const [paymentNotificationCopied, setPaymentNotificationCopied] = useState(false)
     const [activeWormOrder, setActiveWormOrder] = useState<WormOrderSnapshot | null>(null)
     const [wormOrderList, setWormOrderList] = useState<WormOrderListItem[]>([])
     const [wormOrderListLoading, setWormOrderListLoading] = useState(false)
@@ -2520,6 +2521,7 @@ export default function WormOrderPage() {
         setDocHasFetched(false)
         setSelectedDocEmailUid(null)
         setDocEmailError('')
+        setPaymentNotificationCopied(false)
         setExpandedSteps(
             PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
                 acc[step.id] = step.id <= 3
@@ -3751,6 +3753,45 @@ export default function WormOrderPage() {
                 {remittanceSaveWarning && (
                     <p className="text-xs font-semibold text-amber-700">{remittanceSaveWarning}</p>
                 )}
+
+                {/* 입금완료 통보 메시지 */}
+                {(remittancePricingSummary || isActiveOrderRemittanceApplied) && (() => {
+                    const sentAmountUsd = autoTransferAmountUsd
+                        ?? activeWormOrderRecord?.remittanceFinalReceiveAmountText
+                            ? null
+                            : null
+                    const sendAmountText = remittancePricingSummary?.sendAmount
+                        || (autoTransferAmountUsd !== null
+                            ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : activeWormOrderRecord?.remittanceSendAmountText || null)
+                    const notificationMessage = sendAmountText
+                        ? `Michael, the payment has been completed to the "${sendAmountText}" bank. It should be credited shortly, so please prepare the order for shipment.`
+                        : null
+                    if (!notificationMessage) return null
+                    return (
+                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
+                            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-[0.16em] flex items-center gap-1.5">
+                                <Send size={12} />
+                                입금완료 통보 메시지
+                            </p>
+                            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-800 font-medium">
+                                {notificationMessage}
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    navigator.clipboard.writeText(notificationMessage)
+                                    setPaymentNotificationCopied(true)
+                                    setTimeout(() => setPaymentNotificationCopied(false), 2500)
+                                }}
+                                className="inline-flex items-center gap-2 h-9 px-4 border border-slate-300 rounded-lg font-semibold text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+                            >
+                                <Copy size={14} />
+                                {paymentNotificationCopied ? '복사 완료 ✓' : '메시지 복사'}
+                            </button>
+                        </div>
+                    )
+                })()}
                 </div>
             )}
             {showCustomsTools && (
