@@ -86,7 +86,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'notification' | 'customs' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'shipping' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -171,8 +171,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'MANUAL',
         owner: '관리자',
         details: ['외부 결제 채널 접속', '실제 입금 수행', '입금 완료 확인'],
-        actionLabel: '수동 처리',
-        target: 'none',
+        actionLabel: '송금 정보 확인',
+        target: 'bankPayment',
         warning: '은행 정책상 시스템 완전 자동화 불가',
     },
     {
@@ -222,8 +222,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'SEMI',
         owner: '관리자',
         details: ['첨부파일 선택', '수신자 입력', '메일 전송 확인'],
-        actionLabel: '첨부 전달',
-        target: 'inbox',
+        actionLabel: '수동 처리',
+        target: 'none',
     },
     {
         id: 10,
@@ -232,8 +232,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'AUTO',
         owner: '시스템',
         details: ['INBOX 메일 스캔', '청구 메일 식별', '후속 단계 알림'],
-        actionLabel: 'Inbox 모니터',
-        target: 'inbox',
+        actionLabel: '수동 처리',
+        target: 'none',
     },
     {
         id: 11,
@@ -254,6 +254,16 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         details: ['픽업 일정 확인', '현장 수령', '사이클 종료'],
         actionLabel: '수동 픽업',
         target: 'none',
+    },
+    {
+        id: 13,
+        title: '로젠 송장 출력',
+        summary: '거래처 주문 정보로 로젠 택배 운송장을 자동 발행합니다.',
+        mode: 'SEMI',
+        owner: '관리자',
+        details: ['로젠 물류 자동 로그인', '수하인/주소 자동 입력', '운송장 출력 및 송장번호 수신'],
+        actionLabel: '송장 출력 실행',
+        target: 'shipping',
     },
 ]
 
@@ -930,8 +940,10 @@ export default function WormOrderPage() {
     const inboxSectionRef = useRef<HTMLDivElement>(null)
     const docInboxSectionRef = useRef<HTMLDivElement>(null)
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
+    const bankPaymentSectionRef = useRef<HTMLDivElement>(null)
     const notificationSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
+    const shippingSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
     const remittanceRequestAbortControllerRef = useRef<AbortController | null>(null)
     const remittanceCancelRequestedRef = useRef(false)
@@ -1087,6 +1099,55 @@ export default function WormOrderPage() {
     const [forwarding, setForwarding] = useState(false)
     const [forwardError, setForwardError] = useState('')
     const [forwardSuccess, setForwardSuccess] = useState('')
+    const [remittanceManuallyDone, setRemittanceManuallyDone] = useState(false)
+
+    // ── 로젠 송장 출력 관련 State ──
+    const [shippingRecipientPhone, setShippingRecipientPhone] = useState('')
+    const [shippingRecipientName, setShippingRecipientName] = useState('')
+    const [shippingRecipientAddress, setShippingRecipientAddress] = useState('')
+    const [shippingRecipientDetailAddress, setShippingRecipientDetailAddress] = useState('')
+    const [shippingSubmitting, setShippingSubmitting] = useState(false)
+    const [shippingError, setShippingError] = useState('')
+    const [shippingSuccess, setShippingSuccess] = useState('')
+    const [shippingTrackingNumber, setShippingTrackingNumber] = useState('')
+    const [shippingProgressLabel, setShippingProgressLabel] = useState('대기 중')
+
+    const handleSubmitLogenShipping = useCallback(async () => {
+        if (shippingSubmitting) return
+        if (!shippingRecipientPhone || !shippingRecipientName || !shippingRecipientAddress) {
+            setShippingError('수하인 전화번호, 이름, 주소를 모두 입력해주세요.')
+            return
+        }
+        setShippingSubmitting(true)
+        setShippingError('')
+        setShippingSuccess('')
+        setShippingTrackingNumber('')
+        setShippingProgressLabel('로젠 자동화 시작...')
+        try {
+            const res = await fetch('/api/admin/worm-order/logen-shipping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recipientPhone: shippingRecipientPhone,
+                    recipientName: shippingRecipientName,
+                    recipientAddress: shippingRecipientAddress,
+                    recipientDetailAddress: shippingRecipientDetailAddress,
+                }),
+            })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+                throw new Error(data?.error || '로젠 송장 출력 실패')
+            }
+            setShippingTrackingNumber(data.trackingNumber || '')
+            setShippingSuccess(`운송장 발행 완료! 송장번호: ${data.trackingNumber || '-'}`)
+            setShippingProgressLabel('완료')
+        } catch (error) {
+            setShippingError(error instanceof Error ? error.message : '로젠 송장 출력 중 오류가 발생했습니다.')
+            setShippingProgressLabel('실패')
+        } finally {
+            setShippingSubmitting(false)
+        }
+    }, [shippingSubmitting, shippingRecipientPhone, shippingRecipientName, shippingRecipientAddress, shippingRecipientDetailAddress])
 
     const handleForwardEmail = async (uid: string) => {
         if (!forwardEmail) {
@@ -2411,8 +2472,8 @@ export default function WormOrderPage() {
             : remittanceSubmitting || Boolean(transferAmountUsd.trim()) || Boolean(invoicePdf)
                 ? 'active'
                 : 'todo'
-        result[4] = result[3] === 'done' ? 'active' : 'todo'
-        result[5] = forwardSuccess ? 'done' : 'todo'
+        result[4] = remittanceManuallyDone ? 'done' : result[3] === 'done' ? 'active' : 'todo'
+        result[5] = paymentNotificationCopied ? 'done' : remittanceManuallyDone ? 'active' : 'todo'
         result[6] = fallbackAwbCandidate ? 'done' : awbLoading ? 'active' : 'todo'
         result[7] = customsProgressResult
             ? 'done'
@@ -2429,6 +2490,7 @@ export default function WormOrderPage() {
         result[10] = hasWarehouseMail ? 'done' : hasFetched ? 'active' : 'todo'
         result[11] = 'todo'
         result[12] = 'todo'
+        result[13] = shippingTrackingNumber ? 'done' : shippingSubmitting ? 'active' : 'todo'
 
         return result
     }, [
@@ -2445,8 +2507,12 @@ export default function WormOrderPage() {
         hasWarehouseMail,
         invoicePdf,
         loadingEmails,
+        paymentNotificationCopied,
+        remittanceManuallyDone,
         remittanceSubmitting,
         remittanceSuccess,
+        shippingSubmitting,
+        shippingTrackingNumber,
         totalBoxes,
         transferAmountUsd,
     ])
@@ -2500,8 +2566,16 @@ export default function WormOrderPage() {
             notificationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
         }
+        if (target === 'bankPayment') {
+            bankPaymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
         if (target === 'customs') {
             customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
+        if (target === 'shipping') {
+            shippingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
     }, [])
 
@@ -2606,6 +2680,15 @@ export default function WormOrderPage() {
         setDocEmailError('')
         setDocEmailMatchMessage('')
         setPaymentNotificationCopied(false)
+        setRemittanceManuallyDone(false)
+        setShippingRecipientPhone('')
+        setShippingRecipientName('')
+        setShippingRecipientAddress('')
+        setShippingRecipientDetailAddress('')
+        setShippingError('')
+        setShippingSuccess('')
+        setShippingTrackingNumber('')
+        setShippingProgressLabel('대기 중')
         setExpandedSteps(
             PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
                 acc[step.id] = step.id <= 3
@@ -2616,11 +2699,13 @@ export default function WormOrderPage() {
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
     const showOrderTools = visibleStepIdSet.has(1)
-    const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
+    const showInboxTools = visibleStepIdSet.has(2)
     const showDocInboxTools = visibleStepIdSet.has(6)
     const showRemittanceTools = visibleStepIdSet.has(3)
+    const showBankPaymentTools = visibleStepIdSet.has(4)
     const showNotificationTools = visibleStepIdSet.has(5)
     const showCustomsTools = visibleStepIdSet.has(7)
+    const showShippingTools = visibleStepIdSet.has(13)
     const stepRenderOrderMap = useMemo(() => {
         const next = new Map<number, number>()
         filteredPipelineSteps.forEach((step, index) => {
@@ -2637,11 +2722,13 @@ export default function WormOrderPage() {
         return stepRenderOrderMap.get(defaultStepId) ?? fallbackOrderBase
     }, [fallbackOrderBase, stepRenderOrderMap])
     const orderToolOrderBase = getAnchorOrderBase([1], 1)
-    const inboxToolOrderBase = getAnchorOrderBase([2, 9, 10], 2)
+    const inboxToolOrderBase = getAnchorOrderBase([2], 2)
     const docInboxToolOrderBase = getAnchorOrderBase([6], 6)
     const remittanceToolOrderBase = getAnchorOrderBase([3], 3)
+    const bankPaymentToolOrderBase = getAnchorOrderBase([4], 4)
     const notificationToolOrderBase = getAnchorOrderBase([5], 5)
     const customsToolOrderBase = getAnchorOrderBase([7], 7)
+    const shippingToolOrderBase = getAnchorOrderBase([13], 13)
 
     return (
         <div className="max-w-5xl mx-auto pb-10 flex flex-col gap-6">
@@ -3190,21 +3277,32 @@ export default function WormOrderPage() {
                                                 )}
                                             </div>
                                             {email.matchedOrderId && (
-                                                <div className="mt-1.5 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-2 space-y-1">
-                                                    <p className="text-[10px] font-semibold text-emerald-700 tracking-wide">
-                                                        유닛프라이스 달러 {formatUsdAmount(email.invoiceUnitPriceUsd)} / 원화 {formatKrwAmount(email.invoiceUnitPriceKrw)}
-                                                    </p>
-                                                    <p className="text-[10px] font-semibold text-emerald-700 tracking-wide">
-                                                        토탈어마운트 달러 {formatUsdAmount(email.invoiceTotalAmountUsd)} / 원화 {formatKrwAmount(email.invoiceTotalAmountKrw)}
-                                                    </p>
-                                                    <p className="text-[10px] text-emerald-800/90 font-medium tracking-wide">
-                                                        실시간환율 1 USD = {email.usdKrwRate !== null ? `₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}
-                                                    </p>
-                                                    {email.invoiceOcrError && (
-                                                        <p className="text-[10px] font-semibold text-rose-600">
-                                                            {email.invoiceOcrError}
-                                                        </p>
-                                                    )}
+                                                <div className="mt-1.5 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5">
+                                                    <table className="w-full text-[10px]">
+                                                        <tbody>
+                                                            <tr>
+                                                                <td className="py-0.5 font-semibold text-emerald-700 pr-2 whitespace-nowrap">유닛프라이스</td>
+                                                                <td className="py-0.5 font-bold text-emerald-900 text-right">{formatUsdAmount(email.invoiceUnitPriceUsd)}</td>
+                                                                <td className="py-0.5 text-emerald-700 text-right pl-2">{formatKrwAmount(email.invoiceUnitPriceKrw)}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td className="py-0.5 font-semibold text-emerald-700 pr-2 whitespace-nowrap">토탈어마운트</td>
+                                                                <td className="py-0.5 font-bold text-emerald-900 text-right">{formatUsdAmount(email.invoiceTotalAmountUsd)}</td>
+                                                                <td className="py-0.5 text-emerald-700 text-right pl-2">{formatKrwAmount(email.invoiceTotalAmountKrw)}</td>
+                                                            </tr>
+                                                            <tr>
+                                                                <td className="py-0.5 font-medium text-emerald-700/80 pr-2 whitespace-nowrap">환율</td>
+                                                                <td colSpan={2} className="py-0.5 text-emerald-700/80 text-right">
+                                                                    {email.usdKrwRate !== null ? `1 USD = ₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}
+                                                                </td>
+                                                            </tr>
+                                                            {email.invoiceOcrError && (
+                                                                <tr>
+                                                                    <td colSpan={3} className="py-0.5 font-semibold text-rose-600">{email.invoiceOcrError}</td>
+                                                                </tr>
+                                                            )}
+                                                        </tbody>
+                                                    </table>
                                                 </div>
                                             )}
                                             {email.awbNumber && (
@@ -3287,54 +3385,10 @@ export default function WormOrderPage() {
                                             <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
                                         </div>
 
-                                        <div className="mt-4 flex items-center gap-2">
-                                            <button
-                                                onClick={() => { void handleRunInvoiceOcrForEmail(selectedEmailBase) }}
-                                                disabled={
-                                                    loadingEmailDetail ||
-                                                    invoiceOcrRunningUid === selectedEmail.uid ||
-                                                    matchingEmailUid === selectedEmail.uid ||
-                                                    (!selectedEmail.matchedOrderId && !activeWormOrder?.id)
-                                                }
-                                                className="h-9 px-3 rounded-lg bg-emerald-700 text-white text-[12px] font-bold disabled:opacity-50"
-                                            >
-                                                {invoiceOcrRunningUid === selectedEmail.uid ? '인보이스 OCR 실행중...' : '인보이스 OCR 실행'}
-                                            </button>
-                                            {loadingEmailDetail ? (
-                                                <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
-                                            ) : (
-                                                <span className="text-[12px] text-emerald-700 font-semibold">
-                                                    PDF 첨부파일 {selectedEmail.invoicePdfCount}개 (파일명/확장자 기준 OCR)
-                                                </span>
-                                            )}
-                                        </div>
-
-                                        {(selectedEmail.matchedOrderId || selectedEmail.invoiceOcrError) && (
-                                            <div className="mt-3 rounded-lg border border-emerald-100 bg-emerald-50/60 px-3 py-2.5 space-y-1.5">
-                                                <p className="text-[11px] font-semibold text-emerald-800">
-                                                    유닛프라이스 달러 {formatUsdAmount(selectedEmail.invoiceUnitPriceUsd)} / 원화 {formatKrwAmount(selectedEmail.invoiceUnitPriceKrw)}
-                                                </p>
-                                                <p className="text-[11px] font-semibold text-emerald-800">
-                                                    토탈어마운트 달러 {formatUsdAmount(selectedEmail.invoiceTotalAmountUsd)} / 원화 {formatKrwAmount(selectedEmail.invoiceTotalAmountKrw)}
-                                                </p>
-                                                <p className="text-[11px] font-medium text-emerald-900/90">
-                                                    실시간환율 1 USD = {selectedEmail.usdKrwRate !== null ? `₩${Math.round(selectedEmail.usdKrwRate).toLocaleString()}` : '-'}
-                                                </p>
-                                                {selectedEmail.invoiceSourceFile && (
-                                                    <p className="text-[10px] font-medium text-emerald-700">
-                                                        소스 파일: {selectedEmail.invoiceSourceFile}
-                                                    </p>
-                                                )}
-                                                {selectedEmail.invoiceExtractedAt && (
-                                                    <p className="text-[10px] font-medium text-emerald-700">
-                                                        OCR 시각: {new Date(selectedEmail.invoiceExtractedAt).toLocaleString()}
-                                                    </p>
-                                                )}
-                                                {selectedEmail.invoiceOcrError && (
-                                                    <p className="text-[11px] font-semibold text-rose-600">
-                                                        {selectedEmail.invoiceOcrError}
-                                                    </p>
-                                                )}
+                                        {(matchingEmailUid === selectedEmail.uid || invoiceOcrRunningUid === selectedEmail.uid) && (
+                                            <div className="mt-3 flex items-center gap-2 text-[12px] text-emerald-700 font-semibold">
+                                                <Loader2 size={14} className="animate-spin" />
+                                                인보이스 OCR 분석 중...
                                             </div>
                                         )}
 
@@ -3356,38 +3410,6 @@ export default function WormOrderPage() {
                                             </div>
                                         )}
 
-                                        {/* ── [NEW] 관세사 메일 전달 영역 ── */}
-                                        <div className="mt-5 p-4 rounded-xl border border-orange-100 bg-orange-50/50 flex flex-col gap-3">
-                                            <label className="text-[13px] font-bold text-gray-800 flex items-center gap-1.5 focus-within:text-orange-600 transition-colors">
-                                                <Send size={15} className="text-orange-600" />
-                                                이 메일의 첨부파일을 지정된 이메일로 바로 전달하기
-                                            </label>
-                                            <div className="flex gap-2 w-full">
-                                                <input 
-                                                    type="email"
-                                                    value={forwardEmail}
-                                                    onChange={(e) => setForwardEmail(e.target.value)}
-                                                    placeholder="수신자 이메일 주소 (예: customs@example.com)" 
-                                                    className="flex-1 px-3 h-10 rounded-lg border border-gray-300 text-[13px] outline-none focus:border-orange-500 focus:ring-1 focus:ring-orange-500 transition-shadow bg-white"
-                                                    disabled={forwarding}
-                                                    onKeyDown={(e) => {
-                                                        if (e.key === 'Enter' && forwardEmail && !forwarding) {
-                                                            handleForwardEmail(selectedEmail.uid)
-                                                        }
-                                                    }}
-                                                />
-                                                <button
-                                                    onClick={() => handleForwardEmail(selectedEmail.uid)}
-                                                    disabled={forwarding || !forwardEmail.includes('@')}
-                                                    className="px-5 h-10 rounded-lg bg-orange-600 text-white font-bold text-[13px] hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm whitespace-nowrap"
-                                                >
-                                                    {forwarding ? <Loader2 size={14} className="animate-spin" /> : null}
-                                                    {forwarding ? '전송중...' : '해당 양식으로 전달'}
-                                                </button>
-                                            </div>
-                                            {forwardError && <p className="text-[12px] font-bold text-red-500">{forwardError}</p>}
-                                            {forwardSuccess && <p className="text-[12px] font-bold text-emerald-600">{forwardSuccess}</p>}
-                                        </div>
                                     </div>
                                     {/* 메일 본문 내용 */}
                                     <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
@@ -3725,6 +3747,76 @@ export default function WormOrderPage() {
                         })()}
                     </div>
                 </div>
+                </div>
+            )}
+
+            {showBankPaymentTools && (
+                <div
+                    ref={bankPaymentSectionRef}
+                    style={{ order: bankPaymentToolOrderBase + 5 }}
+                    className={`rounded-2xl border shadow-sm overflow-hidden transition-all duration-500 ${
+                        remittanceManuallyDone
+                            ? 'bg-[#fff3ef] border-[#e34219]'
+                            : 'bg-white border-gray-200'
+                    }`}
+                >
+                    <div className={`px-6 py-4 border-b flex items-center justify-between ${
+                        remittanceManuallyDone ? 'border-[#f5c4b8] bg-[#fff7f3]' : 'border-gray-100 bg-[#fff7f3]'
+                    }`}>
+                        <div>
+                            <h3 className="text-lg font-black text-[#111827]">모인비지니스 송금</h3>
+                            <p className="text-xs text-slate-500 mt-0.5">아래 계좌로 최종 금액을 직접 송금해 주세요.</p>
+                        </div>
+                        <Send size={18} className="text-[#e34219] mt-1" />
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-5 py-4">
+                            <p className="text-sm font-bold text-[#e34219] mb-3">모인비지니스로 최종금액을 송금해주세요.</p>
+                            <table className="w-full text-sm">
+                                <tbody className="divide-y divide-[#f5c4b8]">
+                                    <tr>
+                                        <td className="py-2 font-semibold text-slate-600 w-32">은행</td>
+                                        <td className="py-2 font-bold text-slate-900">신한은행</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-2 font-semibold text-slate-600">가상계좌번호</td>
+                                        <td className="py-2 font-black text-slate-900 tracking-wider">562-167-6230695-9</td>
+                                    </tr>
+                                    <tr>
+                                        <td className="py-2 font-semibold text-slate-600">예금주명</td>
+                                        <td className="py-2 font-bold text-slate-900">모인_dabin lee(엑스트래커)</td>
+                                    </tr>
+                                    {autoTransferAmountUsd !== null && (
+                                        <tr>
+                                            <td className="py-2 font-semibold text-slate-600">송금 금액</td>
+                                            <td className="py-2 font-black text-[#e34219] text-base">
+                                                {autoTransferAmountUsd.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => setRemittanceManuallyDone((prev) => !prev)}
+                                className={`h-11 px-8 rounded-xl font-black text-sm tracking-wide transition-all duration-300 inline-flex items-center gap-2 ${
+                                    remittanceManuallyDone
+                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
+                                        : 'bg-[#e34219] hover:bg-[#cd3b17] text-white shadow'
+                                }`}
+                            >
+                                {remittanceManuallyDone ? '✓ 송금완료' : '송금완료'}
+                            </button>
+                            {remittanceManuallyDone && (
+                                <span className="text-sm font-semibold text-emerald-700">
+                                    송금이 완료되었습니다. 입금완료 통보를 진행해 주세요.
+                                </span>
+                            )}
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -4111,6 +4203,114 @@ export default function WormOrderPage() {
                 )}
                 </div>
                 )}
+
+            {showShippingTools && (
+                <div
+                    ref={shippingSectionRef}
+                    style={{ order: shippingToolOrderBase + 5 }}
+                    className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+                >
+                    <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-black text-[#111827] flex items-center gap-2">
+                                <Package size={18} className="text-[#e34219]" />
+                                로젠 송장 출력
+                            </h3>
+                            <p className="text-xs text-slate-500 mt-0.5">수하인 정보를 입력하면 로젠 택배 운송장을 자동 발행합니다.</p>
+                        </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">수하인 전화번호</label>
+                                <input
+                                    type="text"
+                                    value={shippingRecipientPhone}
+                                    onChange={(e) => setShippingRecipientPhone(e.target.value)}
+                                    placeholder="010-0000-0000"
+                                    className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                                />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">수하인명 (업체명)</label>
+                                <input
+                                    type="text"
+                                    value={shippingRecipientName}
+                                    onChange={(e) => setShippingRecipientName(e.target.value)}
+                                    placeholder="업체명 또는 수하인명"
+                                    className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                                />
+                            </div>
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">주소 (도로명 + 건물번호)</label>
+                            <input
+                                type="text"
+                                value={shippingRecipientAddress}
+                                onChange={(e) => setShippingRecipientAddress(e.target.value)}
+                                placeholder="예: 창업로 57번길 7, 시흥동 343"
+                                className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">상세주소</label>
+                            <input
+                                type="text"
+                                value={shippingRecipientDetailAddress}
+                                onChange={(e) => setShippingRecipientDetailAddress(e.target.value)}
+                                placeholder="상세주소 (선택)"
+                                className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                            />
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                            <button
+                                type="button"
+                                onClick={() => { void handleSubmitLogenShipping() }}
+                                disabled={shippingSubmitting || !shippingRecipientPhone || !shippingRecipientName || !shippingRecipientAddress}
+                                className="h-11 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                            >
+                                {shippingSubmitting ? (
+                                    <>
+                                        <Loader2 size={15} className="animate-spin" />
+                                        송장 출력 중...
+                                    </>
+                                ) : (
+                                    '송장 출력 실행'
+                                )}
+                            </button>
+                            {shippingSubmitting && (
+                                <span className="text-xs font-semibold text-slate-500">{shippingProgressLabel}</span>
+                            )}
+                        </div>
+
+                        {shippingError && (
+                            <p className="text-sm font-semibold text-[#e34219]">{shippingError}</p>
+                        )}
+                        {shippingSuccess && (
+                            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
+                                <p className="text-sm font-bold text-emerald-700">{shippingSuccess}</p>
+                                {shippingTrackingNumber && (
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-xl font-black text-emerald-900 tracking-wider">{shippingTrackingNumber}</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                navigator.clipboard.writeText(shippingTrackingNumber)
+                                            }}
+                                            className="h-8 px-3 rounded-lg bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700"
+                                        >
+                                            <Copy size={13} className="inline mr-1" />
+                                            복사
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
                 </div>
             </div>
     )
