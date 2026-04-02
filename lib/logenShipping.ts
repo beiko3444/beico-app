@@ -677,9 +677,16 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         )
 
         // Step 6: Address search
+        // IMPORTANT: Do NOT use labelFallbacks here - it causes the sidebar "주소검색변환서비스"
+        // menu link to be clicked (it contains "주소검색" text), which navigates away from the
+        // order form (lrm01f0050.html) and breaks all subsequent steps.
         throwIfAbortRequested(signal, 'Address Search')
         reportStep('주소 검색')
 
+        // Set up popup listener BEFORE clicking - logen address search opens in a new popup window
+        const addrPopupPromise = page.waitForEvent('popup', { timeout: 8000 }).catch(() => null) as Promise<PageLike | null>
+
+        // Click address search button using CSS selectors ONLY (no labelFallbacks)
         await clickFirstVisible(
             page,
             [
@@ -703,15 +710,26 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 'input[type="image"]',
             ],
             'Address Search - Open Dialog',
-            DEFAULT_TIMEOUT_MS,
-            ['주소', '우편번호', '주소검색', '주소입력']
+            DEFAULT_TIMEOUT_MS
+            // NO labelFallbacks - prevents clicking sidebar "주소검색변환서비스" menu
         )
 
-        await page.waitForTimeout(3000)
+        await page.waitForTimeout(2000)
+        const addrPopup = await addrPopupPromise
 
-        // Fill address in popup (searches all frames)
+        // Use popup window if it opened, otherwise fall back to searching all frames
+        const addrCtx = (addrPopup ?? page) as PageLike
+
+        if (addrPopup) {
+            console.log('[LogenShipping] Address search popup window detected')
+            addrPopup.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
+            await safeWaitForLoad(addrPopup as unknown as FrameLike)
+            await addrPopup.waitForTimeout(1000)
+        }
+
+        // Fill address keyword
         await fillFirstVisible(
-            page,
+            addrCtx,
             [
                 'input[name="keyword"]',
                 'input[name="searchAddr"]',
@@ -719,34 +737,40 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 'input[placeholder*="주소"]',
                 'input[placeholder*="도로명"]',
                 '#keyword',
+                '#schAddr',
             ],
             recipientAddress,
             'Address Search - Fill Address',
             15000,
-            ['주소', '도로명', '검색어']
+            addrPopup ? undefined : ['주소', '도로명', '검색어']
         )
 
-        // Click 검색
+        // Click search button
         await clickFirstVisible(
-            page,
+            addrCtx,
             [
                 'button:has-text("검색")',
                 'input[type="button"][value="검색"]',
                 'a:has-text("검색")',
                 '#searchBtn',
+                'button[onclick*="fn_search"]',
+                'button[onclick*="search"]',
             ],
             'Address Search - Click Search'
         )
 
-        await page.waitForTimeout(3000)
+        await addrCtx.waitForTimeout(3000)
 
-        // Double-click first search result (search all frames)
+        // Double-click first search result
         const resultSelectors = [
             'table tbody tr:first-child td',
             'table tbody tr td',
         ]
         let resultClicked = false
-        for (const ctx of getAllContexts(page)) {
+        const addrContexts = addrPopup
+            ? [addrPopup as unknown as FrameLike]
+            : getAllContexts(page)
+        for (const ctx of addrContexts) {
             for (const selector of resultSelectors) {
                 try {
                     const row = ctx.locator(selector).first()
@@ -764,9 +788,10 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             console.log('[LogenShipping] Could not double-click search result')
         }
 
-        await page.waitForTimeout(2000)
+        // Wait for popup to close and address to be filled back into the order form
+        await page.waitForTimeout(3000)
 
-        // Fill detail address
+        // Fill detail address (back in the main page/order form)
         if (recipientDetailAddress) {
             try {
                 await fillFirstVisible(
@@ -787,16 +812,16 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             }
         }
 
-        // Close address popup
+        // Close address popup if still open (some implementations require manual close)
         try {
             await clickFirstVisible(
                 page,
                 ['button:has-text("확인")', 'input[type="button"][value="확인"]', 'a:has-text("확인")'],
                 'Address Confirm',
-                8000
+                5000
             )
         } catch {
-            console.log('[LogenShipping] Address confirm auto-closed')
+            console.log('[LogenShipping] Address confirm auto-closed or not needed')
         }
 
         await page.waitForTimeout(2000)

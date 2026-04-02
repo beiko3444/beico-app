@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)",
+      "Bash(cmd /c \"cd /d C:\\\\Users\\\\다빈\\\\Documents\\\\GitHub\\\\beico-app && npx tsc --noEmit --skipLibCheck 2>&1 | head -30\")"
+    ]
+  }
+}
