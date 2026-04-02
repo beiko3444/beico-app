@@ -339,6 +339,24 @@ async function waitForUnprintedGridReady(page, frame, timeoutMs = 12000) {
   return await getUnprintedGridState(page, frame);
 }
 
+async function getSlipSummaryCounts(page, frame) {
+  const contexts = [frame, page];
+  for (const ctx of contexts) {
+    const counts = await ctx.evaluate(() => {
+      const text = (document.body?.innerText || '').replace(/\s+/g, ' ');
+      const noPrintMatch = text.match(/미출력\s*[:：]\s*(\d+)/);
+      const printedMatch = text.match(/출력\s*[:：]\s*(\d+)/);
+      return {
+        noPrint: noPrintMatch ? Number(noPrintMatch[1]) : null,
+        printed: printedMatch ? Number(printedMatch[1]) : null,
+      };
+    }).catch(() => null);
+    if (!counts) continue;
+    if (counts.noPrint !== null || counts.printed !== null) return counts;
+  }
+  return { noPrint: null, printed: null };
+}
+
 async function waitForNoPrintRowsByApi(frame, timeoutMs = 12000) {
   const started = Date.now();
   while (Date.now() - started < timeoutMs) {
@@ -581,9 +599,12 @@ async function main() {
 
   const page = await context.newPage();
 
+  const dialogMessages = [];
+
   page.on('dialog', async (dialog) => {
     try {
       console.log('[Dialog]', dialog.type(), dialog.message());
+      dialogMessages.push(String(dialog.message?.() || ''));
       await dialog.accept();
     } catch {
       // ignore
@@ -1301,6 +1322,9 @@ async function main() {
     }
     await sleep(260);
 
+    const beforePrintRows = await waitForNoPrintRowsByApi(frame, 2000);
+    const beforeCounts = await getSlipSummaryCounts(page, frame);
+
     console.log('[Live] Print flow: 운송장출력...');
     const printClicked = await clickFirstVisibleAny([frame, page], [
       'button:has-text("운송장출력")',
@@ -1315,21 +1339,111 @@ async function main() {
       }).catch(() => {});
     }
 
-    await sleep(1200);
-    await clickFirstVisibleAny([frame, page], [
-      '#popupModal button:has-text("운송장출력")',
-      '#popupModal a:has-text("운송장출력")',
-      'button:has-text("운송장출력")',
-      'input[type="button"][value*="운송장출력"]',
-    ], 2000);
-    await sleep(500);
-    await clickFirstVisibleAny([frame, page], [
+    // 운송장출력 클릭 후 확인 팝업이 뜰 때까지 최대 4초 대기 (popupModal1 포함)
+    let printConfirmPopupVisible = false;
+    for (let i = 0; i < 20; i += 1) {
+      const visible = await page.evaluate(() => {
+        const isVis = (sel) => {
+          const el = document.querySelector(sel);
+          if (!el) return false;
+          const st = window.getComputedStyle(el);
+          const r = el.getBoundingClientRect?.();
+          return st.display !== 'none' && st.visibility !== 'hidden' && st.opacity !== '0' && !!r && r.width > 0 && r.height > 0;
+        };
+        return isVis('#popupModal1') || isVis('#popupModal1 .modalWrap');
+      }).catch(() => false);
+      if (visible) { printConfirmPopupVisible = true; break; }
+      await sleep(200);
+    }
+    console.log(`[Live] Print confirm popup (popupModal1) visible: ${printConfirmPopupVisible}`);
+
+    // 팝업 내용 덤프 (디버깅)
+    const popupButtonDebug = await page.evaluate(() => {
+      const isVis = (el) => {
+        if (!el) return false;
+        const st = window.getComputedStyle(el);
+        const r = el.getBoundingClientRect?.();
+        return st.display !== 'none' && st.visibility !== 'hidden' && st.opacity !== '0' && !!r && r.width > 0 && r.height > 0;
+      };
+      const pick = (rootSel) => {
+        const root = document.querySelector(rootSel);
+        if (!root) return [];
+        return Array.from(root.querySelectorAll('button,input[type="button"],a'))
+          .map((el) => ({ text: (el.textContent || el.value || '').replace(/\s+/g, ' ').trim(), visible: isVis(el) }))
+          .filter((x) => x.text)
+          .slice(0, 12);
+      };
+      return {
+        popupModal1: pick('#popupModal1'),
+        popupModal: pick('#popupModal'),
+        modalWrap: pick('.modalWrap'),
+        uiDialog: pick('.ui-dialog'),
+        popupModal1Html: (document.querySelector('#popupModal1')?.innerHTML || '').slice(0, 300),
+      };
+    }).catch(() => null);
+    console.log(`[Live] Print popup debug: ${JSON.stringify(popupButtonDebug)}`);
+
+    // popupModal1 우선으로 "예"/"확인" 클릭
+    const popupConfirmClicked = await clickFirstVisibleAny([page, frame], [
+      '#popupModal1 button:has-text("예")',
+      '#popupModal1 button:has-text("예(Y)")',
+      '#popupModal1 input[type="button"][value="예"]',
+      '#popupModal1 input[type="button"][value*="예"]',
+      '#popupModal1 button:has-text("확인")',
+      '#popupModal1 input[type="button"][value="확인"]',
       '#popupModal button:has-text("예")',
+      '#popupModal button:has-text("예(Y)")',
       'button:has-text("예")',
+      'button:has-text("예(Y)")',
       'input[type="button"][value="예"]',
       'button:has-text("확인")',
-    ], 2000);
-    await sleep(1000);
+      '.ui-dialog button:has-text("예")',
+      '.ui-dialog button:has-text("확인")',
+      '.modalWrap button:has-text("예")',
+      '.modalWrap button:has-text("확인")',
+      'button:has-text("OK")',
+    ], 3000);
+
+    if (!popupConfirmClicked) {
+      // JS API 직접 호출 fallback
+      for (const ctx of [frame, page]) {
+        await ctx.evaluate(() => {
+          try { if (typeof window.fn_silpPrint === 'function') { window.fn_silpPrint(); return; } } catch {}
+          try { if (typeof window.fn_printPop === 'function') { window.fn_printPop(); return; } } catch {}
+        }).catch(() => {});
+      }
+    }
+    console.log(`[Live] Print popup clicks: open=${printClicked}, popupConfirm=${popupConfirmClicked}`);
+    await sleep(2200);
+
+    await frame.evaluate(() => {
+      try {
+        if (typeof window.fn_retrieve === 'function') {
+          window.fn_retrieve('noprint', 'btn');
+        } else if (typeof window.fn_noPrint === 'function') {
+          window.fn_noPrint();
+        }
+      } catch {}
+    }).catch(() => {});
+    await sleep(1200);
+
+    const afterPrintRows = await waitForNoPrintRowsByApi(frame, 7000);
+    const afterCounts = await getSlipSummaryCounts(page, frame);
+    console.log(`[Live] Print verification: rows ${beforePrintRows.rowCount} -> ${afterPrintRows.rowCount}, printed ${beforeCounts.printed} -> ${afterCounts.printed}`);
+
+    const rowReduced = afterPrintRows.rowCount < beforePrintRows.rowCount;
+    const printedIncreased =
+      Number.isFinite(beforeCounts.printed) &&
+      Number.isFinite(afterCounts.printed) &&
+      Number(afterCounts.printed) > Number(beforeCounts.printed);
+    const hasOZInstallPrompt = dialogMessages.some((m) => /OZ|오즈|설치/.test(String(m)));
+
+    if (!rowReduced && !printedIncreased) {
+      if (hasOZInstallPrompt) {
+        throw new Error('OZ 출력 프로그램 설치/허용 팝업으로 인해 실제 출력이 완료되지 않았습니다.');
+      }
+      throw new Error(`운송장 출력 완료 신호 없음 (rows ${beforePrintRows.rowCount}->${afterPrintRows.rowCount}, printed ${beforeCounts.printed}->${afterCounts.printed})`);
+    }
 
     const state = await frame.evaluate(() => ({
       tel: document.querySelector('#strRcvCustTelNo')?.value || '',

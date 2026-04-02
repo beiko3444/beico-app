@@ -1,0 +1,42 @@
+
+> beico-app@0.1.1 logen-live
+> node scripts/logen-address-confirm-live.mjs
+
+[Live] Login...
+[Live] Move to single order page...
+[Dialog] beforeunload 
+[Live] Fill recipient phone/name (value only)...
+[Live] Address keyword + magnifier...
+[Live] Popup context: frame
+[Live] Popup debug: {"popupVisible":true,"hasPopupInput":true,"hasSearchFn":true,"hasSheet":true,"popupHtml":"<div id=\"popupModal\" running=\"running\" style=\"z-index: 1000; display: block;\" class=\"ui-draggable\">    <script src=\"/lmm01f-standard/common/js/lmm01fp416.js\"></script>\n    <!-- <script src=\"/lmm01f-standard/common/js/commLmm.js\"></script> -->\n\n    <div id=\"modalCommPop\" class=\"modalWrap\">  \n        <input type=\"hidden\" id=\"hddObj\" name=\"hddObj\" value=\"{&quot;schVal&quot;:&quot;06159&quot;,&quot;schType&quot;:&quot;B10401&quot;,&quot;schPrntVal1&quot;:&quot;&quot;,&quot;schPrntVal2&quot;:&quot;&q"}
+[Live] Double click postal row... 
+[Live] Fill popup detail address + confirm...
+[Live] Save step 1/4: 저장(F5)...
+[Live] Save step 2/4: 저장 확인 팝업 처리...
+[Live] Save step 3/4: 저장 이후 상태 재검증...
+[Live] Save step 4/4: 완료, 이제 체크데이터 단계로 진행
+[Live] Print flow: 미출력 탭 + 전체 체크...
+[Live] Print flow(api): rows=14, checked=0
+[Live] Print flow: grid ready rows=112, cbs=8
+[Live] Print flow: 첫 행 선택 성공
+[Live] Print flow: CheckData attempt#1 api ok=true checked=14 reason=ok
+[Live] Print flow: 전체 체크 성공, checkedRows(api/dom)=14/14
+[Live] Print flow: 운송장출력...
+[Live] Final recipient state: {
+  "tel": "",
+  "cell": "",
+  "name": "",
+  "zip": "",
+  "bldgCd": "",
+  "addr1": "",
+  "addr2": "",
+  "branCd": "",
+  "branNm": "",
+  "multiPopupVisible": false
+}
+[Live] Keep browser open for manual check. Close window when done.
+[Live] Failed: page.waitForTimeout: Target page, context or browser has been closed
+    at main (C:\Users\vdvin\OneDrive\바탕 화면\CODE\beico-app\scripts\logen-address-confirm-live.mjs:1355:16)
+[Live] Browser kept open for debugging (20 min).
+[Live] Failed: page.waitForTimeout: Target page, context or browser has been closed
+    at main (C:\Users\vdvin\OneDrive\바탕 화면\CODE\beico-app\scripts\logen-address-confirm-live.mjs:1360:16)
