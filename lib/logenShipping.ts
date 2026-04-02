@@ -258,15 +258,16 @@ const clickFirstVisible = async (
     step: string,
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
+    const perSelectorTimeout = Math.min(timeoutMs, 1500)
     const contexts = getAllContexts(page)
     for (const ctx of contexts) {
         for (const selector of selectors) {
             try {
                 const target = ctx.locator(selector).first()
-                await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 4000) })
+                await target.waitFor({ state: 'visible', timeout: perSelectorTimeout })
                 const disabled = await target.isDisabled().catch(() => false)
                 if (disabled) continue
-                await target.click({ timeout: 5000 })
+                await target.click({ timeout: 3000 })
                 return
             } catch {
                 // Try next selector/frame
@@ -276,7 +277,8 @@ const clickFirstVisible = async (
     throw new LogenAutomationError(step, `Could not find a clickable element for step: ${step}`)
 }
 
-/** Fill the first visible input matching any selector across ALL frames */
+/** Fill the first visible input matching any selector across ALL frames.
+ *  Strategy order: 1) label-text evaluate (fast), 2) CSS selectors, 3) dump debug */
 const fillFirstVisible = async (
     page: PageLike,
     selectors: string[],
@@ -285,13 +287,21 @@ const fillFirstVisible = async (
     timeoutMs = DEFAULT_TIMEOUT_MS,
     labelFallbacks?: string[],
 ): Promise<void> => {
+    // Strategy 1: Try label-text evaluate FIRST (fastest - one call per frame)
+    if (labelFallbacks) {
+        const filled = await fillByLabelText(page, labelFallbacks, value, step)
+        if (filled) return
+    }
+
+    // Strategy 2: Try CSS selectors (1.5s per selector per frame)
+    const perSelectorTimeout = Math.min(timeoutMs, 1500)
     const contexts = getAllContexts(page)
     for (const ctx of contexts) {
         for (const selector of selectors) {
             try {
                 const target = ctx.locator(selector).first()
-                await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, 4000) })
-                await target.click({ timeout: 5000 })
+                await target.waitFor({ state: 'visible', timeout: perSelectorTimeout })
+                await target.click({ timeout: 3000 })
                 await target.fill(value)
                 return
             } catch {
@@ -300,16 +310,10 @@ const fillFirstVisible = async (
         }
     }
 
-    // Fallback: try finding input by nearby label text using evaluate
-    if (labelFallbacks) {
-        const filled = await fillByLabelText(page, labelFallbacks, value, step)
-        if (filled) return
-    }
-
     // Dump debug info on failure
     const debugInfo = await dumpAllInputs(page)
     console.error(`[LogenShipping] fillFirstVisible FAILED for step: ${step}\n${debugInfo}`)
-    throw new LogenAutomationError(step, `Could not find a fillable input for step: ${step}\n\nDebug (all inputs across frames):\n${debugInfo}`)
+    throw new LogenAutomationError(step, `Could not find input for: ${step}\n\nDebug:\n${debugInfo}`)
 }
 
 /** Safe wait - use domcontentloaded instead of networkidle to avoid timeout on sites with persistent connections */
