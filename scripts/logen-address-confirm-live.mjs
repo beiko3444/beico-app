@@ -105,22 +105,88 @@ async function clickFirstVisibleAny(contexts, selectors, timeout = 1800) {
   return false;
 }
 
-async function waitUntilSavePopupsClosed(page, timeoutMs = 7000) {
-  const started = Date.now();
-  while (Date.now() - started < timeoutMs) {
-    const open = await page.evaluate(() => {
+function getAllContexts(page, frame) {
+  const contexts = [];
+  if (frame) contexts.push(frame);
+  contexts.push(page);
+  for (const f of page.frames()) {
+    if (!f) continue;
+    if (frame && f === frame) continue;
+    if (f.url() === 'about:blank') continue;
+    contexts.push(f);
+  }
+  return contexts;
+}
+
+async function hasOpenSavePopup(contexts) {
+  for (const ctx of contexts) {
+    const open = await ctx.evaluate(() => {
       const isVisible = (sel) => {
         const el = document.querySelector(sel);
         if (!el) return false;
         const st = window.getComputedStyle(el);
-        return st.display !== 'none' && st.visibility !== 'hidden';
+        const rect = el.getBoundingClientRect?.();
+        return st.display !== 'none'
+          && st.visibility !== 'hidden'
+          && st.opacity !== '0'
+          && !!rect
+          && rect.width > 0
+          && rect.height > 0;
       };
       return isVisible('#popupModal1') || isVisible('#popupModal') || isVisible('#popupModal_MultiCust');
     }).catch(() => false);
+    if (open) return true;
+  }
+  return false;
+}
+
+async function waitUntilSavePopupsClosed(page, frame, timeoutMs = 7000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const open = await hasOpenSavePopup(getAllContexts(page, frame));
     if (!open) return true;
     await sleep(140);
   }
   return false;
+}
+
+async function dismissSavePopups(page, frame) {
+  const contexts = getAllContexts(page, frame);
+
+  await clickFirstVisibleAny(contexts, [
+    '#popupModal1 button:has-text("확인")',
+    '#popupModal1 button:has-text("예")',
+    '#popupModal button:has-text("확인")',
+    '#popupModal button:has-text("예")',
+    'button:has-text("확인")',
+    'button:has-text("예")',
+    'input[type="button"][value="확인"]',
+    'input[type="button"][value="예"]',
+    '#btn-popupModal1',
+    '#selectBtn',
+  ], 900);
+
+  for (const ctx of contexts) {
+    await ctx.evaluate(() => {
+      const call = (name, ...args) => {
+        try {
+          if (typeof window[name] === 'function') {
+            window[name](...args);
+            return true;
+          }
+        } catch {}
+        return false;
+      };
+      call('fn_popClose', 'N');
+      call('fn_comm_popClose');
+      call('fn_btnRcvCustMultiOk');
+    }).catch(() => {});
+  }
+
+  // 다수회원조회가 뜨면 즉시 첫 행 선택 후 확인.
+  for (const ctx of contexts) {
+    await resolveMultiCustomerPopup(ctx);
+  }
 }
 
 async function focusFirstUnprintedRow(page, frame) {
@@ -162,7 +228,7 @@ async function clickUtilityCheckboxNearLabel(page, frame, labelText) {
         return true;
       }
       return false;
-    }, label).catch(() => false);
+    }, labelText).catch(() => false);
     if (ok) return true;
   }
   return false;
@@ -182,6 +248,56 @@ async function clickGridHeaderAllCheckbox(page, frame) {
           cb.click();
           return true;
         }
+      }
+      return false;
+    }).catch(() => false);
+    if (ok) return true;
+  }
+  return false;
+}
+
+async function clickIBSheetHeaderAllIcon(page, frame) {
+  const contexts = [frame, page];
+  for (const ctx of contexts) {
+    const ok = await ctx.evaluate(() => {
+      const isVisible = (el) => {
+        if (!el) return false;
+        const st = window.getComputedStyle(el);
+        const r = el.getBoundingClientRect?.();
+        return st.display !== 'none' && st.visibility !== 'hidden' && st.opacity !== '0' && !!r && r.width > 0 && r.height > 0;
+      };
+      const clickIcon = (icon) => {
+        if (!isVisible(icon)) return false;
+        try {
+          icon.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }));
+        } catch {}
+        try {
+          icon.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+          icon.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+          icon.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+          icon.click?.();
+        } catch {}
+        return true;
+      };
+
+      // Prefer the header icon located in the header row containing "No." and "전체".
+      const headerRows = Array.from(document.querySelectorAll('tr, .IBHScroll, .IBHead, .IBHeaderRow, .IBMain')).filter((el) => {
+        const txt = (el.textContent || '').replace(/\s+/g, ' ').trim();
+        return txt.includes('No.') && txt.includes('전체');
+      });
+      for (const row of headerRows) {
+        const icon =
+          row.querySelector('div.IBHeaderIcon')
+          || row.querySelector('div[class*="IBHeaderIcon"]')
+          || row.querySelector('div[class*="IBCheck0"]')
+          || null;
+        if (clickIcon(icon)) return true;
+      }
+
+      // Fallback: first visible IBSheet header icon.
+      const icons = Array.from(document.querySelectorAll('div.IBHeaderIcon, div[class*="IBHeaderIcon"], div[class*="IBCheck0"]'));
+      for (const icon of icons) {
+        if (clickIcon(icon)) return true;
       }
       return false;
     }).catch(() => false);
@@ -223,14 +339,151 @@ async function waitForUnprintedGridReady(page, frame, timeoutMs = 12000) {
   return await getUnprintedGridState(page, frame);
 }
 
+async function waitForNoPrintRowsByApi(frame, timeoutMs = 12000) {
+  const started = Date.now();
+  while (Date.now() - started < timeoutMs) {
+    const state = await frame.evaluate(() => {
+      const slipTy = $('input[name="rboSlipTy"]:checked').val();
+      const normalSheet = window.lrm01f0050Sheet1;
+      const rtnSheet = window.lrm01f0050RtnSheet1;
+      const getRows = (sheet) => {
+        if (!sheet || typeof sheet.getDataRows !== 'function') return [];
+        const rows = sheet.getDataRows() || [];
+        return Array.isArray(rows) ? rows : [];
+      };
+      const normalRows = getRows(normalSheet);
+      const rtnRows = getRows(rtnSheet);
+
+      let sheet = slipTy === '200' ? rtnSheet : normalSheet;
+      let rows = getRows(sheet);
+      if (rows.length === 0) {
+        const altSheet = sheet === normalSheet ? rtnSheet : normalSheet;
+        const altRows = getRows(altSheet);
+        if (altRows.length > rows.length) {
+          sheet = altSheet;
+          rows = altRows;
+        }
+      }
+
+      if (!sheet || typeof sheet.getDataRows !== 'function') return { rowCount: 0, checkedCount: 0 };
+      let checkedCount = 0;
+      try {
+        if (typeof sheet.getRowsByChecked === 'function') {
+          checkedCount = (sheet.getRowsByChecked('CheckData') || []).length;
+        }
+      } catch {}
+      return { rowCount: Array.isArray(rows) ? rows.length : 0, checkedCount };
+    }).catch(() => ({ rowCount: 0, checkedCount: 0 }));
+    if (state.rowCount > 0) return state;
+    await sleep(180);
+  }
+  return await frame.evaluate(() => {
+    const slipTy = $('input[name="rboSlipTy"]:checked').val();
+    const normalSheet = window.lrm01f0050Sheet1;
+    const rtnSheet = window.lrm01f0050RtnSheet1;
+    const getRows = (sheet) => {
+      if (!sheet || typeof sheet.getDataRows !== 'function') return [];
+      const rows = sheet.getDataRows() || [];
+      return Array.isArray(rows) ? rows : [];
+    };
+    const normalRows = getRows(normalSheet);
+    const rtnRows = getRows(rtnSheet);
+    let sheet = slipTy === '200' ? rtnSheet : normalSheet;
+    let rows = getRows(sheet);
+    if (rows.length === 0) {
+      const altSheet = sheet === normalSheet ? rtnSheet : normalSheet;
+      const altRows = getRows(altSheet);
+      if (altRows.length > rows.length) {
+        sheet = altSheet;
+        rows = altRows;
+      }
+    }
+    if (!sheet || typeof sheet.getDataRows !== 'function') return { rowCount: 0, checkedCount: 0 };
+    let checkedCount = 0;
+    try {
+      if (typeof sheet.getRowsByChecked === 'function') {
+        checkedCount = (sheet.getRowsByChecked('CheckData') || []).length;
+      }
+    } catch {}
+    return { rowCount: Array.isArray(rows) ? rows.length : 0, checkedCount };
+  }).catch(() => ({ rowCount: 0, checkedCount: 0 }));
+}
+
+async function selectNoPrintRowsByApi(frame) {
+  return await frame.evaluate(() => {
+    const slipTy = $('input[name="rboSlipTy"]:checked').val();
+    const normalSheet = window.lrm01f0050Sheet1;
+    const rtnSheet = window.lrm01f0050RtnSheet1;
+    const getRows = (sheet) => {
+      if (!sheet || typeof sheet.getDataRows !== 'function') return [];
+      const rows = sheet.getDataRows() || [];
+      return Array.isArray(rows) ? rows : [];
+    };
+    let sheet = slipTy === '200' ? rtnSheet : normalSheet;
+    let rows = getRows(sheet);
+    if (rows.length === 0) {
+      const altSheet = sheet === normalSheet ? rtnSheet : normalSheet;
+      const altRows = getRows(altSheet);
+      if (altRows.length > rows.length) {
+        sheet = altSheet;
+        rows = altRows;
+      }
+    }
+
+    if (!sheet || typeof sheet.getDataRows !== 'function') return { ok: false, rowCount: 0, checkedCount: 0, reason: 'no-sheet' };
+    if (!Array.isArray(rows) || rows.length === 0) return { ok: false, rowCount: 0, checkedCount: 0, reason: 'no-rows' };
+
+    // Primary: page-native selection path
+    try {
+      window.grd2ChkIdx = rows.slice();
+      if (typeof window.fn_grdChk === 'function') {
+        window.fn_grdChk('rdo_noprint');
+      }
+    } catch {}
+
+    let checkedCount = 0;
+    try {
+      if (typeof sheet.getRowsByChecked === 'function') {
+        checkedCount = (sheet.getRowsByChecked('CheckData') || []).length;
+      }
+    } catch {}
+
+    // Fallback: force CheckData value for each row
+    if (checkedCount === 0) {
+      for (const row of rows) {
+        try {
+          sheet.setValue({ row, col: 'CheckData', val: 1, render: 1 });
+        } catch {}
+      }
+      try {
+        const h = sheet.getHeaderRows?.();
+        if (Array.isArray(h) && h.length && typeof sheet.setIconCheck === 'function') {
+          sheet.setIconCheck(h[0], 'CheckData', 1);
+        }
+      } catch {}
+      try {
+        if (typeof sheet.getRowsByChecked === 'function') {
+          checkedCount = (sheet.getRowsByChecked('CheckData') || []).length;
+        }
+      } catch {}
+    }
+
+    return { ok: checkedCount > 0, rowCount: rows.length, checkedCount, reason: checkedCount > 0 ? 'ok' : 'not-checked' };
+  }).catch(() => ({ ok: false, rowCount: 0, checkedCount: 0, reason: 'eval-failed' }));
+}
+
 async function checkAllUnprintedOrders(page, frame) {
   const contexts = [frame, page];
 
-  // 0) Strict grid header checkbox first
+  // 0) Exact IBSheet header icon click first (what user points to: div.IBHeaderIcon...).
+  const headerIconChecked = await clickIBSheetHeaderAllIcon(page, frame);
+  if (headerIconChecked) return true;
+
+  // 1) Strict grid header checkbox fallback
   const headerChecked = await clickGridHeaderAllCheckbox(page, frame);
   if (headerChecked) return true;
 
-  // 1) Prefer DOM "전체" checkbox click
+  // 2) Prefer DOM "전체" checkbox click
   for (const ctx of contexts) {
     const clickedByDom = await ctx.evaluate(() => {
       const clickIfCheckbox = (el) => {
@@ -261,7 +514,7 @@ async function checkAllUnprintedOrders(page, frame) {
     if (clickedByDom) return true;
   }
 
-  // 2) IBSheet API fallback
+  // 3) IBSheet API fallback
   for (const ctx of contexts) {
     const checkedBySheet = await ctx.evaluate(() => {
       const win = window;
@@ -280,7 +533,7 @@ async function checkAllUnprintedOrders(page, frame) {
     if (checkedBySheet) return true;
   }
 
-  // 3) CSS fallback
+  // 4) CSS fallback
   const checked = await clickFirstVisibleAny(contexts, [
     'th:has-text("전체") input[type="checkbox"]',
     'td:has-text("전체") input[type="checkbox"]',
@@ -291,7 +544,7 @@ async function checkAllUnprintedOrders(page, frame) {
   ], 3000);
   if (checked) return true;
 
-  // 4) Force first-row checkbox only (row print fallback)
+  // 5) Force first-row checkbox only (row print fallback)
   for (const ctx of contexts) {
     const firstRowChecked = await ctx.evaluate(() => {
       const row =
@@ -444,16 +697,66 @@ async function main() {
 
     await sleep(1200);
 
-    let popupInFrame = false;
-    let popupInPage = false;
-    for (let i = 0; i < 12; i += 1) {
-      popupInFrame = await frame.locator('#popupModal').first().isVisible().catch(() => false);
-      popupInPage = popupInFrame ? false : await page.locator('#popupModal').first().isVisible().catch(() => false);
-      if (popupInFrame || popupInPage) break;
+    const popupCandidates = getAllContexts(page, frame);
+    const inspectPopupCtx = async (ctx) => {
+      return await ctx.evaluate(() => {
+        const popup = document.querySelector('#popupModal');
+        const style = popup ? window.getComputedStyle(popup) : null;
+        const rect = popup?.getBoundingClientRect?.();
+        const popupVisible = !!popup
+          && !!style
+          && style.display !== 'none'
+          && style.visibility !== 'hidden'
+          && style.opacity !== '0'
+          && !!rect
+          && rect.width > 0
+          && rect.height > 0;
+        const hasPopupInput = !!document.querySelector('#commPopSchVal1');
+        const hasSearchFn = typeof window.fn_comm_getDataList === 'function';
+        const hasSheet = !!window.popGridSheet;
+        const sheetRows = (() => {
+          const sheet = window.popGridSheet;
+          if (!sheet || typeof sheet.getDataRows !== 'function') return 0;
+          const rows = sheet.getDataRows();
+          return Array.isArray(rows) ? rows.length : 0;
+        })();
+        const domRows = document.querySelectorAll('#popupModal .IBMain tbody tr, #popupModal table tbody tr').length;
+        const rowCount = Math.max(sheetRows, domRows);
+        return { popupVisible, hasPopupInput, hasSearchFn, hasSheet, rowCount };
+      }).catch(() => ({ popupVisible: false, hasPopupInput: false, hasSearchFn: false, hasSheet: false, rowCount: 0 }));
+    };
+
+    let popupCtx = frame;
+    let popupCtxName = 'frame(default)';
+    for (let i = 0; i < 14; i += 1) {
+      let best = { score: -1, ctx: frame, name: 'frame(default)' };
+      for (const ctx of popupCandidates) {
+        const state = await inspectPopupCtx(ctx);
+        const score = (state.popupVisible ? 100 : 0)
+          + (state.rowCount > 0 ? 60 : 0)
+          + (state.hasPopupInput ? 25 : 0)
+          + (state.hasSearchFn ? 15 : 0)
+          + (state.hasSheet ? 10 : 0);
+        const name = ctx === frame ? 'frame' : (ctx === page ? 'page' : `subframe:${ctx.url()}`);
+        if (score > best.score) best = { score, ctx, name };
+      }
+      popupCtx = best.ctx;
+      popupCtxName = best.name;
+      if (best.score >= 25) break;
+
+      await frame.evaluate(() => {
+        if (typeof window.fn_popRcvAddrSearch === 'function') {
+          window.fn_popRcvAddrSearch();
+        }
+      }).catch(() => {});
+      await page.evaluate(() => {
+        if (typeof window.fn_popRcvAddrSearch === 'function') {
+          window.fn_popRcvAddrSearch();
+        }
+      }).catch(() => {});
       await sleep(250);
     }
-    const popupCtx = popupInFrame ? frame : (popupInPage ? page : frame);
-    const popupCtxName = popupInFrame ? 'frame' : (popupInPage ? 'page' : 'frame(default)');
+
     console.log(`[Live] Popup context: ${popupCtxName}`);
     const popupDebug = await popupCtx.evaluate(() => ({
       popupVisible: (() => {
@@ -521,6 +824,28 @@ async function main() {
         await sleep(250);
       }
     }
+    if (!rowCount) {
+      for (const ctx of popupCandidates) {
+        if (ctx === popupCtx) continue;
+        const otherRowCount = await ctx.evaluate(() => {
+          const sheetRows = (() => {
+            const sheet = window.popGridSheet;
+            if (!sheet || typeof sheet.getDataRows !== 'function') return 0;
+            const rows = sheet.getDataRows();
+            return Array.isArray(rows) ? rows.length : 0;
+          })();
+          const domRows = document.querySelectorAll('#popupModal .IBMain tbody tr, #popupModal table tbody tr').length;
+          return Math.max(sheetRows, domRows);
+        }).catch(() => 0);
+        if (otherRowCount > 0) {
+          popupCtx = ctx;
+          rowCount = otherRowCount;
+          console.log('[Live] Popup context fallback switched to row-ready context.');
+          break;
+        }
+      }
+    }
+
     if (!rowCount) {
       const rowDebug = await popupCtx.evaluate(() => ({
         sheetRows: (() => {
@@ -817,9 +1142,34 @@ async function main() {
       await frame.fill('#strRcvCustAddr2', RECIPIENT_DETAIL).catch(() => {});
     }
 
-    await sleep(1200);
+    await frame.evaluate(() => {
+      const cell = document.querySelector('#strRcvCustCellNo');
+      if (!cell) return;
+      cell.value = '';
+      cell.dispatchEvent(new Event('input', { bubbles: true }));
+      cell.dispatchEvent(new Event('change', { bubbles: true }));
+    }).catch(() => {});
 
-    console.log('[Live] Save...');
+    const readyBeforeSave = await frame.evaluate(() => {
+      const val = (sel) => (document.querySelector(sel)?.value || '').trim();
+      return {
+        tel: val('#strRcvCustTelNo'),
+        name: val('#strRcvCustNm'),
+        cell: val('#strRcvCustCellNo'),
+        zip: val('#strRcvZipCd'),
+        bldg: val('#strRcvBldgCd'),
+        addr1: val('#strRcvCustAddr1'),
+        addr2: val('#strRcvCustAddr2'),
+      };
+    }).catch(() => null);
+
+    if (!readyBeforeSave || !readyBeforeSave.tel || !readyBeforeSave.name || !readyBeforeSave.zip || !readyBeforeSave.bldg || !readyBeforeSave.addr1 || !readyBeforeSave.addr2) {
+      throw new Error(`Save precheck failed: ${JSON.stringify(readyBeforeSave)}`);
+    }
+
+    await sleep(700);
+
+    console.log('[Live] Save step 1/4: 저장(F5)...');
     const savedByButton = await clickFirstVisible(page, [
       '.button-area button.btn.base.save[onclick*="fn_save"]',
       'button.btn.base.save[onclick*="fn_save"]',
@@ -838,22 +1188,47 @@ async function main() {
       }
     }
 
-    await sleep(1500);
+    await sleep(1200);
 
-    await clickFirstVisible(frame, [
-      '#btn-popupModal1',
-      '#popupModal1 button.btn.base.close',
-      '#popupModal1 button',
-    ], 1200);
-
-    for (let i = 0; i < 8; i += 1) {
-      const resolved = await resolveMultiCustomerPopup(frame);
-      if (!resolved) break;
-      console.log('[Live] Multi-customer popup resolved (first row + select).');
-      await sleep(800);
+    console.log('[Live] Save step 2/4: 저장 확인 팝업 처리...');
+    for (let i = 0; i < 14; i += 1) {
+      await dismissSavePopups(page, frame);
+      const closed = await waitUntilSavePopupsClosed(page, frame, 900);
+      if (closed) break;
+      await sleep(200);
+    }
+    const closedAfterSave = await waitUntilSavePopupsClosed(page, frame, 4000);
+    if (!closedAfterSave) {
+      throw new Error('Save confirm popup still open after save sequence');
     }
 
-    await waitUntilSavePopupsClosed(page, 8000);
+    console.log('[Live] Save step 3/4: 저장 이후 상태 재검증...');
+    const postSaveState = await frame.evaluate(() => {
+      const val = (sel) => (document.querySelector(sel)?.value || '').trim();
+      return {
+        tel: val('#strRcvCustTelNo'),
+        name: val('#strRcvCustNm'),
+        cell: val('#strRcvCustCellNo'),
+        zip: val('#strRcvZipCd'),
+        bldg: val('#strRcvBldgCd'),
+        addr1: val('#strRcvCustAddr1'),
+        addr2: val('#strRcvCustAddr2'),
+      };
+    }).catch(() => null);
+    const formStillFilled = !!postSaveState?.tel && !!postSaveState?.name && !!postSaveState?.zip && !!postSaveState?.bldg && !!postSaveState?.addr1 && !!postSaveState?.addr2;
+    const formResetAfterSave = !!postSaveState
+      && !postSaveState.tel
+      && !postSaveState.name
+      && !postSaveState.cell
+      && !postSaveState.zip
+      && !postSaveState.bldg
+      && !postSaveState.addr1
+      && !postSaveState.addr2;
+    if (!formStillFilled && !formResetAfterSave) {
+      throw new Error(`Save postcheck failed: ${JSON.stringify(postSaveState)}`);
+    }
+
+    console.log('[Live] Save step 4/4: 완료, 이제 체크데이터 단계로 진행');
     await sleep(250);
 
     console.log('[Live] Print flow: 미출력 탭 + 전체 체크...');
@@ -864,12 +1239,26 @@ async function main() {
     ], 3000);
     await sleep(300);
 
+    // Use page-native retrieval/filter path to ensure IBSheet rows are ready in noprint tab.
+    await frame.evaluate(() => {
+      try {
+        if (typeof window.fn_retrieve === 'function') {
+          window.fn_retrieve('noprint', 'btn');
+        } else if (typeof window.fn_noPrint === 'function') {
+          window.fn_noPrint();
+        }
+      } catch {}
+    }).catch(() => {});
+    await sleep(250);
+
+    const apiReady = await waitForNoPrintRowsByApi(frame, 14000);
+    console.log(`[Live] Print flow(api): rows=${apiReady.rowCount}, checked=${apiReady.checkedCount}`);
+
     const gridReady = await waitForUnprintedGridReady(page, frame, 12000);
     console.log(`[Live] Print flow: grid ready rows=${gridReady.rowCount}, cbs=${gridReady.checkboxCount}`);
     await sleep(180);
 
-    const utilityChecked = await clickUtilityCheckboxNearLabel(page, frame, '관내우선');
-    console.log(`[Live] Print flow: 우측 체크박스 ${utilityChecked ? '성공' : '실패/없음'}`);
+    // Do not touch 관내우선 utility checkbox; it can switch list context and break CheckData selection.
     await sleep(180);
 
     const rowFocused = await focusFirstUnprintedRow(page, frame);
@@ -878,16 +1267,36 @@ async function main() {
 
     let allChecked = false;
     let checkedState = { rowCount: 0, checkboxCount: 0, checkedCount: 0 };
+    let checkedByApi = 0;
     for (let i = 0; i < 3; i += 1) {
+      const apiSelected = await selectNoPrintRowsByApi(frame);
+      checkedByApi = Math.max(checkedByApi, apiSelected.checkedCount || 0);
+      console.log(`[Live] Print flow: CheckData attempt#${i + 1} api ok=${apiSelected.ok} checked=${apiSelected.checkedCount} reason=${apiSelected.reason}`);
+      if (apiSelected.ok) {
+        checkedState = {
+          rowCount: apiSelected.rowCount,
+          checkboxCount: Math.max(checkedState.checkboxCount, apiSelected.rowCount),
+          checkedCount: apiSelected.checkedCount,
+        };
+        allChecked = true;
+        break;
+      }
+
       allChecked = await checkAllUnprintedOrders(page, frame);
       await sleep(220);
+      const apiAfterDom = await waitForNoPrintRowsByApi(frame, 2500);
+      checkedByApi = Math.max(checkedByApi, apiAfterDom.checkedCount || 0);
       checkedState = await getUnprintedGridState(page, frame);
-      if (checkedState.checkedCount > 0) break;
+      if (checkedByApi > 0 || checkedState.checkedCount > 0) {
+        allChecked = true;
+        break;
+      }
       await waitForUnprintedGridReady(page, frame, 2500);
       await focusFirstUnprintedRow(page, frame);
     }
-    console.log(`[Live] Print flow: 전체 체크 ${allChecked ? '성공' : '실패'}, checkedRows=${checkedState.checkedCount}`);
-    if (checkedState.checkedCount === 0) {
+    const effectiveChecked = Math.max(checkedByApi, checkedState.checkedCount);
+    console.log(`[Live] Print flow: 전체 체크 ${allChecked ? '성공' : '실패'}, checkedRows(api/dom)=${checkedByApi}/${checkedState.checkedCount}`);
+    if (effectiveChecked === 0) {
       throw new Error('미출력 체크가 적용되지 않아 운송장출력 진행 중단');
     }
     await sleep(260);

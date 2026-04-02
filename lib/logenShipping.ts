@@ -425,7 +425,66 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
         }
     }
 
-    // Strategy 1: Strict grid header row ("No." + "전체") checkbox
+    // Strategy 1: Exact IBSheet header icon click (div.IBHeaderIcon...) on the "전체" header.
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const result = await ctx.evaluate(() => {
+                const isVisible = (el: Element | null) => {
+                    if (!(el instanceof HTMLElement)) return false
+                    const st = window.getComputedStyle(el)
+                    const rect = el.getBoundingClientRect?.()
+                    return st.display !== 'none'
+                        && st.visibility !== 'hidden'
+                        && st.opacity !== '0'
+                        && !!rect
+                        && rect.width > 0
+                        && rect.height > 0
+                }
+                const clickIcon = (el: Element | null): boolean => {
+                    if (!(el instanceof HTMLElement) || !isVisible(el)) return false
+                    try {
+                        el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+                    } catch {
+                        // ignore
+                    }
+                    try {
+                        el.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }))
+                        el.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }))
+                        el.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+                        el.click()
+                    } catch {
+                        // ignore
+                    }
+                    return true
+                }
+
+                const headerRows = Array.from(document.querySelectorAll('tr, .IBHScroll, .IBHead, .IBHeaderRow, .IBMain')).filter((el) => {
+                    const txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
+                    return txt.includes('No.') && txt.includes('전체')
+                })
+                for (const row of headerRows) {
+                    const icon =
+                        row.querySelector('div.IBHeaderIcon')
+                        ?? row.querySelector('div[class*="IBHeaderIcon"]')
+                        ?? row.querySelector('div[class*="IBCheck0"]')
+                        ?? null
+                    if (clickIcon(icon)) return 'ibsheet-header-icon'
+                }
+
+                const allIcons = Array.from(document.querySelectorAll('div.IBHeaderIcon, div[class*="IBHeaderIcon"], div[class*="IBCheck0"]'))
+                for (const icon of allIcons) {
+                    if (clickIcon(icon)) return 'ibsheet-header-icon-fallback'
+                }
+                return null
+            })
+            if (result) {
+                console.log(`[LogenShipping] checkOrderCheckboxInIBSheet: ${result}`)
+                return
+            }
+        } catch { /* next frame */ }
+    }
+
+    // Strategy 2: Strict grid header row ("No." + "전체") checkbox
     for (const ctx of getAllContexts(page)) {
         try {
             const result = await ctx.evaluate(() => {
@@ -448,7 +507,7 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
         } catch { /* next frame */ }
     }
 
-    // Strategy 2: Click "전체" header checkbox by DOM (preferred)
+    // Strategy 3: Click "전체" header checkbox by DOM (preferred)
     for (const ctx of getAllContexts(page)) {
         try {
             const result = await ctx.evaluate(() => {
@@ -484,7 +543,7 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
         } catch { /* next frame */ }
     }
 
-    // Strategy 3: IBSheet JavaScript API via evaluate across all frames
+    // Strategy 4: IBSheet JavaScript API via evaluate across all frames
     for (const ctx of getAllContexts(page)) {
         try {
             const result = await ctx.evaluate(() => {
@@ -518,7 +577,7 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
         } catch { /* next frame */ }
     }
 
-    // Strategy 4: CSS selectors (longer timeout)
+    // Strategy 5: CSS selectors (longer timeout)
     try {
         await clickFirstVisible(
             page,
@@ -539,7 +598,7 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
         // fallback below
     }
 
-    // Strategy 5: Force first-row checkbox only
+    // Strategy 6: Force first-row checkbox only
     for (const ctx of getAllContexts(page)) {
         try {
             const checked = await ctx.evaluate(() => {
@@ -605,21 +664,212 @@ const waitForUnprintedGridReady = async (page: PageLike, timeoutMs = 12000): Pro
     }
 }
 
-const waitUntilSavePopupsClosed = async (page: PageLike, timeoutMs = 8000): Promise<void> => {
+const waitForNoPrintRowsByApi = async (page: PageLike, timeoutMs = 14000): Promise<{ rowCount: number; checkedCount: number }> => {
     const started = Date.now()
     while (Date.now() - started < timeoutMs) {
-        const open = await page.evaluate(() => {
+        for (const ctx of getAllContexts(page)) {
+            try {
+                const state = await ctx.evaluate(() => {
+                    const win = window as unknown as Record<string, unknown>
+                    const jq = win.$ as ((selector: string) => { val: () => string }) | undefined
+                    const slipTy = typeof jq === 'function' ? jq('input[name="rboSlipTy"]:checked').val() : ''
+                    const normalSheet = win.lrm01f0050Sheet1 as Record<string, unknown> | undefined
+                    const rtnSheet = win.lrm01f0050RtnSheet1 as Record<string, unknown> | undefined
+                    const getRows = (sheet: Record<string, unknown> | undefined) => {
+                        if (!sheet || typeof sheet.getDataRows !== 'function') return [] as unknown[]
+                        const rows = (sheet.getDataRows as () => unknown[])() || []
+                        return Array.isArray(rows) ? rows : []
+                    }
+                    let sheet = slipTy === '200' ? rtnSheet : normalSheet
+                    let rows = getRows(sheet)
+                    if (rows.length === 0) {
+                        const altSheet = sheet === normalSheet ? rtnSheet : normalSheet
+                        const altRows = getRows(altSheet)
+                        if (altRows.length > rows.length) {
+                            sheet = altSheet
+                            rows = altRows
+                        }
+                    }
+                    if (!sheet || typeof sheet.getDataRows !== 'function') return { rowCount: 0, checkedCount: 0 }
+                    let checkedCount = 0
+                    if (typeof sheet.getRowsByChecked === 'function') {
+                        const checked = (sheet.getRowsByChecked as (col: string) => unknown[])('CheckData') || []
+                        checkedCount = Array.isArray(checked) ? checked.length : 0
+                    }
+                    return { rowCount: Array.isArray(rows) ? rows.length : 0, checkedCount }
+                }) as { rowCount: number; checkedCount: number }
+                if (state.rowCount > 0) return state
+            } catch {
+                // next context
+            }
+        }
+        await page.waitForTimeout(180)
+    }
+    return { rowCount: 0, checkedCount: 0 }
+}
+
+const selectNoPrintRowsByApi = async (page: PageLike): Promise<{ ok: boolean; rowCount: number; checkedCount: number; reason: string }> => {
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const state = await ctx.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const jq = win.$ as ((selector: string) => { val: () => string }) | undefined
+                const slipTy = typeof jq === 'function' ? jq('input[name="rboSlipTy"]:checked').val() : ''
+                const normalSheet = win.lrm01f0050Sheet1 as Record<string, unknown> | undefined
+                const rtnSheet = win.lrm01f0050RtnSheet1 as Record<string, unknown> | undefined
+                const getRows = (sheet: Record<string, unknown> | undefined) => {
+                    if (!sheet || typeof sheet.getDataRows !== 'function') return [] as unknown[]
+                    const rows = (sheet.getDataRows as () => unknown[])() || []
+                    return Array.isArray(rows) ? rows : []
+                }
+                let sheet = slipTy === '200' ? rtnSheet : normalSheet
+                let rows = getRows(sheet)
+                if (rows.length === 0) {
+                    const altSheet = sheet === normalSheet ? rtnSheet : normalSheet
+                    const altRows = getRows(altSheet)
+                    if (altRows.length > rows.length) {
+                        sheet = altSheet
+                        rows = altRows
+                    }
+                }
+                if (!sheet || typeof sheet.getDataRows !== 'function') {
+                    return { ok: false, rowCount: 0, checkedCount: 0, reason: 'no-sheet' }
+                }
+
+                if (!Array.isArray(rows) || rows.length === 0) {
+                    return { ok: false, rowCount: 0, checkedCount: 0, reason: 'no-rows' }
+                }
+
+                try {
+                    win.grd2ChkIdx = rows.slice()
+                    const grdChk = win.fn_grdChk as ((id: string) => void) | undefined
+                    if (typeof grdChk === 'function') {
+                        grdChk('rdo_noprint')
+                    }
+                } catch {
+                    // ignore
+                }
+
+                const readChecked = () => {
+                    if (typeof sheet.getRowsByChecked === 'function') {
+                        const checked = (sheet.getRowsByChecked as (col: string) => unknown[])('CheckData') || []
+                        return Array.isArray(checked) ? checked.length : 0
+                    }
+                    return 0
+                }
+
+                let checkedCount = readChecked()
+                if (checkedCount === 0 && typeof sheet.setValue === 'function') {
+                    for (const row of rows) {
+                        try {
+                            ;(sheet.setValue as (opts: Record<string, unknown>) => void)({ row, col: 'CheckData', val: 1, render: 1 })
+                        } catch {
+                            // ignore
+                        }
+                    }
+                    try {
+                        if (typeof sheet.getHeaderRows === 'function' && typeof sheet.setIconCheck === 'function') {
+                            const headers = (sheet.getHeaderRows as () => unknown[])() || []
+                            if (Array.isArray(headers) && headers.length > 0) {
+                                ;(sheet.setIconCheck as (row: unknown, col: string, val: number) => void)(headers[0], 'CheckData', 1)
+                            }
+                        }
+                    } catch {
+                        // ignore
+                    }
+                    checkedCount = readChecked()
+                }
+
+                return {
+                    ok: checkedCount > 0,
+                    rowCount: rows.length,
+                    checkedCount,
+                    reason: checkedCount > 0 ? 'ok' : 'not-checked',
+                }
+            }) as { ok: boolean; rowCount: number; checkedCount: number; reason: string }
+            if (state.ok || state.rowCount > 0) return state
+        } catch {
+            // next context
+        }
+    }
+    return { ok: false, rowCount: 0, checkedCount: 0, reason: 'no-context' }
+}
+
+const hasOpenSavePopup = async (page: PageLike): Promise<boolean> => {
+    for (const ctx of getAllContexts(page)) {
+        const open = await ctx.evaluate(() => {
             const isVisible = (sel: string) => {
                 const el = document.querySelector(sel) as HTMLElement | null
                 if (!el) return false
                 const style = window.getComputedStyle(el)
-                return style.display !== 'none' && style.visibility !== 'hidden'
+                const rect = el.getBoundingClientRect?.()
+                return style.display !== 'none'
+                    && style.visibility !== 'hidden'
+                    && style.opacity !== '0'
+                    && !!rect
+                    && rect.width > 0
+                    && rect.height > 0
             }
             return isVisible('#popupModal1') || isVisible('#popupModal') || isVisible('#popupModal_MultiCust')
         }).catch(() => false) as boolean
-        if (!open) return
+        if (open) return true
+    }
+    return false
+}
+
+const waitUntilSavePopupsClosed = async (page: PageLike, timeoutMs = 8000): Promise<boolean> => {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+        const open = await hasOpenSavePopup(page)
+        if (!open) return true
         await page.waitForTimeout(140)
     }
+    return false
+}
+
+const dismissSavePopups = async (page: PageLike, orderFrame: FrameLike): Promise<void> => {
+    try {
+        await clickFirstVisible(
+            page,
+            [
+                '#popupModal1 button:has-text("확인")',
+                '#popupModal1 button:has-text("예")',
+                '#popupModal button:has-text("확인")',
+                '#popupModal button:has-text("예")',
+                'button:has-text("확인")',
+                'button:has-text("예")',
+                'input[type="button"][value="확인"]',
+                'input[type="button"][value="예"]',
+                '#btn-popupModal1',
+                '#selectBtn',
+            ],
+            'Save Popup Dismiss',
+            1200
+        )
+    } catch {
+        // ignore if not present
+    }
+
+    for (const ctx of getAllContexts(page)) {
+        await ctx.evaluate(() => {
+            const win = window as unknown as Record<string, unknown>
+            const call = (name: string, ...args: unknown[]) => {
+                const fn = win[name] as ((...a: unknown[]) => void) | undefined
+                if (typeof fn !== 'function') return false
+                try {
+                    fn(...args)
+                    return true
+                } catch {
+                    return false
+                }
+            }
+            call('fn_popClose', 'N')
+            call('fn_comm_popClose')
+            call('fn_btnRcvCustMultiOk')
+        }).catch(() => undefined)
+    }
+
+    await resolveMultiCustomerPopupIfPresent(orderFrame).catch(() => false)
 }
 
 const clickCheckboxNearText = async (page: PageLike, text: string): Promise<boolean> => {
@@ -1512,6 +1762,43 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             )
         }
 
+        // Recipient mobile must stay empty (phone/name only).
+        await orderFrame.evaluate(() => {
+            const input = document.querySelector('#strRcvCustCellNo') as HTMLInputElement | null
+            if (!input) return
+            input.value = ''
+            input.dispatchEvent(new Event('input', { bubbles: true }))
+            input.dispatchEvent(new Event('change', { bubbles: true }))
+        }).catch(() => undefined)
+
+        const recipientReadyState = await orderFrame.evaluate(() => {
+            const getVal = (selector: string) => (document.querySelector(selector) as HTMLInputElement | null)?.value.trim() || ''
+            return {
+                tel: getVal('#strRcvCustTelNo'),
+                name: getVal('#strRcvCustNm'),
+                cell: getVal('#strRcvCustCellNo'),
+                zip: getVal('#strRcvZipCd'),
+                bldgCd: getVal('#strRcvBldgCd'),
+                addr1: getVal('#strRcvCustAddr1'),
+                addr2: getVal('#strRcvCustAddr2'),
+            }
+        }).catch(() => null) as {
+            tel: string
+            name: string
+            cell: string
+            zip: string
+            bldgCd: string
+            addr1: string
+            addr2: string
+        } | null
+
+        if (!recipientReadyState || !recipientReadyState.tel || !recipientReadyState.name || !recipientReadyState.zip || !recipientReadyState.bldgCd || !recipientReadyState.addr1 || !recipientReadyState.addr2) {
+            throw new LogenAutomationError(
+                'Save Precheck',
+                `Recipient data is incomplete before save: ${JSON.stringify(recipientReadyState)}`
+            )
+        }
+
         // Step 7: Save
         throwIfAbortRequested(signal, 'Save Order')
         reportStep('주문 저장')
@@ -1544,26 +1831,68 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             }
         }
 
-        await page.waitForTimeout(4000)
+        await page.waitForTimeout(1200)
 
-        // Save confirmation (dialog handler auto-accepts, check HTML buttons too)
-        try {
-            await clickFirstVisible(
-                page,
-                ['button:has-text("예")', 'button:has-text("확인")', 'input[type="button"][value="예"]'],
-                'Save Confirm',
-                3000
-            )
-        } catch { /* no dialog */ }
-
-        // If duplicate customer candidates exist, resolve popup by selecting first row
-        for (let i = 0; i < 6; i++) {
-            const resolved = await resolveMultiCustomerPopupIfPresent(orderFrame)
-            if (!resolved) break
-            await orderFrame.waitForTimeout(700)
+        // Save confirmation popup must be fully handled before moving to checkbox/print.
+        let saveSettled = false
+        for (let i = 0; i < 14; i++) {
+            await dismissSavePopups(page, orderFrame)
+            const closed = await waitUntilSavePopupsClosed(page, 1000)
+            if (closed) {
+                saveSettled = true
+                break
+            }
+            await page.waitForTimeout(220)
+        }
+        if (!saveSettled) {
+            const stillOpen = await hasOpenSavePopup(page)
+            if (stillOpen) {
+                throw new LogenAutomationError('Save Confirm', 'Save popup did not close, so print stage is blocked.')
+            }
         }
 
-        await waitUntilSavePopupsClosed(page, 8000)
+        const postSaveReadyState = await orderFrame.evaluate(() => {
+            const getVal = (selector: string) => (document.querySelector(selector) as HTMLInputElement | null)?.value.trim() || ''
+            return {
+                tel: getVal('#strRcvCustTelNo'),
+                name: getVal('#strRcvCustNm'),
+                cell: getVal('#strRcvCustCellNo'),
+                zip: getVal('#strRcvZipCd'),
+                bldgCd: getVal('#strRcvBldgCd'),
+                addr1: getVal('#strRcvCustAddr1'),
+                addr2: getVal('#strRcvCustAddr2'),
+            }
+        }).catch(() => null) as {
+            tel: string
+            name: string
+            cell: string
+            zip: string
+            bldgCd: string
+            addr1: string
+            addr2: string
+        } | null
+
+        const formStillFilled = !!postSaveReadyState?.tel
+            && !!postSaveReadyState?.name
+            && !!postSaveReadyState?.zip
+            && !!postSaveReadyState?.bldgCd
+            && !!postSaveReadyState?.addr1
+            && !!postSaveReadyState?.addr2
+        const formResetAfterSave = !!postSaveReadyState
+            && !postSaveReadyState.tel
+            && !postSaveReadyState.name
+            && !postSaveReadyState.cell
+            && !postSaveReadyState.zip
+            && !postSaveReadyState.bldgCd
+            && !postSaveReadyState.addr1
+            && !postSaveReadyState.addr2
+        if (!formStillFilled && !formResetAfterSave) {
+            throw new LogenAutomationError(
+                'Save Postcheck',
+                `Recipient data became invalid after save: ${JSON.stringify(postSaveReadyState)}`
+            )
+        }
+
         await page.waitForTimeout(250)
 
         // Step 8: 미출력 tab → checkbox → 운송장출력
@@ -1582,26 +1911,54 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             console.log('[LogenShipping] 미출력 tab already selected or not found')
         }
 
+        // Use page-native retrieval/filter path (same as 조회(F2) -> 미출력)
+        for (const ctx of getAllContexts(page)) {
+            await ctx.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const retrieve = win.fn_retrieve as ((tabName: string, btnFlag: string) => void) | undefined
+                const noPrint = win.fn_noPrint as (() => void) | undefined
+                if (typeof retrieve === 'function') {
+                    retrieve('noprint', 'btn')
+                    return
+                }
+                if (typeof noPrint === 'function') {
+                    noPrint()
+                }
+            }).catch(() => undefined)
+        }
+        await page.waitForTimeout(250)
+
+        const apiReadyState = await waitForNoPrintRowsByApi(page, 14000)
+        console.log(`[LogenShipping] Print prep(api): rows=${apiReadyState.rowCount}, checked=${apiReadyState.checkedCount}`)
+
         await waitForUnprintedGridReady(page, 12000)
         const gridReadyState = await getUnprintedGridState(page)
         console.log(`[LogenShipping] Print prep: grid rows=${gridReadyState.rowCount}, cbs=${gridReadyState.checkboxCount}`)
 
-        const utilityChecked = await clickCheckboxNearText(page, '관내우선')
-        if (utilityChecked) {
-            console.log('[LogenShipping] Print prep: checked utility checkbox near 관내우선')
-        }
+        // Do not touch utility checkbox near 관내우선; it can switch sheet context.
 
         // Check the checkbox (IBSheet-aware with CSS fallback) and verify checked rows.
         let checkedRows = 0
+        let checkedRowsByApi = 0
         for (let attempt = 0; attempt < 3; attempt++) {
+            const apiSelected = await selectNoPrintRowsByApi(page)
+            checkedRowsByApi = Math.max(checkedRowsByApi, apiSelected.checkedCount)
+            console.log(`[LogenShipping] Print prep: CheckData attempt#${attempt + 1} ok=${apiSelected.ok} checked=${apiSelected.checkedCount} reason=${apiSelected.reason}`)
+            if (apiSelected.ok) {
+                checkedRows = apiSelected.checkedCount
+                break
+            }
+
             try {
                 await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
             } catch {
                 // retry after short wait
             }
             await page.waitForTimeout(220)
+            const apiAfterDom = await waitForNoPrintRowsByApi(page, 2500)
+            checkedRowsByApi = Math.max(checkedRowsByApi, apiAfterDom.checkedCount)
             const state = await getUnprintedGridState(page)
-            checkedRows = state.checkedCount
+            checkedRows = Math.max(state.checkedCount, checkedRowsByApi)
             if (checkedRows > 0) break
             await waitForUnprintedGridReady(page, 2500)
         }

@@ -1,0 +1,17 @@
+
+> beico-app@0.1.1 logen-live
+> node scripts/logen-address-confirm-live.mjs
+
+[Live] Login...
+[Live] Move to single order page...
+[Dialog] beforeunload 
+[Live] Fill recipient phone/name (value only)...
+[Live] Address keyword + magnifier...
+[Live] Popup context: frame(default)
+[Live] Popup debug: {"popupVisible":false,"hasPopupInput":false,"hasSearchFn":false,"hasSheet":false,"popupHtml":"<div id=\"popupModal\" running=\"\" style=\"z-index: 1000;\"></div>"}
+[Live] Popup row debug: {"sheetRows":0,"domRows":0,"popupVisible":false,"popupDisplay":"none/visible"}
+[Live] Failed: Error: No rows in address popup
+    at main (file:///C:/Users/vdvin/OneDrive/%EB%B0%94%ED%83%95%20%ED%99%94%EB%A9%B4/CODE/beico-app/scripts/logen-address-confirm-live.mjs:626:13)
+[Live] Browser kept open for debugging (20 min).
+[Live] Failed: page.waitForTimeout: Target page, context or browser has been closed
+    at main (C:\Users\vdvin\OneDrive\바탕 화면\CODE\beico-app\scripts\logen-address-confirm-live.mjs:1058:16)
