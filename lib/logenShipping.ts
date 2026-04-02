@@ -98,6 +98,13 @@ const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) =>
     }
 }
 
+const formatPhone = (raw: string) => {
+    const digits = String(raw ?? '').replace(/\D/g, '')
+    if (digits.length === 11) return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`
+    if (digits.length === 10) return `${digits.slice(0, 3)}-${digits.slice(3, 6)}-${digits.slice(6)}`
+    return String(raw ?? '').trim()
+}
+
 const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
     const runtimeErrors: string[] = []
 
@@ -391,7 +398,93 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
     // Wait longer for IBSheet grid to populate after save
     await page.waitForTimeout(4000)
 
-    // Strategy 1: IBSheet JavaScript API via evaluate across all frames
+    // Pre-step: focus/click first row so print target row is selected
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const focused = await ctx.evaluate(() => {
+                const row =
+                    document.querySelector('.IBMain tbody tr')
+                    ?? document.querySelector('.IBMain table tbody tr')
+                    ?? document.querySelector('table tbody tr')
+                if (!row) return false
+                const cell = (row.querySelector('td') as HTMLElement | null) ?? (row as HTMLElement)
+                try {
+                    cell.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+                    ;(row as HTMLElement).dispatchEvent(new MouseEvent('click', { bubbles: true }))
+                } catch {
+                    // ignore
+                }
+                return true
+            })
+            if (focused) {
+                console.log('[LogenShipping] checkOrderCheckboxInIBSheet: focused first row')
+                break
+            }
+        } catch {
+            // next frame
+        }
+    }
+
+    // Strategy 1: Strict grid header row ("No." + "전체") checkbox
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const result = await ctx.evaluate(() => {
+                const headerRows = Array.from(document.querySelectorAll('tr')).filter((tr) => {
+                    const txt = (tr.textContent || '').replace(/\s+/g, ' ').trim()
+                    return txt.includes('No.') && txt.includes('전체')
+                })
+                for (const row of headerRows) {
+                    const cb = row.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+                    if (!cb) continue
+                    cb.click()
+                    return 'strict-grid-header-checkbox'
+                }
+                return null
+            })
+            if (result) {
+                console.log(`[LogenShipping] checkOrderCheckboxInIBSheet: ${result}`)
+                return
+            }
+        } catch { /* next frame */ }
+    }
+
+    // Strategy 2: Click "전체" header checkbox by DOM (preferred)
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const result = await ctx.evaluate(() => {
+                const clickIfCheckbox = (el: Element | null): boolean => {
+                    if (!el) return false
+                    if (el instanceof HTMLInputElement && el.type === 'checkbox') {
+                        if (!el.checked) {
+                            el.checked = true
+                            el.dispatchEvent(new Event('input', { bubbles: true }))
+                            el.dispatchEvent(new Event('change', { bubbles: true }))
+                        }
+                        ;(el as HTMLElement).click()
+                        return true
+                    }
+                    return false
+                }
+
+                const textNodes = Array.from(document.querySelectorAll('th, td, span, label, div, a'))
+                for (const node of textNodes) {
+                    const txt = (node.textContent || '').replace(/\s+/g, ' ').trim()
+                    if (!txt || !txt.includes('전체')) continue
+                    if (clickIfCheckbox(node.querySelector('input[type="checkbox"]'))) return 'header-checkbox-direct'
+                    if (clickIfCheckbox(node.previousElementSibling?.querySelector('input[type="checkbox"]') ?? null)) return 'header-checkbox-prev'
+                    if (clickIfCheckbox(node.nextElementSibling?.querySelector('input[type="checkbox"]') ?? null)) return 'header-checkbox-next'
+                    if (clickIfCheckbox(node.closest('tr, thead, table, .IBMain')?.querySelector('input[type="checkbox"]') ?? null)) return 'header-checkbox-near'
+                }
+                return null
+            })
+            if (result) {
+                console.log(`[LogenShipping] checkOrderCheckboxInIBSheet: ${result}`)
+                return
+            }
+        } catch { /* next frame */ }
+    }
+
+    // Strategy 3: IBSheet JavaScript API via evaluate across all frames
     for (const ctx of getAllContexts(page)) {
         try {
             const result = await ctx.evaluate(() => {
@@ -400,27 +493,18 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
                     const obj = win[key]
                     if (!obj || typeof obj !== 'object') continue
                     const sheet = obj as Record<string, unknown>
-                    // IBSheet.allCheck(1) - check all rows
                     if (typeof sheet.allCheck === 'function') {
                         try {
                             ;(sheet.allCheck as (v: number) => void)(1)
                             return `allCheck on ${key}`
                         } catch { /* next */ }
                     }
-                    // IBSheet with getRowCount + setCheckVal or setValue
                     if (typeof sheet.getRowCount === 'function') {
                         try {
                             const rowCount = (sheet.getRowCount as () => number)()
-                            if (rowCount > 0) {
-                                if (typeof sheet.setCheckVal === 'function') {
-                                    ;(sheet.setCheckVal as (r: number, v: number) => void)(0, 1)
-                                    return `setCheckVal on ${key}`
-                                }
-                                if (typeof sheet.setValue === 'function') {
-                                    const sv = sheet.setValue as (r: number, c: string, v: number) => void
-                                    try { sv(0, 'chk', 1); return `setValue(0,chk) on ${key}` } catch { /* next */ }
-                                    try { sv(1, 'chk', 1); return `setValue(1,chk) on ${key}` } catch { /* next */ }
-                                }
+                            if (rowCount > 0 && typeof sheet.setCheckVal === 'function') {
+                                ;(sheet.setCheckVal as (r: number, v: number) => void)(0, 1)
+                                return `setCheckVal on ${key}`
                             }
                         } catch { /* next */ }
                     }
@@ -434,18 +518,137 @@ const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promis
         } catch { /* next frame */ }
     }
 
-    // Strategy 2: CSS selectors (longer timeout)
-    await clickFirstVisible(
-        page,
-        [
-            'table tbody tr input[type="checkbox"]',
-            'input[type="checkbox"][name*="chk"]',
-            'input[type="checkbox"][name*="select"]',
-            'input[type="checkbox"]',
-        ],
-        step,
-        10000
-    )
+    // Strategy 4: CSS selectors (longer timeout)
+    try {
+        await clickFirstVisible(
+            page,
+            [
+                'th:has-text("전체") input[type="checkbox"]',
+                'td:has-text("전체") input[type="checkbox"]',
+                'label:has-text("전체") input[type="checkbox"]',
+                'table tbody tr input[type="checkbox"]',
+                'input[type="checkbox"][name*="chk"]',
+                'input[type="checkbox"][name*="select"]',
+                'input[type="checkbox"]',
+            ],
+            step,
+            10000
+        )
+        return
+    } catch {
+        // fallback below
+    }
+
+    // Strategy 5: Force first-row checkbox only
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const checked = await ctx.evaluate(() => {
+                const row =
+                    document.querySelector('.IBMain tbody tr')
+                    ?? document.querySelector('.IBMain table tbody tr')
+                    ?? document.querySelector('table tbody tr')
+                if (!row) return false
+                const cb = row.querySelector('input[type="checkbox"]') as HTMLInputElement | null
+                if (!cb) return false
+                if (!cb.checked) {
+                    cb.checked = true
+                    cb.dispatchEvent(new Event('input', { bubbles: true }))
+                    cb.dispatchEvent(new Event('change', { bubbles: true }))
+                }
+                cb.click()
+                return true
+            })
+            if (checked) {
+                console.log('[LogenShipping] checkOrderCheckboxInIBSheet: checked first row only')
+                return
+            }
+        } catch {
+            // next frame
+        }
+    }
+
+    throw new LogenAutomationError(step, 'Could not select/check print target row in 미출력 grid.')
+}
+
+const getUnprintedGridState = async (page: PageLike): Promise<{ rowCount: number; checkboxCount: number; checkedCount: number }> => {
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const state = await ctx.evaluate(() => {
+                const rowCount =
+                    document.querySelectorAll('.IBMain tbody tr').length
+                    || document.querySelectorAll('.IBMain table tbody tr').length
+                    || document.querySelectorAll('table tbody tr').length
+                const checkboxCount =
+                    document.querySelectorAll('.IBMain tbody tr input[type="checkbox"]').length
+                    || document.querySelectorAll('table tbody tr input[type="checkbox"]').length
+                    || document.querySelectorAll('input[type="checkbox"]').length
+                const checkedCount =
+                    document.querySelectorAll('.IBMain tbody tr input[type="checkbox"]:checked').length
+                    || document.querySelectorAll('table tbody tr input[type="checkbox"]:checked').length
+                    || 0
+                return { rowCount, checkboxCount, checkedCount }
+            }) as { rowCount: number; checkboxCount: number; checkedCount: number }
+            if (state.rowCount > 0 || state.checkboxCount > 0) return state
+        } catch {
+            // next context
+        }
+    }
+    return { rowCount: 0, checkboxCount: 0, checkedCount: 0 }
+}
+
+const waitForUnprintedGridReady = async (page: PageLike, timeoutMs = 12000): Promise<void> => {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+        const state = await getUnprintedGridState(page)
+        if (state.rowCount > 0 && state.checkboxCount > 0) return
+        await page.waitForTimeout(180)
+    }
+}
+
+const waitUntilSavePopupsClosed = async (page: PageLike, timeoutMs = 8000): Promise<void> => {
+    const started = Date.now()
+    while (Date.now() - started < timeoutMs) {
+        const open = await page.evaluate(() => {
+            const isVisible = (sel: string) => {
+                const el = document.querySelector(sel) as HTMLElement | null
+                if (!el) return false
+                const style = window.getComputedStyle(el)
+                return style.display !== 'none' && style.visibility !== 'hidden'
+            }
+            return isVisible('#popupModal1') || isVisible('#popupModal') || isVisible('#popupModal_MultiCust')
+        }).catch(() => false) as boolean
+        if (!open) return
+        await page.waitForTimeout(140)
+    }
+}
+
+const clickCheckboxNearText = async (page: PageLike, text: string): Promise<boolean> => {
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const clicked = await ctx.evaluate((targetText: unknown) => {
+                const t = String(targetText ?? '')
+                const nodes = Array.from(document.querySelectorAll('label, span, th, td, div, a'))
+                for (const node of nodes) {
+                    const txt = (node.textContent || '').replace(/\s+/g, ' ').trim()
+                    if (!txt || !txt.includes(t)) continue
+                    const cb =
+                        (node.querySelector('input[type="checkbox"]') as HTMLInputElement | null)
+                        ?? (node.previousElementSibling?.querySelector('input[type="checkbox"]') as HTMLInputElement | null)
+                        ?? (node.nextElementSibling?.querySelector('input[type="checkbox"]') as HTMLInputElement | null)
+                        ?? (node.closest('tr, div, li')?.querySelector('input[type="checkbox"]') as HTMLInputElement | null)
+                        ?? null
+                    if (!cb) continue
+                    cb.click()
+                    return true
+                }
+                return false
+            }, text).catch(() => false) as boolean
+            if (clicked) return true
+        } catch {
+            // next context
+        }
+    }
+    return false
 }
 
 /** Safe wait - use domcontentloaded instead of networkidle to avoid timeout on sites with persistent connections */
@@ -455,6 +658,40 @@ const safeWaitForLoad = async (ctx: FrameLike, timeoutMs = 10000) => {
     } catch {
         // Ignore load state timeout - page may already be loaded
     }
+}
+
+/** Auto-handle 다수고객관리 popup when duplicate recipients exist */
+const resolveMultiCustomerPopupIfPresent = async (ctx: FrameLike): Promise<boolean> => {
+    return await ctx.evaluate(() => {
+        const popup = document.querySelector('#popupModal_MultiCust') as HTMLElement | null
+        if (!popup) return false
+
+        const style = window.getComputedStyle(popup)
+        const visible = style.display !== 'none' && style.visibility !== 'hidden'
+        if (!visible) return false
+
+        // Select first row in popup grid
+        const firstRowCell =
+            (document.querySelector('#popupModal_MultiCust table tbody tr td') as HTMLElement | null)
+            ?? (document.querySelector('#popupModal_MultiCust .IBMain td') as HTMLElement | null)
+        if (firstRowCell) {
+            firstRowCell.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+            firstRowCell.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+        }
+
+        // Prefer explicit "선택" button in this popup
+        const selectBtn =
+            (document.querySelector('#selectBtn') as HTMLElement | null)
+            ?? Array.from(document.querySelectorAll('#popupModal_MultiCust button, #popupModal_MultiCust a'))
+                .find(el => (el.textContent || '').replace(/\s+/g, '').includes('선택')) as HTMLElement | undefined
+
+        if (selectBtn) {
+            selectBtn.click()
+            return true
+        }
+
+        return false
+    }).catch(() => false) as boolean
 }
 
 export async function submitLogenShipping(params: LogenShippingInput): Promise<LogenShippingResult> {
@@ -471,6 +708,9 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         signal,
         onStep,
     } = params
+
+    const recipientPhoneFormatted = formatPhone(recipientPhone)
+    const recipientNameFinal = String(recipientName ?? '').trim() || '엑스트래커'
 
     const reportStep = (step: string) => {
         if (onStep) onStep(step)
@@ -546,15 +786,19 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             'Login - Submit'
         )
 
-        await page.waitForTimeout(3000)
+        await page.waitForTimeout(1200)
         await safeWaitForLoad(page)
 
         // Step 3: Close any popup/modal that might appear after login (유통판매채널 등)
         throwIfAbortRequested(signal, 'Close Popup')
         reportStep('팝업 닫기')
 
-        for (let attempt = 0; attempt < 3; attempt++) {
+        for (let attempt = 0; attempt < 8; attempt++) {
             const closeSelectors = [
+                '#btn-popupModal1',
+                '#popupModal1 button.btn.base.close',
+                '#popupModal1 button.btn.outline.close',
+                '[onclick^="fn_popClose"]',
                 'button:has-text("닫기")',
                 'input[type="button"][value="닫기"]',
                 'a:has-text("닫기")',
@@ -567,8 +811,8 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                     const btn = page.locator(selector).first()
                     const visible = await btn.isVisible().catch(() => false)
                     if (visible) {
-                        await btn.click({ timeout: 3000 })
-                        await page.waitForTimeout(800)
+                        await btn.click({ timeout: 1500, force: true })
+                        await page.waitForTimeout(120)
                     }
                 } catch {
                     // Popup button not found, continue
@@ -581,15 +825,22 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                         const btn = frame.locator(selector).first()
                         const visible = await btn.isVisible().catch(() => false)
                         if (visible) {
-                            await btn.click({ timeout: 3000 })
-                            await page.waitForTimeout(500)
+                            await btn.click({ timeout: 1500, force: true })
+                            await page.waitForTimeout(120)
                         }
                     } catch {
                         // continue
                     }
                 }
             }
-            await page.waitForTimeout(500)
+            await page.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const fn = win.fn_popClose as ((mode?: string) => void) | undefined
+                if (typeof fn === 'function') {
+                    fn('N')
+                }
+            }).catch(() => undefined)
+            await page.waitForTimeout(120)
         }
 
         // Step 4: Navigate to 예약관리 > 주문등록/출력(단건)
@@ -632,233 +883,634 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         const frameCount = page.frames().length
         reportStep(`폼 분석 완료 (${frameCount}개 프레임)`)
 
+        const orderFrame =
+            page.frames().find(f => f.url().includes('/lrm01f-reserve/lrm01f0050.html'))
+            ?? page.frames().find(f => f.url().includes('/lrm01f0050.html'))
+
+        if (!orderFrame) {
+            throw new LogenAutomationError('Navigate - Order Form', 'Order frame (lrm01f0050) not found')
+        }
+
+        // Block auto multi-customer popup while filling recipient fields.
+        // LOGEN can trigger this popup from name/phone change handlers (SelectCustInfo chain).
+        await orderFrame.evaluate(() => {
+            const win = window as unknown as Record<string, unknown>
+            const noOp = () => undefined
+
+            win.SelectCustInfo = noOp
+            win.fn_MultCustSearch = noOp
+            win.fn_lcm_MultiCustPopup = noOp
+            win.fn_getMultiCustList = noOp
+            win.fn_custInfoByRcvCustNm = noOp
+            win.fn_btnRcvCustName_Click = noOp
+            win.fn_custInfoByRcvTelNo = noOp
+            win.fn_btnRcvCustTelNo_Click = noOp
+
+            const removeInlineHandlers = (selector: string) => {
+                const el = document.querySelector(selector) as HTMLInputElement | null
+                if (!el) return
+                el.onblur = null
+                el.onchange = null
+                el.onkeyup = null
+                el.removeAttribute('onblur')
+                el.removeAttribute('onchange')
+                el.removeAttribute('onkeyup')
+            }
+
+            removeInlineHandlers('#strRcvCustNm')
+            removeInlineHandlers('#strRcvCustTelNo')
+            removeInlineHandlers('#strRcvCustCellNo')
+        }).catch(() => undefined)
+
         // Step 5: Fill recipient info
         throwIfAbortRequested(signal, 'Fill Recipient Info')
         reportStep('수하인(받으시는 분) 정보 입력')
 
-        // Recipient fields on this page are stable IDs. Fill them directly first.
-        // This prevents accidental input into sender fields by broad label matching.
-        try {
-            await fillFirstVisible(
-                page,
-                [
-                    '#strRcvCustTelNo',
-                    'input[name="strRcvCustTelNo"]',
-                ],
-                recipientPhone,
-                'Recipient Phone (Primary)',
-                12000
-            )
+        // IMPORTANT: For recipient phone/name, only set input values.
+        // Do not click any magnifier/search buttons in this step.
+        const recipientInputsApplied = await orderFrame.evaluate((args: unknown) => {
+            const [phone, name] = args as [string, string]
 
-            await fillFirstVisible(
-                page,
-                [
-                    '#strRcvCustCellNo',
-                    'input[name="strRcvCustCellNo"]',
-                ],
-                recipientPhone,
-                'Recipient Phone (Mobile)',
-                12000
-            )
+            const setInputValue = (selector: string, value: string) => {
+                const input = document.querySelector(selector) as HTMLInputElement | null
+                if (!input) return false
+                input.value = value
+                // Keep this as a plain assignment only.
+                // LOGEN binds multi-customer lookup to input/blur/change handlers.
+                return true
+            }
 
-            await fillFirstVisible(
-                page,
-                [
-                    '#strRcvCustNm',
-                    'input[name="strRcvCustNm"]',
-                ],
-                recipientName,
-                'Recipient Name',
-                12000
-            )
-        } catch {
-            // Fallback for potential screen variants
-            await fillFirstVisible(
-                page,
-                [
-                    'input[name*="rcvTelNo"]',
-                    'input[name*="rcv_tel"]',
-                    'input[name*="rcvHpNo"]',
-                    'input[name*="rcv_hp"]',
-                    'input[name*="recv"][name*="tel"]',
-                    'input[name*="rec"][name*="tel"]',
-                    'input[name*="r_tel"]',
-                    'input[name*="telNo"]',
-                    'input[name*="hpNo"]',
-                    'input[name*="phone"]',
-                    'input[name*="hp1"]',
-                ],
-                recipientPhone,
-                'Recipient Phone',
-                DEFAULT_TIMEOUT_MS
-            )
+            const telOk = setInputValue('#strRcvCustTelNo', phone)
+            const nameOk = setInputValue('#strRcvCustNm', name)
+            return telOk && nameOk
+        }, [recipientPhoneFormatted, recipientNameFinal]).catch(() => false)
 
-            await fillFirstVisible(
-                page,
-                [
-                    'input[name*="rcvNm"]',
-                    'input[name*="rcv_nm"]',
-                    'input[name*="rcvName"]',
-                    'input[name*="recv"][name*="nm"]',
-                    'input[name*="rec"][name*="nm"]',
-                    'input[name*="rcvr"]',
-                    'input[name*="custNm"]',
-                ],
-                recipientName,
-                'Recipient Name',
-                DEFAULT_TIMEOUT_MS
+        if (!recipientInputsApplied) {
+            throw new LogenAutomationError(
+                'Fill Recipient Info',
+                'Could not set recipient phone/name fields directly (#strRcvCustTelNo, #strRcvCustNm)'
             )
         }
 
-        // Step 6: Address search
-        // IMPORTANT: Do NOT use labelFallbacks here - it causes the sidebar "주소검색변환서비스"
-        // menu link to be clicked (it contains "주소검색" text), which navigates away from the
-        // order form (lrm01f0050.html) and breaks all subsequent steps.
+        // Step 6: Address flow
+        // User-required sequence:
+        // 1) fill address keyword in recipient address search input (under recipient phone),
+        // 2) click magnifier button on the right,
+        // 3) double-click postal-code row in popup,
+        // 4) fill detail address,
+        // 5) click confirm button.
         throwIfAbortRequested(signal, 'Address Search')
-        reportStep('주소 검색')
+        reportStep('주소 검색/선택 및 상세주소 입력')
 
-        // Set up popup listener BEFORE clicking - logen address search opens in a new popup window
-        const addrPopupPromise = page.waitForEvent('popup', { timeout: 8000 }).catch(() => null) as Promise<PageLike | null>
-
-        // Click address search button using CSS selectors ONLY (no labelFallbacks)
-        await clickFirstVisible(
-            page,
-            [
-                'img[src*="search"]',
-                'img[src*="btn_search"]',
-                'img[src*="ico_search"]',
-                'img[src*="magnif"]',
-                'img[src*="zoom"]',
-                'button[onclick*="addr"]',
-                'a[onclick*="addr"]',
-                'button[onclick*="zip"]',
-                'a[onclick*="zip"]',
-                'a[onclick*="post"]',
-                'a[onclick*="juso"]',
-                'a[onclick*="Addr"]',
-                'a[onclick*="Zip"]',
-                'a[onclick*="Post"]',
-                'img[alt*="검색"]',
-                'img[alt*="주소"]',
-                'img[alt*="돋보기"]',
-                'input[type="image"]',
-            ],
-            'Address Search - Open Dialog',
-            DEFAULT_TIMEOUT_MS
-            // NO labelFallbacks - prevents clicking sidebar "주소검색변환서비스" menu
-        )
-
-        await page.waitForTimeout(2000)
-        const addrPopup = await addrPopupPromise
-
-        // Use popup window if it opened, otherwise fall back to searching all frames
-        const addrCtx = (addrPopup ?? page) as PageLike
-
-        if (addrPopup) {
-            console.log('[LogenShipping] Address search popup window detected')
-            addrPopup.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
-            await safeWaitForLoad(addrPopup as unknown as FrameLike)
-            await addrPopup.waitForTimeout(1000)
-        }
-
-        // Fill address keyword
-        await fillFirstVisible(
-            addrCtx,
-            [
-                'input[name="keyword"]',
-                'input[name="searchAddr"]',
-                'input[name="newAddr"]',
-                'input[placeholder*="주소"]',
-                'input[placeholder*="도로명"]',
-                '#keyword',
-                '#schAddr',
-            ],
-            recipientAddress,
-            'Address Search - Fill Address',
-            15000,
-            addrPopup ? undefined : ['주소', '도로명', '검색어']
-        )
-
-        // Click search button
-        await clickFirstVisible(
-            addrCtx,
-            [
-                'button:has-text("검색")',
-                'input[type="button"][value="검색"]',
-                'a:has-text("검색")',
-                '#searchBtn',
-                'button[onclick*="fn_search"]',
-                'button[onclick*="search"]',
-            ],
-            'Address Search - Click Search'
-        )
-
-        await addrCtx.waitForTimeout(3000)
-
-        // Double-click first search result
-        const resultSelectors = [
-            'table tbody tr:first-child td',
-            'table tbody tr td',
-        ]
-        let resultClicked = false
-        const addrContexts = addrPopup
-            ? [addrPopup as unknown as FrameLike]
-            : getAllContexts(page)
-        for (const ctx of addrContexts) {
-            for (const selector of resultSelectors) {
-                try {
-                    const row = ctx.locator(selector).first()
-                    const visible = await row.isVisible().catch(() => false)
-                    if (visible) {
-                        await row.dblclick({ timeout: 5000 })
-                        resultClicked = true
-                        break
-                    }
-                } catch { /* next */ }
-            }
-            if (resultClicked) break
-        }
-        if (!resultClicked) {
-            console.log('[LogenShipping] Could not double-click search result')
-        }
-
-        // Wait for popup to close and address to be filled back into the order form
-        await page.waitForTimeout(3000)
-
-        // Fill detail address (back in the main page/order form)
-        if (recipientDetailAddress) {
-            try {
-                await fillFirstVisible(
-                    page,
-                    [
-                        'input[name*="detail"]',
-                        'input[name*="addr2"]',
-                        'input[placeholder*="상세"]',
-                        'input[placeholder*="나머지"]',
-                        '#detailAddr',
-                    ],
-                    recipientDetailAddress,
-                    'Detail Address',
-                    8000
-                )
-            } catch {
-                console.log('[LogenShipping] Detail address input not found')
-            }
-        }
-
-        // Close address popup if still open (some implementations require manual close)
+        // 6-1) Fill keyword in recipient address input (same row as magnifier)
         try {
-            await clickFirstVisible(
-                page,
-                ['button:has-text("확인")', 'input[type="button"][value="확인"]', 'a:has-text("확인")'],
-                'Address Confirm',
-                5000
-            )
+            const addrKeywordInput = orderFrame.locator('#strRcvZipCd').first()
+            await addrKeywordInput.waitFor({ state: 'visible', timeout: 12000 })
+            await addrKeywordInput.fill(recipientAddress)
         } catch {
-            console.log('[LogenShipping] Address confirm auto-closed or not needed')
+            const filled = await orderFrame.evaluate((keyword: unknown) => {
+                const input = document.querySelector('#strRcvZipCd') as HTMLInputElement | null
+                if (!input) return false
+                input.value = String(keyword ?? '')
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+                input.dispatchEvent(new Event('change', { bubbles: true }))
+                return true
+            }, recipientAddress).catch(() => false)
+            if (!filled) {
+                throw new LogenAutomationError('Address Search - Input', 'Could not fill recipient address search input')
+            }
         }
 
-        await page.waitForTimeout(2000)
+        // 6-2) Click recipient-address magnifier button (right side of address input)
+        let magnifierClicked = false
+        const magnifierSelectors = [
+            '#btnRcvZipCd',
+            '#rcvForm .mZip #btnRcvZipCd',
+            '#rcvForm .mZip span.form-btn[onclick*="fn_popRcvAddrSearch"]',
+            '.mZip span.form-btn[onclick*="fn_popRcvAddrSearch"]',
+            '.mZip span.form-btn',
+            '.mZip .las.la-search',
+        ]
+        for (const selector of magnifierSelectors) {
+            try {
+                const btn = orderFrame.locator(selector).first()
+                await btn.waitFor({ state: 'visible', timeout: 1800 })
+                const disabled = await btn.isDisabled().catch(() => false)
+                if (disabled) continue
+                await btn.click({ timeout: 3000, force: true })
+                magnifierClicked = true
+                break
+            } catch {
+                // Try next selector
+            }
+        }
+        if (!magnifierClicked) {
+            // Strict fallback: click only the magnifier inside the same container as #strRcvZipCd
+            magnifierClicked = await orderFrame.evaluate(() => {
+                const zipInput = document.querySelector('#strRcvZipCd') as HTMLInputElement | null
+                if (!zipInput) return false
+                const container = zipInput.closest('.mZip, .form-conts, .w-line, .relative') ?? zipInput.parentElement
+                if (!container) return false
+                const clickTarget =
+                    (container.querySelector('#btnRcvZipCd') as HTMLElement | null)
+                    ?? (container.querySelector('span.form-btn[onclick*="fn_popRcvAddrSearch"]') as HTMLElement | null)
+                    ?? (container.querySelector('span.form-btn') as HTMLElement | null)
+                    ?? (container.querySelector('.las.la-search') as HTMLElement | null)
+                    ?? null
+
+                if (clickTarget) {
+                    clickTarget.click()
+                    return true
+                }
+
+                const win = window as unknown as Record<string, unknown>
+                const fn = win.fn_popRcvAddrSearch as (() => void) | undefined
+                if (typeof fn === 'function') {
+                    fn()
+                    return true
+                }
+                return false
+            }).catch(() => false) as boolean
+        }
+        if (!magnifierClicked) {
+            throw new LogenAutomationError('Address Search - Magnifier', 'Could not click recipient address magnifier button (#btnRcvZipCd / fn_popRcvAddrSearch)')
+        }
+        await orderFrame.evaluate(() => {
+            const win = window as unknown as Record<string, unknown>
+            const fn = win.fn_popRcvAddrSearch as (() => void) | undefined
+            if (typeof fn === 'function') {
+                fn()
+            }
+        }).catch(() => undefined)
+
+        // 6-3) Popup search
+        await orderFrame.waitForTimeout(1200)
+        let popupInOrderFrame = false
+        let popupInPage = false
+        for (let i = 0; i < 12; i++) {
+            popupInOrderFrame = await orderFrame.locator('#popupModal').first().isVisible().catch(() => false) as boolean
+            popupInPage = popupInOrderFrame ? false : await page.locator('#popupModal').first().isVisible().catch(() => false) as boolean
+            if (popupInOrderFrame || popupInPage) break
+            await orderFrame.waitForTimeout(250)
+        }
+        const popupCtx: FrameLike = popupInOrderFrame ? orderFrame : (popupInPage ? page : orderFrame)
+
+        const keywordCandidates = Array.from(
+            new Set([
+                recipientAddress,
+                recipientAddress.split(/\s+/).slice(0, 3).join(' '),
+                recipientAddress.split(/\s+/).slice(0, 2).join(' '),
+                recipientAddress.split(/\s+/).slice(0, 1).join(' '),
+            ].filter(Boolean))
+        )
+
+        const readPopupRowCount = async () => {
+            return await popupCtx.evaluate(() => {
+                const sheetRows = (() => {
+                    const sheet = (window as unknown as Record<string, unknown>).popGridSheet as Record<string, unknown> | undefined
+                    if (!sheet || typeof sheet.getDataRows !== 'function') return 0
+                    const rows = (sheet.getDataRows as () => unknown[])()
+                    return Array.isArray(rows) ? rows.length : 0
+                })()
+                const domRows = document.querySelectorAll('#popupModal .IBMain tbody tr, #popupModal table tbody tr').length
+                return Math.max(sheetRows, domRows)
+            }).catch(() => 0) as number
+        }
+
+        let popupRowCount = 0
+        const popupVisible = await popupCtx.locator('#popupModal').first().isVisible().catch(() => false)
+        const popupKeywordInput = popupCtx.locator('#commPopSchVal1').first()
+        const popupKeywordVisible = await popupKeywordInput.isVisible().catch(() => false)
+
+        if (popupVisible && popupKeywordVisible) {
+            for (const keyword of keywordCandidates) {
+                await popupKeywordInput.fill(keyword).catch(() => undefined)
+
+                let popupSearchClicked = false
+                const popupSearchSelectors = [
+                    '#popupModal button[onclick*="fn_comm_getDataList"]',
+                    '#popupModal span.form-btn[onclick*="fn_comm_getDataList"]',
+                    '#popupModal .form-btn[onclick*="fn_comm_getDataList"]',
+                    '#popupModal button:has-text("검색")',
+                    '#popupModal .btn.base:has-text("검색")',
+                    '#popupModal input[type="button"][value="검색"]',
+                ]
+                for (const selector of popupSearchSelectors) {
+                    try {
+                        const searchBtn = popupCtx.locator(selector).first()
+                        await searchBtn.waitFor({ state: 'visible', timeout: 1000 })
+                        await searchBtn.click({ timeout: 2500, force: true })
+                        popupSearchClicked = true
+                        break
+                    } catch {
+                        // Try next selector
+                    }
+                }
+
+                if (!popupSearchClicked) {
+                    await popupCtx.evaluate(() => {
+                        const fn = (window as unknown as Record<string, unknown>).fn_comm_getDataList
+                        if (typeof fn === 'function') {
+                            ;(fn as (mode?: string) => void)('fst')
+                        }
+                    }).catch(() => undefined)
+                }
+
+                for (let i = 0; i < 15; i++) {
+                    popupRowCount = await readPopupRowCount()
+                    if (popupRowCount > 0) break
+                    await orderFrame.waitForTimeout(250)
+                }
+                if (popupRowCount > 0) break
+            }
+        } else {
+            for (let i = 0; i < 20; i++) {
+                popupRowCount = await readPopupRowCount()
+                if (popupRowCount > 0) break
+                await orderFrame.waitForTimeout(250)
+            }
+        }
+
+        if (popupRowCount === 0) {
+            throw new LogenAutomationError('Address Search - Result', 'No address rows found in popup')
+        }
+
+        // 6-5) Double-click postal-code row
+        const firstPostalCode = await popupCtx.evaluate(() => {
+            const sheet = (window as unknown as Record<string, unknown>).popGridSheet as Record<string, unknown> | undefined
+            if (!sheet || typeof sheet.getDataRows !== 'function') return ''
+            const rows = (sheet.getDataRows as () => Array<Record<string, unknown>>)()
+            if (!Array.isArray(rows) || rows.length === 0) return ''
+            return String(rows[0].bsiZonNo ?? '')
+        }).catch(() => '') as string
+
+        let rowDblClicked = false
+        const safePostalCode = firstPostalCode.replace(/"/g, '\\"')
+        const popupRowSelectors = safePostalCode
+            ? [
+                `#popupModal td:has-text("${safePostalCode}")`,
+                '#popupModal .IBMain td',
+                '#popupModal table tbody tr td',
+            ]
+            : [
+                '#popupModal .IBMain td',
+                '#popupModal table tbody tr td',
+            ]
+
+        for (const selector of popupRowSelectors) {
+            try {
+                const row = popupCtx.locator(selector).first()
+                await row.waitFor({ state: 'visible', timeout: 1800 })
+                await row.dblclick({ timeout: 3500, force: true })
+                rowDblClicked = true
+                break
+            } catch {
+                // Try next selector
+            }
+        }
+
+        if (!rowDblClicked) {
+            rowDblClicked = await popupCtx.evaluate(() => {
+                const rows = Array.from(document.querySelectorAll('#popupModal .IBMain tr, #popupModal table tbody tr'))
+                for (const tr of rows) {
+                    const text = (tr.textContent || '').replace(/\s+/g, ' ').trim()
+                    if (!text) continue
+                    tr.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+                    tr.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }))
+                    return true
+                }
+                return false
+            }).catch(() => false) as boolean
+        }
+
+        await orderFrame.waitForTimeout(1300)
+
+        // Some IBSheet states only highlight the row and do not fire the double-click return callback.
+        // In that case, invoke popup return explicitly with the first row.
+        const returnInvoked = await popupCtx.evaluate(() => {
+            const win = window as unknown as Record<string, unknown>
+            const sheet = win.popGridSheet as Record<string, unknown> | undefined
+            if (!sheet || typeof sheet.getDataRows !== 'function') return false
+            const rows = (sheet.getDataRows as () => Array<Record<string, unknown>>)()
+            if (!Array.isArray(rows) || rows.length === 0) return false
+            const popReturn = win.fn_comm_popReturn as ((row: Record<string, unknown>) => void) | undefined
+            if (typeof popReturn !== 'function') return false
+            popReturn(rows[0])
+            return true
+        }).catch(() => false) as boolean
+
+        if (returnInvoked) {
+            await orderFrame.waitForTimeout(500)
+        }
+
+        // If double-click did not populate address fields, force-apply first popup row as fallback.
+        const addressFilledByDblClick = await orderFrame.evaluate(() => {
+            const bldgCd = (document.querySelector('#strRcvBldgCd') as HTMLInputElement | null)?.value || ''
+            const addr1 = (document.querySelector('#strRcvCustAddr1') as HTMLInputElement | null)?.value || ''
+            return !!bldgCd && !!addr1
+        }).catch(() => false)
+
+        if (!addressFilledByDblClick) {
+            const firstPopupRow = await popupCtx.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const sheet = win.popGridSheet as Record<string, unknown> | undefined
+                if (!sheet || typeof sheet.getDataRows !== 'function') return null
+                const rows = (sheet.getDataRows as () => Array<Record<string, unknown>>)()
+                if (!Array.isArray(rows) || rows.length === 0) return null
+                const raw = rows[0]
+                return {
+                    bsiZonNo: String(raw.bsiZonNo ?? ''),
+                    bldgCd: String(raw.bldgCd ?? ''),
+                    sidoNam: String(raw.sidoNam ?? ''),
+                    sigunguNam: String(raw.sigunguNam ?? ''),
+                    dongRiNam: String(raw.dongRiNam ?? ''),
+                    bunjiHo: String(raw.bunjiHo ?? ''),
+                    roadNam: String(raw.roadNam ?? ''),
+                    strcNum: String(raw.strcNum ?? ''),
+                    branCd: String(raw.branCd ?? ''),
+                    branNm: String(raw.branNm ?? ''),
+                }
+            }).catch(() => null) as Record<string, string> | null
+
+            const forcedApplied = await orderFrame.evaluate((raw: unknown) => {
+                const row = raw as Record<string, string> | null
+                if (!row) return false
+                const win = window as unknown as Record<string, unknown>
+                const setValue = (selector: string, value: string) => {
+                    const input = document.querySelector(selector) as HTMLInputElement | null
+                    if (!input) return
+                    input.value = value
+                    input.dispatchEvent(new Event('input', { bubbles: true }))
+                    input.dispatchEvent(new Event('change', { bubbles: true }))
+                }
+
+                const makeAddr = win.makeAddr as
+                    | ((a1: string, a2: string, a3: string, a4: string, a5: string, n3: string, n4: string) => string)
+                    | undefined
+
+                const addr1 = typeof makeAddr === 'function'
+                    ? makeAddr(
+                        String(row.sidoNam ?? ''),
+                        String(row.sigunguNam ?? ''),
+                        String(row.dongRiNam ?? ''),
+                        String(row.bunjiHo ?? ''),
+                        '',
+                        String(row.roadNam ?? ''),
+                        String(row.strcNum ?? ''),
+                    )
+                    : [row.sidoNam, row.sigunguNam, row.roadNam, row.strcNum]
+                        .map(v => String(v ?? '').trim())
+                        .filter(Boolean)
+                        .join(' ')
+
+                setValue('#strRcvZipCd', String(row.bsiZonNo ?? ''))
+                setValue('#strRcvBldgCd', String(row.bldgCd ?? ''))
+                setValue('#strRcvCustAddr1', addr1)
+                setValue('#strDlvBranCd', String(row.branCd ?? ''))
+                setValue('#strDlvBranNm', String(row.branNm ?? ''))
+                return true
+            }, firstPopupRow).catch(() => false)
+
+            if (!forcedApplied) {
+                throw new LogenAutomationError('Address Search - Select Row', 'Could not apply popup address row')
+            }
+        }
+
+        // 6-6) Fill detail address and confirm.
+        // If popup detail field exists, fill/confirm in popup first; otherwise fill parent detail field directly.
+        const popupDetailVisible = await popupCtx.locator('#commAddr2').first().isVisible().catch(() => false) as boolean
+        if (popupDetailVisible) {
+            if (recipientDetailAddress) {
+                await popupCtx.locator('#commAddr2').first().fill(recipientDetailAddress).catch(async () => {
+                    await popupCtx.evaluate((detail: unknown) => {
+                        const input = document.querySelector('#commAddr2') as HTMLInputElement | null
+                        if (!input) return
+                        input.value = String(detail ?? '')
+                        input.dispatchEvent(new Event('input', { bubbles: true }))
+                        input.dispatchEvent(new Event('change', { bubbles: true }))
+                    }, recipientDetailAddress).catch(() => undefined)
+                })
+            }
+
+            // Ensure popup return payload exists. In some IBSheet states, detail page opens without hddAddrObj.
+            await popupCtx.evaluate(() => {
+                const getTextLines = (cell: Element | null) => (cell?.textContent || '').split(/\n+/).map(s => s.trim()).filter(Boolean)
+                const firstRow = document.querySelector('#popupModal .IBMain tbody tr, #popupModal table tbody tr')
+                const cells = firstRow ? Array.from(firstRow.querySelectorAll('td')) : []
+                const line = (idx: number, n = 0) => {
+                    const lines = getTextLines(cells[idx] ?? null)
+                    return lines[n] || ''
+                }
+                const fromDom = cells.length >= 5
+                    ? {
+                        bsiZonNo: line(0, 0),
+                        sidoNam: line(1, 0),
+                        sigunguNam: line(2, 0),
+                        roadNam: line(3, 0),
+                        dongRiNam: line(3, 1),
+                        strcNum: line(4, 0),
+                        bunjiHo: line(4, 1),
+                        bldgNm: line(5, 0),
+                        branNm: line(7, 0),
+                    }
+                    : null
+
+                const sheetRows = ((window as unknown as Record<string, unknown>).popGridSheet as { getDataRows?: () => unknown[] } | undefined)?.getDataRows?.() || []
+                const fromSheet = Array.isArray(sheetRows) && sheetRows.length > 0 ? sheetRows[0] as Record<string, unknown> : null
+                const raw = fromSheet ?? fromDom
+                if (!raw) return
+
+                const win = window as unknown as Record<string, unknown>
+                const makeAddr = win.makeAddr as
+                    | ((a1: string, a2: string, a3: string, a4: string, a5: string, n3: string, n4: string) => string)
+                    | undefined
+                const addr1 = typeof makeAddr === 'function'
+                    ? makeAddr(
+                        String(raw.sidoNam ?? ''),
+                        String(raw.sigunguNam ?? ''),
+                        String(raw.dongRiNam ?? ''),
+                        String(raw.bunjiHo ?? ''),
+                        '',
+                        String(raw.roadNam ?? ''),
+                        String(raw.strcNum ?? ''),
+                    )
+                    : [raw.sidoNam, raw.sigunguNam, raw.roadNam, raw.strcNum]
+                        .map(v => String(v ?? '').trim())
+                        .filter(Boolean)
+                        .join(' ')
+
+                const hddAddrObj = document.querySelector('#hddAddrObj') as HTMLInputElement | null
+                if (hddAddrObj && !hddAddrObj.value) {
+                    hddAddrObj.value = JSON.stringify(raw)
+                }
+                const hddAddr1 = document.querySelector('#hddAddr1') as HTMLInputElement | null
+                if (hddAddr1 && !hddAddr1.value) {
+                    hddAddr1.value = addr1
+                }
+            }).catch(() => undefined)
+
+            let popupConfirmed = false
+            const popupConfirmSelectors = [
+                '#btnCommAddrConfim',
+                '#popupModal button[onclick*="fn_comm_addr_return"]',
+                '#popupModal .btn.base.w100.mt-3',
+                '#popupModal button:has-text("확인")',
+                '#popupModal input[type="button"][value="확인"]',
+            ]
+
+            // Fast path: invoke popup confirm-return function first.
+            await popupCtx.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const fn = win.fn_comm_addr_return as (() => void) | undefined
+                if (typeof fn === 'function') fn()
+            }).catch(() => undefined)
+            await orderFrame.waitForTimeout(120)
+            popupConfirmed = !(await popupCtx.locator('#popupModal').first().isVisible().catch(() => false) as boolean)
+
+            // Quick one-pass click fallback.
+            if (!popupConfirmed) {
+                for (const selector of popupConfirmSelectors) {
+                    try {
+                        const confirmBtn = popupCtx.locator(selector).first()
+                        const visible = await confirmBtn.isVisible().catch(() => false)
+                        if (!visible) continue
+                        await confirmBtn.click({ timeout: 1800, force: true })
+                        break
+                    } catch {
+                        // Try next selector
+                    }
+                }
+                await popupCtx.evaluate(() => {
+                    const win = window as unknown as Record<string, unknown>
+                    const fn = win.fn_comm_addr_return as (() => void) | undefined
+                    if (typeof fn === 'function') fn()
+                }).catch(() => undefined)
+                await orderFrame.waitForTimeout(120)
+                popupConfirmed = !(await popupCtx.locator('#popupModal').first().isVisible().catch(() => false) as boolean)
+            }
+
+            if (!popupConfirmed) {
+                const popupStillOpen = await popupCtx.locator('#popupModal').first().isVisible().catch(() => false) as boolean
+                if (popupStillOpen) {
+                    const forcedClosed = await popupCtx.evaluate((detail: unknown) => {
+                        const setValue = (selector: string, value: string) => {
+                            const input = document.querySelector(selector) as HTMLInputElement | null
+                            if (!input) return
+                            input.value = value
+                            input.dispatchEvent(new Event('input', { bubbles: true }))
+                            input.dispatchEvent(new Event('change', { bubbles: true }))
+                        }
+
+                        try {
+                            const fnAddrReturn = (window as unknown as Record<string, unknown>).fn_comm_addr_return
+                            if (typeof fnAddrReturn === 'function') {
+                                ;(fnAddrReturn as () => void)()
+                            }
+                        } catch {
+                            // ignore
+                        }
+
+                        const getTextLines = (cell: Element | null) => (cell?.textContent || '').split(/\n+/).map(s => s.trim()).filter(Boolean)
+                        const firstRow = document.querySelector('#popupModal .IBMain tbody tr, #popupModal table tbody tr')
+                        const cells = firstRow ? Array.from(firstRow.querySelectorAll('td')) : []
+                        if (cells.length >= 5) {
+                            const line = (idx: number, n = 0) => {
+                                const lines = getTextLines(cells[idx] ?? null)
+                                return lines[n] || ''
+                            }
+                            const row = {
+                                bsiZonNo: line(0, 0),
+                                sidoNam: line(1, 0),
+                                sigunguNam: line(2, 0),
+                                roadNam: line(3, 0),
+                                dongRiNam: line(3, 1),
+                                strcNum: line(4, 0),
+                                bunjiHo: line(4, 1),
+                                branNm: line(7, 0),
+                            }
+                            const win = window as unknown as Record<string, unknown>
+                            const makeAddr = win.makeAddr as
+                                | ((a1: string, a2: string, a3: string, a4: string, a5: string, n3: string, n4: string) => string)
+                                | undefined
+                            const addr1 = typeof makeAddr === 'function'
+                                ? makeAddr(row.sidoNam, row.sigunguNam, row.dongRiNam, row.bunjiHo, '', row.roadNam, row.strcNum)
+                                : [row.sidoNam, row.sigunguNam, row.roadNam, row.strcNum].filter(Boolean).join(' ')
+                            setValue('#strRcvZipCd', row.bsiZonNo)
+                            setValue('#strRcvCustAddr1', addr1)
+                            if (row.branNm) setValue('#strDlvBranNm', row.branNm)
+                        }
+
+                        if (detail) {
+                            setValue('#strRcvCustAddr2', String(detail))
+                        }
+
+                        try {
+                            const fnPopClose = (window as unknown as Record<string, unknown>).fn_comm_popClose
+                            if (typeof fnPopClose === 'function') {
+                                ;(fnPopClose as () => void)()
+                            }
+                        } catch {
+                            // ignore
+                        }
+
+                        const popup = document.querySelector('#popupModal') as HTMLElement | null
+                        if (popup) {
+                            popup.style.display = 'none'
+                            popup.style.visibility = 'hidden'
+                        }
+                        if (!popup) return true
+                        const style = window.getComputedStyle(popup)
+                        return style.display === 'none' || style.visibility === 'hidden'
+                    }, recipientDetailAddress).catch(() => false) as boolean
+
+                    if (!forcedClosed) {
+                        throw new LogenAutomationError('Address Search - Confirm', 'Detail address entered but popup confirm did not close')
+                    }
+                }
+            }
+        } else if (recipientDetailAddress) {
+            try {
+                const detailInput = orderFrame.locator('#strRcvCustAddr2').first()
+                await detailInput.waitFor({ state: 'visible', timeout: 7000 })
+                await detailInput.fill(recipientDetailAddress)
+            } catch {
+                await orderFrame.evaluate((detail: unknown) => {
+                    const input = document.querySelector('#strRcvCustAddr2') as HTMLInputElement | null
+                    if (!input) return
+                    input.value = String(detail ?? '')
+                    input.dispatchEvent(new Event('input', { bubbles: true }))
+                    input.dispatchEvent(new Event('change', { bubbles: true }))
+                }, recipientDetailAddress).catch(() => undefined)
+            }
+        }
+
+        await orderFrame.waitForTimeout(450)
+
+        const addressFinalState = await orderFrame.evaluate(() => {
+            const getVal = (selector: string) => (document.querySelector(selector) as HTMLInputElement | null)?.value || ''
+            return {
+                zip: getVal('#strRcvZipCd'),
+                bldgCd: getVal('#strRcvBldgCd'),
+                addr1: getVal('#strRcvCustAddr1'),
+                addr2: getVal('#strRcvCustAddr2'),
+                branCd: getVal('#strDlvBranCd'),
+                branNm: getVal('#strDlvBranNm'),
+            }
+        }).catch(() => null) as {
+            zip: string
+            bldgCd: string
+            addr1: string
+            addr2: string
+            branCd: string
+            branNm: string
+        } | null
+
+        if (!addressFinalState || !addressFinalState.bldgCd || !addressFinalState.addr1) {
+            throw new LogenAutomationError(
+                'Address Search - Final Check',
+                `Address was not finalized after popup confirm: ${JSON.stringify(addressFinalState)}`
+            )
+        }
 
         // Step 7: Save
         throwIfAbortRequested(signal, 'Save Order')
@@ -868,17 +1520,28 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             await clickFirstVisible(
                 page,
                 [
-                    'button:has-text("저장")',
-                    'a:has-text("저장(F5)")',
-                    'a:has-text("저장")',
-                    'input[type="button"][value*="저장"]',
+                    '.button-area button.btn.base.save[onclick*="fn_save"]',
+                    'button.btn.base.save[onclick*="fn_save"]',
+                    'button[onclick="fn_save()"]',
                 ],
                 'Save Order',
                 10000
             )
         } catch {
-            console.log('[LogenShipping] Save button not found, pressing F5')
-            await page.keyboard.press('F5')
+            console.log('[LogenShipping] Save button click failed, invoking fn_save directly')
+            const savedByFn = await page.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const fn = win.fn_save as (() => void) | undefined
+                if (typeof fn === 'function') {
+                    fn()
+                    return true
+                }
+                return false
+            }).catch(() => false)
+            if (!savedByFn) {
+                console.log('[LogenShipping] fn_save not found, pressing F5')
+                await page.keyboard.press('F5')
+            }
         }
 
         await page.waitForTimeout(4000)
@@ -893,7 +1556,15 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             )
         } catch { /* no dialog */ }
 
-        await page.waitForTimeout(2000)
+        // If duplicate customer candidates exist, resolve popup by selecting first row
+        for (let i = 0; i < 6; i++) {
+            const resolved = await resolveMultiCustomerPopupIfPresent(orderFrame)
+            if (!resolved) break
+            await orderFrame.waitForTimeout(700)
+        }
+
+        await waitUntilSavePopupsClosed(page, 8000)
+        await page.waitForTimeout(250)
 
         // Step 8: 미출력 tab → checkbox → 운송장출력
         throwIfAbortRequested(signal, 'Print Label')
@@ -906,14 +1577,38 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 '미출력 Tab',
                 10000
             )
-            await page.waitForTimeout(3000)
+            await page.waitForTimeout(300)
         } catch {
             console.log('[LogenShipping] 미출력 tab already selected or not found')
         }
 
-        // Check the checkbox (IBSheet-aware with CSS fallback)
-        await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
-        await page.waitForTimeout(500)
+        await waitForUnprintedGridReady(page, 12000)
+        const gridReadyState = await getUnprintedGridState(page)
+        console.log(`[LogenShipping] Print prep: grid rows=${gridReadyState.rowCount}, cbs=${gridReadyState.checkboxCount}`)
+
+        const utilityChecked = await clickCheckboxNearText(page, '관내우선')
+        if (utilityChecked) {
+            console.log('[LogenShipping] Print prep: checked utility checkbox near 관내우선')
+        }
+
+        // Check the checkbox (IBSheet-aware with CSS fallback) and verify checked rows.
+        let checkedRows = 0
+        for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+                await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
+            } catch {
+                // retry after short wait
+            }
+            await page.waitForTimeout(220)
+            const state = await getUnprintedGridState(page)
+            checkedRows = state.checkedCount
+            if (checkedRows > 0) break
+            await waitForUnprintedGridReady(page, 2500)
+        }
+        if (checkedRows === 0) {
+            throw new LogenAutomationError('Select Order Checkbox', '미출력 체크가 적용되지 않아 운송장출력을 진행할 수 없습니다.')
+        }
+        await page.waitForTimeout(260)
 
         // Click 운송장출력
         reportStep('운송장 출력')
