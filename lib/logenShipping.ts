@@ -1,4 +1,4 @@
-const LOGEN_LOGIN_URL = 'https://logis.ilogen.com/'
+﻿const LOGEN_LOGIN_URL = 'https://logis.ilogen.com/'
 const DEFAULT_TIMEOUT_MS = 30000
 const LONG_TIMEOUT_MS = 60000
 
@@ -636,45 +636,79 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         throwIfAbortRequested(signal, 'Fill Recipient Info')
         reportStep('수하인(받으시는 분) 정보 입력')
 
-        // Fill recipient phone - try CSS selectors first, then label-text fallback
-        await fillFirstVisible(
-            page,
-            [
-                'input[name*="rcvTelNo"]',
-                'input[name*="rcv_tel"]',
-                'input[name*="rcvHpNo"]',
-                'input[name*="rcv_hp"]',
-                'input[name*="recv"][name*="tel"]',
-                'input[name*="rec"][name*="tel"]',
-                'input[name*="r_tel"]',
-                'input[name*="telNo"]',
-                'input[name*="hpNo"]',
-                'input[name*="phone"]',
-                'input[name*="hp1"]',
-            ],
-            recipientPhone,
-            'Recipient Phone',
-            DEFAULT_TIMEOUT_MS,
-            ['전화번호', '연락처', 'HP', '휴대폰', '전화']
-        )
+        // Recipient fields on this page are stable IDs. Fill them directly first.
+        // This prevents accidental input into sender fields by broad label matching.
+        try {
+            await fillFirstVisible(
+                page,
+                [
+                    '#strRcvCustTelNo',
+                    'input[name="strRcvCustTelNo"]',
+                ],
+                recipientPhone,
+                'Recipient Phone (Primary)',
+                12000
+            )
 
-        // Fill recipient name
-        await fillFirstVisible(
-            page,
-            [
-                'input[name*="rcvNm"]',
-                'input[name*="rcv_nm"]',
-                'input[name*="rcvName"]',
-                'input[name*="recv"][name*="nm"]',
-                'input[name*="rec"][name*="nm"]',
-                'input[name*="rcvr"]',
-                'input[name*="custNm"]',
-            ],
-            recipientName,
-            'Recipient Name',
-            DEFAULT_TIMEOUT_MS,
-            ['수하인명', '수하인', '받으시는', '고객명']
-        )
+            await fillFirstVisible(
+                page,
+                [
+                    '#strRcvCustCellNo',
+                    'input[name="strRcvCustCellNo"]',
+                ],
+                recipientPhone,
+                'Recipient Phone (Mobile)',
+                12000
+            )
+
+            await fillFirstVisible(
+                page,
+                [
+                    '#strRcvCustNm',
+                    'input[name="strRcvCustNm"]',
+                ],
+                recipientName,
+                'Recipient Name',
+                12000
+            )
+        } catch {
+            // Fallback for potential screen variants
+            await fillFirstVisible(
+                page,
+                [
+                    'input[name*="rcvTelNo"]',
+                    'input[name*="rcv_tel"]',
+                    'input[name*="rcvHpNo"]',
+                    'input[name*="rcv_hp"]',
+                    'input[name*="recv"][name*="tel"]',
+                    'input[name*="rec"][name*="tel"]',
+                    'input[name*="r_tel"]',
+                    'input[name*="telNo"]',
+                    'input[name*="hpNo"]',
+                    'input[name*="phone"]',
+                    'input[name*="hp1"]',
+                ],
+                recipientPhone,
+                'Recipient Phone',
+                DEFAULT_TIMEOUT_MS
+            )
+
+            await fillFirstVisible(
+                page,
+                [
+                    'input[name*="rcvNm"]',
+                    'input[name*="rcv_nm"]',
+                    'input[name*="rcvName"]',
+                    'input[name*="recv"][name*="nm"]',
+                    'input[name*="rec"][name*="nm"]',
+                    'input[name*="rcvr"]',
+                    'input[name*="custNm"]',
+                ],
+                recipientName,
+                'Recipient Name',
+                DEFAULT_TIMEOUT_MS
+            )
+        }
 
         // Step 6: Address search
         // IMPORTANT: Do NOT use labelFallbacks here - it causes the sidebar "주소검색변환서비스"

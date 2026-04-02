@@ -589,9 +589,23 @@ export async function getWormEmailDetail(uid: string): Promise<WormEmailDetail> 
     size: att.size || (att.content?.length ?? 0),
     index: idx,
   }))
-  const skmIndices = attachments
-    .map((att) => att.filename.toUpperCase().includes('SKM') ? att.index : -1)
-    .filter((idx) => idx >= 0)
+  const isPdfAttachment = (att: WormEmailAttachment) => {
+    const fileName = att.filename.toLowerCase()
+    const contentType = att.contentType.toLowerCase()
+    return fileName.endsWith('.pdf') || contentType.includes('pdf')
+  }
+
+  const awbLikelyKeywordRegex = /(?:SKM|AWB|AIR\s*WAYBILL|WAYBILL|MAWB|HAWB|HBL|MBL|B\/L|BL|BILL\s*OF\s*LADING|DOCUM)/i
+  let skmIndices = attachments
+    .filter((att) => isPdfAttachment(att) && awbLikelyKeywordRegex.test(att.filename))
+    .map((att) => att.index)
+
+  // Fallback: if no keyword-matched file, OCR all PDF attachments.
+  if (skmIndices.length === 0) {
+    skmIndices = attachments
+      .filter((att) => isPdfAttachment(att))
+      .map((att) => att.index)
+  }
 
   return {
     uid,

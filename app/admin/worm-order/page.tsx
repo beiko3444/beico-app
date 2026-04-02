@@ -618,6 +618,23 @@ function pruneEmailDetails(
     ) as Record<string, WormEmailDetail>
 }
 
+function compactEmailDetailsForCache(
+    details: Record<string, WormEmailDetail>,
+    emails: WormEmailListItem[],
+) {
+    const pruned = pruneEmailDetails(details, emails)
+    return Object.fromEntries(
+        Object.entries(pruned).map(([uid, detail]) => [
+            uid,
+            {
+                ...detail,
+                // Keep cache payload small; detail body is fetched on demand.
+                text: '',
+            } satisfies WormEmailDetail,
+        ]),
+    ) as Record<string, WormEmailDetail>
+}
+
 function readWormEmailOfflineCache(): WormEmailOfflineCache | null {
     if (typeof window === 'undefined') return null
 
@@ -875,6 +892,12 @@ function extractAwbCandidatesFromText(ocrText: string, source: string, trustBoos
             addCandidate(`${match[1]}${match[2]}${match[3]}`, context, 270, lineIndex, `${sourceSuffix}-grouped`)
         }
 
+        // Common AWB display format: 123-12345675 (3 + 8 digits)
+        const tripleEightRegex = /(?:^|[^\d])(\d{3})[\s\-_.:/]*(\d{8})(?=[^\d]|$)/g
+        while ((match = tripleEightRegex.exec(digitFriendly)) !== null) {
+            addCandidate(`${match[1]}${match[2]}`, context, 300, lineIndex, `${sourceSuffix}-3x8`)
+        }
+
         const compactRegex = /(?:^|[^\d])(\d{11})(?=[^\d]|$)/g
         while ((match = compactRegex.exec(digitFriendly)) !== null) {
             addCandidate(match[1], context, 220, lineIndex, `${sourceSuffix}-compact`)
@@ -999,7 +1022,7 @@ export default function WormOrderPage() {
             savedAt: emailCacheSavedAt,
             hasFetched,
             emails,
-            emailDetails: pruneEmailDetails(emailDetails, emails),
+            emailDetails: compactEmailDetailsForCache(emailDetails, emails),
             selectedEmailUid: normalizedSelectedEmailUid,
         })
     }, [emailCacheSavedAt, emailDetails, emails, hasFetched, selectedEmailUid])
@@ -1312,7 +1335,10 @@ export default function WormOrderPage() {
     }, [ocrOnePdf, persistAwbCache])
 
     const fetchEmailDetail = useCallback(async (uid: string): Promise<WormEmailDetail | null> => {
-        if (emailDetails[uid]) return emailDetails[uid]
+        const cachedDetail = emailDetails[uid]
+        if (cachedDetail && cachedDetail.text.trim().length > 0) {
+            return cachedDetail
+        }
 
         setLoadingEmailDetail(true)
         try {
@@ -1544,6 +1570,8 @@ export default function WormOrderPage() {
 
     const handleSelectWormOrder = useCallback((order: WormOrderListItem) => {
         const receiveDateText = toKstDateInputString(order.receiveDate)
+        const isSameOrder = activeWormOrder?.id === order.id
+
         setActiveWormOrder({
             id: order.id,
             orderNumber: order.orderNumber,
@@ -1552,13 +1580,17 @@ export default function WormOrderPage() {
         if (receiveDateText) {
             setReceiveDate(receiveDateText)
         }
+
+        // Keep already-fetched inbox state when user re-selects the same order.
+        if (isSameOrder) return
+
         setEmails([])
         setEmailDetails({})
         setSelectedEmailUid(null)
         setHasFetched(false)
         setEmailError('')
         setEmailMatchMessage('')
-    }, [])
+    }, [activeWormOrder?.id])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
         const shouldDelete = window.confirm(`삭제할까요?\n${order.orderNumber}`)
@@ -2590,7 +2622,10 @@ export default function WormOrderPage() {
         }
 
         if (step.id === 2 && !loadingEmails) {
-            void fetchEmails()
+            const shouldFetchInbox = !hasFetched || emails.length === 0
+            if (shouldFetchInbox) {
+                void fetchEmails()
+            }
             return
         }
 
@@ -2609,6 +2644,8 @@ export default function WormOrderPage() {
         handleGenerate,
         loadingDocEmails,
         loadingEmails,
+        hasFetched,
+        emails.length,
         scrollToPipelineSection,
         selectedOrders.length,
     ])
