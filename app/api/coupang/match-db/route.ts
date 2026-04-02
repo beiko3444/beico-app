@@ -1,7 +1,11 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { requireAdminSession } from "@/lib/requireAdmin";
 
 export async function POST(request: Request) {
+    const { unauthorized } = await requireAdminSession();
+    if (unauthorized) return unauthorized;
+
     try {
         const body = await request.json();
         const { externalSkus } = body;

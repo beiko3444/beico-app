@@ -65,7 +65,7 @@ export default function AdminNav({
         async function loadFromNumber() {
             setLoadingFromNumber(true)
             try {
-                const response = await fetch('/api/admin/sms', { cache: 'no-store' })
+                const response = await fetch('/api/admin/sms?mode=sender')
                 const result: {
                     defaultFromNumber?: string
                     fromNumbers?: Array<{ number?: string }>

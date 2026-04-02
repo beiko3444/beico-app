@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { requireAdminSession } from "@/lib/requireAdmin"
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: Request) {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     try {
         const { searchParams } = new URL(request.url)
         const year = parseInt(searchParams.get('year') || '')
@@ -29,6 +33,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     try {
         const body = await request.json()
         const { year, month } = body

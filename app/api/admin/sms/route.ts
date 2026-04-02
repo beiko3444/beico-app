@@ -6,6 +6,14 @@ import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+const SENDER_INFO_CACHE_TTL_MS = 10 * 60 * 1000
+
+type SenderInfoCacheEntry = {
+  expiresAt: number
+  data: Awaited<ReturnType<typeof getBarobillSmsFromNumbers>>
+}
+
+let senderInfoCache: SenderInfoCacheEntry | null = null
 
 function normalizeDigits(value: string) {
   return value.replace(/\D/g, '')
@@ -51,6 +59,20 @@ function getDefaultHistoryRange() {
   }
 }
 
+async function getCachedSenderInfo(forceRefresh = false) {
+  const now = Date.now()
+  if (!forceRefresh && senderInfoCache && senderInfoCache.expiresAt > now) {
+    return senderInfoCache.data
+  }
+
+  const data = await getBarobillSmsFromNumbers()
+  senderInfoCache = {
+    expiresAt: now + SENDER_INFO_CACHE_TTL_MS,
+    data,
+  }
+  return data
+}
+
 export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {
@@ -59,6 +81,18 @@ export async function GET(request: Request) {
 
   try {
     const { searchParams } = new URL(request.url)
+    const mode = (searchParams.get('mode') || '').trim().toLowerCase()
+    const forceRefresh = searchParams.get('force') === '1'
+
+    if (mode === 'sender') {
+      const senderInfo = await getCachedSenderInfo(forceRefresh)
+      return NextResponse.json(senderInfo, {
+        headers: {
+          'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+        },
+      })
+    }
+
     const defaultRange = getDefaultHistoryRange()
     const fromDate = toCompactDate(searchParams.get('fromDate') || '') || defaultRange.fromDate
     const toDate = toCompactDate(searchParams.get('toDate') || '') || defaultRange.toDate
@@ -70,7 +104,7 @@ export async function GET(request: Request) {
     }
 
     const [senderInfo, history, recipients] = await Promise.all([
-      getBarobillSmsFromNumbers(),
+      getCachedSenderInfo(forceRefresh),
       getBarobillSmsSendMessagesByPaging({
         fromDate,
         toDate,

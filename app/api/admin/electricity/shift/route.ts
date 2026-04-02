@@ -1,7 +1,11 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { requireAdminSession } from '@/lib/requireAdmin'
 
 export async function GET() {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     try {
         const records = await prisma.electricityUsage.findMany()
 

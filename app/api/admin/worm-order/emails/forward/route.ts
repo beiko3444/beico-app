@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
 import { getParsedMailByUid } from '@/lib/wormOrderMail'
+import { requireAdminSession } from '@/lib/requireAdmin'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     try {
         const body = await req.json()
         const { uid, toEmail } = body

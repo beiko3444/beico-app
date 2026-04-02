@@ -1,11 +1,16 @@
 import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { HttpsProxyAgent } from "https-proxy-agent";
+import fetch from "node-fetch";
+import { requireAdminSession } from "@/lib/requireAdmin";
 
-// Using credentials from the user's provided snapshot
-const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY || "316ac83a-78d0-48e3-a8fe-41b744bd90fe";
-const SECRET_KEY = process.env.COUPANG_SECRET_KEY || "75b0b84b0b70cace39e295cdf1eaf224e524c607";
-const VENDOR_ID = process.env.COUPANG_VENDOR_ID || "A00534715";
+const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY || "";
+const SECRET_KEY = process.env.COUPANG_SECRET_KEY || "";
+const VENDOR_ID = process.env.COUPANG_VENDOR_ID || "";
+const COUPANG_CACHE_TTL_MS = 5 * 60 * 1000;
+
+let cachedInventoryResponse: { expiresAt: number; payload: unknown } | null = null;
 
 function generateHmacAuthHeader(method: string, path: string, query: string = "") {
     const now = new Date();
@@ -26,12 +31,31 @@ function generateHmacAuthHeader(method: string, path: string, query: string = ""
 
     return `CEA algorithm=HmacSHA256, access-key=${ACCESS_KEY}, signed-date=${datetime}, signature=${signature}`;
 }
-import { HttpsProxyAgent } from "https-proxy-agent";
-import fetch from "node-fetch";
 
 export async function GET(request: Request) {
+    const { unauthorized } = await requireAdminSession();
+    if (unauthorized) return unauthorized;
+
     try {
         const { searchParams } = new URL(request.url);
+        const forceRefresh = searchParams.get("force") === "1";
+        const now = Date.now();
+
+        if (!forceRefresh && cachedInventoryResponse && cachedInventoryResponse.expiresAt > now) {
+            return NextResponse.json(cachedInventoryResponse.payload, {
+                headers: {
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+                },
+            });
+        }
+
+        if (!ACCESS_KEY || !SECRET_KEY || !VENDOR_ID) {
+            return NextResponse.json(
+                { error: "COUPANG_ACCESS_KEY / COUPANG_SECRET_KEY / COUPANG_VENDOR_ID 환경변수가 필요합니다." },
+                { status: 500 },
+            );
+        }
+
         let allData: any[] = [];
         let currentNextToken: string | null = searchParams.get('nextToken');
         let pagesFetched = 0;
@@ -142,9 +166,19 @@ export async function GET(request: Request) {
             }
         });
 
-        return NextResponse.json({
+        const payload = {
             data: data.data,
             lastSyncedAt: syncHistory.createdAt
+        };
+        cachedInventoryResponse = {
+            expiresAt: now + COUPANG_CACHE_TTL_MS,
+            payload,
+        };
+
+        return NextResponse.json(payload, {
+            headers: {
+                "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+            },
         });
     } catch (error: any) {
         console.error("Failed to fetch Coupang Inventory:", error);

@@ -1,8 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdminSession } from '@/lib/requireAdmin'
 
 const DEFAULT_UNIPASS_API_KEY = 'r290g216h033p330q080i040q6'
 const UNIPASS_API_URL = 'https://unipass.customs.go.kr:38010/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo'
 const LOOKBACK_YEARS = 3
+const CUSTOMS_PROGRESS_CACHE_TTL_MS = 10 * 60 * 1000
+
+type CachedCustomsProgress = {
+    expiresAt: number
+    status: number
+    payload: unknown
+}
+
+const customsProgressCache = new Map<string, CachedCustomsProgress>()
 
 type QueryKind = 'mblNo' | 'hblNo'
 
@@ -91,9 +101,14 @@ async function requestApi001(apiKey: string, blNo: string, blYy: string, kind: Q
 }
 
 export async function GET(request: NextRequest) {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     const apiKey = process.env.UNIPASS_API_KEY || DEFAULT_UNIPASS_API_KEY
     const rawBlNo = request.nextUrl.searchParams.get('blNo') || ''
     const blNo = rawBlNo.replace(/\s+/g, '').trim()
+    const forceRefresh = request.nextUrl.searchParams.get('force') === '1'
+    const cacheKey = blNo.toUpperCase()
 
     if (!blNo) {
         return NextResponse.json({ error: 'B/L 번호를 입력해주세요.' }, { status: 400 })
@@ -101,6 +116,18 @@ export async function GET(request: NextRequest) {
 
     if (blNo.length < 6) {
         return NextResponse.json({ error: 'B/L 번호 형식이 너무 짧습니다.' }, { status: 400 })
+    }
+
+    if (!forceRefresh) {
+        const cached = customsProgressCache.get(cacheKey)
+        if (cached && cached.expiresAt > Date.now()) {
+            return NextResponse.json(cached.payload, {
+                status: cached.status,
+                headers: {
+                    'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+                },
+            })
+        }
     }
 
     const currentYear = new Date().getFullYear()
@@ -117,7 +144,7 @@ export async function GET(request: NextRequest) {
                 const hasData = parsed.tCnt > 0 || parsed.summaryRecords.length > 0 || parsed.detailRecords.length > 0
                 const looksLikeListMode = parsed.ntceInfo.startsWith('[N00]')
                 if (hasData || looksLikeListMode) {
-                    return NextResponse.json({
+                    const payload = {
                         blNo,
                         query: { kind, blYy },
                         tCnt: parsed.tCnt,
@@ -125,6 +152,17 @@ export async function GET(request: NextRequest) {
                         summaryRecords: parsed.summaryRecords,
                         detailRecords: parsed.detailRecords,
                         attempts,
+                    }
+                    customsProgressCache.set(cacheKey, {
+                        expiresAt: Date.now() + CUSTOMS_PROGRESS_CACHE_TTL_MS,
+                        status: 200,
+                        payload,
+                    })
+                    return NextResponse.json(payload, {
+                        status: 200,
+                        headers: {
+                            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+                        },
                     })
                 }
             } catch (error) {
@@ -134,12 +172,20 @@ export async function GET(request: NextRequest) {
         }
     }
 
-    return NextResponse.json(
-        {
-            error: '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
-            blNo,
-            attempts,
+    const notFoundPayload = {
+        error: '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
+        blNo,
+        attempts,
+    }
+    customsProgressCache.set(cacheKey, {
+        expiresAt: Date.now() + CUSTOMS_PROGRESS_CACHE_TTL_MS,
+        status: 404,
+        payload: notFoundPayload,
+    })
+    return NextResponse.json(notFoundPayload, {
+        status: 404,
+        headers: {
+            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
         },
-        { status: 404 },
-    )
+    })
 }

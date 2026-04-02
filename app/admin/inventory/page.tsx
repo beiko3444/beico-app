@@ -56,11 +56,12 @@ export default function InventoryPage() {
     const [smartstoreError, setSmartstoreError] = useState<string | null>(null);
     const [smartstoreSortConfig, setSmartstoreSortConfig] = useState<SortConfig>(null);
 
-    const fetchInventory = async () => {
+    const fetchInventory = async (options?: { force?: boolean }) => {
         setLoading(true);
         setError(null);
         try {
-            const res = await fetch("/api/coupang/inventory");
+            const force = options?.force === true;
+            const res = await fetch(force ? "/api/coupang/inventory?force=1" : "/api/coupang/inventory");
             if (!res.ok) {
                 const text = await res.text();
                 throw new Error(text || "리스트를 불러오는 데 실패했습니다.");
@@ -90,11 +91,12 @@ export default function InventoryPage() {
         }
     };
 
-    const fetchSmartstoreInventory = async () => {
+    const fetchSmartstoreInventory = async (options?: { force?: boolean }) => {
         setSmartstoreLoading(true);
         setSmartstoreError(null);
         try {
-            const res = await fetch("/api/naver/inventory");
+            const force = options?.force === true;
+            const res = await fetch(force ? "/api/naver/inventory?force=1" : "/api/naver/inventory");
             if (!res.ok) {
                 const text = await res.text();
                 throw new Error(text || "스마트스토어 재고를 불러오는 데 실패했습니다.");
@@ -288,7 +290,7 @@ export default function InventoryPage() {
                         쿠팡 DB 연동 새로고침
                     </button>
                     <button
-                        onClick={fetchInventory}
+                        onClick={() => fetchInventory({ force: true })}
                         disabled={loading}
                         className="flex items-center gap-2 px-4 py-2 bg-[#e34219] text-white text-sm font-bold rounded-xl hover:bg-[#c93a15] transition-all disabled:opacity-50"
                     >
@@ -296,7 +298,7 @@ export default function InventoryPage() {
                         쿠팡서버 새로고침
                     </button>
                     <button
-                        onClick={fetchSmartstoreInventory}
+                        onClick={() => fetchSmartstoreInventory({ force: true })}
                         disabled={smartstoreLoading}
                         className="flex items-center gap-2 px-4 py-2 bg-[#0f766e] text-white text-sm font-bold rounded-xl hover:bg-[#0d655e] transition-all disabled:opacity-50"
                     >

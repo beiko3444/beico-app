@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { loadWormEmailList } from '@/lib/wormOrderMail'
+import { requireAdminSession } from '@/lib/requireAdmin'
 
 export const dynamic = 'force-dynamic'
 
@@ -8,6 +9,9 @@ function isUuid(value: string) {
 }
 
 export async function GET(request: Request) {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     try {
         const { searchParams } = new URL(request.url)
         const orderIdRaw = (searchParams.get('orderId') || '').trim()
@@ -20,7 +24,14 @@ export async function GET(request: Request) {
             listLimit: 20,
             orderId,
         })
-        return NextResponse.json({ emails })
+        return NextResponse.json(
+            { emails },
+            {
+                headers: {
+                    'Cache-Control': 'private, max-age=30, stale-while-revalidate=120',
+                },
+            },
+        )
     } catch (error: unknown) {
         console.error('Daum IMAP 연동 에러:', error)
         const message = error instanceof Error ? error.message : '이메일 로딩 실패'

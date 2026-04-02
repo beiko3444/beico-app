@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { upsertWormEmailAwbCache } from '@/lib/wormOrderMail'
+import { requireAdminSession } from '@/lib/requireAdmin'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: Request) {
+  const { unauthorized } = await requireAdminSession()
+  if (unauthorized) return unauthorized
+
   try {
     const body = await request.json()
     const uid = typeof body?.uid === 'string' ? body.uid.trim() : ''

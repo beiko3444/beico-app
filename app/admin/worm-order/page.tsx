@@ -269,6 +269,7 @@ const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
     { percent: 88, label: '약관 동의 및 최종 제출을 준비하는 중...' },
     { percent: 94, label: '모인 응답을 확인하는 중...' },
 ]
+const CUSTOMS_PROGRESS_CLIENT_CACHE_TTL_MS = 10 * 60 * 1000
 
 const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressStage }> = [
     { keys: ['runtime:'], stage: { percent: 5, label: '브라우저 런타임을 준비하는 중...' } },
@@ -933,6 +934,7 @@ export default function WormOrderPage() {
     const remittanceCancelRequestedRef = useRef(false)
     const invoicePreviewUrlRef = useRef<string | null>(null)
     const invoicePreviewTaskIdRef = useRef(0)
+    const customsProgressCacheRef = useRef<Map<string, { savedAt: number; result: CustomsProgressResult | null; error: string }>>(new Map())
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -2053,6 +2055,7 @@ export default function WormOrderPage() {
         options?: { scrollIntoView?: boolean },
     ) => {
         const blNo = (nextBlNo ?? blNumberQuery).replace(/\s+/g, '').trim()
+        const normalizedBlNo = blNo.toUpperCase()
         if (nextBlNo) {
             setBlNumberQuery(blNo)
         }
@@ -2069,22 +2072,37 @@ export default function WormOrderPage() {
             return
         }
 
+        const cached = customsProgressCacheRef.current.get(normalizedBlNo)
+        if (cached && Date.now() - cached.savedAt <= CUSTOMS_PROGRESS_CLIENT_CACHE_TTL_MS) {
+            setCustomsProgressResult(cached.result)
+            setCustomsProgressError(cached.error)
+            return
+        }
+
         setCustomsProgressLoading(true)
         try {
-            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(blNo)}`, {
-                method: 'GET',
-                cache: 'no-store',
-            })
+            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(blNo)}`, { method: 'GET' })
             const result = await response.json()
 
             if (!response.ok) {
                 throw new Error(typeof result?.error === 'string' ? result.error : '화물통관 진행정보 조회에 실패했습니다.')
             }
 
-            setCustomsProgressResult(result as CustomsProgressResult)
+            const parsed = result as CustomsProgressResult
+            setCustomsProgressResult(parsed)
+            customsProgressCacheRef.current.set(normalizedBlNo, {
+                savedAt: Date.now(),
+                result: parsed,
+                error: '',
+            })
         } catch (error) {
             const message = error instanceof Error ? error.message : '화물통관 진행정보 조회에 실패했습니다.'
             setCustomsProgressError(message)
+            customsProgressCacheRef.current.set(normalizedBlNo, {
+                savedAt: Date.now(),
+                result: null,
+                error: message,
+            })
         } finally {
             setCustomsProgressLoading(false)
         }

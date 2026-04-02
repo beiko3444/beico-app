@@ -1,9 +1,13 @@
 import { NextResponse } from 'next/server'
 import { getWormEmailAttachment } from '@/lib/wormOrderMail'
+import { requireAdminSession } from '@/lib/requireAdmin'
 
 export const dynamic = 'force-dynamic'
 
 export async function GET(req: Request) {
+    const { unauthorized } = await requireAdminSession()
+    if (unauthorized) return unauthorized
+
     const { searchParams } = new URL(req.url)
     const uid = searchParams.get('uid')
     const indexStr = searchParams.get('index')
@@ -24,6 +28,7 @@ export async function GET(req: Request) {
         const encodedFilename = encodeURIComponent(safeFilename).replace(/['()]/g, escape).replace(/\*/g, '%2A')
         headers.set('Content-Disposition', `attachment; filename*=UTF-8''${encodedFilename}`)
         headers.set('Content-Type', attachment.contentType || 'application/octet-stream')
+        headers.set('Cache-Control', 'private, max-age=86400, stale-while-revalidate=604800')
 
         return new NextResponse(new Uint8Array(attachment.content), {
             status: 200,

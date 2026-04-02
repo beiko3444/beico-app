@@ -14,6 +14,7 @@ const DEFAULT_PAGE_SIZE = 200;
 const MAX_PAGE_SIZE = 500;
 const DEFAULT_MAX_PAGES = 20;
 const MAX_FETCH_PAGES = 50;
+const NAVER_INVENTORY_CACHE_TTL_MS = 5 * 60 * 1000;
 
 type NaverProductSearchRequest = {
     page: number;
@@ -50,6 +51,7 @@ type NaverProductSearchResponse = {
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
 let cachedProxyAgent: HttpsProxyAgent<string> | null = null;
 let cachedProxyUrl = "";
+const cachedInventoryByQuery = new Map<string, { expiresAt: number; payload: unknown }>();
 
 type ErrorReadableResponse = {
     status: number;
@@ -203,6 +205,16 @@ export async function GET(request: Request) {
             1,
             MAX_FETCH_PAGES,
         );
+        const forceRefresh = url.searchParams.get("force") === "1";
+        const cacheKey = `${pageSize}:${maxPages}`;
+        const cached = cachedInventoryByQuery.get(cacheKey);
+        if (!forceRefresh && cached && cached.expiresAt > Date.now()) {
+            return NextResponse.json(cached.payload, {
+                headers: {
+                    "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
+                },
+            });
+        }
 
         let accessToken = await issueNaverAccessToken();
         let currentPage = 1;
@@ -302,7 +314,7 @@ export async function GET(request: Request) {
             };
         });
 
-        return NextResponse.json({
+        const payload = {
             data: inventory,
             fetchedAt: new Date().toISOString(),
             paging: {
@@ -310,6 +322,17 @@ export async function GET(request: Request) {
                 fetchedPages: Math.min(currentPage, maxPages),
                 totalPages,
                 totalItems: inventory.length,
+            },
+        };
+
+        cachedInventoryByQuery.set(cacheKey, {
+            expiresAt: Date.now() + NAVER_INVENTORY_CACHE_TTL_MS,
+            payload,
+        });
+
+        return NextResponse.json(payload, {
+            headers: {
+                "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
             },
         });
     } catch (error: unknown) {
