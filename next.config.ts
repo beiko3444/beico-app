@@ -2,7 +2,7 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['playwright-core', '@sparticuz/chromium'],
+  serverExternalPackages: ['playwright-core', '@sparticuz/chromium', '@napi-rs/canvas', 'pdf-parse'],
   outputFileTracingIncludes: {
     '/api/admin/worm-order/remittance': ['./node_modules/@sparticuz/chromium/**/*'],
   },
