@@ -148,8 +148,107 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
 /** Get all browsing contexts: main page + all frames */
 const getAllContexts = (page: PageLike): FrameLike[] => {
     const frames = page.frames()
-    // Main page first, then all frames (skip about:blank)
     return [page as FrameLike, ...frames.filter(f => f.url() !== 'about:blank')]
+}
+
+/** Dump all input elements across all frames for debugging */
+const dumpAllInputs = async (page: PageLike): Promise<string> => {
+    const results: string[] = []
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const frameUrl = ctx.url()
+            const inputs = await ctx.evaluate(() => {
+                const els = document.querySelectorAll('input, select, textarea')
+                return Array.from(els).map(el => {
+                    const inp = el as HTMLInputElement
+                    return {
+                        tag: el.tagName,
+                        type: inp.type || '',
+                        name: inp.name || '',
+                        id: inp.id || '',
+                        placeholder: inp.placeholder || '',
+                        className: (inp.className || '').slice(0, 60),
+                        visible: el.offsetParent !== null,
+                        value: (inp.value || '').slice(0, 30),
+                    }
+                })
+            }) as Array<Record<string, unknown>>
+            results.push(`Frame[${frameUrl}]: ${inputs.length} inputs`)
+            for (const inp of inputs) {
+                results.push(`  <${inp.tag} type="${inp.type}" name="${inp.name}" id="${inp.id}" placeholder="${inp.placeholder}" visible=${inp.visible}>`)
+            }
+        } catch (e) {
+            results.push(`Frame error: ${getErrorMessage(e)}`)
+        }
+    }
+    return results.join('\n')
+}
+
+/** Fill input by evaluating JS to find input near a Korean label text */
+const fillByLabelText = async (
+    page: PageLike,
+    labelTexts: string[],
+    value: string,
+    step: string,
+): Promise<boolean> => {
+    for (const ctx of getAllContexts(page)) {
+        for (const labelText of labelTexts) {
+            try {
+                const filled = await ctx.evaluate((args: unknown) => {
+                    const [text, val] = args as [string, string]
+                    // Strategy 1: Find <td>/<th>/<label> containing label text, then find input in same or next row/cell
+                    const allElements = document.querySelectorAll('td, th, label, span, div')
+                    for (const el of allElements) {
+                        if (!el.textContent?.includes(text)) continue
+                        // Look in parent row first
+                        const row = el.closest('tr')
+                        if (row) {
+                            const input = row.querySelector('input[type="text"]:not([readonly]), input:not([type]):not([readonly])') as HTMLInputElement
+                            if (input && input.offsetParent !== null) {
+                                input.focus()
+                                input.value = val
+                                input.dispatchEvent(new Event('input', { bubbles: true }))
+                                input.dispatchEvent(new Event('change', { bubbles: true }))
+                                return true
+                            }
+                        }
+                        // Look in parent container
+                        const container = el.closest('div, fieldset')
+                        if (container) {
+                            const input = container.querySelector('input[type="text"]:not([readonly]), input:not([type]):not([readonly])') as HTMLInputElement
+                            if (input && input.offsetParent !== null) {
+                                input.focus()
+                                input.value = val
+                                input.dispatchEvent(new Event('input', { bubbles: true }))
+                                input.dispatchEvent(new Event('change', { bubbles: true }))
+                                return true
+                            }
+                        }
+                        // Look at next sibling
+                        const next = el.nextElementSibling
+                        if (next) {
+                            const input = (next.tagName === 'INPUT' ? next : next.querySelector('input[type="text"], input:not([type])')) as HTMLInputElement
+                            if (input && input.offsetParent !== null) {
+                                input.focus()
+                                input.value = val
+                                input.dispatchEvent(new Event('input', { bubbles: true }))
+                                input.dispatchEvent(new Event('change', { bubbles: true }))
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }, [labelText, value])
+                if (filled) {
+                    console.log(`[LogenShipping] fillByLabelText: filled "${labelText}" via evaluate`)
+                    return true
+                }
+            } catch {
+                // Try next frame/label
+            }
+        }
+    }
+    return false
 }
 
 /** Click the first visible element matching any selector across ALL frames */
@@ -183,7 +282,8 @@ const fillFirstVisible = async (
     selectors: string[],
     value: string,
     step: string,
-    timeoutMs = DEFAULT_TIMEOUT_MS
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    labelFallbacks?: string[],
 ): Promise<void> => {
     const contexts = getAllContexts(page)
     for (const ctx of contexts) {
@@ -199,7 +299,17 @@ const fillFirstVisible = async (
             }
         }
     }
-    throw new LogenAutomationError(step, `Could not find a fillable input for step: ${step}`)
+
+    // Fallback: try finding input by nearby label text using evaluate
+    if (labelFallbacks) {
+        const filled = await fillByLabelText(page, labelFallbacks, value, step)
+        if (filled) return
+    }
+
+    // Dump debug info on failure
+    const debugInfo = await dumpAllInputs(page)
+    console.error(`[LogenShipping] fillFirstVisible FAILED for step: ${step}\n${debugInfo}`)
+    throw new LogenAutomationError(step, `Could not find a fillable input for step: ${step}\n\nDebug (all inputs across frames):\n${debugInfo}`)
 }
 
 /** Safe wait - use domcontentloaded instead of networkidle to avoid timeout on sites with persistent connections */
@@ -373,20 +483,22 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             'Navigate - 주문등록/출력(단건) Submenu'
         )
 
-        await page.waitForTimeout(4000)
+        await page.waitForTimeout(5000)
 
         // Log available frames for debugging
-        console.log(`[LogenShipping] Found ${page.frames().length} frames:`)
-        for (const f of page.frames()) { console.log(`  - ${f.url()}`) }
+        const frameUrls = page.frames().map(f => f.url())
+        console.log(`[LogenShipping] Found ${frameUrls.length} frames:`, frameUrls)
+
+        // Dump all inputs for diagnostic purposes
+        const inputDump = await dumpAllInputs(page)
+        console.log(`[LogenShipping] All inputs after menu navigation:\n${inputDump}`)
+        reportStep('폼 분석 완료, 수하인 정보 입력 시작')
 
         // Step 5: Fill recipient info
-        // All clickFirstVisible/fillFirstVisible now search ALL frames automatically
         throwIfAbortRequested(signal, 'Fill Recipient Info')
         reportStep('수하인(받으시는 분) 정보 입력')
 
-        await page.waitForTimeout(1000)
-
-        // Fill recipient phone
+        // Fill recipient phone - try CSS selectors first, then label-text fallback
         await fillFirstVisible(
             page,
             [
@@ -397,9 +509,15 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 'input[name*="recv"][name*="tel"]',
                 'input[name*="rec"][name*="tel"]',
                 'input[name*="r_tel"]',
+                'input[name*="telNo"]',
+                'input[name*="hpNo"]',
+                'input[name*="phone"]',
+                'input[name*="hp1"]',
             ],
             recipientPhone,
-            'Recipient Phone'
+            'Recipient Phone',
+            DEFAULT_TIMEOUT_MS,
+            ['전화번호', '연락처', 'HP', '휴대폰', '전화']
         )
 
         // Fill recipient name
@@ -411,9 +529,13 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 'input[name*="rcvName"]',
                 'input[name*="recv"][name*="nm"]',
                 'input[name*="rec"][name*="nm"]',
+                'input[name*="rcvr"]',
+                'input[name*="custNm"]',
             ],
             recipientName,
-            'Recipient Name'
+            'Recipient Name',
+            DEFAULT_TIMEOUT_MS,
+            ['수하인명', '수하인', '받으시는', '고객명']
         )
 
         // Step 6: Address search
