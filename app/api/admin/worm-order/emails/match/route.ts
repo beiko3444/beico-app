@@ -97,67 +97,66 @@ function extractUnitPriceUsd(text: string, totalAmount?: number | null) {
     .map((line) => line.trim())
     .filter(Boolean)
 
-  // 확장된 키워드: UNIT PRICE 외 중국 무역 인보이스에서 자주 쓰이는 표현 포함
-  const keywordRegex = /\b(?:UNIT\s*PRICE|U\/?\s*PRICE|PRICE\s*PER\s*(?:UNIT|PC|PIECE|KG|BOX|CTN)|UNIT\s*RATE|PRICE\s*\/\s*(?:BOX|PC|UNIT|KG)|P\s*\/\s*U|단\s*가|단가|单\s*价|单价|PRICE)\b/i
+  // ── 1단계: 키워드 기반 탐색 (±10줄 범위) ──
+  const keywordRegex = /\b(?:UNIT\s*PRICE|U\/?\s*PRICE|PRICE\s*PER\s*(?:UNIT|PC|PIECE|KG|BOX|CTN)|UNIT\s*RATE|PRICE\s*\/\s*(?:BOX|PC|UNIT|KG)|P\s*\/\s*U|단\s*가|단가|单\s*价|单价)\b/i
   const candidates: number[] = []
 
   for (let i = 0; i < lines.length; i++) {
     if (!keywordRegex.test(lines[i])) continue
 
-    // "PRICE" 단독 키워드는 TOTAL/AMOUNT 라인에서 걸리지 않도록 필터
-    if (/\b(?:TOTAL|AMOUNT|GRAND|INVOICE\s*TOTAL|AMOUNT\s*DUE)\b/i.test(lines[i])) continue
-
-    // 같은 줄에 $ / USD 명시 금액이 있으면 우선 사용
-    const sameLineCurrency = parseCurrencyAmountTokens(lines[i])
-    if (sameLineCurrency.length > 0) {
-      candidates.push(...sameLineCurrency)
-      continue
-    }
-
-    // 다음 1~3줄에서 $ / USD 명시 금액 탐색 (표 구조: 헤더 행 아래 데이터 행)
-    let foundInNext = false
-    for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
-      const nextCurrency = parseCurrencyAmountTokens(lines[j])
-      if (nextCurrency.length > 0) {
-        candidates.push(...nextCurrency)
-        foundInNext = true
-        break
-      }
-    }
-    if (foundInNext) continue
-
-    // $ / USD 표시 없으면 같은 줄 숫자 탐색
-    const sameLine = parseAmountTokens(lines[i])
-    if (sameLine.length > 0) {
-      candidates.push(...sameLine)
-      continue
-    }
-
-    // 마지막으로 다음 줄 숫자 탐색
-    for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
-      const nextLine = parseAmountTokens(lines[j])
-      if (nextLine.length > 0) {
-        candidates.push(...nextLine)
+    // 같은 줄 또는 이후 10줄 내에서 $ / USD 명시 금액 탐색
+    // (PDF 테이블 구조에 따라 헤더-데이터 간격이 크게 달라질 수 있음)
+    const windowEnd = Math.min(i + 10, lines.length - 1)
+    for (let j = i; j <= windowEnd; j++) {
+      // TOTAL / AMOUNT 등 합계 라인은 건너뜀
+      if (j > i && /\b(?:TOTAL|AMOUNT\s*DUE|GRAND\s*TOTAL|INVOICE\s*TOTAL)\b/i.test(lines[j])) break
+      const currencyValues = parseCurrencyAmountTokens(lines[j])
+      if (currencyValues.length > 0) {
+        candidates.push(...currencyValues)
         break
       }
     }
   }
 
   if (candidates.length > 0) {
-    const filtered = candidates.filter((value) => value > 0 && value < 1_000_000)
-    if (filtered.length > 0) return Math.min(...filtered)
+    const filtered = candidates.filter((v) => v > 0 && v < 100_000)
+    if (filtered.length > 0) {
+      // totalAmount와 동일한 값은 단가가 아닌 합계일 가능성이 높으므로 제외
+      const withoutTotal = totalAmount
+        ? filtered.filter((v) => Math.abs(v - totalAmount) > 0.01)
+        : filtered
+      if (withoutTotal.length > 0) return Math.min(...withoutTotal)
+      return Math.min(...filtered)
+    }
   }
 
-  // Fallback: 총액과 수량(BOX/CTN/PC/KG)으로부터 단가 역산
+  // ── 2단계: 전체 문서에서 모든 $ 금액 중 단가 추론 ──
+  // 문서 내 모든 명시적 $ 금액을 수집 → totalAmount와 다른 값 중 가장 작은 것
+  const allCurrencyValues: number[] = []
+  for (const line of lines) {
+    allCurrencyValues.push(...parseCurrencyAmountTokens(line))
+  }
+  if (allCurrencyValues.length > 0) {
+    const distinct = [...new Set(allCurrencyValues)].filter((v) => v > 0 && v < 100_000)
+    const withoutTotal = totalAmount
+      ? distinct.filter((v) => Math.abs(v - totalAmount) > 0.01)
+      : distinct
+    if (withoutTotal.length > 0) {
+      const candidate = Math.min(...withoutTotal)
+      // 단가는 보통 총액보다 작고 1 이상
+      if (!totalAmount || candidate < totalAmount) return candidate
+    }
+  }
+
+  // ── 3단계: 총액 ÷ 수량으로 역산 (소수점 포함 수량 지원) ──
   if (totalAmount && totalAmount > 0) {
-    const qtyRegex = /(\d[\d,]*)\s*(?:BOXES?|BOX|CTNS?|CTN|PCS?|PC|KGS?|KG|EA|UNIT)/i
+    const qtyRegex = /(\d[\d,]*(?:\.\d+)?)\s*(?:BOXES?|BOX|CTNS?|CTN|PCS?|PC|KGS?|KG|EA|UNIT)/i
     for (const line of lines) {
       const qtyMatch = line.match(qtyRegex)
       if (!qtyMatch) continue
       const qty = Number(qtyMatch[1].replace(/,/g, ''))
       if (!qty || qty <= 0) continue
       const unitPrice = totalAmount / qty
-      // 단가가 0.01~9999 USD 범위면 유효
       if (unitPrice >= 0.01 && unitPrice <= 9999) {
         return Math.round(unitPrice * 100) / 100
       }
