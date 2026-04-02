@@ -91,17 +91,21 @@ function parseCurrencyAmountTokens(line: string) {
   return values
 }
 
-function extractUnitPriceUsd(text: string) {
+function extractUnitPriceUsd(text: string, totalAmount?: number | null) {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
 
-  const keywordRegex = /\b(?:UNIT\s*PRICE|U\/?\s*PRICE|PRICE\s*PER\s*(?:UNIT|PC|PIECE|KG)|UNIT\s*RATE|단\s*가|단가)\b/i
+  // 확장된 키워드: UNIT PRICE 외 중국 무역 인보이스에서 자주 쓰이는 표현 포함
+  const keywordRegex = /\b(?:UNIT\s*PRICE|U\/?\s*PRICE|PRICE\s*PER\s*(?:UNIT|PC|PIECE|KG|BOX|CTN)|UNIT\s*RATE|PRICE\s*\/\s*(?:BOX|PC|UNIT|KG)|P\s*\/\s*U|단\s*가|단가|单\s*价|单价|PRICE)\b/i
   const candidates: number[] = []
 
   for (let i = 0; i < lines.length; i++) {
     if (!keywordRegex.test(lines[i])) continue
+
+    // "PRICE" 단독 키워드는 TOTAL/AMOUNT 라인에서 걸리지 않도록 필터
+    if (/\b(?:TOTAL|AMOUNT|GRAND|INVOICE\s*TOTAL|AMOUNT\s*DUE)\b/i.test(lines[i])) continue
 
     // 같은 줄에 $ / USD 명시 금액이 있으면 우선 사용
     const sameLineCurrency = parseCurrencyAmountTokens(lines[i])
@@ -139,10 +143,28 @@ function extractUnitPriceUsd(text: string) {
     }
   }
 
-  if (candidates.length === 0) return null
-  const filtered = candidates.filter((value) => value > 0 && value < 1_000_000)
-  if (filtered.length === 0) return null
-  return Math.min(...filtered)
+  if (candidates.length > 0) {
+    const filtered = candidates.filter((value) => value > 0 && value < 1_000_000)
+    if (filtered.length > 0) return Math.min(...filtered)
+  }
+
+  // Fallback: 총액과 수량(BOX/CTN/PC/KG)으로부터 단가 역산
+  if (totalAmount && totalAmount > 0) {
+    const qtyRegex = /(\d[\d,]*)\s*(?:BOXES?|BOX|CTNS?|CTN|PCS?|PC|KGS?|KG|EA|UNIT)/i
+    for (const line of lines) {
+      const qtyMatch = line.match(qtyRegex)
+      if (!qtyMatch) continue
+      const qty = Number(qtyMatch[1].replace(/,/g, ''))
+      if (!qty || qty <= 0) continue
+      const unitPrice = totalAmount / qty
+      // 단가가 0.01~9999 USD 범위면 유효
+      if (unitPrice >= 0.01 && unitPrice <= 9999) {
+        return Math.round(unitPrice * 100) / 100
+      }
+    }
+  }
+
+  return null
 }
 
 function extractTotalAmountUsd(text: string) {
@@ -252,8 +274,12 @@ async function runInvoicePdfOcr(uid: string): Promise<InvoiceOcrResult> {
         continue
       }
 
-      unitPrice = extractUnitPriceUsd(text)
+      // 디버그: 추출된 전체 텍스트 로그 출력 (유닛프라이스 파싱 실패 원인 파악용)
+      console.log(`[InvoiceOCR] ${attachment.filename} text preview:\n${text.slice(0, 1200)}`)
+
       totalAmount = extractTotalAmountUsd(text)
+      // totalAmount를 먼저 구한 후 단가 역산에도 활용
+      unitPrice = extractUnitPriceUsd(text, totalAmount)
       sourceFile = attachment.filename || `attachment-${index}.pdf`
 
       if (unitPrice !== null || totalAmount !== null) {
