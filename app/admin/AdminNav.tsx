@@ -194,7 +194,7 @@ export default function AdminNav({
                 body: JSON.stringify({
                     fromNumber,
                     toName: '소장님',
-                    toNumber: '01034443467',
+                    toNumber: '01027104466',
                     contents,
                 }),
             })
