@@ -2,6 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { Loader2 } from 'lucide-react'
+
+function splitAddress(fullAddress: string): { main: string; detail: string } {
+    const match = fullAddress.match(/^(.+[로길]\s+\d+(?:-\d+)?)\s*(.*)$/)
+    if (match) return { main: match[1].trim(), detail: match[2].trim() }
+    return { main: fullAddress, detail: '' }
+}
 
 export default function OrderActions({ order, isPartner = false }: { order: any, isPartner?: boolean }) {
     const router = useRouter()
@@ -12,6 +19,56 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     const [adminDepositConfirmedAt, setAdminDepositConfirmedAt] = useState(order.adminDepositConfirmedAt)
     const [courier, setCourier] = useState(order.courier || 'Rosen')
     const [isEditingTracking, setIsEditingTracking] = useState(false)
+
+    // 로젠 송장출력
+    const [showLogenForm, setShowLogenForm] = useState(false)
+    const [logenLoading, setLogenLoading] = useState(false)
+    const [logenError, setLogenError] = useState<string | null>(null)
+    const [logenTrackingNumber, setLogenTrackingNumber] = useState<string | null>(null)
+    const partnerAddress = order.user?.partnerProfile?.address || ''
+    const { main: defaultMainAddr, detail: defaultDetailAddr } = splitAddress(partnerAddress)
+    const [logenPhone, setLogenPhone] = useState(order.user?.partnerProfile?.contact || '')
+    const [logenName, setLogenName] = useState(order.user?.partnerProfile?.businessName || order.user?.name || '')
+    const [logenAddress, setLogenAddress] = useState(defaultMainAddr)
+    const [logenDetailAddress, setLogenDetailAddress] = useState(defaultDetailAddr)
+
+    const submitLogenShipping = async () => {
+        setLogenLoading(true)
+        setLogenError(null)
+        setLogenTrackingNumber(null)
+        try {
+            const res = await fetch('/api/admin/worm-order/logen-shipping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    recipientPhone: logenPhone,
+                    recipientName: logenName,
+                    recipientAddress: logenAddress,
+                    recipientDetailAddress: logenDetailAddress,
+                }),
+            })
+            const data = await res.json()
+            if (!res.ok) {
+                setLogenError(data.error || '송장 출력 실패')
+            } else {
+                setLogenTrackingNumber(data.trackingNumber)
+                if (data.trackingNumber && !trackingNumber) {
+                    await fetch(`/api/orders/${order.id}`, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ trackingNumber: data.trackingNumber, courier: 'Rosen', status: 'SHIPPED' }),
+                    })
+                    setTrackingNumber(data.trackingNumber)
+                    setStatus('SHIPPED')
+                    router.refresh()
+                }
+            }
+        } catch (e) {
+            setLogenError('통신 오류가 발생했습니다.')
+        } finally {
+            setLogenLoading(false)
+        }
+    }
 
     const confirmAdminDeposit = async () => {
         if (!confirm("입금 내역을 확인하셨습니까? 관리자 확인 시간을 기록합니다.")) return
@@ -274,6 +331,54 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                         )
                     )}
                 </div>
+
+                {/* 로젠 송장출력 */}
+                <button
+                    onClick={() => { setShowLogenForm(v => !v); setLogenError(null); setLogenTrackingNumber(null) }}
+                    className="w-full py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors"
+                >
+                    🚚 로젠 송장출력
+                </button>
+
+                {showLogenForm && (
+                    <div className="mt-1 p-3 bg-blue-50 border border-blue-100 rounded-xl flex flex-col gap-2">
+                        <div className="flex flex-col gap-0.5">
+                            <label className="text-[10px] text-gray-500 font-bold">수하인 전화번호</label>
+                            <input type="text" value={logenPhone} onChange={e => setLogenPhone(e.target.value)}
+                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <label className="text-[10px] text-gray-500 font-bold">수하인명 (업체명)</label>
+                            <input type="text" value={logenName} onChange={e => setLogenName(e.target.value)}
+                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <label className="text-[10px] text-gray-500 font-bold">주소 (검색용)</label>
+                            <input type="text" value={logenAddress} onChange={e => setLogenAddress(e.target.value)}
+                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                        </div>
+                        <div className="flex flex-col gap-0.5">
+                            <label className="text-[10px] text-gray-500 font-bold">상세주소</label>
+                            <input type="text" value={logenDetailAddress} onChange={e => setLogenDetailAddress(e.target.value)}
+                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                        </div>
+                        {logenError && (
+                            <p className="text-[10px] text-red-600 font-bold">{logenError}</p>
+                        )}
+                        {logenTrackingNumber && (
+                            <p className="text-[11px] text-blue-700 font-bold">✅ 송장번호: {logenTrackingNumber}</p>
+                        )}
+                        <button
+                            onClick={submitLogenShipping}
+                            disabled={logenLoading}
+                            className="w-full py-2 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-60"
+                        >
+                            {logenLoading ? (
+                                <><Loader2 size={12} className="animate-spin" /> 자동화 진행 중...</>
+                            ) : '송장 출력 실행'}
+                        </button>
+                    </div>
+                )}
             </div>
         </div>
     )
