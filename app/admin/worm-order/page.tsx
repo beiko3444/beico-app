@@ -86,7 +86,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'customs' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'notification' | 'customs' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -182,8 +182,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'AUTO',
         owner: '시스템',
         details: ['완료 알림 메시지 생성', '이메일/메신저 전송', '전송 이력 보관'],
-        actionLabel: '알림 자동화 예정',
-        target: 'none',
+        actionLabel: '통보 메시지 복사',
+        target: 'notification',
     },
     {
         id: 6,
@@ -930,6 +930,7 @@ export default function WormOrderPage() {
     const inboxSectionRef = useRef<HTMLDivElement>(null)
     const docInboxSectionRef = useRef<HTMLDivElement>(null)
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
+    const notificationSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
     const remittanceRequestAbortControllerRef = useRef<AbortController | null>(null)
@@ -2495,6 +2496,10 @@ export default function WormOrderPage() {
             docInboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
         }
+        if (target === 'notification') {
+            notificationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
         if (target === 'customs') {
             customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
@@ -2614,6 +2619,7 @@ export default function WormOrderPage() {
     const showInboxTools = visibleStepIdSet.has(2) || visibleStepIdSet.has(9) || visibleStepIdSet.has(10)
     const showDocInboxTools = visibleStepIdSet.has(6)
     const showRemittanceTools = visibleStepIdSet.has(3)
+    const showNotificationTools = visibleStepIdSet.has(5)
     const showCustomsTools = visibleStepIdSet.has(7)
     const stepRenderOrderMap = useMemo(() => {
         const next = new Map<number, number>()
@@ -2634,6 +2640,7 @@ export default function WormOrderPage() {
     const inboxToolOrderBase = getAnchorOrderBase([2, 9, 10], 2)
     const docInboxToolOrderBase = getAnchorOrderBase([6], 6)
     const remittanceToolOrderBase = getAnchorOrderBase([3], 3)
+    const notificationToolOrderBase = getAnchorOrderBase([5], 5)
     const customsToolOrderBase = getAnchorOrderBase([7], 7)
 
     return (
@@ -3112,21 +3119,28 @@ export default function WormOrderPage() {
                             <div className="divide-y divide-gray-100">
                                 {emails.map((email, index) => {
                                     const isSelected = selectedEmailUid === email.uid
+                                    const isMatched = email.matchedOrderId === activeWormOrder?.id
                                     return (
                                         <button
                                             key={email.uid}
                                             onClick={() => setSelectedEmailUid(email.uid)}
-                                            className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${
-                                                isSelected ? 'bg-orange-50/50 border-l-[3px] border-orange-500 pl-[13px]' : 'border-l-[3px] border-transparent pl-4'
+                                            className={`w-full text-left p-4 transition-colors ${
+                                                isMatched && isSelected
+                                                    ? 'bg-emerald-100 border-l-4 border-emerald-600 pl-[13px]'
+                                                    : isMatched
+                                                    ? 'bg-emerald-50 border-l-4 border-emerald-500 pl-[13px] hover:bg-emerald-100'
+                                                    : isSelected
+                                                    ? 'bg-orange-50/50 border-l-[3px] border-orange-500 pl-[13px]'
+                                                    : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50'
                                             }`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-[11px] font-bold ${isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
+                                                <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
                                                     {new Date(email.date).toLocaleDateString()}
                                                 </span>
                                                 {email.hasAttachments && <span className="text-[11px]">📎</span>}
                                             </div>
-                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                                                 {index + 1}. {email.subject}
                                             </h3>
                                             <div className="mt-2 flex items-center gap-2">
@@ -3456,21 +3470,28 @@ export default function WormOrderPage() {
                             <div className="divide-y divide-gray-100">
                                 {docEmails.map((email, index) => {
                                     const isSelected = selectedDocEmailUid === email.uid
+                                    const isMatched = email.matchedOrderId === activeWormOrder?.id
                                     return (
                                         <button
                                             key={email.uid}
                                             onClick={() => setSelectedDocEmailUid(email.uid)}
-                                            className={`w-full text-left p-4 hover:bg-slate-50 transition-colors ${
-                                                isSelected ? 'bg-blue-50/50 border-l-[3px] border-blue-500 pl-[13px]' : 'border-l-[3px] border-transparent pl-4'
+                                            className={`w-full text-left p-4 transition-colors ${
+                                                isMatched && isSelected
+                                                    ? 'bg-blue-200/60 border-l-4 border-blue-700 pl-[13px]'
+                                                    : isMatched
+                                                    ? 'bg-blue-100/70 border-l-4 border-blue-600 pl-[13px] hover:bg-blue-200/60'
+                                                    : isSelected
+                                                    ? 'bg-blue-50/50 border-l-[3px] border-blue-500 pl-[13px]'
+                                                    : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50'
                                             }`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-[11px] font-bold ${isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
+                                                <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
                                                     {new Date(email.date).toLocaleDateString()}
                                                 </span>
                                                 {email.hasAttachments && <span className="text-[11px]">📎</span>}
                                             </div>
-                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                                                 {index + 1}. {email.subject}
                                             </h3>
                                             {/* 매칭/해제 버튼 */}
@@ -3881,46 +3902,63 @@ export default function WormOrderPage() {
                     <p className="text-xs font-semibold text-amber-700">{remittanceSaveWarning}</p>
                 )}
 
-                {/* 입금완료 통보 메시지 */}
-                {(remittancePricingSummary || isActiveOrderRemittanceApplied) && (() => {
-                    const sentAmountUsd = autoTransferAmountUsd
-                        ?? activeWormOrderRecord?.remittanceFinalReceiveAmountText
-                            ? null
-                            : null
-                    const sendAmountText = remittancePricingSummary?.sendAmount
-                        || (autoTransferAmountUsd !== null
-                            ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                            : activeWormOrderRecord?.remittanceSendAmountText || null)
-                    const notificationMessage = sendAmountText
-                        ? `Michael, the payment has been completed to the "${sendAmountText}" bank. It should be credited shortly, so please prepare the order for shipment.`
-                        : null
-                    if (!notificationMessage) return null
-                    return (
-                        <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 space-y-3">
-                            <p className="text-[11px] font-bold text-slate-600 uppercase tracking-[0.16em] flex items-center gap-1.5">
-                                <Send size={12} />
-                                입금완료 통보 메시지
-                            </p>
-                            <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm leading-relaxed text-gray-800 font-medium">
-                                {notificationMessage}
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(notificationMessage)
-                                    setPaymentNotificationCopied(true)
-                                    setTimeout(() => setPaymentNotificationCopied(false), 2500)
-                                }}
-                                className="inline-flex items-center gap-2 h-9 px-4 border border-slate-300 rounded-lg font-semibold text-sm text-slate-700 hover:bg-slate-100 transition-colors"
-                            >
-                                <Copy size={14} />
-                                {paymentNotificationCopied ? '복사 완료 ✓' : '메시지 복사'}
-                            </button>
-                        </div>
-                    )
-                })()}
                 </div>
             )}
+            {/* ── 입금완료 통보 (Step 5) ── */}
+            {showNotificationTools && (() => {
+                const sendAmountText = remittancePricingSummary?.sendAmount
+                    || (autoTransferAmountUsd !== null
+                        ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                        : activeWormOrderRecord?.remittanceSendAmountText || null)
+                const notificationMessage = sendAmountText
+                    ? `Michael, the payment has been completed to the "${sendAmountText}" bank. It should be credited shortly, so please prepare the order for shipment.`
+                    : null
+                return (
+                    <div ref={notificationSectionRef} style={{ order: notificationToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 bg-[#f0fdf4] flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-black text-[#111827] flex items-center gap-2">
+                                    <Send size={18} className="text-emerald-600" />
+                                    입금완료 통보
+                                </h3>
+                                <p className="text-xs text-slate-500 mt-0.5">마이클에게 입금 완료를 통보하는 메시지를 복사해서 전달하세요.</p>
+                            </div>
+                        </div>
+                        <div className="p-6 space-y-4">
+                            {!sendAmountText ? (
+                                <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-[12px] font-semibold text-amber-700">
+                                    송금 신청을 먼저 완료하면 통보 메시지가 자동으로 생성됩니다.
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/40 px-5 py-4 text-[15px] leading-relaxed text-gray-800 font-medium">
+                                        {notificationMessage}
+                                    </div>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            if (notificationMessage) {
+                                                navigator.clipboard.writeText(notificationMessage)
+                                                setPaymentNotificationCopied(true)
+                                                setTimeout(() => setPaymentNotificationCopied(false), 2500)
+                                            }
+                                        }}
+                                        className={`inline-flex items-center gap-2 h-10 px-5 rounded-xl font-bold text-sm transition-colors ${
+                                            paymentNotificationCopied
+                                                ? 'bg-emerald-600 text-white'
+                                                : 'bg-emerald-700 hover:bg-emerald-600 text-white'
+                                        }`}
+                                    >
+                                        <Copy size={15} />
+                                        {paymentNotificationCopied ? '복사 완료 ✓' : '메시지 복사'}
+                                    </button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )
+            })()}
+
             {showCustomsTools && (
                 <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
