@@ -27,7 +27,22 @@ let pdfParseModulePromise: Promise<PdfParseModule> | null = null
 
 async function getPdfParseModule() {
   if (!pdfParseModulePromise) {
-    pdfParseModulePromise = import('pdf-parse')
+    pdfParseModulePromise = (async () => {
+      // Polyfill DOMMatrix for pdfjs-dist used by pdf-parse
+      if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+        try {
+          const canvasObj = await import('@napi-rs/canvas')
+          if (canvasObj && canvasObj.DOMMatrix) {
+            ;(globalThis as any).DOMMatrix = canvasObj.DOMMatrix as any
+          }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        } catch (_) {
+          // Fallback dummy
+          ;(globalThis as any).DOMMatrix = class DOMMatrix {} as any
+        }
+      }
+      return import('pdf-parse')
+    })()
   }
   return pdfParseModulePromise
 }
