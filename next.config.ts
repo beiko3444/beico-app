@@ -2,9 +2,13 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-  serverExternalPackages: ['playwright-core', '@sparticuz/chromium', '@napi-rs/canvas', 'pdf-parse'],
+  serverExternalPackages: ['playwright-core', '@sparticuz/chromium', '@napi-rs/canvas', 'pdf-parse', 'pdfjs-dist'],
   outputFileTracingIncludes: {
     '/api/admin/worm-order/remittance': ['./node_modules/@sparticuz/chromium/**/*'],
+    '/api/admin/worm-order/emails/match': [
+      './node_modules/pdf-parse/**/*',
+      './node_modules/pdfjs-dist/**/*',
+    ],
   },
   async headers() {
     return [
