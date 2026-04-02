@@ -1286,29 +1286,18 @@ async function main() {
     console.log(`[Live] Print flow: 첫 행 선택 ${rowFocused ? '성공' : '실패'}`);
     await sleep(250);
 
+    // DOM 헤더 체크박스 클릭 (API 강제 체크 사용 안 함 - 삭제된 주문 포함 오류 방지)
     let allChecked = false;
     let checkedState = { rowCount: 0, checkboxCount: 0, checkedCount: 0 };
     let checkedByApi = 0;
     for (let i = 0; i < 3; i += 1) {
-      const apiSelected = await selectNoPrintRowsByApi(frame);
-      checkedByApi = Math.max(checkedByApi, apiSelected.checkedCount || 0);
-      console.log(`[Live] Print flow: CheckData attempt#${i + 1} api ok=${apiSelected.ok} checked=${apiSelected.checkedCount} reason=${apiSelected.reason}`);
-      if (apiSelected.ok) {
-        checkedState = {
-          rowCount: apiSelected.rowCount,
-          checkboxCount: Math.max(checkedState.checkboxCount, apiSelected.rowCount),
-          checkedCount: apiSelected.checkedCount,
-        };
-        allChecked = true;
-        break;
-      }
-
       allChecked = await checkAllUnprintedOrders(page, frame);
-      await sleep(220);
+      await sleep(500);
+      checkedState = await getUnprintedGridState(page, frame);
       const apiAfterDom = await waitForNoPrintRowsByApi(frame, 2500);
       checkedByApi = Math.max(checkedByApi, apiAfterDom.checkedCount || 0);
-      checkedState = await getUnprintedGridState(page, frame);
-      if (checkedByApi > 0 || checkedState.checkedCount > 0) {
+      console.log(`[Live] Print flow: DOM check attempt#${i + 1} dom=${checkedState.checkedCount} api=${checkedByApi}`);
+      if (checkedState.checkedCount > 0 || checkedByApi > 0) {
         allChecked = true;
         break;
       }
