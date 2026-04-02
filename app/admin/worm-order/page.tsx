@@ -2689,7 +2689,6 @@ export default function WormOrderPage() {
                             </div>
                         )}
                     </div>
-                </div>
             )}
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
