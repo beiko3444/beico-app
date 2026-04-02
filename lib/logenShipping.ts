@@ -151,31 +151,43 @@ const getAllContexts = (page: PageLike): FrameLike[] => {
     return [page as FrameLike, ...frames.filter(f => f.url() !== 'about:blank')]
 }
 
-/** Dump all input elements across all frames for debugging */
-const dumpAllInputs = async (page: PageLike): Promise<string> => {
+/** Dump ALL elements (inputs, buttons, links, images) across all frames for debugging */
+const dumpAllElements = async (page: PageLike): Promise<string> => {
     const results: string[] = []
     for (const ctx of getAllContexts(page)) {
         try {
             const frameUrl = ctx.url()
-            const inputs = await ctx.evaluate(() => {
-                const els = document.querySelectorAll('input, select, textarea')
+            const elements = await ctx.evaluate(() => {
+                const els = document.querySelectorAll('input, select, textarea, button, a, img')
                 return Array.from(els).map(el => {
-                    const inp = el as HTMLInputElement
+                    const h = el as HTMLElement
                     return {
                         tag: el.tagName,
-                        type: inp.type || '',
-                        name: inp.name || '',
-                        id: inp.id || '',
-                        placeholder: inp.placeholder || '',
-                        className: (inp.className || '').slice(0, 60),
-                        visible: (el as HTMLElement).offsetParent !== null,
-                        value: (inp.value || '').slice(0, 30),
+                        type: (el as HTMLInputElement).type || '',
+                        name: (el as HTMLInputElement).name || '',
+                        id: h.id || '',
+                        src: (el as HTMLImageElement).src ? (el as HTMLImageElement).src.slice(-50) : '',
+                        alt: (el as HTMLImageElement).alt || '',
+                        onclick: h.getAttribute('onclick')?.slice(0, 80) || '',
+                        href: (el as HTMLAnchorElement).href ? (el as HTMLAnchorElement).href.slice(-60) : '',
+                        text: (h.textContent || '').trim().slice(0, 30),
+                        className: (h.className || '').toString().slice(0, 40),
+                        visible: h.offsetParent !== null,
                     }
-                })
+                }).filter(e => e.visible)
             }) as Array<Record<string, unknown>>
-            results.push(`Frame[${frameUrl}]: ${inputs.length} inputs`)
-            for (const inp of inputs) {
-                results.push(`  <${inp.tag} type="${inp.type}" name="${inp.name}" id="${inp.id}" placeholder="${inp.placeholder}" visible=${inp.visible}>`)
+            results.push(`Frame[${frameUrl}]: ${elements.length} visible elements`)
+            for (const el of elements) {
+                const parts = [`<${el.tag}`]
+                if (el.type) parts.push(`type="${el.type}"`)
+                if (el.name) parts.push(`name="${el.name}"`)
+                if (el.id) parts.push(`id="${el.id}"`)
+                if (el.src) parts.push(`src="...${el.src}"`)
+                if (el.alt) parts.push(`alt="${el.alt}"`)
+                if (el.onclick) parts.push(`onclick="${el.onclick}"`)
+                if (el.href) parts.push(`href="...${el.href}"`)
+                if (el.text) parts.push(`text="${el.text}"`)
+                results.push(`  ${parts.join(' ')}>`)
             }
         } catch (e) {
             results.push(`Frame error: ${getErrorMessage(e)}`)
@@ -251,13 +263,67 @@ const fillByLabelText = async (
     return false
 }
 
-/** Click the first visible element matching any selector across ALL frames */
+/** Click by evaluating JS to find clickable element near a label text */
+const clickByLabelText = async (
+    page: PageLike,
+    labelTexts: string[],
+    step: string,
+): Promise<boolean> => {
+    for (const ctx of getAllContexts(page)) {
+        for (const labelText of labelTexts) {
+            try {
+                const clicked = await ctx.evaluate((text: unknown) => {
+                    const t = text as string
+                    const allElements = document.querySelectorAll('td, th, label, span, div')
+                    for (const el of allElements) {
+                        if (!el.textContent?.includes(t)) continue
+                        // Look in same row for img/button/a
+                        const row = el.closest('tr')
+                        if (row) {
+                            const clickable = row.querySelector('img, button, a[onclick], input[type="button"], input[type="image"]') as HTMLElement
+                            if (clickable && clickable.offsetParent !== null) {
+                                clickable.click()
+                                return true
+                            }
+                        }
+                        // Look in parent container
+                        const container = el.closest('div, fieldset, td')
+                        if (container) {
+                            const clickable = container.querySelector('img, button, a[onclick], input[type="button"], input[type="image"]') as HTMLElement
+                            if (clickable && clickable.offsetParent !== null) {
+                                clickable.click()
+                                return true
+                            }
+                        }
+                    }
+                    return false
+                }, labelText)
+                if (clicked) {
+                    console.log(`[LogenShipping] clickByLabelText: clicked near "${labelText}" via evaluate`)
+                    return true
+                }
+            } catch { /* next */ }
+        }
+    }
+    return false
+}
+
+/** Click the first visible element matching any selector across ALL frames.
+ *  Optionally tries label-based evaluate fallback. */
 const clickFirstVisible = async (
     page: PageLike,
     selectors: string[],
     step: string,
-    timeoutMs = DEFAULT_TIMEOUT_MS
+    timeoutMs = DEFAULT_TIMEOUT_MS,
+    labelFallbacks?: string[],
 ): Promise<void> => {
+    // Strategy 1: evaluate-based click near label (fast)
+    if (labelFallbacks) {
+        const clicked = await clickByLabelText(page, labelFallbacks, step)
+        if (clicked) return
+    }
+
+    // Strategy 2: CSS selectors (1.5s each)
     const perSelectorTimeout = Math.min(timeoutMs, 1500)
     const contexts = getAllContexts(page)
     for (const ctx of contexts) {
@@ -274,7 +340,11 @@ const clickFirstVisible = async (
             }
         }
     }
-    throw new LogenAutomationError(step, `Could not find a clickable element for step: ${step}`)
+
+    // Dump debug info on failure
+    const debugInfo = await dumpAllElements(page)
+    console.error(`[LogenShipping] clickFirstVisible FAILED for step: ${step}\n${debugInfo}`)
+    throw new LogenAutomationError(step, `Could not find clickable element for: ${step}\n\nDebug:\n${debugInfo}`)
 }
 
 /** Fill the first visible input matching any selector across ALL frames.
@@ -311,7 +381,7 @@ const fillFirstVisible = async (
     }
 
     // Dump debug info on failure
-    const debugInfo = await dumpAllInputs(page)
+    const debugInfo = await dumpAllElements(page)
     console.error(`[LogenShipping] fillFirstVisible FAILED for step: ${step}\n${debugInfo}`)
     throw new LogenAutomationError(step, `Could not find input for: ${step}\n\nDebug:\n${debugInfo}`)
 }
@@ -493,10 +563,12 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         const frameUrls = page.frames().map(f => f.url())
         console.log(`[LogenShipping] Found ${frameUrls.length} frames:`, frameUrls)
 
-        // Dump all inputs for diagnostic purposes
-        const inputDump = await dumpAllInputs(page)
-        console.log(`[LogenShipping] All inputs after menu navigation:\n${inputDump}`)
-        reportStep('폼 분석 완료, 수하인 정보 입력 시작')
+        // Dump all elements for diagnostic purposes
+        const elemDump = await dumpAllElements(page)
+        console.log(`[LogenShipping] All elements after menu navigation:\n${elemDump}`)
+        // Send frame count info via SSE
+        const frameCount = page.frames().length
+        reportStep(`폼 분석 완료 (${frameCount}개 프레임)`)
 
         // Step 5: Fill recipient info
         throwIfAbortRequested(signal, 'Fill Recipient Info')
@@ -550,14 +622,27 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             page,
             [
                 'img[src*="search"]',
+                'img[src*="btn_search"]',
+                'img[src*="ico_search"]',
+                'img[src*="magnif"]',
+                'img[src*="zoom"]',
                 'button[onclick*="addr"]',
                 'a[onclick*="addr"]',
                 'button[onclick*="zip"]',
                 'a[onclick*="zip"]',
+                'a[onclick*="post"]',
+                'a[onclick*="juso"]',
+                'a[onclick*="Addr"]',
+                'a[onclick*="Zip"]',
+                'a[onclick*="Post"]',
                 'img[alt*="검색"]',
                 'img[alt*="주소"]',
+                'img[alt*="돋보기"]',
+                'input[type="image"]',
             ],
-            'Address Search - Open Dialog'
+            'Address Search - Open Dialog',
+            DEFAULT_TIMEOUT_MS,
+            ['주소', '우편번호', '주소검색', '주소입력']
         )
 
         await page.waitForTimeout(3000)
@@ -575,7 +660,8 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             ],
             recipientAddress,
             'Address Search - Fill Address',
-            15000
+            15000,
+            ['주소', '도로명', '검색어']
         )
 
         // Click 검색
