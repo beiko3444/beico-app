@@ -74,18 +74,69 @@ function parseAmountTokens(line: string) {
   return values
 }
 
+// $ / USD 접두사가 붙은 금액만 추출 (명시적 통화 표시)
+function parseCurrencyAmountTokens(line: string) {
+  const matches = line.match(/(?:US\$|USD|\$)\s*\d[\d,]*(?:\.\d+)?/gi) || []
+  const values: number[] = []
+
+  for (const match of matches) {
+    const normalized = match.replace(/[^0-9.,]/g, '').replace(/,/g, '').trim()
+    if (!normalized) continue
+    const parsed = Number(normalized)
+    if (Number.isFinite(parsed) && parsed > 0) {
+      values.push(parsed)
+    }
+  }
+
+  return values
+}
+
 function extractUnitPriceUsd(text: string) {
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean)
 
-  const keywordRegex = /\b(?:UNIT\s*PRICE|U\/?\s*PRICE|PRICE\s*PER\s*UNIT|UNIT\s*RATE)\b/i
+  const keywordRegex = /\b(?:UNIT\s*PRICE|U\/?\s*PRICE|PRICE\s*PER\s*(?:UNIT|PC|PIECE|KG)|UNIT\s*RATE|단\s*가|단가)\b/i
   const candidates: number[] = []
 
-  for (const line of lines) {
-    if (!keywordRegex.test(line)) continue
-    candidates.push(...parseAmountTokens(line))
+  for (let i = 0; i < lines.length; i++) {
+    if (!keywordRegex.test(lines[i])) continue
+
+    // 같은 줄에 $ / USD 명시 금액이 있으면 우선 사용
+    const sameLineCurrency = parseCurrencyAmountTokens(lines[i])
+    if (sameLineCurrency.length > 0) {
+      candidates.push(...sameLineCurrency)
+      continue
+    }
+
+    // 다음 1~3줄에서 $ / USD 명시 금액 탐색 (표 구조: 헤더 행 아래 데이터 행)
+    let foundInNext = false
+    for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
+      const nextCurrency = parseCurrencyAmountTokens(lines[j])
+      if (nextCurrency.length > 0) {
+        candidates.push(...nextCurrency)
+        foundInNext = true
+        break
+      }
+    }
+    if (foundInNext) continue
+
+    // $ / USD 표시 없으면 같은 줄 숫자 탐색
+    const sameLine = parseAmountTokens(lines[i])
+    if (sameLine.length > 0) {
+      candidates.push(...sameLine)
+      continue
+    }
+
+    // 마지막으로 다음 줄 숫자 탐색
+    for (let j = i + 1; j <= Math.min(i + 3, lines.length - 1); j++) {
+      const nextLine = parseAmountTokens(lines[j])
+      if (nextLine.length > 0) {
+        candidates.push(...nextLine)
+        break
+      }
+    }
   }
 
   if (candidates.length === 0) return null
