@@ -386,6 +386,68 @@ const fillFirstVisible = async (
     throw new LogenAutomationError(step, `Could not find input for: ${step}\n\nDebug:\n${debugInfo}`)
 }
 
+/** Try to check the first row checkbox via IBSheet API, then CSS fallback */
+const checkOrderCheckboxInIBSheet = async (page: PageLike, step: string): Promise<void> => {
+    // Wait longer for IBSheet grid to populate after save
+    await page.waitForTimeout(4000)
+
+    // Strategy 1: IBSheet JavaScript API via evaluate across all frames
+    for (const ctx of getAllContexts(page)) {
+        try {
+            const result = await ctx.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                for (const key of Object.keys(win)) {
+                    const obj = win[key]
+                    if (!obj || typeof obj !== 'object') continue
+                    const sheet = obj as Record<string, unknown>
+                    // IBSheet.allCheck(1) - check all rows
+                    if (typeof sheet.allCheck === 'function') {
+                        try {
+                            ;(sheet.allCheck as (v: number) => void)(1)
+                            return `allCheck on ${key}`
+                        } catch { /* next */ }
+                    }
+                    // IBSheet with getRowCount + setCheckVal or setValue
+                    if (typeof sheet.getRowCount === 'function') {
+                        try {
+                            const rowCount = (sheet.getRowCount as () => number)()
+                            if (rowCount > 0) {
+                                if (typeof sheet.setCheckVal === 'function') {
+                                    ;(sheet.setCheckVal as (r: number, v: number) => void)(0, 1)
+                                    return `setCheckVal on ${key}`
+                                }
+                                if (typeof sheet.setValue === 'function') {
+                                    const sv = sheet.setValue as (r: number, c: string, v: number) => void
+                                    try { sv(0, 'chk', 1); return `setValue(0,chk) on ${key}` } catch { /* next */ }
+                                    try { sv(1, 'chk', 1); return `setValue(1,chk) on ${key}` } catch { /* next */ }
+                                }
+                            }
+                        } catch { /* next */ }
+                    }
+                }
+                return null
+            })
+            if (result) {
+                console.log(`[LogenShipping] checkOrderCheckboxInIBSheet: ${result}`)
+                return
+            }
+        } catch { /* next frame */ }
+    }
+
+    // Strategy 2: CSS selectors (longer timeout)
+    await clickFirstVisible(
+        page,
+        [
+            'table tbody tr input[type="checkbox"]',
+            'input[type="checkbox"][name*="chk"]',
+            'input[type="checkbox"][name*="select"]',
+            'input[type="checkbox"]',
+        ],
+        step,
+        10000
+    )
+}
+
 /** Safe wait - use domcontentloaded instead of networkidle to avoid timeout on sites with persistent connections */
 const safeWaitForLoad = async (ctx: FrameLike, timeoutMs = 10000) => {
     try {
@@ -785,21 +847,13 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 '미출력 Tab',
                 10000
             )
-            await page.waitForTimeout(2000)
+            await page.waitForTimeout(3000)
         } catch {
             console.log('[LogenShipping] 미출력 tab already selected or not found')
         }
 
-        // Check the checkbox
-        await clickFirstVisible(
-            page,
-            [
-                'table tbody tr input[type="checkbox"]',
-                'input[type="checkbox"][name*="chk"]',
-                'input[type="checkbox"][name*="select"]',
-            ],
-            'Select Order Checkbox'
-        )
+        // Check the checkbox (IBSheet-aware with CSS fallback)
+        await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
         await page.waitForTimeout(500)
 
         // Click 운송장출력
