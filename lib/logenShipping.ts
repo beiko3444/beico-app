@@ -265,25 +265,24 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         throwIfAbortRequested(signal, 'Login')
         reportStep('로그인')
 
-        await typeFirstVisible(
+        // LOGEN uses id="user.id" and id="user.pw" (dots in IDs)
+        await fillFirstVisible(
             page,
             [
-                'input[name="login_id"]',
-                'input[name="userId"]',
-                'input[name="id"]',
-                'input[type="text"][id*="id"]',
-                'input[type="text"]',
+                '[id="user.id"]',
+                'input#user\\.id',
+                'input.fText[placeholder="사용자 ID"]',
             ],
             loginId,
             'Login - Username'
         )
 
-        await typeFirstVisible(
+        await fillFirstVisible(
             page,
             [
-                'input[name="login_pw"]',
-                'input[name="userPw"]',
-                'input[name="password"]',
+                '[id="user.pw"]',
+                'input#user\\.pw',
+                'input.fText[placeholder="Password"]',
                 'input[type="password"]',
             ],
             loginPassword,
@@ -293,12 +292,9 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         await clickFirstVisible(
             page,
             [
-                'button:has-text("로그인")',
-                'input[type="submit"][value*="로그인"]',
+                'a[onclick="basicLogin()"]',
                 'a:has-text("로그인")',
-                'button[type="submit"]',
-                '.login_btn',
-                '#loginBtn',
+                'button:has-text("로그인")',
             ],
             'Login - Submit'
         )
