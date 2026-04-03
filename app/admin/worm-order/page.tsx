@@ -3426,8 +3426,8 @@ export default function WormOrderPage() {
                             return (
                                 <div className="flex flex-col h-full max-h-[600px]">
                                     {/* 상세 헤더 */}
-                                    <div className="p-6 bg-white border-b border-gray-100 shrink-0">
-                                        <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">
+                                    <div className="p-6 bg-white dark:bg-[#1e1e1e] border-b border-gray-100 dark:border-[#2a2a2a] shrink-0">
+                                        <h2 className="text-[18px] font-black text-gray-900 dark:text-white leading-tight mb-2 pr-4">
                                             {selectedEmail.sequence ? `${selectedEmail.sequence}. ` : ''}
                                             {selectedEmail.subject}
                                         </h2>
@@ -3467,7 +3467,7 @@ export default function WormOrderPage() {
 
                                     </div>
                                     {/* 메일 본문 내용 */}
-                                    <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
+                                    <div className="p-6 overflow-y-auto bg-white dark:bg-[#1e1e1e] flex-1 text-[14px]">
                                         {loadingEmailDetail && !selectedEmail.text ? (
                                             <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
                                                 <Loader2 size={16} className="animate-spin mr-2" />

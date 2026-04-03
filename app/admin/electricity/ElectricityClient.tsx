@@ -1086,12 +1086,12 @@ export default function ElectricityClient() {
                                                                 {status.rentTaxInvoiceIssued ? '✓' : '-'}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-right text-gray-600 whitespace-nowrap">
+                                                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 whitespace-nowrap">
                                                             {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
                                                             <div className="flex flex-col items-center">
-                                                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'}`}>
                                                                     {status.electricityPaid ? '✓' : '-'}
                                                                 </span>
                                                                 {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}

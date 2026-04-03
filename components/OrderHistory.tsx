@@ -205,7 +205,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                         {order.status !== 'DEPOSIT_COMPLETED' && order.status !== 'SHIPPED' && (
                             <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-3 flex items-start gap-3 mb-4 mx-1">
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
-                                <div className="text-xs text-gray-600 flex flex-col gap-1.5">
+                                <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-col gap-1.5">
                                     <p className="leading-relaxed">
                                         <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}{isUSD ? '$' : 'ウォン'}</span>{isUSD ? ' を入金後、' : 'を入金後、'}「入金確認の要請」ボタンを押してください.入金確認後の注文キャンセル는 できません.
                                     </p>
@@ -217,14 +217,14 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                         )}
 
                         {/* Action Buttons */}
-                        <div className="bg-white rounded-xl mb-4 px-1">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-xl mb-4 px-1">
                             <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                                 <button
                                     onClick={() => order.status !== 'DEPOSIT_COMPLETED' && !order.trackingNumber && toggleDeposit(order.id, order.status)}
                                     disabled={loadingMap[order.id] || order.status === 'DEPOSIT_COMPLETED' || !!order.trackingNumber}
                                     className={`h-13 border-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center leading-tight
                                         ${order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber
-                                            ? 'border-gray-200 text-gray-400 bg-gray-50 cursor-not-allowed'
+                                            ? 'border-gray-200 dark:border-[#2a2a2a] text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#1a1a1a] cursor-not-allowed'
                                             : 'border-[#e34219] text-white bg-[#e34219] hover:bg-[#cc3b16]'
                                         }`}
                                 >
