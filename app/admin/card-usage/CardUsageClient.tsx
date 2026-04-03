@@ -385,6 +385,10 @@ export default function CardUsageClient() {
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [pendingJumpDate, setPendingJumpDate] = useState<string | null>(null)
   const [showShortcutDock, setShowShortcutDock] = useState(false)
+  const monthInputRef = useRef<HTMLInputElement | null>(null)
+  const startDateInputRef = useRef<HTMLInputElement | null>(null)
+  const endDateInputRef = useRef<HTMLInputElement | null>(null)
+  const didInitDateAutoLoadRef = useRef(false)
 
   /* ── User-managed categories ── */
   const [categories, setCategories] = useState<CategoryMeta[]>(() => loadUserCategories())
@@ -630,8 +634,39 @@ export default function CardUsageClient() {
     setEndDate(range.endDate)
     setSyncMessage('')
     setSyncCompletedAt(null)
-    void load(1, { startDate: range.startDate, endDate: range.endDate })
   }
+
+  const openNativePicker = useCallback((target: HTMLInputElement | null) => {
+    if (!target) return
+    if ('showPicker' in target && typeof target.showPicker === 'function') {
+      target.showPicker()
+      return
+    }
+    target.focus()
+    target.click()
+  }, [])
+
+  useEffect(() => {
+    if (!didInitDateAutoLoadRef.current) {
+      didInitDateAutoLoadRef.current = true
+      return
+    }
+
+    const start = parseYmd(startDate)
+    const end = parseYmd(endDate)
+    if (!start || !end) return
+
+    const startTime = new Date(`${startDate}T00:00:00+09:00`).getTime()
+    const endTime = new Date(`${endDate}T23:59:59+09:00`).getTime()
+    if (Number.isNaN(startTime) || Number.isNaN(endTime) || startTime > endTime) return
+
+    setSyncMessage('')
+    setSyncCompletedAt(null)
+    const timer = window.setTimeout(() => {
+      void load(1, { startDate, endDate })
+    }, 120)
+    return () => window.clearTimeout(timer)
+  }, [startDate, endDate, load])
 
   /* ── Derived data ── */
   const allItems = data?.items ?? []
@@ -1336,13 +1371,19 @@ export default function CardUsageClient() {
         <div style={{
           ...flatInputStyle, display: 'flex', alignItems: 'center', gap: 8,
           flex: '0 1 180px', paddingLeft: 12,
-        }}>
+          cursor: 'pointer',
+        }} onClick={() => openNativePicker(monthInputRef.current)}>
           <Calendar size={14} style={{ color: T.textTertiary, flexShrink: 0 }} />
           <input
+            ref={monthInputRef}
             type="month"
             value={selectedMonth}
             onChange={e => handleMonthChange(e.target.value)}
-            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit' }}
+            onClick={e => {
+              e.stopPropagation()
+              openNativePicker(monthInputRef.current)
+            }}
+            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit', cursor: 'pointer' }}
           />
         </div>
 
@@ -1353,13 +1394,21 @@ export default function CardUsageClient() {
         }}>
           <Calendar size={14} style={{ color: T.textTertiary, flexShrink: 0 }} />
           <input
-            type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
-            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit' }}
+            ref={startDateInputRef}
+            type="date"
+            value={startDate}
+            onChange={e => setStartDate(e.target.value)}
+            onClick={() => openNativePicker(startDateInputRef.current)}
+            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit', cursor: 'pointer' }}
           />
           <span style={{ color: T.textTertiary, fontSize: 13, flexShrink: 0 }}>—</span>
           <input
-            type="date" value={endDate} onChange={e => setEndDate(e.target.value)}
-            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit' }}
+            ref={endDateInputRef}
+            type="date"
+            value={endDate}
+            onChange={e => setEndDate(e.target.value)}
+            onClick={() => openNativePicker(endDateInputRef.current)}
+            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit', cursor: 'pointer' }}
           />
         </div>
 
