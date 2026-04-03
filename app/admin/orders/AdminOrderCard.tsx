@@ -290,44 +290,44 @@ export default function AdminOrderCard({ order }: { order: any }) {
 
                         {/* 배송비 */}
                         {shippingFee > 0 && (
-                            <div className="flex items-center justify-between py-3 border-b border-gray-100 -mx-5 px-5 bg-gray-50/50">
+                            <div className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-[#2a2a2a] -mx-5 px-5 bg-gray-50/50 dark:bg-[#1a1a1a]">
                                 <div className="flex items-center gap-2">
-                                    <div className="w-8 h-8 rounded-full bg-white shadow-sm border border-gray-100 flex items-center justify-center">
-                                        <Truck size={14} className="text-gray-400" />
+                                    <div className="w-8 h-8 rounded-full bg-white dark:bg-[#1e1e1e] shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] flex items-center justify-center">
+                                        <Truck size={14} className="text-gray-400 dark:text-gray-500" />
                                     </div>
                                     <div>
-                                        <span className="text-[12px] font-bold text-gray-800">배송비</span>
-                                        <span className="text-[10px] text-gray-500 ml-1.5">(VAT 포함)</span>
+                                        <span className="text-[12px] font-bold text-gray-800 dark:text-gray-200">배송비</span>
+                                        <span className="text-[10px] text-gray-500 dark:text-gray-400 ml-1.5">(VAT 포함)</span>
                                     </div>
                                 </div>
-                                <span className="text-[14px] font-black text-gray-900">{shippingFee.toLocaleString()}<span className="text-[10px] text-gray-500 font-medium ml-0.5">원</span></span>
+                                <span className="text-[14px] font-black text-gray-900 dark:text-white">{shippingFee.toLocaleString()}<span className="text-[10px] text-gray-500 dark:text-gray-400 font-medium ml-0.5">원</span></span>
                             </div>
                         )}
                     </div>
 
                     {/* ── 최종 합계 ── */}
-                    <div className="mt-4 pt-4 border-t-2 border-gray-100 relative z-10">
+                    <div className="mt-4 pt-4 border-t-2 border-gray-100 dark:border-[#2a2a2a] relative z-10">
                         <div className="flex flex-col gap-2 mb-4">
                             <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-gray-500 font-medium">공급가액</span>
-                                <span className="text-[13px] font-bold text-gray-700">{grandSupply.toLocaleString()}원</span>
+                                <span className="text-[12px] text-gray-500 dark:text-gray-400 font-medium">공급가액</span>
+                                <span className="text-[13px] font-bold text-gray-700 dark:text-gray-200">{grandSupply.toLocaleString()}원</span>
                             </div>
                             <div className="flex items-center justify-between">
-                                <span className="text-[12px] text-gray-500 font-medium">부가세 (10%)</span>
-                                <span className="text-[13px] font-bold text-gray-700">{grandVat.toLocaleString()}원</span>
+                                <span className="text-[12px] text-gray-500 dark:text-gray-400 font-medium">부가세 (10%)</span>
+                                <span className="text-[13px] font-bold text-gray-700 dark:text-gray-200">{grandVat.toLocaleString()}원</span>
                             </div>
                         </div>
-                        
-                        <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100/50 rounded-xl p-4 border border-orange-200/60 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)]">
+
+                        <div className="flex items-center justify-between bg-gradient-to-r from-orange-50 to-orange-100/50 dark:from-orange-900/20 dark:to-orange-800/10 rounded-xl p-4 border border-orange-200/60 dark:border-orange-800 shadow-[inset_0_1px_2px_rgba(255,255,255,0.5)] dark:shadow-none">
                             <div>
-                                <p className="text-[12px] text-orange-600 font-black">최종 결제금액</p>
-                                <p className="text-[10px] text-orange-500/80 font-medium mt-0.5 tracking-tight">모든 세금 포함</p>
+                                <p className="text-[12px] text-orange-600 dark:text-orange-400 font-black">최종 결제금액</p>
+                                <p className="text-[10px] text-orange-500/80 dark:text-orange-400/60 font-medium mt-0.5 tracking-tight">모든 세금 포함</p>
                             </div>
                             <div className="text-right flex items-baseline gap-0.5">
-                                <span className="text-[28px] font-black text-orange-600 tracking-tight leading-none">
+                                <span className="text-[28px] font-black text-orange-600 dark:text-orange-400 tracking-tight leading-none">
                                     {totalAmount.toLocaleString()}
                                 </span>
-                                <span className="text-[14px] font-bold text-orange-500">원</span>
+                                <span className="text-[14px] font-bold text-orange-500 dark:text-orange-400">원</span>
                             </div>
                         </div>
                     </div>

@@ -293,7 +293,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     }
                                                 }}
                                                 className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
-                                                    ? 'text-[#1e293b]'
+                                                    ? 'text-[#1e293b] dark:text-white'
                                                     : qty < product.minOrderQuantity
                                                         ? 'text-[#e34219]'
                                                         : 'text-blue-600'
@@ -313,7 +313,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="flex items-center text-[13px] font-bold text-[#e34219] bg-[#fff5f5] px-4 py-2 rounded-lg border border-red-100">
+                                    <div className="flex items-center text-[13px] font-bold text-[#e34219] bg-[#fff5f5] dark:bg-[#2a1a1a] px-4 py-2 rounded-lg border border-red-100 dark:border-[#3a2a2a]">
                                         こちらの商品は品切れとなりました。
                                     </div>
                                 )}

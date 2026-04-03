@@ -134,12 +134,12 @@ export default async function ProformaPage() {
 
     return (
         <div className="space-y-6">
-            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 shadow-sm transition-all duration-300">
+            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all duration-300">
                 <div className="flex items-center gap-3">
-                    <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#e53b19] transition-all" title="Dashboard">
+                    <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-400 hover:text-[#e53b19] transition-all" title="Dashboard">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                    <h1 className="text-lg font-black text-gray-900 tracking-tight">P.I발급 작성</h1>
+                    <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">P.I발급 작성</h1>
                 </div>
             </div>
 

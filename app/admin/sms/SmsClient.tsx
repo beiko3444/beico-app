@@ -400,7 +400,7 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="toNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="toNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   수신번호
                 </label>
                 <input
@@ -409,7 +409,7 @@ export default function SmsClient() {
                   inputMode="numeric"
                   value={toNumber}
                   onChange={(event) => setToNumber(formatPhoneNumber(event.target.value))}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   placeholder="010-0000-0000"
                   required
                 />
@@ -432,21 +432,21 @@ export default function SmsClient() {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="contents" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+              <label htmlFor="contents" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                 문자 내용
               </label>
               <textarea
                 id="contents"
                 value={contents}
                 onChange={(event) => setContents(event.target.value)}
-                className="w-full min-h-[220px] px-4 py-4 rounded-2xl border border-gray-200 bg-white text-sm leading-6 text-gray-900 outline-none focus:border-[#e34219] resize-y"
+                className="w-full min-h-[220px] px-4 py-4 rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm leading-6 text-gray-900 dark:text-white outline-none focus:border-[#e34219] resize-y"
                 placeholder="발송할 문자를 입력하세요."
                 required
               />
             </div>
           </div>
 
-          <div className="p-6 md:p-8 bg-[linear-gradient(180deg,#fff7f3_0%,#ffffff_100%)] border-t xl:border-t-0 xl:border-l border-gray-100 space-y-5">
+          <div className="p-6 md:p-8 bg-[linear-gradient(180deg,#fff7f3_0%,#ffffff_100%)] dark:bg-[linear-gradient(180deg,#1a1a1a_0%,#1e1e1e_100%)] border-t xl:border-t-0 xl:border-l border-gray-100 dark:border-[#2a2a2a] space-y-5">
             <div className="rounded-2xl bg-white border border-gray-200 p-5 space-y-4 shadow-sm">
               <div className="flex items-center justify-between">
                 <span className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">발송 타입</span>

@@ -267,7 +267,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                             <div
                                 key={task.id}
                                 className={`group flex items-center gap-4 p-4 rounded-2xl transition-all border
-                                    ${task.completed ? 'bg-gray-50/50 border-gray-100 opacity-60' : 'bg-white border-gray-100 hover:border-black hover:shadow-xl hover:-translate-y-1'}
+                                    ${task.completed ? 'bg-gray-50/50 dark:bg-[#1a1a1a]/50 border-gray-100 dark:border-[#2a2a2a] opacity-60' : 'bg-white dark:bg-[#1e1e1e] border-gray-100 dark:border-[#2a2a2a] hover:border-black hover:shadow-xl hover:-translate-y-1'}
                                 `}
                             >
                                 <button
@@ -277,20 +277,20 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                     {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
                                 </button>
                                 <div className="flex-1 min-w-0 flex items-center gap-6" onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}>
-                                    <h4 className={`text-sm font-black truncate max-w-[200px] ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900'}`}>{task.title}</h4>
-                                    {task.description && <p className="text-xs text-gray-400 truncate font-medium flex-1 pt-0.5">{task.description}</p>}
+                                    <h4 className={`text-sm font-black truncate max-w-[200px] ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900 dark:text-white'}`}>{task.title}</h4>
+                                    {task.description && <p className="text-xs text-gray-400 dark:text-gray-400 truncate font-medium flex-1 pt-0.5">{task.description}</p>}
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {task.fileUrl && <Paperclip className="w-4 h-4 text-blue-500" />}
                                     <button
                                         onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}
-                                        className="bg-gray-100 hover:bg-black hover:text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-sm"
+                                        className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-black hover:text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-sm dark:shadow-none"
                                     >
                                         수정
                                     </button>
                                     <button
                                         onClick={() => handleDeleteTask(task.id)}
-                                        className="bg-red-50 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black text-red-500 transition-all shadow-sm"
+                                        className="bg-red-50 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black text-red-500 transition-all shadow-sm dark:shadow-none"
                                     >
                                         삭제
                                     </button>
@@ -298,7 +298,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                             </div>
                         ))
                     ) : (
-                        <div className="py-20 text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
+                        <div className="py-20 text-center bg-gray-50/50 dark:bg-[#1a1a1a]/50 rounded-3xl border-2 border-dashed border-gray-100 dark:border-[#2a2a2a]">
                             <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">No events scheduled</p>
                         </div>
                     )}
@@ -310,8 +310,8 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
             {/* Task Modal (Add/Edit) */}
             {isModalOpen && mounted && createPortal(
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100000] flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-                        <div className="bg-gray-50 p-8 border-b border-gray-100 flex justify-between items-start">
+                    <div className="bg-white dark:bg-[#1e1e1e] rounded-[2.5rem] w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="bg-gray-50 dark:bg-[#1a1a1a] p-8 border-b border-gray-100 dark:border-[#2a2a2a] flex justify-between items-start">
                             <div>
                                 <h3 className="text-2xl font-black text-gray-900 tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
                                 <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">

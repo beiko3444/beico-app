@@ -2793,7 +2793,7 @@ export default function WormOrderPage() {
                         type="button"
                         onClick={handleStartNewOrder}
                         disabled={creatingOrder}
-                        className="h-10 px-4 rounded-xl border border-[#e34219] bg-white hover:bg-[#fff3ef] text-sm font-bold text-[#e34219] inline-flex items-center gap-2 w-full md:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="h-10 px-4 rounded-xl border border-[#e34219] bg-white dark:bg-[#1e1e1e] hover:bg-[#fff3ef] dark:hover:bg-[#252525] text-sm font-bold text-[#e34219] inline-flex items-center gap-2 w-full md:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
                     >
                         {creatingOrder ? (
                             <>
@@ -2818,29 +2818,29 @@ export default function WormOrderPage() {
                 )}
 
                 <div className="mt-4 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 rounded-full bg-slate-200 overflow-hidden">
+                    <div className="h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-[#2a2a2a] overflow-hidden">
                         <div
                             className="h-full bg-[#e34219] rounded-full transition-all duration-500"
                             style={{ width: `${Math.round((doneStepCount / PIPELINE_STEP_DEFINITIONS.length) * 100)}%` }}
                         />
                     </div>
-                    <span className="text-xs font-semibold text-slate-500 shrink-0">
+                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 shrink-0">
                         {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                     </span>
                 </div>
             </div>
 
-            <section className="rounded-2xl border border-gray-200 bg-white shadow-sm p-4 md:p-5">
+            <section className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] shadow-sm dark:shadow-none p-4 md:p-5">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
-                        <h2 className="text-lg font-black text-slate-900">발주 리스트</h2>
-                        <p className="text-xs text-slate-500 mt-1">새 발주 생성 시 DB에 저장되며, 아래에서 바로 선택할 수 있습니다.</p>
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white">발주 리스트</h2>
+                        <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">새 발주 생성 시 DB에 저장되며, 아래에서 바로 선택할 수 있습니다.</p>
                     </div>
                     <button
                         type="button"
                         onClick={() => { void fetchWormOrders() }}
                         disabled={wormOrderListLoading}
-                        className="h-9 px-3 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-bold hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                        className="h-9 px-3 rounded-lg border border-slate-300 bg-white dark:bg-[#1e1e1e] text-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#252525] disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
                     >
                         {wormOrderListLoading && <Loader2 size={14} className="animate-spin" />}
                         리스트 새로고침
@@ -2854,7 +2854,7 @@ export default function WormOrderPage() {
                 <div className="mt-3 overflow-x-auto">
                     <table className="min-w-full text-sm">
                         <thead>
-                            <tr className="bg-slate-50 text-slate-600">
+                            <tr className="bg-slate-50 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400">
                                 <th className="text-left px-3 py-2 font-bold">발주번호</th>
                                 <th className="text-left px-3 py-2 font-bold">작성일</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
@@ -2871,11 +2871,11 @@ export default function WormOrderPage() {
                                     <tr
                                         key={order.id}
                                         onClick={() => handleSelectWormOrder(order)}
-                                        className={`border-t border-slate-100 cursor-pointer transition-colors ${
-                                            isActiveOrder ? 'bg-[#fff3ef]' : 'hover:bg-slate-50'
+                                        className={`border-t border-slate-100 dark:border-[#2a2a2a] cursor-pointer transition-colors ${
+                                            isActiveOrder ? 'bg-[#fff3ef] dark:bg-[#252525]' : 'hover:bg-slate-50 dark:hover:bg-[#252525]'
                                         }`}
                                     >
-                                        <td className="px-3 py-2.5 font-bold text-slate-900">{order.orderNumber}</td>
+                                        <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-white">{order.orderNumber}</td>
                                         <td className="px-3 py-2.5 text-slate-700">{createdDateText || '-'}</td>
                                         <td className="px-3 py-2.5">
                                             <div className="flex flex-col gap-1">

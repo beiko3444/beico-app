@@ -730,7 +730,7 @@ export default function ElectricityClient() {
                     onClick={() => setActiveTab('payment')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'payment'
                         ? 'bg-[#d9361b] text-white'
-                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        : 'bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
                         }`}
                 >
                     납부관리
@@ -740,7 +740,7 @@ export default function ElectricityClient() {
                     onClick={() => setActiveTab('rent-receipt')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'rent-receipt'
                         ? 'bg-blue-600 text-white'
-                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        : 'bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
                         }`}
                 >
                     임대료영수증
@@ -748,12 +748,12 @@ export default function ElectricityClient() {
             </div>
 
             {/* Month Selection */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 space-y-4">
+            <div className="bg-white dark:bg-[#1e1e1e] p-4 rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] space-y-4">
                 <div className="flex gap-4 items-center overflow-x-auto pb-2">
                     <select
                         value={selectedYear}
                         onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="bg-gray-50 border border-gray-200 text-gray-900 text-sm rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] block p-2 font-bold min-w-[100px]"
+                        className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-900 dark:text-white text-sm rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] block p-2 font-bold min-w-[100px]"
                     >
                         {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
                     </select>
@@ -764,7 +764,7 @@ export default function ElectricityClient() {
                                 onClick={() => setSelectedMonth(month)}
                                 className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedMonth === month
                                     ? 'bg-[#d9361b] text-white shadow-md transform scale-105'
-                                    : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                                    : 'bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
                                     }`}
                             >
                                 {month}월
@@ -774,14 +774,14 @@ export default function ElectricityClient() {
                 </div>
 
                 {activeTab === 'analysis' && billData && (
-                    <div className="flex flex-wrap gap-2 justify-start pt-2 border-t border-gray-50">
+                    <div className="flex flex-wrap gap-2 justify-start pt-2 border-t border-gray-50 dark:border-[#2a2a2a]">
                         <button onClick={() => setIsPhotoModalOpen(true)} className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 border border-green-700 shadow-sm">
                             계량기 확인하기
                         </button>
-                        <button onClick={() => setIsLandlordModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
+                        <button onClick={() => setIsLandlordModalOpen(true)} className="px-4 py-2 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-[#252525] rounded-xl text-xs font-bold text-gray-700 dark:text-gray-400 transition-all border border-gray-100 dark:border-[#2a2a2a]">
                             {landlordData ? '임대인 데이터 수정' : '임대인 사용량 입력'}
                         </button>
-                        <button onClick={() => setIsUsageModalOpen(true)} className="px-4 py-2 bg-gray-50 hover:bg-gray-100 rounded-xl text-xs font-bold text-gray-700 transition-all border border-gray-100">
+                        <button onClick={() => setIsUsageModalOpen(true)} className="px-4 py-2 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-[#252525] rounded-xl text-xs font-bold text-gray-700 dark:text-gray-400 transition-all border border-gray-100 dark:border-[#2a2a2a]">
                             고지서 수정
                         </button>
                         <button onClick={() => setIsInvoiceOpen(true)} className="px-5 py-2.5 bg-[#d9361b] hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ml-auto">
@@ -795,7 +795,7 @@ export default function ElectricityClient() {
                 activeTab === 'analysis' && (billData ? (
                     <>
                         {/* Total Bill Summary */}
-                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl shadow-lg dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
                             <div className="bg-gray-900 p-6 text-white flex justify-between items-center">
                                 <div>
                                     <h2 className="text-xl font-bold flex items-center gap-2">
@@ -823,7 +823,7 @@ export default function ElectricityClient() {
                             </div>
 
                             <div className="p-6 grid grid-cols-2 gap-4">
-                                <div className="bg-gray-50 p-5 rounded-3xl border border-gray-100 relative overflow-hidden group">
+                                <div className="bg-gray-50 dark:bg-[#1a1a1a] p-5 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] relative overflow-hidden group">
                                     <div className="absolute top-0 right-0 p-4 text-gray-100 group-hover:text-gray-200 transition-colors">
                                         <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
                                     </div>

@@ -365,33 +365,33 @@ export default function InventoryPage() {
                                 </tr>
                             ) : (
                                 sortedInventory.map((item, idx) => (
-                                    <tr key={`${item.vendorItemId}-${idx}`} className="even:bg-gray-50/50 hover:bg-gray-50/80 transition-colors">
+                                    <tr key={`${item.vendorItemId}-${idx}`} className="even:bg-gray-50/50 dark:even:bg-[#1a1a1a] hover:bg-gray-50/80 dark:hover:bg-[#252525] transition-colors">
                                         <td className="px-6 py-2">
-                                            <div className="text-xs text-gray-700">{item.externalSkuId || "-"}</div>
+                                            <div className="text-xs text-gray-700 dark:text-gray-400">{item.externalSkuId || "-"}</div>
                                         </td>
                                         <td className="px-6 py-2">
-                                            <div className="text-xs text-gray-500">{item.vendorItemId}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">{item.vendorItemId}</div>
                                         </td>
                                         <td className="px-6 py-2">
                                             <div className="flex items-center gap-3">
                                                 {item.imageUrl ? (
-                                                    <img src={item.imageUrl} alt={item.productName} className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-100 bg-white" />
+                                                    <img src={item.imageUrl} alt={item.productName} className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-100 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e]" />
                                                 ) : (
-                                                    <div className="w-10 h-10 bg-gray-50 rounded-md border border-gray-100 flex-shrink-0 flex items-center justify-center">
-                                                        <Package className="w-4 h-4 text-gray-300" />
+                                                    <div className="w-10 h-10 bg-gray-50 dark:bg-[#1a1a1a] rounded-md border border-gray-100 dark:border-[#2a2a2a] flex-shrink-0 flex items-center justify-center">
+                                                        <Package className="w-4 h-4 text-gray-300 dark:text-gray-500" />
                                                     </div>
                                                 )}
-                                                <div className="text-xs text-gray-700 min-w-[300px] whitespace-normal leading-relaxed" title={item.productName}>
+                                                <div className="text-xs text-gray-700 dark:text-gray-400 min-w-[300px] whitespace-normal leading-relaxed" title={item.productName}>
                                                     {item.productName || "알 수 없는 상품"}
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-2 text-right">
                                             <div className="inline-flex items-center justify-end gap-1.5 min-w-[3rem]">
-                                                <span className={`text-xs ${item.inventoryDetails.totalOrderableQuantity > 10 ? "text-gray-700" : "text-red-500"}`}>
+                                                <span className={`text-xs ${item.inventoryDetails.totalOrderableQuantity > 10 ? "text-gray-700 dark:text-gray-400" : "text-red-500"}`}>
                                                     {item.inventoryDetails.totalOrderableQuantity.toLocaleString()}
                                                 </span>
-                                                <span className="text-[10px] text-gray-400">개</span>
+                                                <span className="text-[10px] text-gray-400 dark:text-gray-500">개</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-2 text-right">
@@ -432,60 +432,60 @@ export default function InventoryPage() {
                         <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {smartstoreLoading && smartstoreInventory.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
+                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400 dark:text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-3">
-                                            <RefreshCw className="w-6 h-6 animate-spin text-gray-300" />
+                                            <RefreshCw className="w-6 h-6 animate-spin text-gray-300 dark:text-gray-500" />
                                             스마트스토어 재고 정보를 불러오는 중입니다...
                                         </div>
                                     </td>
                                 </tr>
                             ) : smartstoreInventory.length === 0 && !smartstoreError ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
+                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400 dark:text-gray-500">
                                         스마트스토어 재고 데이터가 없습니다. 상단 버튼으로 조회해주세요.
                                     </td>
                                 </tr>
                             ) : (
                                 sortedSmartstoreInventory.map((item, idx) => (
-                                    <tr key={`${item.channelProductNo || "no"}-${item.sellerManagementCode}-${idx}`} className="even:bg-gray-50/50 hover:bg-gray-50/80 transition-colors">
+                                    <tr key={`${item.channelProductNo || "no"}-${item.sellerManagementCode}-${idx}`} className="even:bg-gray-50/50 dark:even:bg-[#1a1a1a] hover:bg-gray-50/80 dark:hover:bg-[#252525] transition-colors">
                                         <td className="px-6 py-2">
-                                            <div className="text-xs text-gray-700">{item.sellerManagementCode || "-"}</div>
+                                            <div className="text-xs text-gray-700 dark:text-gray-400">{item.sellerManagementCode || "-"}</div>
                                         </td>
                                         <td className="px-6 py-2">
-                                            <div className="text-xs text-gray-500">{item.channelProductNo ? item.channelProductNo.toLocaleString() : "-"}</div>
+                                            <div className="text-xs text-gray-500 dark:text-gray-400">{item.channelProductNo ? item.channelProductNo.toLocaleString() : "-"}</div>
                                         </td>
                                         <td className="px-6 py-2">
                                             <div className="flex items-center gap-3">
                                                 {item.imageUrl ? (
-                                                    <img src={item.imageUrl} alt={item.dbProductName || item.productName || "상품 이미지"} className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-100 bg-white" />
+                                                    <img src={item.imageUrl} alt={item.dbProductName || item.productName || "상품 이미지"} className="w-10 h-10 object-cover rounded-md flex-shrink-0 border border-gray-100 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e]" />
                                                 ) : (
-                                                    <div className="w-10 h-10 bg-gray-50 rounded-md border border-gray-100 flex-shrink-0 flex items-center justify-center">
-                                                        <Package className="w-4 h-4 text-gray-300" />
+                                                    <div className="w-10 h-10 bg-gray-50 dark:bg-[#1a1a1a] rounded-md border border-gray-100 dark:border-[#2a2a2a] flex-shrink-0 flex items-center justify-center">
+                                                        <Package className="w-4 h-4 text-gray-300 dark:text-gray-500" />
                                                     </div>
                                                 )}
                                                 <div className="min-w-[280px]">
-                                                    <div className="text-xs text-gray-700 leading-relaxed">
+                                                    <div className="text-xs text-gray-700 dark:text-gray-400 leading-relaxed">
                                                         {item.dbProductName || item.productName || "-"}
                                                     </div>
                                                     {item.dbProductName && item.productName && item.dbProductName !== item.productName && (
-                                                        <div className="text-[11px] text-gray-500 mt-0.5">{item.productName}</div>
+                                                        <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">{item.productName}</div>
                                                     )}
                                                     {item.dbProductCode && (
-                                                        <div className="text-[10px] text-gray-400 mt-0.5">{item.dbProductCode}</div>
+                                                        <div className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">{item.dbProductCode}</div>
                                                     )}
                                                 </div>
                                             </div>
                                         </td>
                                         <td className="px-6 py-2 text-right">
                                             <div className="inline-flex items-center justify-end gap-1.5 min-w-[3rem]">
-                                                <span className={`text-xs ${item.stockQuantity > 10 ? "text-gray-700" : "text-red-500"}`}>
+                                                <span className={`text-xs ${item.stockQuantity > 10 ? "text-gray-700 dark:text-gray-400" : "text-red-500"}`}>
                                                     {item.stockQuantity.toLocaleString()}
                                                 </span>
-                                                <span className="text-[10px] text-gray-400">개</span>
+                                                <span className="text-[10px] text-gray-400 dark:text-gray-500">개</span>
                                             </div>
                                         </td>
                                         <td className="px-6 py-2">
-                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold bg-gray-100 text-gray-700">
+                                            <span className="inline-flex items-center px-2 py-1 rounded-md text-[11px] font-semibold bg-gray-100 dark:bg-[#2a2a2a] text-gray-700 dark:text-gray-400">
                                                 {item.statusType || "-"}
                                             </span>
                                         </td>

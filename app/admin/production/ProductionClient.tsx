@@ -338,8 +338,8 @@ export default function ProductionClient() {
                                     key={cat}
                                     onClick={() => setActiveTab(cat)}
                                     className={`px-3 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition-all ${activeTab === cat
-                                        ? 'bg-white text-[var(--color-brand-blue)] shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-600'
+                                        ? 'bg-white dark:bg-[#1e1e1e] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none'
+                                        : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                                         }`}
                                 >
                                     {cat}
@@ -351,7 +351,7 @@ export default function ProductionClient() {
             </div>
 
             {/* Action Bar */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-center bg-white dark:bg-[#1e1e1e] p-4 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[var(--color-brand-blue)]"></span>
                     <span className="font-bold text-gray-700">{activeTab} 생산일지</span>
@@ -416,10 +416,10 @@ export default function ProductionClient() {
                             : '0%'
                     }
                 ].map((stat, idx) => (
-                    <div key={idx} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-1 transition-transform hover:scale-[1.02]">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{stat.label}</span>
+                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] p-5 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-1 transition-transform hover:scale-[1.02]">
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-wider">{stat.label}</span>
                         <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-black text-gray-900">{stat.value}</span>
+                            <span className="text-xl font-black text-gray-900 dark:text-white">{stat.value}</span>
                         </div>
                     </div>
                 ))}
@@ -429,13 +429,13 @@ export default function ProductionClient() {
             {!loading && batches.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Total Production Cost Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                                     <DollarSign className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">총 생산비용 추이</h3>
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">총 생산비용 추이</h3>
                             </div>
                             <Activity className="w-4 h-4 text-gray-300" />
                         </div>
@@ -462,13 +462,13 @@ export default function ProductionClient() {
                     </div>
 
                     {/* Production Quantity Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
                                     <Package className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">생산수량 변동</h3>
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">생산수량 변동</h3>
                             </div>
                             <TrendingUp className="w-4 h-4 text-gray-300" />
                         </div>
@@ -491,13 +491,13 @@ export default function ProductionClient() {
                     </div>
 
                     {/* Unit Cost Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
                                     <Calculator className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">생산단가 추이</h3>
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">생산단가 추이</h3>
                             </div>
                             <ChevronRight className="w-4 h-4 text-gray-300" />
                         </div>
@@ -523,36 +523,36 @@ export default function ProductionClient() {
 
 
             {/* Table */}
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-x-auto shadow-sm pb-16">
+            <div className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl overflow-x-auto shadow-sm dark:shadow-none pb-16">
                 <div className="min-w-[800px]">
                     <table className="w-full text-xs text-left">
-                        <thead className="bg-gray-50 text-black font-black uppercase border-b border-gray-100">
+                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-black dark:text-white font-black uppercase border-b border-gray-100 dark:border-[#2a2a2a]">
                             <tr>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('productionDate')}>
+                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('productionDate')}>
                                     No {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('productionDate')}>
+                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('productionDate')}>
                                     생산날짜 {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
                                     총 생산비용 {sortConfig?.key === 'totalCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('quantity')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('quantity')}>
                                     생산수량 {sortConfig?.key === 'quantity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('unitCost')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('unitCost')}>
                                     단가 {sortConfig?.key === 'unitCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('salesPrice')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('salesPrice')}>
                                     도매가 {sortConfig?.key === 'salesPrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('wMargin')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('wMargin')}>
                                     도매마진 {sortConfig?.key === 'wMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('wholesalePrice')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('wholesalePrice')}>
                                     판매가 {sortConfig?.key === 'wholesalePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('rMargin')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('rMargin')}>
                                     소매마진 {sortConfig?.key === 'rMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap border-r border-gray-200">메모</th>

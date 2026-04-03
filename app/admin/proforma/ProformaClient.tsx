@@ -657,11 +657,11 @@ ${rowsHtml}
 
             <div className="grid grid-cols-1 xl:grid-cols-[minmax(480px,1fr)_210mm] gap-8 items-start">
                 <div className="pi-no-print space-y-6 xl:max-w-none">
-                    <section className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
+                    <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4">
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                             <div>
-                                <h2 className="text-base font-black text-gray-900">P.I발급 관리</h2>
-                                <p className="text-xs text-gray-500 mt-1">좌측 탭에서 제품리스트 작성/발급리스트 관리를 분리했습니다.</p>
+                                <h2 className="text-base font-black text-gray-900 dark:text-white">P.I발급 관리</h2>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">좌측 탭에서 제품리스트 작성/발급리스트 관리를 분리했습니다.</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button
@@ -671,13 +671,13 @@ ${rowsHtml}
                                 >
                                     출력 (PDF 저장/인쇄)
                                 </button>
-                                <span className="text-[11px] text-gray-500">인쇄창에서 머리글/바닥글 해제 시 날짜/URL 표시가 사라집니다.</span>
+                                <span className="text-[11px] text-gray-500 dark:text-gray-400">인쇄창에서 머리글/바닥글 해제 시 날짜/URL 표시가 사라집니다.</span>
                                 {leftTab === 'write' && (
                                     <>
                                         <button
                                             type="button"
                                             onClick={resetDraft}
-                                            className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 text-gray-600 hover:bg-gray-200 transition-all"
+                                            className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-all"
                                         >
                                             초기화
                                         </button>
@@ -694,18 +694,18 @@ ${rowsHtml}
                             </div>
                         </div>
 
-                        <div className="inline-flex rounded-xl border border-gray-200 p-1 bg-gray-50">
+                        <div className="inline-flex rounded-xl border border-gray-200 dark:border-[#2a2a2a] p-1 bg-gray-50 dark:bg-[#1a1a1a]">
                             <button
                                 type="button"
                                 onClick={() => setLeftTab('write')}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'write' ? 'bg-[#e53b19] text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'write' ? 'bg-[#e53b19] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
                             >
                                 PI 작성
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setLeftTab('issued')}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'issued' ? 'bg-[#e53b19] text-white' : 'text-gray-500 hover:bg-gray-100'}`}
+                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'issued' ? 'bg-[#e53b19] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
                             >
                                 PI 발급리스트
                             </button>
@@ -713,7 +713,7 @@ ${rowsHtml}
 
                         {leftTab === 'write' ? (
                             <div className="space-y-4">
-                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
+                                <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a]">
                                     <label className="text-xs font-bold text-gray-700">업체 선택</label>
                                     <select
                                         value={selectedPartnerId}
@@ -722,7 +722,7 @@ ${rowsHtml}
                                             setActiveIssuedId(null)
                                             setLeftTab('write')
                                         }}
-                                        className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-bold focus:ring-[#e53b19] focus:border-[#e53b19]"
+                                        className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-bold dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]"
                                     >
                                         <option value="">업체를 선택하세요</option>
                                         {partners.map((partner) => (
