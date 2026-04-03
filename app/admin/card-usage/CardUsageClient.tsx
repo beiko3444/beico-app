@@ -1183,7 +1183,7 @@ export default function CardUsageClient() {
 
       {error && (
         <div style={{
-          background: T.errorBg, border: `1px solid #FED7D7`, borderRadius: 10,
+          background: T.errorBg, border: `1px solid ${T.error}`, borderRadius: 10,
           padding: '10px 16px', marginBottom: 16, fontSize: 13, color: T.error, fontWeight: 500,
         }}>
           {error}

@@ -601,7 +601,7 @@ export default function SmsClient() {
                 type="date"
                 value={historyToDate}
                 onChange={(event) => setHistoryToDate(event.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
               />
             </div>
 
@@ -618,10 +618,10 @@ export default function SmsClient() {
 
         {historyError && <p className="text-sm font-bold text-red-600">{historyError}</p>}
 
-        <div className="rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500">
+              <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
                 <tr>
                   <th className="px-4 py-3 text-left font-black">발송일시</th>
                   <th className="px-4 py-3 text-left font-black">상태</th>

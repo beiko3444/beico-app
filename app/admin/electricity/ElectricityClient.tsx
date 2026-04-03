@@ -977,23 +977,23 @@ export default function ElectricityClient() {
                                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
                                 </div>
                                 <div className="text-right">
-                                    <div className="text-xs text-gray-500">선택 월</div>
-                                    <div className="text-sm font-bold text-gray-900">{selectedYear}년 {selectedMonth}월</div>
+                                    <div className="text-xs text-gray-500 dark:text-gray-400">선택 월</div>
+                                    <div className="text-sm font-bold text-gray-900 dark:text-white">{selectedYear}년 {selectedMonth}월</div>
                                 </div>
                             </div>
 
                             <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
                                 <div className="text-xs font-bold text-red-600">현재 일자 기준 임대인 미납 전기세</div>
-                                <div className="mt-1 text-lg font-black text-gray-900">
+                                <div className="mt-1 text-lg font-black text-gray-900 dark:text-white">
                                     {unpaidLandlordElectricitySummary.total.toLocaleString()}원
                                 </div>
-                                <div className="text-xs text-gray-600 mt-1">
+                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
                                     {selectedYear}년 도래분 중 미납 {unpaidLandlordElectricitySummary.months}개월 합계
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-blue-50/50">
+                                <label className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] px-4 py-3 bg-blue-50/50 dark:bg-blue-950/20">
                                     <div>
                                         <div className="text-sm font-bold text-gray-900">월세 납부 세금계산서 발행</div>
                                         <div className="mt-1.5 space-y-0.5">

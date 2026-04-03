@@ -3131,11 +3131,11 @@ export default function WormOrderPage() {
                                                             <div className="text-[11px] tracking-tight text-gray-500 font-medium leading-none">{size.range}</div>
                                                         </div>
 
-                                                        <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
+                                                        <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 dark:border-[#2a2a2a] overflow-hidden w-full transition-colors bg-white dark:bg-[#1e1e1e]">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
-                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                                                className="h-[36px] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]"
                                                                 aria-label={`${wormType.label} ${size.id} decrease`}
                                                             >
                                                                 <Minus size={15} />
@@ -3153,7 +3153,7 @@ export default function WormOrderPage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
-                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
+                                                                className="h-[36px] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]"
                                                                 aria-label={`${wormType.label} ${size.id} increase`}
                                                             >
                                                                 <Plus size={15} />

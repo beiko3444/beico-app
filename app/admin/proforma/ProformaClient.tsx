@@ -714,7 +714,7 @@ ${rowsHtml}
                         {leftTab === 'write' ? (
                             <div className="space-y-4">
                                 <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a]">
-                                    <label className="text-xs font-bold text-gray-700">업체 선택</label>
+                                    <label className="text-xs font-bold text-gray-700 dark:text-gray-400">업체 선택</label>
                                     <select
                                         value={selectedPartnerId}
                                         onChange={(event) => {
@@ -733,7 +733,7 @@ ${rowsHtml}
                                     </select>
                                     <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
                                     <div className="mt-3">
-                                        <label className="text-xs font-bold text-gray-700">Production time</label>
+                                        <label className="text-xs font-bold text-gray-700 dark:text-gray-400">Production time</label>
                                         <input
                                             type="text"
                                             value={draftProductionTime}
@@ -785,7 +785,7 @@ ${rowsHtml}
                                                             <div className="text-[11px] text-gray-500 dark:text-gray-400">{product.nameEN || product.name}</div>
                                                             <div className="text-[10px] text-gray-400 dark:text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
                                                         </td>
-                                                        <td className="px-3 py-2 text-center text-gray-600">{product.stock.toLocaleString()}</td>
+                                                        <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400">{product.stock.toLocaleString()}</td>
                                                         <td className="px-3 py-2 text-right font-bold text-gray-900 dark:text-white">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <input

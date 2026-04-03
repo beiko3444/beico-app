@@ -104,12 +104,12 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                 ];
 
                 return (
-                    <div key={order.id} className={`bg-white rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md border border-gray-100 mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${order.taxInvoiceIssued ? 'opacity-70 brightness-[0.8] grayscale-[0.2]' : ''}`}>
+                    <div key={order.id} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${order.taxInvoiceIssued ? 'opacity-70 brightness-[0.8] grayscale-[0.2]' : ''}`}>
                         {/* Order No & Date Box */}
-                        <div className="bg-white rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
                             <div className="flex flex-col text-sm">
-                                <span className="text-gray-400 mb-0.5 text-xs">注文日時 / {isUSD ? 'Order Date' : '주문일시'}</span>
-                                <span className="font-bold text-gray-700" suppressHydrationWarning>
+                                <span className="text-gray-400 dark:text-gray-500 mb-0.5 text-xs">注文日時 / {isUSD ? 'Order Date' : '주문일시'}</span>
+                                <span className="font-bold text-gray-700 dark:text-gray-400" suppressHydrationWarning>
                                     {(() => {
                                         const d = new Date(order.createdAt);
                                         const datePart = d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
