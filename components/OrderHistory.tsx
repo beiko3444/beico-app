@@ -166,22 +166,22 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl pt-4 px-2 pb-2 mb-1">
                             <div className="flex items-center gap-2 mb-3 border-b border-gray-100 dark:border-[#2a2a2a] pb-2">
                                 <Landmark size={14} className="text-[#e34219]" />
-                                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">お支払い情報 / {isUSD ? 'Payment Info' : '입금정보'}</h3>
+                                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-tight">お支払い情報 / {isUSD ? 'Payment Info' : '입금정보'}</h3>
                             </div>
 
                             <div className="flex flex-col gap-0.5 tracking-tight">
                                 {/* Bank Details */}
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-900 text-xs min-w-[100px]">銀行名 / {isUSD ? 'Bank' : '은행'}</span>
-                                    <span className="font-bold text-gray-900">IBK Industrial Bank of Korea (기업은행)</span>
+                                    <span className="text-gray-900 dark:text-white text-xs min-w-[100px]">銀行名 / {isUSD ? 'Bank' : '은행'}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white">IBK Industrial Bank of Korea (기업은행)</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-900 text-xs min-w-[100px]">口座番号 / {isUSD ? 'Account' : '계좌'}</span>
-                                    <span className="font-bold text-gray-900 font-inter">656-045236-01-013</span>
+                                    <span className="text-gray-900 dark:text-white text-xs min-w-[100px]">口座番号 / {isUSD ? 'Account' : '계좌'}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white font-inter">656-045236-01-013</span>
                                 </div>
                                 <div className="flex justify-between items-center text-sm">
-                                    <span className="text-gray-900 text-xs min-w-[100px]">名義人 / {isUSD ? 'Holder' : '예금주'}</span>
-                                    <span className="font-bold text-gray-900 uppercase">주식회사 베이코</span>
+                                    <span className="text-gray-900 dark:text-white text-xs min-w-[100px]">名義人 / {isUSD ? 'Holder' : '예금주'}</span>
+                                    <span className="font-bold text-gray-900 dark:text-white uppercase">주식회사 베이코</span>
                                 </div>
 
                                 {/* Separator & Total Amount Details */}

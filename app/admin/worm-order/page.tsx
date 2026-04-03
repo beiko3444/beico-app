@@ -3233,9 +3233,9 @@ export default function WormOrderPage() {
                         <span className="relative z-10">{loadingEmails ? '스캔 중...' : '인박스 모니터'}</span>
                     </button>
                 </div>
-                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100">
+                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
                     {/* 좌측 리스트 패널 */}
-                    <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px] relative">
+                    <div className="w-full md:w-[35%] bg-white dark:bg-[#1e1e1e] border-r border-gray-100 dark:border-[#2a2a2a] overflow-y-auto max-h-[600px] relative">
                         {emailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{emailError}</div>}
                         {emailMatchMessage && <div className="px-4 py-2 text-[12px] text-emerald-700 font-semibold text-center">{emailMatchMessage}</div>}
                         
@@ -3252,7 +3252,7 @@ export default function WormOrderPage() {
                         )}
 
                         {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
-                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50 mt-10">
+                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-[#1a1a1a]/50 mt-10">
                                 현재 발주에서 매칭 가능한 `invoice` 제목 메일이 없습니다.
                             </div>
                         )}
@@ -3519,9 +3519,9 @@ export default function WormOrderPage() {
                         <span className="relative z-10">{loadingDocEmails ? '스캔 중...' : '메일 스캔'}</span>
                     </button>
                 </div>
-                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100">
+                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
                     {/* 좌측 리스트 패널 */}
-                    <div className="w-full md:w-[35%] bg-white border-r border-gray-100 overflow-y-auto max-h-[600px] relative">
+                    <div className="w-full md:w-[35%] bg-white dark:bg-[#1e1e1e] border-r border-gray-100 dark:border-[#2a2a2a] overflow-y-auto max-h-[600px] relative">
                         {docEmailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{docEmailError}</div>}
                         {docEmailMatchMessage && <div className="px-4 py-2 text-[12px] text-emerald-700 font-semibold text-center">{docEmailMatchMessage}</div>}
 

@@ -1058,7 +1058,7 @@ export default function ElectricityClient() {
                                             <th className="text-center px-4 py-3 whitespace-nowrap">전기세 납부</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100">
+                                    <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                                         {Array.from({ length: 12 }, (_, i) => i + 1)
                                             .filter(m => selectedYear > PAYMENT_START_YEAR || (selectedYear === PAYMENT_START_YEAR && m >= 1))
                                             .map(m => {
@@ -1069,10 +1069,10 @@ export default function ElectricityClient() {
 
                                                 return (
                                                     <tr key={m} className={`hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
-                                                        <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
+                                                        <td className="px-4 py-3 font-bold text-gray-900 dark:text-white cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
                                                             {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center text-gray-700 whitespace-nowrap">
+                                                        <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-400 whitespace-nowrap">
                                                             {rowRentInfo.paidDate}
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
