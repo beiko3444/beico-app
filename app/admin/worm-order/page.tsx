@@ -128,6 +128,7 @@ type WormOrderListItem = {
     remittanceSendAmountText: string | null
     remittanceTotalFeeText: string | null
     remittanceExchangeRateText: string | null
+    awbNumber: string | null
     createdAt: string
     updatedAt: string
 }
@@ -618,6 +619,23 @@ function pruneEmailDetails(
     ) as Record<string, WormEmailDetail>
 }
 
+function compactEmailDetailsForCache(
+    details: Record<string, WormEmailDetail>,
+    emails: WormEmailListItem[],
+) {
+    const pruned = pruneEmailDetails(details, emails)
+    return Object.fromEntries(
+        Object.entries(pruned).map(([uid, detail]) => [
+            uid,
+            {
+                ...detail,
+                // Keep cache payload small; detail body is fetched on demand.
+                text: '',
+            } satisfies WormEmailDetail,
+        ]),
+    ) as Record<string, WormEmailDetail>
+}
+
 function readWormEmailOfflineCache(): WormEmailOfflineCache | null {
     if (typeof window === 'undefined') return null
 
@@ -875,6 +893,12 @@ function extractAwbCandidatesFromText(ocrText: string, source: string, trustBoos
             addCandidate(`${match[1]}${match[2]}${match[3]}`, context, 270, lineIndex, `${sourceSuffix}-grouped`)
         }
 
+        // Common AWB display format: 123-12345675 (3 + 8 digits)
+        const tripleEightRegex = /(?:^|[^\d])(\d{3})[\s\-_.:/]*(\d{8})(?=[^\d]|$)/g
+        while ((match = tripleEightRegex.exec(digitFriendly)) !== null) {
+            addCandidate(`${match[1]}${match[2]}`, context, 300, lineIndex, `${sourceSuffix}-3x8`)
+        }
+
         const compactRegex = /(?:^|[^\d])(\d{11})(?=[^\d]|$)/g
         while ((match = compactRegex.exec(digitFriendly)) !== null) {
             addCandidate(match[1], context, 220, lineIndex, `${sourceSuffix}-compact`)
@@ -999,7 +1023,7 @@ export default function WormOrderPage() {
             savedAt: emailCacheSavedAt,
             hasFetched,
             emails,
-            emailDetails: pruneEmailDetails(emailDetails, emails),
+            emailDetails: compactEmailDetailsForCache(emailDetails, emails),
             selectedEmailUid: normalizedSelectedEmailUid,
         })
     }, [emailCacheSavedAt, emailDetails, emails, hasFetched, selectedEmailUid])
@@ -1067,6 +1091,16 @@ export default function WormOrderPage() {
         applyAwbNumberToEmailState(uid, normalizedAwb)
         setEmailCacheSavedAt(new Date().toISOString())
 
+        // 매칭된 발주가 있으면 로컬 발주 리스트에도 AWB 즉시 반영
+        const matchedOrderId = fallbackEmail?.matchedOrderId
+            || docEmails.find((e) => e.uid === uid)?.matchedOrderId
+            || null
+        if (matchedOrderId) {
+            setWormOrderList((prev) => prev.map((order) =>
+                order.id === matchedOrderId ? { ...order, awbNumber: normalizedAwb } : order
+            ))
+        }
+
         try {
             const response = await fetch('/api/admin/worm-order/emails/awb-cache', {
                 method: 'POST',
@@ -1086,7 +1120,7 @@ export default function WormOrderPage() {
         } catch (error) {
             console.warn('Failed to persist AWB cache:', error)
         }
-    }, [applyAwbNumberToEmailState, emails])
+    }, [applyAwbNumberToEmailState, emails, docEmails])
 
     // ── AWB OCR 관련 State ──
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
@@ -1312,7 +1346,10 @@ export default function WormOrderPage() {
     }, [ocrOnePdf, persistAwbCache])
 
     const fetchEmailDetail = useCallback(async (uid: string): Promise<WormEmailDetail | null> => {
-        if (emailDetails[uid]) return emailDetails[uid]
+        const cachedDetail = emailDetails[uid]
+        if (cachedDetail && cachedDetail.text.trim().length > 0) {
+            return cachedDetail
+        }
 
         setLoadingEmailDetail(true)
         try {
@@ -1544,6 +1581,8 @@ export default function WormOrderPage() {
 
     const handleSelectWormOrder = useCallback((order: WormOrderListItem) => {
         const receiveDateText = toKstDateInputString(order.receiveDate)
+        const isSameOrder = activeWormOrder?.id === order.id
+
         setActiveWormOrder({
             id: order.id,
             orderNumber: order.orderNumber,
@@ -1552,13 +1591,17 @@ export default function WormOrderPage() {
         if (receiveDateText) {
             setReceiveDate(receiveDateText)
         }
+
+        // Keep already-fetched inbox state when user re-selects the same order.
+        if (isSameOrder) return
+
         setEmails([])
         setEmailDetails({})
         setSelectedEmailUid(null)
         setHasFetched(false)
         setEmailError('')
         setEmailMatchMessage('')
-    }, [])
+    }, [activeWormOrder?.id])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
         const shouldDelete = window.confirm(`삭제할까요?\n${order.orderNumber}`)
@@ -2090,7 +2133,9 @@ export default function WormOrderPage() {
         return docEmails.find(e => e.matchedOrderId === activeWormOrder.id) || null
     }, [docEmails, activeWormOrder?.id])
 
-    const autoBlNumber = matchedAwbEmail?.awbNumber ?? null
+    // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
+    const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
+    const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
@@ -2590,7 +2635,10 @@ export default function WormOrderPage() {
         }
 
         if (step.id === 2 && !loadingEmails) {
-            void fetchEmails()
+            const shouldFetchInbox = !hasFetched || emails.length === 0
+            if (shouldFetchInbox) {
+                void fetchEmails()
+            }
             return
         }
 
@@ -2609,6 +2657,8 @@ export default function WormOrderPage() {
         handleGenerate,
         loadingDocEmails,
         loadingEmails,
+        hasFetched,
+        emails.length,
         scrollToPipelineSection,
         selectedOrders.length,
     ])

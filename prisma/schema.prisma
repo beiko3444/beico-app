@@ -198,6 +198,7 @@ model WormOrderEmailMatch {
   emailDate             DateTime?
   orderId               String
   matchedAt             DateTime  @default(now())
+  awbNumber             String?
   invoiceUnitPriceUsd   Float?
   invoiceTotalAmountUsd Float?
   usdKrwRate            Float?
@@ -259,6 +260,20 @@ model ProformaInvoiceItem {
   createdAt         DateTime        @default(now())
   proformaInvoice   ProformaInvoice @relation(fields: [proformaInvoiceId], references: [id], onDelete: Cascade)
   product           Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
+}
+
+model WormEmailAttachmentCache {
+  id          String   @id @default(uuid())
+  uid         String
+  index       Int
+  r2Key       String
+  r2Url       String
+  filename    String?
+  contentType String?
+  createdAt   DateTime @default(now())
+
+  @@unique([uid, index])
+  @@index([uid])
 }
 
 model CardUsage {

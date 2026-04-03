@@ -7,9 +7,12 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "logen-live": "node scripts/logen-address-confirm-live.mjs",
     "postinstall": "prisma generate"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1022.0",
+    "@aws-sdk/s3-request-presigner": "^3.1022.0",
     "@capacitor/android": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@dnd-kit/core": "^6.3.1",
