@@ -325,7 +325,7 @@ const extractLatestAutomationStep = (message: string): string | null => {
 function getPipelineModeBadgeClass(mode: PipelineMode) {
     if (mode === 'AUTO') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
     if (mode === 'SEMI') return 'bg-amber-100 text-amber-800 border-amber-200'
-    return 'bg-slate-200 text-slate-700 border-slate-300'
+    return 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-700 dark:text-gray-300 border-slate-300 dark:border-[#333]'
 }
 
 function getPipelineModeLabel(mode: PipelineMode) {
@@ -337,7 +337,7 @@ function getPipelineModeLabel(mode: PipelineMode) {
 function getPipelineRuntimeBadgeClass(status: PipelineRuntimeStatus) {
     if (status === 'done') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
     if (status === 'active') return 'bg-red-100 text-red-800 border-red-200'
-    return 'bg-slate-100 text-slate-600 border-slate-200'
+    return 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400 border-slate-200 dark:border-[#2a2a2a]'
 }
 
 function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
@@ -3273,7 +3273,7 @@ export default function WormOrderPage() {
                                                     ? 'bg-emerald-50 border-l-4 border-emerald-500 pl-[13px] hover:bg-emerald-100'
                                                     : isSelected
                                                     ? 'bg-orange-50/50 border-l-[3px] border-orange-500 pl-[13px]'
-                                                    : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50'
+                                                    : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50 dark:hover:bg-[#252525]'
                                             }`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
@@ -3559,7 +3559,7 @@ export default function WormOrderPage() {
                                                     ? 'bg-blue-100/70 border-l-4 border-blue-600 pl-[13px] hover:bg-blue-200/60'
                                                     : isSelected
                                                     ? 'bg-blue-50/50 border-l-[3px] border-blue-500 pl-[13px]'
-                                                    : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50'
+                                                    : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50 dark:hover:bg-[#252525]'
                                             }`}
                                         >
                                             <div className="flex justify-between items-start mb-2">
