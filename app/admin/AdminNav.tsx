@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bell, Download, LayoutGrid, Plus } from 'lucide-react'
+import ThemeToggle from '@/components/ThemeToggle'
 
 type SmsStatusType = 'success' | 'error'
 
@@ -249,21 +250,24 @@ export default function AdminNav({
     return (
         <div className="fixed top-0 left-0 right-0 z-[100]">
             {/* Top header bar */}
-            <div className="bg-[#1a1a1a] px-4 py-2.5">
+            <div className="bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-transparent px-4 py-2.5 shadow-sm dark:shadow-none">
                 <div className="max-w-7xl mx-auto flex items-center justify-between">
                     {/* Left: Logo + Title */}
                     <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-[#2a2a2a] rounded-lg flex items-center justify-center">
-                            <LayoutGrid size={18} className="text-gray-300" />
+                        <div className="w-9 h-9 bg-gray-100 dark:bg-[#2a2a2a] rounded-lg flex items-center justify-center">
+                            <LayoutGrid size={18} className="text-gray-500 dark:text-gray-300" />
                         </div>
-                        <span className="text-white text-sm font-bold tracking-tight">관리자 콘솔</span>
+                        <span className="text-gray-900 dark:text-white text-sm font-bold tracking-tight">관리자 콘솔</span>
                     </div>
 
                     {/* Right: Actions */}
                     <div className="flex items-center gap-2">
+                        {/* Theme toggle */}
+                        <ThemeToggle className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333]" />
+
                         {/* Bell notification */}
-                        <button className="relative w-9 h-9 rounded-lg bg-[#2a2a2a] flex items-center justify-center hover:bg-[#333] transition-colors">
-                            <Bell size={17} className="text-gray-300" />
+                        <button className="relative w-9 h-9 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] flex items-center justify-center hover:bg-gray-200 dark:hover:bg-[#333] transition-colors">
+                            <Bell size={17} className="text-gray-500 dark:text-gray-300" />
                             {totalAlerts > 0 && (
                                 <span className="absolute -top-1 -right-1 flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
                                     {totalAlerts}
@@ -272,7 +276,7 @@ export default function AdminNav({
                         </button>
 
                         {/* Shipment count input + 건출고 */}
-                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-lg bg-[#2a2a2a]">
+                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-lg bg-gray-100 dark:bg-[#2a2a2a]">
                             <span className="inline-flex h-full items-center pl-2.5 pr-1 text-gray-400">
                                 <Plus size={14} />
                             </span>
@@ -282,18 +286,18 @@ export default function AdminNav({
                                 inputMode="numeric"
                                 value={shipmentCount}
                                 onChange={(event) => setShipmentCount(event.target.value)}
-                                className="h-full w-[36px] border-none bg-transparent text-center text-xs font-bold text-white outline-none focus:outline-none"
+                                className="h-full w-[36px] border-none bg-transparent text-center text-xs font-bold text-gray-900 dark:text-white outline-none focus:outline-none"
                                 placeholder="1"
                                 aria-label="출고 건수"
                             />
-                            <span className="inline-flex h-full items-center pr-2.5 text-xs font-bold text-white whitespace-nowrap">건 출고</span>
+                            <span className="inline-flex h-full items-center pr-2.5 text-xs font-bold text-gray-700 dark:text-white whitespace-nowrap">건 출고</span>
                         </div>
 
                         {/* 집하요청 button */}
                         <button
                             onClick={handleSendSms}
                             disabled={sendingSms || loadingFromNumber}
-                            className="h-9 px-3 text-xs font-bold text-white bg-[#2a2a2a] hover:bg-[#333] disabled:opacity-40 rounded-lg transition-colors flex items-center gap-1.5"
+                            className="h-9 px-3 text-xs font-bold text-gray-700 dark:text-white bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] disabled:opacity-40 rounded-lg transition-colors flex items-center gap-1.5"
                         >
                             <Download size={14} />
                             <span>{sendingSms ? '요청중...' : '집하요청'}</span>
@@ -314,15 +318,15 @@ export default function AdminNav({
                 {(smsStatus || smsSendLogs.length > 0) && (
                     <div className="max-w-7xl mx-auto flex items-center justify-end gap-2 mt-1.5">
                         {smsStatus ? (
-                            <span className={`text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
+                            <span className={`text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                                 {smsStatus.message}
                             </span>
                         ) : null}
                         {smsSendLogs.length > 0 ? (
                             <span
                                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${smsSendLogs[0].status === 'success'
-                                    ? 'border-green-700 bg-green-900/40 text-green-400'
-                                    : 'border-red-700 bg-red-900/40 text-red-400'
+                                    ? 'border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-400'
+                                    : 'border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-400'
                                     }`}
                                 title={smsSendLogs[0].detail}
                             >
@@ -336,7 +340,7 @@ export default function AdminNav({
             </div>
 
             {/* Tab navigation bar */}
-            <div className="bg-[#1a1a1a] border-t border-[#333] px-4">
+            <div className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#333] px-4">
                 <div className="max-w-7xl mx-auto">
                     <nav ref={tabContainerRef} className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
                         {navItems.map((item) => {
@@ -349,8 +353,8 @@ export default function AdminNav({
                                     href={item.path}
                                     prefetch={false}
                                     className={`relative px-4 py-3 text-[13px] transition-colors whitespace-nowrap flex items-center gap-1.5 ${isActive
-                                        ? 'text-white font-bold'
-                                        : 'text-gray-500 hover:text-gray-300 font-medium'
+                                        ? 'text-gray-900 dark:text-white font-bold'
+                                        : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 font-medium'
                                         }`}
                                 >
                                     {item.name}
@@ -365,7 +369,7 @@ export default function AdminNav({
                                         </span>
                                     ) : null}
                                     {isActive && (
-                                        <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-white rounded-t-full" />
+                                        <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-gray-900 dark:bg-white rounded-t-full" />
                                     )}
                                 </Link>
                             )

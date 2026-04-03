@@ -206,7 +206,7 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f9f9f9] flex flex-col items-center justify-center p-4 font-sans text-[#333] py-6">
+        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111] flex flex-col items-center justify-center p-4 font-sans text-[#333] dark:text-gray-200 py-6">
             <div className="w-full max-w-[500px] mb-5">
                 <div className="flex items-center gap-6">
                     <div className="w-[77px] h-auto relative shrink-0">
@@ -217,8 +217,8 @@ export default function SignupPage() {
                         />
                     </div>
                     <div className="flex flex-col justify-center mt-2">
-                        <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">{t.title}</h1>
-                        <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 whitespace-nowrap">
+                        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">{t.title}</h1>
+                        <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 dark:text-slate-500 whitespace-nowrap">
                             {t.subtitle}
                         </p>
                     </div>
@@ -227,15 +227,15 @@ export default function SignupPage() {
 
             <div className="w-full max-w-[500px]">
                 {error && (
-                    <div className="mb-6 bg-red-50 border-l-4 border-[#e34219] text-[#e34219] px-4 py-3 rounded-r-lg text-sm font-medium">
+                    <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-[#e34219] text-[#e34219] dark:text-red-400 px-4 py-3 rounded-r-lg text-sm font-medium">
                         ⚠️ {error}
                     </div>
                 )}
 
                 {step === 1 ? (
-                    <form onSubmit={handleNextStep} className="space-y-5 bg-white p-6 rounded-xl border border-gray-100 shadow-sm">
+                    <form onSubmit={handleNextStep} className="space-y-5 bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> 国籍 / Nationality / 국가
                             </label>
                             <div className="relative group">
@@ -282,19 +282,19 @@ export default function SignupPage() {
                             <button
                                 type="button"
                                 onClick={() => setStep(1)}
-                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-800 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-gray-100"
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#2a2a2a]"
                             >
                                 <ArrowLeft size={12} strokeWidth={3} />
                                 Change Nationality / 国籍変更 / 국가 변경
                             </button>
-                            <div className="px-3 py-1 text-[10px] font-black text-[#e34219] bg-red-50 rounded-full border border-red-100 uppercase tracking-widest">
+                            <div className="px-3 py-1 text-[10px] font-black text-[#e34219] dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-full border border-red-100 dark:border-red-800 uppercase tracking-widest">
                                 Step 2/2
                             </div>
                         </div>
 
                         {/* User ID */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.userId}
                             </label>
                             <div className="relative group">
@@ -307,7 +307,7 @@ export default function SignupPage() {
                                     value={formData.username}
                                     onChange={handleChange as any}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder="your_id"
                                 />
                             </div>
@@ -315,7 +315,7 @@ export default function SignupPage() {
 
                         {/* Password */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.password}
                             </label>
                             <div className="relative group">
@@ -343,7 +343,7 @@ export default function SignupPage() {
 
                         {/* Confirm Password */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.confirmPassword}
                             </label>
                             <div className="relative group">
@@ -372,7 +372,7 @@ export default function SignupPage() {
 
                         {/* Company Name */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.companyName}
                             </label>
                             <div className="relative group">
@@ -385,7 +385,7 @@ export default function SignupPage() {
                                     value={formData.businessName}
                                     onChange={handleChange as any}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder="Your Company Name"
                                 />
                             </div>
@@ -393,7 +393,7 @@ export default function SignupPage() {
 
                         {/* Contact Person */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.contactPerson}
                             </label>
                             <div className="relative group">
@@ -406,7 +406,7 @@ export default function SignupPage() {
                                     value={formData.representativeName}
                                     onChange={handleChange as any}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder="Full Name"
                                 />
                             </div>
@@ -414,7 +414,7 @@ export default function SignupPage() {
 
                         {/* Business Reg Number */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.registrationNumber}
                             </label>
                             <div className="relative group">
@@ -427,7 +427,7 @@ export default function SignupPage() {
                                     value={formData.businessRegNumber}
                                     onChange={handleChange as any}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder="Business Registration Number (numbers only)"
                                 />
                             </div>
@@ -435,11 +435,11 @@ export default function SignupPage() {
 
                         {/* Business Registration Document */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> 事業者登録証 / Business Registration Document / 사업자등록증
                             </label>
-                            <label className="flex items-center justify-center w-full h-12 px-4 bg-white border border-gray-200 border-dashed rounded-lg cursor-pointer hover:bg-gray-50 focus:border-gray-400 transition-all shadow-sm">
-                                <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                            <label className="flex items-center justify-center w-full h-12 px-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] border-dashed rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] focus:border-gray-400 transition-all shadow-sm dark:shadow-none">
+                                <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
                                     <Printer size={18} strokeWidth={1.5} />
                                     <span>
                                         {formData.businessRegistrationDocument ?
@@ -465,7 +465,7 @@ export default function SignupPage() {
 
                         {/* Email */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.email}
                             </label>
                             <div className="relative group">
@@ -478,7 +478,7 @@ export default function SignupPage() {
                                     value={formData.email}
                                     onChange={handleChange as any}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder={t.emailPlaceholder}
                                 />
                             </div>
@@ -488,7 +488,7 @@ export default function SignupPage() {
                         <div className="grid grid-cols-2 gap-3">
                             {/* Phone */}
                             <div className="space-y-1.5">
-                                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                                <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                     <span className="text-[#e34219]">*</span> {t.phone}
                                 </label>
                                 <div className="relative group">
@@ -502,7 +502,7 @@ export default function SignupPage() {
                                         onChange={handleChange as any}
                                         required
                                         maxLength={13}
-                                        className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                        className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                         placeholder="03-1234-5678"
                                     />
                                 </div>
@@ -510,7 +510,7 @@ export default function SignupPage() {
 
                             {/* Fax */}
                             <div className="space-y-1.5">
-                                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">{t.fax}</label>
+                                <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.fax}</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                         <Printer size={18} strokeWidth={1.5} />
@@ -520,7 +520,7 @@ export default function SignupPage() {
                                         name="fax"
                                         value={formData.fax}
                                         onChange={handleChange as any}
-                                        className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                        className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                         placeholder="(Optional)"
                                     />
                                 </div>
@@ -529,7 +529,7 @@ export default function SignupPage() {
 
                         {/* Address 1 */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.address1}
                             </label>
                             <div className="relative group">
@@ -542,7 +542,7 @@ export default function SignupPage() {
                                     value={formData.address}
                                     onChange={handleChange as any}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder="Prefecture, City, District"
                                 />
                             </div>
@@ -550,7 +550,7 @@ export default function SignupPage() {
 
                         {/* Address 2 */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1 block">{t.address2}</label>
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.address2}</label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                     <Home size={18} strokeWidth={1.5} />
@@ -560,7 +560,7 @@ export default function SignupPage() {
                                     name="addressDetail"
                                     value={formData.addressDetail}
                                     onChange={handleChange as any}
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 shadow-sm"
+                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
                                     placeholder="Building, Apt, Suite"
                                 />
                             </div>
@@ -588,7 +588,7 @@ export default function SignupPage() {
 
                 {/* Footer */}
                 <div className="mt-8 text-center">
-                    <p className="text-xs text-gray-500 font-medium tracking-wide">
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium tracking-wide">
                         {t.loginText} <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">{t.loginLink}</Link>
                     </p>
                 </div>

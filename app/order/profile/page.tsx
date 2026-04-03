@@ -31,22 +31,22 @@ export default async function ProfilePage() {
                     <div className="w-5 h-5 flex items-center justify-center text-gray-400">
                         <User size={16} className="stroke-[2.5]" />
                     </div>
-                    <h2 className="text-[12px] font-semibold text-[#1e293b] tracking-tight">アカウント情報 / Account Info</h2>
+                    <h2 className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight">アカウント情報 / Account Info</h2>
                 </div>
 
                 <div className="flex flex-col gap-3">
                     {/* Name Field Style Card */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">氏名 / Name</label>
-                        <div className="w-full h-12 px-4 bg-[#f9f9f9] border border-gray-200 rounded-lg flex items-center shadow-sm text-[14px] font-medium text-gray-800">
+                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight ml-1">氏名 / Name</label>
+                        <div className="w-full h-12 px-4 bg-[#f9f9f9] dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center shadow-sm dark:shadow-none text-[14px] font-medium text-gray-800 dark:text-gray-400">
                             {session.user.name}
                         </div>
                     </div>
 
                     {/* Email Field Style Card */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">ユーザーID / User ID</label>
-                        <div className="w-full h-12 px-4 bg-[#f9f9f9] border border-gray-200 rounded-lg flex items-center shadow-sm text-[14px] font-medium text-gray-800">
+                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight ml-1">ユーザーID / User ID</label>
+                        <div className="w-full h-12 px-4 bg-[#f9f9f9] dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center shadow-sm dark:shadow-none text-[14px] font-medium text-gray-800 dark:text-gray-400">
                             {session.user.email}
                         </div>
                     </div>

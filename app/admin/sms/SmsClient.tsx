@@ -320,29 +320,29 @@ export default function SmsClient() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Barobill Messaging</p>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">문자발송서비스</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자발송서비스</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             바로빌 공식 `SendMessage` 및 `GetSMSSendMessagesByPaging` SOAP API를 사용합니다.
           </p>
         </div>
-        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-[#e34219] shadow-sm">
+        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-[#e34219] shadow-sm dark:shadow-none">
           <MessageSquareText size={22} />
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-[28px] border border-gray-200 shadow-sm overflow-hidden">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
         <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="p-6 md:p-8 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label htmlFor="fromNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="fromNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   From Number
                 </label>
                 <select
                   id="fromNumber"
                   value={fromNumber}
                   onChange={(event) => setFromNumber(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   required
                   disabled={loading || fromNumbers.length === 0}
                 >
@@ -356,7 +356,7 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="savedRecipient" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="savedRecipient" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   저장된 수신자
                 </label>
                 <div className="flex gap-2">
@@ -364,7 +364,7 @@ export default function SmsClient() {
                     id="savedRecipient"
                     value={selectedRecipientId}
                     onChange={(event) => setSelectedRecipientId(event.target.value)}
-                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   >
                     <option value="">수신자를 선택하세요</option>
                     {recipients.map((item) => (
@@ -377,7 +377,7 @@ export default function SmsClient() {
                     type="button"
                     onClick={() => applyRecipient(selectedRecipient)}
                     disabled={!selectedRecipient}
-                    className="shrink-0 h-12 px-4 rounded-xl border border-gray-200 text-sm font-black text-gray-700 disabled:opacity-50"
+                    className="shrink-0 h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-700 dark:text-gray-400 disabled:opacity-50"
                   >
                     적용
                   </button>
@@ -385,7 +385,7 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="toName" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="toName" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   수신자명
                 </label>
                 <input
@@ -393,7 +393,7 @@ export default function SmsClient() {
                   type="text"
                   value={toName}
                   onChange={(event) => setToName(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   placeholder="수신자 이름"
                   required
                 />

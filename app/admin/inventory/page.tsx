@@ -258,7 +258,7 @@ export default function InventoryPage() {
         alignRight = false,
     ) => (
         <th
-            className={`px-6 py-4 text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors ${alignRight ? "text-right" : "text-left"}`}
+            className={`px-6 py-4 text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] transition-colors ${alignRight ? "text-right" : "text-left"}`}
             onClick={() => requestSort(key, sortState, setSortState)}
         >
             <div className={`flex items-center gap-1.5 ${alignRight ? "justify-end" : ""}`}>
@@ -272,11 +272,11 @@ export default function InventoryPage() {
         <div className="max-w-7xl mx-auto px-4 py-8 mt-12">
             <div className="flex items-center justify-between mb-8">
                 <div>
-                    <h1 className="text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                    <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight flex items-center gap-2">
                         <Package className="w-7 h-7 text-[#e34219]" />
                         재고관리
                     </h1>
-                    <p className="text-sm text-gray-500 mt-1 font-medium">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1 font-medium">
                         쿠팡 로켓창고 재고와 스마트스토어 재고를 함께 확인합니다.
                     </p>
                 </div>
@@ -284,7 +284,7 @@ export default function InventoryPage() {
                     <button
                         onClick={syncWithDB}
                         disabled={loading || inventory.length === 0}
-                        className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 text-sm font-bold text-gray-700 rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50"
+                        className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] text-sm font-bold text-gray-700 dark:text-gray-400 rounded-xl hover:bg-gray-50 dark:hover:bg-[#252525] transition-all disabled:opacity-50"
                     >
                         <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
                         쿠팡 DB 연동 새로고침
@@ -309,7 +309,7 @@ export default function InventoryPage() {
             </div>
 
             {error && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 rounded-2xl flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                     <div>
                         <h3 className="text-sm font-bold text-red-800">쿠팡 재고 정보를 불러오지 못했습니다</h3>
@@ -319,7 +319,7 @@ export default function InventoryPage() {
             )}
 
             {smartstoreError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-100 rounded-2xl flex items-start gap-3">
+                <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/20 border border-red-100 rounded-2xl flex items-start gap-3">
                     <AlertCircle className="w-5 h-5 text-red-500 shrink-0 mt-0.5" />
                     <div>
                         <h3 className="text-sm font-bold text-red-800">스마트스토어 재고 정보를 불러오지 못했습니다</h3>
@@ -328,9 +328,9 @@ export default function InventoryPage() {
                 </div>
             )}
 
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/40">
-                    <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/40 dark:bg-[#1a1a1a]">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
                         <Package className="w-4 h-4 text-[#e34219]" />
                         쿠팡 로켓창고 재고
                         {lastSyncTime && <span className="ml-2 font-bold text-[#e34219] text-xs">({lastSyncTime})</span>}
@@ -339,7 +339,7 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100 select-none">
+                            <tr className="bg-gray-50/50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] select-none">
                                 {renderSortHeader("SKU ID", "externalSkuId", sortConfig, setSortConfig)}
                                 {renderSortHeader("옵션 ID", "vendorItemId", sortConfig, setSortConfig)}
                                 {renderSortHeader("상품명", "productName", sortConfig, setSortConfig)}
@@ -347,19 +347,19 @@ export default function InventoryPage() {
                                 {renderSortHeader("최근 30일 판매량", "sales", sortConfig, setSortConfig, true)}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {loading && inventory.length === 0 ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
+                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400 dark:text-gray-500">
                                         <div className="flex flex-col items-center justify-center gap-3">
-                                            <RefreshCw className="w-6 h-6 animate-spin text-gray-300" />
+                                            <RefreshCw className="w-6 h-6 animate-spin text-gray-300 dark:text-gray-500" />
                                             재고 정보를 불러오는 중입니다...
                                         </div>
                                     </td>
                                 </tr>
                             ) : inventory.length === 0 && !error ? (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">
+                                    <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400 dark:text-gray-500">
                                         등록된 재고 데이터가 없습니다.
                                     </td>
                                 </tr>
@@ -410,9 +410,9 @@ export default function InventoryPage() {
                 </div>
             </div>
 
-            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mt-8">
-                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/40">
-                    <h2 className="text-sm font-black text-gray-900 flex items-center gap-2">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden mt-8">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/40 dark:bg-[#1a1a1a]">
+                    <h2 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
                         <Store className="w-4 h-4 text-[#0f766e]" />
                         스마트스토어 재고
                         {smartstoreLastSyncTime && <span className="ml-2 font-bold text-[#0f766e] text-xs">({smartstoreLastSyncTime})</span>}
@@ -421,7 +421,7 @@ export default function InventoryPage() {
                 <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                         <thead>
-                            <tr className="bg-gray-50/50 border-b border-gray-100 select-none">
+                            <tr className="bg-gray-50/50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] select-none">
                                 {renderSortHeader("판매자코드", "sellerManagementCode", smartstoreSortConfig, setSmartstoreSortConfig)}
                                 {renderSortHeader("채널상품번호", "channelProductNo", smartstoreSortConfig, setSmartstoreSortConfig)}
                                 {renderSortHeader("상품명", "productName", smartstoreSortConfig, setSmartstoreSortConfig)}
@@ -429,7 +429,7 @@ export default function InventoryPage() {
                                 {renderSortHeader("판매상태", "statusType", smartstoreSortConfig, setSmartstoreSortConfig)}
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {smartstoreLoading && smartstoreInventory.length === 0 ? (
                                 <tr>
                                     <td colSpan={5} className="px-6 py-20 text-center text-sm font-medium text-gray-400">

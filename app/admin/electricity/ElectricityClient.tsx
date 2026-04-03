@@ -701,26 +701,26 @@ export default function ElectricityClient() {
     return (
         <div id="electricity-main" className="space-y-8 font-sans pb-20 print:pb-0 print:space-y-0">
             {/* Header */}
-            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 shadow-sm transition-all">
+            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all">
                 <div className="flex flex-col gap-4 py-4">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#d9361b] transition-all">
+                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-400 hover:text-[#d9361b] transition-all">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight">전력 관리</h1>
+                            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">전력 관리</h1>
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-1 flex gap-1">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] p-1 flex gap-1">
                 <button
                     type="button"
                     onClick={() => setActiveTab('analysis')}
                     className={`flex-1 rounded-xl px-4 py-2 text-sm font-bold transition-all ${activeTab === 'analysis'
                         ? 'bg-gray-900 text-white'
-                        : 'bg-gray-50 text-gray-600 hover:bg-gray-100'
+                        : 'bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
                         }`}
                 >
                     전력관리

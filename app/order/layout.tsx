@@ -50,9 +50,9 @@ export default async function OrderLayout({
                                 country
 
     return (
-        <div className="min-h-screen bg-[#f9f9f9]">
+        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111]">
             {/* Sophisticated Top Navigation Bar */}
-            <header className="sticky top-0 z-50 bg-white shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)]">
+            <header className="sticky top-0 z-50 bg-white dark:bg-[#1a1a1a] shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] dark:shadow-none dark:border-b dark:border-[#2a2a2a]">
                 {/* Main White Header */}
                 <div className="max-w-6xl mx-auto px-4 md:px-8">
                     <div className="h-20 flex justify-between items-center">
@@ -74,7 +74,7 @@ export default async function OrderLayout({
                 </div>
 
                 {/* Brand Red User Info Bar */}
-                <div className="bg-[#e34219] text-white border-t border-white/10 shadow-sm">
+                <div className="bg-[#e34219] dark:bg-[#1e1e1e] text-white border-t border-white/10 dark:border-[#333] shadow-sm dark:shadow-none">
                     <div className="max-w-6xl mx-auto px-4 md:px-8 h-[64px] flex items-center justify-between">
                         {/* LEFT: Retailer Info & Clock */}
                         <div className="flex items-center gap-8">
@@ -83,7 +83,7 @@ export default async function OrderLayout({
                                     <span className="text-[13px] font-black text-white tracking-tight leading-none">小売店・卸売業者向け</span>
                                     <span className="text-[7.5px] font-bold text-white/80 uppercase tracking-widest leading-none mt-1.5">For retailers & distributors</span>
                                 </div>
-                                <Clock className="text-white text-[11px] leading-none" />
+                                <Clock className="text-white/80 text-[11px] leading-none" />
                             </div>
                         </div>
 
@@ -93,7 +93,7 @@ export default async function OrderLayout({
                                 <span className="text-[8.5px] text-white/70 font-bold leading-none uppercase tracking-wider mb-0.5">ログイン中:</span>
                                 <span className="text-[17px] text-white font-black leading-none mb-0.5">{businessNameJP}</span>
                                 {countryDisplay && (
-                                    <div className="bg-white px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-black text-[#e34219] shadow-sm flex items-center leading-none">
+                                    <div className="bg-white dark:bg-[#2a2a2a] px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-black text-[#e34219] dark:text-white shadow-sm flex items-center leading-none">
                                         {countryDisplay}
                                     </div>
                                 )}

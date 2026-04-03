@@ -2783,11 +2783,11 @@ export default function WormOrderPage() {
 
     return (
         <div className="max-w-5xl mx-auto pb-10 flex flex-col gap-6">
-            <div className="rounded-3xl border border-[#f3ddd8] bg-gradient-to-br from-white via-[#fff8f6] to-[#fff3ef] p-5 md:p-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)] text-slate-900">
+            <div className="rounded-3xl border border-[#f3ddd8] bg-gradient-to-br from-white via-[#fff8f6] to-[#fff3ef] dark:from-[#1e1e1e] dark:via-[#1e1e1e] dark:to-[#1e1e1e] dark:border-[#2a2a2a] p-5 md:p-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)] text-slate-900 dark:text-white">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="space-y-1">
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">지렁이 수입 자동화 파이프라인</h1>
-                        <p className="text-sm text-slate-600 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 dark:text-white">지렁이 수입 자동화 파이프라인</h1>
+                        <p className="text-sm text-slate-600 dark:text-gray-400 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
                     </div>
                     <button
                         type="button"

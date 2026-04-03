@@ -162,9 +162,9 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
     return (
         <div className="flex flex-col gap-6 font-sans">
             {/* Calendar Main View (Horizontally Long) */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
                 {/* Header */}
-                <div className="bg-white text-gray-900 p-6 flex justify-between items-center border-b border-gray-100">
+                <div className="bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white p-6 flex justify-between items-center border-b border-gray-100 dark:border-[#2a2a2a]">
                     <div className="flex items-center gap-8">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col items-center">
@@ -172,7 +172,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                 <span className="text-2xl font-black tracking-tighter leading-none">{currentMonth.getFullYear()}</span>
                                 <button onClick={() => changeYear(-1)} className="hover:text-blue-500 transition-colors"><ChevronDown className="w-4 h-4" /></button>
                             </div>
-                            <div className="w-px h-8 bg-gray-200"></div>
+                            <div className="w-px h-8 bg-gray-200 dark:bg-[#2a2a2a]"></div>
                             <div className="flex flex-col items-center">
                                 <button onClick={() => changeMonth(1)} className="hover:text-blue-500 transition-colors"><ChevronUp className="w-4 h-4" /></button>
                                 <span className="text-2xl font-black tracking-tighter leading-none">{currentMonth.getMonth() + 1}</span>
@@ -182,8 +182,8 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { setCurrentMonth(new Date()); setSelectedDate(new Date()); }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Today</button>
-                        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <button onClick={() => { setCurrentMonth(new Date()); setSelectedDate(new Date()); }} className="px-4 py-2 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#252525] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Today</button>
+                        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-400">
                             <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> 완료
                             </div>
@@ -195,7 +195,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                 </div>
 
                 {/* Weekdays */}
-                <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
+                <div className="grid grid-cols-7 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/50 dark:bg-[#1a1a1a]/50">
                     {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
                         <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
                             {day}
@@ -238,17 +238,17 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
             </div>
 
             {/* Bottom: Focused Day Task List & Quick Add */}
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl p-8 shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div className="lg:col-span-1">
                     <div className="flex items-center gap-4 mb-4">
                         <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center text-xl font-black shadow-lg">
                             {selectedDate.getDate()}
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-gray-900 tracking-tighter">
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {selectedDate.getFullYear()}. {selectedDate.getMonth() + 1}
                             </h3>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest italic">
+                            <p className="text-xs font-bold text-gray-400 dark:text-gray-400 uppercase tracking-widest italic">
                                 {['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][selectedDate.getDay()]}
                             </p>
                         </div>

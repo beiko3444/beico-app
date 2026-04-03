@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   /* New Point Color: #d9361b */
   --color-brand-blue: #d9361b;
@@ -16,8 +18,31 @@
 
 :root {
   --background: #ffffff;
-  /* All white background */
   --foreground: #0A2342;
+  --card: #ffffff;
+  --card-hover: #f9fafb;
+  --border: #f3f4f6;
+  --border-strong: #e5e7eb;
+  --muted: #f9fafb;
+  --muted-foreground: #6b7280;
+  --input-bg: #ffffff;
+  --input-border: #e5e7eb;
+  --surface: #f9f9f9;
+}
+
+.dark {
+  --background: #111111;
+  --foreground: #e5e5e5;
+  --card: #1e1e1e;
+  --card-hover: #252525;
+  --border: #2a2a2a;
+  --border-strong: #333333;
+  --muted: #1a1a1a;
+  --muted-foreground: #999999;
+  --input-bg: #1e1e1e;
+  --input-border: #333333;
+  --surface: #141414;
+  color-scheme: dark;
 }
 
 body {
@@ -32,6 +57,12 @@ body {
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.3);
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.dark .glass-panel {
+  background: rgba(30, 30, 30, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
 }
 
 .glass-button {

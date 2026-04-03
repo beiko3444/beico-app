@@ -18,11 +18,11 @@ export default function DashboardOrderSummary({
     recentOrders
 }: OrderSummaryProps) {
     return (
-        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
+        <div className="bg-white dark:bg-[#1e1e1e] rounded-[2rem] shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden mb-8 animate-in fade-in slide-in-from-top-4 duration-700">
             {/* Header */}
-            <div className="bg-gray-50/50 p-6 border-b border-gray-100 flex justify-between items-center">
+            <div className="bg-gray-50/50 dark:bg-[#1a1a1a] p-6 border-b border-gray-100 dark:border-[#2a2a2a] flex justify-between items-center">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[var(--color-brand-blue)] rounded-xl flex items-center justify-center text-white shadow-lg shadow-red-100">
+                    <div className="w-10 h-10 bg-[var(--color-brand-blue)] rounded-xl flex items-center justify-center text-white shadow-lg dark:shadow-none shadow-red-100">
                         <span className="text-xl">📝</span>
                     </div>
                     <div>

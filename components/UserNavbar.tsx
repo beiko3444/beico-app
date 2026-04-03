@@ -25,14 +25,14 @@ export default function UserNavbar() {
                         href={item.href}
                         className={`
                             flex flex-col items-center group transition-colors duration-200 min-w-[60px]
-                            ${isActive ? 'text-[#e34219]' : 'text-gray-400 hover:text-gray-600'}
+                            ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
                         `}
                     >
                         <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
-                        <span className={`text-[12.5px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400'}`}>
+                        <span className={`text-[12.5px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
                             {item.subLabel}
                         </span>
-                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]' : 'text-gray-400'}`}>
+                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
                             {item.label}
                         </span>
                     </Link>

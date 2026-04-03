@@ -104,24 +104,24 @@ export default function OrdersClient({
     return (
         <div className="space-y-6">
             {/* Sticky Header with Title and Partner Filter */}
-            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 shadow-sm transition-all duration-300">
+            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all duration-300">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#d9361b] transition-all" title="Dashboard">
+                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-500 hover:text-[#d9361b] transition-all" title="Dashboard">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight">주문 관리</h1>
+                            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">주문 관리</h1>
                         </div>
 
-                        <div className="h-4 w-px bg-gray-200"></div>
+                        <div className="h-4 w-px bg-gray-200 dark:bg-[#2a2a2a]"></div>
 
                         {/* Partner Select Toggle */}
                         <div className="relative">
                             <select
                                 value={selectedPartner || ''}
                                 onChange={(e) => setSelectedPartner(e.target.value || null)}
-                                className="appearance-none bg-gray-50/50 border border-gray-100 text-[#d9361b] text-[11px] font-black rounded-lg focus:ring-[#d9361b] focus:border-[#d9361b] block w-full pl-2.5 pr-8 py-1 transition-all hover:bg-white cursor-pointer min-w-[140px]"
+                                className="appearance-none bg-gray-50/50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] text-[#d9361b] text-[11px] font-black rounded-lg focus:ring-[#d9361b] focus:border-[#d9361b] block w-full pl-2.5 pr-8 py-1 transition-all hover:bg-white dark:hover:bg-[#252525] cursor-pointer min-w-[140px]"
                             >
                                 <option value="">🏢 모든 거래처 보기</option>
                                 {partners.map(partner => (
@@ -139,7 +139,7 @@ export default function OrdersClient({
                                 type="month"
                                 value={selectedMonth}
                                 onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="bg-gray-50/50 border border-gray-100 text-gray-700 text-[11px] font-black rounded-lg focus:ring-gray-300 focus:border-gray-300 block w-full px-2.5 py-1.5 transition-all hover:bg-white cursor-pointer h-[26px]"
+                                className="bg-gray-50/50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-200 text-[11px] font-black rounded-lg focus:ring-gray-300 focus:border-gray-300 block w-full px-2.5 py-1.5 transition-all hover:bg-white dark:hover:bg-[#252525] cursor-pointer h-[26px]"
                             />
                         </div>
                     </div>
@@ -149,7 +149,7 @@ export default function OrdersClient({
                         {selectedPartner && (
                             <button
                                 onClick={() => setSelectedPartner(null)}
-                                className="flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 bg-white text-gray-500 hover:bg-gray-50 hover:text-gray-900 transition-all shadow-sm"
+                                className="flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525] hover:text-gray-900 dark:hover:text-white transition-all shadow-sm dark:shadow-none"
                             >
                                 <span className="text-[10px]">🏠</span>
                                 <span className="text-[10px] font-black">모든 거래처</span>
@@ -159,7 +159,7 @@ export default function OrdersClient({
                         {pendingTaxCount > 0 && (
                             <Link
                                 href={type === 'invoice' ? '/admin/orders' : '/admin/orders?type=invoice'}
-                                className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'invoice' ? 'bg-[#d9361b] border-[#d9361b] text-white shadow-lg scale-105' : 'bg-white border-red-200 text-[#d9361b] hover:bg-red-50'}`}
+                                className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'invoice' ? 'bg-[#d9361b] border-[#d9361b] text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-red-200 dark:border-red-900 text-[#d9361b] hover:bg-red-50 dark:hover:bg-[#252525]'}`}
                             >
                                 <span className="text-[10px]">📄</span>
                                 <span className="text-[10px] font-black">{pendingTaxCount} <span className="opacity-70 font-bold ml-1">미발행</span></span>
@@ -169,7 +169,7 @@ export default function OrdersClient({
                         {missingTrackingCount > 0 && (
                             <Link
                                 href={type === 'tracking' ? '/admin/orders' : '/admin/orders?type=tracking'}
-                                className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'tracking' ? 'bg-gray-800 border-gray-800 text-white shadow-lg scale-105' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+                                className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'tracking' ? 'bg-gray-800 border-gray-800 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]'}`}
                             >
                                 <span className="text-[10px]">📦</span>
                                 <span className="text-[10px] font-black">{missingTrackingCount} <span className="opacity-70 font-bold ml-1">송장누락</span></span>
@@ -178,7 +178,7 @@ export default function OrdersClient({
 
                         <Link
                             href={type === 'inprogress' ? '/admin/orders' : '/admin/orders?type=inprogress'}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'inprogress' ? 'bg-orange-500 border-orange-500 text-white shadow-lg scale-105' : 'bg-white border-orange-200 text-orange-600 hover:bg-orange-50'}`}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'inprogress' ? 'bg-orange-500 border-orange-500 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-orange-200 dark:border-orange-900 text-orange-600 hover:bg-orange-50 dark:hover:bg-[#252525]'}`}
                         >
                             <span className="text-[10px]">⏳</span>
                             <span className="text-[10px] font-black">거래중</span>
@@ -186,7 +186,7 @@ export default function OrdersClient({
 
                         <Link
                             href={type === 'completed' ? '/admin/orders' : '/admin/orders?type=completed'}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'completed' ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105' : 'bg-white border-blue-200 text-blue-600 hover:bg-blue-50'}`}
+                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'completed' ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-blue-200 dark:border-blue-900 text-blue-600 hover:bg-blue-50 dark:hover:bg-[#252525]'}`}
                         >
                             <span className="text-[10px]">✅</span>
                             <span className="text-[10px] font-black">거래완료</span>
@@ -213,22 +213,22 @@ export default function OrdersClient({
                     </div>
 
                     {/* Product Quantity Table Card */}
-                    <div className="lg:col-span-3 bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col min-h-[200px]">
+                    <div className="lg:col-span-3 bg-white dark:bg-[#1e1e1e] rounded-2xl p-6 shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] flex flex-col min-h-[200px]">
                         <div className="flex justify-between items-center mb-4">
-                            <h3 className="text-sm font-black text-gray-900 flex items-center gap-2">
+                            <h3 className="text-sm font-black text-gray-900 dark:text-white flex items-center gap-2">
                                 <span className="w-1.5 h-4 bg-[#d9361b] rounded-full"></span>
                                 품목별 매입 현황 ({stats.month}월)
                             </h3>
                             <div className="flex items-center gap-2">
                                 <button
                                     onClick={() => setStatSortType('quantity')}
-                                    className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${statSortType === 'quantity' ? 'bg-[#d9361b] text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                    className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${statSortType === 'quantity' ? 'bg-[#d9361b] text-white' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-[#252525]'}`}
                                 >
                                     수량순
                                 </button>
                                 <button
                                     onClick={() => setStatSortType('total')}
-                                    className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${statSortType === 'total' ? 'bg-[#d9361b] text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
+                                    className={`text-[10px] px-2 py-1 rounded-md font-bold transition-all ${statSortType === 'total' ? 'bg-[#d9361b] text-white' : 'bg-gray-100 dark:bg-[#2a2a2a] text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-[#252525]'}`}
                                 >
                                     금액순
                                 </button>
@@ -237,7 +237,7 @@ export default function OrdersClient({
 
                         <div className="flex-1 overflow-auto max-h-[300px] scrollbar-hide">
                             <table className="w-full text-left border-collapse">
-                                <thead className="sticky top-0 bg-white z-10 text-[10px] uppercase text-gray-400 font-black border-b border-gray-100">
+                                <thead className="sticky top-0 bg-white dark:bg-[#1e1e1e] z-10 text-[10px] uppercase text-gray-400 dark:text-gray-500 font-black border-b border-gray-100 dark:border-[#2a2a2a]">
                                     <tr>
                                         <th className="py-2 px-2 w-10 text-center">No.</th>
                                         <th className="py-2 px-2">상품정보</th>
@@ -245,44 +245,44 @@ export default function OrdersClient({
                                         <th className="py-2 text-right pr-2">금액 (공급가)</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-50">
+                                <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                                     {stats.products.length > 0 ? (
                                         stats.products.map((product, i) => (
-                                            <tr key={i} className="group even:bg-gray-100/70 hover:bg-gray-200/50 transition-colors">
+                                            <tr key={i} className="group even:bg-gray-100/70 dark:even:bg-[#252525]/70 hover:bg-gray-200/50 dark:hover:bg-[#252525]/50 transition-colors">
                                                 <td className="py-2 px-2 text-center">
-                                                    <span className="text-[10px] font-bold text-gray-400">{i + 1}</span>
+                                                    <span className="text-[10px] font-bold text-gray-400 dark:text-gray-500">{i + 1}</span>
                                                 </td>
                                                 <td className="py-2 px-2 flex items-center gap-3">
-                                                    <div className="w-8 h-8 rounded border border-gray-100 overflow-hidden shrink-0 bg-gray-50 flex items-center justify-center">
+                                                    <div className="w-8 h-8 rounded border border-gray-100 dark:border-[#2a2a2a] overflow-hidden shrink-0 bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-center">
                                                         {product.image ? (
                                                             <img src={product.image} alt="" className="w-full h-full object-cover" />
                                                         ) : (
                                                             <span className="text-[6px] text-gray-300">N/A</span>
                                                         )}
                                                     </div>
-                                                    <span className="text-[11px] font-bold text-gray-800 truncate max-w-[200px]" title={product.name}>
+                                                    <span className="text-[11px] font-bold text-gray-800 dark:text-gray-200 truncate max-w-[200px]" title={product.name}>
                                                         {product.name}
                                                     </span>
                                                 </td>
                                                 <td className="py-2 text-center">
-                                                    <span className="text-[11px] font-black text-gray-900">{product.quantity.toLocaleString()}</span>
+                                                    <span className="text-[11px] font-black text-gray-900 dark:text-white">{product.quantity.toLocaleString()}</span>
                                                 </td>
                                                 <td className="py-2 text-right pr-2">
-                                                    <span className="text-[11px] font-black text-gray-900">{product.total.toLocaleString()} 원</span>
+                                                    <span className="text-[11px] font-black text-gray-900 dark:text-white">{product.total.toLocaleString()} 원</span>
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan={3} className="py-10 text-center text-gray-300 text-xs italic">
+                                            <td colSpan={3} className="py-10 text-center text-gray-300 dark:text-gray-500 text-xs italic">
                                                 데이터가 없습니다.
                                             </td>
                                         </tr>
                                     )}
                                 </tbody>
                                 {stats.products.length > 0 && (
-                                    <tfoot className="sticky bottom-0 bg-gray-100/80 backdrop-blur-sm border-t border-gray-200">
-                                        <tr className="font-black text-gray-900">
+                                    <tfoot className="sticky bottom-0 bg-gray-100/80 dark:bg-[#2a2a2a]/80 backdrop-blur-sm border-t border-gray-200 dark:border-[#2a2a2a]">
+                                        <tr className="font-black text-gray-900 dark:text-white">
                                             <td colSpan={2} className="py-2 px-4 text-[11px]">총 합계</td>
                                             <td className="py-2 text-center text-[11px]">
                                                 {stats.products.reduce((acc, p) => acc + p.quantity, 0).toLocaleString()}
@@ -303,8 +303,8 @@ export default function OrdersClient({
 
             <div className="flex flex-col gap-10">
                 {filteredOrders.length === 0 ? (
-                    <div className="text-center py-20 bg-white rounded-2xl border-2 border-dashed border-gray-200">
-                        <p className="text-gray-400 font-medium">검색 결과가 없습니다.</p>
+                    <div className="text-center py-20 bg-white dark:bg-[#1e1e1e] rounded-2xl border-2 border-dashed border-gray-200 dark:border-[#2a2a2a]">
+                        <p className="text-gray-400 dark:text-gray-500 font-medium">검색 결과가 없습니다.</p>
                         {(type || selectedPartner) && (
                             <button onClick={() => { setSelectedPartner(null); history.pushState({}, '', '/admin/orders'); }} className="text-[#d9361b] font-bold mt-2 inline-block hover:underline">
                                 모든 주문 보기
@@ -316,9 +316,9 @@ export default function OrdersClient({
                         <div key={order.id}>
                             {idx > 0 && (
                                 <div className="flex items-center gap-3 mb-8 max-w-[480px] mx-auto px-4">
-                                    <div className="flex-1 h-[2px] bg-gray-300 rounded-full" />
-                                    <span className="text-[9px] font-black text-gray-400 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
-                                    <div className="flex-1 h-[2px] bg-gray-300 rounded-full" />
+                                    <div className="flex-1 h-[2px] bg-gray-300 dark:bg-[#2a2a2a] rounded-full" />
+                                    <span className="text-[9px] font-black text-gray-400 dark:text-gray-500 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
+                                    <div className="flex-1 h-[2px] bg-gray-300 dark:bg-[#2a2a2a] rounded-full" />
                                 </div>
                             )}
                             <AdminOrderCard order={order} />
