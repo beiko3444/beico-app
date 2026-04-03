@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bell, Download, LayoutGrid, Plus } from 'lucide-react'
 
 type SmsStatusType = 'success' | 'error'
 
@@ -34,8 +35,10 @@ function formatSmsCompletedHm(value: string) {
 
 export default function AdminNav({
     counts,
+    userName,
 }: {
     counts?: { pendingOrders: number, lowStock: number, pendingPartners: number, missingBill: number }
+    userName?: string
 }) {
     const pathname = usePathname()
     const [shipmentCount, setShipmentCount] = useState('1')
@@ -226,92 +229,148 @@ export default function AdminNav({
         }
     }
 
+    const totalAlerts = (counts?.pendingOrders || 0) + (counts?.lowStock || 0) + (counts?.pendingPartners || 0) + (counts?.missingBill || 0)
+    const userInitial = userName ? userName.charAt(0) : '관'
+    const activeTabRef = useRef<HTMLAnchorElement>(null)
+    const tabContainerRef = useRef<HTMLDivElement>(null)
+
+    useEffect(() => {
+        if (activeTabRef.current && tabContainerRef.current) {
+            const container = tabContainerRef.current
+            const tab = activeTabRef.current
+            const containerRect = container.getBoundingClientRect()
+            const tabRect = tab.getBoundingClientRect()
+            if (tabRect.left < containerRect.left || tabRect.right > containerRect.right) {
+                tab.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
+            }
+        }
+    }, [pathname])
+
     return (
-        <div className="fixed top-0 left-0 right-0 z-[100] px-4 py-2 bg-white/80 backdrop-blur-md border-b border-gray-100 shadow-sm">
-            <div className="max-w-7xl mx-auto flex items-center justify-between min-h-[40px] gap-4">
-                <nav className="flex items-center gap-1 overflow-x-auto scrollbar-hide flex-1 pb-1">
-                    {navItems.map((item) => {
-                        const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
+        <div className="fixed top-0 left-0 right-0 z-[100]">
+            {/* Top header bar */}
+            <div className="bg-[#1a1a1a] px-4 py-2.5">
+                <div className="max-w-7xl mx-auto flex items-center justify-between">
+                    {/* Left: Logo + Title */}
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 bg-[#2a2a2a] rounded-lg flex items-center justify-center">
+                            <LayoutGrid size={18} className="text-gray-300" />
+                        </div>
+                        <span className="text-white text-sm font-bold tracking-tight">관리자 콘솔</span>
+                    </div>
 
-                        return (
-                            <Link
-                                key={item.path}
-                                href={item.path}
-                                prefetch={false}
-                                className={`px-4 py-2 rounded-xl text-xs font-black transition-all whitespace-nowrap tracking-tight flex items-center gap-1.5 ${isActive
-                                    ? 'bg-black text-white'
-                                    : 'text-gray-400 hover:text-black hover:bg-gray-50'
-                                    }`}
-                            >
-                                {item.name}
-                                {item.count && item.count > 0 ? (
-                                    <span className={`flex items-center justify-center h-4 min-w-[16px] px-1 rounded-full text-[9px] font-bold ${isActive ? 'bg-red-500 text-white' : 'bg-red-500 text-white'}`}>
-                                        {item.count}
-                                    </span>
-                                ) : null}
-                                {item.alert ? (
-                                    <span className={`flex items-center justify-center h-4 w-4 rounded-full text-[10px] font-bold ${isActive ? 'bg-red-500 text-white' : 'bg-red-500 text-white'}`}>
-                                        !
-                                    </span>
-                                ) : null}
-                            </Link>
-                        )
-                    })}
-                </nav>
-
-                <div className="shrink-0 flex flex-col items-end gap-1">
+                    {/* Right: Actions */}
                     <div className="flex items-center gap-2">
-                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-xl border border-gray-200 bg-white">
+                        {/* Bell notification */}
+                        <button className="relative w-9 h-9 rounded-lg bg-[#2a2a2a] flex items-center justify-center hover:bg-[#333] transition-colors">
+                            <Bell size={17} className="text-gray-300" />
+                            {totalAlerts > 0 && (
+                                <span className="absolute -top-1 -right-1 flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                    {totalAlerts}
+                                </span>
+                            )}
+                        </button>
+
+                        {/* Shipment count input + 건출고 */}
+                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-lg bg-[#2a2a2a]">
+                            <span className="inline-flex h-full items-center pl-2.5 pr-1 text-gray-400">
+                                <Plus size={14} />
+                            </span>
                             <input
                                 type="number"
                                 min={1}
                                 inputMode="numeric"
                                 value={shipmentCount}
                                 onChange={(event) => setShipmentCount(event.target.value)}
-                                className="h-full w-[54px] border-none bg-transparent px-2 text-center text-xs font-black outline-none focus:outline-none"
+                                className="h-full w-[36px] border-none bg-transparent text-center text-xs font-bold text-white outline-none focus:outline-none"
                                 placeholder="1"
                                 aria-label="출고 건수"
                             />
-                            <span className="inline-flex h-full items-center border-l border-gray-200 bg-gray-50 px-2 text-xs font-black text-slate-600">건 출고</span>
+                            <span className="inline-flex h-full items-center pr-2.5 text-xs font-bold text-white whitespace-nowrap">건 출고</span>
                         </div>
 
+                        {/* 집하요청 button */}
                         <button
                             onClick={handleSendSms}
                             disabled={sendingSms || loadingFromNumber}
-                            className="h-9 px-3 text-xs font-black text-white bg-red-500 hover:bg-red-600 disabled:bg-gray-300 rounded-xl transition-all"
+                            className="h-9 px-3 text-xs font-bold text-white bg-[#2a2a2a] hover:bg-[#333] disabled:opacity-40 rounded-lg transition-colors flex items-center gap-1.5"
                         >
-                            {sendingSms ? '요청중...' : '집하요청'}
+                            <Download size={14} />
+                            <span>{sendingSms ? '요청중...' : '집하요청'}</span>
                         </button>
 
+                        {/* User avatar */}
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
-                            className="h-9 px-3 text-xs font-black text-red-500 hover:bg-red-50 rounded-xl transition-all"
+                            className="w-9 h-9 rounded-full bg-purple-200 flex items-center justify-center text-sm font-bold text-purple-700 hover:bg-purple-300 transition-colors"
+                            title="로그아웃"
                         >
-                            로그아웃
+                            {userInitial}
                         </button>
                     </div>
+                </div>
 
-                    <div className="flex min-h-[22px] items-center justify-end gap-1.5">
+                {/* SMS status row */}
+                {(smsStatus || smsSendLogs.length > 0) && (
+                    <div className="max-w-7xl mx-auto flex items-center justify-end gap-2 mt-1.5">
                         {smsStatus ? (
-                            <div className={`text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-600' : 'text-red-500'}`}>
+                            <span className={`text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-400' : 'text-red-400'}`}>
                                 {smsStatus.message}
-                            </div>
+                            </span>
                         ) : null}
-
                         {smsSendLogs.length > 0 ? (
-                            <div
-                                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] ${smsSendLogs[0].status === 'success'
-                                    ? 'border-green-200 bg-green-50 text-green-700'
-                                    : 'border-red-200 bg-red-50 text-red-700'
+                            <span
+                                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${smsSendLogs[0].status === 'success'
+                                    ? 'border-green-700 bg-green-900/40 text-green-400'
+                                    : 'border-red-700 bg-red-900/40 text-red-400'
                                     }`}
                                 title={smsSendLogs[0].detail}
                             >
-                                <span className="font-black text-slate-700">{smsSendLogs[0].seq}번</span>
-                                <span className="font-semibold text-slate-500">{formatSmsCompletedHm(smsSendLogs[0].completedAt)} 완료</span>
-                                <span className="font-black">{smsSendLogs[0].status === 'success' ? '성공' : '실패'}</span>
-                            </div>
+                                <span className="font-bold">{smsSendLogs[0].seq}번</span>
+                                <span className="font-medium opacity-70">{formatSmsCompletedHm(smsSendLogs[0].completedAt)} 완료</span>
+                                <span className="font-bold">{smsSendLogs[0].status === 'success' ? '성공' : '실패'}</span>
+                            </span>
                         ) : null}
                     </div>
+                )}
+            </div>
+
+            {/* Tab navigation bar */}
+            <div className="bg-[#1a1a1a] border-t border-[#333] px-4">
+                <div className="max-w-7xl mx-auto">
+                    <nav ref={tabContainerRef} className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
+                        {navItems.map((item) => {
+                            const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
+
+                            return (
+                                <Link
+                                    key={item.path}
+                                    ref={isActive ? activeTabRef : undefined}
+                                    href={item.path}
+                                    prefetch={false}
+                                    className={`relative px-4 py-3 text-[13px] transition-colors whitespace-nowrap flex items-center gap-1.5 ${isActive
+                                        ? 'text-white font-bold'
+                                        : 'text-gray-500 hover:text-gray-300 font-medium'
+                                        }`}
+                                >
+                                    {item.name}
+                                    {item.count && item.count > 0 ? (
+                                        <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                            {item.count}
+                                        </span>
+                                    ) : null}
+                                    {item.alert ? (
+                                        <span className="flex items-center justify-center h-[18px] w-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                            !
+                                        </span>
+                                    ) : null}
+                                    {isActive && (
+                                        <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-white rounded-t-full" />
+                                    )}
+                                </Link>
+                            )
+                        })}
+                    </nav>
                 </div>
             </div>
         </div>
