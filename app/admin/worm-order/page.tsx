@@ -3664,8 +3664,8 @@ export default function WormOrderPage() {
                             }
                             return (
                                 <div className="flex flex-col h-full max-h-[600px]">
-                                    <div className="p-6 bg-white border-b border-gray-100 shrink-0">
-                                        <h2 className="text-[18px] font-black text-gray-900 leading-tight mb-2 pr-4">
+                                    <div className="p-6 bg-white dark:bg-[#1e1e1e] border-b border-gray-100 dark:border-[#2a2a2a] shrink-0">
+                                        <h2 className="text-[18px] font-black text-gray-900 dark:text-white leading-tight mb-2 pr-4">
                                             {selectedDoc.subject}
                                         </h2>
                                         {selectedDoc.awbNumber && (
@@ -3686,9 +3686,9 @@ export default function WormOrderPage() {
                                                 {awbLoading ? 'OCR 실행중...' : 'AWB OCR 실행'}
                                             </button>
                                             {loadingDocEmailDetail ? (
-                                                <span className="text-[12px] text-slate-500 font-medium">메일 상세를 불러오는 중입니다...</span>
+                                                <span className="text-[12px] text-slate-500 dark:text-gray-400 font-medium">메일 상세를 불러오는 중입니다...</span>
                                             ) : (
-                                                <span className="text-[12px] text-slate-500 font-medium">
+                                                <span className="text-[12px] text-slate-500 dark:text-gray-400 font-medium">
                                                     {selectedDoc.skmIndices.length > 0
                                                         ? `SKM 첨부파일 ${selectedDoc.skmIndices.length}개`
                                                         : 'SKM 첨부파일이 없습니다.'}

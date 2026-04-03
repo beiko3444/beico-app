@@ -304,13 +304,13 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                                 {item.product.imageUrl ? (
                                                     <img src={item.product.imageUrl} alt="" className="w-full h-full object-contain" />
                                                 ) : (
-                                                    <span className="text-xs text-gray-300">No Img</span>
+                                                    <span className="text-xs text-gray-300 dark:text-gray-500">No Img</span>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                            <h4 className="font-bold text-sm text-gray-900 truncate leading-tight">{item.product.nameJP || item.product.name}</h4>
-                                            <p className="text-xs text-gray-900 font-medium leading-tight">{item.product.nameEN || item.product.name}</p>
+                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{item.product.nameJP || item.product.name}</h4>
+                                            <p className="text-xs text-gray-900 dark:text-white font-medium leading-tight">{item.product.nameEN || item.product.name}</p>
                                             <div className="text-[10px] text-blue-400 font-medium font-inter leading-tight">
                                                 Code: {item.product.productCode || '-'}
                                             </div>
