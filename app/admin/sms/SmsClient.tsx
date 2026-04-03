@@ -632,11 +632,11 @@ export default function SmsClient() {
                   <th className="px-4 py-3 text-left font-black">RefKey</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                 {history?.messages.length ? (
                   history.messages.map((item) => (
                     <tr key={item.sendKey || `${item.refKey}-${item.receiverNum}-${item.sendDT}`} className="align-top">
-                      <td className="px-4 py-4 font-semibold text-gray-900 whitespace-nowrap">
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                         {formatSendDateTime(item.sendDT)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">

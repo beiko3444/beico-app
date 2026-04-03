@@ -3177,12 +3177,12 @@ export default function WormOrderPage() {
                                 <textarea
                                     readOnly
                                     value={generatedMessage}
-                                    className="w-full h-52 border border-gray-300 rounded-xl p-4 text-sm leading-6 text-gray-800 bg-gray-50"
+                                    className="w-full h-52 border border-gray-300 dark:border-[#2a2a2a] rounded-xl p-4 text-sm leading-6 text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-[#1a1a1a]"
                                 />
                                 <button
                                     type="button"
                                     onClick={handleCopy}
-                                    className="inline-flex items-center gap-2 h-9 px-4 border border-gray-300 rounded-lg font-semibold text-sm text-gray-700 hover:bg-gray-50"
+                                    className="inline-flex items-center gap-2 h-9 px-4 border border-gray-300 dark:border-[#2a2a2a] rounded-lg font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
                                 >
                                     <Copy size={15} />
                                     {copied ? '복사 완료' : '메시지 복사'}

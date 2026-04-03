@@ -995,7 +995,7 @@ export default function ElectricityClient() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                                 <label className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] px-4 py-3 bg-blue-50/50 dark:bg-blue-950/20">
                                     <div>
-                                        <div className="text-sm font-bold text-gray-900">월세 납부 세금계산서 발행</div>
+                                        <div className="text-sm font-bold text-gray-900 dark:text-white">월세 납부 세금계산서 발행</div>
                                         <div className="mt-1.5 space-y-0.5">
                                             <div className="text-[11px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded inline-block">
                                                 임대기간: {rentInfo.period}

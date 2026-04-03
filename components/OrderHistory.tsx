@@ -120,11 +120,11 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 </span>
                             </div>
                             <div className="flex flex-col text-right text-sm">
-                                <span className="text-gray-400 mb-0.5 text-xs">注文番号 / {isUSD ? 'Order No' : '주문번호'}</span>
-                                <span className="font-bold text-gray-900 font-inter tracking-[0.01em]">{order.orderNumber || order.id.slice(0, 12)}</span>
+                                <span className="text-gray-400 dark:text-gray-500 mb-0.5 text-xs">注文番号 / {isUSD ? 'Order No' : '주문번호'}</span>
+                                <span className="font-bold text-gray-900 dark:text-white font-inter tracking-[0.01em]">{order.orderNumber || order.id.slice(0, 12)}</span>
                             </div>
                         </div>
-                        <div className="border-t border-gray-100 mx-5 my-0.5" />
+                        <div className="border-t border-gray-100 dark:border-[#2a2a2a] mx-5 my-0.5" />
 
                         {/* Progress Stepper moved under Order No */}
                         <div className="bg-white rounded-xl py-1 px-1 mb-1">
