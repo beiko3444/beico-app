@@ -57,10 +57,21 @@ export async function GET(request: NextRequest) {
         remittanceExchangeRateText: true,
         createdAt: true,
         updatedAt: true,
+        emailMatches: {
+          where: { awbNumber: { not: null } },
+          select: { awbNumber: true },
+          take: 1,
+        },
       },
     })
 
-    return NextResponse.json({ success: true, orders })
+    const ordersWithAwb = orders.map((order) => ({
+      ...order,
+      awbNumber: order.emailMatches?.[0]?.awbNumber ?? null,
+      emailMatches: undefined,
+    }))
+
+    return NextResponse.json({ success: true, orders: ordersWithAwb })
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : '발주 리스트 조회 중 오류가 발생했습니다.'
     return NextResponse.json({ error: message }, { status: 500 })

@@ -128,6 +128,7 @@ type WormOrderListItem = {
     remittanceSendAmountText: string | null
     remittanceTotalFeeText: string | null
     remittanceExchangeRateText: string | null
+    awbNumber: string | null
     createdAt: string
     updatedAt: string
 }
@@ -1090,6 +1091,16 @@ export default function WormOrderPage() {
         applyAwbNumberToEmailState(uid, normalizedAwb)
         setEmailCacheSavedAt(new Date().toISOString())
 
+        // 매칭된 발주가 있으면 로컬 발주 리스트에도 AWB 즉시 반영
+        const matchedOrderId = fallbackEmail?.matchedOrderId
+            || docEmails.find((e) => e.uid === uid)?.matchedOrderId
+            || null
+        if (matchedOrderId) {
+            setWormOrderList((prev) => prev.map((order) =>
+                order.id === matchedOrderId ? { ...order, awbNumber: normalizedAwb } : order
+            ))
+        }
+
         try {
             const response = await fetch('/api/admin/worm-order/emails/awb-cache', {
                 method: 'POST',
@@ -1109,7 +1120,7 @@ export default function WormOrderPage() {
         } catch (error) {
             console.warn('Failed to persist AWB cache:', error)
         }
-    }, [applyAwbNumberToEmailState, emails])
+    }, [applyAwbNumberToEmailState, emails, docEmails])
 
     // ── AWB OCR 관련 State ──
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
@@ -2122,7 +2133,9 @@ export default function WormOrderPage() {
         return docEmails.find(e => e.matchedOrderId === activeWormOrder.id) || null
     }, [docEmails, activeWormOrder?.id])
 
-    const autoBlNumber = matchedAwbEmail?.awbNumber ?? null
+    // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
+    const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
+    const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)

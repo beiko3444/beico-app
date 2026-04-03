@@ -198,6 +198,7 @@ model WormOrderEmailMatch {
   emailDate             DateTime?
   orderId               String
   matchedAt             DateTime  @default(now())
+  awbNumber             String?
   invoiceUnitPriceUsd   Float?
   invoiceTotalAmountUsd Float?
   usdKrwRate            Float?

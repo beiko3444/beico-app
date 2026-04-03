@@ -72,6 +72,7 @@ type WormOrderEmailMatchHydrated = {
   orderId: string
   orderNumber: string
   matchedAt: string | null
+  awbNumber: string | null
   invoiceUnitPriceUsd: number | null
   invoiceTotalAmountUsd: number | null
   usdKrwRate: number | null
@@ -194,6 +195,7 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
         uid: true,
         orderId: true,
         matchedAt: true,
+        awbNumber: true,
         invoiceUnitPriceUsd: true,
         invoiceTotalAmountUsd: true,
         usdKrwRate: true,
@@ -217,6 +219,7 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
           orderId: row.orderId,
           orderNumber: row.order?.orderNumber || '',
           matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
+          awbNumber: row.awbNumber || null,
           invoiceUnitPriceUsd: row.invoiceUnitPriceUsd,
           invoiceTotalAmountUsd: row.invoiceTotalAmountUsd,
           usdKrwRate: row.usdKrwRate,
@@ -254,6 +257,7 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
             orderId: row.orderId,
             orderNumber: row.order?.orderNumber || '',
             matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
+            awbNumber: null,
             invoiceUnitPriceUsd: null,
             invoiceTotalAmountUsd: null,
             usdKrwRate: null,
@@ -277,7 +281,7 @@ async function hydrateEmailsWithAwbCache(emails: WormEmailListItem[]) {
   const matchMap = await getWormOrderEmailMatchMap(emails.map((email) => email.uid))
   return emails.map((email) => ({
     ...email,
-    awbNumber: awbMap.get(email.uid) || email.awbNumber || null,
+    awbNumber: awbMap.get(email.uid) || matchMap.get(email.uid)?.awbNumber || email.awbNumber || null,
     matchedOrderId: matchMap.get(email.uid)?.orderId || null,
     matchedOrderNumber: matchMap.get(email.uid)?.orderNumber || null,
     matchedAt: matchMap.get(email.uid)?.matchedAt || null,
@@ -330,7 +334,7 @@ export async function upsertWormEmailAwbCache(input: {
     throw new Error('awbNumber is required.')
   }
 
-  return prisma.wormEmailAwbCache.upsert({
+  const result = await prisma.wormEmailAwbCache.upsert({
     where: { uid },
     update: {
       subject: input.subject?.trim() || null,
@@ -344,6 +348,18 @@ export async function upsertWormEmailAwbCache(input: {
       awbNumber,
     },
   })
+
+  // AWB 번호가 저장되면 기존 매칭 레코드에도 자동 반영
+  try {
+    await prisma.wormOrderEmailMatch.updateMany({
+      where: { uid },
+      data: { awbNumber },
+    })
+  } catch {
+    // 매칭 레코드가 없으면 무시
+  }
+
+  return result
 }
 
 export async function upsertWormOrderEmailMatch(input: {
@@ -351,6 +367,7 @@ export async function upsertWormOrderEmailMatch(input: {
   orderId: string
   subject?: string | null
   date?: string | null
+  awbNumber?: string | null
   invoiceUnitPriceUsd?: number | null
   invoiceTotalAmountUsd?: number | null
   usdKrwRate?: number | null
@@ -370,6 +387,13 @@ export async function upsertWormOrderEmailMatch(input: {
     throw new Error('orderId is required.')
   }
 
+  // AWB 번호: 명시적으로 전달되면 사용, 없으면 AWB 캐시에서 자동 조회
+  let awbNumber = input.awbNumber?.replace(/\s+/g, '').trim() || null
+  if (!awbNumber) {
+    const awbCache = await getWormEmailAwbCacheByUid(uid)
+    awbNumber = awbCache?.awbNumber || null
+  }
+
   try {
     return await prisma.wormOrderEmailMatch.upsert({
       where: { uid },
@@ -378,6 +402,7 @@ export async function upsertWormOrderEmailMatch(input: {
         subject: input.subject?.trim() || null,
         emailDate: toOptionalDate(input.date),
         matchedAt: new Date(),
+        awbNumber,
         invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
         invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
         usdKrwRate: input.usdKrwRate ?? null,
@@ -393,6 +418,7 @@ export async function upsertWormOrderEmailMatch(input: {
         subject: input.subject?.trim() || null,
         emailDate: toOptionalDate(input.date),
         matchedAt: new Date(),
+        awbNumber,
         invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
         invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
         usdKrwRate: input.usdKrwRate ?? null,
