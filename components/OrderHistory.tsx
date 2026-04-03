@@ -127,10 +127,10 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                         <div className="border-t border-gray-100 dark:border-[#2a2a2a] mx-5 my-0.5" />
 
                         {/* Progress Stepper moved under Order No */}
-                        <div className="bg-white rounded-xl py-1 px-1 mb-1">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-xl py-1 px-1 mb-1">
                             <div className="relative flex justify-between items-start overflow-hidden pt-2">
                                 {/* Connecting Line Container (Grey Background) */}
-                                <div className="absolute top-[26px] left-[10%] right-[10%] h-[2px] bg-gray-100 z-0">
+                                <div className="absolute top-[26px] left-[10%] right-[10%] h-[2px] bg-gray-100 dark:bg-[#2a2a2a] z-0">
                                     {/* Active Progress Line (Red) */}
                                     <div
                                         className="h-full bg-[#e34219] transition-all duration-500"
@@ -144,7 +144,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                     return (
                                         <div key={idx} className="flex-1 flex flex-col items-center gap-2 focus:outline-none relative z-10">
                                             <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white text-xs transition-all duration-300
-                                                ${isActive ? 'bg-[#e34219] shadow-[0_0_0_4px_rgba(227,66,25,0.1)]' : 'bg-gray-200 text-gray-400'}
+                                                ${isActive ? 'bg-[#e34219] shadow-[0_0_0_4px_rgba(227,66,25,0.1)]' : 'bg-gray-200 dark:bg-[#2a2a2a] text-gray-400 dark:text-gray-500'}
                                             `}>
                                                 {isActive ? <step.icon size={16} strokeWidth={3} /> : idx + 1}
                                             </div>

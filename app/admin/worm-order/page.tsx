@@ -3195,7 +3195,7 @@ export default function WormOrderPage() {
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
             {showInboxTools && (
-                <div ref={inboxSectionRef} style={{ order: inboxToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+                <div ref={inboxSectionRef} style={{ order: inboxToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -3207,10 +3207,10 @@ export default function WormOrderPage() {
                     </div>
                 )}
 
-                <div className="px-6 py-4 border-b border-gray-100 bg-[#f8fafc] flex items-center justify-between mt-[2px]">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f8fafc] dark:bg-[#1a1a1a] flex items-center justify-between mt-[2px]">
                     <div>
-                        <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
-                            <Mail size={18} className="text-slate-500" />
+                        <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
+                            <Mail size={18} className="text-slate-500 dark:text-gray-400" />
                             인보이스 메일 수신
                             {loadingEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </h2>

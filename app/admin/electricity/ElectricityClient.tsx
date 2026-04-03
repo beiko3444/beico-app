@@ -1000,11 +1000,11 @@ export default function ElectricityClient() {
                                             <div className="text-[11px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded inline-block">
                                                 임대기간: {rentInfo.period}
                                             </div>
-                                            <div className="text-xs text-gray-600 mt-1">
-                                                • 납부금액: <span className="font-bold text-gray-900">{rentInfo.amount}</span>
+                                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                                • 납부금액: <span className="font-bold text-gray-900 dark:text-white">{rentInfo.amount}</span>
                                             </div>
-                                            <div className="text-xs text-gray-600">
-                                                • 납부상태: <span className="font-bold text-gray-900">{rentInfo.paidDate}</span>
+                                            <div className="text-xs text-gray-600 dark:text-gray-400">
+                                                • 납부상태: <span className="font-bold text-gray-900 dark:text-white">{rentInfo.paidDate}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1019,7 +1019,7 @@ export default function ElectricityClient() {
                                     />
                                 </label>
 
-                                <label className="flex items-center justify-between rounded-xl border border-gray-200 px-4 py-3 bg-gray-50">
+                                <label className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a]">
                                     <div>
                                         <div className="text-sm font-bold text-gray-900">전기세 납부 완료</div>
                                         <div className="text-xs text-gray-500 mt-1">

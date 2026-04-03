@@ -644,18 +644,18 @@ export default function SmsClient() {
                           {getSendStateLabel(item.sendState)}
                         </span>
                       </td>
-                      <td className="px-4 py-4 font-semibold text-gray-900 whitespace-nowrap">{item.receiverName || '-'}</td>
-                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap">{formatPhoneNumber(item.receiverNum || '') || '-'}</td>
-                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap">{formatPhoneNumber(item.senderNum || '') || '-'}</td>
-                      <td className="px-4 py-4 text-gray-700 min-w-[320px]">
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{item.receiverName || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.receiverNum || '') || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.senderNum || '') || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 min-w-[320px]">
                         <div className="line-clamp-2 whitespace-pre-wrap break-words">{item.message || '-'}</div>
                       </td>
-                      <td className="px-4 py-4 text-gray-500 whitespace-nowrap">{item.refKey || '-'}</td>
+                      <td className="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.refKey || '-'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm font-bold text-gray-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm font-bold text-gray-400 dark:text-gray-400">
                       {historyLoading ? '발송내역을 불러오는 중입니다.' : '조회된 문자 발송내역이 없습니다.'}
                     </td>
                   </tr>

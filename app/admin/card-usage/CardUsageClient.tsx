@@ -363,7 +363,7 @@ const CARD_USAGE_THEME_CSS = `
     --cu-selectedBg: #EAF3FF;
     --cu-selectedBorder: #BFDBFE;
   }
-  :where(.dark, .dark *) .cu-root {
+  .dark .cu-root {
     --cu-bg: #121212;
     --cu-surface: #1e1e1e;
     --cu-surfaceSecondary: #1a1a1a;
