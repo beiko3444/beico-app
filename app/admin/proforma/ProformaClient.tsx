@@ -816,7 +816,7 @@ ${rowsHtml}
                                 </div>
                                 <div className="max-h-[620px] overflow-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
                                     <table className="w-full text-xs">
-                                        <thead className="bg-gray-50 text-gray-600 border-b border-gray-100">
+                                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-[#2a2a2a]">
                                             <tr>
                                                 <th className="px-3 py-2 text-left">날짜</th>
                                                 <th className="px-3 py-2 text-left">업체명</th>
@@ -824,16 +824,16 @@ ${rowsHtml}
                                                 <th className="px-3 py-2 text-center">관리</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100">
+                                        <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                                             {issuedInvoices.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400">발급된 PI가 없습니다.</td>
+                                                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400 dark:text-gray-400">발급된 PI가 없습니다.</td>
                                                 </tr>
                                             ) : (
                                                 issuedInvoices.map((invoice) => (
                                                     <tr
                                                         key={invoice.id}
-                                                        className={`cursor-pointer hover:bg-gray-50 ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
+                                                        className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
                                                         onClick={() => setActiveIssuedId(invoice.id)}
                                                     >
                                                         <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>

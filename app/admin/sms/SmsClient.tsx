@@ -544,7 +544,7 @@ export default function SmsClient() {
                   <button
                     type="button"
                     onClick={() => applyRecipient(item)}
-                    className="flex-1 h-10 rounded-xl bg-white border border-gray-200 text-sm font-black text-gray-800 inline-flex items-center justify-center gap-2"
+                    className="flex-1 h-10 rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-800 dark:text-white inline-flex items-center justify-center gap-2"
                   >
                     <Save size={14} />
                     불러오기
@@ -553,7 +553,7 @@ export default function SmsClient() {
                     type="button"
                     onClick={() => handleDeleteRecipient(item.id)}
                     disabled={deletingRecipientId === item.id}
-                    className="h-10 px-3 rounded-xl border border-red-200 bg-white text-red-600 inline-flex items-center justify-center disabled:opacity-50"
+                    className="h-10 px-3 rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-[#1e1e1e] text-red-600 inline-flex items-center justify-center disabled:opacity-50"
                   >
                     {deletingRecipientId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   </button>
@@ -561,7 +561,7 @@ export default function SmsClient() {
               </div>
             ))
           ) : (
-            <div className="col-span-full rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm font-bold text-gray-400">
+            <div className="col-span-full rounded-2xl border border-dashed border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] px-4 py-10 text-center text-sm font-bold text-gray-400 dark:text-gray-400">
               저장된 수신자가 없습니다.
             </div>
           )}

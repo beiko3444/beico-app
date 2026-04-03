@@ -657,11 +657,11 @@ export default function ProductionClient() {
                                                     {rMarginRate}%
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-1.5 text-black border-r border-gray-200" title={batch.memo || ''}>{batch.memo || '-'}</td>
+                                            <td className="px-4 py-1.5 text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]" title={batch.memo || ''}>{batch.memo || '-'}</td>
                                             <td className="px-4 py-1.5 text-center">
                                                 <div className="flex items-center justify-center gap-2 transition-opacity">
-                                                    <button onClick={() => handleEdit(batch)} className="text-gray-500 hover:text-gray-700 font-bold text-[10px] border border-gray-200 bg-gray-50 px-2 py-1 rounded shadow-sm transition-colors">수정</button>
-                                                    <button onClick={() => handleDelete(batch.id)} className="text-red-500 hover:text-red-700 font-bold text-[10px] border border-red-100 bg-red-50 px-2 py-1 rounded shadow-sm">삭제</button>
+                                                    <button onClick={() => handleEdit(batch)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 font-bold text-[10px] border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] px-2 py-1 rounded shadow-sm dark:shadow-none transition-colors">수정</button>
+                                                    <button onClick={() => handleDelete(batch.id)} className="text-red-500 hover:text-red-700 font-bold text-[10px] border border-red-100 dark:border-red-900/50 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded shadow-sm dark:shadow-none">삭제</button>
                                                 </div>
                                             </td>
                                         </tr>

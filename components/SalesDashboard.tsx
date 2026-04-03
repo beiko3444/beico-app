@@ -58,7 +58,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
                 {/* Horizontal Grid Lines */}
                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
                     {[0, 1, 2, 3].map(i => (
-                        <div key={i} className="border-b border-gray-50 w-full h-0"></div>
+                        <div key={i} className="border-b border-gray-50 dark:border-[#2a2a2a] w-full h-0"></div>
                     ))}
                 </div>
 
@@ -66,7 +66,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
                     <div key={i} className="relative flex-1 group flex flex-col items-center justify-end h-full">
                         {/* Tooltip */}
                         <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                            <div className="bg-gray-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap shadow-xl">
+                            <div className="bg-gray-800 dark:bg-gray-700 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap shadow-xl dark:shadow-none">
                                 {item.label}: {item.value.toLocaleString()} KRW
                             </div>
                         </div>
@@ -78,7 +78,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
                         ></div>
 
                         {/* Label */}
-                        <span className="text-[10px] text-gray-400 mt-2 rotate-45 md:rotate-0 origin-left whitespace-nowrap">
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 rotate-45 md:rotate-0 origin-left whitespace-nowrap">
                             {item.label}
                         </span>
                     </div>
@@ -86,7 +86,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
             </div>
 
             <div className="mt-12 flex justify-end">
-                <div className="bg-blue-50 px-4 py-2 rounded-xl">
+                <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl">
                     <span className="text-xs text-blue-400 font-bold uppercase mr-2">Total Selection:</span>
                     <span className="text-[var(--color-brand-blue)] font-extrabold">
                         {data.reduce((acc, curr) => acc + curr.value, 0).toLocaleString()} <small>KRW</small>

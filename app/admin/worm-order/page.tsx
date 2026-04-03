@@ -3030,7 +3030,7 @@ export default function WormOrderPage() {
                                 >
                                     <ChevronLeft size={14} />
                                 </button>
-                                <p className="text-sm font-black text-slate-900">{calendarMonthLabel}</p>
+                                <p className="text-sm font-black text-slate-900 dark:text-white">{calendarMonthLabel}</p>
                                 <button
                                     type="button"
                                     onClick={() =>
@@ -3040,7 +3040,7 @@ export default function WormOrderPage() {
                                             return { year: prev.year, month: nextMonth }
                                         })
                                     }
-                                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 inline-flex items-center justify-center"
+                                    className="h-8 w-8 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-[#252525] inline-flex items-center justify-center"
                                     aria-label="다음 달"
                                 >
                                     <ChevronRight size={14} />
@@ -3076,8 +3076,8 @@ export default function WormOrderPage() {
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
-                                                        ? 'bg-white text-slate-700 border border-slate-200 hover:bg-slate-100'
-                                                        : 'bg-slate-100 text-slate-400 border border-slate-200 hover:bg-slate-200'
+                                                        ? 'bg-white dark:bg-[#1e1e1e] text-slate-700 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'
+                                                        : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
                                             } ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             {dayCell.date.getDate()}
