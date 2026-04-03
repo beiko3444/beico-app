@@ -6,8 +6,6 @@ import { createPortal } from 'react-dom'
 import {
     LineChart,
     Line,
-    BarChart,
-    Bar,
     XAxis,
     YAxis,
     CartesianGrid,
@@ -16,7 +14,8 @@ import {
     ResponsiveContainer,
     AreaChart,
     Area,
-    ComposedChart
+    ComposedChart,
+    LabelList
 } from 'recharts'
 import { TrendingUp, Package, DollarSign, Calculator, ChevronRight, Activity } from 'lucide-react'
 
@@ -475,17 +474,18 @@ export default function ProductionClient() {
                         </div>
                         <div className="h-48 w-full">
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={barChartData}>
+                                <LineChart data={barChartData}>
                                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
                                     <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
                                     <YAxis hide />
                                     <Tooltip
-                                        cursor={{ fill: '#f9fafb' }}
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
                                         formatter={(value: any) => [Number(value).toLocaleString() + '개', '수량']}
                                     />
-                                    <Bar dataKey="qty" fill="#10b981" radius={[4, 4, 0, 0]} barSize={20} />
-                                </BarChart>
+                                    <Line type="linear" dataKey="qty" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }}>
+                                        <LabelList dataKey="qty" position="top" fill="#059669" fontSize={10} fontWeight={700} formatter={(value: any) => Number(value).toLocaleString()} />
+                                    </Line>
+                                </LineChart>
                             </ResponsiveContainer>
                         </div>
                     </div>
@@ -511,7 +511,9 @@ export default function ProductionClient() {
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
                                         formatter={(value: any) => [Number(value).toLocaleString() + '원', '단가']}
                                     />
-                                    <Line type="stepAfter" dataKey="unit" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }} />
+                                    <Line type="linear" dataKey="unit" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }}>
+                                        <LabelList dataKey="unit" position="top" fill="#d97706" fontSize={10} fontWeight={700} formatter={(value: any) => Number(value).toLocaleString()} />
+                                    </Line>
                                 </LineChart>
                             </ResponsiveContainer>
                         </div>
