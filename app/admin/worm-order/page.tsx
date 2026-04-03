@@ -760,6 +760,7 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         remittanceSendAmountText: typeof candidate.remittanceSendAmountText === 'string' ? candidate.remittanceSendAmountText : null,
         remittanceTotalFeeText: typeof candidate.remittanceTotalFeeText === 'string' ? candidate.remittanceTotalFeeText : null,
         remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
+        awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
         createdAt: candidate.createdAt,
         updatedAt: candidate.updatedAt,
     }
