@@ -166,7 +166,6 @@ export async function POST(request: Request) {
               installmentMonths: row.installmentMonths,
               currencyCode: row.currencyCode,
               memo: row.memo,
-              category,
               raw,
               syncedAt: now,
             },

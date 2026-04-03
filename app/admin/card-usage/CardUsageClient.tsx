@@ -54,6 +54,28 @@ type CategoryEditTarget = {
   itemId?: string
 }
 
+type CalendarGaugeSegment = {
+  code: string
+  amount: number
+  ratio: number
+}
+
+type CalendarCell = {
+  key: string
+  date: Date
+  inRange: boolean
+  amount: number
+  percent: number
+  hasTransactions: boolean
+  segments: CalendarGaugeSegment[]
+}
+
+type CalendarMonth = {
+  key: string
+  label: string
+  cells: Array<CalendarCell | null>
+}
+
 /* ═══════════════════ Helpers ═══════════════════ */
 function formatInputDate(date: Date) {
   const y = date.getFullYear()
@@ -225,12 +247,6 @@ function formatDisplayDate(input: string) {
   return `${parts[0]}. ${parts[1]}. ${parts[2]}`
 }
 
-/* ── Resolve category from DB or fallback ── */
-function resolveCategory(item: Pick<CardUsageItem, 'category' | 'useStoreName'>, customCategories: CategoryMeta[] = []) {
-  const code = item.category || classifyCategory(item.useStoreName)
-  return customCategories.find(c => c.code === code) || getCategoryMeta(code)
-}
-
 /* ═══════════════════ localStorage helpers ═══════════════════ */
 const STORAGE_KEY = 'beico-card-categories'
 
@@ -307,6 +323,37 @@ const T = {
   reviewPendingBorder: '#F6D7C8',
 }
 
+const DEFAULT_GAUGE_PALETTE = [
+  '#2563EB', '#10B981', '#F59E0B', '#EF4444',
+  '#8B5CF6', '#06B6D4', '#84CC16', '#F97316',
+  '#EC4899', '#14B8A6',
+]
+
+const CATEGORY_GAUGE_COLORS: Record<string, string> = {
+  CAFE: '#8B5CF6',
+  FOOD: '#F97316',
+  BAKERY: '#F59E0B',
+  TRANSPORT: '#2563EB',
+  SHOPPING: '#10B981',
+  CONVENIENCE: '#22C55E',
+  FUEL: '#EF4444',
+  FINANCE: '#6366F1',
+  TELECOM: '#06B6D4',
+  OFFICE: '#64748B',
+  MEDICAL: '#14B8A6',
+  EDUCATION: '#0EA5E9',
+  ENTERTAINMENT: '#EC4899',
+  OTHER: '#94A3B8',
+}
+
+function pickGaugeColor(code: string) {
+  const key = String(code || 'OTHER').toUpperCase()
+  if (CATEGORY_GAUGE_COLORS[key]) return CATEGORY_GAUGE_COLORS[key]
+  let hash = 0
+  for (let i = 0; i < key.length; i += 1) hash = (hash * 31 + key.charCodeAt(i)) >>> 0
+  return DEFAULT_GAUGE_PALETTE[hash % DEFAULT_GAUGE_PALETTE.length]
+}
+
 /* ═══════════════════ Component ═══════════════════ */
 export default function CardUsageClient() {
   const [startDate, setStartDate] = useState(() => {
@@ -325,7 +372,9 @@ export default function CardUsageClient() {
   const [syncMessage, setSyncMessage] = useState('')
   const [syncCompletedAt, setSyncCompletedAt] = useState<string | null>(null)
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
+  const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({})
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
+  const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [sortField, setSortField] = useState<'date' | 'amount'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
@@ -334,6 +383,7 @@ export default function CardUsageClient() {
   const [reviewOnlyPending, setReviewOnlyPending] = useState(false)
   const [reviewSavingId, setReviewSavingId] = useState<string | null>(null)
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
+  const [pendingJumpDate, setPendingJumpDate] = useState<string | null>(null)
   const [showShortcutDock, setShowShortcutDock] = useState(false)
 
   /* ── User-managed categories ── */
@@ -436,10 +486,13 @@ export default function CardUsageClient() {
       if (!res.ok) throw new Error(json.error || '카드 사용내역 조회 실패')
       setData(json)
       const nextDrafts: Record<string, string> = {}
+      const nextCategoryDrafts: Record<string, string> = {}
       ;(json.items || []).forEach((item: CardUsageItem) => {
         nextDrafts[item.id] = item.userMemo ?? item.memo ?? ''
+        nextCategoryDrafts[item.id] = item.category || classifyCategory(item.useStoreName)
       })
       setMemoDrafts(nextDrafts)
+      setCategoryDrafts(nextCategoryDrafts)
       setPage(targetPage)
     } catch (err: unknown) {
       setError(errorMessage(err))
@@ -502,6 +555,7 @@ export default function CardUsageClient() {
 
   /* ── Save category via PATCH ── */
   const handleSaveCategory = useCallback(async (item: CardUsageItem, categoryCode: string) => {
+    setSavingCategoryId(item.id)
     try {
       const res = await fetch('/api/admin/card-usage', {
         method: 'PATCH',
@@ -514,7 +568,12 @@ export default function CardUsageClient() {
         if (!prev) return prev
         return { ...prev, items: prev.items.map((row) => row.id === item.id ? { ...row, category: json.item?.category ?? null } : row) }
       })
+      setCategoryDrafts((prev) => ({
+        ...prev,
+        [item.id]: json.item?.category || categoryCode,
+      }))
     } catch (err: unknown) { setError(errorMessage(err)) }
+    finally { setSavingCategoryId(null) }
   }, [])
 
   const handleSetReviewed = async (item: CardUsageItem, reviewed: boolean) => {
@@ -667,23 +726,42 @@ export default function CardUsageClient() {
     return groups
   }, [sortedItems, sortField, sortOrder])
 
+  const firstItemIdByDate = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const item of sortedItems) {
+      const key = getDateKey(item.usedAt)
+      if (key === 'unknown') continue
+      if (!map.has(key)) map.set(key, item.id)
+    }
+    return map
+  }, [sortedItems])
+
   const calendarData = useMemo(() => {
     const amountByDate = new Map<string, number>()
+    const transactionCountByDate = new Map<string, number>()
+    const categoryAmountByDate = new Map<string, Map<string, number>>()
     for (const item of filteredItems) {
       const key = getDateKey(item.usedAt)
       if (key === 'unknown') continue
+      transactionCountByDate.set(key, (transactionCountByDate.get(key) || 0) + 1)
       const amount = Math.max(0, resolveAmount(item))
       amountByDate.set(key, (amountByDate.get(key) || 0) + amount)
+      if (amount > 0) {
+        const categoryCode = (item.category || classifyCategory(item.useStoreName) || 'OTHER').toUpperCase()
+        if (!categoryAmountByDate.has(key)) categoryAmountByDate.set(key, new Map<string, number>())
+        const byCategory = categoryAmountByDate.get(key)!
+        byCategory.set(categoryCode, (byCategory.get(categoryCode) || 0) + amount)
+      }
     }
 
     const start = new Date(`${startDate}T00:00:00+09:00`)
     const end = new Date(`${endDate}T00:00:00+09:00`)
     if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-      return { months: [] as Array<{ key: string; label: string; cells: Array<{ key: string; date: Date; inRange: boolean; amount: number; percent: number } | null> }>, maxDailyAmount: 0 }
+      return { months: [] as CalendarMonth[], maxDailyAmount: 0 }
     }
 
     const maxDailyAmount = Math.max(0, ...Array.from(amountByDate.values()))
-    const months: Array<{ key: string; label: string; cells: Array<{ key: string; date: Date; inRange: boolean; amount: number; percent: number } | null> }> = []
+    const months: CalendarMonth[] = []
     const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
     const endMonth = new Date(end.getFullYear(), end.getMonth(), 1)
 
@@ -693,7 +771,7 @@ export default function CardUsageClient() {
       const firstDay = new Date(y, m, 1)
       const daysInMonth = new Date(y, m + 1, 0).getDate()
       const firstWeekday = firstDay.getDay()
-      const cells: Array<{ key: string; date: Date; inRange: boolean; amount: number; percent: number } | null> = []
+      const cells: Array<CalendarCell | null> = []
 
       for (let i = 0; i < firstWeekday; i += 1) cells.push(null)
 
@@ -701,9 +779,17 @@ export default function CardUsageClient() {
         const date = new Date(y, m, day)
         const key = `${y}-${String(m + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
         const amount = amountByDate.get(key) || 0
+        const hasTransactions = (transactionCountByDate.get(key) || 0) > 0
+        const categoryMap = categoryAmountByDate.get(key)
+        const segments: CalendarGaugeSegment[] = amount > 0 && categoryMap
+          ? Array.from(categoryMap.entries())
+              .filter(([, v]) => v > 0)
+              .sort((a, b) => b[1] - a[1])
+              .map(([code, v]) => ({ code, amount: v, ratio: v / amount }))
+          : []
         const inRange = date >= start && date <= end
         const percent = maxDailyAmount > 0 ? Math.round((amount / maxDailyAmount) * 100) : 0
-        cells.push({ key, date, inRange, amount, percent })
+        cells.push({ key, date, inRange, amount, percent, hasTransactions, segments })
       }
 
       months.push({
@@ -717,6 +803,23 @@ export default function CardUsageClient() {
 
     return { months, maxDailyAmount }
   }, [filteredItems, startDate, endDate])
+
+  const handleCalendarDateClick = useCallback((dateKey: string, hasTransactions: boolean) => {
+    if (!hasTransactions) return
+    const firstItemId = firstItemIdByDate.get(dateKey) || null
+    setSortField('date')
+    setViewMode('list')
+    setPendingJumpDate(dateKey)
+    if (firstItemId) setSelectedItemId(firstItemId)
+  }, [firstItemIdByDate])
+
+  useEffect(() => {
+    if (viewMode !== 'list' || !pendingJumpDate) return
+    const target = document.querySelector(`[data-date-group="${pendingJumpDate}"]`) as HTMLElement | null
+    if (!target) return
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setPendingJumpDate(null)
+  }, [viewMode, pendingJumpDate, groupedItems])
 
   useEffect(() => {
     if (!selectedItemId) return
@@ -778,6 +881,13 @@ export default function CardUsageClient() {
     return allItems.find(item => item.id === selectedItemId) || null
   }, [allItems, selectedItemId])
   const shortcutCategories = useMemo(() => categories.slice(0, 6), [categories])
+  const gaugeColorByCode = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const cat of categories) {
+      map.set(cat.code, pickGaugeColor(cat.code))
+    }
+    return map
+  }, [categories])
 
   /* ── Styles ── */
   const cardStyle: React.CSSProperties = {
@@ -1466,7 +1576,7 @@ export default function CardUsageClient() {
         ) : (
           <div style={{ ...cardStyle, padding: '14px 14px 6px' }}>
             <p style={{ margin: '0 0 12px', fontSize: 12, color: T.textTertiary }}>
-              일별 사용액 게이지 (최대 {calendarData.maxDailyAmount.toLocaleString()}원 = 100%)
+              일별 사용액 게이지 (카테고리 분할, 최대 {calendarData.maxDailyAmount.toLocaleString()}원 = 100%)
             </p>
             {calendarData.months.map(month => (
               <div key={month.key} style={{ marginBottom: 14 }}>
@@ -1485,6 +1595,7 @@ export default function CardUsageClient() {
                     cell ? (
                       <div
                         key={cell.key}
+                        onClick={() => handleCalendarDateClick(cell.key, cell.hasTransactions)}
                         style={{
                           borderRadius: 10,
                           border: `1px solid ${cell.inRange ? T.borderLight : '#F2F1ED'}`,
@@ -1494,7 +1605,9 @@ export default function CardUsageClient() {
                           padding: '8px 8px 7px',
                           minHeight: 66,
                           opacity: cell.inRange ? 1 : 0.45,
+                          cursor: cell.inRange && cell.hasTransactions ? 'pointer' : 'default',
                         }}
+                        title={cell.hasTransactions ? '클릭하면 해당 날짜 결제내역으로 이동' : undefined}
                       >
                         <div style={{ fontSize: 11, fontWeight: 700, color: T.text, marginBottom: 4 }}>
                           {cell.date.getDate()}일
@@ -1503,7 +1616,31 @@ export default function CardUsageClient() {
                           {cell.amount > 0 ? `${cell.amount.toLocaleString()}원` : '-'}
                         </div>
                         <div style={{ height: 6, borderRadius: 999, background: T.surfaceSecondary, overflow: 'hidden' }}>
-                          <div style={{ width: `${cell.percent}%`, height: '100%', background: '#2563EB' }} />
+                          <div
+                            style={{
+                              width: `${cell.percent}%`,
+                              height: '100%',
+                              display: 'flex',
+                              borderRadius: 999,
+                              overflow: 'hidden',
+                            }}
+                          >
+                            {cell.segments.length > 0 ? (
+                              cell.segments.map(segment => (
+                                <div
+                                  key={`${cell.key}-${segment.code}`}
+                                  style={{
+                                    width: `${segment.ratio * 100}%`,
+                                    height: '100%',
+                                    background: gaugeColorByCode.get(segment.code) || pickGaugeColor(segment.code),
+                                  }}
+                                  title={`${segment.code}: ${segment.amount.toLocaleString()}원`}
+                                />
+                              ))
+                            ) : (
+                              <div style={{ width: '100%', height: '100%', background: '#2563EB' }} />
+                            )}
+                          </div>
                         </div>
                         <div style={{ marginTop: 4, fontSize: 10, color: T.textTertiary, textAlign: 'right' }}>
                           {cell.percent}%
@@ -1525,7 +1662,7 @@ export default function CardUsageClient() {
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {groupedItems.map(group => (
-            <div key={group.date}>
+            <div key={group.date} data-date-group={group.date}>
               {/* Date group label */}
               {sortField === 'date' && (
                 <p style={{
@@ -1542,8 +1679,13 @@ export default function CardUsageClient() {
                 {group.items.map((item) => {
                   const amt = resolveAmount(item)
                   const approvalStatus = normalizeApprovalStatus(item)
+                  const signedAmt = approvalStatus === 'CANCELED' ? -Math.abs(amt) : amt
                   const approvalStatusText = approvalStatusLabel(approvalStatus)
-                  const cat = resolveCategory(item, categories)
+                  const originalCategoryCode = item.category || classifyCategory(item.useStoreName)
+                  const draftCategoryCode = categoryDrafts[item.id] ?? originalCategoryCode
+                  const cat = (categories.find((c) => c.code === draftCategoryCode) || getCategoryMeta(draftCategoryCode))
+                  const isCategoryDirty = draftCategoryCode !== originalCategoryCode
+                  const isCategorySaving = savingCategoryId === item.id
                   const displayMemo = memoDrafts[item.id] || item.userMemo || item.memo || ''
                   const globalIdx = sortedItems.indexOf(item)
                   const isCatSelectOpen = catSelectItemId === item.id
@@ -1580,7 +1722,8 @@ export default function CardUsageClient() {
                             e.stopPropagation()
                             setSelectedItemId(item.id)
                             setCatSelectItemId(isCatSelectOpen ? null : item.id)
-                            setCatSelectIdx(0)
+                            const activeIdx = categories.findIndex((c) => c.code === draftCategoryCode)
+                            setCatSelectIdx(activeIdx >= 0 ? activeIdx : 0)
                           }}
                           title={`${cat.label} 카테고리`}
                           style={{
@@ -1675,13 +1818,8 @@ export default function CardUsageClient() {
                                 e.preventDefault()
                                 const selected = categories[catSelectIdx]
                                 if (selected) {
-                                  handleSaveCategory(item, selected.code)
+                                  setCategoryDrafts((prev) => ({ ...prev, [item.id]: selected.code }))
                                   setCatSelectItemId(null)
-                                  const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
-                                  if (nextInput) {
-                                    nextInput.focus()
-                                    nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                  }
                                 }
                               } else if (e.key === 'Escape') {
                                 e.preventDefault()
@@ -1720,13 +1858,8 @@ export default function CardUsageClient() {
                                 type="button"
                                 tabIndex={-1}
                                 onClick={() => {
-                                  handleSaveCategory(item, c.code)
+                                  setCategoryDrafts((prev) => ({ ...prev, [item.id]: c.code }))
                                   setCatSelectItemId(null)
-                                  const nextInput = document.querySelector(`input[data-memo-idx="${globalIdx + 1}"]`) as HTMLInputElement | null
-                                  if (nextInput) {
-                                    nextInput.focus()
-                                    nextInput.scrollIntoView({ behavior: 'smooth', block: 'center' })
-                                  }
                                 }}
                                 style={{
                                   display: 'flex', alignItems: 'center', gap: 8,
@@ -1744,13 +1877,37 @@ export default function CardUsageClient() {
                                   fontSize: 13,
                                 }}>{c.emoji}</span>
                                 <span>{c.label}</span>
-                                {(item.category || classifyCategory(item.useStoreName)) === c.code && (
+                                {draftCategoryCode === c.code && (
                                   <span style={{ marginLeft: 'auto', color: T.success, fontSize: 11 }}>✓</span>
                                 )}
                               </button>
                             ))}
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            void handleSaveCategory(item, draftCategoryCode)
+                          }}
+                          disabled={!isCategoryDirty || isCategorySaving}
+                          style={{
+                            marginTop: 4,
+                            width: 58,
+                            height: 20,
+                            borderRadius: 6,
+                            border: `1px solid ${!isCategoryDirty ? T.borderLight : '#CBD5E1'}`,
+                            background: !isCategoryDirty ? T.surfaceSecondary : '#FFFFFF',
+                            color: !isCategoryDirty ? T.textTertiary : T.text,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            cursor: !isCategoryDirty || isCategorySaving ? 'default' : 'pointer',
+                            opacity: isCategorySaving ? 0.7 : 1,
+                          }}
+                          title={isCategoryDirty ? '카테고리 저장' : '변경사항 없음'}
+                        >
+                          {isCategorySaving ? '저장중' : '저장'}
+                        </button>
                       </div>
 
                       {/* Info */}
@@ -1820,7 +1977,7 @@ export default function CardUsageClient() {
                           fontSize: 15, fontWeight: 600, margin: 0, whiteSpace: 'nowrap',
                           color: approvalStatus === 'CANCELED' ? '#DC2626' : T.text
                         }}>
-                          {amt.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400 }}>원</span>
+                          {signedAmt.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400 }}>원</span>
                         </p>
                         <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0', whiteSpace: 'nowrap' }}>
                           {item.paymentPlan || '일시불'} · {item.currencyCode || 'KRW'}
