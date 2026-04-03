@@ -1111,15 +1111,15 @@ export default function ElectricityClient() {
             {
                 isUsageModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsUsageModalOpen(false)}>
-                        <div className="bg-white rounded-2xl p-6 max-w-2xl w-full shadow-2xl animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl p-6 max-w-2xl w-full shadow-2xl dark:shadow-none animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-between items-center mb-6 border-b pb-4">
                                 <h3 className="text-lg font-bold">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
-                                <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 hover:text-black">✕</button>
+                                <button onClick={() => setIsUsageModalOpen(false)} className="text-gray-400 dark:text-gray-400 hover:text-black dark:hover:text-white">✕</button>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                                 <div className="space-y-4">
-                                    <label className="block text-xs font-bold text-gray-500">문자/명세서 내용 붙여넣기</label>
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400">문자/명세서 내용 붙여넣기</label>
                                     <textarea
                                         value={rawText}
                                         onChange={(e) => setRawText(e.target.value)}

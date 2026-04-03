@@ -259,7 +259,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                     <button
                                         onClick={() => handleDelete(order.id)}
                                         disabled={loadingMap[order.id]}
-                                        className="h-13 border-2 border-gray-200 text-gray-400 bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight"
+                                        className="h-13 border-2 border-gray-200 dark:border-[#2a2a2a] text-gray-400 dark:text-gray-500 bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight"
                                     >
                                         <span className="text-sm font-bold">注文キャンセル</span>
                                         <span className="text-[10px] md:text-[11px] font-medium opacity-80">(주문취소)</span>
@@ -271,7 +271,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 <Link
                                     href={`/invoice/${order.id}`}
                                     target="_blank"
-                                    className="flex-1 h-14 border-2 border-[#111827] text-[#111827] bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
+                                    className="flex-1 h-14 border-2 border-[#111827] dark:border-gray-600 text-[#111827] dark:text-white bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
                                 >
                                     <span className="text-[11px] md:text-[13px] font-bold">取引明細書を確認する</span>
                                     <span className="text-[9px] md:text-[10px] font-bold opacity-60">{isUSD ? 'Check Transaction' : '거래명세표 확인하기'}</span>

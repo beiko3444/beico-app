@@ -3491,7 +3491,7 @@ export default function WormOrderPage() {
 
             {/* ── AWB Documents 메일 조회 ── */}
             {showDocInboxTools && (
-                <div ref={docInboxSectionRef} style={{ order: docInboxToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden relative">
+                <div ref={docInboxSectionRef} style={{ order: docInboxToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
 
                 {docFetchProgress > 0 && (
                     <div className="absolute top-0 left-0 w-full h-[4px] bg-slate-100 z-10 overflow-hidden">
@@ -3499,9 +3499,9 @@ export default function WormOrderPage() {
                     </div>
                 )}
 
-                <div className="px-6 py-4 border-b border-gray-100 bg-[#f0f5ff] flex items-center justify-between mt-[2px]">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0f5ff] dark:bg-[#1a1a1a] flex items-center justify-between mt-[2px]">
                     <div>
-                        <h2 className="text-lg font-black text-[#1f2937] flex items-center gap-2">
+                        <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Package size={18} className="text-blue-500" />
                             AWB 메일 수신
                             {loadingDocEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span>}
