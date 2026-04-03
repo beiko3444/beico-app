@@ -247,6 +247,20 @@ function formatDisplayDate(input: string) {
   return `${parts[0]}. ${parts[1]}. ${parts[2]}`
 }
 
+function parseSearchQuery(q: string): { text: string; minAmount: number | null; maxAmount: number | null } {
+  const t = q.trim()
+  // 금액 범위: "10000~50000" 또는 ">50000" 또는 "<10000"
+  const rangeMatch = t.match(/^(\d[\d,]*)\s*[~\-]\s*(\d[\d,]*)$/)
+  if (rangeMatch) {
+    return { text: '', minAmount: Number(rangeMatch[1].replace(/,/g, '')), maxAmount: Number(rangeMatch[2].replace(/,/g, '')) }
+  }
+  const gtMatch = t.match(/^>(\d[\d,]*)$/)
+  if (gtMatch) return { text: '', minAmount: Number(gtMatch[1].replace(/,/g, '')), maxAmount: null }
+  const ltMatch = t.match(/^<(\d[\d,]*)$/)
+  if (ltMatch) return { text: '', minAmount: null, maxAmount: Number(ltMatch[1].replace(/,/g, '')) }
+  return { text: t, minAmount: null, maxAmount: null }
+}
+
 /* ═══════════════════ localStorage helpers ═══════════════════ */
 const STORAGE_KEY = 'beico-card-categories'
 
@@ -377,11 +391,12 @@ export default function CardUsageClient() {
   const [savingCategoryId, setSavingCategoryId] = useState<string | null>(null)
   const [sortField, setSortField] = useState<'date' | 'amount'>('date')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
-  const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list')
+  const [viewMode, setViewMode] = useState<'list' | 'table' | 'calendar'>('table')
   const [categoryFilter, setCategoryFilter] = useState('')
   const [reviewMode, setReviewMode] = useState(false)
   const [reviewOnlyPending, setReviewOnlyPending] = useState(false)
   const [reviewSavingId, setReviewSavingId] = useState<string | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [pendingJumpDate, setPendingJumpDate] = useState<string | null>(null)
   const [showShortcutDock, setShowShortcutDock] = useState(false)
@@ -710,6 +725,17 @@ export default function CardUsageClient() {
       .slice(0, 6)
   }, [allItems, categories])
 
+  const amountThresholds = useMemo(() => {
+    const amounts = allItems
+      .map(i => Math.abs(resolveAmount(i)))
+      .filter(a => a > 0)
+      .sort((a, b) => a - b)
+    if (amounts.length === 0) return { high: 0, veryHigh: 0 }
+    const p75 = amounts[Math.floor(amounts.length * 0.75)] ?? 0
+    const p90 = amounts[Math.floor(amounts.length * 0.90)] ?? 0
+    return { high: p75, veryHigh: p90 }
+  }, [allItems])
+
   const filteredItems = useMemo(() => {
     let items = [...allItems]
     if (categoryFilter) {
@@ -718,8 +744,21 @@ export default function CardUsageClient() {
     if (reviewMode && reviewOnlyPending) {
       items = items.filter(i => !i.reviewedAt)
     }
+    if (searchQuery.trim()) {
+      const { text, minAmount, maxAmount } = parseSearchQuery(searchQuery)
+      if (text) {
+        const lower = text.toLowerCase()
+        items = items.filter(i =>
+          (i.useStoreName || '').toLowerCase().includes(lower) ||
+          (i.userMemo || '').toLowerCase().includes(lower) ||
+          (i.memo || '').toLowerCase().includes(lower)
+        )
+      }
+      if (minAmount !== null) items = items.filter(i => Math.abs(resolveAmount(i)) >= minAmount)
+      if (maxAmount !== null) items = items.filter(i => Math.abs(resolveAmount(i)) <= maxAmount)
+    }
     return items
-  }, [allItems, categoryFilter, reviewMode, reviewOnlyPending])
+  }, [allItems, categoryFilter, reviewMode, reviewOnlyPending, searchQuery])
 
   // Sort — show all items (no pagination)
   const sortedItems = useMemo(() => {
@@ -1468,6 +1507,46 @@ export default function CardUsageClient() {
         </button>
       </div>
 
+      {/* ════════ Unified search bar ════════ */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        background: T.surface,
+        border: `1px solid ${searchQuery.trim() ? '#2563EB' : T.border}`,
+        borderRadius: 12,
+        padding: '0 14px',
+        height: 44,
+        marginBottom: 14,
+        transition: 'border-color .15s',
+        boxShadow: searchQuery.trim() ? '0 0 0 3px rgba(37,99,235,0.08)' : 'none',
+      }}>
+        <Search size={15} style={{ color: searchQuery.trim() ? '#2563EB' : T.textTertiary, flexShrink: 0, transition: 'color .15s' }} />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={e => setSearchQuery(e.target.value)}
+          placeholder="가맹점명, 메모 검색 · 금액범위: >50000  /  <10000  /  10000~50000"
+          style={{
+            flex: 1, border: 'none', outline: 'none', background: 'transparent',
+            fontSize: 13, color: T.text, fontFamily: 'inherit',
+          }}
+        />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', color: T.textTertiary }}
+            title="검색어 초기화"
+          >
+            <X size={14} />
+          </button>
+        )}
+        {searchQuery.trim() && (
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#2563EB', whiteSpace: 'nowrap', paddingLeft: 4 }}>
+            {filteredItems.length}건 매칭
+          </span>
+        )}
+      </div>
+
       {/* ════════ Review mode panel ════════ */}
       {reviewMode && (
         <div style={{ ...cardStyle, padding: '14px 16px', marginBottom: 14 }}>
@@ -1522,7 +1601,7 @@ export default function CardUsageClient() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-            {(['list', 'calendar'] as const).map(mode => (
+            {(['table', 'list', 'calendar'] as const).map(mode => (
               <button
                 key={mode}
                 type="button"
@@ -1538,7 +1617,7 @@ export default function CardUsageClient() {
                   transition: 'all .15s',
                 }}
               >
-                {mode === 'list' ? '리스트' : '캘린더'}
+                {mode === 'table' ? '테이블' : mode === 'list' ? '카드' : '캘린더'}
               </button>
             ))}
           </div>
@@ -1583,7 +1662,7 @@ export default function CardUsageClient() {
               미리뷰만 보기
             </button>
           )}
-          {viewMode === 'list' && (
+          {(viewMode === 'list' || viewMode === 'table') && (
             <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
             {(['date', 'amount'] as const).map(mode => (
               <button
@@ -1605,7 +1684,7 @@ export default function CardUsageClient() {
         </div>
       </div>
 
-      {viewMode === 'list' && (
+      {(viewMode === 'list' || viewMode === 'table') && (
         <p style={{ margin: '-4px 0 10px', fontSize: 12, color: T.textTertiary }}>
           거래내역을 클릭한 뒤 숫자키 1~6을 누르면 카테고리 순서대로 즉시 적용됩니다.
         </p>
