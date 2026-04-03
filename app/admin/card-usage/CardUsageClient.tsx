@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTheme } from '@/components/ThemeProvider'
 import { Calendar, CheckCircle2, ChevronDown, Circle, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 import type { CategoryMeta } from '@/lib/cardCategory'
@@ -313,82 +314,57 @@ function saveUserCategories(cats: CategoryMeta[]) {
 }
 
 /* ═══════════════════ CSS tokens ═══════════════════ */
-const T = {
-  bg: 'var(--cu-bg)',
-  surface: 'var(--cu-surface)',
-  surfaceSecondary: 'var(--cu-surfaceSecondary)',
-  border: 'var(--cu-border)',
-  borderLight: 'var(--cu-borderLight)',
-  text: 'var(--cu-text)',
-  textSecondary: 'var(--cu-textSecondary)',
-  textTertiary: 'var(--cu-textTertiary)',
-  success: 'var(--cu-success)',
-  successBg: 'var(--cu-successBg)',
-  successBorder: 'var(--cu-successBorder)',
-  warning: 'var(--cu-warning)',
-  warningBg: 'var(--cu-warningBg)',
-  warningBorder: 'var(--cu-warningBorder)',
-  error: 'var(--cu-error)',
-  errorBg: 'var(--cu-errorBg)',
-  accent: 'var(--cu-accent)',
-  reviewDoneBg: 'var(--cu-reviewDoneBg)',
-  reviewDoneBorder: 'var(--cu-reviewDoneBorder)',
-  reviewPendingBg: 'var(--cu-reviewPendingBg)',
-  reviewPendingBorder: 'var(--cu-reviewPendingBorder)',
+const LIGHT_TOKENS = {
+  bg: '#FAFAF8',
+  surface: '#FFFFFF',
+  surfaceSecondary: '#F5F5F0',
+  border: '#E8E6E1',
+  borderLight: '#EEECE7',
+  text: '#1A1A1A',
+  textSecondary: '#4A4A4A',
+  textTertiary: '#737373',
+  success: '#3D8B37',
+  successBg: '#EDF7EC',
+  successBorder: '#D4EDD2',
+  warning: '#9E7B15',
+  warningBg: '#FDF6E3',
+  warningBorder: '#F5E6B8',
+  error: '#C53030',
+  errorBg: '#FFF5F5',
+  accent: '#1A1A1A',
+  reviewDoneBg: '#F2F8F0',
+  reviewDoneBorder: '#D4EDD2',
+  reviewPendingBg: '#FFF7F1',
+  reviewPendingBorder: '#F6D7C8',
+  selectedBg: '#EAF3FF',
+  selectedBorder: '#BFDBFE',
 }
 
-const CARD_USAGE_THEME_CSS = `
-  .cu-root {
-    --cu-bg: #FAFAF8;
-    --cu-surface: #FFFFFF;
-    --cu-surfaceSecondary: #F5F5F0;
-    --cu-border: #E8E6E1;
-    --cu-borderLight: #EEECE7;
-    --cu-text: #1A1A1A;
-    --cu-textSecondary: #4A4A4A;
-    --cu-textTertiary: #737373;
-    --cu-success: #3D8B37;
-    --cu-successBg: #EDF7EC;
-    --cu-successBorder: #D4EDD2;
-    --cu-warning: #9E7B15;
-    --cu-warningBg: #FDF6E3;
-    --cu-warningBorder: #F5E6B8;
-    --cu-error: #C53030;
-    --cu-errorBg: #FFF5F5;
-    --cu-accent: #1A1A1A;
-    --cu-reviewDoneBg: #F2F8F0;
-    --cu-reviewDoneBorder: #D4EDD2;
-    --cu-reviewPendingBg: #FFF7F1;
-    --cu-reviewPendingBorder: #F6D7C8;
-    --cu-selectedBg: #EAF3FF;
-    --cu-selectedBorder: #BFDBFE;
-  }
-  .dark .cu-root {
-    --cu-bg: #121212;
-    --cu-surface: #1e1e1e;
-    --cu-surfaceSecondary: #1a1a1a;
-    --cu-border: #2a2a2a;
-    --cu-borderLight: #2a2a2a;
-    --cu-text: #ffffff;
-    --cu-textSecondary: #e5e5e5;
-    --cu-textTertiary: #9ca3af;
-    --cu-success: #4ade80;
-    --cu-successBg: #14291a;
-    --cu-successBorder: #1a3a22;
-    --cu-warning: #d4a017;
-    --cu-warningBg: #2a2210;
-    --cu-warningBorder: #3a3018;
-    --cu-error: #f87171;
-    --cu-errorBg: #2a1515;
-    --cu-accent: #e5e5e5;
-    --cu-reviewDoneBg: #14291a;
-    --cu-reviewDoneBorder: #1a3a22;
-    --cu-reviewPendingBg: #2a1f18;
-    --cu-reviewPendingBorder: #3a2820;
-    --cu-selectedBg: #1a2a3a;
-    --cu-selectedBorder: #2a4a6a;
-  }
-`
+const DARK_TOKENS = {
+  bg: '#111111',
+  surface: '#1e1e1e',
+  surfaceSecondary: '#252525',
+  border: '#2a2a2a',
+  borderLight: '#2a2a2a',
+  text: '#ffffff',
+  textSecondary: '#e5e5e5',
+  textTertiary: '#9ca3af',
+  success: '#4ade80',
+  successBg: '#14291a',
+  successBorder: '#1a3a22',
+  warning: '#d4a017',
+  warningBg: '#2a2210',
+  warningBorder: '#3a3018',
+  error: '#f87171',
+  errorBg: '#2a1515',
+  accent: '#d9361b',
+  reviewDoneBg: '#14291a',
+  reviewDoneBorder: '#1a3a22',
+  reviewPendingBg: '#2a1f18',
+  reviewPendingBorder: '#3a2820',
+  selectedBg: '#1a2a3a',
+  selectedBorder: '#2a4a6a',
+}
 
 const DEFAULT_GAUGE_PALETTE = [
   '#2563EB', '#10B981', '#F59E0B', '#EF4444',
@@ -423,6 +399,9 @@ function pickGaugeColor(code: string) {
 
 /* ═══════════════════ Component ═══════════════════ */
 export default function CardUsageClient() {
+  const { theme } = useTheme()
+  const T = theme === 'dark' ? DARK_TOKENS : LIGHT_TOKENS
+
   const [startDate, setStartDate] = useState(() => {
     const now = new Date()
     return formatInputDate(new Date(now.getFullYear(), now.getMonth(), 1))
@@ -1037,7 +1016,6 @@ export default function CardUsageClient() {
 
   return (
     <div className="cu-root" style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
-      <style dangerouslySetInnerHTML={{ __html: CARD_USAGE_THEME_CSS }} />
       {viewMode === 'list' && showShortcutDock && shortcutCategories.length > 0 && (
         <div
           style={{
@@ -1888,8 +1866,8 @@ export default function CardUsageClient() {
                         gridTemplateColumns: '72px 1fr auto',
                         gap: 12,
                         alignItems: 'center',
-                        background: isSelected ? 'var(--cu-selectedBg)' : defaultRowBg,
-                        border: `1px solid ${isSelected ? 'var(--cu-selectedBorder)' : defaultRowBorder}`,
+                        background: isSelected ? T.selectedBg : defaultRowBg,
+                        border: `1px solid ${isSelected ? T.selectedBorder : defaultRowBorder}`,
                         borderRadius: 10,
                         padding: '12px 14px',
                         transition: 'border-color .15s',
