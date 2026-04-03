@@ -289,6 +289,9 @@ export default function ProductionClient() {
     }
 
     const currentPriceInfo = getProductPricing()
+    const overseasRemittanceAmount = Number(parseNumber(formData.rawMaterialCost)) || 0
+    const usdAmount = Number(parseDecimal(formData.depositDollar)) || 0
+    const remittanceExchangeRate = usdAmount > 0 ? overseasRemittanceAmount / usdAmount : null
 
     const areaChartData = useMemo(() =>
         [...batches].sort((a, b) => new Date(a.productionDate).getTime() - new Date(b.productionDate).getTime())
@@ -591,7 +594,7 @@ export default function ProductionClient() {
                                                 {/* Tooltip for Cost Breakdown */}
                                                 <div className="absolute opacity-0 group-hover/cost:opacity-100 z-[60] bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white p-3 rounded-lg text-[10px] pointer-events-none transition-opacity shadow-xl">
                                                     <div className="flex justify-between mb-1">
-                                                        <span>원재료비:</span>
+                                                        <span>해외송금금액:</span>
                                                         <span>{batch.rawMaterialCost.toLocaleString()}
                                                             {batch.depositDollar && <span className='text-[9px] text-gray-400 ml-1'>(${batch.depositDollar})</span>}
                                                         </span>
@@ -671,7 +674,7 @@ export default function ProductionClient() {
             {/* Modal */}
             {
                 isCreating && mounted && createPortal(
-                    <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsCreating(false)}>
+                    <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden">
                         <div
                             className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-lg shadow-md animate-in fade-in duration-100 relative"
                             onClick={(e) => e.stopPropagation()}
@@ -719,7 +722,7 @@ export default function ProductionClient() {
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
-                                                <label className="text-[11px] font-bold text-gray-600">원재료비 (Raw Material)</label>
+                                                <label className="text-[11px] font-bold text-gray-600">해외송금금액 (Remittance Amount)</label>
                                                 <input
                                                     type="text"
                                                     required
@@ -760,6 +763,14 @@ export default function ProductionClient() {
                                                     />
                                                 </div>
                                             ))}
+                                            <div className="space-y-1 col-start-2">
+                                                <label className="text-[10px] font-bold text-emerald-600">환율 (해외송금금액/USD)</label>
+                                                <div className="w-full px-1.5 py-1 bg-emerald-50 border border-emerald-200 text-xs text-right font-mono text-emerald-700">
+                                                    {remittanceExchangeRate !== null
+                                                        ? `1 USD = ₩${remittanceExchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+                                                        : '-'}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </fieldset>
