@@ -197,7 +197,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                 {/* Weekdays */}
                 <div className="grid grid-cols-7 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/50 dark:bg-[#1a1a1a]/50">
                     {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                        <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
+                        <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400 dark:text-gray-400'}`}>
                             {day}
                         </div>
                     ))}
@@ -480,7 +480,7 @@ const TaskItem = React.forwardRef(({ task, isDragging, isOverlay, attributes, li
                 <span>{task.title}</span>
             </div>
             {isExpanded && task.description && (
-                <p className="mt-1 text-[9px] text-gray-400 font-medium leading-tight opacity-70 px-2.5">{task.description}</p>
+                <p className="mt-1 text-[9px] text-gray-400 dark:text-gray-400 font-medium leading-tight opacity-70 px-2.5">{task.description}</p>
             )}
         </div>
     )

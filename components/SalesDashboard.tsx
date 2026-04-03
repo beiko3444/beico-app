@@ -29,25 +29,25 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--color-brand-blue)]">매출 현황 (Revenue Analytics)</h2>
-                    <p className="text-sm text-gray-400 mt-1">Check your sales performance visually</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Check your sales performance visually</p>
                 </div>
 
-                <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
+                <div className="flex bg-gray-50 dark:bg-[#1a1a1a] p-1 rounded-xl border border-gray-100 dark:border-[#2a2a2a]">
                     <button
                         onClick={() => setView('daily')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'daily' ? 'bg-white text-[var(--color-brand-blue)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'daily' ? 'bg-white dark:bg-[#2a2a2a] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                         일일 (Daily)
                     </button>
                     <button
                         onClick={() => setView('monthly')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'monthly' ? 'bg-white text-[var(--color-brand-blue)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'monthly' ? 'bg-white dark:bg-[#2a2a2a] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                         월별 (Monthly)
                     </button>
                     <button
                         onClick={() => setView('yearly')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'yearly' ? 'bg-white text-[var(--color-brand-blue)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'yearly' ? 'bg-white dark:bg-[#2a2a2a] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                         연간 (Yearly)
                     </button>

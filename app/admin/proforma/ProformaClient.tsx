@@ -795,7 +795,7 @@ ${rowsHtml}
                                                                 onChange={(event) => updateQuantity(product.id, event.target.value)}
                                                                 onFocus={(event) => event.currentTarget.select()}
                                                                 onClick={(event) => event.currentTarget.select()}
-                                                                className="w-20 border border-gray-200 rounded-lg px-2 py-1 text-center font-bold"
+                                                                className="w-20 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2 py-1 text-center font-bold bg-white dark:bg-[#1e1e1e] dark:text-white"
                                                             />
                                                         </td>
                                                         <td className="px-3 py-2 text-right font-bold text-[#e53b19]">
@@ -811,10 +811,10 @@ ${rowsHtml}
                         ) : (
                             <div className="space-y-3">
                                 <div>
-                                    <h3 className="text-sm font-black text-gray-900">PI 발급리스트</h3>
-                                    <p className="text-xs text-gray-500 mt-1">발급된 PI를 선택하면 우측 인쇄 미리보기에 즉시 반영됩니다.</p>
+                                    <h3 className="text-sm font-black text-gray-900 dark:text-white">PI 발급리스트</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">발급된 PI를 선택하면 우측 인쇄 미리보기에 즉시 반영됩니다.</p>
                                 </div>
-                                <div className="max-h-[620px] overflow-auto border border-gray-100 rounded-xl">
+                                <div className="max-h-[620px] overflow-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
                                     <table className="w-full text-xs">
                                         <thead className="bg-gray-50 text-gray-600 border-b border-gray-100">
                                             <tr>

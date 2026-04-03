@@ -904,26 +904,26 @@ export default function ElectricityClient() {
                                             <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordPowerFactor.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50 text-gray-500">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
                                             <td className="px-4 py-1.5">부가가치세</td>
                                             <td className="px-4 py-1.5 text-right">{totalVat.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoVat.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordVat.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50 text-gray-500">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
                                             <td className="px-4 py-1.5">전력기금</td>
                                             <td className="px-4 py-1.5 text-right">{totalFund.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoFund.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordFund.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50 text-gray-500">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
                                             <td className="px-4 py-1.5">TV 수신료</td>
                                             <td className="px-4 py-1.5 text-right">{tvTotal.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoTvFee.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordTvFee.toLocaleString()}원</td>
                                         </tr>
                                         {roundingDiff !== 0 && (
-                                            <tr className="hover:bg-gray-50 text-gray-400 italic">
+                                            <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a] text-gray-400 dark:text-gray-400 italic">
                                                 <td className="px-4 py-1.5">원단위 절사</td>
                                                 <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
                                                 <td className="px-4 py-1.5 text-right">{roundingDiff.toLocaleString()}원</td>
@@ -1068,7 +1068,7 @@ export default function ElectricityClient() {
                                                 const rowRentInfo = getRentPaymentInfo(selectedYear, m)
 
                                                 return (
-                                                    <tr key={m} className={`hover:bg-gray-50 transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
+                                                    <tr key={m} className={`hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
                                                         <td className="px-4 py-3 font-bold text-gray-900 cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
                                                             {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
                                                         </td>
@@ -1214,7 +1214,7 @@ export default function ElectricityClient() {
 
                                 <div className="pt-4">
                                     <label className="block text-xs font-bold text-gray-500 mb-2">계량기 사진 업로드</label>
-                                    <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center hover:bg-gray-50 transition-colors cursor-pointer relative overflow-hidden">
+                                    <div className="border-2 border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl p-4 text-center hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors cursor-pointer relative overflow-hidden">
                                         <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                         {landlordPhoto ? (
                                             <div className="relative h-40 w-full rounded-lg overflow-hidden">

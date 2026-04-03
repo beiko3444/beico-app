@@ -3001,19 +3001,19 @@ export default function WormOrderPage() {
                 <div
                     ref={orderSectionRef}
                     style={{ order: orderToolOrderBase + 5 }}
-                    className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+                    className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
-                    <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
+                    <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a] flex items-center justify-between">
                         <div>
-                            <h2 className="text-lg font-black text-[#1f2937]">발주서 작성</h2>
-                            <p className="text-xs text-slate-500 mt-0.5">사이즈별 수량을 입력하고 발주 메시지를 생성합니다.</p>
+                            <h2 className="text-lg font-black text-[#1f2937] dark:text-white">발주서 작성</h2>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">사이즈별 수량을 입력하고 발주 메시지를 생성합니다.</p>
                         </div>
                         <Sparkles size={18} className="text-[#e34219]" />
                     </div>
 
                     <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
-                        <aside className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 md:p-5 flex flex-col">
-                            <p className="text-[11px] font-black text-slate-600 uppercase tracking-[0.2em]">납품 예정일</p>
+                        <aside className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a]/60 p-4 md:p-5 flex flex-col">
+                            <p className="text-[11px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-[0.2em]">납품 예정일</p>
 
                             <div className="mt-3 flex items-center justify-between">
                                 <button
@@ -3025,7 +3025,7 @@ export default function WormOrderPage() {
                                             return { year: prev.year, month: nextMonth }
                                         })
                                     }
-                                    className="h-8 w-8 rounded-lg border border-slate-200 bg-white text-slate-600 hover:bg-slate-100 inline-flex items-center justify-center"
+                                    className="h-8 w-8 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400 hover:bg-slate-100 dark:hover:bg-[#252525] inline-flex items-center justify-center"
                                     aria-label="이전 달"
                                 >
                                     <ChevronLeft size={14} />

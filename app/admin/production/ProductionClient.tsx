@@ -645,15 +645,15 @@ export default function ProductionClient() {
                                             <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {batch.unitCost ? batch.unitCost.toLocaleString() : '-'}
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.salesPrice.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-center border-r border-gray-200">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(wMarginRate) > 30 ? 'bg-red-50 text-red-600' : 'bg-red-50 text-red-400'}`}>
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.salesPrice.toLocaleString()}</td>
+                                            <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(wMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
                                                     {wMarginRate}%
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.wholesalePrice.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-center border-r border-gray-200">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(rMarginRate) > 30 ? 'bg-red-50 text-red-600' : 'bg-red-50 text-red-400'}`}>
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.wholesalePrice.toLocaleString()}</td>
+                                            <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(rMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
                                                     {rMarginRate}%
                                                 </span>
                                             </td>

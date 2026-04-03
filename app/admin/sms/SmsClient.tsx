@@ -534,10 +534,10 @@ export default function SmsClient() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {recipients.length ? (
             recipients.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+              <div key={item.id} className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] p-4 space-y-3">
                 <div>
-                  <div className="text-base font-black text-gray-900">{item.name}</div>
-                  <div className="text-sm font-semibold text-gray-500 mt-1">{formatPhoneNumber(item.phoneNumber)}</div>
+                  <div className="text-base font-black text-gray-900 dark:text-white">{item.name}</div>
+                  <div className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{formatPhoneNumber(item.phoneNumber)}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
