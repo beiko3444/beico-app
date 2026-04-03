@@ -2958,11 +2958,11 @@ export default function WormOrderPage() {
                                                     ? 'bg-emerald-500 text-white'
                                                     : runtimeStatus === 'active'
                                                         ? 'bg-[#e34219] text-white'
-                                                        : 'bg-slate-200 text-slate-600'
+                                                        : 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-600 dark:text-gray-400'
                                             }`}>
                                                 {step.id}
                                             </span>
-                                            <h2 className="text-sm font-bold text-slate-900 truncate">{step.title}</h2>
+                                            <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">{step.title}</h2>
                                         </div>
                                         <div className="flex items-center gap-1.5 shrink-0">
                                             <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
@@ -2977,8 +2977,8 @@ export default function WormOrderPage() {
 
                                     {isExpanded && (
                                         <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
-                                            <p className="text-xs text-slate-500">
-                                                <span className="font-semibold text-slate-600">처리주체</span> {step.owner}
+                                            <p className="text-xs text-slate-500 dark:text-gray-400">
+                                                <span className="font-semibold text-slate-600 dark:text-gray-400">처리주체</span> {step.owner}
                                                 {step.warning && <span className="ml-2 text-orange-600">· {step.warning}</span>}
                                             </p>
 

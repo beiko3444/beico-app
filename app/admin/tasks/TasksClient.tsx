@@ -336,12 +336,12 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">상세 내용</label>
+                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-widest">상세 내용</label>
                                 <textarea
                                     name="description"
                                     defaultValue={editingTask?.description || ''}
                                     placeholder="업무에 대한 상세 내용을 입력하세요..."
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-black focus:bg-white outline-none transition-all placeholder:text-gray-300 min-h-[120px] resize-none"
+                                    className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl px-5 py-4 text-sm font-medium dark:text-white focus:ring-2 focus:ring-black focus:bg-white dark:focus:bg-[#2a2a2a] outline-none transition-all placeholder:text-gray-300 min-h-[120px] resize-none"
                                 />
                             </div>
 
@@ -399,9 +399,9 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 setIsModalOpen(true)
             }}
             onClick={() => setSelectedDate(date)}
-            className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-all flex flex-col group relative
-                ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
-                ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50'}
+            className={`min-h-[140px] p-2 border-r border-b border-gray-100 dark:border-[#2a2a2a] transition-all flex flex-col group relative
+                ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50 dark:bg-[#1a1a1a]' : 'bg-white dark:bg-[#1e1e1e]') : 'bg-gray-50/20 dark:bg-[#1a1a1a]/20 text-gray-300'}
+                ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50 dark:hover:bg-[#252525]'}
                 ${isOver ? 'bg-blue-100/50 ring-2 ring-blue-400 ring-inset z-10' : ''}
             `}
         >
@@ -409,7 +409,7 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 <span className={`text-sm font-black transition-all ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-emerald-600' : ''}`}>
                     {date.getDate()}
                 </span>
-                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
+                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
             </div>
 
             <div className="flex flex-col gap-1 overflow-hidden h-full relative z-10">

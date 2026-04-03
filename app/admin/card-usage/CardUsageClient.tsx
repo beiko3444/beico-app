@@ -1782,7 +1782,7 @@ export default function CardUsageClient() {
                           borderRadius: 10,
                           border: `1px solid ${cell.inRange ? T.borderLight : T.borderLight}`,
                           background: cell.inRange
-                            ? (cell.percent > 0 ? 'rgba(26,26,26,0.03)' : T.surface)
+                            ? (cell.percent > 0 ? T.surfaceSecondary : T.surface)
                             : T.bg,
                           padding: '8px 8px 7px',
                           minHeight: 66,

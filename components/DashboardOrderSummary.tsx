@@ -127,14 +127,14 @@ export default function DashboardOrderSummary({
                                                     {order.status}
                                                 </span>
                                             </td>
-                                            <td className="py-3 px-4 text-right text-[10px] text-gray-400 font-medium">
+                                            <td className="py-3 px-4 text-right text-[10px] text-gray-400 dark:text-gray-500 font-medium">
                                                 {new Date(order.createdAt).toLocaleDateString()}
                                             </td>
                                         </tr>
                                     ))
                                 ) : (
                                     <tr>
-                                        <td colSpan={5} className="py-8 text-center text-xs text-gray-400 italic">
+                                        <td colSpan={5} className="py-8 text-center text-xs text-gray-400 dark:text-gray-500 italic">
                                             최근 주문 내역이 없습니다.
                                         </td>
                                     </tr>

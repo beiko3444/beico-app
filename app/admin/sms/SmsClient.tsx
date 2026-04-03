@@ -475,13 +475,13 @@ export default function SmsClient() {
                   예약 발송 (선택)
                 </label>
                 <div className="relative">
-                  <CalendarClock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <CalendarClock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-400" />
                   <input
                     id="sendAt"
                     type="datetime-local"
                     value={sendAt}
                     onChange={(event) => setSendAt(event.target.value)}
-                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   />
                 </div>
               </div>
@@ -522,11 +522,11 @@ export default function SmsClient() {
         </div>
       </form>
 
-      <section className="bg-white rounded-[28px] border border-gray-200 shadow-sm p-6 md:p-8 space-y-5">
+      <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-5">
         <div>
           <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Recipients</p>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">저장된 수신자</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">저장된 수신자</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             등록한 수신자를 저장해두고 문자 발송 시 바로 불러올 수 있습니다.
           </p>
         </div>

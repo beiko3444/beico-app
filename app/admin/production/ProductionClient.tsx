@@ -587,7 +587,7 @@ export default function ProductionClient() {
                                                 {new Date(batch.productionDate).toISOString().split('T')[0]}
                                             </td>
                                             <td
-                                                className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200 group/cost relative cursor-pointer hover:bg-gray-200/50 transition-colors font-bold"
+                                                className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a] group/cost relative cursor-pointer hover:bg-gray-200/50 dark:hover:bg-[#252525] transition-colors font-bold"
                                                 onClick={() => handleEdit(batch)}
                                             >
                                                 <span className="underline decoration-dotted underline-offset-4 decoration-gray-300">
@@ -641,8 +641,8 @@ export default function ProductionClient() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.quantity.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.quantity.toLocaleString()}</td>
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {batch.unitCost ? batch.unitCost.toLocaleString() : '-'}
                                             </td>
                                             <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.salesPrice.toLocaleString()}</td>

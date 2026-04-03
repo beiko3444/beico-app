@@ -772,7 +772,7 @@ ${rowsHtml}
                                                             />
                                                         </td>
                                                         <td className="px-3 py-2 text-center">
-                                                            <div className="mx-auto w-11 h-11 rounded-lg border border-gray-200 bg-white overflow-hidden flex items-center justify-center">
+                                                            <div className="mx-auto w-11 h-11 rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] overflow-hidden flex items-center justify-center">
                                                                 {product.imageUrl ? (
                                                                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                                                                 ) : (
@@ -781,12 +781,12 @@ ${rowsHtml}
                                                             </div>
                                                         </td>
                                                         <td className="px-3 py-2">
-                                                            <div className="font-bold text-gray-900">{product.nameJP || product.name}</div>
-                                                            <div className="text-[11px] text-gray-500">{product.nameEN || product.name}</div>
-                                                            <div className="text-[10px] text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
+                                                            <div className="font-bold text-gray-900 dark:text-white">{product.nameJP || product.name}</div>
+                                                            <div className="text-[11px] text-gray-500 dark:text-gray-400">{product.nameEN || product.name}</div>
+                                                            <div className="text-[10px] text-gray-400 dark:text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
                                                         </td>
                                                         <td className="px-3 py-2 text-center text-gray-600">{product.stock.toLocaleString()}</td>
-                                                        <td className="px-3 py-2 text-right font-bold text-gray-900">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
+                                                        <td className="px-3 py-2 text-right font-bold text-gray-900 dark:text-white">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="number"

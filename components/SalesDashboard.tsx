@@ -25,7 +25,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
     const maxValue = Math.max(...data.map(d => d.value), 1)
 
     return (
-        <div className="glass-panel bg-white p-8 rounded-2xl shadow-sm border border-gray-100 border-t-[var(--color-brand-blue)] mb-10 overflow-hidden">
+        <div className="glass-panel bg-white dark:bg-[#1e1e1e] p-8 rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] border-t-[var(--color-brand-blue)] mb-10 overflow-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--color-brand-blue)]">매출 현황 (Revenue Analytics)</h2>
