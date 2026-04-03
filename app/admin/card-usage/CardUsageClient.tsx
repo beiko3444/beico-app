@@ -1780,10 +1780,10 @@ export default function CardUsageClient() {
                         onClick={() => handleCalendarDateClick(cell.key, cell.hasTransactions)}
                         style={{
                           borderRadius: 10,
-                          border: `1px solid ${cell.inRange ? T.borderLight : '#F2F1ED'}`,
+                          border: `1px solid ${cell.inRange ? T.borderLight : T.borderLight}`,
                           background: cell.inRange
                             ? (cell.percent > 0 ? 'rgba(26,26,26,0.03)' : T.surface)
-                            : '#FCFCFA',
+                            : T.bg,
                           padding: '8px 8px 7px',
                           minHeight: 66,
                           opacity: cell.inRange ? 1 : 0.45,
@@ -2079,7 +2079,7 @@ export default function CardUsageClient() {
                             height: 20,
                             borderRadius: 6,
                             border: `1px solid ${!isCategoryDirty ? T.borderLight : '#CBD5E1'}`,
-                            background: !isCategoryDirty ? T.surfaceSecondary : '#FFFFFF',
+                            background: !isCategoryDirty ? T.surfaceSecondary : T.surface,
                             color: !isCategoryDirty ? T.textTertiary : T.text,
                             fontSize: 10,
                             fontWeight: 700,

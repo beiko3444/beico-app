@@ -96,25 +96,25 @@ export default function DashboardOrderSummary({
                                     <th className="py-2.5 px-4 text-right rounded-r-lg">일시</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-50">
+                            <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                                 {recentOrders.length > 0 ? (
                                     recentOrders.map((order, i) => (
-                                        <tr key={order.id} className="group hover:bg-gray-50/80 transition-colors">
+                                        <tr key={order.id} className="group hover:bg-gray-50/80 dark:hover:bg-[#252525] transition-colors">
                                             <td className="py-3 px-4">
-                                                <span className="text-[11px] font-black text-[#d9361b] bg-red-50 px-2 py-0.5 rounded border border-red-100">
+                                                <span className="text-[11px] font-black text-[#d9361b] bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded border border-red-100 dark:border-red-800">
                                                     {order.orderNumber || order.id.slice(0, 8)}
                                                 </span>
                                             </td>
                                             <td className="py-3 px-2">
                                                 <div className="flex flex-col">
-                                                    <span className="text-[11px] font-bold text-gray-900">
+                                                    <span className="text-[11px] font-bold text-gray-900 dark:text-white">
                                                         {order.user.partnerProfile?.businessName || order.user.name}
                                                     </span>
-                                                    <span className="text-[9px] text-gray-400">{order.user.username}</span>
+                                                    <span className="text-[9px] text-gray-400 dark:text-gray-500">{order.user.username}</span>
                                                 </div>
                                             </td>
                                             <td className="py-3 px-2">
-                                                <span className="text-[11px] font-bold text-gray-900">
+                                                <span className="text-[11px] font-bold text-gray-900 dark:text-white">
                                                     {order.total.toLocaleString()}원
                                                 </span>
                                             </td>

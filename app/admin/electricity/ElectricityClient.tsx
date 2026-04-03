@@ -827,9 +827,9 @@ export default function ElectricityClient() {
                                     <div className="absolute top-0 right-0 p-4 text-gray-100 group-hover:text-gray-200 transition-colors">
                                         <svg className="w-12 h-12" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.31-8.86c-1.77-.45-2.34-.94-2.34-1.67 0-.84.79-1.39 2.1-1.39 1.47 0 2.01.59 2.06 1.71h1.73c-.05-1.94-1.29-3.21-3.12-3.62V4h-1.5v2.15c-1.54.34-2.82 1.31-2.82 2.92 0 1.89 1.55 2.83 3.8 3.4 2.02.5 2.42 1.2 2.42 2.03 0 1.15-1.13 1.63-2.39 1.63-1.76 0-2.43-.88-2.51-2.11H7.28c.08 2.3 1.65 3.39 3.27 3.73V20h1.5v-2.15c1.65-.31 3.13-1.2 3.13-3.05 0-1.99-1.63-2.86-3.79-3.41z" /></svg>
                                     </div>
-                                    <div className="text-[10px] text-gray-400 font-bold mb-1 tracking-widest uppercase">Beico Share ({shareRatioBeico.toFixed(1)}%)</div>
-                                    <div className="text-2xl font-black text-gray-900 tracking-tight">{beicoTotal.toLocaleString()}원</div>
-                                    <div className="text-xs text-gray-400 mt-1">베이코 이용요금</div>
+                                    <div className="text-[10px] text-gray-400 dark:text-gray-400 font-bold mb-1 tracking-widest uppercase">Beico Share ({shareRatioBeico.toFixed(1)}%)</div>
+                                    <div className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">{beicoTotal.toLocaleString()}원</div>
+                                    <div className="text-xs text-gray-400 dark:text-gray-400 mt-1">베이코 이용요금</div>
                                     {prevMonthData && (
                                         <div className={`text-[10px] mt-2 font-bold ${beicoTotal - prevShares.beicoTotal >= 0 ? 'text-red-500' : 'text-blue-500'}`}>
                                             전월비 {beicoTotal - prevShares.beicoTotal >= 0 ? '▲' : '▼'}{Math.abs(beicoTotal - prevShares.beicoTotal).toLocaleString()}원
@@ -853,13 +853,13 @@ export default function ElectricityClient() {
                         </div>
 
                         {/* Detailed Comparison Table */}
-                        <div className="bg-white rounded-3xl shadow-lg border border-gray-100 overflow-hidden">
-                            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                                <h3 className="text-base font-bold text-gray-800">요금 분담 상세 내역</h3>
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl shadow-lg dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
+                            <div className="p-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] flex justify-between items-center">
+                                <h3 className="text-base font-bold text-gray-800 dark:text-white">요금 분담 상세 내역</h3>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-[11px] text-left">
-                                    <thead className="bg-gray-100 text-gray-600 font-bold uppercase border-b border-gray-200">
+                                    <thead className="bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400 font-bold uppercase border-b border-gray-200 dark:border-[#2a2a2a]">
                                         <tr>
                                             <th className="px-4 py-2">항목</th>
                                             <th className="px-4 py-2 text-right">전체 금액</th>
@@ -867,38 +867,38 @@ export default function ElectricityClient() {
                                             <th className="px-4 py-2 text-right">임대인 ({shareRatioLandlord.toFixed(1)}%)</th>
                                         </tr>
                                     </thead>
-                                    <tbody className="divide-y divide-gray-100 [&>tr:nth-child(even)]:bg-gray-50">
+                                    <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a] [&>tr:nth-child(even)]:bg-gray-50 dark:[&>tr:nth-child(even)]:bg-[#1a1a1a]">
                                         <tr className="bg-blue-50/20 text-blue-900 font-bold">
                                             <td className="px-4 py-2">총 사용 전력량</td>
                                             <td className="px-4 py-2 text-right">{totalKwh.toLocaleString()}kWh</td>
                                             <td className="px-4 py-2 text-right">{beicoUsageKwh.toLocaleString()}kWh</td>
                                             <td className="px-4 py-2 text-right">{landlordUsageKwh.toLocaleString()}kWh</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a]">
                                             <td className="px-4 py-1.5">기본요금</td>
                                             <td className="px-4 py-1.5 text-right">{baseTotal.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoBaseCost.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordBaseCost.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a]">
                                             <td className="px-4 py-1.5">전력량요금</td>
                                             <td className="px-4 py-1.5 text-right">{usageTotal.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoUsageCost.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordUsageCost.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a]">
                                             <td className="px-4 py-1.5">기후환경요금</td>
                                             <td className="px-4 py-1.5 text-right">{envTotal.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoEnvCost.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordEnvCost.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a]">
                                             <td className="px-4 py-1.5">연료비조정액</td>
                                             <td className="px-4 py-1.5 text-right">{fuelTotal.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoFuelCost.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{landlordFuelCost.toLocaleString()}원</td>
                                         </tr>
-                                        <tr className="hover:bg-gray-50">
+                                        <tr className="hover:bg-gray-50 dark:hover:bg-[#1a1a1a]">
                                             <td className="px-4 py-1.5">역률요금</td>
                                             <td className="px-4 py-1.5 text-right">{powerFactorTotal.toLocaleString()}원</td>
                                             <td className="px-4 py-1.5 text-right">{beicoPowerFactor.toLocaleString()}원</td>

@@ -555,15 +555,15 @@ export default function ProductionClient() {
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('rMargin')}>
                                     소매마진 {sortConfig?.key === 'rMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap border-r border-gray-200">메모</th>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap border-r border-gray-200 dark:border-[#2a2a2a]">메모</th>
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap">관리</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {loading ? (
-                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">로딩 중...</td></tr>
+                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400 dark:text-gray-400">로딩 중...</td></tr>
                             ) : sortedBatches.length === 0 ? (
-                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">기록이 없습니다.</td></tr>
+                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400 dark:text-gray-400">기록이 없습니다.</td></tr>
                             ) : (
                                 sortedBatches.map((batch, idx) => {
                                     const totalCost = batch.rawMaterialCost
@@ -579,11 +579,11 @@ export default function ProductionClient() {
                                     const rMarginRate = batch.wholesalePrice ? (((batch.wholesalePrice - (batch.unitCost || 0)) / batch.wholesalePrice) * 100).toFixed(1) : '0';
 
                                     return (
-                                        <tr key={batch.id} className="hover:bg-blue-50 transition-colors group even:bg-gray-100/70 hover:relative hover:z-50">
-                                            <td className="px-4 py-1.5 text-center text-black font-bold border-r border-gray-200">
+                                        <tr key={batch.id} className="hover:bg-blue-50 dark:hover:bg-[#252525] transition-colors group even:bg-gray-100/70 dark:even:bg-[#1a1a1a] hover:relative hover:z-50">
+                                            <td className="px-4 py-1.5 text-center text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {idx + 1}
                                             </td>
-                                            <td className="px-4 py-1.5 text-black font-bold border-r border-gray-200">
+                                            <td className="px-4 py-1.5 text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {new Date(batch.productionDate).toISOString().split('T')[0]}
                                             </td>
                                             <td

@@ -313,25 +313,25 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                     <div className="bg-white dark:bg-[#1e1e1e] rounded-[2.5rem] w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
                         <div className="bg-gray-50 dark:bg-[#1a1a1a] p-8 border-b border-gray-100 dark:border-[#2a2a2a] flex justify-between items-start">
                             <div>
-                                <h3 className="text-2xl font-black text-gray-900 tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
+                                <p className="text-xs font-bold text-gray-400 dark:text-gray-400 uppercase tracking-widest mt-1">
                                     {selectedDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
                                 </p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-all text-gray-400"><X className="w-6 h-6" /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 dark:hover:bg-[#252525] rounded-full transition-all text-gray-400 dark:text-gray-400"><X className="w-6 h-6" /></button>
                         </div>
 
                         <form action={handleSaveTask} className="p-8 space-y-6">
                             <input type="hidden" name="date" value={selectedDate.toISOString()} />
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">업무 제목</label>
+                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-widest">업무 제목</label>
                                 <input
                                     name="title"
                                     type="text"
                                     required
                                     defaultValue={editingTask?.title || ''}
                                     placeholder="무엇을 해야 하나요?"
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:ring-2 focus:ring-black focus:bg-white outline-none transition-all placeholder:text-gray-300"
+                                    className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl px-5 py-4 text-sm font-black dark:text-white focus:ring-2 focus:ring-black focus:bg-white dark:focus:bg-[#2a2a2a] outline-none transition-all placeholder:text-gray-300"
                                 />
                             </div>
 

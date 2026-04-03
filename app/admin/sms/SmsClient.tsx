@@ -447,22 +447,22 @@ export default function SmsClient() {
           </div>
 
           <div className="p-6 md:p-8 bg-[linear-gradient(180deg,#fff7f3_0%,#ffffff_100%)] dark:bg-[linear-gradient(180deg,#1a1a1a_0%,#1e1e1e_100%)] border-t xl:border-t-0 xl:border-l border-gray-100 dark:border-[#2a2a2a] space-y-5">
-            <div className="rounded-2xl bg-white border border-gray-200 p-5 space-y-4 shadow-sm">
+            <div className="rounded-2xl bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] p-5 space-y-4 shadow-sm dark:shadow-none">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">발송 타입</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">발송 타입</span>
                 <span className={`px-3 py-1 rounded-full text-[11px] font-black ${sendType === 'SMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                   {sendType}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">바이트</div>
-                  <div className="text-2xl font-black text-gray-900 mt-2">{byteLength}</div>
+                <div className="rounded-2xl bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] p-4">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400 dark:text-gray-400">바이트</div>
+                  <div className="text-2xl font-black text-gray-900 dark:text-white mt-2">{byteLength}</div>
                 </div>
-                <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">기준</div>
-                  <div className="text-sm font-bold text-gray-900 mt-2 leading-5">
+                <div className="rounded-2xl bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] p-4">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400 dark:text-gray-400">기준</div>
+                  <div className="text-sm font-bold text-gray-900 dark:text-white mt-2 leading-5">
                     90 bytes 이하 SMS
                     <br />
                     90 bytes 초과 LMS
@@ -471,7 +471,7 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="sendAt" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="sendAt" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   예약 발송 (선택)
                 </label>
                 <div className="relative">

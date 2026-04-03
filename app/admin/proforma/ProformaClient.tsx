@@ -731,22 +731,22 @@ ${rowsHtml}
                                             </option>
                                         ))}
                                     </select>
-                                    <p className="mt-2 text-[11px] text-gray-500">단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
+                                    <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
                                     <div className="mt-3">
                                         <label className="text-xs font-bold text-gray-700">Production time</label>
                                         <input
                                             type="text"
                                             value={draftProductionTime}
                                             onChange={(event) => setDraftProductionTime(event.target.value)}
-                                            className="mt-2 w-full bg-white border border-gray-200 rounded-xl p-2.5 text-sm font-medium focus:ring-[#e53b19] focus:border-[#e53b19]"
+                                            className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-medium dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]"
                                             placeholder="e.g. 3-5 days after receiving the deposit"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="overflow-x-auto border border-gray-100 rounded-xl">
+                                <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
                                     <table className="w-full text-sm">
-                                        <thead className="bg-gray-50 border-b border-gray-100 text-gray-600">
+                                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] text-gray-600 dark:text-gray-400">
                                             <tr>
                                                 <th className="px-3 py-2 text-center">선택</th>
                                                 <th className="px-3 py-2 text-center">이미지</th>
@@ -757,12 +757,12 @@ ${rowsHtml}
                                                 <th className="px-3 py-2 text-center">금액</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100">
+                                        <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                                             {products.map((product) => {
                                                 const rowState = draftState[product.id] || { checked: false, quantity: 1 }
                                                 const amount = rowState.quantity * Number(product.usBuyPrice || 0)
                                                 return (
-                                                    <tr key={product.id} className={rowState.checked ? 'bg-[#e53b19]/5' : 'bg-white'}>
+                                                    <tr key={product.id} className={rowState.checked ? 'bg-[#e53b19]/5' : 'bg-white dark:bg-[#1e1e1e]'}>
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
