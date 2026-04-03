@@ -51,14 +51,14 @@ export default function DashboardStatistics({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-10">
             {/* Sales Trend Chart (Col Span 2) */}
-            <div className="lg:col-span-2 glass-panel bg-white p-8 rounded-[2rem] shadow-sm border border-gray-100 overflow-hidden relative">
+            <div className="lg:col-span-2 glass-panel bg-white dark:bg-[#1e1e1e] p-8 rounded-[2rem] shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden relative">
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-4">
                     <div>
                         <h2 className="text-xl font-black text-[var(--color-brand-blue)] flex items-center gap-2">
                             <span className="w-2 h-2 rounded-full bg-[var(--color-brand-blue)] animate-pulse"></span>
                             매출 트렌드 분석 (Revenue)
                         </h2>
-                        <p className="text-xs text-gray-400 mt-1 font-medium ml-4">기간별 매출 추이를 확인하세요.</p>
+                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1 font-medium ml-4">기간별 매출 추이를 확인하세요.</p>
                     </div>
 
                     <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">

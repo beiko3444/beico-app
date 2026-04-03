@@ -3295,10 +3295,10 @@ export default function WormOrderPage() {
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
                                                             : matchingEmailUid === email.uid
-                                                                ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-progress'
+                                                                ? 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-progress'
                                                                 : activeWormOrder?.id
                                                                     ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
-                                                                    : 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                                                                    : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
                                                     role="button"
                                                     aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
@@ -3582,10 +3582,10 @@ export default function WormOrderPage() {
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
                                                             : matchingDocEmailUid === email.uid
-                                                                ? 'bg-slate-100 text-slate-500 border border-slate-200 cursor-progress'
+                                                                ? 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-progress'
                                                                 : activeWormOrder?.id
                                                                     ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
-                                                                    : 'bg-slate-100 text-slate-500 border border-slate-200 cursor-not-allowed'
+                                                                    : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
                                                     role="button"
                                                     aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
