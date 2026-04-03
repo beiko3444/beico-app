@@ -279,28 +279,28 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 <a
                                     href="/beiko_Business%20Registration%20Certificate.png"
                                     download="beiko_Business_Registration_Certificate.png"
-                                    className="flex-1 h-14 border-2 border-gray-300 text-gray-700 bg-white rounded-lg font-bold transition-all hover:bg-gray-50 flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
+                                    className="flex-1 h-14 border-2 border-gray-300 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-400 bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
                                 >
                                     <span className="text-[11px] md:text-[13px] font-bold">事業者登録証</span>
                                     <span className="text-[9px] md:text-[10px] font-bold opacity-60">{isUSD ? 'Business Reg. Download' : '사업자등록증 다운로드'}</span>
                                 </a>
                             </div>
                         </div>
-                        <div className="border-t border-gray-100 mx-5 mt-4 mb-3" />
+                        <div className="border-t border-gray-100 dark:border-[#2a2a2a] mx-5 mt-4 mb-3" />
 
                         {/* Order Items List */}
                         <div className="mt-8 px-1">
                             <div className="flex items-center gap-2 mb-4">
                                 <Package size={17} className="text-[#e34219]" />
-                                <h3 className="text-base font-extrabold text-gray-900 tracking-tight">注文商品リスト <span className="text-gray-400 font-medium ml-1">/ {isUSD ? 'Order Item List' : '주문상품목록'}</span></h3>
+                                <h3 className="text-base font-extrabold text-gray-900 dark:text-white tracking-tight">注文商品リスト <span className="text-gray-400 dark:text-gray-500 font-medium ml-1">/ {isUSD ? 'Order Item List' : '주문상품목록'}</span></h3>
                             </div>
 
                             <div className="space-y-3">
                                 {order.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="bg-white border border-gray-100 rounded-xl p-4 flex gap-4 md:items-center shadow-sm relative overflow-hidden">
+                                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-xl p-4 flex gap-4 md:items-center shadow-sm dark:shadow-none relative overflow-hidden">
                                         <div className="flex flex-col items-center gap-1.5 shrink-0">
-                                            <span className="text-[10px] font-extrabold text-gray-900 uppercase tracking-tighter">No. {idx + 1}</span>
-                                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white border border-gray-200 rounded-lg flex items-center justify-center shrink-0 p-1">
+                                            <span className="text-[10px] font-extrabold text-gray-900 dark:text-white uppercase tracking-tighter">No. {idx + 1}</span>
+                                            <div className="w-16 h-16 md:w-20 md:h-20 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center justify-center shrink-0 p-1">
                                                 {item.product.imageUrl ? (
                                                     <img src={item.product.imageUrl} alt="" className="w-full h-full object-contain" />
                                                 ) : (

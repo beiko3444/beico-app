@@ -3506,7 +3506,7 @@ export default function WormOrderPage() {
                             AWB 메일 수신
                             {loadingDocEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span>}
                         </h2>
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
                             제목에 &apos;documents&apos;가 포함된 선적 서류 메일을 조회합니다.
                         </p>
                     </div>
@@ -3538,7 +3538,7 @@ export default function WormOrderPage() {
                         )}
 
                         {docHasFetched && !loadingDocEmails && docEmails.length === 0 && !docEmailError && (
-                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 bg-gray-50/50 mt-10">
+                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-[#1a1a1a]/50 mt-10">
                                 &apos;documents&apos; 제목 메일이 없습니다.
                             </div>
                         )}
@@ -3642,7 +3642,7 @@ export default function WormOrderPage() {
                     </div>
 
                     {/* 우측 본문 렌더링 패널 */}
-                    <div className="w-full md:w-[65%] bg-gray-50/30 flex flex-col">
+                    <div className="w-full md:w-[65%] bg-gray-50/30 dark:bg-[#1a1a1a]/30 flex flex-col">
                         {!selectedDocEmailUid ? (
                             <div className="flex-1 flex items-center justify-center p-10 text-[13px] text-gray-400 font-medium">
                                 {docEmails.length > 0 ? '좌측에서 메일을 선택하시면 내용이 표시됩니다.' : ''}

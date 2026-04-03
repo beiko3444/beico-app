@@ -1123,7 +1123,7 @@ export default function ElectricityClient() {
                                     <textarea
                                         value={rawText}
                                         onChange={(e) => setRawText(e.target.value)}
-                                        className="w-full h-40 p-3 text-xs font-mono bg-gray-50 border rounded-xl resize-none focus:ring-2 focus:ring-[#d9361b]"
+                                        className="w-full h-40 p-3 text-xs font-mono bg-gray-50 dark:bg-[#1a1a1a] border dark:border-[#2a2a2a] rounded-xl resize-none focus:ring-2 focus:ring-[#d9361b] dark:text-white"
                                         placeholder="여기에 텍스트를 붙여넣고 [추출하기]를 누르면 우측 폼이 자동으로 채워집니다."
                                     />
                                     <button type="button" onClick={parseBillText} className="w-full py-2 bg-gray-800 text-white rounded-lg text-xs font-bold hover:bg-black transition-all">텍스트에서 데이터 추출하기</button>
