@@ -666,7 +666,7 @@ export default function SmsClient() {
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="text-sm font-semibold text-gray-500">
+          <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
             {history ? `총 ${history.maxIndex}건 · ${history.currentPage} / ${history.maxPageNum} 페이지` : '발송내역을 불러오는 중입니다.'}
           </div>
 
@@ -675,7 +675,7 @@ export default function SmsClient() {
               type="button"
               onClick={() => moveHistoryPage((history?.currentPage || 1) - 1)}
               disabled={!history || history.currentPage <= 1 || historyLoading}
-              className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-black text-gray-700 disabled:opacity-50"
+              className="h-10 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-700 dark:text-gray-400 disabled:opacity-50"
             >
               이전
             </button>
@@ -683,7 +683,7 @@ export default function SmsClient() {
               type="button"
               onClick={() => moveHistoryPage((history?.currentPage || 1) + 1)}
               disabled={!history || history.currentPage >= history.maxPageNum || historyLoading}
-              className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-black text-gray-700 disabled:opacity-50"
+              className="h-10 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-700 dark:text-gray-400 disabled:opacity-50"
             >
               다음
             </button>

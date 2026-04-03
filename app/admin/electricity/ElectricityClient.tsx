@@ -1021,8 +1021,8 @@ export default function ElectricityClient() {
 
                                 <label className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a]">
                                     <div>
-                                        <div className="text-sm font-bold text-gray-900">전기세 납부 완료</div>
-                                        <div className="text-xs text-gray-500 mt-1">
+                                        <div className="text-sm font-bold text-gray-900 dark:text-white">전기세 납부 완료</div>
+                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                             임대인 월별 전기세: {selectedMonthLandlordTotal !== null ? `${selectedMonthLandlordTotal.toLocaleString()}원` : '계산 데이터 없음'}
                                         </div>
                                     </div>
@@ -1040,14 +1040,14 @@ export default function ElectricityClient() {
                             </div>
                         </div>
 
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                                <h3 className="text-sm font-bold text-gray-800">{selectedYear}년 월별 납부 현황</h3>
-                                <div className="text-xs text-gray-500">체크 결과는 현재 브라우저에 저장됩니다.</div>
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
+                            <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-between">
+                                <h3 className="text-sm font-bold text-gray-800 dark:text-white">{selectedYear}년 월별 납부 현황</h3>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">체크 결과는 현재 브라우저에 저장됩니다.</div>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full text-sm">
-                                    <thead className="bg-white text-gray-600 border-b border-gray-100">
+                                    <thead className="bg-white dark:bg-[#1e1e1e] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-[#2a2a2a]">
                                         <tr>
                                             <th className="text-left px-4 py-3 whitespace-nowrap">월</th>
                                             <th className="text-center px-4 py-3 whitespace-nowrap">월세 입금일자</th>

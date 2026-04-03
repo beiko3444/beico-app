@@ -3214,9 +3214,9 @@ export default function WormOrderPage() {
                             인보이스 메일 수신
                             {loadingEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </h2>
-                        <p className="mt-0.5 text-xs text-slate-500">
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
                             제목에 &apos;invoice&apos;가 포함된 메일만 조회합니다.
-                            {activeWormOrder && <span className="ml-2 font-semibold text-slate-600">현재 발주: {activeWormOrder.orderNumber}</span>}
+                            {activeWormOrder && <span className="ml-2 font-semibold text-slate-600 dark:text-gray-400">현재 발주: {activeWormOrder.orderNumber}</span>}
                         </p>
                         {emailCacheSavedAt && (
                             <p className={`mt-1 text-[11px] font-medium ${usingOfflineEmailCache ? 'text-amber-600' : 'text-slate-400'}`}>

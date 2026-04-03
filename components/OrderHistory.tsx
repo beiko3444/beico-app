@@ -149,10 +149,10 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                                 {isActive ? <step.icon size={16} strokeWidth={3} /> : idx + 1}
                                             </div>
                                             <div className="text-center">
-                                                <div className={`text-[11px] md:text-sm font-bold mb-0.5 whitespace-nowrap ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>
+                                                <div className={`text-[11px] md:text-sm font-bold mb-0.5 whitespace-nowrap ${isActive ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
                                                     {step.label}
                                                 </div>
-                                                <div className="text-[10px] md:text-xs font-bold text-gray-400 uppercase tracking-wide whitespace-nowrap">
+                                                <div className="text-[10px] md:text-xs font-bold text-gray-400 dark:text-gray-500 uppercase tracking-wide whitespace-nowrap">
                                                     {step.sub}
                                                 </div>
                                             </div>
@@ -163,8 +163,8 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                         </div>
 
                         {/* Payment Information & Totals Summary */}
-                        <div className="bg-white rounded-xl pt-4 px-2 pb-2 mb-1">
-                            <div className="flex items-center gap-2 mb-3 border-b border-gray-100 pb-2">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-xl pt-4 px-2 pb-2 mb-1">
+                            <div className="flex items-center gap-2 mb-3 border-b border-gray-100 dark:border-[#2a2a2a] pb-2">
                                 <Landmark size={14} className="text-[#e34219]" />
                                 <h3 className="text-xs font-bold text-gray-500 uppercase tracking-tight">お支払い情報 / {isUSD ? 'Payment Info' : '입금정보'}</h3>
                             </div>
