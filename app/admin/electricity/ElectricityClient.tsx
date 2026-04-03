@@ -1075,14 +1075,14 @@ export default function ElectricityClient() {
                                                         <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-400 whitespace-nowrap">
                                                             {rowRentInfo.paidDate}
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-bold text-gray-900 whitespace-nowrap">
+                                                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                                             {rowRentInfo.amount}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center text-xs text-gray-500 whitespace-nowrap">
+                                                        <td className="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
                                                             {rowRentInfo.period}
                                                         </td>
                                                         <td className="px-4 py-3 text-center">
-                                                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'}`}>
+                                                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'}`}>
                                                                 {status.rentTaxInvoiceIssued ? '✓' : '-'}
                                                             </span>
                                                         </td>

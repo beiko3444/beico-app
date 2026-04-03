@@ -185,16 +185,16 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 </div>
 
                                 {/* Separator & Total Amount Details */}
-                                <div className="flex justify-between items-center pt-1.5 pb-0 mt-1 border-t border-gray-100">
-                                    <span className="font-bold text-sm text-gray-900 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / {isUSD ? 'Total Amount' : '총 합계금액'}</span>
+                                <div className="flex justify-between items-center pt-1.5 pb-0 mt-1 border-t border-gray-100 dark:border-[#2a2a2a]">
+                                    <span className="font-bold text-sm text-gray-900 dark:text-white underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / {isUSD ? 'Total Amount' : '총 합계금액'}</span>
                                     <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                 </div>
-                                <div className="flex justify-between text-xs text-gray-400">
+                                <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
                                     <span>供給価額 / {isUSD ? 'Supply Price' : '공급가액'}</span>
                                     <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">{currencySymbol}</span>{supplyPrice.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
                                 </div>
                                 {!isUSD && (
-                                    <div className="flex justify-between text-xs text-gray-400">
+                                    <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
                                         <span>消費税 / 부가세 (10%)</span>
                                         <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">{currencySymbol}</span>{vat.toLocaleString()}</span>
                                     </div>

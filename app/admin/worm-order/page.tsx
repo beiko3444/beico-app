@@ -3384,7 +3384,7 @@ export default function WormOrderPage() {
                     </div>
 
                     {/* 우측 본문 렌더링 패널 */}
-                    <div className="w-full md:w-[65%] bg-gray-50/30 flex flex-col">
+                    <div className="w-full md:w-[65%] bg-gray-50/30 dark:bg-[#1a1a1a]/30 flex flex-col">
                         {!selectedEmailUid ? (
                             <div className="flex-1 flex items-center justify-center p-10 text-[13px] text-gray-400 font-medium">
                                 {emails.length > 0 ? "좌측에서 메일을 선택하시면 내용이 표시됩니다." : ""}
