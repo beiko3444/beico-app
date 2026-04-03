@@ -12,9 +12,9 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
 
     if (!orders || orders.length === 0) {
         return (
-            <div className="flex items-center justify-center py-20 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div className="flex items-center justify-center py-20 bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a]">
                 <div className="text-center">
-                    <p className="text-xl font-bold text-gray-400">注文履歴がありません / 주문내역이 없습니다.</p>
+                    <p className="text-xl font-bold text-gray-400 dark:text-gray-500">注文履歴がありません / 주문내역이 없습니다.</p>
                 </div>
             </div>
         )
@@ -63,10 +63,10 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
             {/* Header Title Layer */}
             <div className="mb-4 md:mb-6 flex flex-col md:flex-row md:items-end justify-between gap-4 px-4 md:px-0 pt-2 md:pt-0">
                 <div className="flex items-baseline gap-3 text-left">
-                    <h1 className="text-3xl md:text-4xl font-black text-[#111827] tracking-tight">
+                    <h1 className="text-3xl md:text-4xl font-black text-[#111827] dark:text-white tracking-tight">
                         注文履歴
                     </h1>
-                    <span className="text-sm font-normal text-gray-400 tracking-wide uppercase">Order History</span>
+                    <span className="text-sm font-normal text-gray-400 dark:text-gray-500 tracking-wide uppercase">Order History</span>
                 </div>
             </div>
 

@@ -354,7 +354,7 @@ export default function ProductionClient() {
             <div className="flex justify-between items-center bg-white dark:bg-[#1e1e1e] p-4 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[var(--color-brand-blue)]"></span>
-                    <span className="font-bold text-gray-700">{activeTab} 생산일지</span>
+                    <span className="font-bold text-gray-700 dark:text-gray-400">{activeTab} 생산일지</span>
                 </div>
                 <button
                     onClick={() => {

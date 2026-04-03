@@ -836,8 +836,8 @@ ${rowsHtml}
                                                         className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
                                                         onClick={() => setActiveIssuedId(invoice.id)}
                                                     >
-                                                        <td className="px-3 py-2 text-gray-600 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
-                                                        <td className="px-3 py-2 font-bold text-gray-900">{invoice.partnerName}</td>
+                                                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
+                                                        <td className="px-3 py-2 font-bold text-gray-900 dark:text-white">{invoice.partnerName}</td>
                                                         <td className="px-3 py-2 text-right font-bold text-[#e53b19]">{usdFormatter.format(invoice.totalUsd)}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <button
@@ -865,7 +865,7 @@ ${rowsHtml}
 
                 <section
                     id="pi-print-sheet"
-                    className="bg-[#f6f3f1] border border-gray-200 shadow-lg p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24 xl:w-[210mm] xl:max-w-none xl:min-w-[210mm] xl:h-[297mm] xl:min-h-[297mm] xl:aspect-auto"
+                    className="bg-[#f6f3f1] border border-gray-200 dark:border-[#2a2a2a] shadow-lg dark:shadow-none p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24 xl:w-[210mm] xl:max-w-none xl:min-w-[210mm] xl:h-[297mm] xl:min-h-[297mm] xl:aspect-auto"
                 >
                     <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
 

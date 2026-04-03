@@ -568,19 +568,19 @@ export default function SmsClient() {
         </div>
       </section>
 
-      <section className="bg-white rounded-[28px] border border-gray-200 shadow-sm p-6 md:p-8 space-y-6">
+      <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">History</p>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">문자 발송내역</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자 발송내역</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               기간별로 바로빌 문자 발송내역을 조회합니다.
             </p>
           </div>
 
           <form onSubmit={handleHistorySearch} className="flex flex-col md:flex-row gap-3 md:items-end">
             <div className="space-y-1">
-              <label htmlFor="historyFromDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500">
+              <label htmlFor="historyFromDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                 시작일
               </label>
               <input
@@ -588,12 +588,12 @@ export default function SmsClient() {
                 type="date"
                 value={historyFromDate}
                 onChange={(event) => setHistoryFromDate(event.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
               />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="historyToDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500">
+              <label htmlFor="historyToDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                 종료일
               </label>
               <input

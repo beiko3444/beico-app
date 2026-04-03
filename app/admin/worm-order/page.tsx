@@ -3086,7 +3086,7 @@ export default function WormOrderPage() {
                                 })}
                             </div>
 
-                            <div className="mt-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600">
+                            <div className="mt-3 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-gray-400">
                                 선택된 납품 예정일: {receiveDate || '-'}
                             </div>
 
@@ -3122,8 +3122,8 @@ export default function WormOrderPage() {
                                                         key={`${wormType.id}-${size.id}`}
                                                         className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
                                                             isSelected
-                                                                ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm`
-                                                                : 'border-gray-200 bg-white hover:border-gray-300'
+                                                                ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm dark:shadow-none`
+                                                                : 'border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] hover:border-gray-300'
                                                         }`}
                                                     >
                                                         <div className="flex flex-col items-start gap-0.5 px-0.5">

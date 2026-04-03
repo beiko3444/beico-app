@@ -947,8 +947,8 @@ export default function ElectricityClient() {
                         <div className="w-16 h-16 bg-gray-100 dark:bg-[#252525] rounded-full flex items-center justify-center mb-4 text-gray-400 dark:text-gray-400">
                             <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         </div>
-                        <h3 className="text-lg font-bold text-gray-900 mb-1">{selectedYear}년 {selectedMonth}월 데이터 없음</h3>
-                        <p className="text-gray-500 text-sm mb-6">등록된 전기요금 명세서가 없습니다.</p>
+                        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-1">{selectedYear}년 {selectedMonth}월 데이터 없음</h3>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-6">등록된 전기요금 명세서가 없습니다.</p>
                         <div className="flex gap-2">
                             <button
                                 onClick={() => setIsLandlordModalOpen(true)}
@@ -970,11 +970,11 @@ export default function ElectricityClient() {
             {
                 activeTab === 'payment' && (
                     <div className="space-y-4">
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <h2 className="text-lg font-black text-gray-900">납부관리 체크리스트</h2>
-                                    <p className="text-xs text-gray-500 mt-1">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
+                                    <h2 className="text-lg font-black text-gray-900 dark:text-white">납부관리 체크리스트</h2>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
                                 </div>
                                 <div className="text-right">
                                     <div className="text-xs text-gray-500">선택 월</div>
