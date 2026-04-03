@@ -263,7 +263,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                             세금계산서 발급완료
                         </span>
                     ) : (
-                        <span className="px-3 py-1 rounded text-xs font-bold bg-gray-100 text-gray-500 border border-gray-200">
+                        <span className="px-3 py-1 rounded text-xs font-bold bg-gray-100 dark:bg-[#2a2a2a] text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-[#2a2a2a]">
                             세금계산서 발행중
                         </span>
                     )}
@@ -281,7 +281,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                     </button>
                 )}
                 {(status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED') && order.trackingNumber && (
-                    <div className="text-xs bg-white text-gray-800 px-3 py-1 rounded-lg border border-gray-200 font-medium shadow-sm">
+                    <div className="text-xs bg-white dark:bg-[#1e1e1e] text-gray-800 dark:text-gray-200 px-3 py-1 rounded-lg border border-gray-200 dark:border-[#2a2a2a] font-medium shadow-sm dark:shadow-none">
                         <span className="font-bold mr-2">로젠택배</span>
                         <span className="text-[var(--color-brand-blue)]">송장번호 : <span className="font-bold">{order.trackingNumber}</span></span>
                     </div>
@@ -296,18 +296,18 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
             {/* 배송 폼 */}
             <div className="flex gap-2 items-end">
                 <div className="w-28 flex flex-col gap-0.5">
-                    <label className="text-[10px] text-gray-400 ml-0.5">택배사</label>
+                    <label className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">택배사</label>
                     <select
                         value={courier}
                         onChange={(e) => setCourier(e.target.value)}
                         disabled={!isEditingTracking && !!order.trackingNumber}
-                        className="w-full appearance-none border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] text-gray-800 font-bold bg-white outline-none focus:border-[#d9361b] transition-colors"
+                        className="w-full appearance-none border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors"
                     >
                         <option value="Rosen">로젠택배</option>
                     </select>
                 </div>
                 <div className="flex-1 flex flex-col gap-0.5">
-                    <label className="text-[10px] text-gray-400 ml-0.5">송장번호</label>
+                    <label className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">송장번호</label>
                     <div className="flex gap-1.5">
                         <input
                             type="text"
@@ -315,7 +315,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                             onChange={(e) => setTrackingNumber(e.target.value)}
                             disabled={!isEditingTracking && !!order.trackingNumber}
                             placeholder="송장번호 입력"
-                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-2 text-[11px] text-gray-800 font-bold bg-white outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300"
+                            className="flex-1 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-500"
                         />
                         {(!order.trackingNumber || isEditingTracking) ? (
                             <button onClick={saveShippingInfo} disabled={loading}
@@ -324,7 +324,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                             </button>
                         ) : (
                             <button onClick={() => setIsEditingTracking(true)}
-                                className="bg-gray-100 text-gray-600 px-3.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 transition-colors">
+                                className="bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-3.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors">
                                 수정
                             </button>
                         )}
@@ -376,26 +376,26 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 </button>
 
                 {showLogenForm && (
-                    <div className="mt-1 p-3 bg-blue-50 border border-blue-100 rounded-xl flex flex-col gap-2">
+                    <div className="mt-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex flex-col gap-2">
                         <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 font-bold">수하인 전화번호</label>
+                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인 전화번호</label>
                             <input type="text" value={logenPhone} onChange={e => setLogenPhone(e.target.value)}
-                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 font-bold">수하인명 (업체명)</label>
+                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인명 (업체명)</label>
                             <input type="text" value={logenName} onChange={e => setLogenName(e.target.value)}
-                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 font-bold">주소 (검색용)</label>
+                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">주소 (검색용)</label>
                             <input type="text" value={logenAddress} onChange={e => setLogenAddress(e.target.value)}
-                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
                         </div>
                         <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 font-bold">상세주소</label>
+                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">상세주소</label>
                             <input type="text" value={logenDetailAddress} onChange={e => setLogenDetailAddress(e.target.value)}
-                                className="border border-gray-200 rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 bg-white outline-none focus:border-blue-400" />
+                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
                         </div>
                         {logenError && (
                             <p className="text-[10px] text-red-600 font-bold">{logenError}</p>

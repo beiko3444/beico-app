@@ -92,7 +92,7 @@ export default async function AdminLayout({
     const userName = session.user.name || '관리자'
 
     return (
-        <div className="min-h-screen bg-gray-50/30 relative">
+        <div className="min-h-screen bg-gray-50/30 dark:bg-[#111111] relative">
             <AdminNav counts={counts} userName={userName} />
             <main className="pt-28 pb-12 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
                 {children}

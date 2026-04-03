@@ -320,29 +320,29 @@ export default function SmsClient() {
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Barobill Messaging</p>
-          <h1 className="text-2xl font-black text-gray-900 tracking-tight">문자발송서비스</h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자발송서비스</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             바로빌 공식 `SendMessage` 및 `GetSMSSendMessagesByPaging` SOAP API를 사용합니다.
           </p>
         </div>
-        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-[#e34219] shadow-sm">
+        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-[#e34219] shadow-sm dark:shadow-none">
           <MessageSquareText size={22} />
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-[28px] border border-gray-200 shadow-sm overflow-hidden">
+      <form onSubmit={handleSubmit} className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
         <div className="grid grid-cols-1 xl:grid-cols-[1.15fr_0.85fr]">
           <div className="p-6 md:p-8 space-y-5">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <label htmlFor="fromNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="fromNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   From Number
                 </label>
                 <select
                   id="fromNumber"
                   value={fromNumber}
                   onChange={(event) => setFromNumber(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   required
                   disabled={loading || fromNumbers.length === 0}
                 >
@@ -356,7 +356,7 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="savedRecipient" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="savedRecipient" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   저장된 수신자
                 </label>
                 <div className="flex gap-2">
@@ -364,7 +364,7 @@ export default function SmsClient() {
                     id="savedRecipient"
                     value={selectedRecipientId}
                     onChange={(event) => setSelectedRecipientId(event.target.value)}
-                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   >
                     <option value="">수신자를 선택하세요</option>
                     {recipients.map((item) => (
@@ -377,7 +377,7 @@ export default function SmsClient() {
                     type="button"
                     onClick={() => applyRecipient(selectedRecipient)}
                     disabled={!selectedRecipient}
-                    className="shrink-0 h-12 px-4 rounded-xl border border-gray-200 text-sm font-black text-gray-700 disabled:opacity-50"
+                    className="shrink-0 h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-700 dark:text-gray-400 disabled:opacity-50"
                   >
                     적용
                   </button>
@@ -385,7 +385,7 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="toName" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="toName" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   수신자명
                 </label>
                 <input
@@ -393,14 +393,14 @@ export default function SmsClient() {
                   type="text"
                   value={toName}
                   onChange={(event) => setToName(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   placeholder="수신자 이름"
                   required
                 />
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="toNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="toNumber" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   수신번호
                 </label>
                 <input
@@ -409,7 +409,7 @@ export default function SmsClient() {
                   inputMode="numeric"
                   value={toNumber}
                   onChange={(event) => setToNumber(formatPhoneNumber(event.target.value))}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   placeholder="010-0000-0000"
                   required
                 />
@@ -432,37 +432,37 @@ export default function SmsClient() {
             </div>
 
             <div className="space-y-1.5">
-              <label htmlFor="contents" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+              <label htmlFor="contents" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                 문자 내용
               </label>
               <textarea
                 id="contents"
                 value={contents}
                 onChange={(event) => setContents(event.target.value)}
-                className="w-full min-h-[220px] px-4 py-4 rounded-2xl border border-gray-200 bg-white text-sm leading-6 text-gray-900 outline-none focus:border-[#e34219] resize-y"
+                className="w-full min-h-[220px] px-4 py-4 rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm leading-6 text-gray-900 dark:text-white outline-none focus:border-[#e34219] resize-y"
                 placeholder="발송할 문자를 입력하세요."
                 required
               />
             </div>
           </div>
 
-          <div className="p-6 md:p-8 bg-[linear-gradient(180deg,#fff7f3_0%,#ffffff_100%)] border-t xl:border-t-0 xl:border-l border-gray-100 space-y-5">
-            <div className="rounded-2xl bg-white border border-gray-200 p-5 space-y-4 shadow-sm">
+          <div className="p-6 md:p-8 bg-[linear-gradient(180deg,#fff7f3_0%,#ffffff_100%)] dark:bg-[linear-gradient(180deg,#1a1a1a_0%,#1e1e1e_100%)] border-t xl:border-t-0 xl:border-l border-gray-100 dark:border-[#2a2a2a] space-y-5">
+            <div className="rounded-2xl bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] p-5 space-y-4 shadow-sm dark:shadow-none">
               <div className="flex items-center justify-between">
-                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">발송 타입</span>
+                <span className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">발송 타입</span>
                 <span className={`px-3 py-1 rounded-full text-[11px] font-black ${sendType === 'SMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
                   {sendType}
                 </span>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">바이트</div>
-                  <div className="text-2xl font-black text-gray-900 mt-2">{byteLength}</div>
+                <div className="rounded-2xl bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] p-4">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400 dark:text-gray-400">바이트</div>
+                  <div className="text-2xl font-black text-gray-900 dark:text-white mt-2">{byteLength}</div>
                 </div>
-                <div className="rounded-2xl bg-gray-50 border border-gray-100 p-4">
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400">기준</div>
-                  <div className="text-sm font-bold text-gray-900 mt-2 leading-5">
+                <div className="rounded-2xl bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] p-4">
+                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-400 dark:text-gray-400">기준</div>
+                  <div className="text-sm font-bold text-gray-900 dark:text-white mt-2 leading-5">
                     90 bytes 이하 SMS
                     <br />
                     90 bytes 초과 LMS
@@ -471,17 +471,17 @@ export default function SmsClient() {
               </div>
 
               <div className="space-y-1.5">
-                <label htmlFor="sendAt" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500">
+                <label htmlFor="sendAt" className="text-[11px] font-black uppercase tracking-[0.18em] text-gray-500 dark:text-gray-400">
                   예약 발송 (선택)
                 </label>
                 <div className="relative">
-                  <CalendarClock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <CalendarClock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-400" />
                   <input
                     id="sendAt"
                     type="datetime-local"
                     value={sendAt}
                     onChange={(event) => setSendAt(event.target.value)}
-                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
                   />
                 </div>
               </div>
@@ -522,11 +522,11 @@ export default function SmsClient() {
         </div>
       </form>
 
-      <section className="bg-white rounded-[28px] border border-gray-200 shadow-sm p-6 md:p-8 space-y-5">
+      <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-5">
         <div>
           <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Recipients</p>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">저장된 수신자</h2>
-          <p className="text-sm text-gray-500 mt-1">
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">저장된 수신자</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             등록한 수신자를 저장해두고 문자 발송 시 바로 불러올 수 있습니다.
           </p>
         </div>
@@ -534,17 +534,17 @@ export default function SmsClient() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
           {recipients.length ? (
             recipients.map((item) => (
-              <div key={item.id} className="rounded-2xl border border-gray-200 bg-gray-50 p-4 space-y-3">
+              <div key={item.id} className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] p-4 space-y-3">
                 <div>
-                  <div className="text-base font-black text-gray-900">{item.name}</div>
-                  <div className="text-sm font-semibold text-gray-500 mt-1">{formatPhoneNumber(item.phoneNumber)}</div>
+                  <div className="text-base font-black text-gray-900 dark:text-white">{item.name}</div>
+                  <div className="text-sm font-semibold text-gray-500 dark:text-gray-400 mt-1">{formatPhoneNumber(item.phoneNumber)}</div>
                 </div>
 
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => applyRecipient(item)}
-                    className="flex-1 h-10 rounded-xl bg-white border border-gray-200 text-sm font-black text-gray-800 inline-flex items-center justify-center gap-2"
+                    className="flex-1 h-10 rounded-xl bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-800 dark:text-white inline-flex items-center justify-center gap-2"
                   >
                     <Save size={14} />
                     불러오기
@@ -553,7 +553,7 @@ export default function SmsClient() {
                     type="button"
                     onClick={() => handleDeleteRecipient(item.id)}
                     disabled={deletingRecipientId === item.id}
-                    className="h-10 px-3 rounded-xl border border-red-200 bg-white text-red-600 inline-flex items-center justify-center disabled:opacity-50"
+                    className="h-10 px-3 rounded-xl border border-red-200 dark:border-red-900 bg-white dark:bg-[#1e1e1e] text-red-600 inline-flex items-center justify-center disabled:opacity-50"
                   >
                     {deletingRecipientId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                   </button>
@@ -561,26 +561,26 @@ export default function SmsClient() {
               </div>
             ))
           ) : (
-            <div className="col-span-full rounded-2xl border border-dashed border-gray-200 bg-gray-50 px-4 py-10 text-center text-sm font-bold text-gray-400">
+            <div className="col-span-full rounded-2xl border border-dashed border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] px-4 py-10 text-center text-sm font-bold text-gray-400 dark:text-gray-400">
               저장된 수신자가 없습니다.
             </div>
           )}
         </div>
       </section>
 
-      <section className="bg-white rounded-[28px] border border-gray-200 shadow-sm p-6 md:p-8 space-y-6">
+      <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
             <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">History</p>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">문자 발송내역</h2>
-            <p className="text-sm text-gray-500 mt-1">
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자 발송내역</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               기간별로 바로빌 문자 발송내역을 조회합니다.
             </p>
           </div>
 
           <form onSubmit={handleHistorySearch} className="flex flex-col md:flex-row gap-3 md:items-end">
             <div className="space-y-1">
-              <label htmlFor="historyFromDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500">
+              <label htmlFor="historyFromDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                 시작일
               </label>
               <input
@@ -588,12 +588,12 @@ export default function SmsClient() {
                 type="date"
                 value={historyFromDate}
                 onChange={(event) => setHistoryFromDate(event.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
               />
             </div>
 
             <div className="space-y-1">
-              <label htmlFor="historyToDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500">
+              <label htmlFor="historyToDate" className="text-[11px] font-black uppercase tracking-[0.16em] text-gray-500 dark:text-gray-400">
                 종료일
               </label>
               <input
@@ -601,7 +601,7 @@ export default function SmsClient() {
                 type="date"
                 value={historyToDate}
                 onChange={(event) => setHistoryToDate(event.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-900 outline-none focus:border-[#e34219]"
+                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
               />
             </div>
 
@@ -618,10 +618,10 @@ export default function SmsClient() {
 
         {historyError && <p className="text-sm font-bold text-red-600">{historyError}</p>}
 
-        <div className="rounded-2xl border border-gray-200 overflow-hidden">
+        <div className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] overflow-hidden">
           <div className="overflow-x-auto">
             <table className="min-w-full text-sm">
-              <thead className="bg-gray-50 text-gray-500">
+              <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
                 <tr>
                   <th className="px-4 py-3 text-left font-black">발송일시</th>
                   <th className="px-4 py-3 text-left font-black">상태</th>
@@ -632,11 +632,11 @@ export default function SmsClient() {
                   <th className="px-4 py-3 text-left font-black">RefKey</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                 {history?.messages.length ? (
                   history.messages.map((item) => (
                     <tr key={item.sendKey || `${item.refKey}-${item.receiverNum}-${item.sendDT}`} className="align-top">
-                      <td className="px-4 py-4 font-semibold text-gray-900 whitespace-nowrap">
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">
                         {formatSendDateTime(item.sendDT)}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap">
@@ -644,18 +644,18 @@ export default function SmsClient() {
                           {getSendStateLabel(item.sendState)}
                         </span>
                       </td>
-                      <td className="px-4 py-4 font-semibold text-gray-900 whitespace-nowrap">{item.receiverName || '-'}</td>
-                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap">{formatPhoneNumber(item.receiverNum || '') || '-'}</td>
-                      <td className="px-4 py-4 text-gray-700 whitespace-nowrap">{formatPhoneNumber(item.senderNum || '') || '-'}</td>
-                      <td className="px-4 py-4 text-gray-700 min-w-[320px]">
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{item.receiverName || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.receiverNum || '') || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.senderNum || '') || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 min-w-[320px]">
                         <div className="line-clamp-2 whitespace-pre-wrap break-words">{item.message || '-'}</div>
                       </td>
-                      <td className="px-4 py-4 text-gray-500 whitespace-nowrap">{item.refKey || '-'}</td>
+                      <td className="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.refKey || '-'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={7} className="px-4 py-12 text-center text-sm font-bold text-gray-400">
+                    <td colSpan={7} className="px-4 py-12 text-center text-sm font-bold text-gray-400 dark:text-gray-400">
                       {historyLoading ? '발송내역을 불러오는 중입니다.' : '조회된 문자 발송내역이 없습니다.'}
                     </td>
                   </tr>
@@ -666,7 +666,7 @@ export default function SmsClient() {
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div className="text-sm font-semibold text-gray-500">
+          <div className="text-sm font-semibold text-gray-500 dark:text-gray-400">
             {history ? `총 ${history.maxIndex}건 · ${history.currentPage} / ${history.maxPageNum} 페이지` : '발송내역을 불러오는 중입니다.'}
           </div>
 
@@ -675,7 +675,7 @@ export default function SmsClient() {
               type="button"
               onClick={() => moveHistoryPage((history?.currentPage || 1) - 1)}
               disabled={!history || history.currentPage <= 1 || historyLoading}
-              className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-black text-gray-700 disabled:opacity-50"
+              className="h-10 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-700 dark:text-gray-400 disabled:opacity-50"
             >
               이전
             </button>
@@ -683,7 +683,7 @@ export default function SmsClient() {
               type="button"
               onClick={() => moveHistoryPage((history?.currentPage || 1) + 1)}
               disabled={!history || history.currentPage >= history.maxPageNum || historyLoading}
-              className="h-10 px-4 rounded-xl border border-gray-200 text-sm font-black text-gray-700 disabled:opacity-50"
+              className="h-10 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] text-sm font-black text-gray-700 dark:text-gray-400 disabled:opacity-50"
             >
               다음
             </button>

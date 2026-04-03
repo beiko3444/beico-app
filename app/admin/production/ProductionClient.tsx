@@ -319,27 +319,27 @@ export default function ProductionClient() {
     return (
         <div className="space-y-6">
             {/* Sticky Header with Title and Category Tabs */}
-            <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 shadow-sm transition-all duration-300">
+            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all duration-300">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div className="flex items-center gap-4">
                         <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 hover:text-[#d9361b] transition-all" title="Dashboard">
+                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded-full text-gray-400 dark:text-gray-400 hover:text-[#d9361b] transition-all" title="Dashboard">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 tracking-tight">생산 관리</h1>
+                            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">생산 관리</h1>
                         </div>
 
-                        <div className="h-4 w-px bg-gray-200"></div>
+                        <div className="h-4 w-px bg-gray-200 dark:bg-[#2a2a2a]"></div>
 
                         {/* Category Tabs */}
-                        <div className="flex bg-gray-100/50 p-1 rounded-lg overflow-x-auto scrollbar-hide">
+                        <div className="flex bg-gray-100/50 dark:bg-[#1a1a1a] p-1 rounded-lg overflow-x-auto scrollbar-hide">
                             {CATEGORIES.map(cat => (
                                 <button
                                     key={cat}
                                     onClick={() => setActiveTab(cat)}
                                     className={`px-3 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition-all ${activeTab === cat
-                                        ? 'bg-white text-[var(--color-brand-blue)] shadow-sm'
-                                        : 'text-gray-400 hover:text-gray-600'
+                                        ? 'bg-white dark:bg-[#1e1e1e] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none'
+                                        : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
                                         }`}
                                 >
                                     {cat}
@@ -351,10 +351,10 @@ export default function ProductionClient() {
             </div>
 
             {/* Action Bar */}
-            <div className="flex justify-between items-center bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="flex justify-between items-center bg-white dark:bg-[#1e1e1e] p-4 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
                 <div className="flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-[var(--color-brand-blue)]"></span>
-                    <span className="font-bold text-gray-700">{activeTab} 생산일지</span>
+                    <span className="font-bold text-gray-700 dark:text-gray-400">{activeTab} 생산일지</span>
                 </div>
                 <button
                     onClick={() => {
@@ -416,10 +416,10 @@ export default function ProductionClient() {
                             : '0%'
                     }
                 ].map((stat, idx) => (
-                    <div key={idx} className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-1 transition-transform hover:scale-[1.02]">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">{stat.label}</span>
+                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] p-5 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-1 transition-transform hover:scale-[1.02]">
+                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-wider">{stat.label}</span>
                         <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-black text-gray-900">{stat.value}</span>
+                            <span className="text-xl font-black text-gray-900 dark:text-white">{stat.value}</span>
                         </div>
                     </div>
                 ))}
@@ -429,13 +429,13 @@ export default function ProductionClient() {
             {!loading && batches.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Total Production Cost Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
                                     <DollarSign className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">총 생산비용 추이</h3>
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">총 생산비용 추이</h3>
                             </div>
                             <Activity className="w-4 h-4 text-gray-300" />
                         </div>
@@ -462,13 +462,13 @@ export default function ProductionClient() {
                     </div>
 
                     {/* Production Quantity Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
                                     <Package className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">생산수량 변동</h3>
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">생산수량 변동</h3>
                             </div>
                             <TrendingUp className="w-4 h-4 text-gray-300" />
                         </div>
@@ -491,13 +491,13 @@ export default function ProductionClient() {
                     </div>
 
                     {/* Unit Cost Trend */}
-                    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
                                     <Calculator className="w-4 h-4" />
                                 </div>
-                                <h3 className="text-sm font-black text-gray-900 tracking-tight">생산단가 추이</h3>
+                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">생산단가 추이</h3>
                             </div>
                             <ChevronRight className="w-4 h-4 text-gray-300" />
                         </div>
@@ -523,47 +523,47 @@ export default function ProductionClient() {
 
 
             {/* Table */}
-            <div className="bg-white border border-gray-100 rounded-2xl overflow-x-auto shadow-sm pb-16">
+            <div className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl overflow-x-auto shadow-sm dark:shadow-none pb-16">
                 <div className="min-w-[800px]">
                     <table className="w-full text-xs text-left">
-                        <thead className="bg-gray-50 text-black font-black uppercase border-b border-gray-100">
+                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-black dark:text-white font-black uppercase border-b border-gray-100 dark:border-[#2a2a2a]">
                             <tr>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('productionDate')}>
+                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('productionDate')}>
                                     No {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('productionDate')}>
+                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('productionDate')}>
                                     생산날짜 {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
                                     총 생산비용 {sortConfig?.key === 'totalCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('quantity')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('quantity')}>
                                     생산수량 {sortConfig?.key === 'quantity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('unitCost')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('unitCost')}>
                                     단가 {sortConfig?.key === 'unitCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('salesPrice')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('salesPrice')}>
                                     도매가 {sortConfig?.key === 'salesPrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('wMargin')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('wMargin')}>
                                     도매마진 {sortConfig?.key === 'wMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('wholesalePrice')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('wholesalePrice')}>
                                     판매가 {sortConfig?.key === 'wholesalePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 border-r border-gray-200" onClick={() => handleSort('rMargin')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('rMargin')}>
                                     소매마진 {sortConfig?.key === 'rMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap border-r border-gray-200">메모</th>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap border-r border-gray-200 dark:border-[#2a2a2a]">메모</th>
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap">관리</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50">
+                        <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {loading ? (
-                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">로딩 중...</td></tr>
+                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400 dark:text-gray-400">로딩 중...</td></tr>
                             ) : sortedBatches.length === 0 ? (
-                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400">기록이 없습니다.</td></tr>
+                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400 dark:text-gray-400">기록이 없습니다.</td></tr>
                             ) : (
                                 sortedBatches.map((batch, idx) => {
                                     const totalCost = batch.rawMaterialCost
@@ -579,15 +579,15 @@ export default function ProductionClient() {
                                     const rMarginRate = batch.wholesalePrice ? (((batch.wholesalePrice - (batch.unitCost || 0)) / batch.wholesalePrice) * 100).toFixed(1) : '0';
 
                                     return (
-                                        <tr key={batch.id} className="hover:bg-blue-50 transition-colors group even:bg-gray-100/70 hover:relative hover:z-50">
-                                            <td className="px-4 py-1.5 text-center text-black font-bold border-r border-gray-200">
+                                        <tr key={batch.id} className="hover:bg-blue-50 dark:hover:bg-[#252525] transition-colors group even:bg-gray-100/70 dark:even:bg-[#1a1a1a] hover:relative hover:z-50">
+                                            <td className="px-4 py-1.5 text-center text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {idx + 1}
                                             </td>
-                                            <td className="px-4 py-1.5 text-black font-bold border-r border-gray-200">
+                                            <td className="px-4 py-1.5 text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {new Date(batch.productionDate).toISOString().split('T')[0]}
                                             </td>
                                             <td
-                                                className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200 group/cost relative cursor-pointer hover:bg-gray-200/50 transition-colors font-bold"
+                                                className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a] group/cost relative cursor-pointer hover:bg-gray-200/50 dark:hover:bg-[#252525] transition-colors font-bold"
                                                 onClick={() => handleEdit(batch)}
                                             >
                                                 <span className="underline decoration-dotted underline-offset-4 decoration-gray-300">
@@ -641,27 +641,27 @@ export default function ProductionClient() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.quantity.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.quantity.toLocaleString()}</td>
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {batch.unitCost ? batch.unitCost.toLocaleString() : '-'}
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.salesPrice.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-center border-r border-gray-200">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(wMarginRate) > 30 ? 'bg-red-50 text-red-600' : 'bg-red-50 text-red-400'}`}>
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.salesPrice.toLocaleString()}</td>
+                                            <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(wMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
                                                     {wMarginRate}%
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black border-r border-gray-200">{batch.wholesalePrice.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-center border-r border-gray-200">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(rMarginRate) > 30 ? 'bg-red-50 text-red-600' : 'bg-red-50 text-red-400'}`}>
+                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.wholesalePrice.toLocaleString()}</td>
+                                            <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
+                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(rMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
                                                     {rMarginRate}%
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-1.5 text-black border-r border-gray-200" title={batch.memo || ''}>{batch.memo || '-'}</td>
+                                            <td className="px-4 py-1.5 text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]" title={batch.memo || ''}>{batch.memo || '-'}</td>
                                             <td className="px-4 py-1.5 text-center">
                                                 <div className="flex items-center justify-center gap-2 transition-opacity">
-                                                    <button onClick={() => handleEdit(batch)} className="text-gray-500 hover:text-gray-700 font-bold text-[10px] border border-gray-200 bg-gray-50 px-2 py-1 rounded shadow-sm transition-colors">수정</button>
-                                                    <button onClick={() => handleDelete(batch.id)} className="text-red-500 hover:text-red-700 font-bold text-[10px] border border-red-100 bg-red-50 px-2 py-1 rounded shadow-sm">삭제</button>
+                                                    <button onClick={() => handleEdit(batch)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 font-bold text-[10px] border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] px-2 py-1 rounded shadow-sm dark:shadow-none transition-colors">수정</button>
+                                                    <button onClick={() => handleDelete(batch.id)} className="text-red-500 hover:text-red-700 font-bold text-[10px] border border-red-100 dark:border-red-900/50 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded shadow-sm dark:shadow-none">삭제</button>
                                                 </div>
                                             </td>
                                         </tr>

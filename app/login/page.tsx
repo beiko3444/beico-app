@@ -5,6 +5,7 @@ import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { User, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
+import ThemeToggle from '@/components/ThemeToggle'
 
 export default function LoginPage() {
     const router = useRouter()
@@ -91,9 +92,13 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f9f9f9] flex flex-col items-center justify-center p-4 font-sans text-[#333] relative">
+        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111] flex flex-col items-center justify-center p-4 font-sans text-[#333] dark:text-gray-200 relative">
+            {/* Theme toggle */}
+            <div className="absolute top-6 right-6">
+                <ThemeToggle className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333]" />
+            </div>
             {/* Real-time Japanese Clock */}
-            <div className="absolute top-8 text-[11px] font-bold text-gray-800 tracking-widest" suppressHydrationWarning>
+            <div className="absolute top-8 text-[11px] font-bold text-gray-800 dark:text-gray-400 tracking-widest" suppressHydrationWarning>
                 {time ? formatJapaneseDate(time) : ''}
             </div>
 
@@ -107,7 +112,7 @@ export default function LoginPage() {
                     />
                 </div>
 
-                <h1 className="text-xl font-bold text-gray-800 tracking-tight mb-1">卸売専用ポータル</h1>
+                <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">卸売専用ポータル</h1>
                 <div className="flex flex-col items-center gap-1.5">
                     <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-gray-400 leading-none">
                         Wholesale Portal
@@ -124,7 +129,7 @@ export default function LoginPage() {
 
                     {/* User ID Input */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">ユーザーID / User ID</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1">ユーザーID / User ID</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                                 <User size={18} className="stroke-[1.5]" />
@@ -133,7 +138,7 @@ export default function LoginPage() {
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full h-12 pl-12 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 shadow-sm transition-all text-[14px] font-medium placeholder:text-gray-300"
+                                className="w-full h-12 pl-12 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-300 dark:focus:border-[#555] shadow-sm transition-all text-[14px] font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white"
                                 placeholder="Enter ID"
                                 required
                             />
@@ -142,7 +147,7 @@ export default function LoginPage() {
 
                     {/* Password Input */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">パスワード / Password</label>
+                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1">パスワード / Password</label>
                         <div className="relative group">
                             <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
                                 <Lock size={18} className="stroke-[1.5]" />
@@ -151,7 +156,7 @@ export default function LoginPage() {
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full h-12 pl-12 pr-12 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 shadow-sm transition-all text-[14px] font-medium placeholder:text-gray-300 tracking-wider"
+                                className="w-full h-12 pl-12 pr-12 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-300 dark:focus:border-[#555] shadow-sm transition-all text-[14px] font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white tracking-wider"
                                 placeholder="••••••••"
                                 required
                             />
@@ -167,14 +172,14 @@ export default function LoginPage() {
 
                     {/* Remember Me */}
                     <div className="flex items-center gap-2 cursor-pointer group px-1 mt-0.5" onClick={() => setRememberMe(!rememberMe)}>
-                        <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${rememberMe ? 'bg-white border-gray-300' : 'bg-white border-gray-200 group-hover:border-gray-300'}`}>
+                        <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${rememberMe ? 'bg-white dark:bg-[#1e1e1e] border-gray-300 dark:border-[#555]' : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#333] group-hover:border-gray-300'}`}>
                             {rememberMe && <ArrowRight size={10} className="text-[#333] rotate-[-45deg]" strokeWidth={2.5} />}
                         </div>
-                        <span className="text-[11px] font-medium text-gray-500 tracking-tight transition-colors group-hover:text-gray-800">ログイン状態を保持 / Remember Me</span>
+                        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 tracking-tight transition-colors group-hover:text-gray-800 dark:group-hover:text-gray-200">ログイン状態を保持 / Remember Me</span>
                     </div>
 
                     {error && (
-                        <div className="text-red-500 text-xs bg-red-50 px-4 py-3 rounded-lg border border-red-100 flex flex-col items-center justify-center">
+                        <div className="text-red-500 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 px-4 py-3 rounded-lg border border-red-100 dark:border-red-800 flex flex-col items-center justify-center">
                             {typeof error === 'string' ? <span className="font-bold">{error}</span> : error}
                         </div>
                     )}
@@ -202,15 +207,15 @@ export default function LoginPage() {
 
             {/* New Partners Section */}
             <div className="mt-4 w-full max-w-[360px] text-center">
-                <div className="border-t border-gray-200 pt-2 mb-1 w-full"></div>
+                <div className="border-t border-gray-200 dark:border-[#333] pt-2 mb-1 w-full"></div>
 
-                <h3 className="text-[19px] font-black text-[#111827] mb-1 tracking-tight">新規パートナー様 / New Partners</h3>
+                <h3 className="text-[19px] font-black text-[#111827] dark:text-white mb-1 tracking-tight">新規パートナー様 / New Partners</h3>
                 <p className="text-[10.5px] text-gray-400 leading-normal mb-4 font-medium px-6">
                     Partner with BEIKO for professional-grade tackle & bait solutions.
                 </p>
 
                 <Link href="/signup" className="block w-full">
-                    <button className="w-full h-12 bg-[#111827] border-2 border-[#111827] text-white rounded-lg font-bold text-[14px] hover:bg-white hover:text-[#111827] transition-all tracking-tight shadow-sm leading-normal">
+                    <button className="w-full h-12 bg-[#111827] dark:bg-white border-2 border-[#111827] dark:border-white text-white dark:text-[#111827] rounded-lg font-bold text-[14px] hover:bg-white hover:text-[#111827] dark:hover:bg-[#111827] dark:hover:text-white transition-all tracking-tight shadow-sm leading-normal">
                         卸売アカウントの申請 / Apply for Wholesale Account
                     </button>
                 </Link>

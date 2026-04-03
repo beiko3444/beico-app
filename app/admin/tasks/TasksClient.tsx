@@ -162,9 +162,9 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
     return (
         <div className="flex flex-col gap-6 font-sans">
             {/* Calendar Main View (Horizontally Long) */}
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
                 {/* Header */}
-                <div className="bg-white text-gray-900 p-6 flex justify-between items-center border-b border-gray-100">
+                <div className="bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white p-6 flex justify-between items-center border-b border-gray-100 dark:border-[#2a2a2a]">
                     <div className="flex items-center gap-8">
                         <div className="flex items-center gap-4">
                             <div className="flex flex-col items-center">
@@ -172,7 +172,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                 <span className="text-2xl font-black tracking-tighter leading-none">{currentMonth.getFullYear()}</span>
                                 <button onClick={() => changeYear(-1)} className="hover:text-blue-500 transition-colors"><ChevronDown className="w-4 h-4" /></button>
                             </div>
-                            <div className="w-px h-8 bg-gray-200"></div>
+                            <div className="w-px h-8 bg-gray-200 dark:bg-[#2a2a2a]"></div>
                             <div className="flex flex-col items-center">
                                 <button onClick={() => changeMonth(1)} className="hover:text-blue-500 transition-colors"><ChevronUp className="w-4 h-4" /></button>
                                 <span className="text-2xl font-black tracking-tighter leading-none">{currentMonth.getMonth() + 1}</span>
@@ -182,8 +182,8 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                     </div>
 
                     <div className="flex items-center gap-4">
-                        <button onClick={() => { setCurrentMonth(new Date()); setSelectedDate(new Date()); }} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Today</button>
-                        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-gray-400">
+                        <button onClick={() => { setCurrentMonth(new Date()); setSelectedDate(new Date()); }} className="px-4 py-2 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#252525] rounded-xl text-[10px] font-black uppercase tracking-widest transition-all">Today</button>
+                        <div className="flex items-center gap-6 text-[10px] font-black uppercase tracking-widest text-gray-400 dark:text-gray-400">
                             <div className="flex items-center gap-2">
                                 <span className="w-2 h-2 rounded-full bg-emerald-500"></span> 완료
                             </div>
@@ -195,9 +195,9 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                 </div>
 
                 {/* Weekdays */}
-                <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
+                <div className="grid grid-cols-7 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/50 dark:bg-[#1a1a1a]/50">
                     {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                        <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
+                        <div key={day} className={`py-4 text-center text-sm font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400 dark:text-gray-400'}`}>
                             {day}
                         </div>
                     ))}
@@ -238,17 +238,17 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
             </div>
 
             {/* Bottom: Focused Day Task List & Quick Add */}
-            <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl p-8 shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] grid grid-cols-1 lg:grid-cols-3 gap-8 items-start">
                 <div className="lg:col-span-1">
                     <div className="flex items-center gap-4 mb-4">
                         <div className="w-12 h-12 bg-black text-white rounded-2xl flex items-center justify-center text-xl font-black shadow-lg">
                             {selectedDate.getDate()}
                         </div>
                         <div>
-                            <h3 className="text-xl font-black text-gray-900 tracking-tighter">
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter">
                                 {selectedDate.getFullYear()}. {selectedDate.getMonth() + 1}
                             </h3>
-                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest italic">
+                            <p className="text-xs font-bold text-gray-400 dark:text-gray-400 uppercase tracking-widest italic">
                                 {['일요일', '월요일', '화요일', '수요일', '목요일', '금요일', '토요일'][selectedDate.getDay()]}
                             </p>
                         </div>
@@ -267,7 +267,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                             <div
                                 key={task.id}
                                 className={`group flex items-center gap-4 p-4 rounded-2xl transition-all border
-                                    ${task.completed ? 'bg-gray-50/50 border-gray-100 opacity-60' : 'bg-white border-gray-100 hover:border-black hover:shadow-xl hover:-translate-y-1'}
+                                    ${task.completed ? 'bg-gray-50/50 dark:bg-[#1a1a1a]/50 border-gray-100 dark:border-[#2a2a2a] opacity-60' : 'bg-white dark:bg-[#1e1e1e] border-gray-100 dark:border-[#2a2a2a] hover:border-black hover:shadow-xl hover:-translate-y-1'}
                                 `}
                             >
                                 <button
@@ -277,20 +277,20 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                                     {task.completed ? <CheckCircle2 className="w-6 h-6" /> : <Circle className="w-6 h-6" />}
                                 </button>
                                 <div className="flex-1 min-w-0 flex items-center gap-6" onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}>
-                                    <h4 className={`text-sm font-black truncate max-w-[200px] ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900'}`}>{task.title}</h4>
-                                    {task.description && <p className="text-xs text-gray-400 truncate font-medium flex-1 pt-0.5">{task.description}</p>}
+                                    <h4 className={`text-sm font-black truncate max-w-[200px] ${task.completed ? 'text-gray-300 line-through' : 'text-gray-900 dark:text-white'}`}>{task.title}</h4>
+                                    {task.description && <p className="text-xs text-gray-400 dark:text-gray-400 truncate font-medium flex-1 pt-0.5">{task.description}</p>}
                                 </div>
                                 <div className="flex items-center gap-3">
                                     {task.fileUrl && <Paperclip className="w-4 h-4 text-blue-500" />}
                                     <button
                                         onClick={() => { setEditingTask(task); setFileUrl(task.fileUrl || null); setIsModalOpen(true); }}
-                                        className="bg-gray-100 hover:bg-black hover:text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-sm"
+                                        className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-black hover:text-white px-4 py-2 rounded-xl text-[10px] font-black transition-all shadow-sm dark:shadow-none"
                                     >
                                         수정
                                     </button>
                                     <button
                                         onClick={() => handleDeleteTask(task.id)}
-                                        className="bg-red-50 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black text-red-500 transition-all shadow-sm"
+                                        className="bg-red-50 hover:bg-red-500 hover:text-white px-4 py-2 rounded-xl text-[10px] font-black text-red-500 transition-all shadow-sm dark:shadow-none"
                                     >
                                         삭제
                                     </button>
@@ -298,7 +298,7 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
                             </div>
                         ))
                     ) : (
-                        <div className="py-20 text-center bg-gray-50/50 rounded-3xl border-2 border-dashed border-gray-100">
+                        <div className="py-20 text-center bg-gray-50/50 dark:bg-[#1a1a1a]/50 rounded-3xl border-2 border-dashed border-gray-100 dark:border-[#2a2a2a]">
                             <p className="text-[10px] font-black text-gray-300 uppercase tracking-[0.2em]">No events scheduled</p>
                         </div>
                     )}
@@ -310,38 +310,38 @@ export default function TasksClient({ initialTasks }: { initialTasks: any[] }) {
             {/* Task Modal (Add/Edit) */}
             {isModalOpen && mounted && createPortal(
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100000] flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white rounded-[2.5rem] w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
-                        <div className="bg-gray-50 p-8 border-b border-gray-100 flex justify-between items-start">
+                    <div className="bg-white dark:bg-[#1e1e1e] rounded-[2.5rem] w-full max-w-lg overflow-hidden flex flex-col shadow-2xl animate-in zoom-in-95 duration-300" onClick={e => e.stopPropagation()}>
+                        <div className="bg-gray-50 dark:bg-[#1a1a1a] p-8 border-b border-gray-100 dark:border-[#2a2a2a] flex justify-between items-start">
                             <div>
-                                <h3 className="text-2xl font-black text-gray-900 tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
-                                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
+                                <p className="text-xs font-bold text-gray-400 dark:text-gray-400 uppercase tracking-widest mt-1">
                                     {selectedDate.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', weekday: 'long' })}
                                 </p>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-all text-gray-400"><X className="w-6 h-6" /></button>
+                            <button onClick={() => setIsModalOpen(false)} className="p-2 hover:bg-gray-200 dark:hover:bg-[#252525] rounded-full transition-all text-gray-400 dark:text-gray-400"><X className="w-6 h-6" /></button>
                         </div>
 
                         <form action={handleSaveTask} className="p-8 space-y-6">
                             <input type="hidden" name="date" value={selectedDate.toISOString()} />
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">업무 제목</label>
+                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-widest">업무 제목</label>
                                 <input
                                     name="title"
                                     type="text"
                                     required
                                     defaultValue={editingTask?.title || ''}
                                     placeholder="무엇을 해야 하나요?"
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-black focus:ring-2 focus:ring-black focus:bg-white outline-none transition-all placeholder:text-gray-300"
+                                    className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl px-5 py-4 text-sm font-black dark:text-white focus:ring-2 focus:ring-black focus:bg-white dark:focus:bg-[#2a2a2a] outline-none transition-all placeholder:text-gray-300"
                                 />
                             </div>
 
                             <div className="space-y-2">
-                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">상세 내용</label>
+                                <label className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-widest">상세 내용</label>
                                 <textarea
                                     name="description"
                                     defaultValue={editingTask?.description || ''}
                                     placeholder="업무에 대한 상세 내용을 입력하세요..."
-                                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-black focus:bg-white outline-none transition-all placeholder:text-gray-300 min-h-[120px] resize-none"
+                                    className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl px-5 py-4 text-sm font-medium dark:text-white focus:ring-2 focus:ring-black focus:bg-white dark:focus:bg-[#2a2a2a] outline-none transition-all placeholder:text-gray-300 min-h-[120px] resize-none"
                                 />
                             </div>
 
@@ -399,9 +399,9 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 setIsModalOpen(true)
             }}
             onClick={() => setSelectedDate(date)}
-            className={`min-h-[140px] p-2 border-r border-b border-gray-100 transition-all flex flex-col group relative
-                ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
-                ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50'}
+            className={`min-h-[140px] p-2 border-r border-b border-gray-100 dark:border-[#2a2a2a] transition-all flex flex-col group relative
+                ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50 dark:bg-[#1a1a1a]' : 'bg-white dark:bg-[#1e1e1e]') : 'bg-gray-50/20 dark:bg-[#1a1a1a]/20 text-gray-300'}
+                ${isSelected ? 'bg-emerald-50' : 'hover:bg-gray-50 dark:hover:bg-[#252525]'}
                 ${isOver ? 'bg-blue-100/50 ring-2 ring-blue-400 ring-inset z-10' : ''}
             `}
         >
@@ -409,7 +409,7 @@ function CalendarDayCell({ cell, isSameDay, selectedDate, setSelectedDate, setEd
                 <span className={`text-sm font-black transition-all ${isToday ? 'bg-[#d9361b] text-white w-6 h-6 flex items-center justify-center rounded-lg shadow-md' : isSelected ? 'text-emerald-600' : ''}`}>
                     {date.getDate()}
                 </span>
-                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
+                {dayTasks.length > 0 && <span className="text-[9px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-tighter">{dayTasks.length} tasks</span>}
             </div>
 
             <div className="flex flex-col gap-1 overflow-hidden h-full relative z-10">
@@ -480,7 +480,7 @@ const TaskItem = React.forwardRef(({ task, isDragging, isOverlay, attributes, li
                 <span>{task.title}</span>
             </div>
             {isExpanded && task.description && (
-                <p className="mt-1 text-[9px] text-gray-400 font-medium leading-tight opacity-70 px-2.5">{task.description}</p>
+                <p className="mt-1 text-[9px] text-gray-400 dark:text-gray-400 font-medium leading-tight opacity-70 px-2.5">{task.description}</p>
             )}
         </div>
     )

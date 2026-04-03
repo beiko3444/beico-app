@@ -25,29 +25,29 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
     const maxValue = Math.max(...data.map(d => d.value), 1)
 
     return (
-        <div className="glass-panel bg-white p-8 rounded-2xl shadow-sm border border-gray-100 border-t-[var(--color-brand-blue)] mb-10 overflow-hidden">
+        <div className="glass-panel bg-white dark:bg-[#1e1e1e] p-8 rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] border-t-[var(--color-brand-blue)] mb-10 overflow-hidden">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
                 <div>
                     <h2 className="text-xl font-bold text-[var(--color-brand-blue)]">매출 현황 (Revenue Analytics)</h2>
-                    <p className="text-sm text-gray-400 mt-1">Check your sales performance visually</p>
+                    <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">Check your sales performance visually</p>
                 </div>
 
-                <div className="flex bg-gray-50 p-1 rounded-xl border border-gray-100">
+                <div className="flex bg-gray-50 dark:bg-[#1a1a1a] p-1 rounded-xl border border-gray-100 dark:border-[#2a2a2a]">
                     <button
                         onClick={() => setView('daily')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'daily' ? 'bg-white text-[var(--color-brand-blue)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'daily' ? 'bg-white dark:bg-[#2a2a2a] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                         일일 (Daily)
                     </button>
                     <button
                         onClick={() => setView('monthly')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'monthly' ? 'bg-white text-[var(--color-brand-blue)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'monthly' ? 'bg-white dark:bg-[#2a2a2a] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                         월별 (Monthly)
                     </button>
                     <button
                         onClick={() => setView('yearly')}
-                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'yearly' ? 'bg-white text-[var(--color-brand-blue)] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                        className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${view === 'yearly' ? 'bg-white dark:bg-[#2a2a2a] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`}
                     >
                         연간 (Yearly)
                     </button>
@@ -58,7 +58,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
                 {/* Horizontal Grid Lines */}
                 <div className="absolute inset-0 flex flex-col justify-between pointer-events-none">
                     {[0, 1, 2, 3].map(i => (
-                        <div key={i} className="border-b border-gray-50 w-full h-0"></div>
+                        <div key={i} className="border-b border-gray-50 dark:border-[#2a2a2a] w-full h-0"></div>
                     ))}
                 </div>
 
@@ -66,7 +66,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
                     <div key={i} className="relative flex-1 group flex flex-col items-center justify-end h-full">
                         {/* Tooltip */}
                         <div className="absolute bottom-full mb-2 opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none">
-                            <div className="bg-gray-800 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap shadow-xl">
+                            <div className="bg-gray-800 dark:bg-gray-700 text-white text-[10px] py-1 px-2 rounded whitespace-nowrap shadow-xl dark:shadow-none">
                                 {item.label}: {item.value.toLocaleString()} KRW
                             </div>
                         </div>
@@ -78,7 +78,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
                         ></div>
 
                         {/* Label */}
-                        <span className="text-[10px] text-gray-400 mt-2 rotate-45 md:rotate-0 origin-left whitespace-nowrap">
+                        <span className="text-[10px] text-gray-400 dark:text-gray-500 mt-2 rotate-45 md:rotate-0 origin-left whitespace-nowrap">
                             {item.label}
                         </span>
                     </div>
@@ -86,7 +86,7 @@ export default function SalesDashboard({ daily, monthly, yearly }: SalesDashboar
             </div>
 
             <div className="mt-12 flex justify-end">
-                <div className="bg-blue-50 px-4 py-2 rounded-xl">
+                <div className="bg-blue-50 dark:bg-blue-900/20 px-4 py-2 rounded-xl">
                     <span className="text-xs text-blue-400 font-bold uppercase mr-2">Total Selection:</span>
                     <span className="text-[var(--color-brand-blue)] font-extrabold">
                         {data.reduce((acc, curr) => acc + curr.value, 0).toLocaleString()} <small>KRW</small>

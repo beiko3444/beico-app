@@ -314,28 +314,81 @@ function saveUserCategories(cats: CategoryMeta[]) {
 
 /* ═══════════════════ CSS tokens ═══════════════════ */
 const T = {
-  bg: '#FAFAF8',
-  surface: '#FFFFFF',
-  surfaceSecondary: '#F5F5F0',
-  border: '#E8E6E1',
-  borderLight: '#EEECE7',
-  text: '#1A1A1A',
-  textSecondary: '#4A4A4A',
-  textTertiary: '#737373',
-  success: '#3D8B37',
-  successBg: '#EDF7EC',
-  successBorder: '#D4EDD2',
-  warning: '#9E7B15',
-  warningBg: '#FDF6E3',
-  warningBorder: '#F5E6B8',
-  error: '#C53030',
-  errorBg: '#FFF5F5',
-  accent: '#1A1A1A',
-  reviewDoneBg: '#F2F8F0',
-  reviewDoneBorder: '#D4EDD2',
-  reviewPendingBg: '#FFF7F1',
-  reviewPendingBorder: '#F6D7C8',
+  bg: 'var(--cu-bg)',
+  surface: 'var(--cu-surface)',
+  surfaceSecondary: 'var(--cu-surfaceSecondary)',
+  border: 'var(--cu-border)',
+  borderLight: 'var(--cu-borderLight)',
+  text: 'var(--cu-text)',
+  textSecondary: 'var(--cu-textSecondary)',
+  textTertiary: 'var(--cu-textTertiary)',
+  success: 'var(--cu-success)',
+  successBg: 'var(--cu-successBg)',
+  successBorder: 'var(--cu-successBorder)',
+  warning: 'var(--cu-warning)',
+  warningBg: 'var(--cu-warningBg)',
+  warningBorder: 'var(--cu-warningBorder)',
+  error: 'var(--cu-error)',
+  errorBg: 'var(--cu-errorBg)',
+  accent: 'var(--cu-accent)',
+  reviewDoneBg: 'var(--cu-reviewDoneBg)',
+  reviewDoneBorder: 'var(--cu-reviewDoneBorder)',
+  reviewPendingBg: 'var(--cu-reviewPendingBg)',
+  reviewPendingBorder: 'var(--cu-reviewPendingBorder)',
 }
+
+const CARD_USAGE_THEME_CSS = `
+  .cu-root {
+    --cu-bg: #FAFAF8;
+    --cu-surface: #FFFFFF;
+    --cu-surfaceSecondary: #F5F5F0;
+    --cu-border: #E8E6E1;
+    --cu-borderLight: #EEECE7;
+    --cu-text: #1A1A1A;
+    --cu-textSecondary: #4A4A4A;
+    --cu-textTertiary: #737373;
+    --cu-success: #3D8B37;
+    --cu-successBg: #EDF7EC;
+    --cu-successBorder: #D4EDD2;
+    --cu-warning: #9E7B15;
+    --cu-warningBg: #FDF6E3;
+    --cu-warningBorder: #F5E6B8;
+    --cu-error: #C53030;
+    --cu-errorBg: #FFF5F5;
+    --cu-accent: #1A1A1A;
+    --cu-reviewDoneBg: #F2F8F0;
+    --cu-reviewDoneBorder: #D4EDD2;
+    --cu-reviewPendingBg: #FFF7F1;
+    --cu-reviewPendingBorder: #F6D7C8;
+    --cu-selectedBg: #EAF3FF;
+    --cu-selectedBorder: #BFDBFE;
+  }
+  .dark .cu-root {
+    --cu-bg: #121212;
+    --cu-surface: #1e1e1e;
+    --cu-surfaceSecondary: #1a1a1a;
+    --cu-border: #2a2a2a;
+    --cu-borderLight: #2a2a2a;
+    --cu-text: #ffffff;
+    --cu-textSecondary: #e5e5e5;
+    --cu-textTertiary: #9ca3af;
+    --cu-success: #4ade80;
+    --cu-successBg: #14291a;
+    --cu-successBorder: #1a3a22;
+    --cu-warning: #d4a017;
+    --cu-warningBg: #2a2210;
+    --cu-warningBorder: #3a3018;
+    --cu-error: #f87171;
+    --cu-errorBg: #2a1515;
+    --cu-accent: #e5e5e5;
+    --cu-reviewDoneBg: #14291a;
+    --cu-reviewDoneBorder: #1a3a22;
+    --cu-reviewPendingBg: #2a1f18;
+    --cu-reviewPendingBorder: #3a2820;
+    --cu-selectedBg: #1a2a3a;
+    --cu-selectedBorder: #2a4a6a;
+  }
+`
 
 const DEFAULT_GAUGE_PALETTE = [
   '#2563EB', '#10B981', '#F59E0B', '#EF4444',
@@ -983,7 +1036,8 @@ export default function CardUsageClient() {
   }
 
   return (
-    <div style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
+    <div className="cu-root" style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
+      <style dangerouslySetInnerHTML={{ __html: CARD_USAGE_THEME_CSS }} />
       {viewMode === 'list' && showShortcutDock && shortcutCategories.length > 0 && (
         <div
           style={{
@@ -994,7 +1048,7 @@ export default function CardUsageClient() {
             width: 188,
             borderRadius: 12,
             border: `1px solid ${T.border}`,
-            background: 'rgba(255,255,255,0.95)',
+            background: 'var(--cu-surface, rgba(255,255,255,0.95))',
             boxShadow: '0 10px 24px rgba(0,0,0,0.08)',
             padding: '10px 10px 8px',
             zIndex: 60,
@@ -1129,7 +1183,7 @@ export default function CardUsageClient() {
 
       {error && (
         <div style={{
-          background: T.errorBg, border: `1px solid #FED7D7`, borderRadius: 10,
+          background: T.errorBg, border: `1px solid ${T.error}`, borderRadius: 10,
           padding: '10px 16px', marginBottom: 16, fontSize: 13, color: T.error, fontWeight: 500,
         }}>
           {error}
@@ -1183,7 +1237,7 @@ export default function CardUsageClient() {
                     fontSize: 12,
                     fontWeight: 600,
                     color: T.text,
-                    background: '#fff',
+                    background: T.surface,
                     outline: 'none',
                   }}
                 />
@@ -1370,7 +1424,7 @@ export default function CardUsageClient() {
                       fontSize: 12,
                       fontWeight: 500,
                       color: T.text,
-                      background: '#fff',
+                      background: T.surface,
                       minWidth: 72,
                       outline: 'none',
                     }}
@@ -1726,10 +1780,10 @@ export default function CardUsageClient() {
                         onClick={() => handleCalendarDateClick(cell.key, cell.hasTransactions)}
                         style={{
                           borderRadius: 10,
-                          border: `1px solid ${cell.inRange ? T.borderLight : '#F2F1ED'}`,
+                          border: `1px solid ${cell.inRange ? T.borderLight : T.borderLight}`,
                           background: cell.inRange
-                            ? (cell.percent > 0 ? 'rgba(26,26,26,0.03)' : T.surface)
-                            : '#FCFCFA',
+                            ? (cell.percent > 0 ? T.surfaceSecondary : T.surface)
+                            : T.bg,
                           padding: '8px 8px 7px',
                           minHeight: 66,
                           opacity: cell.inRange ? 1 : 0.45,
@@ -1834,8 +1888,8 @@ export default function CardUsageClient() {
                         gridTemplateColumns: '72px 1fr auto',
                         gap: 12,
                         alignItems: 'center',
-                        background: isSelected ? '#EAF3FF' : defaultRowBg,
-                        border: `1px solid ${isSelected ? '#BFDBFE' : defaultRowBorder}`,
+                        background: isSelected ? 'var(--cu-selectedBg)' : defaultRowBg,
+                        border: `1px solid ${isSelected ? 'var(--cu-selectedBorder)' : defaultRowBorder}`,
                         borderRadius: 10,
                         padding: '12px 14px',
                         transition: 'border-color .15s',
@@ -1896,7 +1950,7 @@ export default function CardUsageClient() {
                               height: 20,
                               borderRadius: 6,
                               border: `1px solid ${T.borderLight}`,
-                              background: '#fff',
+                              background: T.surface,
                               color: T.text,
                               fontSize: 10,
                               lineHeight: 1.2,
@@ -2025,7 +2079,7 @@ export default function CardUsageClient() {
                             height: 20,
                             borderRadius: 6,
                             border: `1px solid ${!isCategoryDirty ? T.borderLight : '#CBD5E1'}`,
-                            background: !isCategoryDirty ? T.surfaceSecondary : '#FFFFFF',
+                            background: !isCategoryDirty ? T.surfaceSecondary : T.surface,
                             color: !isCategoryDirty ? T.textTertiary : T.text,
                             fontSize: 10,
                             fontWeight: 700,
