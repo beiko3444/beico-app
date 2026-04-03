@@ -113,9 +113,9 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
 
     return (
         <div className="flex flex-col gap-6 font-sans">
-            <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
                 {/* Header */}
-                <div className="bg-white text-gray-900 p-5 flex justify-between items-center border-b border-gray-100">
+                <div className="bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white p-5 flex justify-between items-center border-b border-gray-100 dark:border-[#2a2a2a]">
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
                             <div className="flex flex-col items-center">
@@ -123,7 +123,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                 <span className="text-xl font-black tracking-tighter leading-none">{currentMonth.getFullYear()}</span>
                                 <button onClick={() => changeYear(-1)} className="hover:text-blue-500 transition-colors"><ChevronDown className="w-3 h-3" /></button>
                             </div>
-                            <div className="w-px h-6 bg-gray-200"></div>
+                            <div className="w-px h-6 bg-gray-200 dark:bg-[#2a2a2a]"></div>
                             <div className="flex flex-col items-center">
                                 <button onClick={() => changeMonth(1)} className="hover:text-blue-500 transition-colors"><ChevronUp className="w-3 h-3" /></button>
                                 <span className="text-xl font-black tracking-tighter leading-none">{currentMonth.getMonth() + 1}</span>
@@ -132,14 +132,14 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
-                        <button onClick={() => { setCurrentMonth(new Date()); setSelectedDate(new Date()); }} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">Today</button>
+                        <button onClick={() => { setCurrentMonth(new Date()); setSelectedDate(new Date()); }} className="px-3 py-1.5 bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#252525] rounded-lg text-[9px] font-black uppercase tracking-widest transition-all">Today</button>
                     </div>
                 </div>
 
                 {/* Weekdays */}
-                <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50/50">
+                <div className="grid grid-cols-7 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50/50 dark:bg-[#1a1a1a]">
                     {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                        <div key={day} className={`py-3 text-center text-[10px] font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
+                        <div key={day} className={`py-3 text-center text-[10px] font-black tracking-widest ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400 dark:text-gray-500'}`}>
                             {day}
                         </div>
                     ))}
@@ -163,9 +163,9 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                     setIsModalOpen(true)
                                 }}
                                 onClick={() => setSelectedDate(date)}
-                                className={`min-h-[100px] p-1.5 border-r border-b border-gray-100 transition-all flex flex-col group relative
-                                    ${current ? (isToday ? 'bg-yellow-200' : isWeekend ? 'bg-gray-50' : 'bg-white') : 'bg-gray-50/20 text-gray-300'}
-                                    ${isSelected ? 'bg-indigo-50/30' : 'hover:bg-gray-800 hover:text-white'}
+                                className={`min-h-[100px] p-1.5 border-r border-b border-gray-100 dark:border-[#2a2a2a] transition-all flex flex-col group relative
+                                    ${current ? (isToday ? 'bg-yellow-200 dark:bg-yellow-900/30' : isWeekend ? 'bg-gray-50 dark:bg-[#1a1a1a]' : 'bg-white dark:bg-[#1e1e1e]') : 'bg-gray-50/20 dark:bg-[#1a1a1a]/50 text-gray-300 dark:text-gray-500'}
+                                    ${isSelected ? 'bg-indigo-50/30 dark:bg-indigo-900/20' : 'hover:bg-gray-800 hover:text-white dark:hover:bg-[#252525]'}
                                 `}
                             >
                                 <div className="flex justify-between items-start mb-1">
@@ -196,7 +196,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                         </div>
                                     ))}
                                     {dayTasks.length > 3 && (
-                                        <div className="text-[8px] font-bold text-gray-300 px-1">+ {dayTasks.length - 3}</div>
+                                        <div className="text-[8px] font-bold text-gray-300 dark:text-gray-500 px-1">+ {dayTasks.length - 3}</div>
                                     )}
                                 </div>
                             </div>
@@ -206,13 +206,13 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
             </div>
 
             {/* Quick Summary Section */}
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col gap-4">
+            <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl p-6 shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center text-lg font-black">{selectedDate.getDate()}</div>
                         <div>
-                            <h3 className="text-sm font-black text-gray-900 leading-none">{selectedDate.getMonth() + 1}월 일정</h3>
-                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Agenda</p>
+                            <h3 className="text-sm font-black text-gray-900 dark:text-white leading-none">{selectedDate.getMonth() + 1}월 일정</h3>
+                            <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Agenda</p>
                         </div>
                     </div>
                     <button onClick={() => router.push('/admin/tasks')} className="text-[10px] font-black text-indigo-500 hover:underline">상세보기</button>
@@ -221,16 +221,16 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                 <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-hide">
                     {parsedTasks.filter(t => isSameDay(t.date, selectedDate)).length > 0 ? (
                         parsedTasks.filter(t => isSameDay(t.date, selectedDate)).map((task) => (
-                            <div key={task.id} className="flex items-center gap-3 p-3 bg-gray-50/50 rounded-xl border border-gray-50 group hover:border-black transition-all">
-                                <button onClick={() => handleToggleTask(task.id, !task.completed)} className={task.completed ? 'text-emerald-500' : 'text-gray-300'}>
+                            <div key={task.id} className="flex items-center gap-3 p-3 bg-gray-50/50 dark:bg-[#1a1a1a] rounded-xl border border-gray-50 dark:border-[#2a2a2a] group hover:border-black dark:hover:border-gray-500 transition-all">
+                                <button onClick={() => handleToggleTask(task.id, !task.completed)} className={task.completed ? 'text-emerald-500' : 'text-gray-300 dark:text-gray-500'}>
                                     {task.completed ? <CheckCircle2 className="w-5 h-5" /> : <Circle className="w-5 h-5" />}
                                 </button>
-                                <span className={`text-[11px] font-bold flex-1 truncate ${task.completed ? 'text-gray-300 line-through' : 'text-gray-700'}`}>{task.title}</span>
-                                <button onClick={() => handleDeleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
+                                <span className={`text-[11px] font-bold flex-1 truncate ${task.completed ? 'text-gray-300 dark:text-gray-500 line-through' : 'text-gray-700 dark:text-gray-400'}`}>{task.title}</span>
+                                <button onClick={() => handleDeleteTask(task.id)} className="opacity-0 group-hover:opacity-100 text-gray-300 dark:text-gray-500 hover:text-red-500 transition-all"><Trash2 className="w-3.5 h-3.5" /></button>
                             </div>
                         ))
                     ) : (
-                        <div className="py-8 text-center text-[10px] font-black text-gray-300 uppercase tracking-widest">일정이 없습니다</div>
+                        <div className="py-8 text-center text-[10px] font-black text-gray-300 dark:text-gray-500 uppercase tracking-widest">일정이 없습니다</div>
                     )}
                 </div>
 
@@ -261,20 +261,20 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
             {/* Modal - Consistent with TasksClient */}
             {isModalOpen && mounted && createPortal(
                 <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100000] flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white rounded-[2rem] w-full max-w-md overflow-hidden flex flex-col shadow-2xl" onClick={e => e.stopPropagation()}>
-                        <div className="bg-gray-50 p-6 border-b border-gray-100 flex justify-between items-center">
-                            <h3 className="text-xl font-black text-gray-900 tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400"><X className="w-5 h-5" /></button>
+                    <div className="bg-white dark:bg-[#1e1e1e] rounded-[2rem] w-full max-w-md overflow-hidden flex flex-col shadow-2xl dark:shadow-none" onClick={e => e.stopPropagation()}>
+                        <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 border-b border-gray-100 dark:border-[#2a2a2a] flex justify-between items-center">
+                            <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
+                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 dark:text-gray-500"><X className="w-5 h-5" /></button>
                         </div>
                         <form action={handleSaveTask} className="p-6 space-y-4">
                             <input type="hidden" name="date" value={selectedDate.toISOString()} />
                             <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">업무 제목</label>
-                                <input name="title" required defaultValue={editingTask?.title || ''} placeholder="무엇을 해야 하나요?" className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-black focus:ring-2 focus:ring-black outline-none transition-all" />
+                                <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">업무 제목</label>
+                                <input name="title" required defaultValue={editingTask?.title || ''} placeholder="무엇을 해야 하나요?" className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-xl px-4 py-3 text-sm font-black text-gray-900 dark:text-white focus:ring-2 focus:ring-black outline-none transition-all" />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest">상세 내용</label>
-                                <textarea name="description" defaultValue={editingTask?.description || ''} placeholder="업무에 대한 상세 내용을 입력하세요..." className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-black outline-none transition-all min-h-[100px] resize-none" />
+                                <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">상세 내용</label>
+                                <textarea name="description" defaultValue={editingTask?.description || ''} placeholder="업무에 대한 상세 내용을 입력하세요..." className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white focus:ring-2 focus:ring-black outline-none transition-all min-h-[100px] resize-none" />
                             </div>
                             <button type="submit" disabled={isPending} className="w-full py-4 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest">
                                 {isPending ? '저장 중...' : '일정 저장하기'}

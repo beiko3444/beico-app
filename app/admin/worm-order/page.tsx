@@ -3736,7 +3736,7 @@ export default function WormOrderPage() {
                                                 )}
                                                 {awbCandidates.length > 1 && !awbLoading && (
                                                     <div className="mt-1 pt-2 border-t border-blue-100/70 flex flex-wrap items-center gap-2">
-                                                        <span className="text-[11px] font-bold text-slate-500">대안 후보</span>
+                                                        <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400">대안 후보</span>
                                                         {awbCandidates.slice(1, 6).map((candidate) => (
                                                             <button
                                                                 key={`${candidate.value}-${candidate.source}`}
@@ -3745,7 +3745,7 @@ export default function WormOrderPage() {
                                                                     setAwbError('')
                                                                     persistAwbCache(selectedDoc.uid, candidate.value, selectedDoc)
                                                                 }}
-                                                                className="h-7 px-2.5 rounded-md border border-slate-200 bg-white text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                                                                className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
                                                                 title={`source: ${candidate.source}, score: ${candidate.score}`}
                                                             >
                                                                 {candidate.value}
@@ -3783,7 +3783,7 @@ export default function WormOrderPage() {
                                         )}
                                     </div>
                                     {/* 메일 본문 */}
-                                    <div className="p-6 overflow-y-auto bg-white flex-1 text-[14px]">
+                                    <div className="p-6 overflow-y-auto bg-white dark:bg-[#1e1e1e] flex-1 text-[14px]">
                                         {loadingDocEmailDetail && !selectedDoc.text ? (
                                             <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
                                                 <Loader2 size={16} className="animate-spin mr-2" />
@@ -3809,18 +3809,18 @@ export default function WormOrderPage() {
                 <div
                     ref={bankPaymentSectionRef}
                     style={{ order: bankPaymentToolOrderBase + 5 }}
-                    className={`rounded-2xl border shadow-sm overflow-hidden transition-all duration-500 ${
+                    className={`rounded-2xl border shadow-sm dark:shadow-none overflow-hidden transition-all duration-500 ${
                         remittanceManuallyDone
-                            ? 'bg-[#fff3ef] border-[#e34219]'
-                            : 'bg-white border-gray-200'
+                            ? 'bg-[#fff3ef] dark:bg-[#252525] border-[#e34219]'
+                            : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
                     }`}
                 >
                     <div className={`px-6 py-4 border-b flex items-center justify-between ${
-                        remittanceManuallyDone ? 'border-[#f5c4b8] bg-[#fff7f3]' : 'border-gray-100 bg-[#fff7f3]'
+                        remittanceManuallyDone ? 'border-[#f5c4b8] bg-[#fff7f3] dark:bg-[#1a1a1a]' : 'border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a]'
                     }`}>
                         <div>
-                            <h3 className="text-lg font-black text-[#111827]">모인비지니스 송금</h3>
-                            <p className="text-xs text-slate-500 mt-0.5">아래 계좌로 최종 금액을 직접 송금해 주세요.</p>
+                            <h3 className="text-lg font-black text-[#111827] dark:text-white">모인비지니스 송금</h3>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">아래 계좌로 최종 금액을 직접 송금해 주세요.</p>
                         </div>
                         <Send size={18} className="text-[#e34219] mt-1" />
                     </div>
@@ -3830,20 +3830,20 @@ export default function WormOrderPage() {
                             <table className="w-full text-sm">
                                 <tbody className="divide-y divide-[#f5c4b8]">
                                     <tr>
-                                        <td className="py-2 font-semibold text-slate-600 w-32">은행</td>
-                                        <td className="py-2 font-bold text-slate-900">신한은행</td>
+                                        <td className="py-2 font-semibold text-slate-600 dark:text-gray-400 w-32">은행</td>
+                                        <td className="py-2 font-bold text-slate-900 dark:text-white">신한은행</td>
                                     </tr>
                                     <tr>
-                                        <td className="py-2 font-semibold text-slate-600">가상계좌번호</td>
-                                        <td className="py-2 font-black text-slate-900 tracking-wider">562-167-6230695-9</td>
+                                        <td className="py-2 font-semibold text-slate-600 dark:text-gray-400">가상계좌번호</td>
+                                        <td className="py-2 font-black text-slate-900 dark:text-white tracking-wider">562-167-6230695-9</td>
                                     </tr>
                                     <tr>
-                                        <td className="py-2 font-semibold text-slate-600">예금주명</td>
-                                        <td className="py-2 font-bold text-slate-900">모인_dabin lee(엑스트래커)</td>
+                                        <td className="py-2 font-semibold text-slate-600 dark:text-gray-400">예금주명</td>
+                                        <td className="py-2 font-bold text-slate-900 dark:text-white">모인_dabin lee(엑스트래커)</td>
                                     </tr>
                                     {autoTransferAmountUsd !== null && (
                                         <tr>
-                                            <td className="py-2 font-semibold text-slate-600">송금 금액</td>
+                                            <td className="py-2 font-semibold text-slate-600 dark:text-gray-400">송금 금액</td>
                                             <td className="py-2 font-black text-[#e34219] text-base">
                                                 {autoTransferAmountUsd.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </td>
@@ -3876,7 +3876,7 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">모인 자동 송금 신청</h3>
@@ -3884,7 +3884,7 @@ export default function WormOrderPage() {
                             서버 환경변수에 저장된 계정으로 자동 로그인 후 송금을 신청합니다.
                         </p>
                         {activeWormOrder && (
-                            <p className="text-[11px] font-semibold text-slate-600 mt-1">
+                            <p className="text-[11px] font-semibold text-slate-600 dark:text-gray-400 mt-1">
                                 대상 발주: {activeWormOrder.orderNumber} / 수령일 {activeWormOrder.receiveDate}
                             </p>
                         )}
@@ -3902,14 +3902,14 @@ export default function WormOrderPage() {
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
                         <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">인보이스 자동 연동</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                                <p className="text-[11px] text-slate-500 font-semibold">송금 금액 (USD)</p>
-                                <p className="text-[15px] font-black text-slate-900">
+                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">송금 금액 (USD)</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">
                                     {autoTransferAmountUsd !== null ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
                                 </p>
                             </div>
-                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                                <p className="text-[11px] text-slate-500 font-semibold">인보이스 PDF</p>
+                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">인보이스 PDF</p>
                                 <p className="text-[13px] font-bold text-slate-700 truncate">{matchedInvoiceEmail.subject}</p>
                             </div>
                         </div>
@@ -3975,7 +3975,7 @@ export default function WormOrderPage() {
                     </p>
                 )}
                 {!activeWormOrderRecord && (
-                    <p className="text-xs font-semibold text-slate-600">
+                    <p className="text-xs font-semibold text-slate-600 dark:text-gray-400">
                         발주리스트에서 대상 발주를 먼저 선택해 주세요.
                     </p>
                 )}
@@ -3983,14 +3983,14 @@ export default function WormOrderPage() {
                 {(remittanceSubmitting || remittanceProgress > 0 || !!remittanceSuccess) && (
                     <div className="space-y-1.5">
                         <div className="flex items-center justify-between text-[11px] font-semibold">
-                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-600'}>
+                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-600 dark:text-gray-400'}>
                                 {remittanceProgressLabel}
                             </span>
-                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-500'}>
+                            <span className={remittanceError ? 'text-red-600' : remittanceSuccess ? 'text-emerald-700' : 'text-slate-500 dark:text-gray-400'}>
                                 {Math.max(0, Math.min(100, Math.round(remittanceProgress)))}%
                             </span>
                         </div>
-                        <div className="h-2 w-full rounded-full bg-slate-200 overflow-hidden">
+                        <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-[#2a2a2a] overflow-hidden">
                             <div
                                 className={`h-full transition-all duration-500 ${
                                     remittanceError ? 'bg-red-500' : remittanceSuccess ? 'bg-emerald-500' : 'bg-[#e34219]'
@@ -4021,21 +4021,21 @@ export default function WormOrderPage() {
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
                         <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">송금 확정 정보</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                                <p className="text-[11px] text-slate-500 font-semibold">최종 수취금액</p>
-                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.finalReceiveAmount || '-'}</p>
+                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">최종 수취금액</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.finalReceiveAmount || '-'}</p>
                             </div>
-                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                                <p className="text-[11px] text-slate-500 font-semibold">보내는 돈</p>
-                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.sendAmount || '-'}</p>
+                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">보내는 돈</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.sendAmount || '-'}</p>
                             </div>
-                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                                <p className="text-[11px] text-slate-500 font-semibold">총수수료</p>
-                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.totalFee || '-'}</p>
+                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">총수수료</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.totalFee || '-'}</p>
                             </div>
-                            <div className="rounded-lg border border-emerald-100 bg-white px-3 py-2">
-                                <p className="text-[11px] text-slate-500 font-semibold">적용환율</p>
-                                <p className="text-[15px] font-black text-slate-900">{remittancePricingSummary.exchangeRate || '-'}</p>
+                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">적용환율</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.exchangeRate || '-'}</p>
                             </div>
                         </div>
                         {remittanceSaveInfo && (
@@ -4061,14 +4061,14 @@ export default function WormOrderPage() {
                     ? `Michael, the payment has been completed to the "${sendAmountText}" bank. It should be credited shortly, so please prepare the order for shipment.`
                     : null
                 return (
-                    <div ref={notificationSectionRef} style={{ order: notificationToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 bg-[#f0fdf4] flex items-center justify-between">
+                    <div ref={notificationSectionRef} style={{ order: notificationToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
+                        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0fdf4] dark:bg-[#1a1a1a] flex items-center justify-between">
                             <div>
-                                <h3 className="text-lg font-black text-[#111827] flex items-center gap-2">
+                                <h3 className="text-lg font-black text-[#111827] dark:text-white flex items-center gap-2">
                                     <Send size={18} className="text-emerald-600" />
                                     입금완료 통보
                                 </h3>
-                                <p className="text-xs text-slate-500 mt-0.5">마이클에게 입금 완료를 통보하는 메시지를 복사해서 전달하세요.</p>
+                                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">마이클에게 입금 완료를 통보하는 메시지를 복사해서 전달하세요.</p>
                             </div>
                         </div>
                         <div className="p-6 space-y-4">
@@ -4107,7 +4107,7 @@ export default function WormOrderPage() {
             })()}
 
             {showCustomsTools && (
-                <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 space-y-4">
+                <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">유니패스 수입 통관 조회</h3>
@@ -4167,7 +4167,7 @@ export default function WormOrderPage() {
                 )}
 
                 {customsProgressResult && (
-                    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 space-y-4">
+                    <div className="rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] p-4 space-y-4">
                         <div className="text-xs text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
                             <span><span className="font-bold text-gray-800">B/L:</span> {customsProgressResult.blNo}</span>
                             <span><span className="font-bold text-gray-800">조회조건:</span> {customsProgressResult.query.kind} / {customsProgressResult.query.blYy}</span>
@@ -4181,7 +4181,7 @@ export default function WormOrderPage() {
                         )}
 
                         {firstSummary && (
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
+                            <div className="rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] p-3 space-y-2">
                                 <p className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
                                     관리자 또는 관세사가 직접 챙겨야 하는 단계는 배경색으로 강조됩니다.
                                 </p>
@@ -4202,8 +4202,8 @@ export default function WormOrderPage() {
                         )}
 
                         {detailRows.length > 0 && (
-                            <div className="rounded-lg border border-gray-200 bg-white p-3 space-y-2">
-                                <h4 className="text-sm font-black text-[#111827]">진행이력</h4>
+                            <div className="rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] p-3 space-y-2">
+                                <h4 className="text-sm font-black text-[#111827] dark:text-white">진행이력</h4>
                                 <p className="text-[11px] font-semibold text-orange-700 bg-orange-50 border border-orange-100 rounded-lg px-3 py-2">
                                     강조된 행은 관리자나 관세사가 직접 챙겨야 하는 단계이며, 각 행에 처리주체를 함께 표시합니다.
                                 </p>
@@ -4236,7 +4236,7 @@ export default function WormOrderPage() {
                                                                         <span className={`inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${adminStep.badgeClassName}`}>
                                                                             {adminStep.label}
                                                                         </span>
-                                                                        <span className="text-[11px] font-medium text-slate-600">
+                                                                        <span className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
                                                                             처리주체: {adminStep.owner}
                                                                         </span>
                                                                     </>
@@ -4263,21 +4263,21 @@ export default function WormOrderPage() {
                 <div
                     ref={shippingSectionRef}
                     style={{ order: shippingToolOrderBase + 5 }}
-                    className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden"
+                    className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
-                    <div className="px-6 py-4 border-b border-gray-100 bg-[#fff7f3] flex items-center justify-between">
+                    <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a] flex items-center justify-between">
                         <div>
-                            <h3 className="text-lg font-black text-[#111827] flex items-center gap-2">
+                            <h3 className="text-lg font-black text-[#111827] dark:text-white flex items-center gap-2">
                                 <Package size={18} className="text-[#e34219]" />
                                 로젠 송장 출력
                             </h3>
-                            <p className="text-xs text-slate-500 mt-0.5">수하인 정보를 입력하면 로젠 택배 운송장을 자동 발행합니다.</p>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">수하인 정보를 입력하면 로젠 택배 운송장을 자동 발행합니다.</p>
                         </div>
                     </div>
                     <div className="p-6 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">수하인 전화번호</label>
+                                <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">수하인 전화번호</label>
                                 <input
                                     type="text"
                                     value={shippingRecipientPhone}
@@ -4287,7 +4287,7 @@ export default function WormOrderPage() {
                                 />
                             </div>
                             <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">수하인명 (업체명)</label>
+                                <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">수하인명 (업체명)</label>
                                 <input
                                     type="text"
                                     value={shippingRecipientName}
@@ -4298,7 +4298,7 @@ export default function WormOrderPage() {
                             </div>
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">주소 (도로명 + 건물번호)</label>
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">주소 (도로명 + 건물번호)</label>
                             <input
                                 type="text"
                                 value={shippingRecipientAddress}
@@ -4308,7 +4308,7 @@ export default function WormOrderPage() {
                             />
                         </div>
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 uppercase tracking-wider">상세주소</label>
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">상세주소</label>
                             <input
                                 type="text"
                                 value={shippingRecipientDetailAddress}
@@ -4335,7 +4335,7 @@ export default function WormOrderPage() {
                                 )}
                             </button>
                             {shippingSubmitting && (
-                                <span className="text-xs font-semibold text-slate-500">{shippingProgressLabel}</span>
+                                <span className="text-xs font-semibold text-slate-500 dark:text-gray-400">{shippingProgressLabel}</span>
                             )}
                         </div>
 

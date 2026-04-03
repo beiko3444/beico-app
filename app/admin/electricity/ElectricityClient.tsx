@@ -1130,7 +1130,7 @@ export default function ElectricityClient() {
 
                                     {extractionHistory.length > 0 && (
                                         <div className="mt-4 space-y-2">
-                                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">추출 히스토리</label>
+                                            <label className="block text-[10px] font-bold text-gray-400 dark:text-gray-400 uppercase tracking-wider">추출 히스토리</label>
                                             <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
                                                 {extractionHistory.map((item) => (
                                                     <div key={item.id} className="flex gap-1">
@@ -1139,7 +1139,7 @@ export default function ElectricityClient() {
                                                                 setRawText(item.rawText)
                                                                 setManualInputs(item.inputs)
                                                             }}
-                                                            className="flex-1 text-left px-3 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-100 rounded-lg text-[10px] text-gray-600 flex justify-between items-center transition-colors"
+                                                            className="flex-1 text-left px-3 py-1.5 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-[#252525] border border-gray-100 dark:border-[#2a2a2a] rounded-lg text-[10px] text-gray-600 dark:text-gray-400 flex justify-between items-center transition-colors"
                                                         >
                                                             <span>{item.timestamp}</span>
                                                             <span className="font-bold text-gray-400">불러오기</span>
@@ -1164,7 +1164,7 @@ export default function ElectricityClient() {
                                         <InputGroup label="총 청구금액" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
                                         <InputGroup label="당월 사용량(kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
                                     </div>
-                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-2"></div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <InputGroup label="기본요금" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
                                         <InputGroup label="전력량요금" value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
@@ -1173,12 +1173,12 @@ export default function ElectricityClient() {
                                         <InputGroup label="역률요금" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
                                         <InputGroup label="TV수신료" value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
                                     </div>
-                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-2"></div>
                                     <div className="grid grid-cols-2 gap-3">
                                         <InputGroup label="부가가치세" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
                                         <InputGroup label="전력기금" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
                                     </div>
-                                    <div className="h-px bg-gray-100 my-2"></div>
+                                    <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-2"></div>
                                     <div className="space-y-2">
                                         <InputGroup label="검침일" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
                                         <InputGroup label="사용기간" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
@@ -1187,7 +1187,7 @@ export default function ElectricityClient() {
                             </div>
 
                             <div className="flex gap-2 justify-end mt-6 border-t pt-4">
-                                <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 text-sm font-medium hover:text-red-500 transition-colors">상세내역 초기화</button>
+                                <button onClick={resetManualInputs} className="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-medium hover:text-red-500 transition-colors">상세내역 초기화</button>
                                 <button onClick={confirmBillInput} disabled={loading} className="bg-[#d9361b] text-white px-8 py-2 rounded-lg font-bold text-sm shadow-md hover:brightness-110 disabled:opacity-50">
                                     {loading ? '저장 중...' : '저장 완료'}
                                 </button>
@@ -1200,7 +1200,7 @@ export default function ElectricityClient() {
             {
                 isLandlordModalOpen && (
                     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsLandlordModalOpen(false)}>
-                        <div className="bg-white rounded-2xl p-6 max-w-lg w-full shadow-2xl animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl p-6 max-w-lg w-full shadow-2xl dark:shadow-none animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
                             <h3 className="text-lg font-bold mb-4">임대인 사용량 입력</h3>
                             <div className="space-y-4">
                                 <div className="grid grid-cols-2 gap-4">
@@ -1213,7 +1213,7 @@ export default function ElectricityClient() {
                                 </div>
 
                                 <div className="pt-4">
-                                    <label className="block text-xs font-bold text-gray-500 mb-2">계량기 사진 업로드</label>
+                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">계량기 사진 업로드</label>
                                     <div className="border-2 border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl p-4 text-center hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors cursor-pointer relative overflow-hidden">
                                         <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
                                         {landlordPhoto ? (
@@ -1230,7 +1230,7 @@ export default function ElectricityClient() {
                                 </div>
                             </div>
                             <div className="flex gap-2 justify-end mt-6">
-                                <button onClick={() => setIsLandlordModalOpen(false)} className="px-4 py-2 text-gray-500 text-sm font-medium">취소</button>
+                                <button onClick={() => setIsLandlordModalOpen(false)} className="px-4 py-2 text-gray-500 dark:text-gray-400 text-sm font-medium">취소</button>
                                 <button onClick={calculateLandlordBill} disabled={loading} className="bg-gray-800 text-white px-6 py-2 rounded-lg font-bold text-sm shadow-md hover:bg-black disabled:opacity-50">
                                     {loading ? '저장 중...' : '저장하기'}
                                 </button>
@@ -1243,10 +1243,10 @@ export default function ElectricityClient() {
             {
                 isPhotoModalOpen && landlordData && (
                     <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setIsPhotoModalOpen(false)}>
-                        <div className="bg-white rounded-3xl p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
                             <div className="flex justify-between items-center mb-8 border-b pb-4">
-                                <h3 className="text-2xl font-black text-gray-900">계량기 사진 확인 (전월 vs 당월)</h3>
-                                <button onClick={() => setIsPhotoModalOpen(false)} className="bg-gray-100 hover:bg-gray-200 p-2 rounded-full transition-colors">
+                                <h3 className="text-2xl font-black text-gray-900 dark:text-white">계량기 사진 확인 (전월 vs 당월)</h3>
+                                <button onClick={() => setIsPhotoModalOpen(false)} className="bg-gray-100 dark:bg-[#252525] hover:bg-gray-200 dark:hover:bg-[#333] p-2 rounded-full transition-colors">
                                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
                                 </button>
                             </div>
@@ -1256,11 +1256,11 @@ export default function ElectricityClient() {
                                     <div className="flex justify-between items-end">
                                         <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">전월 계량기</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400">전월 지침</div>
-                                            <div className="text-xl font-black">{landlordData.prevMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400">kWh</span></div>
+                                            <div className="text-xs text-gray-400 dark:text-gray-400">전월 지침</div>
+                                            <div className="text-xl font-black dark:text-white">{landlordData.prevMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400 dark:text-gray-400">kWh</span></div>
                                         </div>
                                     </div>
-                                    <div className="aspect-[4/3] bg-gray-100 rounded-2xl border-4 border-gray-100 overflow-hidden shadow-inner">
+                                    <div className="aspect-[4/3] bg-gray-100 dark:bg-[#252525] rounded-2xl border-4 border-gray-100 dark:border-[#2a2a2a] overflow-hidden shadow-inner">
                                         {prevMonthPhoto ? (
                                             <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="Prev month meter" />
                                         ) : (
@@ -1273,11 +1273,11 @@ export default function ElectricityClient() {
                                     <div className="flex justify-between items-end">
                                         <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">당월 계량기</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400">당월 지침</div>
-                                            <div className="text-xl font-black text-[#d9361b]">{landlordData.currMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400">kWh</span></div>
+                                            <div className="text-xs text-gray-400 dark:text-gray-400">당월 지침</div>
+                                            <div className="text-xl font-black text-[#d9361b]">{landlordData.currMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400 dark:text-gray-400">kWh</span></div>
                                         </div>
                                     </div>
-                                    <div className="aspect-[4/3] bg-gray-100 rounded-2xl border-4 border-red-50 overflow-hidden shadow-xl">
+                                    <div className="aspect-[4/3] bg-gray-100 dark:bg-[#252525] rounded-2xl border-4 border-red-50 dark:border-red-950 overflow-hidden shadow-xl">
                                         {landlordData.photo ? (
                                             <img src={landlordData.photo} className="w-full h-full object-contain" alt="Current month meter" />
                                         ) : (
@@ -1310,14 +1310,14 @@ export default function ElectricityClient() {
                             {/* Floating Side Buttons - Fixed Right */}
                             <div className="fixed top-1/2 right-6 -translate-y-1/2 z-[200] flex flex-col gap-4 print:hidden">
                                 {/* Remarks Input Modal Tool */}
-                                <div className="absolute right-full top-0 mr-4 w-64 bg-white p-3 rounded-2xl shadow-xl border border-gray-100 mb-4 hover:shadow-2xl transition-all">
+                                <div className="absolute right-full top-0 mr-4 w-64 bg-white dark:bg-[#1e1e1e] p-3 rounded-2xl shadow-xl dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-4 hover:shadow-2xl transition-all">
                                     <div className="text-xs font-bold text-gray-700 mb-2">하단 비고란 입력</div>
                                     <textarea
                                         value={invoiceRemarks}
                                         onChange={(e) => setInvoiceRemarks(e.target.value)}
                                         placeholder="청구서 하단에 인쇄할 안내사항이나 입금 계좌 변경 등의 내용을 자유롭게 적어주세요."
                                         rows={4}
-                                        className="w-full text-xs p-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] transition-all resize-none"
+                                        className="w-full text-xs p-2.5 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] transition-all resize-none dark:text-white"
                                     />
                                 </div>
                                 <button
@@ -1615,12 +1615,12 @@ function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = tru
 
     return (
         <div>
-            <label className="block text-[10px] font-bold text-gray-500 mb-1">{label}</label>
+            <label className="block text-[10px] font-bold text-gray-500 dark:text-gray-400 mb-1">{label}</label>
             <input
                 type="text"
                 value={value}
                 onChange={handleChange}
-                className="w-full p-2 bg-white border border-gray-200 rounded text-xs font-medium focus:border-black outline-none transition-colors"
+                className="w-full p-2 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded text-xs font-medium focus:border-black dark:focus:border-gray-500 outline-none transition-colors dark:text-white"
                 placeholder={placeholder}
             />
         </div>

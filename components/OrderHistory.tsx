@@ -328,10 +328,10 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                             )}
                                             <div className="flex items-end justify-between mt-1">
                                                 <div className="flex items-center gap-2 text-xs leading-tight">
-                                                    <span className="font-bold text-gray-900 font-inter"><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{item.price.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
-                                                    <span className="text-gray-900 font-inter font-medium">x {item.quantity}ea</span>
+                                                    <span className="font-bold text-gray-900 dark:text-white font-inter"><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{item.price.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                                    <span className="text-gray-900 dark:text-white font-inter font-medium">x {item.quantity}ea</span>
                                                 </div>
-                                                <span className="font-bold text-base md:text-lg text-gray-900 font-inter leading-none">
+                                                <span className="font-bold text-base md:text-lg text-gray-900 dark:text-white font-inter leading-none">
                                                     <span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{(item.price * item.quantity).toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}
                                                 </span>
                                             </div>
@@ -340,17 +340,17 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 ))}
 
                                 {shippingFee > 0 && (
-                                    <div className="bg-white border border-gray-100 rounded-xl px-4 py-2 flex gap-4 items-start shadow-sm">
+                                    <div className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-xl px-4 py-2 flex gap-4 items-start shadow-sm dark:shadow-none">
                                         <div className="w-8 h-8 md:w-10 md:h-10 flex items-center justify-center shrink-0 mt-1">
                                             <Truck className="text-[#e34219]" size={20} />
                                         </div>
                                         <div className="flex-1 min-w-0">
                                             <div className="flex justify-between items-center h-full py-0.5">
                                                 <div>
-                                                    <h4 className="font-bold text-sm text-gray-900 leading-tight">送料 <span className="text-gray-400 font-normal text-xs">/ 배송비</span></h4>
-                                                    <p className="text-[10px] text-gray-500 mt-0.5 leading-tight">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
+                                                    <h4 className="font-bold text-sm text-gray-900 dark:text-white leading-tight">送料 <span className="text-gray-400 dark:text-gray-500 font-normal text-xs">/ 배송비</span></h4>
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
                                                 </div>
-                                                <span className="font-bold text-base md:text-lg text-gray-900 font-inter">
+                                                <span className="font-bold text-base md:text-lg text-gray-900 dark:text-white font-inter">
                                                     <span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{shippingFee.toLocaleString()}
                                                 </span>
                                             </div>
