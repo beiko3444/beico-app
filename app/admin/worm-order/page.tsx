@@ -2858,6 +2858,7 @@ export default function WormOrderPage() {
                                 <th className="text-left px-3 py-2 font-bold">발주번호</th>
                                 <th className="text-left px-3 py-2 font-bold">작성일</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
+                                <th className="text-left px-3 py-2 font-bold">총 송금액</th>
                                 <th className="text-left px-3 py-2 font-bold">최근수정</th>
                                 <th className="text-right px-3 py-2 font-bold">관리</th>
                             </tr>
@@ -2889,6 +2890,9 @@ export default function WormOrderPage() {
                                                 )}
                                             </div>
                                         </td>
+                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                            {order.remittanceSendAmountText || '-'}
+                                        </td>
                                         <td className="px-3 py-2.5 text-xs text-slate-500">
                                             {new Date(order.updatedAt).toLocaleString()}
                                         </td>
@@ -2916,7 +2920,7 @@ export default function WormOrderPage() {
                             })}
                             {!wormOrderListLoading && wormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={5} className="px-3 py-6 text-center text-sm text-slate-500">
+                                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-slate-500">
                                         저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.
                                     </td>
                                 </tr>
