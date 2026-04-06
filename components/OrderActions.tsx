@@ -319,163 +319,176 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
         )
     }
 
+    const canUseOrderDocActions = status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED'
+    const shippingStageLabel = status === 'SHIPPED' ? '송장입력완료' : status === 'DEPOSIT_COMPLETED' ? '출고준비' : '배송대기'
+    const shippingStageClass = status === 'SHIPPED'
+        ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+        : status === 'DEPOSIT_COMPLETED'
+            ? 'bg-amber-50 text-amber-700 border-amber-200'
+            : 'bg-gray-100 text-gray-600 border-gray-200'
+
     // ── 관리자 뷰 ──
     return (
         <div className="flex flex-col gap-3 w-full">
-            {/* 배송 폼 */}
-            <div className="flex gap-2 items-end">
-                <div className="w-28 flex flex-col gap-0.5">
-                    <label className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">택배사</label>
-                    <select
-                        value={courier}
-                        onChange={(e) => setCourier(e.target.value)}
-                        disabled={!canEditTracking}
-                        className="w-full appearance-none border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors"
-                    >
-                        <option value="Rosen">로젠택배</option>
-                    </select>
+            <div className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1f1f1f] px-3 py-2">
+                <p className="text-[11px] font-bold text-gray-700 dark:text-gray-200">배송 처리 단계</p>
+                <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${shippingStageClass}`}>
+                    {shippingStageLabel}
+                </span>
+            </div>
+
+            {status === 'PENDING' ? (
+                <button onClick={() => updateStatus('DEPOSIT_COMPLETED')} disabled={loading}
+                    className="w-full py-2.5 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-gray-800 hover:bg-gray-900 transition-colors disabled:opacity-50">
+                    입금확인
+                </button>
+            ) : status === 'DEPOSIT_COMPLETED' && !adminDepositConfirmedAt ? (
+                <button onClick={confirmAdminDeposit} disabled={loading}
+                    className="w-full py-2.5 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-gray-800 hover:bg-gray-900 transition-colors disabled:opacity-50">
+                    관리자 입금확인
+                </button>
+            ) : null}
+
+            <div className="rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] p-3 flex flex-col gap-2.5">
+                <div className="flex flex-col sm:flex-row gap-1.5 sm:items-end">
+                    <div className="sm:w-44 flex flex-col gap-0.5">
+                        <label className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">택배사</label>
+                        <select
+                            value={courier}
+                            onChange={(e) => setCourier(e.target.value)}
+                            disabled={!canEditTracking}
+                            className="w-full appearance-none border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors"
+                        >
+                            <option value="Rosen">로젠택배</option>
+                        </select>
+                    </div>
+                    {canEditTracking ? (
+                        <button onClick={saveShippingInfo} disabled={loading}
+                            className="h-9 bg-[#d9361b] text-white px-3.5 rounded-lg font-bold text-[10px] hover:bg-[#c0301a] transition-colors disabled:opacity-50">
+                            저장
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => setIsEditingTracking(true)}
+                            className="h-9 bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-3.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors"
+                        >
+                            수정
+                        </button>
+                    )}
                 </div>
-                <div className="flex-1 flex flex-col gap-0.5">
-                    <label className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">송장번호</label>
-                    <div className="flex flex-col gap-1.5">
-                        {trackingNumbers.map((tracking, idx) => (
-                            <div key={`tracking-input-${idx}`} className="flex gap-1.5">
-                                <input
-                                    type="text"
-                                    value={tracking}
-                                    onChange={(e) => setTrackingNumbers((prev) => prev.map((v, i) => i === idx ? e.target.value : v))}
-                                    disabled={!canEditTracking}
-                                    placeholder={`출고 송장번호 ${idx + 1} 입력`}
-                                    className="flex-1 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-500"
-                                />
-                                {canEditTracking && trackingNumbers.length > 1 && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setTrackingNumbers((prev) => prev.filter((_, i) => i !== idx))}
-                                        className="bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-2.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors"
-                                    >
-                                        삭제
-                                    </button>
-                                )}
-                            </div>
-                        ))}
-                        <div className="flex gap-1.5">
-                            {canEditTracking && (
+
+                <div className="flex flex-col gap-1.5">
+                    {trackingNumbers.map((tracking, idx) => (
+                        <div key={`tracking-input-${idx}`} className="flex items-center gap-1.5">
+                            <label className="w-16 text-[10px] text-gray-500 dark:text-gray-400 font-bold shrink-0">
+                                송장번호 {idx + 1}
+                            </label>
+                            <input
+                                type="text"
+                                value={tracking}
+                                onChange={(e) => setTrackingNumbers((prev) => prev.map((v, i) => i === idx ? e.target.value : v))}
+                                disabled={!canEditTracking}
+                                placeholder={`출고 송장번호 ${idx + 1} 입력`}
+                                className="flex-1 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-500"
+                            />
+                            {canEditTracking && trackingNumbers.length > 1 && (
                                 <button
                                     type="button"
-                                    onClick={() => setTrackingNumbers((prev) => [...prev, ''])}
-                                    className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-300 px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+                                    onClick={() => setTrackingNumbers((prev) => prev.filter((_, i) => i !== idx))}
+                                    className="h-9 bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-2.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors"
                                 >
-                                    송장 추가 하기
-                                </button>
-                            )}
-                            {canEditTracking ? (
-                                <button onClick={saveShippingInfo} disabled={loading}
-                                    className="bg-[#d9361b] text-white px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-[#c0301a] transition-colors disabled:opacity-50">
-                                    저장
-                                </button>
-                            ) : (
-                                <button
-                                    onClick={() => setIsEditingTracking(true)}
-                                    className="bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors"
-                                >
-                                    수정
+                                    삭제
                                 </button>
                             )}
                         </div>
-                    </div>
+                    ))}
                 </div>
+
+                {canEditTracking && (
+                    <button
+                        type="button"
+                        onClick={() => setTrackingNumbers((prev) => [...prev, ''])}
+                        className="self-start bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-300 px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+                    >
+                        송장 추가 하기
+                    </button>
+                )}
             </div>
 
-            {/* 액션 버튼 */}
-            <div className="flex flex-col gap-1.5">
-                {status === 'PENDING' ? (
-                    <button onClick={() => updateStatus('DEPOSIT_COMPLETED')} disabled={loading}
-                        className="w-full py-2.5 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-gray-800 hover:bg-gray-900 transition-colors disabled:opacity-50">
-                        입금확인
-                    </button>
-                ) : status === 'DEPOSIT_COMPLETED' && !adminDepositConfirmedAt ? (
-                    <button onClick={confirmAdminDeposit} disabled={loading}
-                        className="w-full py-2.5 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-gray-800 hover:bg-gray-900 transition-colors disabled:opacity-50">
-                        관리자 입금확인
-                    </button>
-                ) : null}
-
-                <div className="grid grid-cols-2 gap-1.5">
-                    {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                        <button onClick={() => router.push(`/invoice/${order.id}`)}
-                            className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-gray-600 hover:bg-gray-700 transition-colors">
-                            📄 거래명세표
-                        </button>
-                    )}
-                    {(status === 'PENDING' || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || status === 'APPROVED') && (
-                        taxInvoiceIssued ? (
-                            <button disabled className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-gray-400 cursor-not-allowed">
-                                ✅ 발급완료
-                            </button>
-                        ) : (
-                            <button onClick={issueTaxInvoiceAPI} disabled={loading}
-                                className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center transition-colors disabled:opacity-50 bg-[#d9361b] hover:bg-[#c0301a]">
-                                📋 세금계산서
-                            </button>
-                        )
-                    )}
-                </div>
-
-                {/* 로젠 송장출력 */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
                 <button
                     onClick={() => { setShowLogenForm(v => !v); setLogenError(null); setLogenTrackingNumber(null) }}
-                    className="w-full py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors"
+                    className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors"
                 >
                     🚚 로젠 송장출력
                 </button>
 
-                {showLogenForm && (
-                    <div className="mt-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex flex-col gap-2">
-                        <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인 전화번호</label>
-                            <input type="text" value={logenPhone} onChange={e => setLogenPhone(e.target.value)}
-                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인명 (업체명)</label>
-                            <input type="text" value={logenName} onChange={e => setLogenName(e.target.value)}
-                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">주소 (검색용)</label>
-                            <input type="text" value={logenAddress} onChange={e => setLogenAddress(e.target.value)}
-                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                        </div>
-                        <div className="flex flex-col gap-0.5">
-                            <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">상세주소</label>
-                            <input type="text" value={logenDetailAddress} onChange={e => setLogenDetailAddress(e.target.value)}
-                                className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                        </div>
-                        {logenError && (
-                            <p className="text-[10px] text-red-600 font-bold">{logenError}</p>
-                        )}
-                        {logenTrackingNumber && (
-                            <p className="text-[11px] text-blue-700 font-bold">✅ 송장번호: {logenTrackingNumber}</p>
-                        )}
-                        {logenLoading && logenStep && (
-                            <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-100 border border-blue-200 rounded-lg">
-                                <Loader2 size={12} className="animate-spin text-blue-600 shrink-0" />
-                                <span className="text-[10px] font-bold text-blue-700">{logenStep}</span>
-                            </div>
-                        )}
-                        <button
-                            onClick={submitLogenShipping}
-                            disabled={logenLoading}
-                            className="w-full py-2 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-60"
-                        >
-                            {logenLoading ? (
-                                <><Loader2 size={12} className="animate-spin" /> 자동화 진행 중...</>
-                            ) : '송장 출력 실행'}
+                {canUseOrderDocActions && (
+                    <button onClick={() => router.push(`/invoice/${order.id}`)}
+                        className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-gray-600 hover:bg-gray-700 transition-colors">
+                        📄 거래명세표
+                    </button>
+                )}
+
+                {canUseOrderDocActions && (
+                    taxInvoiceIssued ? (
+                        <button disabled className="py-2.5 text-[10px] font-bold text-emerald-700 rounded-lg flex gap-1 items-center justify-center border border-emerald-200 bg-emerald-50 cursor-not-allowed">
+                            ✅ 발급완료
                         </button>
-                    </div>
+                    ) : (
+                        <button onClick={issueTaxInvoiceAPI} disabled={loading}
+                            className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center transition-colors disabled:opacity-50 bg-[#d9361b] hover:bg-[#c0301a]">
+                            📋 세금계산서
+                        </button>
+                    )
                 )}
             </div>
+
+            {showLogenForm && (
+                <div className="mt-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex flex-col gap-2">
+                    <div className="flex flex-col gap-0.5">
+                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인 전화번호</label>
+                        <input type="text" value={logenPhone} onChange={e => setLogenPhone(e.target.value)}
+                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인명 (업체명)</label>
+                        <input type="text" value={logenName} onChange={e => setLogenName(e.target.value)}
+                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">주소 (검색용)</label>
+                        <input type="text" value={logenAddress} onChange={e => setLogenAddress(e.target.value)}
+                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
+                    </div>
+                    <div className="flex flex-col gap-0.5">
+                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">상세주소</label>
+                        <input type="text" value={logenDetailAddress} onChange={e => setLogenDetailAddress(e.target.value)}
+                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
+                    </div>
+                    {logenError && (
+                        <p className="text-[10px] text-red-600 font-bold">{logenError}</p>
+                    )}
+                    {logenTrackingNumber && (
+                        <p className="text-[11px] text-blue-700 font-bold">✅ 송장번호: {logenTrackingNumber}</p>
+                    )}
+                    {logenLoading && logenStep && (
+                        <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-100 border border-blue-200 rounded-lg">
+                            <Loader2 size={12} className="animate-spin text-blue-600 shrink-0" />
+                            <span className="text-[10px] font-bold text-blue-700">{logenStep}</span>
+                        </div>
+                    )}
+                    <button
+                        onClick={submitLogenShipping}
+                        disabled={logenLoading}
+                        className="w-full py-2 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-60"
+                    >
+                        {logenLoading ? (
+                            <><Loader2 size={12} className="animate-spin" /> 자동화 진행 중...</>
+                        ) : '송장 출력 실행'}
+                    </button>
+                </div>
+            )}
         </div>
     )
 }
