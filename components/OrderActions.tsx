@@ -4,6 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2 } from 'lucide-react'
 
+function parseTrackingNumbers(value: string | null | undefined) {
+    if (!value) return []
+    return value
+        .split(/[,\n]/)
+        .map((v) => v.trim())
+        .filter(Boolean)
+}
+
 function splitAddress(fullAddress: string): { main: string; detail: string } {
     const match = fullAddress.match(/^(.+[로길]\s+\d+(?:-\d+)?)\s*(.*)$/)
     if (match) return { main: match[1].trim(), detail: match[2].trim() }
@@ -14,11 +22,16 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     const router = useRouter()
     const [loading, setLoading] = useState(false)
     const [status, setStatus] = useState(order.status)
-    const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || '')
+    const initialTrackingNumbers = parseTrackingNumbers(order.trackingNumber)
+    const [trackingNumbers, setTrackingNumbers] = useState<string[]>(
+        initialTrackingNumbers.length > 0 ? initialTrackingNumbers : ['']
+    )
     const [taxInvoiceIssued, setTaxInvoiceIssued] = useState(order.taxInvoiceIssued || false)
     const [adminDepositConfirmedAt, setAdminDepositConfirmedAt] = useState(order.adminDepositConfirmedAt)
     const [courier, setCourier] = useState(order.courier || 'Rosen')
     const [isEditingTracking, setIsEditingTracking] = useState(false)
+    const hasSavedTracking = initialTrackingNumbers.length > 0
+    const canEditTracking = !hasSavedTracking || isEditingTracking
 
     // 로젠 송장출력
     const [showLogenForm, setShowLogenForm] = useState(false)
@@ -82,13 +95,13 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                         } else if (currentEvent === 'done') {
                             setLogenTrackingNumber(data.trackingNumber)
                             setLogenStep('완료!')
-                            if (data.trackingNumber && !trackingNumber) {
+                            if (data.trackingNumber && parseTrackingNumbers(order.trackingNumber).length === 0) {
                                 await fetch(`/api/orders/${order.id}`, {
                                     method: 'PATCH',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ trackingNumber: data.trackingNumber, courier: 'Rosen', status: 'SHIPPED' }),
                                 })
-                                setTrackingNumber(data.trackingNumber)
+                                setTrackingNumbers([data.trackingNumber])
                                 setStatus('SHIPPED')
                                 router.refresh()
                             }
@@ -165,15 +178,25 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     }
 
     const saveShippingInfo = async () => {
+        const cleanedTrackingNumbers = trackingNumbers
+            .map((v) => v.trim())
+            .filter(Boolean)
+
+        if (cleanedTrackingNumbers.length === 0) {
+            alert('최소 1개의 송장번호를 입력해 주세요.')
+            return
+        }
+
         setLoading(true)
         try {
             const res = await fetch(`/api/orders/${order.id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ trackingNumber, courier, status: 'SHIPPED' })
+                body: JSON.stringify({ trackingNumber: cleanedTrackingNumbers.join(', '), courier, status: 'SHIPPED' })
             })
             if (res.ok) {
                 setIsEditingTracking(false)
+                setTrackingNumbers(cleanedTrackingNumbers)
                 setStatus('SHIPPED')
                 router.refresh()
             } else {
@@ -283,7 +306,13 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 {(status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED') && order.trackingNumber && (
                     <div className="text-xs bg-white dark:bg-[#1e1e1e] text-gray-800 dark:text-gray-200 px-3 py-1 rounded-lg border border-gray-200 dark:border-[#2a2a2a] font-medium shadow-sm dark:shadow-none">
                         <span className="font-bold mr-2">로젠택배</span>
-                        <span className="text-[var(--color-brand-blue)]">송장번호 : <span className="font-bold">{order.trackingNumber}</span></span>
+                        <span className="text-[var(--color-brand-blue)]">
+                            {parseTrackingNumbers(order.trackingNumber).map((num, idx) => (
+                                <span key={`${num}-${idx}`} className="block">
+                                    송장번호 {idx + 1} : <span className="font-bold">{num}</span>
+                                </span>
+                            ))}
+                        </span>
                     </div>
                 )}
             </div>
@@ -300,7 +329,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                     <select
                         value={courier}
                         onChange={(e) => setCourier(e.target.value)}
-                        disabled={!isEditingTracking && !!order.trackingNumber}
+                        disabled={!canEditTracking}
                         className="w-full appearance-none border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors"
                     >
                         <option value="Rosen">로젠택배</option>
@@ -308,26 +337,52 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 </div>
                 <div className="flex-1 flex flex-col gap-0.5">
                     <label className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">송장번호</label>
-                    <div className="flex gap-1.5">
-                        <input
-                            type="text"
-                            value={trackingNumber}
-                            onChange={(e) => setTrackingNumber(e.target.value)}
-                            disabled={!isEditingTracking && !!order.trackingNumber}
-                            placeholder="송장번호 입력"
-                            className="flex-1 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-500"
-                        />
-                        {(!order.trackingNumber || isEditingTracking) ? (
-                            <button onClick={saveShippingInfo} disabled={loading}
-                                className="bg-[#d9361b] text-white px-3.5 rounded-lg font-bold text-[10px] hover:bg-[#c0301a] transition-colors disabled:opacity-50">
-                                저장
-                            </button>
-                        ) : (
-                            <button onClick={() => setIsEditingTracking(true)}
-                                className="bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-3.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors">
-                                수정
-                            </button>
-                        )}
+                    <div className="flex flex-col gap-1.5">
+                        {trackingNumbers.map((tracking, idx) => (
+                            <div key={`tracking-input-${idx}`} className="flex gap-1.5">
+                                <input
+                                    type="text"
+                                    value={tracking}
+                                    onChange={(e) => setTrackingNumbers((prev) => prev.map((v, i) => i === idx ? e.target.value : v))}
+                                    disabled={!canEditTracking}
+                                    placeholder={`출고 송장번호 ${idx + 1} 입력`}
+                                    className="flex-1 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-2 text-[11px] text-gray-800 dark:text-gray-200 font-bold bg-white dark:bg-[#1e1e1e] outline-none focus:border-[#d9361b] transition-colors placeholder:text-gray-300 dark:placeholder:text-gray-500"
+                                />
+                                {canEditTracking && trackingNumbers.length > 1 && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setTrackingNumbers((prev) => prev.filter((_, i) => i !== idx))}
+                                        className="bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-2.5 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors"
+                                    >
+                                        삭제
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                        <div className="flex gap-1.5">
+                            {canEditTracking && (
+                                <button
+                                    type="button"
+                                    onClick={() => setTrackingNumbers((prev) => [...prev, ''])}
+                                    className="bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-300 px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-gray-50 dark:hover:bg-[#252525] transition-colors"
+                                >
+                                    송장 추가 하기
+                                </button>
+                            )}
+                            {canEditTracking ? (
+                                <button onClick={saveShippingInfo} disabled={loading}
+                                    className="bg-[#d9361b] text-white px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-[#c0301a] transition-colors disabled:opacity-50">
+                                    저장
+                                </button>
+                            ) : (
+                                <button
+                                    onClick={() => setIsEditingTracking(true)}
+                                    className="bg-gray-100 dark:bg-[#2a2a2a] text-gray-600 dark:text-gray-400 px-3.5 py-2 rounded-lg font-bold text-[10px] hover:bg-gray-200 dark:hover:bg-[#252525] transition-colors"
+                                >
+                                    수정
+                                </button>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

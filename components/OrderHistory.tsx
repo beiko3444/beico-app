@@ -6,6 +6,14 @@ import Link from 'next/link'
 import { Check, ShoppingBag, CreditCard, X, Info, Truck, FileText, Banknote, Landmark, Package } from 'lucide-react'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 
+const parseTrackingNumbers = (value: string | null | undefined) => {
+    if (!value) return []
+    return value
+        .split(/[,\n]/)
+        .map((v) => v.trim())
+        .filter(Boolean)
+}
+
 export default function OrderHistory({ orders, userCountry }: { orders: any[], userCountry?: string | null }) {
     const router = useRouter()
     const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
@@ -71,6 +79,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
             </div>
 
             {orders.map(order => {
+                const trackingNumbers = parseTrackingNumbers(order.trackingNumber)
                 const productSum = order.items.reduce((sum: number, item: any) => sum + (item.price * (item.quantity || 0)), 0);
                 const totalQuantity = order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
 
@@ -238,7 +247,13 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                                                 order.courier === 'CJ' ? 'CJ대한통운' :
                                                                     order.courier === 'Lotte' ? '롯데택배' : (order.courier || '배송중')}
                                                         </span>
-                                                        <span className="text-[11px] font-inter font-bold mt-0.5">{isUSD ? 'Tracking No' : '송장번호'}: {order.trackingNumber}</span>
+                                                        <div className="mt-0.5 flex flex-col items-center">
+                                                            {trackingNumbers.map((num, idx) => (
+                                                                <span key={`${num}-${idx}`} className="text-[11px] font-inter font-bold">
+                                                                    {isUSD ? `Tracking No ${idx + 1}` : `송장번호 ${idx + 1}`}: {num}
+                                                                </span>
+                                                            ))}
+                                                        </div>
                                                     </div>
                                                 ) : (
                                                     <>
