@@ -158,7 +158,7 @@ export default async function InvoicePage({ params }: { params: { id: string } }
                                         </div>
                                         {/* Seal image (on top) */}
                                         <div className="absolute inset-0 flex items-center justify-center z-10">
-                                            <img src="/bko.png" alt="Seal" style={{ width: '60px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
+                                            <img src="/seal.png" alt="Seal" style={{ width: '60px', height: 'auto', mixBlendMode: 'multiply' }} className="opacity-100 contrast-125 select-none" />
                                         </div>
                                     </td>
                                 </tr>
