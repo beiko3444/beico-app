@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2 } from 'lucide-react'
 
 function parseTrackingNumbers(value: string | null | undefined) {
     if (!value) return []
@@ -10,12 +9,6 @@ function parseTrackingNumbers(value: string | null | undefined) {
         .split(/[,\n]/)
         .map((v) => v.trim())
         .filter(Boolean)
-}
-
-function splitAddress(fullAddress: string): { main: string; detail: string } {
-    const match = fullAddress.match(/^(.+[로길]\s+\d+(?:-\d+)?)\s*(.*)$/)
-    if (match) return { main: match[1].trim(), detail: match[2].trim() }
-    return { main: fullAddress, detail: '' }
 }
 
 export default function OrderActions({ order, isPartner = false }: { order: any, isPartner?: boolean }) {
@@ -32,91 +25,6 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     const [isEditingTracking, setIsEditingTracking] = useState(false)
     const hasSavedTracking = initialTrackingNumbers.length > 0
     const canEditTracking = !hasSavedTracking || isEditingTracking
-
-    // 로젠 송장출력
-    const [showLogenForm, setShowLogenForm] = useState(false)
-    const [logenLoading, setLogenLoading] = useState(false)
-    const [logenError, setLogenError] = useState<string | null>(null)
-    const [logenTrackingNumber, setLogenTrackingNumber] = useState<string | null>(null)
-    const [logenStep, setLogenStep] = useState<string | null>(null)
-    const partnerAddress = order.user?.partnerProfile?.address || ''
-    const { main: defaultMainAddr, detail: defaultDetailAddr } = splitAddress(partnerAddress)
-    const [logenPhone, setLogenPhone] = useState(order.user?.partnerProfile?.contact || '')
-    const [logenName, setLogenName] = useState(order.user?.partnerProfile?.businessName || order.user?.name || '')
-    const [logenAddress, setLogenAddress] = useState(defaultMainAddr)
-    const [logenDetailAddress, setLogenDetailAddress] = useState(defaultDetailAddr)
-
-    const submitLogenShipping = async () => {
-        setLogenLoading(true)
-        setLogenError(null)
-        setLogenTrackingNumber(null)
-        setLogenStep(null)
-        try {
-            const res = await fetch('/api/admin/worm-order/logen-shipping', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    recipientPhone: logenPhone,
-                    recipientName: logenName,
-                    recipientAddress: logenAddress,
-                    recipientDetailAddress: logenDetailAddress,
-                }),
-            })
-
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({ error: '송장 출력 실패' }))
-                setLogenError(data.error || '송장 출력 실패')
-                return
-            }
-
-            // SSE stream
-            const reader = res.body?.getReader()
-            if (!reader) { setLogenError('스트림 연결 실패'); return }
-
-            const decoder = new TextDecoder()
-            let buffer = ''
-
-            while (true) {
-                const { done, value } = await reader.read()
-                if (done) break
-
-                buffer += decoder.decode(value, { stream: true })
-                const lines = buffer.split('\n')
-                buffer = lines.pop() || ''
-
-                let currentEvent = ''
-                for (const line of lines) {
-                    if (line.startsWith('event: ')) {
-                        currentEvent = line.slice(7).trim()
-                    } else if (line.startsWith('data: ')) {
-                        const data = JSON.parse(line.slice(6))
-                        if (currentEvent === 'step') {
-                            setLogenStep(data.step)
-                        } else if (currentEvent === 'done') {
-                            setLogenTrackingNumber(data.trackingNumber)
-                            setLogenStep('완료!')
-                            if (data.trackingNumber && parseTrackingNumbers(order.trackingNumber).length === 0) {
-                                await fetch(`/api/orders/${order.id}`, {
-                                    method: 'PATCH',
-                                    headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ trackingNumber: data.trackingNumber, courier: 'Rosen', status: 'SHIPPED' }),
-                                })
-                                setTrackingNumbers([data.trackingNumber])
-                                setStatus('SHIPPED')
-                                router.refresh()
-                            }
-                        } else if (currentEvent === 'error') {
-                            setLogenError(data.error)
-                        }
-                    }
-                }
-            }
-        } catch (e) {
-            setLogenError('통신 오류가 발생했습니다.')
-        } finally {
-            setLogenLoading(false)
-        }
-    }
 
     const confirmAdminDeposit = async () => {
         if (!confirm("입금 내역을 확인하셨습니까? 관리자 확인 시간을 기록합니다.")) return
@@ -212,7 +120,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
     }
 
     const deleteOrder = async () => {
-        if (!confirm("정말로 이 주문을 삭제하시겠습니까?")) return
+        if (!confirm("진짜 이 주문을 삭제하시겠습니까?\n삭제 후에는 복구할 수 없습니다.")) return
         setLoading(true)
         try {
             const res = await fetch(`/api/orders/${order.id}`, { method: 'DELETE', cache: 'no-store' })
@@ -415,14 +323,7 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                <button
-                    onClick={() => { setShowLogenForm(v => !v); setLogenError(null); setLogenTrackingNumber(null) }}
-                    className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors"
-                >
-                    🚚 로젠 송장출력
-                </button>
-
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 {canUseOrderDocActions && (
                     <button onClick={() => router.push(`/invoice/${order.id}`)}
                         className="py-2.5 text-[10px] font-bold text-white rounded-lg flex gap-1 items-center justify-center bg-gray-600 hover:bg-gray-700 transition-colors">
@@ -444,51 +345,13 @@ export default function OrderActions({ order, isPartner = false }: { order: any,
                 )}
             </div>
 
-            {showLogenForm && (
-                <div className="mt-1 p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 rounded-xl flex flex-col gap-2">
-                    <div className="flex flex-col gap-0.5">
-                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인 전화번호</label>
-                        <input type="text" value={logenPhone} onChange={e => setLogenPhone(e.target.value)}
-                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">수하인명 (업체명)</label>
-                        <input type="text" value={logenName} onChange={e => setLogenName(e.target.value)}
-                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">주소 (검색용)</label>
-                        <input type="text" value={logenAddress} onChange={e => setLogenAddress(e.target.value)}
-                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                    </div>
-                    <div className="flex flex-col gap-0.5">
-                        <label className="text-[10px] text-gray-500 dark:text-gray-400 font-bold">상세주소</label>
-                        <input type="text" value={logenDetailAddress} onChange={e => setLogenDetailAddress(e.target.value)}
-                            className="border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2.5 py-1.5 text-[11px] text-gray-800 dark:text-gray-200 bg-white dark:bg-[#1e1e1e] outline-none focus:border-blue-400" />
-                    </div>
-                    {logenError && (
-                        <p className="text-[10px] text-red-600 font-bold">{logenError}</p>
-                    )}
-                    {logenTrackingNumber && (
-                        <p className="text-[11px] text-blue-700 font-bold">✅ 송장번호: {logenTrackingNumber}</p>
-                    )}
-                    {logenLoading && logenStep && (
-                        <div className="flex items-center gap-2 px-2 py-1.5 bg-blue-100 border border-blue-200 rounded-lg">
-                            <Loader2 size={12} className="animate-spin text-blue-600 shrink-0" />
-                            <span className="text-[10px] font-bold text-blue-700">{logenStep}</span>
-                        </div>
-                    )}
-                    <button
-                        onClick={submitLogenShipping}
-                        disabled={logenLoading}
-                        className="w-full py-2 text-[11px] font-bold text-white rounded-lg flex gap-1.5 items-center justify-center bg-blue-600 hover:bg-blue-700 transition-colors disabled:opacity-60"
-                    >
-                        {logenLoading ? (
-                            <><Loader2 size={12} className="animate-spin" /> 자동화 진행 중...</>
-                        ) : '송장 출력 실행'}
-                    </button>
-                </div>
-            )}
+            <button
+                onClick={() => deleteOrder()}
+                disabled={loading}
+                className="w-full py-2.5 text-[10px] font-bold rounded-lg border border-red-200 bg-red-50 text-red-700 hover:bg-red-100 transition-colors disabled:opacity-50"
+            >
+                {loading ? '삭제 중...' : '주문삭제'}
+            </button>
         </div>
     )
 }
