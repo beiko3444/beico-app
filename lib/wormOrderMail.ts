@@ -512,13 +512,17 @@ export async function loadWormEmailList(options?: {
   scanLimit?: number
   listLimit?: number
   orderId?: string | null
+  senderEmail?: string | null
+  keywordMatchInSource?: boolean
 }) {
   const rawKeyword = (options?.subjectKeyword || 'invoice').toLowerCase().trim()
   const keywords = rawKeyword.split(',').map(k => k.trim()).filter(Boolean)
   const scanLimit = Math.max(5, Math.min(80, options?.scanLimit || 20))
   const listLimit = Math.max(1, Math.min(30, options?.listLimit || 10))
   const orderId = options?.orderId?.trim() || ''
-  const cacheKey = `${rawKeyword}|${scanLimit}|${listLimit}`
+  const senderEmail = (options?.senderEmail || '').trim().toLowerCase()
+  const keywordMatchInSource = options?.keywordMatchInSource === true
+  const cacheKey = `${rawKeyword}|${scanLimit}|${listLimit}|${senderEmail}|${keywordMatchInSource ? 'source' : 'subject'}`
 
   const cached = getEmailListCache(cacheKey)
   if (cached) return hydrateEmailsWithAwbCache(cached)
@@ -544,7 +548,19 @@ export async function loadWormEmailList(options?: {
       if (sourceBuf.length === 0) continue
 
       const subject = msg.envelope?.subject || '(제목 없음)'
-      if (keywords.length > 0 && !keywords.some(kw => subject.toLowerCase().includes(kw))) {
+      const subjectLower = subject.toLowerCase()
+      const fromAddresses = (msg.envelope?.from || [])
+        .map((from) => (typeof from?.address === 'string' ? from.address.trim().toLowerCase() : ''))
+        .filter(Boolean)
+      if (senderEmail && !fromAddresses.includes(senderEmail)) {
+        continue
+      }
+
+      const sourceLower = keywordMatchInSource ? sourceBuf.toString('utf8').toLowerCase() : ''
+      if (
+        keywords.length > 0 &&
+        !keywords.some((kw) => subjectLower.includes(kw) || (keywordMatchInSource && sourceLower.includes(kw)))
+      ) {
         continue
       }
       const dateObj = msg.envelope?.date || msg.internalDate || new Date()

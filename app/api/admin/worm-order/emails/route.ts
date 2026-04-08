@@ -16,13 +16,22 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url)
         const orderIdRaw = (searchParams.get('orderId') || '').trim()
         const orderId = isUuid(orderIdRaw) ? orderIdRaw : null
-        const subjectKeyword = (searchParams.get('subjectKeyword') || 'invoice').trim() || 'invoice'
+        const requestedSubjectKeyword = (searchParams.get('subjectKeyword') || 'invoice').trim() || 'invoice'
+        const keywordTokens = requestedSubjectKeyword
+            .toLowerCase()
+            .split(',')
+            .map((token) => token.trim())
+            .filter(Boolean)
+        const isInvoiceInboxRequest = keywordTokens.includes('invoice') || keywordTokens.includes('payment')
+        const subjectKeyword = isInvoiceInboxRequest ? 'invoice,payment' : requestedSubjectKeyword
 
         const emails = await loadWormEmailList({
             subjectKeyword,
             scanLimit: 40,
             listLimit: 20,
             orderId,
+            senderEmail: isInvoiceInboxRequest ? 'michael@oikki.com' : null,
+            keywordMatchInSource: isInvoiceInboxRequest,
         })
         return NextResponse.json(
             { emails },
