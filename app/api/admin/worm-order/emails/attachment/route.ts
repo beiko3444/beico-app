@@ -16,8 +16,10 @@ function toAttachmentResponse(attachment: { content?: unknown; filename?: string
         : typeof rawContent === 'string'
             ? Buffer.from(rawContent)
             : new Uint8Array()
+    const body = new ArrayBuffer(bytes.byteLength)
+    new Uint8Array(body).set(bytes)
 
-    return new NextResponse(bytes, {
+    return new NextResponse(body, {
         status: 200,
         headers: {
             'Content-Type': contentType,
