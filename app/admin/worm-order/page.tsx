@@ -128,6 +128,7 @@ type WormOrderListItem = {
     remittanceSendAmount: number | null
     remittanceSendAmountText: string | null
     remittanceTotalFeeText: string | null
+    remittanceExchangeRate: number | null
     remittanceExchangeRateText: string | null
     awbNumber: string | null
     createdAt: string
@@ -560,21 +561,25 @@ type SummaryCurrency = 'krw' | 'usd' | 'any'
 
 function parseSummaryAmountByCurrency(value: string | null, currency: SummaryCurrency) {
     if (!value) return null
-    const tokenRegex = /(US\$|USD|KRW|₩|원)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(US\$|USD|KRW|₩|원)?/gi
+    const tokenRegex = /-?\d[\d,]*(?:\.\d+)?/g
+    const usdMarkerRegex = /US\$|USD/i
+    const krwMarkerRegex = /KRW|\u20A9|\uC6D0/i
     const candidates: Array<{ amount: number; currency: SummaryCurrency }> = []
     let match: RegExpExecArray | null = null
 
     while ((match = tokenRegex.exec(value)) !== null) {
-        const numeric = Number((match[2] || '').replace(/,/g, ''))
+        const numeric = Number((match[0] || '').replace(/,/g, ''))
         if (!Number.isFinite(numeric)) continue
 
-        const prefix = (match[1] || '').toUpperCase()
-        const suffix = (match[3] || '').toUpperCase()
-        const marker = `${prefix} ${suffix}`
+        const start = match.index
+        const end = start + match[0].length
+        const contextStart = Math.max(0, start - 8)
+        const contextEnd = Math.min(value.length, end + 8)
+        const marker = value.slice(contextStart, contextEnd)
         const inferred: SummaryCurrency =
-            marker.includes('USD') || marker.includes('US$')
+            usdMarkerRegex.test(marker)
                 ? 'usd'
-                : marker.includes('KRW') || marker.includes('₩') || marker.includes('원'.toUpperCase())
+                : krwMarkerRegex.test(marker)
                     ? 'krw'
                     : 'any'
         candidates.push({ amount: numeric, currency: inferred })
@@ -593,6 +598,16 @@ function parseSummaryRate(value: string | null) {
     return Number.isFinite(parsed) ? parsed : null
 }
 
+function resolveRemittanceSendUsd(order: WormOrderListItem) {
+    const fromSendTextUsd = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd')
+    if (fromSendTextUsd !== null) return fromSendTextUsd
+
+    const fromFinalReceiveTextUsd = parseSummaryAmountByCurrency(order.remittanceFinalReceiveAmountText, 'usd')
+    if (fromFinalReceiveTextUsd !== null) return fromFinalReceiveTextUsd
+
+    return null
+}
+
 function resolveRemittanceSendKrw(order: WormOrderListItem) {
     const fromSendTextKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
     if (fromSendTextKrw !== null) return fromSendTextKrw
@@ -600,7 +615,7 @@ function resolveRemittanceSendKrw(order: WormOrderListItem) {
     const fromFinalReceiveTextKrw = parseSummaryAmountByCurrency(order.remittanceFinalReceiveAmountText, 'krw')
     if (fromFinalReceiveTextKrw !== null) return fromFinalReceiveTextKrw
 
-    const rate = parseSummaryRate(order.remittanceExchangeRateText)
+    const rate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
     const usdAmount =
         parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd') ??
         parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'any')
@@ -817,6 +832,7 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         remittanceSendAmount: typeof candidate.remittanceSendAmount === 'number' && Number.isFinite(candidate.remittanceSendAmount) ? candidate.remittanceSendAmount : null,
         remittanceSendAmountText: typeof candidate.remittanceSendAmountText === 'string' ? candidate.remittanceSendAmountText : null,
         remittanceTotalFeeText: typeof candidate.remittanceTotalFeeText === 'string' ? candidate.remittanceTotalFeeText : null,
+        remittanceExchangeRate: typeof candidate.remittanceExchangeRate === 'number' && Number.isFinite(candidate.remittanceExchangeRate) ? candidate.remittanceExchangeRate : null,
         remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
         awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
         createdAt: candidate.createdAt,
@@ -2993,19 +3009,24 @@ export default function WormOrderPage() {
                         <thead>
                             <tr className="bg-slate-50 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400">
                                 <th className="text-left px-3 py-2 font-bold">발주번호</th>
-                                <th className="text-left px-3 py-2 font-bold">작성일</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
                                 <th className="text-left px-3 py-2 font-bold">총 송금액</th>
                                 <th className="text-left px-3 py-2 font-bold">총 송금 한화</th>
-                                <th className="text-left px-3 py-2 font-bold">최근수정</th>
+                                <th className="text-left px-3 py-2 font-bold">환율정보</th>
                                 <th className="text-right px-3 py-2 font-bold">관리</th>
                             </tr>
                         </thead>
                         <tbody>
                             {wormOrderList.map((order) => {
                                 const isActiveOrder = activeWormOrder?.id === order.id
-                                const createdDateText = toKstDateInputString(order.createdAt)
+                                const orderDateText = toKstDateInputString(order.receiveDate)
+                                const orderNumberDisplay = orderDateText ? orderDateText.replace(/-/g, '/') : order.orderNumber
+                                const sendAmountUsd = resolveRemittanceSendUsd(order)
                                 const sendAmountKrw = resolveRemittanceSendKrw(order)
+                                const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+                                const exchangeRateText = parsedExchangeRate !== null
+                                    ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
+                                    : order.remittanceExchangeRateText || '-'
                                 return (
                                     <tr
                                         key={order.id}
@@ -3014,8 +3035,7 @@ export default function WormOrderPage() {
                                             isActiveOrder ? 'bg-[#fff3ef] dark:bg-[#252525]' : 'hover:bg-slate-50 dark:hover:bg-[#252525]'
                                         }`}
                                     >
-                                        <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-white">{order.orderNumber}</td>
-                                        <td className="px-3 py-2.5 text-slate-700">{createdDateText || '-'}</td>
+                                        <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-white">{orderNumberDisplay}</td>
                                         <td className="px-3 py-2.5">
                                             <div className="flex flex-col gap-1">
                                                 <span className={`inline-flex h-6 w-fit items-center rounded-md border px-2 text-xs font-bold ${getWormOrderStatusClass(order.status)}`}>
@@ -3025,18 +3045,19 @@ export default function WormOrderPage() {
                                                     <span className="text-[11px] font-semibold text-emerald-700">
                                                         신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
                                                         {sendAmountKrw !== null ? ` / ${formatKrwAmount(sendAmountKrw)}` : ''}
+                                                        {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
-                                            {formatKrwAmount(sendAmountKrw)}
+                                            {formatUsdAmount(sendAmountUsd)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
                                             {formatKrwAmount(sendAmountKrw)}
                                         </td>
-                                        <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-gray-400">
-                                            {new Date(order.updatedAt).toLocaleString()}
+                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                            {exchangeRateText}
                                         </td>
                                         <td className="px-3 py-2.5 text-right">
                                             <button
@@ -3062,7 +3083,7 @@ export default function WormOrderPage() {
                             })}
                             {!wormOrderListLoading && wormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-slate-500 dark:text-gray-400">
+                                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-slate-500 dark:text-gray-400">
                                         저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.
                                     </td>
                                 </tr>

@@ -61,21 +61,25 @@ type SummaryCurrency = 'krw' | 'usd' | 'any'
 
 const parseSummaryAmountByCurrency = (value: string | null, currency: SummaryCurrency) => {
     if (!value) return null
-    const tokenRegex = /(US\$|USD|KRW|₩|원)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(US\$|USD|KRW|₩|원)?/gi
+    const tokenRegex = /-?\d[\d,]*(?:\.\d+)?/g
+    const usdMarkerRegex = /US\$|USD/i
+    const krwMarkerRegex = /KRW|\u20A9|\uC6D0/i
     const candidates: Array<{ amount: number; currency: SummaryCurrency }> = []
     let match: RegExpExecArray | null = null
 
     while ((match = tokenRegex.exec(value)) !== null) {
-        const numeric = Number((match[2] || '').replace(/,/g, ''))
+        const numeric = Number((match[0] || '').replace(/,/g, ''))
         if (!Number.isFinite(numeric)) continue
 
-        const prefix = (match[1] || '').toUpperCase()
-        const suffix = (match[3] || '').toUpperCase()
-        const marker = `${prefix} ${suffix}`
+        const start = match.index
+        const end = start + match[0].length
+        const contextStart = Math.max(0, start - 8)
+        const contextEnd = Math.min(value.length, end + 8)
+        const marker = value.slice(contextStart, contextEnd)
         const inferredCurrency: SummaryCurrency =
-            marker.includes('USD') || marker.includes('US$')
+            usdMarkerRegex.test(marker)
                 ? 'usd'
-                : marker.includes('KRW') || marker.includes('₩') || marker.includes('원'.toUpperCase())
+                : krwMarkerRegex.test(marker)
                     ? 'krw'
                     : 'any'
 

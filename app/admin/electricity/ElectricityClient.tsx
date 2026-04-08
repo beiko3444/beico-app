@@ -1345,8 +1345,8 @@ export default function ElectricityClient() {
 
                             {/* Invoice Content */}
                             {(() => {
-                                const usageYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear;
-                                const usageMonth = selectedMonth === 1 ? 12 : selectedMonth - 1;
+                                const usageYear = selectedYear;
+                                const usageMonth = selectedMonth;
                                 const lastDay = new Date(usageYear, usageMonth, 0).getDate();
                                 const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}일`;
 

@@ -55,6 +55,7 @@ export async function GET(request: NextRequest) {
         remittanceSendAmount: true,
         remittanceSendAmountText: true,
         remittanceTotalFeeText: true,
+        remittanceExchangeRate: true,
         remittanceExchangeRateText: true,
         createdAt: true,
         updatedAt: true,
