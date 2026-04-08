@@ -514,6 +514,7 @@ export async function loadWormEmailList(options?: {
   orderId?: string | null
   senderEmail?: string | null
   keywordMatchInSource?: boolean
+  forceRefresh?: boolean
 }) {
   const rawKeyword = (options?.subjectKeyword || 'invoice').toLowerCase().trim()
   const keywords = rawKeyword.split(',').map(k => k.trim()).filter(Boolean)
@@ -522,10 +523,13 @@ export async function loadWormEmailList(options?: {
   const orderId = options?.orderId?.trim() || ''
   const senderEmail = (options?.senderEmail || '').trim().toLowerCase()
   const keywordMatchInSource = options?.keywordMatchInSource === true
+  const forceRefresh = options?.forceRefresh === true
   const cacheKey = `${rawKeyword}|${scanLimit}|${listLimit}|${senderEmail}|${keywordMatchInSource ? 'source' : 'subject'}`
 
-  const cached = getEmailListCache(cacheKey)
-  if (cached) return hydrateEmailsWithAwbCache(cached)
+  if (!forceRefresh) {
+    const cached = getEmailListCache(cacheKey)
+    if (cached) return hydrateEmailsWithAwbCache(cached)
+  }
 
   const emails = await withInboxLock(async (client) => {
     const status = await client.status('INBOX', { messages: true })

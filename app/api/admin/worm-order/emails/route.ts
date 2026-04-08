@@ -16,6 +16,7 @@ export async function GET(request: Request) {
         const { searchParams } = new URL(request.url)
         const orderIdRaw = (searchParams.get('orderId') || '').trim()
         const orderId = isUuid(orderIdRaw) ? orderIdRaw : null
+        const forceRefresh = ['1', 'true', 'yes', 'y'].includes((searchParams.get('forceRefresh') || '').trim().toLowerCase())
         const requestedSubjectKeyword = (searchParams.get('subjectKeyword') || 'invoice').trim() || 'invoice'
         const keywordTokens = requestedSubjectKeyword
             .toLowerCase()
@@ -32,6 +33,7 @@ export async function GET(request: Request) {
             orderId,
             senderEmail: isInvoiceInboxRequest ? 'michael@oikki.com' : null,
             keywordMatchInSource: isInvoiceInboxRequest,
+            forceRefresh,
         })
         return NextResponse.json(
             { emails },

@@ -936,6 +936,7 @@ export default function WormOrderPage() {
     const [copied, setCopied] = useState(false)
     const [transferAmountUsd, setTransferAmountUsd] = useState('')
     const [invoicePdf, setInvoicePdf] = useState<File | null>(null)
+    const [useManualRemittanceInput, setUseManualRemittanceInput] = useState(false)
     const [invoicePreviewUrl, setInvoicePreviewUrl] = useState('')
     const [invoicePreviewLoading, setInvoicePreviewLoading] = useState(false)
     const [invoicePreviewError, setInvoicePreviewError] = useState('')
@@ -1602,6 +1603,9 @@ export default function WormOrderPage() {
         setHasFetched(false)
         setEmailError('')
         setEmailMatchMessage('')
+        setTransferAmountUsd('')
+        setInvoicePdf(null)
+        setUseManualRemittanceInput(false)
     }, [activeWormOrder?.id])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
@@ -1638,7 +1642,7 @@ export default function WormOrderPage() {
         setCalendarCursor({ year: selected.getFullYear(), month: selected.getMonth() })
     }, [receiveDate])
 
-    const fetchEmails = async () => {
+    const fetchEmails = async (forceRefresh = true) => {
         setLoadingEmails(true)
         setEmailError('')
         setEmailMatchMessage('')
@@ -1654,7 +1658,10 @@ export default function WormOrderPage() {
 
         try {
             const params = new URLSearchParams()
-            params.set('subjectKeyword', 'invoice')
+            params.set('subjectKeyword', 'invoice,payment')
+            if (forceRefresh) {
+                params.set('forceRefresh', '1')
+            }
             if (activeWormOrder?.id) {
                 params.set('orderId', activeWormOrder.id)
             }
@@ -2127,6 +2134,35 @@ export default function WormOrderPage() {
     }, [emails, activeWormOrder?.id])
 
     const autoTransferAmountUsd = matchedInvoiceEmail?.invoiceTotalAmountUsd ?? null
+    const manualTransferAmountUsd = useMemo(() => {
+        const normalized = transferAmountUsd.replace(/[^0-9.,-]/g, '').replace(/,/g, '')
+        if (!normalized) return null
+        const parsed = Number(normalized)
+        return Number.isFinite(parsed) ? parsed : null
+    }, [transferAmountUsd])
+    const isAutoRemittanceReady = Boolean(
+        matchedInvoiceEmail &&
+        autoTransferAmountUsd !== null &&
+        autoTransferAmountUsd > 0,
+    )
+    const isManualRemittanceReady = Boolean(
+        invoicePdf &&
+        manualTransferAmountUsd !== null &&
+        manualTransferAmountUsd > 0,
+    )
+    const remittanceRunDisabled =
+        remittanceSubmitting ||
+        isRemittanceLocked ||
+        isActiveOrderRemittanceApplied ||
+        !activeWormOrderRecord ||
+        (useManualRemittanceInput ? !isManualRemittanceReady : !isAutoRemittanceReady)
+
+    useEffect(() => {
+        if (!useManualRemittanceInput) return
+        if (transferAmountUsd.trim()) return
+        if (autoTransferAmountUsd === null || autoTransferAmountUsd <= 0) return
+        setTransferAmountUsd(autoTransferAmountUsd.toFixed(2))
+    }, [autoTransferAmountUsd, transferAmountUsd, useManualRemittanceInput])
 
     // 현재 발주에 매칭된 AWB 메일에서 AWB 번호 자동 추출
     const matchedAwbEmail = useMemo(() => {
@@ -2236,15 +2272,29 @@ export default function WormOrderPage() {
             return
         }
 
-        if (!autoTransferAmountUsd || autoTransferAmountUsd <= 0) {
-            setRemittanceError('매칭된 인보이스의 토탈어마운트가 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
-            return
-        }
-        const parsedAmount = autoTransferAmountUsd
+        const usingManualInput = useManualRemittanceInput
+        let parsedAmount = 0
 
-        if (!matchedInvoiceEmail) {
-            setRemittanceError('매칭된 인보이스 메일이 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
-            return
+        if (usingManualInput) {
+            if (manualTransferAmountUsd === null || manualTransferAmountUsd <= 0) {
+                setRemittanceError('수동 송금 금액(USD)을 올바르게 입력해 주세요.')
+                return
+            }
+            if (!invoicePdf) {
+                setRemittanceError('수동 모드에서는 인보이스 PDF 파일 업로드가 필요합니다.')
+                return
+            }
+            parsedAmount = manualTransferAmountUsd
+        } else {
+            if (!autoTransferAmountUsd || autoTransferAmountUsd <= 0) {
+                setRemittanceError('매칭된 인보이스의 토탈어마운트가 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
+                return
+            }
+            if (!matchedInvoiceEmail) {
+                setRemittanceError('매칭된 인보이스 메일이 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
+                return
+            }
+            parsedAmount = autoTransferAmountUsd
         }
 
         if (remittanceProgressTimerRef.current) {
@@ -2269,35 +2319,68 @@ export default function WormOrderPage() {
             requestAbortController = new AbortController()
             remittanceRequestAbortControllerRef.current = requestAbortController
 
-            // 매칭된 인보이스 메일에서 PDF 첨부파일 자동 다운로드
-            setRemittanceProgressLabel('인보이스 PDF 다운로드 중...')
-            const matchedDetail = emailDetails[matchedInvoiceEmail.uid] || await fetchEmailDetail(matchedInvoiceEmail.uid)
-            const pdfAtt = matchedDetail?.attachments?.find(att => {
-                const name = att.filename.toLowerCase()
-                const type = att.contentType.toLowerCase()
-                return name.endsWith('.pdf') || type.includes('pdf')
-            })
-            if (!pdfAtt) {
-                setRemittanceError('매칭된 인보이스 메일에 PDF 첨부파일이 없습니다.')
+            let invoicePdfFile: File | null = null
+            if (usingManualInput) {
+                const isPdf =
+                    invoicePdf instanceof File &&
+                    (invoicePdf.type === 'application/pdf' || invoicePdf.name.toLowerCase().endsWith('.pdf'))
+                if (!isPdf || !(invoicePdf instanceof File)) {
+                    setRemittanceError('PDF 파일만 업로드할 수 있습니다.')
+                    if (remittanceProgressTimerRef.current) {
+                        window.clearInterval(remittanceProgressTimerRef.current)
+                        remittanceProgressTimerRef.current = null
+                    }
+                    return
+                }
+                setRemittanceProgressLabel('수동 업로드 인보이스를 확인하는 중...')
+                invoicePdfFile = invoicePdf
+            } else {
+                const linkedInvoiceEmail = matchedInvoiceEmail
+                if (!linkedInvoiceEmail) {
+                    setRemittanceError('매칭된 인보이스 메일이 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
+                    if (remittanceProgressTimerRef.current) {
+                        window.clearInterval(remittanceProgressTimerRef.current)
+                        remittanceProgressTimerRef.current = null
+                    }
+                    return
+                }
+                // 매칭된 인보이스 메일에서 PDF 첨부파일 자동 다운로드
+                setRemittanceProgressLabel('인보이스 PDF 다운로드 중...')
+                const matchedDetail = emailDetails[linkedInvoiceEmail.uid] || await fetchEmailDetail(linkedInvoiceEmail.uid)
+                const pdfAtt = matchedDetail?.attachments?.find(att => {
+                    const name = att.filename.toLowerCase()
+                    const type = att.contentType.toLowerCase()
+                    return name.endsWith('.pdf') || type.includes('pdf')
+                })
+                if (!pdfAtt) {
+                    setRemittanceError('매칭된 인보이스 메일에 PDF 첨부파일이 없습니다.')
+                    if (remittanceProgressTimerRef.current) {
+                        window.clearInterval(remittanceProgressTimerRef.current)
+                        remittanceProgressTimerRef.current = null
+                    }
+                    return
+                }
+                const pdfRes = await fetch(`/api/admin/worm-order/emails/attachment?uid=${linkedInvoiceEmail.uid}&index=${pdfAtt.index}`)
+                if (!pdfRes.ok) {
+                    setRemittanceError('인보이스 PDF 다운로드에 실패했습니다.')
+                    if (remittanceProgressTimerRef.current) {
+                        window.clearInterval(remittanceProgressTimerRef.current)
+                        remittanceProgressTimerRef.current = null
+                    }
+                    return
+                }
+                const pdfBlob = await pdfRes.blob()
+                invoicePdfFile = new File([pdfBlob], pdfAtt.filename, { type: 'application/pdf' })
+            }
+
+            if (!invoicePdfFile) {
+                setRemittanceError('인보이스 PDF를 준비하지 못했습니다.')
                 if (remittanceProgressTimerRef.current) {
                     window.clearInterval(remittanceProgressTimerRef.current)
                     remittanceProgressTimerRef.current = null
                 }
-                setRemittanceSubmitting(false)
                 return
             }
-            const pdfRes = await fetch(`/api/admin/worm-order/emails/attachment?uid=${matchedInvoiceEmail.uid}&index=${pdfAtt.index}`)
-            if (!pdfRes.ok) {
-                setRemittanceError('인보이스 PDF 다운로드에 실패했습니다.')
-                if (remittanceProgressTimerRef.current) {
-                    window.clearInterval(remittanceProgressTimerRef.current)
-                    remittanceProgressTimerRef.current = null
-                }
-                setRemittanceSubmitting(false)
-                return
-            }
-            const pdfBlob = await pdfRes.blob()
-            const invoicePdfFile = new File([pdfBlob], pdfAtt.filename, { type: 'application/pdf' })
 
             const submitData = new FormData()
             submitData.append('amountUsd', parsedAmount.toFixed(2))
@@ -2636,10 +2719,7 @@ export default function WormOrderPage() {
         }
 
         if (step.id === 2 && !loadingEmails) {
-            const shouldFetchInbox = !hasFetched || emails.length === 0
-            if (shouldFetchInbox) {
-                void fetchEmails()
-            }
+            void fetchEmails(true)
             return
         }
 
@@ -2658,8 +2738,6 @@ export default function WormOrderPage() {
         handleGenerate,
         loadingDocEmails,
         loadingEmails,
-        hasFetched,
-        emails.length,
         scrollToPipelineSection,
         selectedOrders.length,
     ])
@@ -2706,6 +2784,7 @@ export default function WormOrderPage() {
         setCopied(false)
         setTransferAmountUsd('')
         setInvoicePdf(null)
+        setUseManualRemittanceInput(false)
         setRemittanceError('')
         setRemittanceSuccess('')
         setRemittanceProgress(0)
@@ -3215,7 +3294,7 @@ export default function WormOrderPage() {
                             {loadingEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </h2>
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
-                            제목에 &apos;invoice&apos;가 포함된 메일만 조회합니다.
+                            제목/본문에 &apos;invoice&apos; 또는 &apos;payment&apos;가 포함된 메일만 조회합니다.
                             {activeWormOrder && <span className="ml-2 font-semibold text-slate-600 dark:text-gray-400">현재 발주: {activeWormOrder.orderNumber}</span>}
                         </p>
                         {emailCacheSavedAt && (
@@ -3225,7 +3304,7 @@ export default function WormOrderPage() {
                         )}
                     </div>
                     <button
-                        onClick={fetchEmails}
+                        onClick={() => { void fetchEmails(true) }}
                         disabled={loadingEmails}
                         className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
@@ -3253,7 +3332,7 @@ export default function WormOrderPage() {
 
                         {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
                             <div className="p-10 text-center text-[13px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-[#1a1a1a]/50 mt-10">
-                                현재 발주에서 매칭 가능한 `invoice` 제목 메일이 없습니다.
+                                현재 발주에서 매칭 가능한 `invoice/payment` 메일이 없습니다.
                             </div>
                         )}
 
@@ -3881,7 +3960,7 @@ export default function WormOrderPage() {
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">모인 자동 송금 신청</h3>
                         <p className="text-xs text-gray-500 mt-1">
-                            서버 환경변수에 저장된 계정으로 자동 로그인 후 송금을 신청합니다.
+                            자동 연동 또는 수동 입력(PDF/금액)으로 송금 신청을 실행할 수 있습니다.
                         </p>
                         {activeWormOrder && (
                             <p className="text-[11px] font-semibold text-slate-600 dark:text-gray-400 mt-1">
@@ -3898,42 +3977,124 @@ export default function WormOrderPage() {
                     <Send size={18} className="text-[#e34219] mt-1" />
                 </div>
 
-                {matchedInvoiceEmail ? (
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
-                        <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">인보이스 자동 연동</p>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
-                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
-                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">송금 금액 (USD)</p>
-                                <p className="text-[15px] font-black text-slate-900 dark:text-white">
-                                    {autoTransferAmountUsd !== null ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
-                                </p>
-                            </div>
-                            <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
-                                <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">인보이스 PDF</p>
-                                <p className="text-[13px] font-bold text-slate-700 truncate">{matchedInvoiceEmail.subject}</p>
+                <div className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] p-1 grid grid-cols-2 gap-1 bg-slate-50 dark:bg-[#1a1a1a]">
+                    <button
+                        type="button"
+                        onClick={() => setUseManualRemittanceInput(false)}
+                        className={`h-9 rounded-lg text-[12px] font-bold transition-colors ${
+                            !useManualRemittanceInput
+                                ? 'bg-[#111827] text-white'
+                                : 'bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400'
+                        }`}
+                    >
+                        자동 연동
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setUseManualRemittanceInput(true)}
+                        className={`h-9 rounded-lg text-[12px] font-bold transition-colors ${
+                            useManualRemittanceInput
+                                ? 'bg-[#111827] text-white'
+                                : 'bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400'
+                        }`}
+                    >
+                        수동 입력
+                    </button>
+                </div>
+
+                {!useManualRemittanceInput ? (
+                    matchedInvoiceEmail ? (
+                        <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
+                            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">인보이스 자동 연동</p>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                                <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                    <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">송금 금액 (USD)</p>
+                                    <p className="text-[15px] font-black text-slate-900 dark:text-white">
+                                        {autoTransferAmountUsd !== null ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : '-'}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                    <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">인보이스 PDF</p>
+                                    <p className="text-[13px] font-bold text-slate-700 truncate">{matchedInvoiceEmail.subject}</p>
+                                </div>
                             </div>
                         </div>
-                    </div>
+                    ) : (
+                        <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-[12px] font-semibold text-amber-700">
+                            인보이스 메일을 발주에 매칭하면 송금 금액과 PDF가 자동으로 연동됩니다.
+                        </div>
+                    )
                 ) : (
-                    <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-[12px] font-semibold text-amber-700">
-                        인보이스 메일을 발주에 매칭하면 송금 금액과 PDF가 자동으로 연동됩니다.
+                    <div className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a] p-4 space-y-3">
+                        <p className="text-[11px] font-bold text-slate-700 dark:text-gray-300 uppercase tracking-[0.16em]">수동 송금 입력</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-semibold text-slate-600 dark:text-gray-400">송금 금액 (USD)</label>
+                                <input
+                                    type="text"
+                                    inputMode="decimal"
+                                    value={transferAmountUsd}
+                                    onChange={(event) => setTransferAmountUsd(event.target.value)}
+                                    placeholder="예: 5800.00"
+                                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#e34219]"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-semibold text-slate-600 dark:text-gray-400">인보이스 PDF</label>
+                                <input
+                                    type="file"
+                                    accept="application/pdf,.pdf"
+                                    onChange={(event) => {
+                                        const nextFile = event.target.files?.[0] || null
+                                        setInvoicePdf(nextFile)
+                                    }}
+                                    className="block w-full text-[12px] file:mr-2 file:h-9 file:rounded-lg file:border-0 file:bg-[#111827] file:px-3 file:text-xs file:font-bold file:text-white hover:file:bg-black"
+                                />
+                                {invoicePdf && (
+                                    <p className="text-[11px] font-semibold text-slate-600 dark:text-gray-400 truncate">
+                                        선택됨: {invoicePdf.name}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {(invoicePreviewLoading || invoicePreviewUrl || invoicePreviewError) && (
+                            <div className="rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] p-3">
+                                {invoicePreviewLoading && (
+                                    <p className="text-[12px] text-slate-500 dark:text-gray-400 inline-flex items-center gap-1.5">
+                                        <Loader2 size={13} className="animate-spin" />
+                                        PDF 미리보기 생성 중...
+                                    </p>
+                                )}
+                                {!invoicePreviewLoading && invoicePreviewError && (
+                                    <p className="text-[12px] font-semibold text-amber-700">{invoicePreviewError}</p>
+                                )}
+                                {!invoicePreviewLoading && !invoicePreviewError && invoicePreviewUrl && (
+                                    <img src={invoicePreviewUrl} alt="Invoice preview" className="max-h-52 rounded-md border border-slate-200 dark:border-[#2a2a2a]" />
+                                )}
+                            </div>
+                        )}
                     </div>
                 )}
 
                 <div className="flex flex-col md:flex-row md:items-center gap-3 md:justify-between">
                     <p className="text-[11px] text-gray-500 leading-relaxed">
-                        매칭된 인보이스의 토탈어마운트(USD)와 PDF 첨부파일로 자동 송금 신청합니다.
+                        {useManualRemittanceInput
+                            ? '수동 입력한 송금 금액(USD)과 PDF로 모인 자동 송금 신청을 실행합니다.'
+                            : '매칭된 인보이스의 토탈어마운트(USD)와 PDF 첨부파일로 자동 송금 신청합니다.'}
                     </p>
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <button
                             type="button"
                             onClick={handleRemittanceApply}
-                            disabled={remittanceSubmitting || isRemittanceLocked || isActiveOrderRemittanceApplied || !activeWormOrderRecord || !matchedInvoiceEmail}
+                            disabled={remittanceRunDisabled}
                             className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 w-full md:w-auto"
                         >
                             {!activeWormOrderRecord ? (
                                 '발주선택'
-                            ) : !matchedInvoiceEmail ? (
+                            ) : useManualRemittanceInput && !isManualRemittanceReady ? (
+                                '수동 입력 필요'
+                            ) : !useManualRemittanceInput && !isAutoRemittanceReady ? (
                                 '인보이스 매칭 필요'
                             ) : isActiveOrderRemittanceApplied ? (
                                 '송금완료'
