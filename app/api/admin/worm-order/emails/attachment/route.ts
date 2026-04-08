@@ -36,7 +36,8 @@ export async function GET(req: Request) {
                     : typeof rawContent === 'string'
                         ? new TextEncoder().encode(rawContent)
                         : new Uint8Array()
-            const body = new Blob([binaryBody], { type: contentType })
+            const body = new ArrayBuffer(binaryBody.byteLength)
+            new Uint8Array(body).set(binaryBody)
 
             return new NextResponse(body, {
                 status: 200,
