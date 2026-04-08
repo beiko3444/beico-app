@@ -57,6 +57,39 @@ const parseSummaryNumber = (value: string | null, mode: 'default' | 'rate' = 'de
     return Number.isFinite(parsed) ? parsed : null
 }
 
+type SummaryCurrency = 'krw' | 'usd' | 'any'
+
+const parseSummaryAmountByCurrency = (value: string | null, currency: SummaryCurrency) => {
+    if (!value) return null
+    const tokenRegex = /(US\$|USD|KRW|₩|원)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(US\$|USD|KRW|₩|원)?/gi
+    const candidates: Array<{ amount: number; currency: SummaryCurrency }> = []
+    let match: RegExpExecArray | null = null
+
+    while ((match = tokenRegex.exec(value)) !== null) {
+        const numeric = Number((match[2] || '').replace(/,/g, ''))
+        if (!Number.isFinite(numeric)) continue
+
+        const prefix = (match[1] || '').toUpperCase()
+        const suffix = (match[3] || '').toUpperCase()
+        const marker = `${prefix} ${suffix}`
+        const inferredCurrency: SummaryCurrency =
+            marker.includes('USD') || marker.includes('US$')
+                ? 'usd'
+                : marker.includes('KRW') || marker.includes('₩') || marker.includes('원'.toUpperCase())
+                    ? 'krw'
+                    : 'any'
+
+        candidates.push({ amount: numeric, currency: inferredCurrency })
+    }
+
+    if (candidates.length === 0) return null
+    if (currency === 'any') return candidates[0]?.amount ?? null
+
+    const exact = candidates.find((candidate) => candidate.currency === currency)
+    if (exact) return exact.amount
+    return null
+}
+
 const getRemittanceGuardState = (): RemittanceAuthGuardState => {
     if (!globalRemittanceGuard.wormRemittanceAuthGuard) {
         globalRemittanceGuard.wormRemittanceAuthGuard = {
@@ -324,6 +357,18 @@ export async function POST(request: Request) {
                 const sendAmountText = normalizeSummaryText(pricingSummary?.sendAmount || parsedAmount.toFixed(2))
                 const totalFeeText = normalizeSummaryText(pricingSummary?.totalFee || '')
                 const exchangeRateText = normalizeSummaryText(pricingSummary?.exchangeRate || '')
+                const exchangeRateNumber = parseSummaryNumber(exchangeRateText, 'rate')
+
+                const sendAmountKrw =
+                    parseSummaryAmountByCurrency(sendAmountText, 'krw') ??
+                    parseSummaryAmountByCurrency(finalReceiveAmountText, 'krw') ??
+                    (() => {
+                        const usdAmount =
+                            parseSummaryAmountByCurrency(sendAmountText, 'usd') ??
+                            parseSummaryNumber(sendAmountText, 'default')
+                        if (usdAmount === null || !exchangeRateNumber || exchangeRateNumber <= 0) return null
+                        return Math.round(usdAmount * exchangeRateNumber)
+                    })()
 
                 savedOrder = await prisma.wormOrder.update({
                     where: { id: targetOrder.id },
@@ -333,11 +378,11 @@ export async function POST(request: Request) {
                         remittanceFinalReceiveAmountText: finalReceiveAmountText,
                         remittanceFinalReceiveAmount: parseSummaryNumber(finalReceiveAmountText, 'default'),
                         remittanceSendAmountText: sendAmountText,
-                        remittanceSendAmount: parseSummaryNumber(sendAmountText, 'default'),
+                        remittanceSendAmount: sendAmountKrw,
                         remittanceTotalFeeText: totalFeeText,
                         remittanceTotalFee: parseSummaryNumber(totalFeeText, 'default'),
                         remittanceExchangeRateText: exchangeRateText,
-                        remittanceExchangeRate: parseSummaryNumber(exchangeRateText, 'rate'),
+                        remittanceExchangeRate: exchangeRateNumber,
                     },
                     select: {
                         id: true,

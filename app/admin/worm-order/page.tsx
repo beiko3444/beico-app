@@ -556,6 +556,62 @@ function formatKrwAmount(value: number | null) {
     return krwAmountFormatter.format(value)
 }
 
+type SummaryCurrency = 'krw' | 'usd' | 'any'
+
+function parseSummaryAmountByCurrency(value: string | null, currency: SummaryCurrency) {
+    if (!value) return null
+    const tokenRegex = /(US\$|USD|KRW|₩|원)?\s*(-?\d[\d,]*(?:\.\d+)?)\s*(US\$|USD|KRW|₩|원)?/gi
+    const candidates: Array<{ amount: number; currency: SummaryCurrency }> = []
+    let match: RegExpExecArray | null = null
+
+    while ((match = tokenRegex.exec(value)) !== null) {
+        const numeric = Number((match[2] || '').replace(/,/g, ''))
+        if (!Number.isFinite(numeric)) continue
+
+        const prefix = (match[1] || '').toUpperCase()
+        const suffix = (match[3] || '').toUpperCase()
+        const marker = `${prefix} ${suffix}`
+        const inferred: SummaryCurrency =
+            marker.includes('USD') || marker.includes('US$')
+                ? 'usd'
+                : marker.includes('KRW') || marker.includes('₩') || marker.includes('원'.toUpperCase())
+                    ? 'krw'
+                    : 'any'
+        candidates.push({ amount: numeric, currency: inferred })
+    }
+
+    if (candidates.length === 0) return null
+    if (currency === 'any') return candidates[0]?.amount ?? null
+    return candidates.find((candidate) => candidate.currency === currency)?.amount ?? null
+}
+
+function parseSummaryRate(value: string | null) {
+    if (!value) return null
+    const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
+    if (!matches || matches.length === 0) return null
+    const parsed = Number(matches[matches.length - 1].replace(/,/g, ''))
+    return Number.isFinite(parsed) ? parsed : null
+}
+
+function resolveRemittanceSendKrw(order: WormOrderListItem) {
+    const fromSendTextKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
+    if (fromSendTextKrw !== null) return fromSendTextKrw
+
+    const fromFinalReceiveTextKrw = parseSummaryAmountByCurrency(order.remittanceFinalReceiveAmountText, 'krw')
+    if (fromFinalReceiveTextKrw !== null) return fromFinalReceiveTextKrw
+
+    const rate = parseSummaryRate(order.remittanceExchangeRateText)
+    const usdAmount =
+        parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd') ??
+        parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'any')
+    if (rate && rate > 0 && usdAmount !== null) {
+        return Math.round(usdAmount * rate)
+    }
+
+    if (order.remittanceSendAmount !== null) return order.remittanceSendAmount
+    return null
+}
+
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
     if (!value || typeof value !== 'object') return null
 
@@ -2949,6 +3005,7 @@ export default function WormOrderPage() {
                             {wormOrderList.map((order) => {
                                 const isActiveOrder = activeWormOrder?.id === order.id
                                 const createdDateText = toKstDateInputString(order.createdAt)
+                                const sendAmountKrw = resolveRemittanceSendKrw(order)
                                 return (
                                     <tr
                                         key={order.id}
@@ -2967,16 +3024,16 @@ export default function WormOrderPage() {
                                                 {order.remittanceAppliedAt && (
                                                     <span className="text-[11px] font-semibold text-emerald-700">
                                                         신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
-                                                        {order.remittanceSendAmountText ? ` / ${order.remittanceSendAmountText}` : ''}
+                                                        {sendAmountKrw !== null ? ` / ${formatKrwAmount(sendAmountKrw)}` : ''}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
-                                            {order.remittanceSendAmountText || '-'}
+                                            {formatKrwAmount(sendAmountKrw)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
-                                            {formatKrwAmount(order.remittanceSendAmount)}
+                                            {formatKrwAmount(sendAmountKrw)}
                                         </td>
                                         <td className="px-3 py-2.5 text-xs text-slate-500 dark:text-gray-400">
                                             {new Date(order.updatedAt).toLocaleString()}
