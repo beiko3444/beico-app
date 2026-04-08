@@ -13,6 +13,7 @@ export async function GET(req: Request) {
     const { searchParams } = new URL(req.url)
     const uid = searchParams.get('uid')
     const indexStr = searchParams.get('index')
+    const rawMode = ['1', 'true', 'yes', 'y'].includes((searchParams.get('raw') || '').trim().toLowerCase())
 
     if (!uid || !indexStr) {
         return NextResponse.json({ error: '요청 파라미터가 누락되었습니다.' }, { status: 400 })
@@ -24,6 +25,28 @@ export async function GET(req: Request) {
     }
 
     try {
+        if (rawMode) {
+            const attachment = await getWormEmailAttachment(uid, index)
+            const filename = attachment.filename || `attachment-${index}`
+            const contentType = attachment.contentType || 'application/octet-stream'
+            const rawContent = attachment.content
+            const body =
+                rawContent instanceof Uint8Array
+                    ? rawContent
+                    : typeof rawContent === 'string'
+                        ? Buffer.from(rawContent)
+                        : Buffer.from([])
+
+            return new NextResponse(body, {
+                status: 200,
+                headers: {
+                    'Content-Type': contentType,
+                    'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+                    'Cache-Control': 'private, max-age=60',
+                },
+            })
+        }
+
         // 1. DB 캐시 확인
         const cached = await prisma.wormEmailAttachmentCache.findUnique({
             where: { uid_index: { uid, index } },
