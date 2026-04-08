@@ -1,10 +1,32 @@
 import { NextResponse } from 'next/server'
 import { getWormEmailAttachment } from '@/lib/wormOrderMail'
 import { requireAdminSession } from '@/lib/requireAdmin'
-import { uploadToR2, getR2PresignedUrl } from '@/lib/r2'
+import { uploadToR2, getR2PresignedUrl, isR2Configured } from '@/lib/r2'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
+
+function toAttachmentResponse(attachment: { content?: unknown; filename?: string | null; contentType?: string | null }, index: number) {
+    const filename = (attachment.filename || '').trim() || `attachment-${index}`
+    const contentType = (attachment.contentType || '').trim() || 'application/octet-stream'
+
+    const rawContent = attachment.content
+    const bytes = rawContent instanceof Uint8Array
+        ? rawContent
+        : typeof rawContent === 'string'
+            ? Buffer.from(rawContent)
+            : new Uint8Array()
+
+    return new NextResponse(bytes, {
+        status: 200,
+        headers: {
+            'Content-Type': contentType,
+            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+            'Cache-Control': 'private, max-age=60',
+            'Content-Length': String(bytes.byteLength),
+        },
+    })
+}
 
 export async function GET(req: Request) {
     const { unauthorized } = await requireAdminSession()
@@ -27,26 +49,12 @@ export async function GET(req: Request) {
     try {
         if (rawMode) {
             const attachment = await getWormEmailAttachment(uid, index)
-            const filename = attachment.filename || `attachment-${index}`
-            const contentType = attachment.contentType || 'application/octet-stream'
-            const rawContent = attachment.content
-            const binaryBody: Uint8Array =
-                rawContent instanceof Uint8Array
-                    ? rawContent
-                    : typeof rawContent === 'string'
-                        ? new TextEncoder().encode(rawContent)
-                        : new Uint8Array()
-            const body = new ArrayBuffer(binaryBody.byteLength)
-            new Uint8Array(body).set(binaryBody)
+            return toAttachmentResponse(attachment, index)
+        }
 
-            return new NextResponse(body, {
-                status: 200,
-                headers: {
-                    'Content-Type': contentType,
-                    'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
-                    'Cache-Control': 'private, max-age=60',
-                },
-            })
+        if (!isR2Configured()) {
+            const attachment = await getWormEmailAttachment(uid, index)
+            return toAttachmentResponse(attachment, index)
         }
 
         // 1. DB 캐시 확인
@@ -85,6 +93,14 @@ export async function GET(req: Request) {
         const presignedUrl = await getR2PresignedUrl(r2Key, filename)
         return NextResponse.redirect(presignedUrl, 302)
     } catch (error: unknown) {
+        // R2 경로 실패 시에도 첨부파일 조회 기능은 동작하게 폴백.
+        try {
+            const attachment = await getWormEmailAttachment(uid, index)
+            return toAttachmentResponse(attachment, index)
+        } catch {
+            // no-op: let the original error response below handle the failure.
+        }
+
         console.error('Attachment Download Error:', error)
         const message = error instanceof Error ? error.message : '첨부파일 다운로드 실패'
         return NextResponse.json({ error: message }, { status: 500 })

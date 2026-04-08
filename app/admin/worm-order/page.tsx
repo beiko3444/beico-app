@@ -375,16 +375,16 @@ const WORM_TYPES: WormType[] = [
     {
         id: 'blue',
         label: '청갯지렁이',
-        cardActiveClass: 'bg-sky-50',
-        cardActiveBorderClass: 'border-sky-400',
-        cardTagClass: 'bg-sky-100 text-sky-700',
+        cardActiveClass: 'bg-green-50',
+        cardActiveBorderClass: 'border-green-400',
+        cardTagClass: 'bg-green-500 text-white',
     },
     {
         id: 'red',
         label: '홍갯지렁이',
         cardActiveClass: 'bg-red-50',
         cardActiveBorderClass: 'border-red-400',
-        cardTagClass: 'bg-red-100 text-red-700',
+        cardTagClass: 'bg-red-500 text-white',
     },
 ]
 
@@ -807,6 +807,28 @@ function sanitizeRemittancePricingSummary(value: unknown): RemittancePricingSumm
     return result
 }
 
+function buildRemittancePricingSummaryFromOrder(
+    order: Pick<
+        WormOrderListItem,
+        'remittanceFinalReceiveAmountText' | 'remittanceSendAmountText' | 'remittanceTotalFeeText' | 'remittanceExchangeRateText'
+    > | null | undefined,
+): RemittancePricingSummary | null {
+    if (!order) return null
+
+    const summary: RemittancePricingSummary = {
+        finalReceiveAmount: order.remittanceFinalReceiveAmountText?.trim() || '',
+        sendAmount: order.remittanceSendAmountText?.trim() || '',
+        totalFee: order.remittanceTotalFeeText?.trim() || '',
+        exchangeRate: order.remittanceExchangeRateText?.trim() || '',
+    }
+
+    if (!summary.finalReceiveAmount && !summary.sendAmount && !summary.totalFee && !summary.exchangeRate) {
+        return null
+    }
+
+    return summary
+}
+
 function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
     if (!value || typeof value !== 'object') return null
 
@@ -1024,6 +1046,7 @@ export default function WormOrderPage() {
     const [remittanceLockedUntil, setRemittanceLockedUntil] = useState<number | null>(null)
     const [remittanceLockTick, setRemittanceLockTick] = useState(0)
     const [remittancePricingSummary, setRemittancePricingSummary] = useState<RemittancePricingSummary | null>(null)
+    const [remittancePricingSummaryOrderId, setRemittancePricingSummaryOrderId] = useState<string | null>(null)
     const [remittanceSaveInfo, setRemittanceSaveInfo] = useState<{ orderNumber: string; savedAt: string } | null>(null)
     const [remittanceSaveWarning, setRemittanceSaveWarning] = useState('')
     const [paymentNotificationCopied, setPaymentNotificationCopied] = useState(false)
@@ -2200,6 +2223,16 @@ export default function WormOrderPage() {
     const activeOrderRemittanceAppliedAtText = activeWormOrderRecord?.remittanceAppliedAt
         ? new Date(activeWormOrderRecord.remittanceAppliedAt).toLocaleString()
         : ''
+    const persistedRemittancePricingSummary = useMemo(
+        () => buildRemittancePricingSummaryFromOrder(activeWormOrderRecord),
+        [activeWormOrderRecord],
+    )
+    const transientRemittancePricingSummary = useMemo(() => {
+        if (!activeWormOrderRecord) return null
+        if (!remittancePricingSummary || !remittancePricingSummaryOrderId) return null
+        return remittancePricingSummaryOrderId === activeWormOrderRecord.id ? remittancePricingSummary : null
+    }, [activeWormOrderRecord, remittancePricingSummary, remittancePricingSummaryOrderId])
+    const effectiveRemittancePricingSummary = persistedRemittancePricingSummary || transientRemittancePricingSummary
 
     // 현재 발주에 매칭된 인보이스 메일 자동 추출
     const matchedInvoiceEmail = useMemo(() => {
@@ -2327,6 +2360,7 @@ export default function WormOrderPage() {
         setRemittanceProgress(0)
         setRemittanceProgressLabel('대기 중')
         setRemittancePricingSummary(null)
+        setRemittancePricingSummaryOrderId(null)
         setRemittanceSaveInfo(null)
         setRemittanceSaveWarning('')
         remittanceCancelRequestedRef.current = false
@@ -2500,6 +2534,7 @@ export default function WormOrderPage() {
             setRemittanceProgress(100)
             setRemittanceProgressLabel(resolvedStage?.label || '송금 신청이 완료되었습니다.')
             setRemittancePricingSummary(pricingSummary)
+            setRemittancePricingSummaryOrderId(activeWormOrderRecord.id)
 
             if (savedOrder?.orderNumber) {
                 setRemittanceSaveInfo({
@@ -2513,6 +2548,32 @@ export default function WormOrderPage() {
             }
 
             setRemittanceSaveWarning(typeof result?.saveWarning === 'string' ? result.saveWarning : '')
+            if (savedOrder?.id) {
+                setWormOrderList((prev) => prev.map((order) => (
+                    order.id === savedOrder.id
+                        ? {
+                            ...order,
+                            status: typeof savedOrder.status === 'string' ? savedOrder.status : order.status,
+                            remittanceAppliedAt: typeof savedOrder.remittanceAppliedAt === 'string'
+                                ? savedOrder.remittanceAppliedAt
+                                : order.remittanceAppliedAt,
+                            remittanceFinalReceiveAmountText: typeof savedOrder.remittanceFinalReceiveAmountText === 'string'
+                                ? savedOrder.remittanceFinalReceiveAmountText
+                                : order.remittanceFinalReceiveAmountText,
+                            remittanceSendAmountText: typeof savedOrder.remittanceSendAmountText === 'string'
+                                ? savedOrder.remittanceSendAmountText
+                                : order.remittanceSendAmountText,
+                            remittanceTotalFeeText: typeof savedOrder.remittanceTotalFeeText === 'string'
+                                ? savedOrder.remittanceTotalFeeText
+                                : order.remittanceTotalFeeText,
+                            remittanceExchangeRateText: typeof savedOrder.remittanceExchangeRateText === 'string'
+                                ? savedOrder.remittanceExchangeRateText
+                                : order.remittanceExchangeRateText,
+                            updatedAt: typeof savedOrder.updatedAt === 'string' ? savedOrder.updatedAt : order.updatedAt,
+                        }
+                        : order
+                )))
+            }
             void fetchWormOrders({ silent: true })
         } catch (error) {
             const canceledByUser =
@@ -2866,6 +2927,7 @@ export default function WormOrderPage() {
         setRemittanceAttemptsRemaining(null)
         setRemittanceLockedUntil(null)
         setRemittancePricingSummary(null)
+        setRemittancePricingSummaryOrderId(null)
         setRemittanceSaveInfo(null)
         setRemittanceSaveWarning('')
         setBlNumberQuery('')
@@ -4262,25 +4324,25 @@ export default function WormOrderPage() {
                 {remittanceSuccess && (
                     <p className="text-sm font-semibold text-green-600">{remittanceSuccess}</p>
                 )}
-                {remittancePricingSummary && (
+                {effectiveRemittancePricingSummary && (
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
                         <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">송금 확정 정보</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                             <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                 <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">최종 수취금액</p>
-                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.finalReceiveAmount || '-'}</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{effectiveRemittancePricingSummary.finalReceiveAmount || '-'}</p>
                             </div>
                             <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                 <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">보내는 돈</p>
-                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.sendAmount || '-'}</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{effectiveRemittancePricingSummary.sendAmount || '-'}</p>
                             </div>
                             <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                 <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">총수수료</p>
-                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.totalFee || '-'}</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{effectiveRemittancePricingSummary.totalFee || '-'}</p>
                             </div>
                             <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                 <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">적용환율</p>
-                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{remittancePricingSummary.exchangeRate || '-'}</p>
+                                <p className="text-[15px] font-black text-slate-900 dark:text-white">{effectiveRemittancePricingSummary.exchangeRate || '-'}</p>
                             </div>
                         </div>
                         {remittanceSaveInfo && (
@@ -4298,7 +4360,7 @@ export default function WormOrderPage() {
             )}
             {/* ── 입금완료 통보 (Step 5) ── */}
             {showNotificationTools && (() => {
-                const sendAmountText = remittancePricingSummary?.sendAmount
+                const sendAmountText = effectiveRemittancePricingSummary?.sendAmount
                     || (autoTransferAmountUsd !== null
                         ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
                         : activeWormOrderRecord?.remittanceSendAmountText || null)

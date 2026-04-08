@@ -351,6 +351,10 @@ export async function POST(request: Request) {
                     orderNumber: string
                     status: string
                     remittanceAppliedAt: Date | null
+                    remittanceFinalReceiveAmountText: string | null
+                    remittanceSendAmountText: string | null
+                    remittanceTotalFeeText: string | null
+                    remittanceExchangeRateText: string | null
                     updatedAt: Date
                   }
                 | null = null
@@ -393,6 +397,10 @@ export async function POST(request: Request) {
                         orderNumber: true,
                         status: true,
                         remittanceAppliedAt: true,
+                        remittanceFinalReceiveAmountText: true,
+                        remittanceSendAmountText: true,
+                        remittanceTotalFeeText: true,
+                        remittanceExchangeRateText: true,
                         updatedAt: true,
                     },
                 })
