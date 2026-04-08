@@ -30,12 +30,12 @@ export async function GET(req: Request) {
             const filename = attachment.filename || `attachment-${index}`
             const contentType = attachment.contentType || 'application/octet-stream'
             const rawContent = attachment.content
-            const body =
+            const body: Uint8Array =
                 rawContent instanceof Uint8Array
                     ? rawContent
                     : typeof rawContent === 'string'
-                        ? Buffer.from(rawContent)
-                        : Buffer.from([])
+                        ? new TextEncoder().encode(rawContent)
+                        : new Uint8Array()
 
             return new NextResponse(body, {
                 status: 200,
