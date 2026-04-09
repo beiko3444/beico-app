@@ -112,6 +112,9 @@ type RemittancePricingSummary = {
     exchangeRate: string
 }
 
+const DEFAULT_CUSTOMS_FORWARD_EMAIL = 'customs@beone.kr'
+const CUSTOMS_FORWARD_SUBJECT_SUFFIX = '엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.'
+
 type WormOrderSnapshot = {
     id: string
     orderNumber: string
@@ -433,6 +436,19 @@ function formatLocalDateToYmd(date: Date) {
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
+}
+
+function formatKstDateDot(date: Date) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date)
+    const year = parts.find((part) => part.type === 'year')?.value ?? '0000'
+    const month = parts.find((part) => part.type === 'month')?.value ?? '00'
+    const day = parts.find((part) => part.type === 'day')?.value ?? '00'
+    return `${year}.${month}.${day}`
 }
 
 function buildMonthCalendarDays(year: number, month: number) {
@@ -1228,7 +1244,7 @@ export default function WormOrderPage() {
     const [awbCandidates, setAwbCandidates] = useState<AwbCandidate[]>([])
 
     // ── 관세사 메일 전달 관련 State ──
-    const [forwardEmail, setForwardEmail] = useState('')
+    const [forwardEmail, setForwardEmail] = useState(DEFAULT_CUSTOMS_FORWARD_EMAIL)
     const [forwarding, setForwarding] = useState(false)
     const [forwardError, setForwardError] = useState('')
     const [forwardSuccess, setForwardSuccess] = useState('')
@@ -1282,9 +1298,13 @@ export default function WormOrderPage() {
         }
     }, [shippingSubmitting, shippingRecipientPhone, shippingRecipientName, shippingRecipientAddress, shippingRecipientDetailAddress])
 
-    const handleForwardEmail = async (uid: string) => {
-        if (!forwardEmail) {
+    const handleForwardEmail = async () => {
+        if (!forwardEmail.trim()) {
             setForwardError('받을 이메일 주소를 입력해주세요.')
+            return
+        }
+        if (!matchedInvoiceEmail?.uid || !matchedAwbEmail?.uid) {
+            setForwardError('인보이스/AWB 메일 매칭이 완료된 후 발송할 수 있습니다.')
             return
         }
         setForwarding(true)
@@ -1295,13 +1315,15 @@ export default function WormOrderPage() {
             const res = await fetch('/api/admin/worm-order/emails/forward', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ uid, toEmail: forwardEmail })
+                body: JSON.stringify({
+                    uids: [matchedInvoiceEmail.uid, matchedAwbEmail.uid],
+                    toEmail: forwardEmail.trim(),
+                }),
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || '이메일 전달 실패')
             setForwardSuccess('메일과 첨부파일이 지정된 주소로 성공적으로 전달되었습니다.')
             setTimeout(() => setForwardSuccess(''), 5000)
-            setForwardEmail('')
         } catch (err: any) {
             setForwardError(err.message)
         } finally {
@@ -2280,6 +2302,16 @@ export default function WormOrderPage() {
     // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
     const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
     const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
+    const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbEmail?.uid)
+    const customsForwardDateText = useMemo(() => formatKstDateDot(new Date()), [])
+    const customsForwardSubject = `${customsForwardDateText} ${CUSTOMS_FORWARD_SUBJECT_SUFFIX}`
+    const customsForwardBody = `안녕하세요 관세사님- ${customsForwardDateText}  엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.
+<직접배차>예정입니다- 감사합니다:)
+
+엑스트래커 매니저 김유정
+010-8119-3313
+전화/문자 메세지 회신은 위에 번호로 연락 부탁드립니다.
+감사합니다.`
 
     const handleQuantityChange = (wormTypeId: WormTypeId, sizeId: string, nextValue: number) => {
         setCopied(false)
@@ -2750,7 +2782,11 @@ export default function WormOrderPage() {
         })
             ? 'done'
             : 'todo'
-        result[9] = forwardSuccess ? 'done' : 'todo'
+        result[9] = forwardSuccess
+            ? 'done'
+            : forwarding || isCustomsForwardReady || Boolean(forwardEmail.trim())
+                ? 'active'
+                : 'todo'
         result[10] = hasWarehouseMail ? 'done' : hasFetched ? 'active' : 'todo'
         result[11] = 'todo'
         result[12] = 'todo'
@@ -2765,11 +2801,14 @@ export default function WormOrderPage() {
         detailRows,
         emails,
         fallbackAwbCandidate,
+        forwardEmail,
+        forwarding,
         forwardSuccess,
         generatedMessage,
         hasFetched,
         hasWarehouseMail,
         invoicePdf,
+        isCustomsForwardReady,
         loadingEmails,
         paymentNotificationCopied,
         remittanceManuallyDone,
@@ -2936,7 +2975,7 @@ export default function WormOrderPage() {
         setAwbNumber(null)
         setAwbCandidates([])
         setAwbError('')
-        setForwardEmail('')
+        setForwardEmail(DEFAULT_CUSTOMS_FORWARD_EMAIL)
         setForwardError('')
         setForwardSuccess('')
         setDocEmails([])
@@ -2971,6 +3010,7 @@ export default function WormOrderPage() {
     const showBankPaymentTools = visibleStepIdSet.has(4)
     const showNotificationTools = visibleStepIdSet.has(5)
     const showCustomsTools = visibleStepIdSet.has(7)
+    const showCargoCustomsMailTools = visibleStepIdSet.has(9)
     const showShippingTools = visibleStepIdSet.has(13)
     const stepRenderOrderMap = useMemo(() => {
         const next = new Map<number, number>()
@@ -2994,6 +3034,7 @@ export default function WormOrderPage() {
     const bankPaymentToolOrderBase = getAnchorOrderBase([4], 4)
     const notificationToolOrderBase = getAnchorOrderBase([5], 5)
     const customsToolOrderBase = getAnchorOrderBase([7], 7)
+    const cargoCustomsMailToolOrderBase = getAnchorOrderBase([9], 9)
     const shippingToolOrderBase = getAnchorOrderBase([13], 13)
 
     return (
@@ -4565,6 +4606,67 @@ export default function WormOrderPage() {
                 )}
                 </div>
                 )}
+
+            {showCargoCustomsMailTools && (
+                <div
+                    style={{ order: cargoCustomsMailToolOrderBase + 5 }}
+                    className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
+                >
+                    <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0f9ff] dark:bg-[#1a1a1a] flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-black text-[#111827] dark:text-white flex items-center gap-2">
+                                <Mail size={18} className="text-sky-600" />
+                                카고 / 관세사 문서전달
+                            </h3>
+                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">인보이스 + AWB 매칭이 완료되면 두 메일의 첨부파일을 한 번에 전달합니다.</p>
+                        </div>
+                    </div>
+                    <div className="p-6 space-y-4">
+                        {!isCustomsForwardReady ? (
+                            <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-[12px] font-semibold text-amber-700">
+                                인보이스 메일과 AWB 메일을 현재 발주에 모두 매칭하면 발송이 활성화됩니다.
+                            </div>
+                        ) : (
+                            <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-[12px] font-semibold text-emerald-700 space-y-1">
+                                <p>매칭 완료: 인보이스 UID {matchedInvoiceEmail?.uid} / AWB UID {matchedAwbEmail?.uid}</p>
+                                <p>두 메일의 첨부파일을 모두 포함해서 발송합니다.</p>
+                            </div>
+                        )}
+
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">수신 이메일</label>
+                            <input
+                                type="email"
+                                value={forwardEmail}
+                                onChange={(event) => setForwardEmail(event.target.value)}
+                                placeholder={DEFAULT_CUSTOMS_FORWARD_EMAIL}
+                                className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                            />
+                            <p className="text-[11px] text-slate-500 dark:text-gray-400">기본값: {DEFAULT_CUSTOMS_FORWARD_EMAIL} (필요 시 변경 가능)</p>
+                        </div>
+
+                        <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.12em]">발송 메일 미리보기</p>
+                            <p className="text-sm font-bold text-slate-800">제목: {customsForwardSubject}</p>
+                            <pre className="whitespace-pre-wrap text-[12px] leading-relaxed text-slate-700 font-medium">{customsForwardBody}</pre>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => { void handleForwardEmail() }}
+                                disabled={forwarding || !isCustomsForwardReady || !forwardEmail.trim()}
+                                className="h-10 px-5 rounded-xl font-bold text-sm bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                            >
+                                {forwarding ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
+                                {forwarding ? '발송 중...' : '발송하기'}
+                            </button>
+                            {forwardSuccess && <p className="text-sm font-semibold text-emerald-600">{forwardSuccess}</p>}
+                            {forwardError && <p className="text-sm font-semibold text-[#e34219]">{forwardError}</p>}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {showShippingTools && (
                 <div
