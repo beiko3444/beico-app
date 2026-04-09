@@ -5,6 +5,7 @@ const DEFAULT_UNIPASS_API_KEY = 'r290g216h033p330q080i040q6'
 const UNIPASS_API_URL = 'https://unipass.customs.go.kr:38010/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo'
 const LOOKBACK_YEARS = 3
 const CUSTOMS_PROGRESS_CACHE_TTL_MS = 10 * 60 * 1000
+const CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS = 60 * 1000
 
 type CachedCustomsProgress = {
     expiresAt: number
@@ -25,6 +26,14 @@ type Api001ParseResult = {
 
 function formatBlYear(year: number) {
     return String(year % 100).padStart(2, '0')
+}
+
+function normalizeBlNo(input: string) {
+    return input
+        .replace(/\s+/g, '')
+        .trim()
+        .replace(/[^0-9a-zA-Z]/g, '')
+        .toUpperCase()
 }
 
 function decodeXmlValue(input: string) {
@@ -106,9 +115,9 @@ export async function GET(request: NextRequest) {
 
     const apiKey = process.env.UNIPASS_API_KEY || DEFAULT_UNIPASS_API_KEY
     const rawBlNo = request.nextUrl.searchParams.get('blNo') || ''
-    const blNo = rawBlNo.replace(/\s+/g, '').trim()
+    const blNo = normalizeBlNo(rawBlNo)
     const forceRefresh = request.nextUrl.searchParams.get('force') === '1'
-    const cacheKey = blNo.toUpperCase()
+    const cacheKey = blNo
 
     if (!blNo) {
         return NextResponse.json({ error: 'B/L 번호를 입력해주세요.' }, { status: 400 })
@@ -178,7 +187,7 @@ export async function GET(request: NextRequest) {
         attempts,
     }
     customsProgressCache.set(cacheKey, {
-        expiresAt: Date.now() + CUSTOMS_PROGRESS_CACHE_TTL_MS,
+        expiresAt: Date.now() + CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS,
         status: 404,
         payload: notFoundPayload,
     })

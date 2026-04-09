@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import nodemailer from 'nodemailer'
-import { getParsedMailByUid } from '@/lib/wormOrderMail'
+import { getParsedMailsByUids } from '@/lib/wormOrderMail'
 import { requireAdminSession } from '@/lib/requireAdmin'
 import { prisma } from '@/lib/prisma'
 
@@ -117,16 +117,15 @@ export async function POST(req: Request) {
 
         if (!user || !pass) return NextResponse.json({ error: '메일 서버 환경변수가 없습니다.' }, { status: 500 })
 
-        // 1. 원본 메일 및 첨부파일 확보 (캐시 재사용)
-        const parsedMessages = await Promise.all(
-            normalizedUids.map(async (targetUid) => {
-                const parsedMessage = await getParsedMailByUid(targetUid)
-                if (!parsedMessage) {
-                    throw new Error(`원본 메일 파싱에 실패했습니다. (uid: ${targetUid})`)
-                }
-                return parsedMessage
-            }),
-        )
+        // 1. 원본 메일 및 첨부파일 확보 (캐시 재사용 + 단일 IMAP 세션 처리)
+        const parsedMap = await getParsedMailsByUids(normalizedUids)
+        const parsedMessages = normalizedUids.map((targetUid) => {
+            const parsedMessage = parsedMap.get(targetUid)
+            if (!parsedMessage) {
+                throw new Error(`원본 메일 파싱에 실패했습니다. (uid: ${targetUid})`)
+            }
+            return parsedMessage
+        })
 
         // 2. 제목 & 본문 포맷팅 (KST 오늘 날짜, 요청 문구 고정)
         const dateStr = formatKstDateDot(new Date())

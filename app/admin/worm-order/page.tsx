@@ -134,6 +134,7 @@ type WormOrderListItem = {
     remittanceExchangeRate: number | null
     remittanceExchangeRateText: string | null
     awbNumber: string | null
+    awbEmailUid: string | null
     createdAt: string
     updatedAt: string
 }
@@ -299,6 +300,14 @@ const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
     { percent: 94, label: '모인 응답을 확인하는 중...' },
 ]
 const CUSTOMS_PROGRESS_CLIENT_CACHE_TTL_MS = 10 * 60 * 1000
+
+function normalizeCustomsBlNo(input: string) {
+    return input
+        .replace(/\s+/g, '')
+        .trim()
+        .replace(/[^0-9a-zA-Z]/g, '')
+        .toUpperCase()
+}
 
 const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressStage }> = [
     { keys: ['runtime:'], stage: { percent: 5, label: '브라우저 런타임을 준비하는 중...' } },
@@ -886,6 +895,7 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         remittanceExchangeRate: typeof candidate.remittanceExchangeRate === 'number' && Number.isFinite(candidate.remittanceExchangeRate) ? candidate.remittanceExchangeRate : null,
         remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
         awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
+        awbEmailUid: typeof candidate.awbEmailUid === 'string' ? candidate.awbEmailUid : null,
         createdAt: candidate.createdAt,
         updatedAt: candidate.updatedAt,
     }
@@ -1351,7 +1361,7 @@ export default function WormOrderPage() {
             setForwardError('받을 이메일 주소를 입력해주세요.')
             return
         }
-        if (!matchedInvoiceEmail?.uid || !matchedAwbEmail?.uid) {
+        if (!matchedInvoiceEmail?.uid || !matchedAwbUid) {
             setForwardError('인보이스/AWB 메일 매칭이 완료된 후 발송할 수 있습니다.')
             return
         }
@@ -1364,7 +1374,7 @@ export default function WormOrderPage() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    uids: [matchedInvoiceEmail.uid, matchedAwbEmail.uid],
+                    uids: [matchedInvoiceEmail.uid, matchedAwbUid],
                     toEmail: forwardEmail.trim(),
                     orderId: activeWormOrder?.id || null,
                 }),
@@ -2353,11 +2363,12 @@ export default function WormOrderPage() {
         if (!activeWormOrder?.id) return null
         return docEmails.find(e => e.matchedOrderId === activeWormOrder.id) || null
     }, [docEmails, activeWormOrder?.id])
+    const matchedAwbUid = matchedAwbEmail?.uid || activeWormOrderRecord?.awbEmailUid || null
 
     // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
     const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
     const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
-    const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbEmail?.uid)
+    const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbUid)
     const customsForwardDateText = useMemo(() => formatKstDateDot(new Date()), [])
     const customsForwardSubject = `${customsForwardDateText} ${CUSTOMS_FORWARD_SUBJECT_SUFFIX}`
     const customsForwardBody = `안녕하세요 관세사님- ${customsForwardDateText}  엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.
@@ -2742,7 +2753,7 @@ export default function WormOrderPage() {
         options?: { scrollIntoView?: boolean },
     ) => {
         const blNo = (nextBlNo ?? blNumberQuery).replace(/\s+/g, '').trim()
-        const normalizedBlNo = blNo.toUpperCase()
+        const normalizedBlNo = normalizeCustomsBlNo(blNo)
         if (nextBlNo) {
             setBlNumberQuery(blNo)
         }
@@ -2754,7 +2765,7 @@ export default function WormOrderPage() {
         setCustomsProgressError('')
         setCustomsProgressResult(null)
 
-        if (!blNo) {
+        if (!normalizedBlNo) {
             setCustomsProgressError('B/L 번호를 입력해주세요.')
             return
         }
@@ -2768,7 +2779,7 @@ export default function WormOrderPage() {
 
         setCustomsProgressLoading(true)
         try {
-            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(blNo)}`, { method: 'GET' })
+            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(normalizedBlNo)}`, { method: 'GET' })
             const result = await response.json()
 
             if (!response.ok) {
@@ -2785,11 +2796,6 @@ export default function WormOrderPage() {
         } catch (error) {
             const message = error instanceof Error ? error.message : '화물통관 진행정보 조회에 실패했습니다.'
             setCustomsProgressError(message)
-            customsProgressCacheRef.current.set(normalizedBlNo, {
-                savedAt: Date.now(),
-                result: null,
-                error: message,
-            })
         } finally {
             setCustomsProgressLoading(false)
         }
@@ -4515,7 +4521,7 @@ export default function WormOrderPage() {
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">유니패스 수입 통관 조회</h3>
                         <p className="text-xs text-gray-500 mt-1">
-                            B/L 번호만 입력하면 MBL/HBL + 최근 3개년을 자동으로 시도해 조회합니다.
+                            B/L 번호만 입력하면 MBL/HBL + 최근 3개년을 자동으로 시도해 조회합니다. (하이픈/공백은 자동 제거)
                         </p>
                     </div>
                     <Search size={18} className="text-[#e34219] mt-1" />
@@ -4683,7 +4689,7 @@ export default function WormOrderPage() {
                             </div>
                         ) : (
                             <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-[12px] font-semibold text-emerald-700 space-y-1">
-                                <p>매칭 완료: 인보이스 UID {matchedInvoiceEmail?.uid} / AWB UID {matchedAwbEmail?.uid}</p>
+                                <p>매칭 완료: 인보이스 UID {matchedInvoiceEmail?.uid} / AWB UID {matchedAwbUid}</p>
                                 <p>두 메일의 첨부파일을 모두 포함해서 발송합니다.</p>
                             </div>
                         )}

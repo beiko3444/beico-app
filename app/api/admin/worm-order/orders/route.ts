@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
         updatedAt: true,
         emailMatches: {
           where: { awbNumber: { not: null } },
-          select: { awbNumber: true },
+          orderBy: { matchedAt: 'desc' },
+          select: { awbNumber: true, uid: true },
           take: 1,
         },
       },
@@ -70,6 +71,7 @@ export async function GET(request: NextRequest) {
     const ordersWithAwb = orders.map((order) => ({
       ...order,
       awbNumber: order.emailMatches?.[0]?.awbNumber ?? null,
+      awbEmailUid: order.emailMatches?.[0]?.uid ?? null,
       emailMatches: undefined,
     }))
 

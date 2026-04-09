@@ -603,25 +603,54 @@ export async function loadWormEmailList(options?: {
   })
 }
 
-export async function getParsedMailByUid(uid: string) {
-  const cacheKey = uid.trim()
-  const cached = parsedMailCache.get(cacheKey)
-  if (cached && cached.expiresAt > Date.now()) {
-    return cached.parsed
+export async function getParsedMailsByUids(uids: string[]) {
+  const normalizedUids = Array.from(new Set(uids.map((uid) => uid.trim()).filter(Boolean)))
+  const now = Date.now()
+  const result = new Map<string, ParsedMail>()
+  const missingUids: string[] = []
+
+  for (const uid of normalizedUids) {
+    const cached = parsedMailCache.get(uid)
+    if (cached && cached.expiresAt > now) {
+      result.set(uid, cached.parsed)
+      continue
+    }
+    missingUids.push(uid)
   }
 
-  const parsed = await withInboxLock(async (client) => {
-    const message = await client.fetchOne(cacheKey, { source: true }, { uid: true })
-    if (!message || !message.source) {
-      throw new Error('해당 메일을 찾을 수 없습니다.')
-    }
-    return simpleParser(message.source)
-  })
+  if (missingUids.length > 0) {
+    const fetched = await withInboxLock(async (client) => {
+      const entries: Array<{ uid: string; parsed: ParsedMail }> = []
+      for (const uid of missingUids) {
+        const message = await client.fetchOne(uid, { source: true }, { uid: true })
+        if (!message || !message.source) {
+          throw new Error(`해당 메일을 찾을 수 없습니다. (uid: ${uid})`)
+        }
+        const parsed = await simpleParser(message.source)
+        entries.push({ uid, parsed })
+      }
+      return entries
+    })
 
-  parsedMailCache.set(cacheKey, {
-    parsed,
-    expiresAt: Date.now() + PARSED_MAIL_CACHE_TTL_MS,
-  })
+    for (const entry of fetched) {
+      parsedMailCache.set(entry.uid, {
+        parsed: entry.parsed,
+        expiresAt: Date.now() + PARSED_MAIL_CACHE_TTL_MS,
+      })
+      result.set(entry.uid, entry.parsed)
+    }
+  }
+
+  return result
+}
+
+export async function getParsedMailByUid(uid: string) {
+  const normalizedUid = uid.trim()
+  const parsedMap = await getParsedMailsByUids([normalizedUid])
+  const parsed = parsedMap.get(normalizedUid)
+  if (!parsed) {
+    throw new Error('해당 메일을 찾을 수 없습니다.')
+  }
 
   return parsed
 }
