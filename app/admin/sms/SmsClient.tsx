@@ -38,12 +38,27 @@ type SmsHistoryResponse = {
   messages: SmsHistoryItem[]
 }
 
+type SmsSendLogItem = {
+  id: string
+  refKey: string
+  receiptNum: string | null
+  fromNumber: string
+  toName: string
+  toNumber: string
+  contents: string
+  sendType: string
+  scheduled: boolean
+  requestedSendDT: string | null
+  createdAt: string
+}
+
 type SmsBootstrapResponse = {
   senderId: string
   defaultFromNumber: string
   fromNumbers: SmsFromNumber[]
   recipients: SmsRecipient[]
   history: SmsHistoryResponse
+  sendLogs: SmsSendLogItem[]
 }
 
 const HISTORY_PAGE_SIZE = 20
@@ -83,6 +98,19 @@ function formatSendDateTime(value: string) {
   return `${year}.${month}.${day} ${hour}:${minute}`
 }
 
+function formatIsoDateTime(value: string) {
+  if (!value) return '-'
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) return value
+
+  const year = parsed.getFullYear()
+  const month = String(parsed.getMonth() + 1).padStart(2, '0')
+  const day = String(parsed.getDate()).padStart(2, '0')
+  const hour = String(parsed.getHours()).padStart(2, '0')
+  const minute = String(parsed.getMinutes()).padStart(2, '0')
+  return `${year}.${month}.${day} ${hour}:${minute}`
+}
+
 function getSendStateLabel(state: number) {
   if (state === 0) return '대기(0)'
   if (state === 1) return '완료(1)'
@@ -109,6 +137,7 @@ export default function SmsClient() {
   const [recipientActionError, setRecipientActionError] = useState('')
   const [fromNumbers, setFromNumbers] = useState<SmsFromNumber[]>([])
   const [recipients, setRecipients] = useState<SmsRecipient[]>([])
+  const [sendLogs, setSendLogs] = useState<SmsSendLogItem[]>([])
   const [selectedRecipientId, setSelectedRecipientId] = useState('')
   const [fromNumber, setFromNumber] = useState('')
   const [toName, setToName] = useState('')
@@ -152,9 +181,11 @@ export default function SmsClient() {
       }
 
       const nextRecipients = Array.isArray(result.recipients) ? result.recipients : []
+      const nextSendLogs = Array.isArray(result.sendLogs) ? result.sendLogs : []
 
       setFromNumbers(Array.isArray(result.fromNumbers) ? result.fromNumbers : [])
       setRecipients(nextRecipients)
+      setSendLogs(nextSendLogs)
       setFromNumber((current) => {
         const currentExists = Array.isArray(result.fromNumbers) && result.fromNumbers.some((item) => item.number === current)
         if (currentExists) return current
@@ -228,6 +259,9 @@ export default function SmsClient() {
           ? `예약 발송이 등록되었습니다. 접수번호: ${result.receiptNum || '-'}`
           : `문자 발송이 완료되었습니다. 접수번호: ${result.receiptNum || '-'}`
       )
+      if (typeof result?.warning === 'string' && result.warning.trim()) {
+        setSubmitError(result.warning)
+      }
       setContents('')
       setSendAt('')
       await loadSmsData(history?.currentPage || 1, false)
@@ -565,6 +599,65 @@ export default function SmsClient() {
               저장된 수신자가 없습니다.
             </div>
           )}
+        </div>
+      </section>
+
+      <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
+        <div>
+          <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Saved Send List</p>
+          <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">저장된 발송리스트</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+            발송 버튼을 누를 때마다 언제 누구에게 보냈는지 로컬에 저장됩니다.
+          </p>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
+                <tr>
+                  <th className="px-4 py-3 text-left font-black">저장시각</th>
+                  <th className="px-4 py-3 text-left font-black">예약시각</th>
+                  <th className="px-4 py-3 text-left font-black">수신자</th>
+                  <th className="px-4 py-3 text-left font-black">수신번호</th>
+                  <th className="px-4 py-3 text-left font-black">발신번호</th>
+                  <th className="px-4 py-3 text-left font-black">타입</th>
+                  <th className="px-4 py-3 text-left font-black">접수번호</th>
+                  <th className="px-4 py-3 text-left font-black">내용</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
+                {sendLogs.length ? (
+                  sendLogs.map((item) => (
+                    <tr key={item.id} className="align-top">
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{formatIsoDateTime(item.createdAt)}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">
+                        {item.scheduled ? formatSendDateTime(item.requestedSendDT || '') : '-'}
+                      </td>
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{item.toName || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.toNumber || '') || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.fromNumber || '') || '-'}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black ${item.sendType === 'SMS' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                          {item.sendType}
+                        </span>
+                      </td>
+                      <td className="px-4 py-4 text-gray-500 dark:text-gray-400 whitespace-nowrap">{item.receiptNum || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 min-w-[320px]">
+                        <div className="line-clamp-2 whitespace-pre-wrap break-words">{item.contents || '-'}</div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-sm font-bold text-gray-400 dark:text-gray-400">
+                      저장된 발송리스트가 없습니다.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </section>
 

@@ -225,6 +225,24 @@ model SmsRecipient {
   @@index([updatedAt])
 }
 
+model SmsSendLog {
+  id              String   @id @default(uuid())
+  refKey          String   @unique
+  receiptNum      String?
+  fromNumber      String
+  toName          String
+  toNumber        String
+  contents        String
+  sendType        String
+  scheduled       Boolean  @default(false)
+  requestedSendDT String?
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([toName])
+  @@index([toNumber])
+}
+
 model CoupangSyncHistory {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())

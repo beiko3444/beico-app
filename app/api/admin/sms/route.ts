@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 const SENDER_INFO_CACHE_TTL_MS = 10 * 60 * 1000
+const SMS_SEND_LOG_LIMIT = 200
 
 type SenderInfoCacheEntry = {
   expiresAt: number
@@ -103,7 +104,7 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '조회 시작일은 종료일보다 늦을 수 없습니다.' }, { status: 400 })
     }
 
-    const [senderInfo, history, recipients] = await Promise.all([
+    const [senderInfo, history, recipients, sendLogs] = await Promise.all([
       getCachedSenderInfo(forceRefresh),
       getBarobillSmsSendMessagesByPaging({
         fromDate,
@@ -113,6 +114,10 @@ export async function GET(request: Request) {
       }),
       prisma.smsRecipient.findMany({
         orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
+      }),
+      prisma.smsSendLog.findMany({
+        orderBy: [{ createdAt: 'desc' }],
+        take: SMS_SEND_LOG_LIMIT,
       }),
     ])
 
@@ -124,6 +129,7 @@ export async function GET(request: Request) {
         toDate,
       },
       recipients,
+      sendLogs,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : '발신번호 목록을 불러오지 못했습니다.'
@@ -159,13 +165,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '문자 내용을 입력해주세요.' }, { status: 400 })
     }
 
+    const refKey = createRefKey()
+    const sendType = Buffer.byteLength(contents, 'utf8') <= 90 ? 'SMS' : 'LMS'
+    const scheduled = Boolean(sendDT)
+
     const result = await sendBarobillMessage({
       fromNumber,
       toName,
       toNumber,
       contents,
       sendDT,
-      refKey: createRefKey(),
+      refKey,
     })
 
     if (!result.success) {
@@ -178,13 +188,39 @@ export async function POST(request: Request) {
       )
     }
 
+    let warning = ''
+    let logSaved = true
+
+    try {
+      await prisma.smsSendLog.create({
+        data: {
+          refKey,
+          receiptNum: result.receiptNum || null,
+          fromNumber,
+          toName,
+          toNumber,
+          contents,
+          sendType,
+          scheduled,
+          requestedSendDT: sendDT || null,
+        },
+      })
+    } catch (logError) {
+      logSaved = false
+      const message = logError instanceof Error ? logError.message : 'unknown'
+      warning = `문자 발송은 완료됐지만 발송리스트 저장에 실패했습니다. (${message})`
+      console.error('[SMS] failed to save send log:', logError)
+    }
+
     return NextResponse.json({
       success: true,
       receiptNum: result.receiptNum,
       message: result.message,
-      sendType: Buffer.byteLength(contents, 'utf8') <= 90 ? 'SMS' : 'LMS',
-      scheduled: Boolean(sendDT),
+      sendType,
+      scheduled,
       completedAt: new Date().toISOString(),
+      logSaved,
+      warning,
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : '문자 발송에 실패했습니다.'
