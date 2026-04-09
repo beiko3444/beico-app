@@ -18,10 +18,19 @@ const TRANSLATIONS: Record<string, any> = {
         contactPerson: "担当者名 / Contact Person",
         nationality: "国籍 / Nationality",
         registrationNumber: "事業者登録番号 / Business Reg. Number",
+<<<<<<< Updated upstream
         email: "メールアドレス (税金計算書発行用) / Email (for Tax Invoice)",
         phone: "電話番号 / Phone",
         fax: "ファックス / Fax",
         address1: "住所 (この住所に卸売商品が配送されます) / Address (Delivery)",
+=======
+        email: "メールアドレス / Email",
+        emailMemo: "(세금계산서 발행용 이메일)",
+        phone: "電話番号 / Phone",
+        fax: "ファックス / Fax",
+        address1: "住所1 / Address 1",
+        address1Memo: "(발주상품이 해당 주소지로 배송됩니다)",
+>>>>>>> Stashed changes
         address2: "詳細住所 / Address 2",
         submit: "登録する / Register",
         passwordMismatch: "パスワードが一致しません。 / Passwords do not match.",
@@ -42,10 +51,19 @@ const TRANSLATIONS: Record<string, any> = {
         contactPerson: "대표자명 (Contact Person)",
         nationality: "국가 (Nationality)",
         registrationNumber: "사업자등록번호 (Business Reg. Number)",
+<<<<<<< Updated upstream
         email: "이메일 (세금계산서 발급용)",
         phone: "전화번호 (Phone)",
         fax: "팩스 (Fax)",
         address1: "기본 주소 (해당 주소지로 도매상품이 배송됩니다)",
+=======
+        email: "이메일 (Email)",
+        emailMemo: "(세금계산서 발행용 이메일)",
+        phone: "전화번호 (Phone)",
+        fax: "팩스 (Fax)",
+        address1: "기본 주소 (Address 1)",
+        address1Memo: "(발주상품이 해당 주소지로 배송됩니다)",
+>>>>>>> Stashed changes
         address2: "상세 주소 (Address 2)",
         submit: "가입하기 (Register)",
         passwordMismatch: "비밀번호가 일치하지 않습니다.",
@@ -66,10 +84,19 @@ const TRANSLATIONS: Record<string, any> = {
         contactPerson: "Contact Person",
         nationality: "Nationality",
         registrationNumber: "Business Registration Number",
+<<<<<<< Updated upstream
         email: "Email (for Tax Invoice)",
         phone: "Phone",
         fax: "Fax",
         address1: "Address (Wholesale products will be shipped to this address)",
+=======
+        email: "Email",
+        emailMemo: "(세금계산서 발행용 이메일)",
+        phone: "Phone",
+        fax: "Fax",
+        address1: "Address 1",
+        address1Memo: "(발주상품이 해당 주소지로 배송됩니다)",
+>>>>>>> Stashed changes
         address2: "Address 2",
         submit: "Register",
         passwordMismatch: "Passwords do not match.",
@@ -468,6 +495,9 @@ export default function SignupPage() {
                             <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.email}
                             </label>
+                            <p className="ml-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                {t.emailMemo}
+                            </p>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                     <Mail size={18} strokeWidth={1.5} />
@@ -532,6 +562,9 @@ export default function SignupPage() {
                             <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.address1}
                             </label>
+                            <p className="ml-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
+                                {t.address1Memo}
+                            </p>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                     <MapPin size={18} strokeWidth={1.5} />
