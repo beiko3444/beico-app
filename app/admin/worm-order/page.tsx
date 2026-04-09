@@ -138,6 +138,19 @@ type WormOrderListItem = {
     updatedAt: string
 }
 
+type WormForwardLogItem = {
+    id: string
+    orderId: string | null
+    orderNumber: string | null
+    toEmail: string
+    fromEmail: string
+    subject: string
+    attachmentCount: number
+    sentByUserId: string | null
+    sentByUserName: string | null
+    createdAt: string
+}
+
 const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 1,
@@ -1248,6 +1261,9 @@ export default function WormOrderPage() {
     const [forwarding, setForwarding] = useState(false)
     const [forwardError, setForwardError] = useState('')
     const [forwardSuccess, setForwardSuccess] = useState('')
+    const [forwardLogs, setForwardLogs] = useState<WormForwardLogItem[]>([])
+    const [forwardLogsLoading, setForwardLogsLoading] = useState(false)
+    const [forwardLogsError, setForwardLogsError] = useState('')
     const [remittanceManuallyDone, setRemittanceManuallyDone] = useState(false)
 
     // ── 로젠 송장 출력 관련 State ──
@@ -1298,6 +1314,38 @@ export default function WormOrderPage() {
         }
     }, [shippingSubmitting, shippingRecipientPhone, shippingRecipientName, shippingRecipientAddress, shippingRecipientDetailAddress])
 
+    const loadForwardLogs = useCallback(async (orderId: string) => {
+        if (!orderId) return
+        setForwardLogsLoading(true)
+        setForwardLogsError('')
+        try {
+            const query = new URLSearchParams({
+                orderId,
+                limit: '20',
+            })
+            const res = await fetch(`/api/admin/worm-order/emails/forward?${query.toString()}`, { cache: 'no-store' })
+            const data = await res.json().catch(() => ({}))
+            if (!res.ok) {
+                throw new Error(typeof data?.error === 'string' ? data.error : '발송 이력을 불러오지 못했습니다.')
+            }
+            const nextLogs = Array.isArray(data?.logs) ? data.logs : []
+            setForwardLogs(nextLogs)
+        } catch (error) {
+            setForwardLogsError(error instanceof Error ? error.message : '발송 이력을 불러오지 못했습니다.')
+        } finally {
+            setForwardLogsLoading(false)
+        }
+    }, [])
+
+    useEffect(() => {
+        if (!activeWormOrder?.id) {
+            setForwardLogs([])
+            setForwardLogsError('')
+            return
+        }
+        void loadForwardLogs(activeWormOrder.id)
+    }, [activeWormOrder?.id, loadForwardLogs])
+
     const handleForwardEmail = async () => {
         if (!forwardEmail.trim()) {
             setForwardError('받을 이메일 주소를 입력해주세요.')
@@ -1318,11 +1366,18 @@ export default function WormOrderPage() {
                 body: JSON.stringify({
                     uids: [matchedInvoiceEmail.uid, matchedAwbEmail.uid],
                     toEmail: forwardEmail.trim(),
+                    orderId: activeWormOrder?.id || null,
                 }),
             })
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || '이메일 전달 실패')
+            if (typeof data?.warning === 'string' && data.warning.trim()) {
+                setForwardError(data.warning)
+            }
             setForwardSuccess('메일과 첨부파일이 지정된 주소로 성공적으로 전달되었습니다.')
+            if (activeWormOrder?.id) {
+                await loadForwardLogs(activeWormOrder.id)
+            }
             setTimeout(() => setForwardSuccess(''), 5000)
         } catch (err: any) {
             setForwardError(err.message)
@@ -4663,6 +4718,29 @@ export default function WormOrderPage() {
                             </button>
                             {forwardSuccess && <p className="text-sm font-semibold text-emerald-600">{forwardSuccess}</p>}
                             {forwardError && <p className="text-sm font-semibold text-[#e34219]">{forwardError}</p>}
+                        </div>
+
+                        <div className="space-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
+                            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.12em]">최근 발송 이력</p>
+                            {forwardLogsLoading ? (
+                                <p className="text-[12px] font-medium text-slate-500">발송 이력을 불러오는 중입니다.</p>
+                            ) : forwardLogs.length > 0 ? (
+                                <div className="space-y-2">
+                                    {forwardLogs.map((log) => (
+                                        <div key={log.id} className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
+                                            <p className="text-[12px] font-semibold text-slate-700">
+                                                {new Date(log.createdAt).toLocaleString()} · {log.toEmail}
+                                            </p>
+                                            <p className="text-[11px] text-slate-500">
+                                                발신계정 {log.fromEmail} · 첨부 {log.attachmentCount}개{log.sentByUserName ? ` · 처리자 ${log.sentByUserName}` : ''}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-[12px] font-medium text-slate-500">저장된 발송 이력이 없습니다.</p>
+                            )}
+                            {forwardLogsError && <p className="text-[12px] font-semibold text-[#e34219]">{forwardLogsError}</p>}
                         </div>
                     </div>
                 </div>

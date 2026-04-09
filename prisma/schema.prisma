@@ -184,6 +184,7 @@ model WormOrder {
   remittanceExchangeRate          Float?
   remittanceExchangeRateText      String?
   emailMatches WormOrderEmailMatch[]
+  forwardLogs WormEmailForwardLog[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -212,6 +213,24 @@ model WormOrderEmailMatch {
 
   @@index([orderId])
   @@index([updatedAt])
+}
+
+model WormEmailForwardLog {
+  id             String    @id @default(uuid())
+  orderId         String?
+  toEmail         String
+  fromEmail       String
+  subject         String
+  attachmentCount Int       @default(0)
+  sourceUids      Json?
+  sentByUserId    String?
+  sentByUserName  String?
+  createdAt       DateTime  @default(now())
+  order           WormOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
+
+  @@index([orderId, createdAt])
+  @@index([createdAt])
+  @@index([toEmail])
 }
 
 model SmsRecipient {
