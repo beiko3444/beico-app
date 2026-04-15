@@ -112,6 +112,18 @@ type RemittancePricingSummary = {
     exchangeRate: string
 }
 
+type CalendarWeatherLocationKey = 'shanghai' | 'busanGangseo'
+
+type CalendarDailyWeather = {
+    date: string
+    weatherCode: number | null
+    weatherText: string
+    maxTempC: number | null
+    minTempC: number | null
+}
+
+type CalendarWeatherByDate = Record<string, Record<CalendarWeatherLocationKey, CalendarDailyWeather | null>>
+
 const DEFAULT_CUSTOMS_FORWARD_EMAIL = 'customs@beone.kr'
 const CUSTOMS_FORWARD_SUBJECT_SUFFIX = '엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.'
 
@@ -485,6 +497,43 @@ function buildMonthCalendarDays(year: number, month: number) {
             isCurrentMonth: date.getMonth() === month,
         }
     })
+}
+
+function formatCalendarWeatherText(weather: CalendarDailyWeather | null) {
+    if (!weather) return '-'
+    const maxText = weather.maxTempC !== null ? `${weather.maxTempC}` : '-'
+    const minText = weather.minTempC !== null ? `${weather.minTempC}` : '-'
+    return `${weather.weatherText} ${maxText}/${minText}°`
+}
+
+function isCalendarWeatherLocationKey(value: unknown): value is CalendarWeatherLocationKey {
+    return value === 'shanghai' || value === 'busanGangseo'
+}
+
+function toCalendarDailyWeather(value: unknown): CalendarDailyWeather | null {
+    if (!value || typeof value !== 'object') return null
+    const candidate = value as Record<string, unknown>
+    const date = typeof candidate.date === 'string' ? candidate.date : ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return null
+
+    const weatherCode = typeof candidate.weatherCode === 'number' && Number.isFinite(candidate.weatherCode)
+        ? candidate.weatherCode
+        : null
+    const weatherText = typeof candidate.weatherText === 'string' ? candidate.weatherText : '정보 없음'
+    const maxTempC = typeof candidate.maxTempC === 'number' && Number.isFinite(candidate.maxTempC)
+        ? candidate.maxTempC
+        : null
+    const minTempC = typeof candidate.minTempC === 'number' && Number.isFinite(candidate.minTempC)
+        ? candidate.minTempC
+        : null
+
+    return {
+        date,
+        weatherCode,
+        weatherText,
+        maxTempC,
+        minTempC,
+    }
 }
 
 function normalizeCustomsStepText(...values: Array<string | undefined>) {
@@ -1063,6 +1112,9 @@ export default function WormOrderPage() {
         const base = parseYmdToLocalDate(today) || new Date()
         return { year: base.getFullYear(), month: base.getMonth() }
     })
+    const [calendarWeatherByDate, setCalendarWeatherByDate] = useState<CalendarWeatherByDate>({})
+    const [calendarWeatherLoading, setCalendarWeatherLoading] = useState(false)
+    const [calendarWeatherError, setCalendarWeatherError] = useState('')
     const [generatedMessage, setGeneratedMessage] = useState('')
     const [validationError, setValidationError] = useState('')
     const [orderCreateError, setOrderCreateError] = useState('')
@@ -1112,6 +1164,7 @@ export default function WormOrderPage() {
     const invoicePreviewUrlRef = useRef<string | null>(null)
     const invoicePreviewTaskIdRef = useRef(0)
     const customsProgressCacheRef = useRef<Map<string, { savedAt: number; result: CustomsProgressResult | null; error: string }>>(new Map())
+    const calendarWeatherRequestIdRef = useRef(0)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -2276,6 +2329,14 @@ export default function WormOrderPage() {
         () => buildMonthCalendarDays(calendarCursor.year, calendarCursor.month),
         [calendarCursor.month, calendarCursor.year],
     )
+    const calendarRange = useMemo(() => {
+        if (calendarDays.length === 0) {
+            return { startDate: today, endDate: today }
+        }
+        const first = formatLocalDateToYmd(calendarDays[0].date)
+        const last = formatLocalDateToYmd(calendarDays[calendarDays.length - 1].date)
+        return { startDate: first, endDate: last }
+    }, [calendarDays, today])
 
     const calendarMonthLabel = useMemo(() => {
         return new Intl.DateTimeFormat('ko-KR', {
@@ -2283,6 +2344,75 @@ export default function WormOrderPage() {
             month: 'long',
         }).format(new Date(calendarCursor.year, calendarCursor.month, 1))
     }, [calendarCursor.month, calendarCursor.year])
+
+    useEffect(() => {
+        const requestId = calendarWeatherRequestIdRef.current + 1
+        calendarWeatherRequestIdRef.current = requestId
+        const { startDate, endDate } = calendarRange
+        setCalendarWeatherLoading(true)
+        setCalendarWeatherError('')
+
+        const query = new URLSearchParams({
+            start: startDate,
+            end: endDate,
+            ts: String(Date.now()),
+        })
+
+        const fetchWeather = async () => {
+            try {
+                const response = await fetch(`/api/admin/worm-order/weather?${query.toString()}`, {
+                    method: 'GET',
+                    cache: 'no-store',
+                })
+                const result = await response.json().catch(() => ({}))
+                if (!response.ok) {
+                    throw new Error(typeof result?.error === 'string' ? result.error : '날씨 정보를 불러오지 못했습니다.')
+                }
+
+                const nextWeatherByDate: CalendarWeatherByDate = {}
+                calendarDays.forEach((dayCell) => {
+                    const ymd = formatLocalDateToYmd(dayCell.date)
+                    nextWeatherByDate[ymd] = {
+                        shanghai: null,
+                        busanGangseo: null,
+                    }
+                })
+
+                const locations = Array.isArray(result?.locations)
+                    ? result.locations
+                    : []
+                locations.forEach((location: unknown) => {
+                    if (!location || typeof location !== 'object') return
+                    const candidate = location as Record<string, unknown>
+                    const key = candidate.key
+                    if (!isCalendarWeatherLocationKey(key)) return
+                    const dailyItems = Array.isArray(candidate.daily) ? candidate.daily : []
+                    dailyItems.forEach((dailyItemRaw: unknown) => {
+                        const dailyItem = toCalendarDailyWeather(dailyItemRaw)
+                        if (!dailyItem?.date) return
+                        const current = nextWeatherByDate[dailyItem.date] || {
+                            shanghai: null,
+                            busanGangseo: null,
+                        }
+                        current[key] = dailyItem
+                        nextWeatherByDate[dailyItem.date] = current
+                    })
+                })
+
+                if (calendarWeatherRequestIdRef.current !== requestId) return
+                setCalendarWeatherByDate(nextWeatherByDate)
+            } catch (error) {
+                if (calendarWeatherRequestIdRef.current !== requestId) return
+                setCalendarWeatherError(error instanceof Error ? error.message : '날씨 정보를 불러오지 못했습니다.')
+            } finally {
+                if (calendarWeatherRequestIdRef.current === requestId) {
+                    setCalendarWeatherLoading(false)
+                }
+            }
+        }
+
+        void fetchWeather()
+    }, [calendarDays, calendarRange])
 
     const remittanceLockRemainingMs = useMemo(() => {
         if (!remittanceLockedUntil) return 0
@@ -3389,6 +3519,9 @@ export default function WormOrderPage() {
                                         dayCell.date.getDate(),
                                     )
                                     const isPast = dayStart.getTime() < todayDate.getTime()
+                                    const dayWeather = calendarWeatherByDate[ymd]
+                                    const shanghaiWeather = dayWeather?.shanghai || null
+                                    const busanGangseoWeather = dayWeather?.busanGangseo || null
                                     return (
                                         <button
                                             key={ymd}
@@ -3399,7 +3532,7 @@ export default function WormOrderPage() {
                                                 setActiveWormOrder(null)
                                             }}
                                             disabled={isPast}
-                                            className={`h-9 rounded-lg text-xs font-bold transition-colors ${
+                                            className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
@@ -3407,7 +3540,17 @@ export default function WormOrderPage() {
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
                                             } ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
-                                            {dayCell.date.getDate()}
+                                            <div className="flex h-full flex-col">
+                                                <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-slate-700 dark:text-gray-300'}`}>
+                                                    {dayCell.date.getDate()}
+                                                </span>
+                                                <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
+                                                    isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
+                                                }`}>
+                                                    <p className="truncate">상해 {formatCalendarWeatherText(shanghaiWeather)}</p>
+                                                    <p className="truncate">부산 {formatCalendarWeatherText(busanGangseoWeather)}</p>
+                                                </div>
+                                            </div>
                                         </button>
                                     )
                                 })}
@@ -3416,6 +3559,12 @@ export default function WormOrderPage() {
                             <div className="mt-3 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-gray-400">
                                 선택된 납품 예정일: {receiveDate || '-'}
                             </div>
+                            <div className="mt-2 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-gray-400">
+                                {calendarWeatherLoading ? '날씨 정보를 최신으로 갱신 중...' : '날씨 정보는 접속 시마다 최신으로 갱신됩니다.'}
+                            </div>
+                            {calendarWeatherError && (
+                                <p className="mt-2 text-[11px] font-semibold text-red-600">{calendarWeatherError}</p>
+                            )}
 
                             <div className="mt-auto pt-4">
                                 <button
@@ -3442,6 +3591,7 @@ export default function WormOrderPage() {
                                         <div className="grid grid-cols-2 gap-3 md:gap-4">
                                             {WORM_SIZES.map((size) => {
                                                 const current = quantitiesByType[wormType.id]?.[size.id] || 0
+                                                const inputValue = current > 0 ? String(current) : ''
                                                 const isSelected = current > 0
 
                                                 return (
@@ -3470,9 +3620,14 @@ export default function WormOrderPage() {
                                                             <input
                                                                 type="number"
                                                                 min={0}
-                                                                value={current}
+                                                                value={inputValue}
                                                                 onChange={(event) => {
-                                                                    const next = Number(event.target.value)
+                                                                    const rawValue = event.target.value.trim()
+                                                                    if (!rawValue) {
+                                                                        handleQuantityChange(wormType.id, size.id, 0)
+                                                                        return
+                                                                    }
+                                                                    const next = Number(rawValue)
                                                                     handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
                                                                 }}
                                                                 className="h-[36px] min-w-[44px] px-1 text-center font-black tabular-nums text-[#111827] outline-none text-[15px]"
