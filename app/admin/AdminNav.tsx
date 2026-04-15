@@ -36,7 +36,7 @@ function formatSmsCompletedHm(value: string) {
 
 export default function AdminNav({
     counts,
-    userName,
+    userName: _userName,
 }: {
     counts?: { pendingOrders: number, lowStock: number, pendingPartners: number, missingBill: number }
     userName?: string
@@ -231,7 +231,6 @@ export default function AdminNav({
     }
 
     const totalAlerts = (counts?.pendingOrders || 0) + (counts?.lowStock || 0) + (counts?.pendingPartners || 0) + (counts?.missingBill || 0)
-    const userInitial = userName ? userName.charAt(0) : '관'
     const activeTabRef = useRef<HTMLAnchorElement>(null)
     const tabContainerRef = useRef<HTMLDivElement>(null)
 
@@ -303,13 +302,13 @@ export default function AdminNav({
                             <span>{sendingSms ? '요청중...' : '집하요청'}</span>
                         </button>
 
-                        {/* User avatar */}
+                        {/* Logout button */}
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
-                            className="w-9 h-9 rounded-full bg-purple-200 flex items-center justify-center text-sm font-bold text-purple-700 hover:bg-purple-300 transition-colors"
+                            className="h-9 px-3 rounded-lg bg-purple-200 flex items-center justify-center text-xs font-bold text-purple-700 hover:bg-purple-300 transition-colors whitespace-nowrap"
                             title="로그아웃"
                         >
-                            {userInitial}
+                            로그아웃
                         </button>
                     </div>
                 </div>
