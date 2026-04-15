@@ -304,6 +304,7 @@ export default function AdminNav({
 
                         {/* Logout button */}
                         {/* 배포 재트리거용 텍스트 주석 */}
+                        {/* 재배포 트리거 주석 2 */}
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
                             className="h-9 px-3 rounded-lg bg-purple-200 flex items-center justify-center text-xs font-bold text-purple-700 hover:bg-purple-300 transition-colors whitespace-nowrap"
