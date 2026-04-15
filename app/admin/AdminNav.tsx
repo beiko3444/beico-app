@@ -308,6 +308,7 @@ export default function AdminNav({
                         {/* 재배포 트리거 주석 3 */}
                         {/* 재배포 트리거 주석 4 */}
                         {/* 재배포 트리거 주석 5 */}
+                        {/* 재배포 트리거 주석 6 */}
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
                             className="h-9 px-3 rounded-lg bg-purple-200 flex items-center justify-center text-xs font-bold text-purple-700 hover:bg-purple-300 transition-colors whitespace-nowrap"
