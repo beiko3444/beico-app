@@ -124,6 +124,42 @@ type CalendarDailyWeather = {
 
 type CalendarWeatherByDate = Record<string, Record<CalendarWeatherLocationKey, CalendarDailyWeather | null>>
 
+type CalendarPriceColorType = 'stable' | 'rise' | 'spike' | 'pullback' | 'transition'
+
+type CalendarMonthlyPriceInfo = {
+    month: number
+    priceStatus: string
+    memo: string
+    colorType: CalendarPriceColorType
+}
+
+type CalendarDayCell = {
+    date: Date
+    isCurrentMonth: boolean
+    priceStatus: string
+    memo: string
+    colorType: CalendarPriceColorType
+}
+
+const CALENDAR_MONTHLY_PRICE_INFOS: CalendarMonthlyPriceInfo[] = [
+    { month: 1, priceStatus: '최저가 / 안정', memo: '연중 가장 유리한 사입 시기', colorType: 'stable' },
+    { month: 2, priceStatus: '최저가 / 안정', memo: '연중 가장 유리한 사입 시기', colorType: 'stable' },
+    { month: 3, priceStatus: '상승 시작', memo: '가격이 오르기 시작하는 구간', colorType: 'rise' },
+    { month: 4, priceStatus: '큰 폭 상승', memo: '수급 불안정으로 가격 부담이 큰 시기', colorType: 'spike' },
+    { month: 5, priceStatus: '높은 가격 유지', memo: '높은 시세가 이어지는 구간', colorType: 'rise' },
+    { month: 6, priceStatus: '소폭 하락', memo: '일시적인 가격 조정 구간', colorType: 'pullback' },
+    { month: 7, priceStatus: '재상승', memo: '다시 가격이 오르는 구간', colorType: 'rise' },
+    { month: 8, priceStatus: '재상승 / 고가 구간', memo: '다시 가격이 오르는 구간', colorType: 'rise' },
+    { month: 9, priceStatus: '전환 구간', memo: '다음 저가 시즌 전환 준비 구간', colorType: 'transition' },
+    { month: 10, priceStatus: '최저가 진입 / 안정', memo: '연중 가장 유리한 사입 시기', colorType: 'stable' },
+    { month: 11, priceStatus: '최저가 / 안정', memo: '연중 가장 유리한 사입 시기', colorType: 'stable' },
+    { month: 12, priceStatus: '최저가 / 안정', memo: '연중 가장 유리한 사입 시기', colorType: 'stable' },
+]
+
+const CALENDAR_MONTHLY_PRICE_INFO_BY_MONTH = new Map<number, CalendarMonthlyPriceInfo>(
+    CALENDAR_MONTHLY_PRICE_INFOS.map((entry) => [entry.month, entry]),
+)
+
 const DEFAULT_CUSTOMS_FORWARD_EMAIL = 'customs@beone.kr'
 const CUSTOMS_FORWARD_SUBJECT_SUFFIX = '엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.'
 
@@ -485,16 +521,41 @@ function formatKstDateDot(date: Date) {
     return `${year}.${month}.${day}`
 }
 
-function buildMonthCalendarDays(year: number, month: number) {
+function getCalendarMonthlyPriceInfo(month: number) {
+    return CALENDAR_MONTHLY_PRICE_INFO_BY_MONTH.get(month) || null
+}
+
+function getCalendarPriceBadgeClass(colorType: CalendarPriceColorType, selected = false) {
+    if (selected) return 'bg-white/20 text-white border border-white/30'
+    if (colorType === 'stable') return 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+    if (colorType === 'rise') return 'bg-orange-50 text-orange-700 border border-orange-200'
+    if (colorType === 'spike') return 'bg-rose-50 text-rose-700 border border-rose-200'
+    if (colorType === 'pullback') return 'bg-amber-50 text-amber-700 border border-amber-200'
+    return 'bg-slate-100 text-slate-700 border border-slate-200'
+}
+
+function getCalendarPriceTintClass(colorType: CalendarPriceColorType) {
+    if (colorType === 'stable') return 'ring-1 ring-emerald-100'
+    if (colorType === 'rise') return 'ring-1 ring-orange-100'
+    if (colorType === 'spike') return 'ring-1 ring-rose-100'
+    if (colorType === 'pullback') return 'ring-1 ring-amber-100'
+    return 'ring-1 ring-slate-200'
+}
+
+function buildMonthCalendarDays(year: number, month: number): CalendarDayCell[] {
     const firstDay = new Date(year, month, 1)
     const firstWeekday = firstDay.getDay()
     const start = new Date(year, month, 1 - firstWeekday)
     return Array.from({ length: 42 }, (_, index) => {
         const date = new Date(start)
         date.setDate(start.getDate() + index)
+        const monthlyPriceInfo = getCalendarMonthlyPriceInfo(date.getMonth() + 1)
         return {
             date,
             isCurrentMonth: date.getMonth() === month,
+            priceStatus: monthlyPriceInfo?.priceStatus || '-',
+            memo: monthlyPriceInfo?.memo || '',
+            colorType: monthlyPriceInfo?.colorType || 'transition',
         }
     })
 }
@@ -2344,6 +2405,15 @@ export default function WormOrderPage() {
             month: 'long',
         }).format(new Date(calendarCursor.year, calendarCursor.month, 1))
     }, [calendarCursor.month, calendarCursor.year])
+    const calendarMonthPriceInfo = useMemo(
+        () => getCalendarMonthlyPriceInfo(calendarCursor.month + 1),
+        [calendarCursor.month],
+    )
+    const selectedDatePriceInfo = useMemo(() => {
+        const selected = parseYmdToLocalDate(receiveDate)
+        if (!selected) return calendarMonthPriceInfo
+        return getCalendarMonthlyPriceInfo(selected.getMonth() + 1) || calendarMonthPriceInfo
+    }, [calendarMonthPriceInfo, receiveDate])
 
     useEffect(() => {
         const requestId = calendarWeatherRequestIdRef.current + 1
@@ -3487,7 +3557,17 @@ export default function WormOrderPage() {
                                 >
                                     <ChevronLeft size={14} />
                                 </button>
-                                <p className="text-sm font-black text-slate-900 dark:text-white">{calendarMonthLabel}</p>
+                                <div className="flex flex-col items-center gap-1 px-2">
+                                    <p className="text-sm font-black text-slate-900 dark:text-white">{calendarMonthLabel}</p>
+                                    {calendarMonthPriceInfo && (
+                                        <span
+                                            className={`inline-flex max-w-[168px] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black leading-none ${getCalendarPriceBadgeClass(calendarMonthPriceInfo.colorType)}`}
+                                            title={calendarMonthPriceInfo.memo}
+                                        >
+                                            {calendarMonthPriceInfo.priceStatus}
+                                        </span>
+                                    )}
+                                </div>
                                 <button
                                     type="button"
                                     onClick={() =>
@@ -3513,12 +3593,18 @@ export default function WormOrderPage() {
                                 {calendarDays.map((dayCell) => {
                                     const ymd = formatLocalDateToYmd(dayCell.date)
                                     const isSelected = receiveDate === ymd
+                                    const isMonthStart = dayCell.date.getDate() === 1
                                     const dayStart = new Date(
                                         dayCell.date.getFullYear(),
                                         dayCell.date.getMonth(),
                                         dayCell.date.getDate(),
                                     )
                                     const isPast = dayStart.getTime() < todayDate.getTime()
+                                    const monthPriceTintClass =
+                                        !isSelected && dayCell.isCurrentMonth
+                                            ? getCalendarPriceTintClass(dayCell.colorType)
+                                            : ''
+                                    const monthPriceTooltip = `${dayCell.date.getMonth() + 1}월 ${dayCell.priceStatus}: ${dayCell.memo}`
                                     const dayWeather = calendarWeatherByDate[ymd]
                                     const shanghaiWeather = dayWeather?.shanghai || null
                                     const busanGangseoWeather = dayWeather?.busanGangseo || null
@@ -3532,18 +3618,27 @@ export default function WormOrderPage() {
                                                 setActiveWormOrder(null)
                                             }}
                                             disabled={isPast}
+                                            title={monthPriceTooltip}
                                             className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
                                                         ? 'bg-white dark:bg-[#1e1e1e] text-slate-700 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
-                                            } ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                            } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
                                                 <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-slate-700 dark:text-gray-300'}`}>
                                                     {dayCell.date.getDate()}
                                                 </span>
+                                                {isMonthStart && (
+                                                    <span
+                                                        className={`mt-1 inline-flex max-w-full items-center rounded-full px-1.5 py-[1px] text-[9px] font-black leading-none truncate ${getCalendarPriceBadgeClass(dayCell.colorType, isSelected)}`}
+                                                        title={dayCell.memo}
+                                                    >
+                                                        {dayCell.priceStatus}
+                                                    </span>
+                                                )}
                                                 <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
                                                     isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
                                                 }`}>
@@ -3559,6 +3654,19 @@ export default function WormOrderPage() {
                             <div className="mt-3 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-gray-400">
                                 선택된 납품 예정일: {receiveDate || '-'}
                             </div>
+                            {selectedDatePriceInfo && (
+                                <div className="mt-2 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <p className="text-[11px] font-black text-slate-700 dark:text-gray-300">월별 가격 추이</p>
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black ${getCalendarPriceBadgeClass(selectedDatePriceInfo.colorType)}`}>
+                                            {selectedDatePriceInfo.priceStatus}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-[11px] font-semibold text-slate-600 dark:text-gray-400">
+                                        {selectedDatePriceInfo.memo}
+                                    </p>
+                                </div>
+                            )}
                             <div className="mt-2 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-gray-400">
                                 {calendarWeatherLoading ? '날씨 정보를 최신으로 갱신 중...' : '날씨 정보는 접속 시마다 최신으로 갱신됩니다.'}
                             </div>
