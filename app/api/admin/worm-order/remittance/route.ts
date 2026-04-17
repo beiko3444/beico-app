@@ -405,8 +405,11 @@ export async function POST(request: Request) {
                     status: string
                     remittanceAppliedAt: Date | null
                     remittanceFinalReceiveAmountText: string | null
+                    remittanceSendAmount: number | null
                     remittanceSendAmountText: string | null
+                    remittanceTotalFee: number | null
                     remittanceTotalFeeText: string | null
+                    remittanceExchangeRate: number | null
                     remittanceExchangeRateText: string | null
                     updatedAt: Date
                   }
@@ -491,8 +494,11 @@ export async function POST(request: Request) {
                         status: true,
                         remittanceAppliedAt: true,
                         remittanceFinalReceiveAmountText: true,
+                        remittanceSendAmount: true,
                         remittanceSendAmountText: true,
+                        remittanceTotalFee: true,
                         remittanceTotalFeeText: true,
+                        remittanceExchangeRate: true,
                         remittanceExchangeRateText: true,
                         updatedAt: true,
                     },

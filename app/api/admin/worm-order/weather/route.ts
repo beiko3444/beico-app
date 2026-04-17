@@ -89,18 +89,44 @@ async function fetchLocationWeather(
     start_date: startDate,
     end_date: endDate,
   })
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
-  if (!response.ok) {
-    throw new Error(`날씨 조회 실패 (${location.label}, ${response.status})`)
+
+  let payload: any = null
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    try {
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'beico-app-weather/1.0',
+        },
+        signal: controller.signal,
+      })
+      if (!response.ok) {
+        throw new Error(`날씨 조회 실패 (${location.label}, ${response.status})`)
+      }
+
+      payload = await response.json()
+      lastError = null
+      clearTimeout(timeoutId)
+      break
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('날씨 조회 실패')
+      clearTimeout(timeoutId)
+      if (attempt === 1) {
+        throw lastError
+      }
+    }
   }
 
-  const payload = await response.json()
+  if (!payload) {
+    throw lastError || new Error(`날씨 조회 실패 (${location.label})`)
+  }
+
   const daily = payload?.daily
 
   const dates: string[] = Array.isArray(daily?.time) ? daily.time : []
@@ -197,4 +223,3 @@ export async function GET(request: NextRequest) {
     },
   )
 }
-
