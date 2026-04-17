@@ -178,6 +178,7 @@ type WormOrderListItem = {
     remittanceFinalReceiveAmountText: string | null
     remittanceSendAmount: number | null
     remittanceSendAmountText: string | null
+    remittanceTotalFee: number | null
     remittanceTotalFeeText: string | null
     remittanceExchangeRate: number | null
     remittanceExchangeRateText: string | null
@@ -794,6 +795,17 @@ function resolveRemittanceSendKrw(order: WormOrderListItem) {
     )
 }
 
+function resolveRemittanceFeeKrw(order: WormOrderListItem) {
+    const fromTotalFeeTextKrw = parseSummaryAmountByCurrency(order.remittanceTotalFeeText, 'krw')
+    if (fromTotalFeeTextKrw !== null) return fromTotalFeeTextKrw
+
+    const fromTotalFeeTextAny = parseSummaryAmountByCurrency(order.remittanceTotalFeeText, 'any')
+    if (fromTotalFeeTextAny !== null) return fromTotalFeeTextAny
+
+    if (order.remittanceTotalFee !== null) return order.remittanceTotalFee
+    return null
+}
+
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
     if (!value || typeof value !== 'object') return null
 
@@ -1020,6 +1032,7 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         remittanceFinalReceiveAmountText: typeof candidate.remittanceFinalReceiveAmountText === 'string' ? candidate.remittanceFinalReceiveAmountText : null,
         remittanceSendAmount: typeof candidate.remittanceSendAmount === 'number' && Number.isFinite(candidate.remittanceSendAmount) ? candidate.remittanceSendAmount : null,
         remittanceSendAmountText: typeof candidate.remittanceSendAmountText === 'string' ? candidate.remittanceSendAmountText : null,
+        remittanceTotalFee: typeof candidate.remittanceTotalFee === 'number' && Number.isFinite(candidate.remittanceTotalFee) ? candidate.remittanceTotalFee : null,
         remittanceTotalFeeText: typeof candidate.remittanceTotalFeeText === 'string' ? candidate.remittanceTotalFeeText : null,
         remittanceExchangeRate: typeof candidate.remittanceExchangeRate === 'number' && Number.isFinite(candidate.remittanceExchangeRate) ? candidate.remittanceExchangeRate : null,
         remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
@@ -3395,6 +3408,7 @@ export default function WormOrderPage() {
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
                                 <th className="text-left px-3 py-2 font-bold">총 송금액</th>
                                 <th className="text-left px-3 py-2 font-bold">총 송금 한화</th>
+                                <th className="text-left px-3 py-2 font-bold">총 수수료</th>
                                 <th className="text-left px-3 py-2 font-bold">환율정보</th>
                                 <th className="text-right px-3 py-2 font-bold">관리</th>
                             </tr>
@@ -3406,6 +3420,7 @@ export default function WormOrderPage() {
                                 const orderNumberDisplay = orderDateText ? orderDateText.replace(/-/g, '/') : order.orderNumber
                                 const sendAmountUsd = resolveRemittanceSendUsd(order)
                                 const sendAmountKrw = resolveRemittanceSendKrw(order)
+                                const totalFeeKrw = resolveRemittanceFeeKrw(order)
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
                                 const exchangeRateText = parsedExchangeRate !== null
                                     ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
@@ -3428,6 +3443,7 @@ export default function WormOrderPage() {
                                                     <span className="text-[11px] font-semibold text-emerald-700">
                                                         신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
                                                         {sendAmountKrw !== null ? ` / ${formatKrwAmount(sendAmountKrw)}` : ''}
+                                                        {totalFeeKrw !== null ? ` / 수수료 ${formatKrwAmount(totalFeeKrw)}` : ''}
                                                         {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
                                                     </span>
                                                 )}
@@ -3438,6 +3454,9 @@ export default function WormOrderPage() {
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
                                             {formatKrwAmount(sendAmountKrw)}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                            {formatKrwAmount(totalFeeKrw)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
                                             {exchangeRateText}
