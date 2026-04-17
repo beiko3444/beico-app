@@ -806,6 +806,13 @@ function resolveRemittanceFeeKrw(order: WormOrderListItem) {
     return null
 }
 
+function resolveRemittanceTotalPaidKrw(order: WormOrderListItem) {
+    const sendAmountKrw = resolveRemittanceSendKrw(order)
+    if (sendAmountKrw === null) return null
+    const feeKrw = resolveRemittanceFeeKrw(order) ?? 0
+    return Math.round(sendAmountKrw + feeKrw)
+}
+
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
     if (!value || typeof value !== 'object') return null
 
@@ -3407,7 +3414,7 @@ export default function WormOrderPage() {
                                 <th className="text-left px-3 py-2 font-bold">발주번호</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
                                 <th className="text-left px-3 py-2 font-bold">총 송금액</th>
-                                <th className="text-left px-3 py-2 font-bold">총 송금 한화</th>
+                                <th className="text-left px-3 py-2 font-bold">총 송금 한화(수수료 포함)</th>
                                 <th className="text-left px-3 py-2 font-bold">총 수수료</th>
                                 <th className="text-left px-3 py-2 font-bold">환율정보</th>
                                 <th className="text-right px-3 py-2 font-bold">관리</th>
@@ -3421,6 +3428,7 @@ export default function WormOrderPage() {
                                 const sendAmountUsd = resolveRemittanceSendUsd(order)
                                 const sendAmountKrw = resolveRemittanceSendKrw(order)
                                 const totalFeeKrw = resolveRemittanceFeeKrw(order)
+                                const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
                                 const exchangeRateText = parsedExchangeRate !== null
                                     ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
@@ -3442,8 +3450,9 @@ export default function WormOrderPage() {
                                                 {order.remittanceAppliedAt && (
                                                     <span className="text-[11px] font-semibold text-emerald-700">
                                                         신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
-                                                        {sendAmountKrw !== null ? ` / ${formatKrwAmount(sendAmountKrw)}` : ''}
+                                                        {sendAmountKrw !== null ? ` / 원금 ${formatKrwAmount(sendAmountKrw)}` : ''}
                                                         {totalFeeKrw !== null ? ` / 수수료 ${formatKrwAmount(totalFeeKrw)}` : ''}
+                                                        {totalPaidKrw !== null ? ` / 합계 ${formatKrwAmount(totalPaidKrw)}` : ''}
                                                         {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
                                                     </span>
                                                 )}
@@ -3453,7 +3462,7 @@ export default function WormOrderPage() {
                                             {formatUsdAmount(sendAmountUsd)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
-                                            {formatKrwAmount(sendAmountKrw)}
+                                            {formatKrwAmount(totalPaidKrw)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
                                             {formatKrwAmount(totalFeeKrw)}
