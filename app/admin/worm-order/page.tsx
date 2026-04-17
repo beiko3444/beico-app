@@ -778,39 +778,38 @@ function resolveRemittanceSendUsd(order: WormOrderListItem) {
 
 function resolveRemittanceSendKrw(order: WormOrderListItem) {
     const fromSendTextKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
-    const fromFinalReceiveTextKrw = parseSummaryAmountByCurrency(order.remittanceFinalReceiveAmountText, 'krw')
-    const rate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
-    const usdAmount = resolveRemittanceSendUsd(order)
-    const expectedKrw = rate && rate > 0 && usdAmount !== null
-        ? Math.round(usdAmount * rate)
-        : null
+    if (fromSendTextKrw !== null) return fromSendTextKrw
 
-    return pickPlausibleKrwAmount(
-        [
-            order.remittanceSendAmount,
-            fromSendTextKrw,
-            fromFinalReceiveTextKrw,
-        ],
-        expectedKrw
-    )
+    if (order.remittanceSendAmount !== null) return order.remittanceSendAmount
+
+    const originKrw = resolveRemittanceOriginKrw(order)
+    const feeKrw = resolveRemittanceFeeKrw(order) ?? 0
+    return originKrw !== null ? Math.round(originKrw + feeKrw) : null
 }
 
 function resolveRemittanceFeeKrw(order: WormOrderListItem) {
     const fromTotalFeeTextKrw = parseSummaryAmountByCurrency(order.remittanceTotalFeeText, 'krw')
     if (fromTotalFeeTextKrw !== null) return fromTotalFeeTextKrw
 
-    const fromTotalFeeTextAny = parseSummaryAmountByCurrency(order.remittanceTotalFeeText, 'any')
-    if (fromTotalFeeTextAny !== null) return fromTotalFeeTextAny
-
     if (order.remittanceTotalFee !== null) return order.remittanceTotalFee
     return null
 }
 
+function resolveRemittanceOriginKrw(order: WormOrderListItem) {
+    const rate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+    const usdAmount = resolveRemittanceSendUsd(order)
+    if (!rate || rate <= 0 || usdAmount === null) return null
+    return Math.round(usdAmount * rate)
+}
+
 function resolveRemittanceTotalPaidKrw(order: WormOrderListItem) {
-    const sendAmountKrw = resolveRemittanceSendKrw(order)
-    if (sendAmountKrw === null) return null
+    const totalPaidKrw = resolveRemittanceSendKrw(order)
+    if (totalPaidKrw !== null) return totalPaidKrw
+
+    const originKrw = resolveRemittanceOriginKrw(order)
+    if (originKrw === null) return null
     const feeKrw = resolveRemittanceFeeKrw(order) ?? 0
-    return Math.round(sendAmountKrw + feeKrw)
+    return Math.round(originKrw + feeKrw)
 }
 
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
@@ -3426,7 +3425,7 @@ export default function WormOrderPage() {
                                 const orderDateText = toKstDateInputString(order.receiveDate)
                                 const orderNumberDisplay = orderDateText ? orderDateText.replace(/-/g, '/') : order.orderNumber
                                 const sendAmountUsd = resolveRemittanceSendUsd(order)
-                                const sendAmountKrw = resolveRemittanceSendKrw(order)
+                                const originKrw = resolveRemittanceOriginKrw(order)
                                 const totalFeeKrw = resolveRemittanceFeeKrw(order)
                                 const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
@@ -3450,7 +3449,7 @@ export default function WormOrderPage() {
                                                 {order.remittanceAppliedAt && (
                                                     <span className="text-[11px] font-semibold text-emerald-700">
                                                         신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
-                                                        {sendAmountKrw !== null ? ` / 원금 ${formatKrwAmount(sendAmountKrw)}` : ''}
+                                                        {originKrw !== null ? ` / 원금 ${formatKrwAmount(originKrw)}` : ''}
                                                         {totalFeeKrw !== null ? ` / 수수료 ${formatKrwAmount(totalFeeKrw)}` : ''}
                                                         {totalPaidKrw !== null ? ` / 합계 ${formatKrwAmount(totalPaidKrw)}` : ''}
                                                         {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}

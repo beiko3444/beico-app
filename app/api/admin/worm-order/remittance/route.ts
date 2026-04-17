@@ -48,6 +48,37 @@ const normalizeSummaryText = (value: string) => {
     return normalized ? normalized : null
 }
 
+const formatSummaryAmount = (rawAmount: string, currency: 'USD' | 'KRW') => {
+    const normalizedNumber = Number(String(rawAmount).replace(/,/g, ''))
+    if (!Number.isFinite(normalizedNumber)) return null
+    const formatted = currency === 'USD'
+        ? normalizedNumber.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : normalizedNumber.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    return `${formatted} ${currency}`
+}
+
+const extractSummaryAmountFromBlob = (
+    blob: string | null,
+    pattern: RegExp,
+    currency: 'USD' | 'KRW',
+) => {
+    if (!blob) return null
+    const match = blob.match(pattern)
+    const rawAmount = match?.[1]
+    if (!rawAmount) return null
+    return formatSummaryAmount(rawAmount, currency)
+}
+
+const extractSummaryRateFromBlob = (blob: string | null) => {
+    if (!blob) return null
+    const match = blob.match(/1\s*USD\s*=\s*([0-9,]+(?:\.\d+)?)\s*(?:KRW|원)/i)
+    const rawAmount = match?.[1]
+    if (!rawAmount) return null
+    const normalizedNumber = Number(String(rawAmount).replace(/,/g, ''))
+    if (!Number.isFinite(normalizedNumber)) return null
+    return `1 USD = ${normalizedNumber.toLocaleString('en-US', { maximumFractionDigits: 4 })} KRW`
+}
+
 const parseSummaryNumber = (value: string | null, mode: 'default' | 'rate' = 'default') => {
     if (!value) return null
     const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
@@ -383,38 +414,74 @@ export async function POST(request: Request) {
             let saveWarning: string | null = null
 
             try {
-                const finalReceiveAmountText = normalizeSummaryText(pricingSummary?.finalReceiveAmount || '')
-                const sendAmountText = normalizeSummaryText(pricingSummary?.sendAmount || parsedAmount.toFixed(2))
-                const totalFeeText = normalizeSummaryText(pricingSummary?.totalFee || '')
-                const exchangeRateText = normalizeSummaryText(pricingSummary?.exchangeRate || '')
-                const exchangeRateNumber = parseSummaryNumber(exchangeRateText, 'rate')
-                const summaryUsdAmount = parseSummaryAmountByCurrency(sendAmountText, 'usd')
-                const fallbackSendAmountText = `${parsedAmount.toFixed(2)} USD`
-                const normalizedSendAmountText = summaryUsdAmount !== null ? sendAmountText : fallbackSendAmountText
+                const pricingBlob = [
+                    pricingSummary?.finalReceiveAmount || '',
+                    pricingSummary?.sendAmount || '',
+                    pricingSummary?.totalFee || '',
+                    pricingSummary?.exchangeRate || '',
+                ]
+                    .map((value) => String(value || '').trim())
+                    .filter(Boolean)
+                    .join(' ')
 
-                const expectedSendAmountKrw =
+                const extractedFinalReceiveAmountText = extractSummaryAmountFromBlob(
+                    pricingBlob,
+                    /([0-9,]+(?:\.\d+)?)\s*(?:USD|US\$)\s*보내는\s*돈/i,
+                    'USD'
+                )
+                const extractedSendAmountText = extractSummaryAmountFromBlob(
+                    pricingBlob,
+                    /보내는\s*돈\s*([0-9,]+(?:\.\d+)?)\s*(?:KRW|원)/i,
+                    'KRW'
+                )
+                const extractedTotalFeeText = extractSummaryAmountFromBlob(
+                    pricingBlob,
+                    /총\s*수수료\s*([0-9,]+(?:\.\d+)?)\s*(?:KRW|원)/i,
+                    'KRW'
+                )
+                const extractedExchangeRateText = extractSummaryRateFromBlob(pricingBlob)
+
+                const finalReceiveAmountText = normalizeSummaryText(
+                    extractedFinalReceiveAmountText || pricingSummary?.finalReceiveAmount || ''
+                )
+                const sendAmountText = normalizeSummaryText(
+                    extractedSendAmountText || pricingSummary?.sendAmount || ''
+                )
+                const totalFeeText = normalizeSummaryText(
+                    extractedTotalFeeText || pricingSummary?.totalFee || ''
+                )
+                const exchangeRateText = normalizeSummaryText(
+                    extractedExchangeRateText || pricingSummary?.exchangeRate || ''
+                )
+                const exchangeRateNumber = parseSummaryNumber(exchangeRateText, 'rate')
+                const normalizedFinalReceiveAmountText = finalReceiveAmountText || `${parsedAmount.toFixed(2)} USD`
+                const expectedOriginKrw =
                     exchangeRateNumber && exchangeRateNumber > 0
                         ? Math.round(parsedAmount * exchangeRateNumber)
                         : null
-                const sendAmountKrw = pickPlausibleKrwAmount(
-                    [
-                        parseSummaryAmountByCurrency(sendAmountText, 'krw'),
-                        parseSummaryAmountByCurrency(finalReceiveAmountText, 'krw'),
-                    ],
-                    expectedSendAmountKrw
-                )
+                const sendAmountKrw =
+                    parseSummaryAmountByCurrency(sendAmountText, 'krw') ??
+                    pickPlausibleKrwAmount([], expectedOriginKrw)
+                const totalFeeKrw = parseSummaryAmountByCurrency(totalFeeText, 'krw')
+
+                const normalizedSendAmountText = sendAmountKrw !== null
+                    ? formatSummaryAmount(String(sendAmountKrw), 'KRW')
+                    : sendAmountText
+                const normalizedTotalFeeText = totalFeeKrw !== null
+                    ? formatSummaryAmount(String(totalFeeKrw), 'KRW')
+                    : totalFeeText
 
                 savedOrder = await prisma.wormOrder.update({
                     where: { id: targetOrder.id },
                     data: {
                         status: 'REMITTANCE_APPLIED',
                         remittanceAppliedAt: new Date(result.completedAt),
-                        remittanceFinalReceiveAmountText: finalReceiveAmountText,
-                        remittanceFinalReceiveAmount: parseSummaryNumber(finalReceiveAmountText, 'default'),
+                        remittanceFinalReceiveAmountText: normalizedFinalReceiveAmountText,
+                        remittanceFinalReceiveAmount: parseSummaryAmountByCurrency(normalizedFinalReceiveAmountText, 'usd') ?? parseSummaryNumber(normalizedFinalReceiveAmountText, 'default'),
                         remittanceSendAmountText: normalizedSendAmountText,
                         remittanceSendAmount: sendAmountKrw,
-                        remittanceTotalFeeText: totalFeeText,
-                        remittanceTotalFee: parseSummaryNumber(totalFeeText, 'default'),
+                        remittanceTotalFeeText: normalizedTotalFeeText,
+                        remittanceTotalFee: totalFeeKrw,
                         remittanceExchangeRateText: exchangeRateText,
                         remittanceExchangeRate: exchangeRateNumber,
                     },
