@@ -94,6 +94,28 @@ const parseSummaryAmountByCurrency = (value: string | null, currency: SummaryCur
     return null
 }
 
+const pickPlausibleKrwAmount = (
+    candidates: Array<number | null>,
+    expected: number | null,
+) => {
+    const normalized = candidates
+        .filter((candidate): candidate is number => candidate !== null && Number.isFinite(candidate) && candidate > 0)
+
+    if (normalized.length === 0) return expected
+    if (expected === null || !Number.isFinite(expected) || expected <= 0) return normalized[0]
+
+    const plausible = normalized.filter((candidate) => {
+        const ratio = candidate / expected
+        return ratio >= 0.75 && ratio <= 1.35
+    })
+
+    if (plausible.length > 0) {
+        return plausible.sort((a, b) => Math.abs(a - expected) - Math.abs(b - expected))[0]
+    }
+
+    return expected
+}
+
 const getRemittanceGuardState = (): RemittanceAuthGuardState => {
     if (!globalRemittanceGuard.wormRemittanceAuthGuard) {
         globalRemittanceGuard.wormRemittanceAuthGuard = {
@@ -366,17 +388,21 @@ export async function POST(request: Request) {
                 const totalFeeText = normalizeSummaryText(pricingSummary?.totalFee || '')
                 const exchangeRateText = normalizeSummaryText(pricingSummary?.exchangeRate || '')
                 const exchangeRateNumber = parseSummaryNumber(exchangeRateText, 'rate')
+                const summaryUsdAmount = parseSummaryAmountByCurrency(sendAmountText, 'usd')
+                const fallbackSendAmountText = `${parsedAmount.toFixed(2)} USD`
+                const normalizedSendAmountText = summaryUsdAmount !== null ? sendAmountText : fallbackSendAmountText
 
-                const sendAmountKrw =
-                    parseSummaryAmountByCurrency(sendAmountText, 'krw') ??
-                    parseSummaryAmountByCurrency(finalReceiveAmountText, 'krw') ??
-                    (() => {
-                        const usdAmount =
-                            parseSummaryAmountByCurrency(sendAmountText, 'usd') ??
-                            parseSummaryNumber(sendAmountText, 'default')
-                        if (usdAmount === null || !exchangeRateNumber || exchangeRateNumber <= 0) return null
-                        return Math.round(usdAmount * exchangeRateNumber)
-                    })()
+                const expectedSendAmountKrw =
+                    exchangeRateNumber && exchangeRateNumber > 0
+                        ? Math.round(parsedAmount * exchangeRateNumber)
+                        : null
+                const sendAmountKrw = pickPlausibleKrwAmount(
+                    [
+                        parseSummaryAmountByCurrency(sendAmountText, 'krw'),
+                        parseSummaryAmountByCurrency(finalReceiveAmountText, 'krw'),
+                    ],
+                    expectedSendAmountKrw
+                )
 
                 savedOrder = await prisma.wormOrder.update({
                     where: { id: targetOrder.id },
@@ -385,7 +411,7 @@ export async function POST(request: Request) {
                         remittanceAppliedAt: new Date(result.completedAt),
                         remittanceFinalReceiveAmountText: finalReceiveAmountText,
                         remittanceFinalReceiveAmount: parseSummaryNumber(finalReceiveAmountText, 'default'),
-                        remittanceSendAmountText: sendAmountText,
+                        remittanceSendAmountText: normalizedSendAmountText,
                         remittanceSendAmount: sendAmountKrw,
                         remittanceTotalFeeText: totalFeeText,
                         remittanceTotalFee: parseSummaryNumber(totalFeeText, 'default'),

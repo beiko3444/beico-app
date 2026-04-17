@@ -746,6 +746,25 @@ function parseSummaryRate(value: string | null) {
     return Number.isFinite(parsed) ? parsed : null
 }
 
+function pickPlausibleKrwAmount(candidates: Array<number | null>, expected: number | null) {
+    const normalized = candidates
+        .filter((candidate): candidate is number => candidate !== null && Number.isFinite(candidate) && candidate > 0)
+
+    if (normalized.length === 0) return expected
+    if (expected === null || !Number.isFinite(expected) || expected <= 0) return normalized[0]
+
+    const plausible = normalized.filter((candidate) => {
+        const ratio = candidate / expected
+        return ratio >= 0.75 && ratio <= 1.35
+    })
+
+    if (plausible.length > 0) {
+        return plausible.sort((a, b) => Math.abs(a - expected) - Math.abs(b - expected))[0]
+    }
+
+    return expected
+}
+
 function resolveRemittanceSendUsd(order: WormOrderListItem) {
     const fromSendTextUsd = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd')
     if (fromSendTextUsd !== null) return fromSendTextUsd
@@ -758,21 +777,21 @@ function resolveRemittanceSendUsd(order: WormOrderListItem) {
 
 function resolveRemittanceSendKrw(order: WormOrderListItem) {
     const fromSendTextKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
-    if (fromSendTextKrw !== null) return fromSendTextKrw
-
     const fromFinalReceiveTextKrw = parseSummaryAmountByCurrency(order.remittanceFinalReceiveAmountText, 'krw')
-    if (fromFinalReceiveTextKrw !== null) return fromFinalReceiveTextKrw
-
     const rate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
-    const usdAmount =
-        parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd') ??
-        parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'any')
-    if (rate && rate > 0 && usdAmount !== null) {
-        return Math.round(usdAmount * rate)
-    }
+    const usdAmount = resolveRemittanceSendUsd(order)
+    const expectedKrw = rate && rate > 0 && usdAmount !== null
+        ? Math.round(usdAmount * rate)
+        : null
 
-    if (order.remittanceSendAmount !== null) return order.remittanceSendAmount
-    return null
+    return pickPlausibleKrwAmount(
+        [
+            order.remittanceSendAmount,
+            fromSendTextKrw,
+            fromFinalReceiveTextKrw,
+        ],
+        expectedKrw
+    )
 }
 
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {

@@ -1,5 +1,15 @@
 const MOIN_BIZPLUS_LOGIN_URL = 'https://www.moinbizplus.com/login'
 const TARGET_COMPANY_NAME = 'Shanghai Oikki Trading Co.,Ltd'
+const TARGET_COMPANY_SEARCH_KEYWORD = 'Oikki'
+const TARGET_COMPANY_NAME_VARIANTS = [
+    TARGET_COMPANY_NAME,
+    'Shanghai Oikki Trading Co Ltd',
+    'Shanghai Oikki Trading Co., Ltd',
+    'Shanghai Oikki Trading',
+    'Oikki Trading',
+    'Oikki',
+]
+const TARGET_COMPANY_NAME_REGEX = /Shanghai\s*Oikki\s*Trading\s*Co\.?\s*,?\s*Ltd/i
 const DEFAULT_TIMEOUT_MS = 45000
 const LONG_TIMEOUT_MS = 60000
 
@@ -398,6 +408,121 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const findVisibleCompanyTextLocator = async (page: PageLike, timeoutMs: number): Promise<LocatorLike | null> => {
+    const variantCandidates = Array.from(new Set([TARGET_COMPANY_NAME, ...TARGET_COMPANY_NAME_VARIANTS].filter(Boolean)))
+    const candidates: Array<string | RegExp> = [TARGET_COMPANY_NAME_REGEX, ...variantCandidates]
+    const deadline = Date.now() + Math.max(1000, timeoutMs)
+
+    while (Date.now() < deadline) {
+        for (const candidate of candidates) {
+            const remaining = deadline - Date.now()
+            if (remaining <= 0) break
+            try {
+                const locator = page.getByText(candidate, { exact: false }).first()
+                await locator.waitFor({ state: 'visible', timeout: Math.min(1200, remaining) })
+                return locator
+            } catch {
+                // Try next text pattern.
+            }
+        }
+        await page.waitForTimeout(180)
+    }
+
+    return null
+}
+
+const scrollToCompanyTextCandidate = async (page: PageLike) => {
+    const found = await page.evaluate(`
+        (() => {
+            const companies = ${JSON.stringify(TARGET_COMPANY_NAME_VARIANTS)};
+            const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+            const normalizedCompanies = companies.map(normalize).filter(Boolean);
+            const requiredTokens = ['shanghai', 'oikki', 'trading'];
+            const matchesCompany = (text) => {
+                const normalized = normalize(text);
+                if (!normalized) return false;
+                if (normalizedCompanies.some((company) => normalized.includes(company))) return true;
+                return requiredTokens.every((token) => normalized.includes(token));
+            };
+
+            const walker = document.createTreeWalker(
+                document.body,
+                NodeFilter.SHOW_TEXT,
+                {
+                    acceptNode: (node) => matchesCompany(node.textContent || '')
+                        ? NodeFilter.FILTER_ACCEPT
+                        : NodeFilter.FILTER_REJECT,
+                }
+            );
+            const node = walker.nextNode();
+            if (node && node.parentElement) {
+                node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                return true;
+            }
+            return false;
+        })()
+    `).catch(() => false)
+
+    return Boolean(found)
+}
+
+const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
+    const result = await page.evaluate(`
+        (() => {
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const keyword = ${JSON.stringify(keyword)};
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const input = Array.from(document.querySelectorAll('input'))
+                .find((el) => isVisible(el) && (el.placeholder || '').includes(recipientPlaceholder));
+            if (!input) return 'recipient-search-not-found';
+
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            if (!nativeSetter) return 'native-setter-not-found';
+
+            nativeSetter.call(input, keyword);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
+            return 'recipient-search-filled';
+        })()
+    `).catch(() => 'recipient-search-error')
+
+    return String(result || 'recipient-search-unknown')
+}
+
+const clearRecipientSearchKeyword = async (page: PageLike) => {
+    const result = await page.evaluate(`
+        (() => {
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const input = Array.from(document.querySelectorAll('input'))
+                .find((el) => isVisible(el) && (el.placeholder || '').includes(recipientPlaceholder));
+            if (!input) return 'recipient-search-not-found';
+
+            const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            if (!nativeSetter) return 'native-setter-not-found';
+
+            nativeSetter.call(input, '');
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            return 'recipient-search-cleared';
+        })()
+    `).catch(() => 'recipient-search-clear-error')
+
+    return String(result || 'recipient-search-clear-unknown')
+}
+
 const inspectTransferInputs = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
@@ -770,15 +895,16 @@ const isRecipientSearchInputInfo = (input: { type?: string; name?: string; id?: 
 
 const clickCompanyScopedRemit = async (
     page: PageLike,
-    companyName: string,
+    companyNames: string[],
     remitText: string
 ): Promise<string> => {
     const result = await page.evaluate(`
         (() => {
-            const company = ${JSON.stringify(companyName)};
+            const companies = ${JSON.stringify(companyNames)};
             const remit = ${JSON.stringify(remitText)};
 
             const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
+            const normalizeAlphaNum = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
             const textOf = (el) => norm((el && el.textContent) || '');
             const hasText = (el, text) => textOf(el).includes(norm(text));
             const describe = (el) => {
@@ -788,6 +914,16 @@ const clickCompanyScopedRemit = async (
                 const href = tag === 'a' ? (el.getAttribute('href') || '') : '';
                 const cls = ((el.className || '') + '').replace(/\\s+/g, '.').slice(0, 60);
                 return tag + ':' + text + (href ? ':href=' + href : '') + (cls ? ':cls=' + cls : '');
+            };
+            const normalizedCompanies = (companies || [])
+                .map((company) => normalizeAlphaNum(company))
+                .filter(Boolean);
+            const requiredTokens = ['shanghai', 'oikki', 'trading'];
+            const hasCompanyText = (el) => {
+                const normalized = normalizeAlphaNum(textOf(el));
+                if (!normalized) return false;
+                if (normalizedCompanies.some((company) => normalized.includes(company))) return true;
+                return requiredTokens.every((token) => normalized.includes(token));
             };
             const isVisible = (el) => {
                 if (!el) return false;
@@ -799,28 +935,110 @@ const clickCompanyScopedRemit = async (
                 if (!el) return false;
                 const tag = (el.tagName || '').toLowerCase();
                 const role = (el.getAttribute('role') || '').toLowerCase();
-                return tag === 'button' || role === 'button';
+                if (tag === 'button' || role === 'button') return true;
+                if (tag === 'input') {
+                    const type = (el.getAttribute('type') || '').toLowerCase();
+                    if (type === 'button' || type === 'submit') return true;
+                }
+                return false;
+            };
+            const isLikelyClickable = (el) => {
+                if (!el) return false;
+                if (isSemanticButton(el)) return true;
+                const tag = (el.tagName || '').toLowerCase();
+                if (tag === 'a') return true;
+                if (el.getAttribute('onclick')) return true;
+                if (typeof el.onclick === 'function') return true;
+                const style = window.getComputedStyle(el);
+                return style.cursor === 'pointer' || el.tabIndex >= 0;
+            };
+            const toClickable = (el) => {
+                if (!el) return null;
+                if (isLikelyClickable(el)) return el;
+                const parent = el.closest('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]');
+                return parent || null;
+            };
+            const clickWithMouseEvents = (raw) => {
+                const target = toClickable(raw) || raw;
+                if (!target || !isVisible(target)) return false;
+                const ariaDisabled = String(target.getAttribute('aria-disabled') || '').toLowerCase();
+                if (target.disabled || ariaDisabled === 'true') return false;
+                try {
+                    target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+                } catch {
+                    // Ignore.
+                }
+                const eventInit = { bubbles: true, cancelable: true, view: window };
+                try { target.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+                if (typeof target.click === 'function') {
+                    target.click();
+                }
+                return true;
+            };
+            const scoreRemitCandidate = (target, reference) => {
+                const text = textOf(target);
+                const exactMatch = text === norm(remit) ? -100000 : 0;
+                const hasRemit = text.includes(norm(remit)) ? -10000 : 0;
+                const semanticBoost = isSemanticButton(target) ? -5000 : 0;
+                const tagBoost = (target.tagName || '').toLowerCase() === 'a' ? -1500 : 0;
+                let distance = 0;
+                if (reference) {
+                    const rect = target.getBoundingClientRect();
+                    const tx = rect.left + rect.width / 2;
+                    const ty = rect.top + rect.height / 2;
+                    const dx = tx - reference.x;
+                    const dy = ty - reference.y;
+                    distance = dx * dx + dy * dy;
+                }
+                return exactMatch + hasRemit + semanticBoost + tagBoost + distance;
+            };
+            const collectRemitCandidates = (scope) => {
+                const clickableRemit = Array.from(scope.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]'))
+                    .filter((el) => isVisible(el) && hasText(el, remit))
+                    .map((el) => toClickable(el))
+                    .filter(Boolean);
+                const textNodes = Array.from(scope.querySelectorAll('div, span, p, strong, b'))
+                    .filter((el) => isVisible(el) && hasText(el, remit))
+                    .map((el) => toClickable(el))
+                    .filter(Boolean);
+                const merged = clickableRemit.concat(textNodes);
+                return merged.filter((el, index, arr) => arr.indexOf(el) === index);
             };
 
             const modalScopes = Array.from(document.querySelectorAll(
                 '[role="dialog"], [class*="modal"], [class*="Modal"], [class*="drawer"], [class*="Drawer"], [class*="popup"], [class*="Popup"]'
             )).filter(isVisible);
-            for (const scope of modalScopes) {
-                const remitInModal = Array.from(scope.querySelectorAll('button, [role="button"], div, span'))
-                    .filter((el) => isVisible(el) && hasText(el, remit))
+            const companyModalScopes = modalScopes.filter((scope) => hasCompanyText(scope));
+            const prioritizedModalScopes = companyModalScopes.length > 0 ? companyModalScopes : modalScopes;
+
+            for (const scope of prioritizedModalScopes) {
+                const companyRef = Array.from(scope.querySelectorAll('*'))
+                    .filter((el) => isVisible(el) && hasCompanyText(el))
                     .sort((a, b) => {
-                        const ta = textOf(a).length
-                        const tb = textOf(b).length
-                        return ta - tb
-                    });
-                if (remitInModal.length > 0) {
-                    remitInModal[0].click();
-                    return 'clicked-modal-remit:' + describe(remitInModal[0]);
+                        const ra = a.getBoundingClientRect();
+                        const rb = b.getBoundingClientRect();
+                        return (ra.width * ra.height) - (rb.width * rb.height);
+                    })[0] || null;
+                const companyRefPoint = companyRef
+                    ? (() => {
+                        const rect = companyRef.getBoundingClientRect();
+                        return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+                    })()
+                    : null;
+                const remitInModal = collectRemitCandidates(scope)
+                    .sort((a, b) => scoreRemitCandidate(a, companyRefPoint) - scoreRemitCandidate(b, companyRefPoint));
+                for (const target of remitInModal) {
+                    if (clickWithMouseEvents(target)) {
+                        return 'clicked-modal-remit:' + describe(target) + ':companyScope=' + (hasCompanyText(scope) ? 'yes' : 'no');
+                    }
                 }
             }
             const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
             const companyLeaves = Array.from(document.querySelectorAll('*'))
-                .filter((el) => isVisible(el) && hasText(el, company))
+                .filter((el) => isVisible(el) && hasCompanyText(el))
                 .sort((a, b) => {
                     const ra = a.getBoundingClientRect();
                     const rb = b.getBoundingClientRect();
@@ -839,26 +1057,20 @@ const clickCompanyScopedRemit = async (
                         continue;
                     }
 
-                    const remitCandidates = Array.from(scope.querySelectorAll('button, [role="button"]'))
-                        .filter((el) => isVisible(el) && isSemanticButton(el) && hasText(el, remit));
+                    const remitCandidates = collectRemitCandidates(scope);
 
                     if (remitCandidates.length > 0) {
                         // Pick closest button to company text to avoid top banner actions.
                         const baseRect = leaf.getBoundingClientRect();
-                        const bx = baseRect.left + baseRect.width / 2;
-                        const by = baseRect.top + baseRect.height / 2;
+                        const basePoint = { x: baseRect.left + baseRect.width / 2, y: baseRect.top + baseRect.height / 2 };
                         remitCandidates.sort((a, b) => {
-                            const ra = a.getBoundingClientRect();
-                            const rb = b.getBoundingClientRect();
-                            const dax = (ra.left + ra.width / 2) - bx;
-                            const day = (ra.top + ra.height / 2) - by;
-                            const dbx = (rb.left + rb.width / 2) - bx;
-                            const dby = (rb.top + rb.height / 2) - by;
-                            return (dax * dax + day * day) - (dbx * dbx + dby * dby);
+                            return scoreRemitCandidate(a, basePoint) - scoreRemitCandidate(b, basePoint);
                         });
-                        const target = remitCandidates[0];
-                        target.click();
-                        return 'clicked-company-scope-remit:' + describe(target);
+                        for (const target of remitCandidates.slice(0, 3)) {
+                            if (clickWithMouseEvents(target)) {
+                                return 'clicked-company-scope-remit:' + describe(target);
+                            }
+                        }
                     }
 
                     scope = scope.parentElement;
@@ -1150,30 +1362,15 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // The modal shows recipient details and has "??瑜곸젧???얄뵛" / "??酉????얄뵛" buttons.
 
         // First, check if company name is visible (may need to scroll)
-        let companyTextEl
-        try {
-            companyTextEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
-            await companyTextEl.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT_MS })
+        let companyTextEl = await findVisibleCompanyTextLocator(page, 8000)
+        if (companyTextEl) {
             steps.push('company-text-visible')
-        } catch {
-            // Maybe not visible due to scrolling ??try JS scroll
-            try {
-                await page.evaluate(`
-                    (() => {
-                        const companyName = ${JSON.stringify(TARGET_COMPANY_NAME)};
-                        const walker = document.createTreeWalker(
-                            document.body, NodeFilter.SHOW_TEXT,
-                            { acceptNode: (n) => n.textContent && n.textContent.includes(companyName) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT }
-                        );
-                        const node = walker.nextNode();
-                        if (node && node.parentElement) node.parentElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    })()
-                `)
-                await page.waitForTimeout(1000)
-                companyTextEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
-                await companyTextEl.waitFor({ state: 'visible', timeout: 10000 })
-                steps.push('company-text-visible-after-scroll')
-            } catch {
+        } else {
+            const scrolled = await scrollToCompanyTextCandidate(page)
+            steps.push(scrolled ? 'company-scroll-hit' : 'company-scroll-miss')
+            await page.waitForTimeout(1000)
+            companyTextEl = await findVisibleCompanyTextLocator(page, 10000)
+            if (!companyTextEl) {
                 let pageInfo = `url: ${page.url()}`
                 try {
                     const html = await page.content()
@@ -1186,9 +1383,20 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
                 throw new MoinAutomationError(
                     'Select company',
-                    `Could not find "${TARGET_COMPANY_NAME}" on page. ${pageInfo}`
+                    `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
                 )
             }
+            steps.push('company-text-visible-after-scroll')
+        }
+
+        // Narrow candidate list by company keyword when recipient search input is present.
+        try {
+            const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
+            steps.push(`recipient-search-prefill:${searchResult}`)
+            await page.waitForTimeout(600)
+            await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
+        } catch {
+            steps.push('recipient-search-prefill-error')
         }
 
         // Click the company card to open the modal popup
@@ -1199,10 +1407,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         for (let attempt = 0; attempt < 3 && !remitClicked; attempt++) {
             throwIfAbortRequested(abortSignal, 'Open remit modal')
             try {
-                const companyEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
-                await companyEl.waitFor({ state: 'visible', timeout: 5000 })
-                await companyEl.click({ timeout: 5000 })
-                steps.push(`clicked-company-text:attempt${attempt}`)
+                const visibleCompanyEl = await findVisibleCompanyTextLocator(page, 3500)
+                if (!visibleCompanyEl) {
+                    steps.push(`company-text-click-failed:not-visible:attempt${attempt}`)
+                } else {
+                    await visibleCompanyEl.click({ timeout: 5000 })
+                    steps.push(`clicked-company-text:attempt${attempt}`)
+                }
             } catch {
                 steps.push(`company-text-click-failed:attempt${attempt}`)
             }
@@ -1211,7 +1422,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             await page.waitForTimeout(1000)
 
             try {
-                remitClickReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
+                remitClickReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME_VARIANTS, KO_REMIT)
                 steps.push(`company-scoped-remit:${remitClickReason}:attempt${attempt}`)
                 if (remitClickReason.startsWith('clicked-')) {
                     remitClicked = true
@@ -1236,7 +1447,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         let step2Ready = false
         let transferInspection = await inspectTransferInputs(page)
 
-        for (let attempt = 0; attempt < 4; attempt++) {
+        for (let attempt = 0; attempt < 5; attempt++) {
             throwIfAbortRequested(abortSignal, 'Open amount step')
             await page.waitForTimeout(2000)
             await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
@@ -1257,25 +1468,39 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 break
             }
 
-            if (transferInspection.aliasSearchVisible && attempt < 3) {
+            if (transferInspection.aliasSearchVisible && attempt < 4) {
                 steps.push(`step2-recovery-attempt:${attempt + 1}`)
 
                 try {
                     throwIfAbortRequested(abortSignal, 'Open amount step')
-                    const recoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
-                    steps.push(`recovery-company-scoped-remit:${recoveryReason}`)
-                    if (!recoveryReason.startsWith('clicked-')) {
-                        const recoveryCompanyEl = page.getByText(TARGET_COMPANY_NAME, { exact: false }).first()
+                    const clearResult = await clearRecipientSearchKeyword(page)
+                    steps.push(`recovery-recipient-search-clear:${clearResult}`)
+                    const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
+                    steps.push(`recovery-recipient-search:${searchResult}`)
+                    await page.waitForTimeout(900)
+                    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
+                    const recoveryCompanyEl = await findVisibleCompanyTextLocator(page, 5000)
+                    if (recoveryCompanyEl) {
                         await recoveryCompanyEl.click({ timeout: 3000 })
                         steps.push('recovery-clicked-company-text')
+                        await page.waitForTimeout(400)
+                    } else {
+                        steps.push('recovery-company-text-not-found')
                     }
+                    const recoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME_VARIANTS, KO_REMIT)
+                    steps.push(`recovery-company-scoped-remit:${recoveryReason}`)
                 } catch (err) {
                     steps.push(`recovery-remit-click-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`)
                 }
 
                 try {
                     throwIfAbortRequested(abortSignal, 'Open amount step')
-                    const secondRecoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME, KO_REMIT)
+                    const clearResult = await clearRecipientSearchKeyword(page)
+                    steps.push(`recovery-recipient-search-clear-2:${clearResult}`)
+                    const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
+                    steps.push(`recovery-recipient-search-2:${searchResult}`)
+                    await page.waitForTimeout(700)
+                    const secondRecoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME_VARIANTS, KO_REMIT)
                     steps.push(`recovery-company-scoped-remit-2:${secondRecoveryReason}`)
                     if (!secondRecoveryReason.startsWith('clicked-')) {
                         steps.push('recovery-remit-click-not-found')
