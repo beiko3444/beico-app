@@ -84,3 +84,28 @@ export async function getWarehousingDetail(slipNo: string) {
     const cstCd = getCstCd()
     return fasstRequest('GET', `/api/v1/warehousing/detail/${cstCd}/${slipNo}`)
 }
+
+export async function updateWarehousing(params: any[]) {
+    const cstCd = getCstCd()
+    return fasstRequest('PATCH', `/api/v1/warehousing/${cstCd}`, params)
+}
+
+export async function getWarehousingInspection(slipNo: string, whCd: string) {
+    const cstCd = getCstCd()
+    return fasstRequest('GET', `/api/v1/warehousing/inspec/${cstCd}/${slipNo}/${whCd}`)
+}
+
+export async function createGoods(params: any[]) {
+    const cstCd = getCstCd()
+    return fasstRequest('POST', `/api/v1/goods/${cstCd}`, params)
+}
+
+export async function updateGoods(params: any[]) {
+    const cstCd = getCstCd()
+    return fasstRequest('PATCH', `/api/v1/goods/${cstCd}`, params)
+}
+
+export async function getGoodsElements() {
+    const cstCd = getCstCd()
+    return fasstRequest('GET', `/api/v1/goods/element/${cstCd}`)
+}

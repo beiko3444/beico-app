@@ -1,17 +1,17 @@
 import { NextResponse } from "next/server"
-import { createWarehousing, updateWarehousing, getWarehousingList } from "@/lib/fassto"
+import { getGoodsList, createGoods, updateGoods, getGoodsElements } from "@/lib/fassto"
 
 export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url)
-        const start = searchParams.get('start') || ''
-        const end = searchParams.get('end') || ''
+        const mode = searchParams.get('mode')
 
-        if (!start || !end) {
-            return NextResponse.json({ error: '시작일과 종료일을 입력해주세요.' }, { status: 400 })
+        if (mode === 'elements') {
+            const result = await getGoodsElements()
+            return NextResponse.json(result)
         }
 
-        const result = await getWarehousingList(start, end)
+        const result = await getGoodsList()
         return NextResponse.json(result)
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 })
@@ -21,7 +21,7 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const result = await createWarehousing(Array.isArray(body) ? body : [body])
+        const result = await createGoods(Array.isArray(body) ? body : [body])
         return NextResponse.json(result)
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 })
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
     try {
         const body = await request.json()
-        const result = await updateWarehousing(Array.isArray(body) ? body : [body])
+        const result = await updateGoods(Array.isArray(body) ? body : [body])
         return NextResponse.json(result)
     } catch (error: any) {
         return NextResponse.json({ error: error.message }, { status: 500 })
