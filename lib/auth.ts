@@ -50,17 +50,7 @@ export const authOptions: NextAuthOptions = {
                         throw error;
                     }
 
-                    console.log("Database Error or Offline Mode:", error)
-                    // Fallback for offline testing
-                    if (credentials.username === 'admin' && credentials.password === '1234') {
-                        return {
-                            id: 'offline-admin',
-                            name: 'Offline Admin',
-                            email: 'admin',
-                            role: 'ADMIN',
-                            country: 'KR'
-                        }
-                    }
+                    console.error("Database error during authentication:", error)
                     return null
                 }
             }
