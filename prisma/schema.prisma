@@ -67,7 +67,8 @@ model Product {
   krSellPrice      Float?      @default(0)
   usBuyPrice       Float?      @default(0)
   usSellPrice      Float?      @default(0)
-  regionalPrices   Json?       @default("{}")
+  regionalPrices      Json?       @default("{}")
+  wholesaleAvailable  Boolean     @default(true)
   orderItems       OrderItem[]
   proformaInvoiceItems ProformaInvoiceItem[]
 }

@@ -24,6 +24,7 @@ export default async function NewOrderPage() {
     }
 
     const products = await prisma.product.findMany({
+        where: { wholesaleAvailable: true },
         orderBy: { sortOrder: 'asc' },
     })
 
