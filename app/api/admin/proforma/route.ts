@@ -132,7 +132,15 @@ export async function POST(request: Request) {
 
         const partner = await prisma.user.findUnique({
             where: { id: partnerId },
-            include: { partnerProfile: true }
+            select: {
+                id: true,
+                name: true,
+                partnerProfile: {
+                    select: {
+                        businessName: true,
+                    },
+                },
+            },
         })
         if (!partner) {
             return NextResponse.json({ error: 'Partner not found' }, { status: 404 })

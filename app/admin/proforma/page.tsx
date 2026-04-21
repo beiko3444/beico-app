@@ -13,7 +13,19 @@ const getCachedProformaPageData = unstable_cache(
         const [partners, products, issued] = await Promise.all([
             prisma.user.findMany({
                 where: { role: 'PARTNER', status: { not: 'DELETED' } },
-                include: { partnerProfile: true },
+                select: {
+                    id: true,
+                    name: true,
+                    partnerProfile: {
+                        select: {
+                            businessName: true,
+                            representativeName: true,
+                            email: true,
+                            contact: true,
+                            address: true,
+                        },
+                    },
+                },
                 orderBy: { name: 'asc' }
             }),
             prisma.product.findMany({
@@ -24,7 +36,6 @@ const getCachedProformaPageData = unstable_cache(
                     nameEN: true,
                     nameJP: true,
                     productCode: true,
-                    imageUrl: true,
                     usBuyPrice: true,
                     usSellPrice: true,
                     regionalPrices: true,
@@ -44,7 +55,7 @@ const getCachedProformaPageData = unstable_cache(
 
         return { partners, products, issued }
     },
-    ['admin-proforma-page-v1'],
+    ['admin-proforma-page-v2'],
     { revalidate: 60 }
 )
 
@@ -108,7 +119,7 @@ export default async function ProformaPage() {
         nameEN: product.nameEN || null,
         nameJP: product.nameJP || null,
         productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
-        imageUrl: product.imageUrl || null,
+        imageUrl: null,
         usBuyPrice: resolveUsdUnitPrice(product),
         stock: product.stock
     }))

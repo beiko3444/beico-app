@@ -16,7 +16,14 @@ export default async function ProfilePage() {
     if (session?.user?.id) {
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            include: { partnerProfile: true }
+            select: {
+                name: true,
+                partnerProfile: {
+                    select: {
+                        businessName: true,
+                    },
+                },
+            },
         })
         if (user) {
             businessName = user.partnerProfile?.businessName || user.name

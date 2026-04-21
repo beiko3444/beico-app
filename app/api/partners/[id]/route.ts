@@ -2,6 +2,30 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
+const partnerResponseSelect = {
+    id: true,
+    username: true,
+    name: true,
+    role: true,
+    status: true,
+    country: true,
+    createdAt: true,
+    updatedAt: true,
+    partnerProfile: {
+        select: {
+            id: true,
+            contact: true,
+            fax: true,
+            email: true,
+            businessName: true,
+            representativeName: true,
+            businessRegNumber: true,
+            address: true,
+            grade: true,
+        },
+    },
+} as const
+
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await context.params
@@ -47,9 +71,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
                     }
                 }
             },
-            include: {
-                partnerProfile: true
-            }
+            select: partnerResponseSelect
         })
 
         return NextResponse.json(partner)

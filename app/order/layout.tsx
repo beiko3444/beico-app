@@ -29,7 +29,17 @@ export default async function OrderLayout({
     if (session?.user?.id) {
         const user = await prisma.user.findUnique({
             where: { id: session.user.id },
-            include: { partnerProfile: true }
+            select: {
+                name: true,
+                country: true,
+                partnerProfile: {
+                    select: {
+                        businessName: true,
+                        businessRegNumber: true,
+                        address: true,
+                    },
+                },
+            },
         }) as any
         if (user) {
             businessName = user.partnerProfile?.businessName || user.name

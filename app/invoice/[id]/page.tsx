@@ -12,9 +12,39 @@ export default async function InvoicePage({ params }: { params: { id: string } }
     const { id } = await params
     const order = await prisma.order.findUnique({
         where: { id },
-        include: {
-            user: { include: { partnerProfile: true } },
-            items: { include: { product: true } }
+        select: {
+            id: true,
+            userId: true,
+            orderNumber: true,
+            createdAt: true,
+            user: {
+                select: {
+                    name: true,
+                    partnerProfile: {
+                        select: {
+                            businessRegNumber: true,
+                            businessName: true,
+                            representativeName: true,
+                            address: true,
+                            contact: true,
+                            email: true,
+                        },
+                    },
+                },
+            },
+            items: {
+                select: {
+                    id: true,
+                    quantity: true,
+                    price: true,
+                    product: {
+                        select: {
+                            name: true,
+                            nameJP: true,
+                        },
+                    },
+                },
+            },
         }
     })
 
