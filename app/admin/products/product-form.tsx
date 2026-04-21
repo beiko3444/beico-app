@@ -242,7 +242,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             const method = isNew ? 'POST' : 'PUT'
 
             // Prepare the body with numbers, ensuring we don't send NaN
-            const productData = {
+            const productData: Record<string, unknown> = {
                 name: name.trim(),
                 nameJP: nameJP.trim(),
                 nameEN: nameEN.trim(),
@@ -260,12 +260,12 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 usSellPrice: parseFloat(parseNumber(regionalPrices['C'].US.retail)) || 0,
                 stock: parseInt(parseNumber(stock)) || 0,
                 safetyStock: parseInt(parseNumber(safetyStock)) || 0,
-                imageUrl: imageUrl,
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
                 regionalPrices: regionalPrices,
             }
-
-            console.log("Submitting product data:", productData);
+            if (isNew || initialData.imageUrl !== undefined || imageUrl) {
+                productData.imageUrl = imageUrl
+            }
 
             const res = await fetch(url, {
                 method,

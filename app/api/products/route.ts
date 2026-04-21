@@ -1,9 +1,41 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 
+const productListSelect = {
+    id: true,
+    name: true,
+    nameJP: true,
+    nameEN: true,
+    buyPrice: true,
+    sellPrice: true,
+    onlinePrice: true,
+    priceA: true,
+    priceB: true,
+    priceC: true,
+    priceD: true,
+    stock: true,
+    safetyStock: true,
+    barcode: true,
+    productCode: true,
+    coupangSku: true,
+    sortOrder: true,
+    minOrderQuantity: true,
+    jpBuyPrice: true,
+    jpSellPrice: true,
+    krBuyPrice: true,
+    krSellPrice: true,
+    usBuyPrice: true,
+    usSellPrice: true,
+    regionalPrices: true,
+    wholesaleAvailable: true,
+    createdAt: true,
+    updatedAt: true,
+} as const
+
 export async function GET() {
     try {
         const products = await prisma.product.findMany({
+            select: productListSelect,
             orderBy: { createdAt: 'desc' }
         })
         return NextResponse.json(products)
@@ -60,7 +92,8 @@ export async function POST(request: Request) {
             data: {
                 ...productData,
                 sortOrder: nextSortOrder
-            }
+            },
+            select: productListSelect
         })
 
         return NextResponse.json(product)

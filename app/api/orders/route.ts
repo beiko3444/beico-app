@@ -114,18 +114,55 @@ export async function GET(request: Request) {
 
         const orders = await prisma.order.findMany({
             where: whereClause,
-            include: {
+            select: {
+                id: true,
+                orderNumber: true,
+                userId: true,
+                total: true,
+                createdAt: true,
+                status: true,
+                trackingNumber: true,
+                courier: true,
+                taxInvoiceIssued: true,
+                depositConfirmedAt: true,
+                adminDepositConfirmedAt: true,
                 user: {
                     select: {
+                        id: true,
                         name: true,
-                        username: true
-                    }
+                        username: true,
+                        country: true,
+                        partnerProfile: {
+                            select: {
+                                businessName: true,
+                                representativeName: true,
+                                grade: true,
+                                businessRegNumber: true,
+                                email: true,
+                                contact: true,
+                                address: true,
+                            },
+                        },
+                    },
                 },
                 items: {
-                    include: {
-                        product: true
-                    }
-                }
+                    select: {
+                        id: true,
+                        productId: true,
+                        quantity: true,
+                        price: true,
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                nameJP: true,
+                                nameEN: true,
+                                productCode: true,
+                                barcode: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 createdAt: 'desc'

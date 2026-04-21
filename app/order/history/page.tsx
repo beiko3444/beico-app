@@ -13,8 +13,35 @@ export default async function OrderHistoryPage() {
 
     const orders = await prisma.order.findMany({
         where: { userId: session.user.id },
-        include: { items: { include: { product: true } } },
-        orderBy: { createdAt: 'desc' }
+        select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            createdAt: true,
+            status: true,
+            trackingNumber: true,
+            courier: true,
+            taxInvoiceIssued: true,
+            items: {
+                select: {
+                    id: true,
+                    productId: true,
+                    quantity: true,
+                    price: true,
+                    product: {
+                        select: {
+                            id: true,
+                            name: true,
+                            nameJP: true,
+                            nameEN: true,
+                            productCode: true,
+                            barcode: true,
+                        },
+                    },
+                },
+            },
+        },
+        orderBy: { createdAt: 'desc' },
     })
 
     return (

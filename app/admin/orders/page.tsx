@@ -7,6 +7,57 @@ import OrdersClient from "./OrdersClient"
 
 export const dynamic = 'force-dynamic'
 
+const orderListSelect = {
+    id: true,
+    orderNumber: true,
+    userId: true,
+    total: true,
+    createdAt: true,
+    status: true,
+    trackingNumber: true,
+    courier: true,
+    taxInvoiceIssued: true,
+    depositConfirmedAt: true,
+    adminDepositConfirmedAt: true,
+    user: {
+        select: {
+            id: true,
+            name: true,
+            username: true,
+            country: true,
+            partnerProfile: {
+                select: {
+                    businessName: true,
+                    representativeName: true,
+                    grade: true,
+                    businessRegNumber: true,
+                    email: true,
+                    contact: true,
+                    address: true,
+                },
+            },
+        },
+    },
+    items: {
+        select: {
+            id: true,
+            productId: true,
+            quantity: true,
+            price: true,
+            product: {
+                select: {
+                    id: true,
+                    name: true,
+                    nameJP: true,
+                    nameEN: true,
+                    productCode: true,
+                    barcode: true,
+                },
+            },
+        },
+    },
+} as const
+
 export default async function OrdersPage() {
     const session = await getServerSession(authOptions)
 
@@ -16,18 +67,7 @@ export default async function OrdersPage() {
 
     const [orders, pendingTaxCount, missingTrackingCount] = await Promise.all([
         prisma.order.findMany({
-            include: {
-                user: {
-                    include: {
-                        partnerProfile: true
-                    }
-                },
-                items: {
-                    include: {
-                        product: true
-                    }
-                }
-            },
+            select: orderListSelect,
             orderBy: {
                 createdAt: 'desc'
             }

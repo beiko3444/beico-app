@@ -24,30 +24,26 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             updateData.password = await bcrypt.hash(password, 10)
         }
 
+        const profileData: any = {
+            contact,
+            email,
+            representativeName,
+            businessRegNumber,
+            address,
+            grade: grade || 'C',
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'businessRegistrationUrl')) {
+            profileData.businessRegistrationUrl = body.businessRegistrationUrl
+        }
+
         const partner = await prisma.user.update({
             where: { id },
             data: {
                 ...updateData,
                 partnerProfile: {
                     upsert: {
-                        create: {
-                            contact,
-                            email,
-                            representativeName,
-                            businessRegNumber,
-                            address,
-                            businessRegistrationUrl: body.businessRegistrationUrl,
-                            grade: grade || 'C',
-                        },
-                        update: {
-                            contact,
-                            email,
-                            representativeName,
-                            businessRegNumber,
-                            address,
-                            businessRegistrationUrl: body.businessRegistrationUrl,
-                            grade: grade || 'C',
-                        }
+                        create: profileData,
+                        update: profileData
                     }
                 }
             },

@@ -11,15 +11,37 @@ export const dynamic = 'force-dynamic'
 
 const getCachedPartnersPageData = unstable_cache(
     async () => {
+        const partnerListSelect = {
+            id: true,
+            username: true,
+            name: true,
+            role: true,
+            status: true,
+            country: true,
+            createdAt: true,
+            partnerProfile: {
+                select: {
+                    id: true,
+                    contact: true,
+                    email: true,
+                    businessName: true,
+                    representativeName: true,
+                    businessRegNumber: true,
+                    address: true,
+                    grade: true,
+                }
+            }
+        } as const
+
         const [activePartners, deletedPartners] = await Promise.all([
             prisma.user.findMany({
                 where: { role: { in: ['PARTNER', 'ADMIN'] }, status: { not: 'DELETED' } },
-                include: { partnerProfile: true },
+                select: partnerListSelect,
                 orderBy: [{ role: 'asc' }, { createdAt: 'desc' }]
             }),
             prisma.user.findMany({
                 where: { role: { in: ['PARTNER', 'ADMIN'] }, status: 'DELETED' },
-                include: { partnerProfile: true },
+                select: partnerListSelect,
                 orderBy: [{ createdAt: 'desc' }]
             })
         ])

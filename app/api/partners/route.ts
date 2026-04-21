@@ -2,11 +2,35 @@ import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
 
+const partnerListSelect = {
+    id: true,
+    username: true,
+    name: true,
+    role: true,
+    status: true,
+    country: true,
+    createdAt: true,
+    updatedAt: true,
+    partnerProfile: {
+        select: {
+            id: true,
+            contact: true,
+            fax: true,
+            email: true,
+            businessName: true,
+            representativeName: true,
+            businessRegNumber: true,
+            address: true,
+            grade: true,
+        },
+    },
+} as const
+
 export async function GET() {
     try {
         const partners = await prisma.user.findMany({
             where: { role: 'PARTNER' },
-            include: { partnerProfile: true },
+            select: partnerListSelect,
             orderBy: { createdAt: 'desc' }
         })
         return NextResponse.json(partners)
@@ -47,9 +71,7 @@ export async function POST(request: Request) {
                     }
                 }
             },
-            include: {
-                partnerProfile: true
-            }
+            select: partnerListSelect
         })
 
         return NextResponse.json(partner)

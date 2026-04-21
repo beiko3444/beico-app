@@ -98,10 +98,15 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
             const url = initialData ? `/api/partners/${initialData.id}` : '/api/partners'
             const method = initialData ? 'PUT' : 'POST'
 
+            const payload: Record<string, unknown> = { ...formData }
+            if (initialData && !formData.businessRegistrationUrl) {
+                delete payload.businessRegistrationUrl
+            }
+
             const res = await fetch(url, {
                 method,
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(formData),
+                body: JSON.stringify(payload),
             })
 
             if (res.ok) {

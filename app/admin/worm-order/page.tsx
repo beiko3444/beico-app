@@ -180,6 +180,30 @@ const CALENDAR_WEATHER_LOCATION_CONFIGS: Array<{
     },
 ]
 
+const CALENDAR_WEATHER_CODE_LABELS: Record<number, string> = {
+    0: '맑음',
+    1: '대체로 맑음',
+    2: '부분 흐림',
+    3: '흐림',
+    45: '안개',
+    48: '서리 안개',
+    51: '이슬비',
+    53: '이슬비',
+    55: '강한 이슬비',
+    61: '약한 비',
+    63: '비',
+    65: '강한 비',
+    71: '약한 눈',
+    73: '눈',
+    75: '강한 눈',
+    80: '소나기',
+    81: '강한 소나기',
+    82: '매우 강한 소나기',
+    95: '뇌우',
+    96: '뇌우/우박',
+    99: '강한 뇌우/우박',
+}
+
 const DEFAULT_CUSTOMS_FORWARD_EMAIL = 'customs@beone.kr'
 const CUSTOMS_FORWARD_SUBJECT_SUFFIX = '엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.'
 
@@ -527,6 +551,33 @@ function formatLocalDateToYmd(date: Date) {
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
+}
+
+function clampCalendarWeatherRange(startDate: string, endDate: string) {
+    const start = parseYmdToLocalDate(startDate)
+    const end = parseYmdToLocalDate(endDate)
+    if (!start || !end) return null
+
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const minDate = new Date(today)
+    minDate.setDate(minDate.getDate() - 94)
+    const maxDate = new Date(today)
+    maxDate.setDate(maxDate.getDate() + 14)
+
+    const clampedStart = start < minDate ? minDate : start
+    const clampedEnd = end > maxDate ? maxDate : end
+    if (clampedStart > clampedEnd) return null
+
+    return {
+        startDate: formatLocalDateToYmd(clampedStart),
+        endDate: formatLocalDateToYmd(clampedEnd),
+    }
+}
+
+function toCalendarWeatherTextByCode(code: number | null) {
+    if (code === null) return '정보 없음'
+    return CALENDAR_WEATHER_CODE_LABELS[code] || '정보 없음'
 }
 
 function formatKstDateDot(date: Date) {
@@ -2545,6 +2596,10 @@ export default function WormOrderPage() {
                 let locations = Array.isArray(result?.locations) ? result.locations : []
 
                 if (!response.ok || locations.length === 0) {
+                    const fallbackRange = clampCalendarWeatherRange(startDate, endDate)
+                    if (!fallbackRange) {
+                        throw new Error(typeof result?.error === 'string' ? result.error : '날씨 정보를 불러오지 못했습니다.')
+                    }
                     const fallbackSettled = await Promise.allSettled(
                         CALENDAR_WEATHER_LOCATION_CONFIGS.map(async (location) => {
                             const fallbackQuery = new URLSearchParams({
@@ -2552,8 +2607,8 @@ export default function WormOrderPage() {
                                 longitude: String(location.longitude),
                                 daily: 'weather_code,temperature_2m_max,temperature_2m_min',
                                 timezone: location.timezone,
-                                start_date: startDate,
-                                end_date: endDate,
+                                start_date: fallbackRange.startDate,
+                                end_date: fallbackRange.endDate,
                             })
                             const fallbackResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${fallbackQuery.toString()}`, {
                                 method: 'GET',
@@ -2574,7 +2629,11 @@ export default function WormOrderPage() {
                                 daily: dates.map((date: unknown, index: number) => ({
                                     date,
                                     weatherCode: weatherCodes[index] ?? null,
-                                    weatherText: '',
+                                    weatherText: toCalendarWeatherTextByCode(
+                                        typeof weatherCodes[index] === 'number' && Number.isFinite(weatherCodes[index])
+                                            ? weatherCodes[index]
+                                            : null,
+                                    ),
                                     maxTempC: maxTemps[index] ?? null,
                                     minTempC: minTemps[index] ?? null,
                                 })),
