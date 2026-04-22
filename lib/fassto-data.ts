@@ -3,6 +3,7 @@ export type FasstoGoodsRow = {
   godNm: string
   godType: string
   giftDiv: string
+  barcode: string | null
   useYn: string | null
   raw: any
 }
@@ -70,6 +71,7 @@ export function normalizeFasstoGoods(rows: any[]): FasstoGoodsRow[] {
       const godNm = toText(firstDefined(row?.godNm, row?.goodsNm, row?.itemNm, row?.godName))
       const godType = toText(firstDefined(row?.godType, row?.goodsType, '1')) || '1'
       const giftDiv = toText(firstDefined(row?.giftDiv, '01')) || '01'
+      const barcode = toText(firstDefined(row?.barcode, row?.barCd, row?.godBarcode)) || null
       const useYn = toText(firstDefined(row?.useYn, row?.use_yn)) || null
       if (!cstGodCd) return null
       return {
@@ -77,6 +79,7 @@ export function normalizeFasstoGoods(rows: any[]): FasstoGoodsRow[] {
         godNm,
         godType,
         giftDiv,
+        barcode,
         useYn,
         raw: row,
       }

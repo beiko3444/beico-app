@@ -1,18 +1,23 @@
-import { NextResponse } from "next/server"
-import { getWarehousingDetail } from "@/lib/fassto"
+import { NextResponse } from 'next/server'
+
+import { requireAdminApi, apiErrorResponse } from '@/lib/admin-api'
+import { getWarehousingDetail } from '@/lib/fassto'
 
 export async function GET(request: Request) {
-    try {
-        const { searchParams } = new URL(request.url)
-        const slipNo = searchParams.get('slipNo')
+  const unauthorized = await requireAdminApi()
+  if (unauthorized) return unauthorized
 
-        if (!slipNo) {
-            return NextResponse.json({ error: '전표번호를 입력해주세요.' }, { status: 400 })
-        }
+  try {
+    const { searchParams } = new URL(request.url)
+    const slipNo = searchParams.get('slipNo')
 
-        const result = await getWarehousingDetail(slipNo)
-        return NextResponse.json(result)
-    } catch (error: any) {
-        return NextResponse.json({ error: error.message }, { status: 500 })
+    if (!slipNo) {
+      return NextResponse.json({ error: '전표번호를 입력해주세요.' }, { status: 400 })
     }
+
+    const result = await getWarehousingDetail(slipNo)
+    return NextResponse.json(result)
+  } catch (error) {
+    return apiErrorResponse(error)
+  }
 }
