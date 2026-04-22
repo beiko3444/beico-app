@@ -7,6 +7,7 @@
     "build": "prisma db push --accept-data-loss && prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
+    "migrate:r2-assets": "node scripts/migrate-r2-assets.mjs",
     "logen-live": "node scripts/logen-address-confirm-live.mjs",
     "postinstall": "prisma generate"
   },

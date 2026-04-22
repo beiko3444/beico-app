@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import { getPartnerBusinessRegistrationUrl } from '@/lib/partner-business-registration-url'
 
 interface PartnerFormProps {
     initialData?: any
@@ -15,6 +16,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
     const [isOpen, setIsOpen] = useState(false)
     const [loading, setLoading] = useState(false)
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
+    const [hasBusinessRegistrationChanged, setHasBusinessRegistrationChanged] = useState(false)
 
     useEffect(() => {
         setMounted(true)
@@ -32,7 +34,8 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
         grade: 'C',
         role: 'PARTNER',
         country: '',
-        businessRegistrationUrl: ''
+        businessRegistrationUrl: '',
+        businessRegistrationContentType: ''
     })
 
     useEffect(() => {
@@ -49,8 +52,10 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 grade: initialData.partnerProfile?.grade || 'C',
                 role: initialData.role || 'PARTNER',
                 country: initialData.country || '',
-                businessRegistrationUrl: initialData.partnerProfile?.businessRegistrationUrl || ''
+                businessRegistrationUrl: initialData.partnerProfile?.businessRegistrationUrl || '',
+                businessRegistrationContentType: initialData.partnerProfile?.businessRegistrationContentType || ''
             })
+            setHasBusinessRegistrationChanged(false)
         } else if (isOpen && !initialData) {
             setFormData({
                 username: '',
@@ -64,8 +69,10 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 grade: 'C',
                 role: 'PARTNER',
                 country: '',
-                businessRegistrationUrl: ''
+                businessRegistrationUrl: '',
+                businessRegistrationContentType: ''
             })
+            setHasBusinessRegistrationChanged(false)
         }
     }, [isOpen, initialData])
 
@@ -85,7 +92,12 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
         const reader = new FileReader()
         reader.onload = (event) => {
             const result = event.target?.result as string
-            setFormData(prev => ({ ...prev, businessRegistrationUrl: result }))
+            setFormData(prev => ({
+                ...prev,
+                businessRegistrationUrl: result,
+                businessRegistrationContentType: file.type || (result.match(/^data:([^;]+)/)?.[1] || '')
+            }))
+            setHasBusinessRegistrationChanged(true)
         }
         reader.readAsDataURL(file)
     }
@@ -98,8 +110,23 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
             const url = initialData ? `/api/partners/${initialData.id}` : '/api/partners'
             const method = initialData ? 'PUT' : 'POST'
 
-            const payload: Record<string, unknown> = { ...formData }
-            if (initialData && !formData.businessRegistrationUrl) {
+            const payload: Record<string, unknown> = {
+                username: formData.username,
+                password: formData.password,
+                name: formData.name,
+                contact: formData.contact,
+                email: formData.email,
+                representativeName: formData.representativeName,
+                businessRegNumber: formData.businessRegNumber,
+                address: formData.address,
+                grade: formData.grade,
+                role: formData.role,
+                country: formData.country,
+            }
+
+            if (!initialData || hasBusinessRegistrationChanged) {
+                payload.businessRegistrationUrl = formData.businessRegistrationUrl || null
+            } else if (initialData && !formData.businessRegistrationUrl) {
                 delete payload.businessRegistrationUrl
             }
 
@@ -113,7 +140,22 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 setIsOpen(false)
                 router.refresh()
                 if (!initialData) {
-                    setFormData({ username: '', password: '', name: '', contact: '', email: '', representativeName: '', businessRegNumber: '', address: '', grade: 'C', role: 'PARTNER', country: '', businessRegistrationUrl: '' })
+                    setFormData({
+                        username: '',
+                        password: '',
+                        name: '',
+                        contact: '',
+                        email: '',
+                        representativeName: '',
+                        businessRegNumber: '',
+                        address: '',
+                        grade: 'C',
+                        role: 'PARTNER',
+                        country: '',
+                        businessRegistrationUrl: '',
+                        businessRegistrationContentType: ''
+                    })
+                    setHasBusinessRegistrationChanged(false)
                 }
             } else {
                 const data = await res.json()
@@ -138,6 +180,22 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
             </div>
         )
     }
+
+    const documentContentType = formData.businessRegistrationContentType
+    const isDocumentImage =
+        documentContentType.startsWith('image/') ||
+        formData.businessRegistrationUrl.startsWith('data:image') ||
+        formData.businessRegistrationUrl.match(/\.(jpeg|jpg|gif|png|webp|svg)$/i)
+
+    const isDocumentPdf =
+        documentContentType === 'application/pdf' ||
+        formData.businessRegistrationUrl.startsWith('data:application/pdf') ||
+        formData.businessRegistrationUrl.match(/\.pdf$/i)
+
+    const businessRegistrationDownloadUrl =
+        initialData && !hasBusinessRegistrationChanged && formData.businessRegistrationUrl
+            ? getPartnerBusinessRegistrationUrl(initialData.id, initialData.updatedAt, { download: true })
+            : formData.businessRegistrationUrl
 
     const modalContent = (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-md z-[99999] flex items-center justify-center p-4 overflow-hidden" onClick={() => setIsOpen(false)}>
@@ -258,7 +316,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                             />
                             {formData.businessRegistrationUrl && (
                                 <div className="flex flex-col gap-2 border rounded-md p-3 bg-gray-50/50">
-                                    {(formData.businessRegistrationUrl.startsWith('data:image') || formData.businessRegistrationUrl.match(/\.(jpeg|jpg|gif|png|webp)$/i)) ? (
+                                    {isDocumentImage ? (
                                         <div className="relative group cursor-pointer" onClick={() => setEnlargedImage(formData.businessRegistrationUrl)}>
                                             <img
                                                 src={formData.businessRegistrationUrl}
@@ -279,7 +337,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                     )}
                                     <div className="flex gap-2 mt-2">
                                         <a
-                                            href={formData.businessRegistrationUrl}
+                                            href={businessRegistrationDownloadUrl}
                                             download="사업자등록증"
                                             target="_blank"
                                             rel="noreferrer"
@@ -288,7 +346,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                         >
                                             <span>💾</span> 다운로드
                                         </a>
-                                        {formData.businessRegistrationUrl.startsWith('data:application/pdf') && (
+                                        {isDocumentPdf && (
                                             <a
                                                 href={formData.businessRegistrationUrl}
                                                 target="_blank"
@@ -299,6 +357,20 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                                 <span>🔗</span> 새 탭에서 열기
                                             </a>
                                         )}
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setHasBusinessRegistrationChanged(true)
+                                                setFormData(prev => ({
+                                                    ...prev,
+                                                    businessRegistrationUrl: '',
+                                                    businessRegistrationContentType: ''
+                                                }))
+                                            }}
+                                            className="bg-white border border-red-200 text-red-600 px-3 py-1.5 rounded-md text-xs font-bold hover:bg-red-50 transition-colors whitespace-nowrap flex items-center gap-1 shadow-sm w-fit"
+                                        >
+                                            <span>✕</span> 첨부 제거
+                                        </button>
                                     </div>
                                 </div>
                             )}

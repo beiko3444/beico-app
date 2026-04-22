@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { normalizeIncomingBusinessRegistration } from "@/lib/partner-business-registration-storage"
 
 const partnerListSelect = {
     id: true,
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
     try {
         const body = await request.json()
         const { username, password, name, contact, email, representativeName, country } = body
+        const businessRegistrationUrl = await normalizeIncomingBusinessRegistration(body.businessRegistrationUrl)
 
         // Validation
         if (!username || !password || !name) {
@@ -66,7 +69,7 @@ export async function POST(request: Request) {
                         representativeName,
                         businessRegNumber: body.businessRegNumber,
                         address: body.address,
-                        businessRegistrationUrl: body.businessRegistrationUrl,
+                        businessRegistrationUrl,
                         grade: body.grade || 'C', // Default to C
                     }
                 }
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
             select: partnerListSelect
         })
 
+        revalidatePath('/admin/partners')
         return NextResponse.json(partner)
     } catch (error) {
         return NextResponse.json({ error: "Failed to create partner", details: String(error) }, { status: 500 })

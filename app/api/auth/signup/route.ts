@@ -2,8 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import nodemailer from 'nodemailer'
-import { writeFile, mkdir } from 'fs/promises'
-import path from 'path'
+import { normalizeUploadedBusinessRegistration } from '@/lib/partner-business-registration-storage'
 
 const transporter = nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -57,18 +56,9 @@ export async function POST(req: Request) {
         let businessRegistrationUrl = ''
         if (businessRegistrationDocument && typeof businessRegistrationDocument === 'object' && 'arrayBuffer' in businessRegistrationDocument) {
             try {
-                // @ts-ignore - businessRegistrationDocument is File-like from FormData
-                const bytes = await businessRegistrationDocument.arrayBuffer()
-                const buffer = Buffer.from(bytes)
-
-                // Convert directly to base64 to avoid local filesystem issues (Vercel read-only restrictions)
-                // @ts-ignore
-                const mimeType = businessRegistrationDocument.type || 'application/octet-stream'
-                const base64String = `data:${mimeType};base64,${buffer.toString('base64')}`
-
-                businessRegistrationUrl = base64String
+                businessRegistrationUrl = (await normalizeUploadedBusinessRegistration(businessRegistrationDocument)) || ''
             } catch (err) {
-                console.warn('File conversion to base64 failed:', err)
+                console.warn('Business registration normalization failed:', err)
             }
         }
 
@@ -90,7 +80,7 @@ export async function POST(req: Request) {
                         email,
                         businessRegNumber,
                         address,
-                        businessRegistrationUrl, // Stored as relative URL path
+                        businessRegistrationUrl,
                         grade: 'C' // Default grade
                     }
                 }

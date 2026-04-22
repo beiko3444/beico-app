@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { normalizeIncomingBusinessRegistration } from "@/lib/partner-business-registration-storage"
 
 const partnerResponseSelect = {
     id: true,
@@ -57,7 +59,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             grade: grade || 'C',
         }
         if (Object.prototype.hasOwnProperty.call(body, 'businessRegistrationUrl')) {
-            profileData.businessRegistrationUrl = body.businessRegistrationUrl
+            profileData.businessRegistrationUrl = await normalizeIncomingBusinessRegistration(body.businessRegistrationUrl)
         }
 
         const partner = await prisma.user.update({
@@ -74,6 +76,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             select: partnerResponseSelect
         })
 
+        revalidatePath('/admin/partners')
         return NextResponse.json(partner)
     } catch (error) {
         console.error("Failed to update partner:", error)
@@ -91,6 +94,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
             data: { status: 'DELETED' }
         })
 
+        revalidatePath('/admin/partners')
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error("Failed to delete partner:", error)
