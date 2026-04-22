@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getProductImageUrl } from "@/lib/product-image-url"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
@@ -44,17 +45,19 @@ const orderListSelect = {
             productId: true,
             quantity: true,
             price: true,
-            product: {
-                select: {
-                    id: true,
-                    name: true,
-                    nameJP: true,
-                    nameEN: true,
-                    productCode: true,
-                    barcode: true,
+                    product: {
+                        select: {
+                            id: true,
+                            name: true,
+                            nameJP: true,
+                            nameEN: true,
+                            imageUrl: true,
+                            productCode: true,
+                            barcode: true,
+                            updatedAt: true,
+                        },
+                    },
                 },
-            },
-        },
     },
 } as const
 
@@ -89,9 +92,23 @@ export default async function OrdersPage() {
         })
     ])
 
+    const ordersWithImageUrls = orders.map(order => ({
+        ...order,
+        items: order.items.map(item => {
+            const { imageUrl, updatedAt, ...product } = item.product
+            return {
+                ...item,
+                product: {
+                    ...product,
+                    imageUrl: imageUrl ? getProductImageUrl(product.id, updatedAt) : null,
+                },
+            }
+        }),
+    }))
+
     return (
         <OrdersClient
-            orders={orders}
+            orders={ordersWithImageUrls}
             pendingTaxCount={pendingTaxCount}
             missingTrackingCount={missingTrackingCount}
         />

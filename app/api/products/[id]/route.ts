@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
+import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
 
 const productResponseSelect = {
     id: true,
@@ -71,7 +73,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             regionalPrices: body.regionalPrices !== undefined ? body.regionalPrices : undefined,
         }
         if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
-            updateData.imageUrl = body.imageUrl || null
+            updateData.imageUrl = await normalizeIncomingProductImage(body.imageUrl)
         }
 
         const product = await prisma.product.update({
@@ -80,6 +82,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             select: productResponseSelect
         })
 
+        revalidatePath('/admin/products')
         return NextResponse.json(product)
     } catch (error: any) {
         console.error("Full Prisma Error:", error)
@@ -95,11 +98,21 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     try {
         const { id } = await context.params
         const body = await request.json()
+        const patchData = { ...body }
+
+        if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
+            patchData.imageUrl = await normalizeIncomingProductImage(body.imageUrl)
+        }
+
+        delete patchData.copyImageFromProductId
+
         const product = await prisma.product.update({
             where: { id },
-            data: body,
+            data: patchData,
             select: productResponseSelect,
         })
+
+        revalidatePath('/admin/products')
         return NextResponse.json(product)
     } catch (error: any) {
         return NextResponse.json({ error: "Failed to patch product", message: error?.message }, { status: 500 })
@@ -112,6 +125,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
         await prisma.product.delete({
             where: { id }
         })
+        revalidatePath('/admin/products')
         return NextResponse.json({ success: true })
     } catch (error) {
         return NextResponse.json({ error: "Failed to delete product" }, { status: 500 })

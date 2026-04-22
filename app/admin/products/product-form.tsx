@@ -70,6 +70,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [priceD, setPriceD] = useState('')
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
+    const [hasImageChanged, setHasImageChanged] = useState(false)
     const [loading, setLoading] = useState(false)
     const [exchangeRates, setExchangeRates] = useState<{ USD: number, JPY: number, CNY: number } | null>(null);
 
@@ -146,6 +147,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
             setImageUrl(initialData.imageUrl || null)
+            setHasImageChanged(false)
             setMinOrderQuantity(formatNumber(initialData.minOrderQuantity || 1))
 
             if (initialData.regionalPrices && Object.keys(initialData.regionalPrices).length > 0) {
@@ -198,6 +200,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setStock('0')
             setSafetyStock('0')
             setImageUrl(null)
+            setHasImageChanged(false)
             setMinOrderQuantity('1')
             setRegionalPrices({
                 A: defaultGradePricing(),
@@ -225,6 +228,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     ctx.drawImage(img, 0, 0, 500, 500)
                     const base64 = canvas.toDataURL('image/jpeg', 0.8)
                     setImageUrl(base64)
+                    setHasImageChanged(true)
                 }
             }
             img.src = event.target?.result as string
@@ -263,7 +267,20 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
                 regionalPrices: regionalPrices,
             }
-            if (isNew || initialData.imageUrl !== undefined || imageUrl) {
+
+            if (!initialData) {
+                if (imageUrl) {
+                    productData.imageUrl = imageUrl
+                }
+            } else if (isCopy) {
+                if (hasImageChanged) {
+                    productData.imageUrl = imageUrl
+                } else if (initialData.imageUrl) {
+                    productData.copyImageFromProductId = initialData.id
+                } else {
+                    productData.imageUrl = null
+                }
+            } else if (hasImageChanged) {
                 productData.imageUrl = imageUrl
             }
 
@@ -286,6 +303,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setStock('0')
                     setSafetyStock('0')
                     setImageUrl(null)
+                    setHasImageChanged(false)
                     setMinOrderQuantity('1')
                     setRegionalPrices({
                         A: defaultGradePricing(),
@@ -368,7 +386,11 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
                                         <button
                                             type="button"
-                                            onClick={(e) => { e.stopPropagation(); setImageUrl(null); }}
+                                            onClick={(e) => {
+                                                e.stopPropagation()
+                                                setHasImageChanged(true)
+                                                setImageUrl(null)
+                                            }}
                                             className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-md opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
                                         >
                                             ✕

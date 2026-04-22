@@ -71,15 +71,21 @@ export async function uploadToR2(key: string, body: Uint8Array, contentType: str
 }
 
 // 1시간 유효한 presigned URL 반환 (파일이 브라우저로 직접 전달됨 - Vercel 트래픽 없음)
-export async function getR2PresignedUrl(key: string, filename: string): Promise<string> {
+export async function getR2PresignedUrl(
+    key: string,
+    filename: string,
+    options: { disposition?: 'attachment' | 'inline' } = {}
+): Promise<string> {
     const config = getRequiredR2Config()
     const r2 = getR2Client(config)
+    const disposition = options.disposition || 'attachment'
+
     return getSignedUrl(
         r2,
         new GetObjectCommand({
             Bucket: config.bucketName,
             Key: key,
-            ResponseContentDisposition: `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+            ResponseContentDisposition: `${disposition}; filename*=UTF-8''${encodeURIComponent(filename)}`,
         }),
         { expiresIn: 3600 }
     )

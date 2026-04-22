@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
+import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
 
 const productListSelect = {
     id: true,
@@ -49,6 +51,17 @@ export async function POST(request: Request) {
         const body = await request.json()
         const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity, coupangSku } = body
         const normalizedProductCode = productCode ? String(productCode).trim().toUpperCase() : null
+        let imageUrl: string | null = null
+
+        if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
+            imageUrl = await normalizeIncomingProductImage(body.imageUrl)
+        } else if (body.copyImageFromProductId) {
+            const sourceProduct = await prisma.product.findUnique({
+                where: { id: String(body.copyImageFromProductId) },
+                select: { imageUrl: true },
+            })
+            imageUrl = await normalizeIncomingProductImage(sourceProduct?.imageUrl)
+        }
 
         // Validation
         if (!name || buyPrice === undefined || sellPrice === undefined) {
@@ -72,7 +85,7 @@ export async function POST(request: Request) {
             usBuyPrice: (body.usBuyPrice !== null && body.usBuyPrice !== undefined && body.usBuyPrice !== "") ? Number(body.usBuyPrice) : 0,
             usSellPrice: (body.usSellPrice !== null && body.usSellPrice !== undefined && body.usSellPrice !== "") ? Number(body.usSellPrice) : 0,
             stock: stock !== undefined ? Math.round(Number(stock)) : 0,
-            imageUrl: body.imageUrl || null,
+            imageUrl,
             priceA: (body.priceA !== null && body.priceA !== undefined && body.priceA !== "") ? Number(body.priceA) : null,
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
@@ -96,6 +109,7 @@ export async function POST(request: Request) {
             select: productListSelect
         })
 
+        revalidatePath('/admin/products')
         return NextResponse.json(product)
     } catch (error: any) {
         console.error("Failed to create product:", error)

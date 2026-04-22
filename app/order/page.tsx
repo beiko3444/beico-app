@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getProductImageUrl } from "@/lib/product-image-url"
 import OrderInterface from "./order-interface"
 import { Filter } from 'lucide-react'
 
@@ -47,6 +48,7 @@ export default async function NewOrderPage() {
             priceC: true,
             priceD: true,
             stock: true,
+            imageUrl: true,
             productCode: true,
             barcode: true,
             minOrderQuantity: true,
@@ -57,6 +59,7 @@ export default async function NewOrderPage() {
             usBuyPrice: true,
             usSellPrice: true,
             regionalPrices: true,
+            updatedAt: true,
         },
     })
 
@@ -123,6 +126,7 @@ export default async function NewOrderPage() {
         return {
             id: p.id,
             name: p.name,
+            imageUrl: p.imageUrl ? getProductImageUrl(p.id, p.updatedAt) : null,
             sellPrice: finalPrice,
             stock: p.stock,
             productCode: p.productCode,
