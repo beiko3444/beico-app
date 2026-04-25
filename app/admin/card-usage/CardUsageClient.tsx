@@ -443,6 +443,7 @@ export default function CardUsageClient() {
   const [coupangModalOpen, setCoupangModalOpen] = useState(false)
   const [coupangLoginId, setCoupangLoginId] = useState('')
   const [coupangPassword, setCoupangPassword] = useState('')
+  const [coupangRememberId, setCoupangRememberId] = useState(true)
   const [coupangManualOpenForId, setCoupangManualOpenForId] = useState<string | null>(null)
   const [coupangManualResults, setCoupangManualResults] = useState<CoupangPurchaseSummary[]>([])
   const [coupangManualLoading, setCoupangManualLoading] = useState(false)
@@ -596,6 +597,14 @@ export default function CardUsageClient() {
     })
   }, [])
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    try {
+      const saved = window.localStorage.getItem('cardUsage.coupangLoginId')
+      if (saved) setCoupangLoginId(saved)
+    } catch { /* ignore */ }
+  }, [])
+
   const handleSearch = () => { setSyncMessage(''); setSyncCompletedAt(null); load(1) }
 
   const handleSync = async () => {
@@ -616,18 +625,32 @@ export default function CardUsageClient() {
   }
 
   const handleCoupangSync = async () => {
+    const trimmedId = coupangLoginId.trim()
+    if (!trimmedId || !coupangPassword) {
+      setCoupangError('쿠팡 아이디와 비밀번호를 모두 입력해 주세요.')
+      return
+    }
     setCoupangSyncing(true)
     setCoupangError('')
     setCoupangMessage('')
     try {
+      if (typeof window !== 'undefined') {
+        try {
+          if (coupangRememberId) {
+            window.localStorage.setItem('cardUsage.coupangLoginId', trimmedId)
+          } else {
+            window.localStorage.removeItem('cardUsage.coupangLoginId')
+          }
+        } catch { /* ignore */ }
+      }
       const syncRes = await fetch('/api/admin/coupang-purchase/sync', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           startDate,
           endDate,
-          loginId: coupangLoginId.trim() || undefined,
-          loginPassword: coupangPassword || undefined,
+          loginId: trimmedId,
+          loginPassword: coupangPassword,
         }),
       })
       const syncJson = await syncRes.json()
@@ -1290,37 +1313,55 @@ export default function CardUsageClient() {
               border: `1px solid ${T.border}`,
             }}
           >
-            <h2 style={{ fontSize: 16, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>쿠팡 구매내역 동기화</h2>
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>쿠팡 로그인</h2>
             <p style={{ fontSize: 12, color: T.textTertiary, margin: '0 0 16px' }}>
               조회 기간({formatDisplayDate(startDate)} ~ {formatDisplayDate(endDate)})의 쿠팡 주문을 가져와 카드결제와 자동매칭합니다.
-              로그인 정보를 입력하지 않으면 서버 환경변수(COUPANG_USER_LOGIN_ID/PASSWORD)를 사용합니다.
+              비밀번호는 한 번의 로그인에만 사용되며 어디에도 저장되지 않습니다.
             </p>
-            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>쿠팡 아이디 (선택)</label>
+            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>쿠팡 아이디 *</label>
             <input
               type="text"
               value={coupangLoginId}
               onChange={(e) => setCoupangLoginId(e.target.value)}
               placeholder="아이디 또는 이메일"
+              required
               style={{
                 width: '100%', height: 36, padding: '0 12px', borderRadius: 8,
                 border: `1px solid ${T.border}`, background: T.surface, color: T.text,
                 fontSize: 13, marginBottom: 12, outline: 'none',
               }}
               autoComplete="username"
+              autoFocus
             />
-            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>비밀번호 (선택)</label>
+            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>쿠팡 비밀번호 *</label>
             <input
               type="password"
               value={coupangPassword}
               onChange={(e) => setCoupangPassword(e.target.value)}
-              placeholder="비밀번호 (저장하지 않음)"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && coupangLoginId.trim() && coupangPassword && !coupangSyncing) {
+                  e.preventDefault()
+                  void handleCoupangSync()
+                }
+              }}
+              placeholder="비밀번호"
+              required
               style={{
                 width: '100%', height: 36, padding: '0 12px', borderRadius: 8,
                 border: `1px solid ${T.border}`, background: T.surface, color: T.text,
-                fontSize: 13, marginBottom: 16, outline: 'none',
+                fontSize: 13, marginBottom: 12, outline: 'none',
               }}
               autoComplete="current-password"
             />
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.textTertiary, marginBottom: 16, cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={coupangRememberId}
+                onChange={(e) => setCoupangRememberId(e.target.checked)}
+                style={{ accentColor: T.accent }}
+              />
+              아이디 기억하기 (이 브라우저에만)
+            </label>
             {coupangError && (
               <div style={{ fontSize: 12, color: T.error, marginBottom: 12 }}>{coupangError}</div>
             )}
@@ -1339,17 +1380,21 @@ export default function CardUsageClient() {
               <button
                 type="button"
                 onClick={handleCoupangSync}
-                disabled={coupangSyncing}
+                disabled={coupangSyncing || !coupangLoginId.trim() || !coupangPassword}
                 style={{
                   height: 36, padding: '0 16px', borderRadius: 8,
-                  background: '#FF4444', border: 'none', color: '#fff',
+                  background: (!coupangLoginId.trim() || !coupangPassword) ? T.borderLight : '#FF4444',
+                  border: 'none', color: '#fff',
                   fontSize: 13, fontWeight: 600,
-                  cursor: coupangSyncing ? 'wait' : 'pointer',
+                  cursor: coupangSyncing
+                    ? 'wait'
+                    : (!coupangLoginId.trim() || !coupangPassword) ? 'not-allowed' : 'pointer',
                   display: 'inline-flex', alignItems: 'center', gap: 6,
+                  opacity: (!coupangLoginId.trim() || !coupangPassword) ? 0.6 : 1,
                 }}
               >
                 {coupangSyncing && <Loader2 size={13} className="animate-spin" />}
-                동기화 + 매칭
+                로그인 + 동기화
               </button>
             </div>
           </div>

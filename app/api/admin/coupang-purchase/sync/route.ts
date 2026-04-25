@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     if (!loginId || !loginPassword) {
       return NextResponse.json(
-        { error: '쿠팡 로그인 정보가 없습니다. 요청 본문 또는 COUPANG_USER_LOGIN_ID / COUPANG_USER_LOGIN_PASSWORD 환경변수를 설정해 주세요.' },
+        { error: '쿠팡 아이디와 비밀번호를 입력해 주세요.' },
         { status: 400 },
       )
     }
