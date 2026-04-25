@@ -158,9 +158,10 @@ const performLogin = async (page: PageLike, loginId: string, loginPassword: stri
     await page.goto(COUPANG_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS })
     await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
 
-    const idSelectors = ['input#login-email-input', 'input[name="login_id"]', 'input[type="email"]']
+    // Verified against the live login page DOM (login.coupang.com/login/login.pang).
+    const idSelectors = ['input#login-email-input', 'input[name="email"]', 'input.member__input._loginIdInput', 'input[type="email"]']
     const pwSelectors = ['input#login-password-input', 'input[name="password"]', 'input[type="password"]']
-    const submitSelectors = ['button[type="submit"]', 'button:has-text("로그인")', '.login__button-login']
+    const submitSelectors = ['button._loginSubmitButton', 'button.login__button--submit', 'button[type="submit"]:has-text("로그인")', 'button[type="submit"]']
 
     const fillField = async (selectors: string[], value: string, label: string) => {
         for (const selector of selectors) {
@@ -199,16 +200,27 @@ const performLogin = async (page: PageLike, loginId: string, loginPassword: stri
 
     await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
 
-    const captchaVisible = await page.locator('img[alt*="자동입력"], iframe[src*="recaptcha"], #captcha').first().isVisible().catch(() => false)
+    // CAPTCHA classes confirmed by inspecting the live login page DOM.
+    const captchaVisible = await page
+        .locator(
+            '._loginCaptchaContainer, .login__content--captcha, .captcha-box__image, .captcha-box, iframe[src*="recaptcha"]',
+        )
+        .first()
+        .isVisible()
+        .catch(() => false)
     if (captchaVisible) {
         throw new CoupangScrapeError(
             'CAPTCHA_REQUIRED',
-            '쿠팡에서 자동입력 방지 인증을 요구합니다. headless=false 모드로 한번 직접 로그인 후 다시 시도해 주세요.',
+            '쿠팡에서 자동입력 방지(CAPTCHA) 인증을 요구합니다. COUPANG_USER_HEADLESS=false 로 한 번 직접 로그인 후 다시 시도해 주세요.',
         )
     }
 
     if (page.url().includes('/login/login.pang')) {
-        const errorText = await page.locator('.login__error, .error_message, [role="alert"]').first().textContent().catch(() => null)
+        const errorText = await page
+            .locator('._loginCommonError, ._loginPasswordError, .member__message-area--error, .error-message, [role="alert"]')
+            .first()
+            .textContent()
+            .catch(() => null)
         throw new CoupangScrapeError('LOGIN_FAILED', errorText?.trim() || '쿠팡 로그인에 실패했습니다. 아이디/비밀번호를 확인해 주세요.')
     }
 }
