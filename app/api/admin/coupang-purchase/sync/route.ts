@@ -83,6 +83,7 @@ export async function POST(request: Request) {
       storedCount,
       pagesScraped: scrape.pagesScraped,
       finalUrl: scrape.finalUrl,
+      proxySource: scrape.proxySource,
     })
   } catch (error) {
     console.error('[CoupangPurchase Sync] error', error)

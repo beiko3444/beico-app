@@ -81,6 +81,7 @@ export type CoupangScrapeResult = {
     purchases: CoupangPurchaseRecord[]
     pagesScraped: number
     finalUrl: string
+    proxySource: string | null
 }
 
 export type CoupangScrapeFailureCode =
@@ -108,8 +109,42 @@ const getErrorMessage = (error: unknown) => {
     return String(error)
 }
 
-const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
+type ProxyConfig = {
+    server: string
+    username?: string
+    password?: string
+}
+
+const resolveProxyFromEnv = (): { proxy: ProxyConfig; source: string } | null => {
+    const candidates: Array<[string, string | undefined]> = [
+        ['QUOTAGUARDSTATIC_URL', process.env.QUOTAGUARDSTATIC_URL],
+        ['FIXIE_URL', process.env.FIXIE_URL],
+        ['HTTPS_PROXY', process.env.HTTPS_PROXY],
+        ['HTTP_PROXY', process.env.HTTP_PROXY],
+        ['COUPANG_USER_PROXY_URL', process.env.COUPANG_USER_PROXY_URL],
+    ]
+    for (const [source, raw] of candidates) {
+        if (!raw) continue
+        try {
+            const u = new URL(raw)
+            const proxy: ProxyConfig = { server: `${u.protocol}//${u.host}` }
+            if (u.username) proxy.username = decodeURIComponent(u.username)
+            if (u.password) proxy.password = decodeURIComponent(u.password)
+            return { proxy, source }
+        } catch {
+            // ignore malformed proxy URL and try next
+        }
+    }
+    return null
+}
+
+const launchBrowser = async (
+    headless: boolean,
+): Promise<{ browser: BrowserLike; runtime: string; proxySource: string | null }> => {
     const runtimeErrors: string[] = []
+    const proxyEntry = resolveProxyFromEnv()
+    const proxy = proxyEntry?.proxy
+    const proxySource = proxyEntry?.source ?? null
 
     try {
         const { chromium: playwrightCoreChromium } = await import('playwright-core')
@@ -121,9 +156,10 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
             headless,
             executablePath,
             args: chromium.args?.length ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(proxy ? { proxy } : {}),
         })
 
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core+sparticuz' }
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core+sparticuz', proxySource }
     } catch (error) {
         runtimeErrors.push(`playwright-core+sparticuz: ${getErrorMessage(error)}`)
     }
@@ -140,9 +176,10 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
             headless,
             executablePath: customExecutablePath,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(proxy ? { proxy } : {}),
         })
 
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path' }
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path', proxySource }
     } catch (error) {
         runtimeErrors.push(`playwright-core-custom-path: ${getErrorMessage(error)}`)
     }
@@ -154,7 +191,12 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
     )
 }
 
-const performLogin = async (page: PageLike, loginId: string, loginPassword: string) => {
+const performLogin = async (
+    page: PageLike,
+    loginId: string,
+    loginPassword: string,
+    proxySource: string | null,
+) => {
     await page.goto(COUPANG_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS })
     await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
 
@@ -173,9 +215,12 @@ const performLogin = async (page: PageLike, loginId: string, loginPassword: stri
     if (blockSnapshot) {
         const haystack = `${blockSnapshot.title}\n${blockSnapshot.bodyText}`
         if (/Access Denied|don't have permission|Reference\s*#\d|errors\.edgesuite\.net/i.test(haystack)) {
+            const proxyHint = proxySource
+                ? `현재 프록시(${proxySource})를 사용 중인데도 차단됐습니다. 다른 출구 IP를 가진 프록시로 교체해 주세요.`
+                : '서버에 프록시(QUOTAGUARDSTATIC_URL, FIXIE_URL, HTTPS_PROXY, COUPANG_USER_PROXY_URL 중 하나)를 설정하거나 로컬에서 실행해 주세요.'
             throw new CoupangScrapeError(
                 'NAVIGATION_FAILED',
-                '쿠팡 CDN(Akamai)이 서버 IP를 차단했습니다. 다른 네트워크/프록시(QUOTAGUARDSTATIC_URL, FIXIE_URL, HTTPS_PROXY)로 우회하거나 로컬에서 실행해 주세요.',
+                `쿠팡 CDN(Akamai)이 서버 IP를 차단했습니다. ${proxyHint}`,
                 `title="${blockSnapshot.title}" url=${blockSnapshot.url}`,
             )
         }
@@ -408,7 +453,7 @@ export async function scrapeCoupangPurchases(input: CoupangScrapeInput): Promise
     }
 
     const headless = input.headless ?? true
-    const { browser } = await launchBrowser(headless)
+    const { browser, proxySource } = await launchBrowser(headless)
 
     try {
         const context = await browser.newContext({
@@ -423,7 +468,7 @@ export async function scrapeCoupangPurchases(input: CoupangScrapeInput): Promise
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(DEFAULT_TIMEOUT_MS)
 
-        await performLogin(page, input.loginId, input.loginPassword)
+        await performLogin(page, input.loginId, input.loginPassword, proxySource)
 
         const purchases: CoupangPurchaseRecord[] = []
         const seenOrderIds = new Set<string>()
@@ -461,7 +506,7 @@ export async function scrapeCoupangPurchases(input: CoupangScrapeInput): Promise
 
         const finalUrl = page.url()
         await context.newPage().catch(() => undefined)
-        return { purchases, pagesScraped, finalUrl }
+        return { purchases, pagesScraped, finalUrl, proxySource }
     } finally {
         await browser.close().catch(() => undefined)
     }
