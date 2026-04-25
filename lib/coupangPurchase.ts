@@ -158,6 +158,36 @@ const performLogin = async (page: PageLike, loginId: string, loginPassword: stri
     await page.goto(COUPANG_LOGIN_URL, { waitUntil: 'domcontentloaded', timeout: DEFAULT_TIMEOUT_MS })
     await page.waitForLoadState('networkidle', { timeout: DEFAULT_TIMEOUT_MS }).catch(() => undefined)
 
+    // Detect Akamai / WAF bot blocks before trying to interact with the page.
+    // The CDN returns a static "Access Denied" HTML with no inputs at all, which
+    // would otherwise surface as a confusing "input not found" error.
+    const blockSnapshot = await page
+        .evaluate(`(() => ({
+            title: document.title || '',
+            bodyText: (document.body && document.body.innerText || '').slice(0, 400),
+            url: location.href,
+            inputCount: document.querySelectorAll('input').length,
+        }))()`)
+        .catch(() => null) as { title: string; bodyText: string; url: string; inputCount: number } | null
+
+    if (blockSnapshot) {
+        const haystack = `${blockSnapshot.title}\n${blockSnapshot.bodyText}`
+        if (/Access Denied|don't have permission|Reference\s*#\d|errors\.edgesuite\.net/i.test(haystack)) {
+            throw new CoupangScrapeError(
+                'NAVIGATION_FAILED',
+                '쿠팡 CDN(Akamai)이 서버 IP를 차단했습니다. 다른 네트워크/프록시(QUOTAGUARDSTATIC_URL, FIXIE_URL, HTTPS_PROXY)로 우회하거나 로컬에서 실행해 주세요.',
+                `title="${blockSnapshot.title}" url=${blockSnapshot.url}`,
+            )
+        }
+        if (blockSnapshot.inputCount === 0) {
+            throw new CoupangScrapeError(
+                'NAVIGATION_FAILED',
+                '쿠팡 로그인 페이지가 정상적으로 로드되지 않았습니다 (입력 필드 0개).',
+                `title="${blockSnapshot.title}" url=${blockSnapshot.url} body="${blockSnapshot.bodyText.slice(0, 120)}"`,
+            )
+        }
+    }
+
     // Verified against the live login page DOM (login.coupang.com/login/login.pang).
     const idSelectors = ['input#login-email-input', 'input[name="email"]', 'input.member__input._loginIdInput', 'input[type="email"]']
     const pwSelectors = ['input#login-password-input', 'input[name="password"]', 'input[type="password"]']
@@ -167,7 +197,7 @@ const performLogin = async (page: PageLike, loginId: string, loginPassword: stri
         for (const selector of selectors) {
             try {
                 const target = page.locator(selector).first()
-                await target.waitFor({ state: 'visible', timeout: 6000 })
+                await target.waitFor({ state: 'visible', timeout: 12000 })
                 await target.click({ timeout: 4000 })
                 await target.fill('')
                 await target.pressSequentially(value, { delay: 60 + Math.floor(Math.random() * 60) })
@@ -176,7 +206,8 @@ const performLogin = async (page: PageLike, loginId: string, loginPassword: stri
                 // try next
             }
         }
-        throw new CoupangScrapeError('LOGIN_FAILED', `로그인 ${label} 입력 필드를 찾지 못했습니다.`)
+        const diag = blockSnapshot ? `inputs=${blockSnapshot.inputCount} title="${blockSnapshot.title}" url=${blockSnapshot.url}` : `url=${page.url()}`
+        throw new CoupangScrapeError('LOGIN_FAILED', `로그인 ${label} 입력 필드를 찾지 못했습니다.`, diag)
     }
 
     await fillField(idSelectors, loginId, '아이디')
