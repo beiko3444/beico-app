@@ -7,6 +7,24 @@ import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/car
 import type { CategoryMeta } from '@/lib/cardCategory'
 
 /* ═══════════════════ Types ═══════════════════ */
+type CoupangPurchaseItemDetail = {
+  name: string
+  quantity: number
+  price: number | null
+  imageUrl: string | null
+  productUrl: string | null
+}
+
+type CoupangPurchaseSummary = {
+  id: string
+  orderId: string
+  orderedAt: string
+  totalAmount: number
+  paymentMethod: string | null
+  itemSummary: string | null
+  itemsJson: CoupangPurchaseItemDetail[] | null
+}
+
 type CardUsageItem = {
   id: string
   corpNum: string
@@ -31,6 +49,8 @@ type CardUsageItem = {
   category: string | null
   reviewedAt: string | null
   reviewedBy: string | null
+  coupangPurchaseId: string | null
+  coupangPurchase: CoupangPurchaseSummary | null
   syncedAt: string
 }
 
@@ -417,6 +437,16 @@ export default function CardUsageClient() {
   const [error, setError] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
   const [syncCompletedAt, setSyncCompletedAt] = useState<string | null>(null)
+  const [coupangSyncing, setCoupangSyncing] = useState(false)
+  const [coupangMessage, setCoupangMessage] = useState('')
+  const [coupangError, setCoupangError] = useState('')
+  const [coupangModalOpen, setCoupangModalOpen] = useState(false)
+  const [coupangLoginId, setCoupangLoginId] = useState('')
+  const [coupangPassword, setCoupangPassword] = useState('')
+  const [coupangManualOpenForId, setCoupangManualOpenForId] = useState<string | null>(null)
+  const [coupangManualResults, setCoupangManualResults] = useState<CoupangPurchaseSummary[]>([])
+  const [coupangManualLoading, setCoupangManualLoading] = useState(false)
+  const [coupangManualSavingId, setCoupangManualSavingId] = useState<string | null>(null)
   const [memoDrafts, setMemoDrafts] = useState<Record<string, string>>({})
   const [categoryDrafts, setCategoryDrafts] = useState<Record<string, string>>({})
   const [savingMemoId, setSavingMemoId] = useState<string | null>(null)
@@ -583,6 +613,111 @@ export default function CardUsageClient() {
       await load(1)
     } catch (err: unknown) { setError(errorMessage(err)) }
     finally { setSyncing(false) }
+  }
+
+  const handleCoupangSync = async () => {
+    setCoupangSyncing(true)
+    setCoupangError('')
+    setCoupangMessage('')
+    try {
+      const syncRes = await fetch('/api/admin/coupang-purchase/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          startDate,
+          endDate,
+          loginId: coupangLoginId.trim() || undefined,
+          loginPassword: coupangPassword || undefined,
+        }),
+      })
+      const syncJson = await syncRes.json()
+      if (!syncRes.ok) {
+        const detail = syncJson?.detail ? ` (${syncJson.detail})` : ''
+        throw new Error(`${syncJson.error || '쿠팡 구매내역 동기화 실패'}${detail}`)
+      }
+
+      const matchRes = await fetch('/api/admin/coupang-purchase/match', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate }),
+      })
+      const matchJson = await matchRes.json()
+      if (!matchRes.ok) {
+        throw new Error(matchJson.error || '쿠팡 자동매칭 실패')
+      }
+
+      setCoupangMessage(
+        `쿠팡 ${syncJson.fetchedCount ?? 0}건 수집 · 자동매칭 ${matchJson.matchedCount ?? 0}건` +
+          (matchJson.ambiguousCount ? ` · 후보다수 ${matchJson.ambiguousCount}건` : '') +
+          (matchJson.unmatchedCount ? ` · 미매칭 ${matchJson.unmatchedCount}건` : ''),
+      )
+      setCoupangModalOpen(false)
+      setCoupangPassword('')
+      await load(1)
+    } catch (err: unknown) {
+      setCoupangError(errorMessage(err))
+    } finally {
+      setCoupangSyncing(false)
+    }
+  }
+
+  const openCoupangManualMatch = async (item: CardUsageItem) => {
+    setCoupangManualOpenForId(item.id)
+    setCoupangManualResults([])
+    setCoupangManualLoading(true)
+    try {
+      const amt = resolveAmount(item)
+      const qs = new URLSearchParams()
+      if (item.usedAt) {
+        const d = new Date(item.usedAt)
+        const start = new Date(d.getTime() - 5 * 24 * 3600 * 1000)
+        const end = new Date(d.getTime() + 5 * 24 * 3600 * 1000)
+        qs.set('startDate', formatInputDate(start))
+        qs.set('endDate', formatInputDate(end))
+      }
+      if (amt > 0) qs.set('amount', String(amt))
+      const res = await fetch(`/api/admin/coupang-purchase?${qs.toString()}`)
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '쿠팡 구매내역 조회 실패')
+      setCoupangManualResults(Array.isArray(json.items) ? json.items : [])
+    } catch (err: unknown) {
+      setCoupangError(errorMessage(err))
+    } finally {
+      setCoupangManualLoading(false)
+    }
+  }
+
+  const linkCoupangPurchase = async (item: CardUsageItem, purchaseId: string | null) => {
+    setCoupangManualSavingId(item.id)
+    try {
+      const res = await fetch('/api/admin/card-usage', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: item.id, coupangPurchaseId: purchaseId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || '쿠팡 매칭 저장 실패')
+      setData((prev) => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          items: prev.items.map((row) =>
+            row.id === item.id
+              ? {
+                  ...row,
+                  coupangPurchaseId: json.item?.coupangPurchaseId ?? null,
+                  coupangPurchase: json.item?.coupangPurchase ?? null,
+                }
+              : row,
+          ),
+        }
+      })
+      setCoupangManualOpenForId(null)
+    } catch (err: unknown) {
+      setCoupangError(errorMessage(err))
+    } finally {
+      setCoupangManualSavingId(null)
+    }
   }
 
   const handleSaveMemo = async (item: CardUsageItem) => {
@@ -1096,8 +1231,130 @@ export default function CardUsageClient() {
             {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             바로빌 동기화
           </button>
+          <button
+            type="button"
+            onClick={() => { setCoupangError(''); setCoupangModalOpen(true) }}
+            disabled={coupangSyncing}
+            style={{
+              height: 40, padding: '0 14px', borderRadius: 10,
+              background: '#FF4444', color: '#fff', fontSize: 13, fontWeight: 600,
+              border: 'none', cursor: coupangSyncing ? 'wait' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              opacity: coupangSyncing ? 0.7 : 1, transition: 'opacity .2s',
+            }}
+            title="쿠팡 로그인하여 구매내역 가져오기 + 카드결제와 자동매칭"
+          >
+            {coupangSyncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+            쿠팡 매칭
+          </button>
         </div>
       </div>
+
+      {/* Coupang status bar */}
+      {(coupangMessage || coupangError) && (
+        <div
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            background: coupangError ? T.errorBg : T.successBg,
+            border: `1px solid ${coupangError ? T.error : T.successBorder}`,
+            borderRadius: 10, padding: '10px 16px', marginBottom: 16, fontSize: 13,
+            color: coupangError ? T.error : T.success, fontWeight: 500,
+          }}
+        >
+          <span>{coupangError || coupangMessage}</span>
+          <button
+            type="button"
+            onClick={() => { setCoupangError(''); setCoupangMessage('') }}
+            style={{
+              background: 'transparent', border: 'none', color: 'inherit',
+              fontSize: 12, cursor: 'pointer', opacity: 0.7,
+            }}
+          >닫기</button>
+        </div>
+      )}
+
+      {/* Coupang sync modal */}
+      {coupangModalOpen && (
+        <div
+          onClick={() => !coupangSyncing && setCoupangModalOpen(false)}
+          style={{
+            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: T.surface, borderRadius: 12, padding: 24,
+              width: 'min(420px, 92vw)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+              border: `1px solid ${T.border}`,
+            }}
+          >
+            <h2 style={{ fontSize: 16, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>쿠팡 구매내역 동기화</h2>
+            <p style={{ fontSize: 12, color: T.textTertiary, margin: '0 0 16px' }}>
+              조회 기간({formatDisplayDate(startDate)} ~ {formatDisplayDate(endDate)})의 쿠팡 주문을 가져와 카드결제와 자동매칭합니다.
+              로그인 정보를 입력하지 않으면 서버 환경변수(COUPANG_USER_LOGIN_ID/PASSWORD)를 사용합니다.
+            </p>
+            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>쿠팡 아이디 (선택)</label>
+            <input
+              type="text"
+              value={coupangLoginId}
+              onChange={(e) => setCoupangLoginId(e.target.value)}
+              placeholder="아이디 또는 이메일"
+              style={{
+                width: '100%', height: 36, padding: '0 12px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: T.surface, color: T.text,
+                fontSize: 13, marginBottom: 12, outline: 'none',
+              }}
+              autoComplete="username"
+            />
+            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>비밀번호 (선택)</label>
+            <input
+              type="password"
+              value={coupangPassword}
+              onChange={(e) => setCoupangPassword(e.target.value)}
+              placeholder="비밀번호 (저장하지 않음)"
+              style={{
+                width: '100%', height: 36, padding: '0 12px', borderRadius: 8,
+                border: `1px solid ${T.border}`, background: T.surface, color: T.text,
+                fontSize: 13, marginBottom: 16, outline: 'none',
+              }}
+              autoComplete="current-password"
+            />
+            {coupangError && (
+              <div style={{ fontSize: 12, color: T.error, marginBottom: 12 }}>{coupangError}</div>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => setCoupangModalOpen(false)}
+                disabled={coupangSyncing}
+                style={{
+                  height: 36, padding: '0 14px', borderRadius: 8,
+                  background: 'transparent', border: `1px solid ${T.border}`,
+                  color: T.text, fontSize: 13, fontWeight: 500,
+                  cursor: coupangSyncing ? 'wait' : 'pointer',
+                }}
+              >취소</button>
+              <button
+                type="button"
+                onClick={handleCoupangSync}
+                disabled={coupangSyncing}
+                style={{
+                  height: 36, padding: '0 16px', borderRadius: 8,
+                  background: '#FF4444', border: 'none', color: '#fff',
+                  fontSize: 13, fontWeight: 600,
+                  cursor: coupangSyncing ? 'wait' : 'pointer',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                {coupangSyncing && <Loader2 size={13} className="animate-spin" />}
+                동기화 + 매칭
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════════ Metric Cards ════════ */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
@@ -2081,6 +2338,53 @@ export default function CardUsageClient() {
                         <p style={{ fontSize: 12, color: T.textTertiary, margin: '2px 0 0' }}>
                           {usedMonthDay ? `${usedMonthDay} · ` : ''}{usedTime} · {maskCard(item.cardNum)} · {item.approvalNum || '-'} · {`\uAD6C\uBD84 ${approvalStatusText}`}
                         </p>
+                        {(item.coupangPurchase || (item.useStoreName || '').includes('쿠팡')) && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+                            {item.coupangPurchase ? (
+                              <>
+                                <span
+                                  title={
+                                    Array.isArray(item.coupangPurchase.itemsJson) && item.coupangPurchase.itemsJson.length > 0
+                                      ? item.coupangPurchase.itemsJson.map((p) => `${p.name}${p.quantity > 1 ? ` x ${p.quantity}` : ''}`).join('\n')
+                                      : (item.coupangPurchase.itemSummary || '')
+                                  }
+                                  style={{
+                                    fontSize: 11, fontWeight: 600, color: '#FF4444',
+                                    background: theme === 'dark' ? '#2a1515' : '#FFF1F1',
+                                    border: `1px solid ${theme === 'dark' ? '#3a1818' : '#FBC9C9'}`,
+                                    padding: '2px 8px', borderRadius: 999,
+                                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320,
+                                  }}
+                                >
+                                  {'📦 '}{item.coupangPurchase.itemSummary || '쿠팡 주문'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); void linkCoupangPurchase(item, null) }}
+                                  disabled={coupangManualSavingId === item.id}
+                                  style={{
+                                    fontSize: 10, color: T.textTertiary, background: 'transparent',
+                                    border: `1px solid ${T.borderLight}`, borderRadius: 6,
+                                    padding: '1px 6px', cursor: 'pointer',
+                                  }}
+                                  title={'매칭 해제'}
+                                >{'해제'}</button>
+                              </>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); void openCoupangManualMatch(item) }}
+                                style={{
+                                  fontSize: 11, fontWeight: 600, color: '#FF4444',
+                                  background: 'transparent',
+                                  border: `1px dashed ${theme === 'dark' ? '#5a2222' : '#FBC9C9'}`,
+                                  padding: '2px 8px', borderRadius: 999, cursor: 'pointer',
+                                }}
+                                title={'쿠팡 구매내역 수동 매칭'}
+                              >{'📦 쿠팡 매칭'}</button>
+                            )}
+                          </div>
+                        )}
                         {reviewMode && (
                           <p style={{ fontSize: 11, margin: '3px 0 0', color: isReviewed ? T.success : T.warning, fontWeight: 600 }}>
                             {isReviewed
@@ -2192,6 +2496,98 @@ export default function CardUsageClient() {
           ))}
         </div>
       )}
+
+      {/* Coupang manual match modal */}
+      {coupangManualOpenForId && (() => {
+        const targetItem = data?.items.find((row) => row.id === coupangManualOpenForId) || null
+        return (
+          <div
+            onClick={() => setCoupangManualOpenForId(null)}
+            style={{
+              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
+            }}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: T.surface, borderRadius: 12, padding: 22,
+                width: 'min(560px, 94vw)', maxHeight: '80vh', overflow: 'auto',
+                boxShadow: '0 20px 60px rgba(0,0,0,0.3)', border: `1px solid ${T.border}`,
+              }}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
+                <div>
+                  <h2 style={{ fontSize: 16, fontWeight: 600, color: T.text, margin: 0 }}>쿠팡 구매내역 매칭</h2>
+                  {targetItem && (
+                    <p style={{ fontSize: 12, color: T.textTertiary, margin: '4px 0 0' }}>
+                      {targetItem.useStoreName || '가맹점 없음'} · {resolveAmount(targetItem).toLocaleString()}원
+                      {targetItem.usedAt ? ` · ${formatMonthDay(targetItem.usedAt)}` : ''}
+                    </p>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setCoupangManualOpenForId(null)}
+                  style={{
+                    background: 'transparent', border: 'none', color: T.textTertiary,
+                    fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1,
+                  }}
+                >✕</button>
+              </div>
+              {coupangManualLoading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
+                  <Loader2 size={14} className="animate-spin" /> 쿠팡 구매내역 검색 중...
+                </div>
+              ) : coupangManualResults.length === 0 ? (
+                <div style={{ padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
+                  매칭 후보가 없습니다. 상단 “쿠팡 매칭” 버튼으로 최신 주문을 먼저 동기화해 주세요.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {coupangManualResults.map((purchase) => {
+                    const isCurrent = targetItem?.coupangPurchaseId === purchase.id
+                    return (
+                      <div
+                        key={purchase.id}
+                        style={{
+                          display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+                          padding: '10px 12px', borderRadius: 10,
+                          border: `1px solid ${isCurrent ? T.successBorder : T.border}`,
+                          background: isCurrent ? T.successBg : T.surfaceSecondary,
+                        }}
+                      >
+                        <div style={{ minWidth: 0 }}>
+                          <p style={{ fontSize: 13, fontWeight: 600, color: T.text, margin: 0 }}>
+                            {purchase.itemSummary || '쿠팡 주문'}
+                          </p>
+                          <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0' }}>
+                            주문 {purchase.orderId} · {new Date(purchase.orderedAt).toLocaleDateString('ko-KR')} · {purchase.totalAmount.toLocaleString()}원
+                            {purchase.paymentMethod ? ` · ${purchase.paymentMethod}` : ''}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => targetItem && void linkCoupangPurchase(targetItem, isCurrent ? null : purchase.id)}
+                          disabled={!targetItem || coupangManualSavingId === targetItem?.id}
+                          style={{
+                            height: 30, padding: '0 12px', borderRadius: 8,
+                            background: isCurrent ? 'transparent' : '#FF4444',
+                            color: isCurrent ? T.textSecondary : '#fff',
+                            border: isCurrent ? `1px solid ${T.border}` : 'none',
+                            fontSize: 12, fontWeight: 600,
+                            cursor: coupangManualSavingId === targetItem?.id ? 'wait' : 'pointer',
+                          }}
+                        >{isCurrent ? '해제' : '매칭'}</button>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Bottom spacer */}
       <div style={{ height: 40 }} />
