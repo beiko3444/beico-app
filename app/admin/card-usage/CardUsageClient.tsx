@@ -906,6 +906,8 @@ export default function CardUsageClient() {
   const categorySummary = useMemo(() => {
     const map = new Map<string, number>()
     for (const item of allItems) {
+      // 카테고리 합계는 승인건만 집계하고, 취소건은 제외한다.
+      if (normalizeApprovalStatus(item) === 'CANCELED') continue
       const code = item.category || classifyCategory(item.useStoreName)
       map.set(code, (map.get(code) || 0) + resolveAmount(item))
     }
