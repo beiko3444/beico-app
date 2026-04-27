@@ -262,7 +262,7 @@ export async function GET(request: Request) {
             new Set(flattenedProducts.map((product) => normalizeCode(product.sellerManagementCode)).filter(Boolean)),
         );
 
-        const dbProductMap = new Map<string, { name: string | null; nameEN: string | null; imageUrl: string | null; productCode: string | null }>();
+        const dbProductMap = new Map<string, { name: string | null; nameEN: string | null; productCode: string | null }>();
         if (sellerCodes.length > 0) {
             const dbProducts = await prisma.product.findMany({
                 where: {
@@ -276,7 +276,6 @@ export async function GET(request: Request) {
                     barcode: true,
                     name: true,
                     nameEN: true,
-                    imageUrl: true,
                 },
             });
 
@@ -284,7 +283,6 @@ export async function GET(request: Request) {
                 const mapValue = {
                     name: product.name,
                     nameEN: product.nameEN,
-                    imageUrl: product.imageUrl,
                     productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
                 };
                 if (product.productCode) {
@@ -306,7 +304,7 @@ export async function GET(request: Request) {
                 productName: product.name || "",
                 dbProductName: matched?.name || matched?.nameEN || null,
                 dbProductCode: matched?.productCode || null,
-                imageUrl: matched?.imageUrl || product.representativeImage?.url || null,
+                imageUrl: product.representativeImage?.url || null,
                 stockQuantity: Number.isFinite(Number(product.stockQuantity)) ? Number(product.stockQuantity) : 0,
                 statusType: product.statusType || "",
                 salePrice: Number.isFinite(Number(product.salePrice)) ? Number(product.salePrice) : null,

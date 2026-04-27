@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma"
+import { inferBusinessRegistrationContentType } from "@/lib/partner-business-registration-storage"
+import { getPartnerBusinessRegistrationUrl } from "@/lib/partner-business-registration-url"
 import { unstable_cache } from "next/cache"
 import PartnerForm from "./partner-form"
 import DeletePartnerButton from '@/components/DeletePartnerButton'
@@ -11,26 +13,65 @@ export const dynamic = 'force-dynamic'
 
 const getCachedPartnersPageData = unstable_cache(
     async () => {
+        const partnerListSelect = {
+            id: true,
+            username: true,
+            name: true,
+            role: true,
+            status: true,
+            country: true,
+            createdAt: true,
+            updatedAt: true,
+            partnerProfile: {
+                select: {
+                    id: true,
+                    contact: true,
+                    email: true,
+                    businessName: true,
+                    representativeName: true,
+                    businessRegNumber: true,
+                    address: true,
+                    businessRegistrationUrl: true,
+                    grade: true,
+                }
+            }
+        } as const
+
         const [activePartners, deletedPartners] = await Promise.all([
             prisma.user.findMany({
                 where: { role: { in: ['PARTNER', 'ADMIN'] }, status: { not: 'DELETED' } },
-                include: { partnerProfile: true },
+                select: partnerListSelect,
                 orderBy: [{ role: 'asc' }, { createdAt: 'desc' }]
             }),
             prisma.user.findMany({
                 where: { role: { in: ['PARTNER', 'ADMIN'] }, status: 'DELETED' },
-                include: { partnerProfile: true },
+                select: partnerListSelect,
                 orderBy: [{ createdAt: 'desc' }]
             })
         ])
         return { activePartners, deletedPartners }
     },
-    ['admin-partners-page-v1'],
-    { revalidate: 60 }
+    ['admin-partners-page-v2'],
+    { revalidate: 60, tags: ['partners'] }
 )
 
 export default async function PartnersPage() {
     const { activePartners, deletedPartners } = await getCachedPartnersPageData()
+
+    const mapPartnerDocuments = (partners: typeof activePartners) => partners.map(({ partnerProfile, updatedAt, ...partner }) => ({
+        ...partner,
+        updatedAt,
+        partnerProfile: partnerProfile ? {
+            ...partnerProfile,
+            businessRegistrationContentType: inferBusinessRegistrationContentType(partnerProfile.businessRegistrationUrl),
+            businessRegistrationUrl: partnerProfile.businessRegistrationUrl
+                ? getPartnerBusinessRegistrationUrl(partner.id, updatedAt)
+                : null,
+        } : null,
+    }))
+
+    const mappedActivePartners = mapPartnerDocuments(activePartners)
+    const mappedDeletedPartners = mapPartnerDocuments(deletedPartners)
 
     return (
 
@@ -48,7 +89,7 @@ export default async function PartnersPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
-                        <PartnerTrashbin deletedPartners={deletedPartners} />
+                        <PartnerTrashbin deletedPartners={mappedDeletedPartners} />
                         <PartnerForm />
                     </div>
                 </div>
@@ -70,16 +111,16 @@ export default async function PartnersPage() {
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                        {activePartners.length === 0 ? (
+                        {mappedActivePartners.length === 0 ? (
                             <tr>
                                 <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-medium">
                                     등록된 파트너가 없습니다. 새 파트너 계정을 생성해주세요.
                                 </td>
                             </tr>
                         ) : (
-                            activePartners.map((partner, index) => (
+                            mappedActivePartners.map((partner, index) => (
                                 <tr key={partner.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group even:bg-gray-50/50 dark:even:bg-[#1a1a1a]">
-                                    <td className="px-3 py-1.5 text-center font-bold text-gray-400 dark:text-gray-500">{activePartners.length - index}</td>
+                                    <td className="px-3 py-1.5 text-center font-bold text-gray-400 dark:text-gray-500">{mappedActivePartners.length - index}</td>
                                     <td className="px-3 py-1.5 text-left">
                                         <PartnerForm
                                             initialData={partner}

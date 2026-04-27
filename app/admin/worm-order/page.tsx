@@ -160,6 +160,50 @@ const CALENDAR_MONTHLY_PRICE_INFO_BY_MONTH = new Map<number, CalendarMonthlyPric
     CALENDAR_MONTHLY_PRICE_INFOS.map((entry) => [entry.month, entry]),
 )
 
+const CALENDAR_WEATHER_LOCATION_CONFIGS: Array<{
+    key: CalendarWeatherLocationKey
+    latitude: number
+    longitude: number
+    timezone: string
+}> = [
+    {
+        key: 'shanghai',
+        latitude: 31.2304,
+        longitude: 121.4737,
+        timezone: 'Asia/Shanghai',
+    },
+    {
+        key: 'busanGangseo',
+        latitude: 35.2122,
+        longitude: 128.9806,
+        timezone: 'Asia/Seoul',
+    },
+]
+
+const CALENDAR_WEATHER_CODE_LABELS: Record<number, string> = {
+    0: '맑음',
+    1: '대체로 맑음',
+    2: '부분 흐림',
+    3: '흐림',
+    45: '안개',
+    48: '서리 안개',
+    51: '이슬비',
+    53: '이슬비',
+    55: '강한 이슬비',
+    61: '약한 비',
+    63: '비',
+    65: '강한 비',
+    71: '약한 눈',
+    73: '눈',
+    75: '강한 눈',
+    80: '소나기',
+    81: '강한 소나기',
+    82: '매우 강한 소나기',
+    95: '뇌우',
+    96: '뇌우/우박',
+    99: '강한 뇌우/우박',
+}
+
 const DEFAULT_CUSTOMS_FORWARD_EMAIL = 'customs@beone.kr'
 const CUSTOMS_FORWARD_SUBJECT_SUFFIX = '엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.'
 
@@ -178,6 +222,7 @@ type WormOrderListItem = {
     remittanceFinalReceiveAmountText: string | null
     remittanceSendAmount: number | null
     remittanceSendAmountText: string | null
+    remittanceTotalFee: number | null
     remittanceTotalFeeText: string | null
     remittanceExchangeRate: number | null
     remittanceExchangeRateText: string | null
@@ -508,6 +553,33 @@ function formatLocalDateToYmd(date: Date) {
     return `${year}-${month}-${day}`
 }
 
+function clampCalendarWeatherRange(startDate: string, endDate: string) {
+    const start = parseYmdToLocalDate(startDate)
+    const end = parseYmdToLocalDate(endDate)
+    if (!start || !end) return null
+
+    const now = new Date()
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const minDate = new Date(today)
+    minDate.setDate(minDate.getDate() - 94)
+    const maxDate = new Date(today)
+    maxDate.setDate(maxDate.getDate() + 14)
+
+    const clampedStart = start < minDate ? minDate : start
+    const clampedEnd = end > maxDate ? maxDate : end
+    if (clampedStart > clampedEnd) return null
+
+    return {
+        startDate: formatLocalDateToYmd(clampedStart),
+        endDate: formatLocalDateToYmd(clampedEnd),
+    }
+}
+
+function toCalendarWeatherTextByCode(code: number | null) {
+    if (code === null) return '정보 없음'
+    return CALENDAR_WEATHER_CODE_LABELS[code] || '정보 없음'
+}
+
 function formatKstDateDot(date: Date) {
     const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Seoul',
@@ -580,7 +652,9 @@ function toCalendarDailyWeather(value: unknown): CalendarDailyWeather | null {
     const weatherCode = typeof candidate.weatherCode === 'number' && Number.isFinite(candidate.weatherCode)
         ? candidate.weatherCode
         : null
-    const weatherText = typeof candidate.weatherText === 'string' ? candidate.weatherText : '정보 없음'
+    const weatherText = typeof candidate.weatherText === 'string' && candidate.weatherText.trim()
+        ? candidate.weatherText
+        : '정보 없음'
     const maxTempC = typeof candidate.maxTempC === 'number' && Number.isFinite(candidate.maxTempC)
         ? candidate.maxTempC
         : null
@@ -595,6 +669,45 @@ function toCalendarDailyWeather(value: unknown): CalendarDailyWeather | null {
         maxTempC,
         minTempC,
     }
+}
+
+function buildEmptyCalendarWeatherByDate(calendarDays: CalendarDayCell[]): CalendarWeatherByDate {
+    const nextWeatherByDate: CalendarWeatherByDate = {}
+    calendarDays.forEach((dayCell) => {
+        const ymd = formatLocalDateToYmd(dayCell.date)
+        nextWeatherByDate[ymd] = {
+            shanghai: null,
+            busanGangseo: null,
+        }
+    })
+    return nextWeatherByDate
+}
+
+function mergeCalendarWeatherLocations(
+    calendarDays: CalendarDayCell[],
+    locations: unknown[],
+): CalendarWeatherByDate {
+    const nextWeatherByDate = buildEmptyCalendarWeatherByDate(calendarDays)
+
+    locations.forEach((location: unknown) => {
+        if (!location || typeof location !== 'object') return
+        const candidate = location as Record<string, unknown>
+        const key = candidate.key
+        if (!isCalendarWeatherLocationKey(key)) return
+        const dailyItems = Array.isArray(candidate.daily) ? candidate.daily : []
+        dailyItems.forEach((dailyItemRaw: unknown) => {
+            const dailyItem = toCalendarDailyWeather(dailyItemRaw)
+            if (!dailyItem?.date) return
+            const current = nextWeatherByDate[dailyItem.date] || {
+                shanghai: null,
+                busanGangseo: null,
+            }
+            current[key] = dailyItem
+            nextWeatherByDate[dailyItem.date] = current
+        })
+    })
+
+    return nextWeatherByDate
 }
 
 function normalizeCustomsStepText(...values: Array<string | undefined>) {
@@ -746,6 +859,25 @@ function parseSummaryRate(value: string | null) {
     return Number.isFinite(parsed) ? parsed : null
 }
 
+function pickPlausibleKrwAmount(candidates: Array<number | null>, expected: number | null) {
+    const normalized = candidates
+        .filter((candidate): candidate is number => candidate !== null && Number.isFinite(candidate) && candidate > 0)
+
+    if (normalized.length === 0) return expected
+    if (expected === null || !Number.isFinite(expected) || expected <= 0) return normalized[0]
+
+    const plausible = normalized.filter((candidate) => {
+        const ratio = candidate / expected
+        return ratio >= 0.75 && ratio <= 1.35
+    })
+
+    if (plausible.length > 0) {
+        return plausible.sort((a, b) => Math.abs(a - expected) - Math.abs(b - expected))[0]
+    }
+
+    return expected
+}
+
 function resolveRemittanceSendUsd(order: WormOrderListItem) {
     const fromSendTextUsd = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd')
     if (fromSendTextUsd !== null) return fromSendTextUsd
@@ -756,23 +888,47 @@ function resolveRemittanceSendUsd(order: WormOrderListItem) {
     return null
 }
 
-function resolveRemittanceSendKrw(order: WormOrderListItem) {
+function resolveRemittanceSendKrw(order: WormOrderListItem): number | null {
     const fromSendTextKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
     if (fromSendTextKrw !== null) return fromSendTextKrw
 
-    const fromFinalReceiveTextKrw = parseSummaryAmountByCurrency(order.remittanceFinalReceiveAmountText, 'krw')
-    if (fromFinalReceiveTextKrw !== null) return fromFinalReceiveTextKrw
+    if (order.remittanceSendAmount !== null) return order.remittanceSendAmount
 
-    const rate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
-    const usdAmount =
-        parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'usd') ??
-        parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'any')
-    if (rate && rate > 0 && usdAmount !== null) {
-        return Math.round(usdAmount * rate)
+    const originKrw = resolveRemittanceOriginKrw(order)
+    const feeKrw = resolveRemittanceFeeKrw(order) ?? 0
+    return originKrw !== null ? Math.round(originKrw + feeKrw) : null
+}
+
+function resolveRemittanceFeeKrw(order: WormOrderListItem): number | null {
+    const fromTotalFeeTextKrw = parseSummaryAmountByCurrency(order.remittanceTotalFeeText, 'krw')
+    if (fromTotalFeeTextKrw !== null) return fromTotalFeeTextKrw
+
+    if (order.remittanceTotalFee !== null) return order.remittanceTotalFee
+    return null
+}
+
+function resolveRemittanceOriginKrw(order: WormOrderListItem): number | null {
+    const totalPaidKrw = resolveRemittanceSendKrw(order)
+    const feeKrw = resolveRemittanceFeeKrw(order)
+    if (totalPaidKrw !== null && feeKrw !== null) {
+        const originKrw = totalPaidKrw - feeKrw
+        if (originKrw >= 0) return originKrw
     }
 
-    if (order.remittanceSendAmount !== null) return order.remittanceSendAmount
-    return null
+    const rate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+    const usdAmount = resolveRemittanceSendUsd(order)
+    if (!rate || rate <= 0 || usdAmount === null) return null
+    return Math.round(usdAmount * rate)
+}
+
+function resolveRemittanceTotalPaidKrw(order: WormOrderListItem): number | null {
+    const totalPaidKrw = resolveRemittanceSendKrw(order)
+    if (totalPaidKrw !== null) return totalPaidKrw
+
+    const originKrw = resolveRemittanceOriginKrw(order)
+    if (originKrw === null) return null
+    const feeKrw = resolveRemittanceFeeKrw(order) ?? 0
+    return Math.round(originKrw + feeKrw)
 }
 
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
@@ -1001,6 +1157,7 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         remittanceFinalReceiveAmountText: typeof candidate.remittanceFinalReceiveAmountText === 'string' ? candidate.remittanceFinalReceiveAmountText : null,
         remittanceSendAmount: typeof candidate.remittanceSendAmount === 'number' && Number.isFinite(candidate.remittanceSendAmount) ? candidate.remittanceSendAmount : null,
         remittanceSendAmountText: typeof candidate.remittanceSendAmountText === 'string' ? candidate.remittanceSendAmountText : null,
+        remittanceTotalFee: typeof candidate.remittanceTotalFee === 'number' && Number.isFinite(candidate.remittanceTotalFee) ? candidate.remittanceTotalFee : null,
         remittanceTotalFeeText: typeof candidate.remittanceTotalFeeText === 'string' ? candidate.remittanceTotalFeeText : null,
         remittanceExchangeRate: typeof candidate.remittanceExchangeRate === 'number' && Number.isFinite(candidate.remittanceExchangeRate) ? candidate.remittanceExchangeRate : null,
         remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
@@ -2435,45 +2592,79 @@ export default function WormOrderPage() {
                     cache: 'no-store',
                 })
                 const result = await response.json().catch(() => ({}))
-                if (!response.ok) {
-                    throw new Error(typeof result?.error === 'string' ? result.error : '날씨 정보를 불러오지 못했습니다.')
+
+                let locations = Array.isArray(result?.locations) ? result.locations : []
+
+                if (!response.ok || locations.length === 0) {
+                    const fallbackRange = clampCalendarWeatherRange(startDate, endDate)
+                    if (!fallbackRange) {
+                        throw new Error(typeof result?.error === 'string' ? result.error : '날씨 정보를 불러오지 못했습니다.')
+                    }
+                    const fallbackSettled = await Promise.allSettled(
+                        CALENDAR_WEATHER_LOCATION_CONFIGS.map(async (location) => {
+                            const fallbackQuery = new URLSearchParams({
+                                latitude: String(location.latitude),
+                                longitude: String(location.longitude),
+                                daily: 'weather_code,temperature_2m_max,temperature_2m_min',
+                                timezone: location.timezone,
+                                start_date: fallbackRange.startDate,
+                                end_date: fallbackRange.endDate,
+                            })
+                            const fallbackResponse = await fetch(`https://api.open-meteo.com/v1/forecast?${fallbackQuery.toString()}`, {
+                                method: 'GET',
+                                cache: 'no-store',
+                            })
+                            if (!fallbackResponse.ok) {
+                                throw new Error(`fallback weather failed (${location.key}, ${fallbackResponse.status})`)
+                            }
+                            const fallbackPayload = await fallbackResponse.json()
+                            const daily = fallbackPayload?.daily || {}
+                            const dates = Array.isArray(daily?.time) ? daily.time : []
+                            const weatherCodes = Array.isArray(daily?.weather_code) ? daily.weather_code : []
+                            const maxTemps = Array.isArray(daily?.temperature_2m_max) ? daily.temperature_2m_max : []
+                            const minTemps = Array.isArray(daily?.temperature_2m_min) ? daily.temperature_2m_min : []
+
+                            return {
+                                key: location.key,
+                                daily: dates.map((date: unknown, index: number) => ({
+                                    date,
+                                    weatherCode: weatherCodes[index] ?? null,
+                                    weatherText: toCalendarWeatherTextByCode(
+                                        typeof weatherCodes[index] === 'number' && Number.isFinite(weatherCodes[index])
+                                            ? weatherCodes[index]
+                                            : null,
+                                    ),
+                                    maxTempC: maxTemps[index] ?? null,
+                                    minTempC: minTemps[index] ?? null,
+                                })),
+                            }
+                        }),
+                    )
+
+                    locations = fallbackSettled
+                        .filter((entry): entry is PromiseFulfilledResult<{ key: CalendarWeatherLocationKey; daily: Array<Record<string, unknown>> }> => entry.status === 'fulfilled')
+                        .map((entry) => entry.value)
+
+                    const fallbackFailures = fallbackSettled
+                        .filter((entry): entry is PromiseRejectedResult => entry.status === 'rejected')
+                        .map((entry) => entry.reason instanceof Error ? entry.reason.message : 'fallback weather failed')
+
+                    const apiErrorMessage = typeof result?.error === 'string' ? result.error : ''
+                    const warningMessage = [apiErrorMessage, ...fallbackFailures].filter(Boolean).join(' / ')
+                    if (locations.length === 0) {
+                        throw new Error(warningMessage || '날씨 정보를 불러오지 못했습니다.')
+                    }
                 }
 
-                const nextWeatherByDate: CalendarWeatherByDate = {}
-                calendarDays.forEach((dayCell) => {
-                    const ymd = formatLocalDateToYmd(dayCell.date)
-                    nextWeatherByDate[ymd] = {
-                        shanghai: null,
-                        busanGangseo: null,
-                    }
-                })
-
-                const locations = Array.isArray(result?.locations)
-                    ? result.locations
-                    : []
-                locations.forEach((location: unknown) => {
-                    if (!location || typeof location !== 'object') return
-                    const candidate = location as Record<string, unknown>
-                    const key = candidate.key
-                    if (!isCalendarWeatherLocationKey(key)) return
-                    const dailyItems = Array.isArray(candidate.daily) ? candidate.daily : []
-                    dailyItems.forEach((dailyItemRaw: unknown) => {
-                        const dailyItem = toCalendarDailyWeather(dailyItemRaw)
-                        if (!dailyItem?.date) return
-                        const current = nextWeatherByDate[dailyItem.date] || {
-                            shanghai: null,
-                            busanGangseo: null,
-                        }
-                        current[key] = dailyItem
-                        nextWeatherByDate[dailyItem.date] = current
-                    })
-                })
+                const nextWeatherByDate = mergeCalendarWeatherLocations(calendarDays, locations)
 
                 if (calendarWeatherRequestIdRef.current !== requestId) return
                 setCalendarWeatherByDate(nextWeatherByDate)
+                setCalendarWeatherError('')
             } catch (error) {
                 if (calendarWeatherRequestIdRef.current !== requestId) return
                 setCalendarWeatherError(error instanceof Error ? error.message : '날씨 정보를 불러오지 못했습니다.')
+                setCalendarWeatherByDate(buildEmptyCalendarWeatherByDate(calendarDays))
             } finally {
                 if (calendarWeatherRequestIdRef.current === requestId) {
                     setCalendarWeatherLoading(false)
@@ -2858,12 +3049,21 @@ export default function WormOrderPage() {
                             remittanceFinalReceiveAmountText: typeof savedOrder.remittanceFinalReceiveAmountText === 'string'
                                 ? savedOrder.remittanceFinalReceiveAmountText
                                 : order.remittanceFinalReceiveAmountText,
+                            remittanceSendAmount: typeof savedOrder.remittanceSendAmount === 'number' && Number.isFinite(savedOrder.remittanceSendAmount)
+                                ? savedOrder.remittanceSendAmount
+                                : order.remittanceSendAmount,
                             remittanceSendAmountText: typeof savedOrder.remittanceSendAmountText === 'string'
                                 ? savedOrder.remittanceSendAmountText
                                 : order.remittanceSendAmountText,
+                            remittanceTotalFee: typeof savedOrder.remittanceTotalFee === 'number' && Number.isFinite(savedOrder.remittanceTotalFee)
+                                ? savedOrder.remittanceTotalFee
+                                : order.remittanceTotalFee,
                             remittanceTotalFeeText: typeof savedOrder.remittanceTotalFeeText === 'string'
                                 ? savedOrder.remittanceTotalFeeText
                                 : order.remittanceTotalFeeText,
+                            remittanceExchangeRate: typeof savedOrder.remittanceExchangeRate === 'number' && Number.isFinite(savedOrder.remittanceExchangeRate)
+                                ? savedOrder.remittanceExchangeRate
+                                : order.remittanceExchangeRate,
                             remittanceExchangeRateText: typeof savedOrder.remittanceExchangeRateText === 'string'
                                 ? savedOrder.remittanceExchangeRateText
                                 : order.remittanceExchangeRateText,
@@ -3375,7 +3575,8 @@ export default function WormOrderPage() {
                                 <th className="text-left px-3 py-2 font-bold">발주번호</th>
                                 <th className="text-left px-3 py-2 font-bold">상태</th>
                                 <th className="text-left px-3 py-2 font-bold">총 송금액</th>
-                                <th className="text-left px-3 py-2 font-bold">총 송금 한화</th>
+                                <th className="text-left px-3 py-2 font-bold">총 송금 한화(수수료 포함)</th>
+                                <th className="text-left px-3 py-2 font-bold">총 수수료</th>
                                 <th className="text-left px-3 py-2 font-bold">환율정보</th>
                                 <th className="text-right px-3 py-2 font-bold">관리</th>
                             </tr>
@@ -3386,7 +3587,9 @@ export default function WormOrderPage() {
                                 const orderDateText = toKstDateInputString(order.receiveDate)
                                 const orderNumberDisplay = orderDateText ? orderDateText.replace(/-/g, '/') : order.orderNumber
                                 const sendAmountUsd = resolveRemittanceSendUsd(order)
-                                const sendAmountKrw = resolveRemittanceSendKrw(order)
+                                const originKrw = resolveRemittanceOriginKrw(order)
+                                const totalFeeKrw = resolveRemittanceFeeKrw(order)
+                                const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
                                 const exchangeRateText = parsedExchangeRate !== null
                                     ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
@@ -3408,7 +3611,9 @@ export default function WormOrderPage() {
                                                 {order.remittanceAppliedAt && (
                                                     <span className="text-[11px] font-semibold text-emerald-700">
                                                         신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
-                                                        {sendAmountKrw !== null ? ` / ${formatKrwAmount(sendAmountKrw)}` : ''}
+                                                        {originKrw !== null ? ` / 원금 ${formatKrwAmount(originKrw)}` : ''}
+                                                        {totalFeeKrw !== null ? ` / 수수료 ${formatKrwAmount(totalFeeKrw)}` : ''}
+                                                        {totalPaidKrw !== null ? ` / 합계 ${formatKrwAmount(totalPaidKrw)}` : ''}
                                                         {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
                                                     </span>
                                                 )}
@@ -3418,7 +3623,10 @@ export default function WormOrderPage() {
                                             {formatUsdAmount(sendAmountUsd)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
-                                            {formatKrwAmount(sendAmountKrw)}
+                                            {formatKrwAmount(totalPaidKrw)}
+                                        </td>
+                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                            {formatKrwAmount(totalFeeKrw)}
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
                                             {exchangeRateText}
@@ -3447,7 +3655,7 @@ export default function WormOrderPage() {
                             })}
                             {!wormOrderListLoading && wormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={6} className="px-3 py-6 text-center text-sm text-slate-500 dark:text-gray-400">
+                                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-slate-500 dark:text-gray-400">
                                         저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.
                                     </td>
                                 </tr>
@@ -3538,8 +3746,8 @@ export default function WormOrderPage() {
                         <Sparkles size={18} className="text-[#e34219]" />
                     </div>
 
-                    <div className="p-4 md:p-6 grid grid-cols-1 xl:grid-cols-[320px_1fr] gap-6">
-                        <aside className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a]/60 p-4 md:p-5 flex flex-col">
+                    <div className="p-4 md:p-6 space-y-6">
+                        <section className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a]/60 p-4 md:p-5">
                             <p className="text-[11px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-[0.2em]">납품 예정일</p>
 
                             <div className="mt-3 flex items-center justify-between">
@@ -3673,17 +3881,7 @@ export default function WormOrderPage() {
                             {calendarWeatherError && (
                                 <p className="mt-2 text-[11px] font-semibold text-red-600">{calendarWeatherError}</p>
                             )}
-
-                            <div className="mt-auto pt-4">
-                                <button
-                                    type="button"
-                                    onClick={handleGenerate}
-                                    className="h-11 w-full bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide"
-                                >
-                                    발주 메시지 생성
-                                </button>
-                            </div>
-                        </aside>
+                        </section>
 
                         <div className="space-y-5">
                             <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
@@ -3760,6 +3958,14 @@ export default function WormOrderPage() {
                             {validationError && (
                                 <p className="text-sm font-semibold text-[#e34219]">{validationError}</p>
                             )}
+
+                            <button
+                                type="button"
+                                onClick={handleGenerate}
+                                className="h-11 w-full md:w-auto md:min-w-[220px] bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide px-6"
+                            >
+                                발주 메시지 생성
+                            </button>
                         </div>
 
                         {generatedMessage && (

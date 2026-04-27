@@ -24,7 +24,7 @@ export async function POST(request: Request) {
                     { barcode: { in: stringSkus } }
                 ]
             },
-            select: { coupangSku: true, barcode: true, name: true, nameEN: true, imageUrl: true }
+            select: { coupangSku: true, barcode: true, name: true, nameEN: true }
         });
 
         const mapping: Record<string, { name: string; imageUrl: string | null }> = {};
@@ -32,10 +32,10 @@ export async function POST(request: Request) {
         products.forEach(p => {
             const productName = p.name || p.nameEN || "알 수 없는 상품";
             if (p.coupangSku) {
-                mapping[p.coupangSku] = { name: productName, imageUrl: p.imageUrl };
+                mapping[p.coupangSku] = { name: productName, imageUrl: null };
             }
             if (p.barcode) {
-                mapping[p.barcode] = { name: productName, imageUrl: p.imageUrl };
+                mapping[p.barcode] = { name: productName, imageUrl: null };
             }
         });
 

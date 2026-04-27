@@ -67,7 +67,8 @@ model Product {
   krSellPrice      Float?      @default(0)
   usBuyPrice       Float?      @default(0)
   usSellPrice      Float?      @default(0)
-  regionalPrices   Json?       @default("{}")
+  regionalPrices      Json?       @default("{}")
+  wholesaleAvailable  Boolean     @default(true)
   orderItems       OrderItem[]
   proformaInvoiceItems ProformaInvoiceItem[]
 }
@@ -344,6 +345,8 @@ model CardUsage {
   category              String?
   reviewedAt            DateTime?
   reviewedBy            String?
+  coupangPurchaseId     String?
+  coupangPurchase       CoupangPurchase? @relation(fields: [coupangPurchaseId], references: [id], onDelete: SetNull)
   raw                   Json?
   syncedAt              DateTime @default(now())
   createdAt             DateTime @default(now())
@@ -354,4 +357,23 @@ model CardUsage {
   @@index([cardNum])
   @@index([approvalNum])
   @@index([reviewedAt])
+  @@index([coupangPurchaseId])
+}
+
+model CoupangPurchase {
+  id            String      @id @default(uuid())
+  orderId       String      @unique
+  orderedAt     DateTime
+  totalAmount   Int
+  paymentMethod String?
+  itemSummary   String?
+  itemsJson     Json?
+  raw           Json?
+  syncedAt      DateTime    @default(now())
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  cardUsages    CardUsage[]
+
+  @@index([orderedAt])
+  @@index([totalAmount])
 }

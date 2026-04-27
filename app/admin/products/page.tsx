@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getProductImageUrl } from "@/lib/product-image-url"
 import { unstable_cache } from "next/cache"
 import ProductForm from "./product-form"
 import Link from 'next/link'
@@ -9,14 +10,48 @@ export const dynamic = 'force-dynamic'
 
 const getCachedProducts = unstable_cache(
     async () => prisma.product.findMany({
+        select: {
+            id: true,
+            name: true,
+            nameJP: true,
+            nameEN: true,
+            buyPrice: true,
+            sellPrice: true,
+            onlinePrice: true,
+            priceA: true,
+            priceB: true,
+            priceC: true,
+            priceD: true,
+            stock: true,
+            safetyStock: true,
+            barcode: true,
+            productCode: true,
+            coupangSku: true,
+            imageUrl: true,
+            sortOrder: true,
+            minOrderQuantity: true,
+            jpBuyPrice: true,
+            jpSellPrice: true,
+            krBuyPrice: true,
+            krSellPrice: true,
+            usBuyPrice: true,
+            usSellPrice: true,
+            regionalPrices: true,
+            wholesaleAvailable: true,
+            createdAt: true,
+            updatedAt: true,
+        },
         orderBy: { sortOrder: 'asc' }
     }),
-    ['admin-products-page-v1'],
-    { revalidate: 60 }
+    ['admin-products-page-v2'],
+    { revalidate: 60, tags: ['products'] }
 )
 
 export default async function ProductsPage() {
-    const products = await getCachedProducts()
+    const products = (await getCachedProducts()).map(({ imageUrl, updatedAt, ...product }) => ({
+        ...product,
+        imageUrl: imageUrl ? getProductImageUrl(product.id, updatedAt) : null,
+    }))
 
     return (
         <div className="space-y-6">

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { sendOrderNotification } from "@/lib/notification"
+import { getProductImageUrl } from "@/lib/product-image-url"
 
 export async function POST(request: Request) {
     try {
@@ -114,24 +115,77 @@ export async function GET(request: Request) {
 
         const orders = await prisma.order.findMany({
             where: whereClause,
-            include: {
+            select: {
+                id: true,
+                orderNumber: true,
+                userId: true,
+                total: true,
+                createdAt: true,
+                status: true,
+                trackingNumber: true,
+                courier: true,
+                taxInvoiceIssued: true,
+                depositConfirmedAt: true,
+                adminDepositConfirmedAt: true,
                 user: {
                     select: {
+                        id: true,
                         name: true,
-                        username: true
-                    }
+                        username: true,
+                        country: true,
+                        partnerProfile: {
+                            select: {
+                                businessName: true,
+                                representativeName: true,
+                                grade: true,
+                                businessRegNumber: true,
+                                email: true,
+                                contact: true,
+                                address: true,
+                            },
+                        },
+                    },
                 },
                 items: {
-                    include: {
-                        product: true
-                    }
-                }
+                    select: {
+                        id: true,
+                        productId: true,
+                        quantity: true,
+                        price: true,
+                        product: {
+                            select: {
+                                id: true,
+                                name: true,
+                                nameJP: true,
+                                nameEN: true,
+                                imageUrl: true,
+                                productCode: true,
+                                barcode: true,
+                                updatedAt: true,
+                            },
+                        },
+                    },
+                },
             },
             orderBy: {
                 createdAt: 'desc'
             }
         })
-        return NextResponse.json(orders)
+        const ordersWithImageUrls = orders.map(order => ({
+            ...order,
+            items: order.items.map(item => {
+                const { imageUrl, updatedAt, ...product } = item.product
+                return {
+                    ...item,
+                    product: {
+                        ...product,
+                        imageUrl: imageUrl ? getProductImageUrl(product.id, updatedAt) : null,
+                    },
+                }
+            }),
+        }))
+
+        return NextResponse.json(ordersWithImageUrls)
     } catch (error) {
         console.error(error)
         return NextResponse.json({ error: "Failed to fetch orders" }, { status: 500 })

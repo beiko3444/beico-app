@@ -1,11 +1,43 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
+import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
+
+const productResponseSelect = {
+    id: true,
+    name: true,
+    nameJP: true,
+    nameEN: true,
+    buyPrice: true,
+    sellPrice: true,
+    onlinePrice: true,
+    priceA: true,
+    priceB: true,
+    priceC: true,
+    priceD: true,
+    stock: true,
+    safetyStock: true,
+    barcode: true,
+    productCode: true,
+    coupangSku: true,
+    sortOrder: true,
+    minOrderQuantity: true,
+    jpBuyPrice: true,
+    jpSellPrice: true,
+    krBuyPrice: true,
+    krSellPrice: true,
+    usBuyPrice: true,
+    usSellPrice: true,
+    regionalPrices: true,
+    wholesaleAvailable: true,
+    createdAt: true,
+    updatedAt: true,
+} as const
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await context.params
         const body = await request.json()
-        console.log(`[UPDATE PRODUCT] ID: ${id}, Body:`, body)
         const normalizedProductCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null
 
         const { name, buyPrice, sellPrice, stock } = body
@@ -32,7 +64,6 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             usBuyPrice: (body.usBuyPrice !== null && body.usBuyPrice !== undefined && body.usBuyPrice !== "") ? Number(body.usBuyPrice) : 0,
             usSellPrice: (body.usSellPrice !== null && body.usSellPrice !== undefined && body.usSellPrice !== "") ? Number(body.usSellPrice) : 0,
             stock: Math.round(Number(stock)),
-            imageUrl: body.imageUrl || null,
             priceA: (body.priceA !== null && body.priceA !== undefined && body.priceA !== "") ? Number(body.priceA) : null,
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
@@ -41,14 +72,17 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             sortOrder: body.sortOrder !== undefined ? Math.round(Number(body.sortOrder)) : undefined,
             regionalPrices: body.regionalPrices !== undefined ? body.regionalPrices : undefined,
         }
-
-        console.log(`[UPDATE PRODUCT] Data for Prisma:`, updateData)
+        if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
+            updateData.imageUrl = await normalizeIncomingProductImage(body.imageUrl)
+        }
 
         const product = await prisma.product.update({
             where: { id },
-            data: updateData
+            data: updateData,
+            select: productResponseSelect
         })
 
+        revalidatePath('/admin/products')
         return NextResponse.json(product)
     } catch (error: any) {
         console.error("Full Prisma Error:", error)
@@ -60,12 +94,38 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
     }
 }
 
+export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
+    try {
+        const { id } = await context.params
+        const body = await request.json()
+        const patchData = { ...body }
+
+        if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
+            patchData.imageUrl = await normalizeIncomingProductImage(body.imageUrl)
+        }
+
+        delete patchData.copyImageFromProductId
+
+        const product = await prisma.product.update({
+            where: { id },
+            data: patchData,
+            select: productResponseSelect,
+        })
+
+        revalidatePath('/admin/products')
+        return NextResponse.json(product)
+    } catch (error: any) {
+        return NextResponse.json({ error: "Failed to patch product", message: error?.message }, { status: 500 })
+    }
+}
+
 export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
         const { id } = await context.params
         await prisma.product.delete({
             where: { id }
         })
+        revalidatePath('/admin/products')
         return NextResponse.json({ success: true })
     } catch (error) {
         return NextResponse.json({ error: "Failed to delete product" }, { status: 500 })

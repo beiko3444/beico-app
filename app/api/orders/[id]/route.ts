@@ -31,13 +31,28 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
         const order = await prisma.order.findUnique({
             where: { id },
-            include: {
-                user: true,
+            select: {
+                id: true,
+                userId: true,
+                orderNumber: true,
+                status: true,
+                user: {
+                    select: {
+                        name: true,
+                    },
+                },
                 items: {
-                    include: {
-                        product: true
-                    }
-                }
+                    select: {
+                        productId: true,
+                        quantity: true,
+                        price: true,
+                        product: {
+                            select: {
+                                name: true,
+                            },
+                        },
+                    },
+                },
             }
         })
 

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import { getProductImageUrl } from "@/lib/product-image-url"
 import OrderInterface from "./order-interface"
 import { Filter } from 'lucide-react'
 
@@ -15,7 +16,15 @@ export default async function NewOrderPage() {
     let userName = ''
     const user = session?.user?.id ? await prisma.user.findUnique({
         where: { id: session.user.id },
-        include: { partnerProfile: true }
+        select: {
+            name: true,
+            country: true,
+            partnerProfile: {
+                select: {
+                    grade: true,
+                },
+            },
+        },
     }) : null
 
     if (user) {
@@ -24,7 +33,34 @@ export default async function NewOrderPage() {
     }
 
     const products = await prisma.product.findMany({
+        where: { wholesaleAvailable: true },
         orderBy: { sortOrder: 'asc' },
+        select: {
+            id: true,
+            name: true,
+            nameJP: true,
+            nameEN: true,
+            buyPrice: true,
+            sellPrice: true,
+            onlinePrice: true,
+            priceA: true,
+            priceB: true,
+            priceC: true,
+            priceD: true,
+            stock: true,
+            imageUrl: true,
+            productCode: true,
+            barcode: true,
+            minOrderQuantity: true,
+            jpBuyPrice: true,
+            jpSellPrice: true,
+            krBuyPrice: true,
+            krSellPrice: true,
+            usBuyPrice: true,
+            usSellPrice: true,
+            regionalPrices: true,
+            updatedAt: true,
+        },
     })
 
     // Map products to apply correct price based on grade
@@ -90,9 +126,9 @@ export default async function NewOrderPage() {
         return {
             id: p.id,
             name: p.name,
+            imageUrl: p.imageUrl ? getProductImageUrl(p.id, p.updatedAt) : null,
             sellPrice: finalPrice,
             stock: p.stock,
-            imageUrl: p.imageUrl,
             productCode: p.productCode,
             barcode: p.barcode,
             nameJP: p.nameJP,

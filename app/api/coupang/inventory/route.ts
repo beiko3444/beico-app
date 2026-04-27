@@ -134,12 +134,12 @@ export async function GET(request: Request) {
                             { barcode: { in: externalSkus } }
                         ]
                     },
-                    select: { coupangSku: true, barcode: true, name: true, nameEN: true, imageUrl: true }
+                    select: { coupangSku: true, barcode: true, name: true, nameEN: true }
                 });
 
                 const productMap = new Map();
                 products.forEach(p => {
-                    const mappedData = { name: p.name || p.nameEN, imageUrl: p.imageUrl };
+                    const mappedData = { name: p.name || p.nameEN, imageUrl: null };
                     if (p.coupangSku) {
                         productMap.set(p.coupangSku, mappedData);
                     }

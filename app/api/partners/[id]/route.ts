@@ -1,6 +1,32 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import bcrypt from "bcryptjs"
+import { normalizeIncomingBusinessRegistration } from "@/lib/partner-business-registration-storage"
+
+const partnerResponseSelect = {
+    id: true,
+    username: true,
+    name: true,
+    role: true,
+    status: true,
+    country: true,
+    createdAt: true,
+    updatedAt: true,
+    partnerProfile: {
+        select: {
+            id: true,
+            contact: true,
+            fax: true,
+            email: true,
+            businessName: true,
+            representativeName: true,
+            businessRegNumber: true,
+            address: true,
+            grade: true,
+        },
+    },
+} as const
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
@@ -24,38 +50,33 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             updateData.password = await bcrypt.hash(password, 10)
         }
 
+        const profileData: any = {
+            contact,
+            email,
+            representativeName,
+            businessRegNumber,
+            address,
+            grade: grade || 'C',
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'businessRegistrationUrl')) {
+            profileData.businessRegistrationUrl = await normalizeIncomingBusinessRegistration(body.businessRegistrationUrl)
+        }
+
         const partner = await prisma.user.update({
             where: { id },
             data: {
                 ...updateData,
                 partnerProfile: {
                     upsert: {
-                        create: {
-                            contact,
-                            email,
-                            representativeName,
-                            businessRegNumber,
-                            address,
-                            businessRegistrationUrl: body.businessRegistrationUrl,
-                            grade: grade || 'C',
-                        },
-                        update: {
-                            contact,
-                            email,
-                            representativeName,
-                            businessRegNumber,
-                            address,
-                            businessRegistrationUrl: body.businessRegistrationUrl,
-                            grade: grade || 'C',
-                        }
+                        create: profileData,
+                        update: profileData
                     }
                 }
             },
-            include: {
-                partnerProfile: true
-            }
+            select: partnerResponseSelect
         })
 
+        revalidatePath('/admin/partners')
         return NextResponse.json(partner)
     } catch (error) {
         console.error("Failed to update partner:", error)
@@ -73,6 +94,7 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
             data: { status: 'DELETED' }
         })
 
+        revalidatePath('/admin/partners')
         return NextResponse.json({ success: true })
     } catch (error) {
         console.error("Failed to delete partner:", error)

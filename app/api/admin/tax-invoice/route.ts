@@ -22,15 +22,34 @@ export async function POST(req: Request) {
     // 주문 데이터 조회
     const order = await prisma.order.findUnique({
       where: { id: orderId },
-      include: {
+      select: {
+        id: true,
+        orderNumber: true,
+        taxInvoiceIssued: true,
         user: {
-          include: {
-            partnerProfile: true,
+          select: {
+            name: true,
+            partnerProfile: {
+              select: {
+                businessRegNumber: true,
+                businessName: true,
+                representativeName: true,
+                address: true,
+                email: true,
+                contact: true,
+              },
+            },
           },
         },
         items: {
-          include: {
-            product: true,
+          select: {
+            quantity: true,
+            price: true,
+            product: {
+              select: {
+                name: true,
+              },
+            },
           },
         },
       },

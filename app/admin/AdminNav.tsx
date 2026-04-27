@@ -61,6 +61,7 @@ export default function AdminNav({
         { name: 'P.I발급', path: '/admin/proforma' },
         { name: '전력관리', path: '/admin/electricity', alert: counts?.missingBill && counts.missingBill > 0 },
         { name: '재고관리', path: '/admin/inventory' },
+        { name: '물류관리', path: '/admin/warehousing' },
     ]
 
     useEffect(() => {

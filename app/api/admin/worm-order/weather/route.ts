@@ -76,31 +76,119 @@ function toWeatherText(code: number | null) {
   return WEATHER_CODE_LABELS[code] || '정보 없음'
 }
 
+function formatYmd(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function parseYmdAsLocalDate(value: string) {
+  const match = value.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2]) - 1
+  const day = Number(match[3])
+  const date = new Date(year, month, day)
+  return Number.isFinite(date.getTime()) ? date : null
+}
+
+function clampWeatherDateRange(startDate: string, endDate: string) {
+  const start = parseYmdAsLocalDate(startDate)
+  const end = parseYmdAsLocalDate(endDate)
+  if (!start || !end) return null
+
+  const now = new Date()
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const minDate = new Date(today)
+  minDate.setDate(minDate.getDate() - 94)
+  const maxDate = new Date(today)
+  maxDate.setDate(maxDate.getDate() + 14)
+
+  const clampedStart = start < minDate ? minDate : start
+  const clampedEnd = end > maxDate ? maxDate : end
+  if (clampedStart > clampedEnd) {
+    return {
+      startDate: formatYmd(clampedStart),
+      endDate: formatYmd(clampedEnd),
+      truncated: true,
+      empty: true,
+    }
+  }
+
+  return {
+    startDate: formatYmd(clampedStart),
+    endDate: formatYmd(clampedEnd),
+    truncated: clampedStart.getTime() !== start.getTime() || clampedEnd.getTime() !== end.getTime(),
+    empty: false,
+  }
+}
+
 async function fetchLocationWeather(
   location: LocationConfig,
   startDate: string,
   endDate: string,
 ) {
+  const clampedRange = clampWeatherDateRange(startDate, endDate)
+  if (!clampedRange || clampedRange.empty) {
+    return {
+      key: location.key,
+      label: location.label,
+      daily: [],
+      truncated: true,
+      requestedStartDate: startDate,
+      requestedEndDate: endDate,
+      servedStartDate: clampedRange?.startDate || startDate,
+      servedEndDate: clampedRange?.endDate || endDate,
+    }
+  }
+
   const params = new URLSearchParams({
     latitude: String(location.latitude),
     longitude: String(location.longitude),
     daily: 'weather_code,temperature_2m_max,temperature_2m_min',
     timezone: location.timezone,
-    start_date: startDate,
-    end_date: endDate,
+    start_date: clampedRange.startDate,
+    end_date: clampedRange.endDate,
   })
-  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
-    method: 'GET',
-    cache: 'no-store',
-    headers: {
-      Accept: 'application/json',
-    },
-  })
-  if (!response.ok) {
-    throw new Error(`날씨 조회 실패 (${location.label}, ${response.status})`)
+
+  let payload: any = null
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000)
+    try {
+      const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`, {
+        method: 'GET',
+        cache: 'no-store',
+        headers: {
+          Accept: 'application/json',
+          'User-Agent': 'beico-app-weather/1.0',
+        },
+        signal: controller.signal,
+      })
+      if (!response.ok) {
+        throw new Error(`날씨 조회 실패 (${location.label}, ${response.status})`)
+      }
+
+      payload = await response.json()
+      lastError = null
+      clearTimeout(timeoutId)
+      break
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('날씨 조회 실패')
+      clearTimeout(timeoutId)
+      if (attempt === 1) {
+        throw lastError
+      }
+    }
   }
 
-  const payload = await response.json()
+  if (!payload) {
+    throw lastError || new Error(`날씨 조회 실패 (${location.label})`)
+  }
+
   const daily = payload?.daily
 
   const dates: string[] = Array.isArray(daily?.time) ? daily.time : []
@@ -136,6 +224,11 @@ async function fetchLocationWeather(
     key: location.key,
     label: location.label,
     daily: list,
+    truncated: clampedRange.truncated,
+    requestedStartDate: startDate,
+    requestedEndDate: endDate,
+    servedStartDate: clampedRange.startDate,
+    servedEndDate: clampedRange.endDate,
   }
 }
 
@@ -197,4 +290,3 @@ export async function GET(request: NextRequest) {
     },
   )
 }
-
