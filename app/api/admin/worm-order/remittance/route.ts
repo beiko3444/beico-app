@@ -169,13 +169,11 @@ const resolveActiveLock = (entry: RemittanceAuthGuardEntry | undefined, now: num
 }
 
 const isAuthRelatedAutomationError = (error: MoinAutomationError) => {
-    const combined = `${error.step} ${error.message}`.toLowerCase()
+    if (error.step === 'Login Failed') return true
+    const message = error.message || ''
     return (
-        combined.includes('login failed') ||
-        combined.includes('password') ||
-        combined.includes('account locked') ||
-        combined.includes('locked') ||
-        combined.includes('credential')
+        message.includes('[Account locked]') ||
+        message.includes('[Password mismatch]')
     )
 }
 
