@@ -564,9 +564,7 @@ const inspectTransferInputs = async (page: PageLike) => {
                 amountKeywordVisible:
                     bodyText.includes(amountEntry) ||
                     bodyText.includes(receiveAmount) ||
-                    bodyText.includes(sendAmount) ||
-                    bodyText.includes('USD') ||
-                    bodyText.includes('KRW'),
+                    bodyText.includes(sendAmount),
             };
         })()
     `) as {
@@ -1012,9 +1010,8 @@ const clickCompanyScopedRemit = async (
                 '[role="dialog"], [class*="modal"], [class*="Modal"], [class*="drawer"], [class*="Drawer"], [class*="popup"], [class*="Popup"]'
             )).filter(isVisible);
             const companyModalScopes = modalScopes.filter((scope) => hasCompanyText(scope));
-            const prioritizedModalScopes = companyModalScopes.length > 0 ? companyModalScopes : modalScopes;
 
-            for (const scope of prioritizedModalScopes) {
+            for (const scope of companyModalScopes) {
                 const companyRef = Array.from(scope.querySelectorAll('*'))
                     .filter((el) => isVisible(el) && hasCompanyText(el))
                     .sort((a, b) => {
