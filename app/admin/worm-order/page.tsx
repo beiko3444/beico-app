@@ -908,10 +908,11 @@ function resolveRemittanceFeeKrw(order: WormOrderListItem): number | null {
 }
 
 function resolveRemittanceOriginKrw(order: WormOrderListItem): number | null {
-    const totalPaidKrw = resolveRemittanceSendKrw(order)
+    const directSendKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
+        ?? order.remittanceSendAmount
     const feeKrw = resolveRemittanceFeeKrw(order)
-    if (totalPaidKrw !== null && feeKrw !== null) {
-        const originKrw = totalPaidKrw - feeKrw
+    if (directSendKrw !== null && feeKrw !== null) {
+        const originKrw = directSendKrw - feeKrw
         if (originKrw >= 0) return originKrw
     }
 
