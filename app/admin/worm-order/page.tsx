@@ -1649,6 +1649,7 @@ export default function WormOrderPage() {
                     uids: [matchedInvoiceEmail.uid, matchedAwbUid],
                     toEmail: forwardEmail.trim(),
                     orderId: activeWormOrder?.id || null,
+                    forwardDate: customsForwardDate || null,
                 }),
             })
             const data = await res.json()
@@ -2761,7 +2762,22 @@ export default function WormOrderPage() {
     const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
     const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
     const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbUid)
-    const customsForwardDateText = useMemo(() => formatKstDateDot(new Date()), [])
+    const todayKstYmd = useMemo(() => {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(new Date())
+        const year = parts.find((part) => part.type === 'year')?.value ?? '0000'
+        const month = parts.find((part) => part.type === 'month')?.value ?? '00'
+        const day = parts.find((part) => part.type === 'day')?.value ?? '00'
+        return `${year}-${month}-${day}`
+    }, [])
+    const [customsForwardDate, setCustomsForwardDate] = useState<string>(todayKstYmd)
+    const customsForwardDateText = customsForwardDate
+        ? customsForwardDate.replace(/-/g, '.')
+        : formatKstDateDot(new Date())
     const customsForwardSubject = `${customsForwardDateText} ${CUSTOMS_FORWARD_SUBJECT_SUFFIX}`
     const customsForwardBody = `안녕하세요 관세사님- ${customsForwardDateText}  엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.
 <직접배차>예정입니다- 감사합니다:)
@@ -5174,6 +5190,26 @@ export default function WormOrderPage() {
                                 className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
                             />
                             <p className="text-[11px] text-slate-500 dark:text-gray-400">기본값: {DEFAULT_CUSTOMS_FORWARD_EMAIL} (필요 시 변경 가능)</p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">통관 진행일</label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="date"
+                                    value={customsForwardDate}
+                                    onChange={(event) => setCustomsForwardDate(event.target.value)}
+                                    className="h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setCustomsForwardDate(todayKstYmd)}
+                                    className="h-10 px-3 rounded-lg border border-gray-300 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                >
+                                    오늘
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-gray-400">제목과 본문에 들어갈 날짜입니다. 기본값은 오늘(KST)이며 캘린더에서 변경할 수 있습니다.</p>
                         </div>
 
                         <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">

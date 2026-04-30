@@ -94,7 +94,7 @@ export async function POST(req: Request) {
     try {
         const forwardLogClient = (prisma as any).wormEmailForwardLog
         const body = await req.json()
-        const { uid, uids, toEmail, orderId: orderIdRaw } = body
+        const { uid, uids, toEmail, orderId: orderIdRaw, forwardDate: forwardDateRaw } = body
 
         const normalizedUids = Array.from(new Set(
             (Array.isArray(uids) ? uids : [uid])
@@ -127,8 +127,13 @@ export async function POST(req: Request) {
             return parsedMessage
         })
 
-        // 2. 제목 & 본문 포맷팅 (KST 오늘 날짜, 요청 문구 고정)
-        const dateStr = formatKstDateDot(new Date())
+        // 2. 제목 & 본문 포맷팅 (요청한 날짜, 또는 KST 오늘 날짜)
+        const forwardDateYmd = typeof forwardDateRaw === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(forwardDateRaw)
+            ? forwardDateRaw
+            : null
+        const dateStr = forwardDateYmd
+            ? forwardDateYmd.replace(/-/g, '.')
+            : formatKstDateDot(new Date())
         const subject = `${dateStr} ${DEFAULT_FORWARD_SUBJECT_SUFFIX}`
         const bodyText = `안녕하세요 관세사님- ${dateStr}  엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.
 <직접배차>예정입니다- 감사합니다:)
