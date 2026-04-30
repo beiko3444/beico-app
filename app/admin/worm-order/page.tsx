@@ -1365,6 +1365,7 @@ export default function WormOrderPage() {
     const [wormOrderListLoading, setWormOrderListLoading] = useState(false)
     const [wormOrderListError, setWormOrderListError] = useState('')
     const [deletingWormOrderId, setDeletingWormOrderId] = useState<string | null>(null)
+    const [importingWormOrderId, setImportingWormOrderId] = useState<string | null>(null)
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -2064,6 +2065,42 @@ export default function WormOrderPage() {
         setInvoicePdf(null)
         setUseManualRemittanceInput(false)
     }, [activeWormOrder?.id])
+
+    const handleImportRemittanceHistory = useCallback(async (order: WormOrderListItem) => {
+        const shouldImport = window.confirm(
+            `${order.orderNumber} 발주의 송금 정보를 모인 비즈플러스 거래내역에서 가져옵니다.\n\n` +
+            `브라우저 자동화로 약 30~60초가 소요됩니다. 계속할까요?`,
+        )
+        if (!shouldImport) return
+
+        setWormOrderListError('')
+        setImportingWormOrderId(order.id)
+        try {
+            const response = await fetch('/api/admin/worm-order/remittance/history-import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    targetDate: order.receiveDate
+                        ? new Date(order.receiveDate).toISOString().slice(0, 10)
+                        : null,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok || !result?.ok) {
+                const candidateCount = Array.isArray(result?.items) ? result.items.length : 0
+                const baseMsg = typeof result?.error === 'string' ? result.error : '송금 정보 가져오기에 실패했습니다.'
+                const detail = candidateCount > 0 ? ` (최근 거래 ${candidateCount}건 검색 완료)` : ''
+                throw new Error(`${baseMsg}${detail}`)
+            }
+            await fetchWormOrders()
+            alert(result?.message || '송금 정보를 가져와 저장했습니다.')
+        } catch (error) {
+            setWormOrderListError(error instanceof Error ? error.message : '송금 정보 가져오기 중 오류가 발생했습니다.')
+        } finally {
+            setImportingWormOrderId(null)
+        }
+    }, [fetchWormOrders])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
         const shouldDelete = window.confirm(`삭제할까요?\n${order.orderNumber}`)
@@ -3649,23 +3686,45 @@ export default function WormOrderPage() {
                                             {exchangeRateText}
                                         </td>
                                         <td className="px-3 py-2.5 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                    event.stopPropagation()
-                                                    void handleDeleteWormOrder(order)
-                                                }}
-                                                disabled={deletingWormOrderId === order.id}
-                                                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                                                aria-label={`${order.orderNumber} 삭제`}
-                                            >
-                                                {deletingWormOrderId === order.id ? (
-                                                    <Loader2 size={13} className="animate-spin" />
-                                                ) : (
-                                                    <Trash2 size={13} />
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                {!order.remittanceAppliedAt && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={(event) => {
+                                                            event.stopPropagation()
+                                                            void handleImportRemittanceHistory(order)
+                                                        }}
+                                                        disabled={importingWormOrderId === order.id}
+                                                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                        aria-label={`${order.orderNumber} 송금정보 가져오기`}
+                                                        title="모인 비즈플러스 거래내역에서 송금 금액·수수료·환율을 가져와 저장합니다"
+                                                    >
+                                                        {importingWormOrderId === order.id ? (
+                                                            <Loader2 size={13} className="animate-spin" />
+                                                        ) : (
+                                                            <ScanSearch size={13} />
+                                                        )}
+                                                        송금정보 가져오기
+                                                    </button>
                                                 )}
-                                                삭제
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        void handleDeleteWormOrder(order)
+                                                    }}
+                                                    disabled={deletingWormOrderId === order.id}
+                                                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    aria-label={`${order.orderNumber} 삭제`}
+                                                >
+                                                    {deletingWormOrderId === order.id ? (
+                                                        <Loader2 size={13} className="animate-spin" />
+                                                    ) : (
+                                                        <Trash2 size={13} />
+                                                    )}
+                                                    삭제
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 )

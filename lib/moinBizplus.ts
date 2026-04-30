@@ -1126,6 +1126,412 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
     )
 }
 
+const performMoinLogin = async (
+    page: PageLike,
+    loginId: string,
+    loginPassword: string,
+    steps: string[],
+    abortSignal: AbortSignal | undefined,
+): Promise<void> => {
+    throwIfAbortRequested(abortSignal, 'Open login page')
+    const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
+    steps.push(`open-login-page:${loginWaitUntil}`)
+
+    throwIfAbortRequested(abortSignal, 'Fill login ID')
+    await typeFirstVisible(
+        page,
+        [
+            'input[name="email"]',
+            'input[type="email"]',
+            'input[name="username"]',
+            'input[autocomplete="username"]',
+            'input[autocomplete="email"]',
+        ],
+        loginId,
+        'Fill login ID',
+        DEFAULT_TIMEOUT_MS,
+    )
+    steps.push('fill-login-id')
+
+    throwIfAbortRequested(abortSignal, 'Fill login password')
+    await typeFirstVisible(
+        page,
+        ['input[name="password"]', 'input[type="password"]', 'input[autocomplete="current-password"]'],
+        loginPassword,
+        'Fill login password',
+        DEFAULT_TIMEOUT_MS,
+    )
+    steps.push('fill-login-password')
+
+    const clickDelay = 1500 + Math.floor(Math.random() * 1000)
+    throwIfAbortRequested(abortSignal, 'Submit login')
+    await page.waitForTimeout(clickDelay)
+
+    const loginUrlBefore = page.url()
+    const loginBtnSelectors = [
+        `button[type="submit"]:has-text("${KO_LOGIN}")`,
+        `button:has-text("${KO_LOGIN}")`,
+        `[role="button"]:has-text("${KO_LOGIN}")`,
+        'button[type="submit"]',
+    ]
+
+    let loginClicked = false
+    for (const selector of loginBtnSelectors) {
+        throwIfAbortRequested(abortSignal, 'Submit login')
+        try {
+            const btn = page.locator(selector).first()
+            await btn.waitFor({ state: 'visible', timeout: 5000 })
+
+            for (let attempt = 0; attempt < 6; attempt++) {
+                try {
+                    const disabled = await btn.isDisabled()
+                    if (!disabled) break
+                } catch {
+                    break
+                }
+                throwIfAbortRequested(abortSignal, 'Submit login')
+                await page.waitForTimeout(500)
+            }
+
+            await btn.click({ timeout: 5000 })
+            loginClicked = true
+            break
+        } catch {
+            // Try next selector
+        }
+    }
+
+    if (!loginClicked) {
+        throw new MoinAutomationError('Submit login', `Could not click login button. (url: ${page.url()})`)
+    }
+    steps.push('submit-login')
+
+    let loginFailed = false
+    try {
+        throwIfAbortRequested(abortSignal, 'Verify login')
+        await Promise.race([
+            waitForUrlChange(page, loginUrlBefore, 10000).then((url) => {
+                if (url.includes('/login')) loginFailed = true
+            }),
+            page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_ATTEMPT_EXCEEDED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_LOCK).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_LOCKED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+        ])
+    } catch {
+        // Ignore timeouts from race
+    }
+
+    throwIfAbortRequested(abortSignal, 'Verify login')
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
+
+    if (loginFailed || page.url().includes('/login')) {
+        const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
+        if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
+            throw new MoinAutomationError(
+                'Login Failed',
+                '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.',
+            )
+        } else if (bodyText.includes(KO_PASSWORD_MISMATCH)) {
+            throw new MoinAutomationError(
+                'Login Failed',
+                '[Password mismatch] The password is incorrect. Please verify the password before trying again.',
+            )
+        } else {
+            throw new MoinAutomationError(
+                'Login Failed',
+                `Login failed (URL: ${page.url()}). Please verify the account credentials.`,
+            )
+        }
+    }
+
+    steps.push(`post-login-url:${page.url()}`)
+}
+
+export type MoinHistoryItem = {
+    detailUrl: string
+    rowText: string
+    dateText: string
+    recipient: string
+    amountUsdText: string
+    statusText: string
+}
+
+export type MoinHistoryFetchInput = {
+    loginId: string
+    loginPassword: string
+    targetDate?: string | null
+    recipientHint?: string | null
+    headless?: boolean
+    abortSignal?: AbortSignal
+}
+
+export type MoinHistoryFetchResult = {
+    steps: string[]
+    items: MoinHistoryItem[]
+    matched: MoinHistoryItem | null
+    matchedSummary: MoinRemittancePricingSummary | null
+    matchedAppliedAtIso: string | null
+    matchedDetailBodyText: string | null
+}
+
+const inspectHistoryListItems = async (page: PageLike): Promise<MoinHistoryItem[]> => {
+    const result = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const detailLinks = Array.from(document.querySelectorAll('a[href*="/history/"]'))
+                .filter((el) => isVisible(el))
+                .filter((el) => {
+                    const href = el.getAttribute('href') || '';
+                    return /\\/history\\/[^/]+$/i.test(href) && !/\\/history\\/(individual|bulk)$/i.test(href);
+                });
+
+            const rows = [];
+            const seen = new Set();
+            for (const link of detailLinks) {
+                const href = link.getAttribute('href') || '';
+                if (seen.has(href)) continue;
+                seen.add(href);
+
+                const rowEl = link.closest('li, tr, article, [class*="row"], [class*="Row"], [class*="item"], [class*="Item"], [class*="card"], [class*="Card"]') || link;
+                const rowText = norm(rowEl.textContent || '');
+
+                const dateMatch = rowText.match(/\\b(20\\d{2})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})\\b/);
+                const dateText = dateMatch
+                    ? dateMatch[1] + '-' + String(dateMatch[2]).padStart(2, '0') + '-' + String(dateMatch[3]).padStart(2, '0')
+                    : '';
+
+                const usdMatch = rowText.match(/[\\d,]+(?:\\.\\d{1,2})?\\s*(?:US\\$|USD|\\$)/i)
+                    || rowText.match(/(?:US\\$|USD|\\$)\\s*[\\d,]+(?:\\.\\d{1,2})?/i);
+                const amountUsdText = usdMatch ? norm(usdMatch[0]) : '';
+
+                const statusMatch = rowText.match(/(송금완료|입금완료|진행중|승인대기|작성중|취소|반려|실패|환불|완료)/);
+                const statusText = statusMatch ? statusMatch[0] : '';
+
+                let recipient = '';
+                const candidates = Array.from(rowEl.querySelectorAll('h1,h2,h3,h4,h5,h6,strong,b,span,p,div'))
+                    .filter((el) => isVisible(el))
+                    .map((el) => norm(el.textContent || ''))
+                    .filter((text) => text.length > 0 && text.length < 80)
+                    .filter((text) => !/^[\\d,.\\s]+$/.test(text));
+                for (const text of candidates) {
+                    if (/[A-Za-z]/.test(text) && !/송금|수수료|환율|입금|진행|완료|반려|취소|실패|상태/.test(text)) {
+                        recipient = text;
+                        break;
+                    }
+                }
+
+                const absoluteUrl = href.startsWith('http')
+                    ? href
+                    : new URL(href, window.location.origin).toString();
+
+                rows.push({
+                    detailUrl: absoluteUrl,
+                    rowText: rowText.slice(0, 400),
+                    dateText,
+                    recipient,
+                    amountUsdText,
+                    statusText,
+                });
+            }
+
+            return JSON.stringify(rows.slice(0, 30));
+        })()
+    `) as string
+
+    try {
+        const parsed = JSON.parse(result || '[]')
+        if (!Array.isArray(parsed)) return []
+        return parsed as MoinHistoryItem[]
+    } catch {
+        return []
+    }
+}
+
+const inspectHistoryDetailAppliedAt = async (page: PageLike): Promise<string | null> => {
+    const raw = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const bodyText = norm((document.body && document.body.innerText) || '');
+
+            const dateTimeMatch = bodyText.match(/(20\\d{2})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?/);
+            if (dateTimeMatch) {
+                const year = dateTimeMatch[1];
+                const month = String(dateTimeMatch[2]).padStart(2, '0');
+                const day = String(dateTimeMatch[3]).padStart(2, '0');
+                const hour = String(dateTimeMatch[4]).padStart(2, '0');
+                const minute = dateTimeMatch[5];
+                const second = dateTimeMatch[6] ? dateTimeMatch[6] : '00';
+                return year + '-' + month + '-' + day + 'T' + hour + ':' + minute + ':' + second + '+09:00';
+            }
+
+            const dateOnlyMatch = bodyText.match(/(20\\d{2})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})/);
+            if (dateOnlyMatch) {
+                const year = dateOnlyMatch[1];
+                const month = String(dateOnlyMatch[2]).padStart(2, '0');
+                const day = String(dateOnlyMatch[3]).padStart(2, '0');
+                return year + '-' + month + '-' + day + 'T00:00:00+09:00';
+            }
+
+            return '';
+        })()
+    `) as string
+
+    if (!raw) return null
+    const parsed = new Date(raw)
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
+}
+
+const matchHistoryItem = (
+    items: MoinHistoryItem[],
+    targetDate: string | null,
+    recipientHint: string | null,
+): MoinHistoryItem | null => {
+    if (items.length === 0) return null
+
+    const recipientNorm = recipientHint
+        ? recipientHint.toLowerCase().replace(/[^a-z0-9]/g, '')
+        : ''
+
+    const targetTime = targetDate ? new Date(`${targetDate}T00:00:00+09:00`).getTime() : null
+    const tolerance = 14 * 24 * 60 * 60 * 1000
+
+    const scored = items
+        .map((item) => {
+            let score = 0
+            if (recipientNorm) {
+                const itemRecipientNorm = (item.recipient || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+                const itemRowNorm = (item.rowText || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+                if (itemRecipientNorm.includes(recipientNorm) || itemRowNorm.includes(recipientNorm)) score += 1000
+            }
+            if (item.statusText && /(송금완료|입금완료|완료)/.test(item.statusText)) score += 200
+            if (targetTime && item.dateText) {
+                const itemTime = new Date(`${item.dateText}T00:00:00+09:00`).getTime()
+                if (Number.isFinite(itemTime)) {
+                    const distance = Math.abs(itemTime - targetTime)
+                    if (distance <= tolerance) {
+                        score += Math.max(0, 500 - Math.floor(distance / (24 * 60 * 60 * 1000)) * 30)
+                    }
+                }
+            }
+            return { item, score }
+        })
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => b.score - a.score)
+
+    return scored.length > 0 ? scored[0].item : null
+}
+
+export const fetchMoinRemittanceHistory = async (
+    input: MoinHistoryFetchInput,
+): Promise<MoinHistoryFetchResult> => {
+    let browser: BrowserLike | null = null
+    const steps: string[] = []
+    const abortSignal = input.abortSignal
+    let abortListenerCleanup: (() => void) | null = null
+
+    try {
+        throwIfAbortRequested(abortSignal, 'Launch browser')
+        const launched = await launchBrowser(input.headless ?? true)
+        browser = launched.browser
+        steps.push(`runtime:${launched.runtime}`)
+
+        if (abortSignal) {
+            const onAbort = () => {
+                steps.push('cancel-requested')
+                if (browser) void browser.close().catch(() => undefined)
+            }
+            abortSignal.addEventListener('abort', onAbort, { once: true })
+            abortListenerCleanup = () => abortSignal.removeEventListener('abort', onAbort)
+            throwIfAbortRequested(abortSignal, 'Initialize browser')
+        }
+
+        const context = await browser.newContext({ locale: 'ko-KR' })
+        const page = await context.newPage()
+        page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
+        page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
+
+        await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
+
+        throwIfAbortRequested(abortSignal, 'Open history page')
+        await page.goto('https://www.moinbizplus.com/history/individual', {
+            waitUntil: 'domcontentloaded',
+            timeout: LONG_TIMEOUT_MS,
+        }).catch(async () => {
+            await page.goto('https://www.moinbizplus.com/history', {
+                waitUntil: 'domcontentloaded',
+                timeout: LONG_TIMEOUT_MS,
+            })
+        })
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+        await page.waitForTimeout(2000)
+        steps.push(`history-page-url:${page.url()}`)
+
+        const items = await inspectHistoryListItems(page)
+        steps.push(`history-items-count:${items.length}`)
+
+        const matched = matchHistoryItem(items, input.targetDate || null, input.recipientHint || null)
+        if (!matched) {
+            steps.push('history-no-match')
+            return {
+                steps,
+                items,
+                matched: null,
+                matchedSummary: null,
+                matchedAppliedAtIso: null,
+                matchedDetailBodyText: null,
+            }
+        }
+        steps.push(`history-matched:${matched.detailUrl}`)
+
+        await page.goto(matched.detailUrl, {
+            waitUntil: 'domcontentloaded',
+            timeout: LONG_TIMEOUT_MS,
+        })
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+        await page.waitForTimeout(1500)
+        steps.push(`history-detail-url:${page.url()}`)
+
+        const summary = await inspectRemittancePricingSummary(page)
+        steps.push(`history-summary:${JSON.stringify(summary).slice(0, 220)}`)
+
+        const appliedAtIso = await inspectHistoryDetailAppliedAt(page)
+        if (appliedAtIso) steps.push(`history-applied-at:${appliedAtIso}`)
+
+        let detailBodyText: string | null = null
+        try {
+            const detailText = (await page.locator('body').textContent().catch(() => '')) || ''
+            detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
+        } catch {
+            detailBodyText = null
+        }
+
+        return {
+            steps,
+            items,
+            matched,
+            matchedSummary: summary,
+            matchedAppliedAtIso: appliedAtIso,
+            matchedDetailBodyText: detailBodyText,
+        }
+    } finally {
+        abortListenerCleanup?.()
+        if (browser) await browser.close().catch(() => undefined)
+    }
+}
+
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
     let browser: BrowserLike | null = null
     const steps: string[] = []
