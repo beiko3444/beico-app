@@ -2120,21 +2120,30 @@ export default function WormOrderPage() {
             const offsetMs = base.getTimezoneOffset() * 60000
             return new Date(base.getTime() - offsetMs).toISOString().slice(0, 16)
         })()
+        const parseLeadingNumber = (value: string | null) => {
+            if (!value) return ''
+            const match = value.match(/-?\d[\d,]*(?:\.\d+)?/)
+            return match ? match[0].replace(/,/g, '') : ''
+        }
+        const parseTrailingRate = (value: string | null) => {
+            if (!value) return ''
+            const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
+            if (!matches || matches.length === 0) return ''
+            return matches[matches.length - 1].replace(/,/g, '')
+        }
         setManualRemittanceOrder(order)
         setManualRemittanceForm({
             appliedAt: initialAppliedAt,
-            finalReceiveAmountUsd: order.remittanceFinalReceiveAmount !== null
-                ? String(order.remittanceFinalReceiveAmount)
-                : '',
+            finalReceiveAmountUsd: parseLeadingNumber(order.remittanceFinalReceiveAmountText),
             sendAmountKrw: order.remittanceSendAmount !== null
                 ? String(order.remittanceSendAmount)
-                : '',
+                : parseLeadingNumber(order.remittanceSendAmountText),
             totalFeeKrw: order.remittanceTotalFee !== null
                 ? String(order.remittanceTotalFee)
-                : '',
+                : parseLeadingNumber(order.remittanceTotalFeeText),
             exchangeRate: order.remittanceExchangeRate !== null
                 ? String(order.remittanceExchangeRate)
-                : '',
+                : parseTrailingRate(order.remittanceExchangeRateText),
         })
         setManualRemittanceError('')
     }, [])
