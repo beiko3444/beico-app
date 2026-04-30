@@ -146,6 +146,17 @@ model ElectricityUsage {
   @@unique([year, month])
 }
 
+model RentPayment {
+  id        String    @id @default(uuid())
+  year      Int
+  month     Int
+  paidDate  DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@unique([year, month])
+}
+
 model Task {
   id          String   @id @default(uuid())
   title       String
