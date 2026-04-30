@@ -94,6 +94,7 @@ export async function POST(request: Request) {
                     error: '일치하는 송금 내역을 찾지 못했습니다. 모인 비즈플러스에서 직접 내역을 확인해 주세요.',
                     items: result.items,
                     steps: result.steps,
+                    diagnostic: result.diagnostic,
                 },
                 { status: 404 },
             )

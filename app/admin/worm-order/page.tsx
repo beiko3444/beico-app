@@ -1366,6 +1366,16 @@ export default function WormOrderPage() {
     const [wormOrderListError, setWormOrderListError] = useState('')
     const [deletingWormOrderId, setDeletingWormOrderId] = useState<string | null>(null)
     const [importingWormOrderId, setImportingWormOrderId] = useState<string | null>(null)
+    const [manualRemittanceOrder, setManualRemittanceOrder] = useState<WormOrderListItem | null>(null)
+    const [manualRemittanceForm, setManualRemittanceForm] = useState({
+        appliedAt: '',
+        finalReceiveAmountUsd: '',
+        sendAmountKrw: '',
+        totalFeeKrw: '',
+        exchangeRate: '',
+    })
+    const [manualRemittanceSaving, setManualRemittanceSaving] = useState(false)
+    const [manualRemittanceError, setManualRemittanceError] = useState('')
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -2101,6 +2111,66 @@ export default function WormOrderPage() {
             setImportingWormOrderId(null)
         }
     }, [fetchWormOrders])
+
+    const openManualRemittanceModal = useCallback((order: WormOrderListItem) => {
+        const initialAppliedAt = (() => {
+            const base = order.remittanceAppliedAt
+                ? new Date(order.remittanceAppliedAt)
+                : (order.receiveDate ? new Date(order.receiveDate) : new Date())
+            const offsetMs = base.getTimezoneOffset() * 60000
+            return new Date(base.getTime() - offsetMs).toISOString().slice(0, 16)
+        })()
+        setManualRemittanceOrder(order)
+        setManualRemittanceForm({
+            appliedAt: initialAppliedAt,
+            finalReceiveAmountUsd: order.remittanceFinalReceiveAmount !== null
+                ? String(order.remittanceFinalReceiveAmount)
+                : '',
+            sendAmountKrw: order.remittanceSendAmount !== null
+                ? String(order.remittanceSendAmount)
+                : '',
+            totalFeeKrw: order.remittanceTotalFee !== null
+                ? String(order.remittanceTotalFee)
+                : '',
+            exchangeRate: order.remittanceExchangeRate !== null
+                ? String(order.remittanceExchangeRate)
+                : '',
+        })
+        setManualRemittanceError('')
+    }, [])
+
+    const handleSaveManualRemittance = useCallback(async () => {
+        if (!manualRemittanceOrder) return
+        setManualRemittanceSaving(true)
+        setManualRemittanceError('')
+        try {
+            const appliedAtIso = manualRemittanceForm.appliedAt
+                ? new Date(manualRemittanceForm.appliedAt).toISOString()
+                : null
+            const response = await fetch('/api/admin/worm-order/remittance/manual-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: manualRemittanceOrder.id,
+                    appliedAt: appliedAtIso,
+                    finalReceiveAmountUsd: manualRemittanceForm.finalReceiveAmountUsd || null,
+                    sendAmountKrw: manualRemittanceForm.sendAmountKrw || null,
+                    totalFeeKrw: manualRemittanceForm.totalFeeKrw || null,
+                    exchangeRate: manualRemittanceForm.exchangeRate || null,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok || !result?.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '저장에 실패했습니다.')
+            }
+            setManualRemittanceOrder(null)
+            await fetchWormOrders()
+        } catch (error) {
+            setManualRemittanceError(error instanceof Error ? error.message : '저장에 실패했습니다.')
+        } finally {
+            setManualRemittanceSaving(false)
+        }
+    }, [manualRemittanceOrder, manualRemittanceForm, fetchWormOrders])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
         const shouldDelete = window.confirm(`삭제할까요?\n${order.orderNumber}`)
@@ -3688,24 +3758,38 @@ export default function WormOrderPage() {
                                         <td className="px-3 py-2.5 text-right">
                                             <div className="flex items-center justify-end gap-1.5">
                                                 {!order.remittanceAppliedAt && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(event) => {
-                                                            event.stopPropagation()
-                                                            void handleImportRemittanceHistory(order)
-                                                        }}
-                                                        disabled={importingWormOrderId === order.id}
-                                                        className="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                                                        aria-label={`${order.orderNumber} 송금정보 가져오기`}
-                                                        title="모인 비즈플러스 거래내역에서 송금 금액·수수료·환율을 가져와 저장합니다"
-                                                    >
-                                                        {importingWormOrderId === order.id ? (
-                                                            <Loader2 size={13} className="animate-spin" />
-                                                        ) : (
-                                                            <ScanSearch size={13} />
-                                                        )}
-                                                        송금정보 가져오기
-                                                    </button>
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                void handleImportRemittanceHistory(order)
+                                                            }}
+                                                            disabled={importingWormOrderId === order.id}
+                                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                            aria-label={`${order.orderNumber} 송금정보 가져오기`}
+                                                            title="모인 비즈플러스 거래내역에서 자동으로 가져옵니다"
+                                                        >
+                                                            {importingWormOrderId === order.id ? (
+                                                                <Loader2 size={13} className="animate-spin" />
+                                                            ) : (
+                                                                <ScanSearch size={13} />
+                                                            )}
+                                                            자동
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                openManualRemittanceModal(order)
+                                                            }}
+                                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                                            aria-label={`${order.orderNumber} 송금정보 직접 입력`}
+                                                            title="송금 금액·수수료·환율을 직접 입력해 저장합니다"
+                                                        >
+                                                            직접 입력
+                                                        </button>
+                                                    </>
                                                 )}
                                                 <button
                                                     type="button"
@@ -5420,6 +5504,113 @@ export default function WormOrderPage() {
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {manualRemittanceOrder && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                >
+                    <div
+                        className="w-full max-w-md rounded-2xl bg-white shadow-xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">송금정보 직접 입력</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5">{manualRemittanceOrder.orderNumber}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
+                                aria-label="닫기"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 space-y-3">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">신청시각</label>
+                                <input
+                                    type="datetime-local"
+                                    value={manualRemittanceForm.appliedAt}
+                                    onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, appliedAt: event.target.value }))}
+                                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 송금액 (USD)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="1050"
+                                        value={manualRemittanceForm.finalReceiveAmountUsd}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, finalReceiveAmountUsd: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">환율 (1 USD =)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="1481.8829"
+                                        value={manualRemittanceForm.exchangeRate}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, exchangeRate: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 송금 한화 (KRW)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="1590589"
+                                        value={manualRemittanceForm.sendAmountKrw}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, sendAmountKrw: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 수수료 (KRW)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="34612"
+                                        value={manualRemittanceForm.totalFeeKrw}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, totalFeeKrw: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-slate-500">금액은 숫자만 입력하면 됩니다 (콤마/통화 기호 자동 제거).</p>
+                            {manualRemittanceError && (
+                                <p className="text-xs font-semibold text-rose-600">{manualRemittanceError}</p>
+                            )}
+                        </div>
+                        <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                                disabled={manualRemittanceSaving}
+                                className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { void handleSaveManualRemittance() }}
+                                disabled={manualRemittanceSaving}
+                                className="h-9 px-4 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-black disabled:opacity-60 inline-flex items-center gap-1.5"
+                            >
+                                {manualRemittanceSaving && <Loader2 size={13} className="animate-spin" />}
+                                저장
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

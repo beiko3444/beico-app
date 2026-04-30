@@ -1273,6 +1273,51 @@ export type MoinHistoryFetchResult = {
     matchedSummary: MoinRemittancePricingSummary | null
     matchedAppliedAtIso: string | null
     matchedDetailBodyText: string | null
+    diagnostic: {
+        listUrl: string
+        bodyTextPreview: string
+        anchorHrefs: string[]
+        clickableTextSamples: string[]
+    } | null
+}
+
+const inspectHistoryListDiagnostic = async (page: PageLike) => {
+    const raw = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+
+            const bodyText = norm((document.body && document.body.innerText) || '').slice(0, 1500);
+            const anchorHrefs = Array.from(document.querySelectorAll('a[href]'))
+                .filter((el) => isVisible(el))
+                .map((el) => el.getAttribute('href') || '')
+                .filter((href) => href && !href.startsWith('#'))
+                .slice(0, 60);
+            const clickableTextSamples = Array.from(document.querySelectorAll('[role="button"], button, [onclick], [data-testid]'))
+                .filter((el) => isVisible(el))
+                .map((el) => norm(el.textContent || ''))
+                .filter((text) => text.length > 0 && text.length <= 80)
+                .slice(0, 30);
+
+            return JSON.stringify({
+                listUrl: window.location.href,
+                bodyTextPreview: bodyText,
+                anchorHrefs,
+                clickableTextSamples,
+            });
+        })()
+    `) as string
+
+    try {
+        return JSON.parse(raw || '{}')
+    } catch {
+        return null
+    }
 }
 
 const inspectHistoryListItems = async (page: PageLike): Promise<MoinHistoryItem[]> => {
@@ -1485,6 +1530,15 @@ export const fetchMoinRemittanceHistory = async (
         const matched = matchHistoryItem(items, input.targetDate || null, input.recipientHint || null)
         if (!matched) {
             steps.push('history-no-match')
+            const diagnosticRaw = await inspectHistoryListDiagnostic(page)
+            const diagnostic = diagnosticRaw && typeof diagnosticRaw === 'object'
+                ? {
+                    listUrl: typeof diagnosticRaw.listUrl === 'string' ? diagnosticRaw.listUrl : page.url(),
+                    bodyTextPreview: typeof diagnosticRaw.bodyTextPreview === 'string' ? diagnosticRaw.bodyTextPreview : '',
+                    anchorHrefs: Array.isArray(diagnosticRaw.anchorHrefs) ? diagnosticRaw.anchorHrefs : [],
+                    clickableTextSamples: Array.isArray(diagnosticRaw.clickableTextSamples) ? diagnosticRaw.clickableTextSamples : [],
+                }
+                : null
             return {
                 steps,
                 items,
@@ -1492,6 +1546,7 @@ export const fetchMoinRemittanceHistory = async (
                 matchedSummary: null,
                 matchedAppliedAtIso: null,
                 matchedDetailBodyText: null,
+                diagnostic,
             }
         }
         steps.push(`history-matched:${matched.detailUrl}`)
@@ -1525,6 +1580,7 @@ export const fetchMoinRemittanceHistory = async (
             matchedSummary: summary,
             matchedAppliedAtIso: appliedAtIso,
             matchedDetailBodyText: detailBodyText,
+            diagnostic: null,
         }
     } finally {
         abortListenerCleanup?.()
