@@ -4154,17 +4154,31 @@ export default function WormOrderPage() {
                                             : getCalendarDayOfWeekBgClass(dayOfWeek))
                                         : ''
                                     const cellBgClass = rainBgClass || dayOfWeekBgClass
+                                    const nextDay = new Date(dayCell.date)
+                                    nextDay.setDate(nextDay.getDate() + 1)
+                                    const nextDayYmd = formatLocalDateToYmd(nextDay)
+                                    const nextDayWeather = calendarWeatherByDate[nextDayYmd]
+                                    const nextDayRainLevel = nextDayWeather
+                                        ? classifyDayPrecipitation(
+                                            nextDayWeather.shanghai || null,
+                                            nextDayWeather.busanGangseo || null,
+                                          )
+                                        : null
                                     const isGoodDeliveryDay =
                                         !isPast &&
                                         dayCell.isCurrentMonth &&
                                         !rainLevel &&
+                                        !nextDayRainLevel &&
                                         !chineseHolidayName &&
                                         dayOfWeek !== 0 &&
                                         dayOfWeek !== 5 &&
                                         dayOfWeek !== 6
-                                    const cellTooltip = chineseHolidayName
-                                        ? `${monthPriceTooltip} · 중국 공휴일: ${chineseHolidayName}`
-                                        : monthPriceTooltip
+                                    const cellTooltip = (() => {
+                                        const parts = [monthPriceTooltip]
+                                        if (chineseHolidayName) parts.push(`중국 공휴일: ${chineseHolidayName}`)
+                                        if (nextDayRainLevel) parts.push(`다음날 ${nextDayRainLevel === 'heavy' ? '강한 비' : '비'} 예보`)
+                                        return parts.join(' · ')
+                                    })()
                                     return (
                                         <button
                                             key={ymd}
