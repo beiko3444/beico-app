@@ -53,10 +53,14 @@ export async function POST(request: Request) {
         )
     }
 
+    const url = new URL(request.url)
+    const debug = url.searchParams.get('debug') === '1' || process.env.NODE_ENV !== 'production'
+
     try {
         const body = await request.json().catch(() => ({}))
         const orderId = typeof body?.orderId === 'string' ? body.orderId.trim() : ''
         const targetDateInput = typeof body?.targetDate === 'string' ? body.targetDate.trim() : ''
+        const transactionIdInput = typeof body?.transactionId === 'string' ? body.transactionId.trim() : ''
 
         if (!orderId || !isUuid(orderId)) {
             return NextResponse.json({ error: '유효한 발주 ID를 전달해 주세요.' }, { status: 400 })
@@ -84,6 +88,7 @@ export async function POST(request: Request) {
             loginPassword: moinPassword,
             targetDate,
             recipientHint: TARGET_RECIPIENT_HINT,
+            targetTransactionId: transactionIdInput || null,
             headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
         })
 
@@ -91,10 +96,11 @@ export async function POST(request: Request) {
             return NextResponse.json(
                 {
                     ok: false,
-                    error: '일치하는 송금 내역을 찾지 못했습니다. 모인 비즈플러스에서 직접 내역을 확인해 주세요.',
+                    error: '일치하는 송금 내역을 자동으로 찾지 못했습니다. 아래 후보에서 직접 선택하거나 직접 입력 버튼으로 등록해 주세요.',
                     items: result.items,
-                    steps: result.steps,
-                    diagnostic: result.diagnostic,
+                    steps: debug ? result.steps : undefined,
+                    diagnostic: debug ? result.diagnostic : undefined,
+                    matchStrategy: result.matchStrategy,
                 },
                 { status: 404 },
             )
@@ -186,7 +192,8 @@ export async function POST(request: Request) {
             message: '모인 거래내역에서 송금 정보를 가져와 저장했습니다.',
             savedOrder: updated,
             matched: result.matched,
-            steps: result.steps,
+            matchStrategy: result.matchStrategy,
+            steps: debug ? result.steps : undefined,
         })
     } catch (error) {
         if (error instanceof MoinAutomationCanceledError) {

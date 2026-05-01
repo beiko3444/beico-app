@@ -232,6 +232,19 @@ type WormOrderListItem = {
     updatedAt: string
 }
 
+type RemittanceCandidate = {
+    transactionId?: string | null
+    detailUrl?: string
+    dateText?: string
+    recipient?: string
+    amountUsdText?: string
+    sendAmountKrwText?: string
+    totalFeeKrwText?: string
+    exchangeRateText?: string
+    statusText?: string
+    appliedAtIso?: string | null
+}
+
 type WormForwardLogItem = {
     id: string
     orderId: string | null
@@ -1603,6 +1616,10 @@ export default function WormOrderPage() {
     const [wormOrderListError, setWormOrderListError] = useState('')
     const [deletingWormOrderId, setDeletingWormOrderId] = useState<string | null>(null)
     const [importingWormOrderId, setImportingWormOrderId] = useState<string | null>(null)
+    const [remittanceCandidates, setRemittanceCandidates] = useState<RemittanceCandidate[] | null>(null)
+    const [remittanceCandidatesOrder, setRemittanceCandidatesOrder] = useState<WormOrderListItem | null>(null)
+    const [remittanceCandidatePicking, setRemittanceCandidatePicking] = useState<string | null>(null)
+    const [remittanceCandidateError, setRemittanceCandidateError] = useState('')
     const [manualRemittanceOrder, setManualRemittanceOrder] = useState<WormOrderListItem | null>(null)
     const [manualRemittanceForm, setManualRemittanceForm] = useState({
         appliedAt: '',
@@ -2335,10 +2352,15 @@ export default function WormOrderPage() {
             })
             const result = await response.json().catch(() => null)
             if (!response.ok || !result?.ok) {
-                const candidateCount = Array.isArray(result?.items) ? result.items.length : 0
+                const items: RemittanceCandidate[] = Array.isArray(result?.items) ? result.items : []
+                if (items.length > 0) {
+                    setRemittanceCandidates(items.slice(0, 12))
+                    setRemittanceCandidatesOrder(order)
+                    setRemittanceCandidateError('')
+                    return
+                }
                 const baseMsg = typeof result?.error === 'string' ? result.error : '송금 정보 가져오기에 실패했습니다.'
-                const detail = candidateCount > 0 ? ` (최근 거래 ${candidateCount}건 검색 완료)` : ''
-                throw new Error(`${baseMsg}${detail}`)
+                throw new Error(baseMsg)
             }
             await fetchWormOrders()
             alert(result?.message || '송금 정보를 가져와 저장했습니다.')
@@ -2348,6 +2370,41 @@ export default function WormOrderPage() {
             setImportingWormOrderId(null)
         }
     }, [fetchWormOrders])
+
+    const handlePickRemittanceCandidate = useCallback(async (candidate: RemittanceCandidate) => {
+        const order = remittanceCandidatesOrder
+        if (!order) return
+        const transactionId = candidate.transactionId
+        if (!transactionId) {
+            setRemittanceCandidateError('이 후보는 거래 ID가 없어서 자동으로 가져올 수 없습니다. 직접 입력으로 저장해 주세요.')
+            return
+        }
+        setRemittanceCandidateError('')
+        setRemittanceCandidatePicking(transactionId)
+        try {
+            const response = await fetch('/api/admin/worm-order/remittance/history-import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    transactionId,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok || !result?.ok) {
+                const baseMsg = typeof result?.error === 'string' ? result.error : '선택한 거래에서 정보를 가져오지 못했습니다.'
+                throw new Error(baseMsg)
+            }
+            setRemittanceCandidates(null)
+            setRemittanceCandidatesOrder(null)
+            await fetchWormOrders()
+            alert(result?.message || '송금 정보를 가져와 저장했습니다.')
+        } catch (error) {
+            setRemittanceCandidateError(error instanceof Error ? error.message : '선택한 거래 가져오기에 실패했습니다.')
+        } finally {
+            setRemittanceCandidatePicking(null)
+        }
+    }, [remittanceCandidatesOrder, fetchWormOrders])
 
     const openManualRemittanceModal = useCallback((order: WormOrderListItem) => {
         const initialAppliedAt = (() => {
@@ -5844,6 +5901,104 @@ export default function WormOrderPage() {
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {remittanceCandidates && remittanceCandidatesOrder && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => {
+                        if (remittanceCandidatePicking) return
+                        setRemittanceCandidates(null)
+                        setRemittanceCandidatesOrder(null)
+                        setRemittanceCandidateError('')
+                    }}
+                >
+                    <div
+                        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[85vh] flex flex-col"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">모인 거래내역에서 직접 선택</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {remittanceCandidatesOrder.orderNumber} · 자동 매칭이 어려워 후보를 보여드립니다. 발주에 해당하는 거래를 클릭해 주세요.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (remittanceCandidatePicking) return
+                                    setRemittanceCandidates(null)
+                                    setRemittanceCandidatesOrder(null)
+                                    setRemittanceCandidateError('')
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
+                                aria-label="닫기"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 space-y-2 overflow-y-auto">
+                            {remittanceCandidates.map((candidate, index) => {
+                                const tid = candidate.transactionId || ''
+                                const isPicking = remittanceCandidatePicking === tid
+                                const disabled = !tid || Boolean(remittanceCandidatePicking)
+                                return (
+                                    <button
+                                        key={tid || `candidate-${index}`}
+                                        type="button"
+                                        onClick={() => { void handlePickRemittanceCandidate(candidate) }}
+                                        disabled={disabled}
+                                        className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-sky-300 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                                <span>{candidate.dateText || '날짜 미상'}</span>
+                                                {candidate.statusText && (
+                                                    <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                                        {candidate.statusText}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-600 mt-0.5 truncate">
+                                                {candidate.recipient || '수취인 미상'}
+                                            </p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                {[candidate.amountUsdText, candidate.sendAmountKrwText, candidate.totalFeeKrwText, candidate.exchangeRateText]
+                                                    .filter(Boolean).join(' · ') || '금액 정보 없음'}
+                                            </p>
+                                        </div>
+                                        {isPicking ? (
+                                            <Loader2 size={16} className="animate-spin text-sky-600 shrink-0" />
+                                        ) : (
+                                            <ArrowRight size={16} className="text-slate-400 shrink-0" />
+                                        )}
+                                    </button>
+                                )
+                            })}
+                            {remittanceCandidateError && (
+                                <p className="text-xs font-semibold text-rose-600 mt-2">{remittanceCandidateError}</p>
+                            )}
+                        </div>
+                        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                            <span>거래 ID 가 없는 후보는 클릭할 수 없습니다 — 직접 입력으로 저장해 주세요.</span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (remittanceCandidatePicking) return
+                                    setRemittanceCandidates(null)
+                                    setRemittanceCandidatesOrder(null)
+                                    setRemittanceCandidateError('')
+                                    if (remittanceCandidatesOrder) openManualRemittanceModal(remittanceCandidatesOrder)
+                                }}
+                                disabled={Boolean(remittanceCandidatePicking)}
+                                className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                                직접 입력으로 전환
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

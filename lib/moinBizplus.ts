@@ -58,6 +58,15 @@ type BrowserContextLike = {
     newPage: () => Promise<PageLike>
 }
 
+type ResponseLike = {
+    url: () => string
+    status: () => number
+    headers: () => Record<string, string>
+    request: () => { method: () => string }
+    json: () => Promise<unknown>
+    text: () => Promise<string>
+}
+
 type PageLike = {
     goto: (url: string, options?: Record<string, unknown>) => Promise<void>
     url: () => string
@@ -70,6 +79,8 @@ type PageLike = {
     waitForTimeout: (ms: number) => Promise<void>
     content: () => Promise<string>
     evaluate: (fn: string | ((...args: unknown[]) => unknown), ...args: unknown[]) => Promise<unknown>
+    on: (event: 'response', handler: (response: ResponseLike) => void) => void
+    off?: (event: 'response', handler: (response: ResponseLike) => void) => void
 }
 
 type LocatorLike = {
@@ -1255,6 +1266,12 @@ export type MoinHistoryItem = {
     recipient: string
     amountUsdText: string
     statusText: string
+    transactionId?: string | null
+    sendAmountKrwText?: string
+    totalFeeKrwText?: string
+    exchangeRateText?: string
+    appliedAtIso?: string | null
+    rawTransaction?: Record<string, unknown> | null
 }
 
 export type MoinHistoryFetchInput = {
@@ -1262,6 +1279,7 @@ export type MoinHistoryFetchInput = {
     loginPassword: string
     targetDate?: string | null
     recipientHint?: string | null
+    targetTransactionId?: string | null
     headless?: boolean
     abortSignal?: AbortSignal
 }
@@ -1273,11 +1291,14 @@ export type MoinHistoryFetchResult = {
     matchedSummary: MoinRemittancePricingSummary | null
     matchedAppliedAtIso: string | null
     matchedDetailBodyText: string | null
+    matchStrategy: 'api' | 'dom' | null
     diagnostic: {
         listUrl: string
         bodyTextPreview: string
         anchorHrefs: string[]
         clickableTextSamples: string[]
+        capturedResponseUrls?: string[]
+        largestResponseSnippet?: string
     } | null
 }
 
@@ -1479,6 +1500,205 @@ const matchHistoryItem = (
     return scored.length > 0 ? scored[0].item : null
 }
 
+type CapturedJsonResponse = {
+    url: string
+    json: unknown
+}
+
+const isMoinHostUrl = (url: string) =>
+    /(?:^https?:\/\/)?(?:[a-z0-9-]+\.)*(?:moinbizplus\.com|themoin\.com)\b/i.test(url)
+
+const findArrayInObject = (
+    value: unknown,
+    pathSoFar: string,
+    depth: number,
+): Array<{ path: string; array: unknown[] }> => {
+    if (depth > 4) return []
+    if (Array.isArray(value)) {
+        return [{ path: pathSoFar || '<root>', array: value }]
+    }
+    if (!value || typeof value !== 'object') return []
+    const collected: Array<{ path: string; array: unknown[] }> = []
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        const nextPath = pathSoFar ? `${pathSoFar}.${key}` : key
+        collected.push(...findArrayInObject(child, nextPath, depth + 1))
+    }
+    return collected
+}
+
+const TX_DATE_KEY_HINTS = ['date', 'at', 'time', 'created', 'apply', 'requested', 'transfer', 'completed', 'submitted']
+const TX_AMOUNT_KEY_HINTS = ['amount', 'krw', 'usd', 'fee', 'rate', 'send', 'receive', 'total']
+const TX_ID_KEY_HINTS = ['id', 'no', 'number', 'transactionid', 'transferid', 'historyid']
+
+const objectHasHints = (obj: Record<string, unknown>) => {
+    const lowerKeys = Object.keys(obj).map((k) => k.toLowerCase())
+    let dateScore = 0
+    let amountScore = 0
+    let idScore = 0
+    for (const key of lowerKeys) {
+        if (TX_DATE_KEY_HINTS.some((hint) => key.includes(hint))) dateScore += 1
+        if (TX_AMOUNT_KEY_HINTS.some((hint) => key.includes(hint))) amountScore += 1
+        if (TX_ID_KEY_HINTS.some((hint) => key.includes(hint))) idScore += 1
+    }
+    return { dateScore, amountScore, idScore }
+}
+
+const looksLikeTransactionArray = (arr: unknown[]) => {
+    if (arr.length === 0 || arr.length > 500) return false
+    const sample = arr[0]
+    if (!sample || typeof sample !== 'object' || Array.isArray(sample)) return false
+    const { dateScore, amountScore, idScore } = objectHasHints(sample as Record<string, unknown>)
+    const signals = (dateScore > 0 ? 1 : 0) + (amountScore > 0 ? 1 : 0) + (idScore > 0 ? 1 : 0)
+    return signals >= 2
+}
+
+const extractTransactionsFromCapturedResponses = (
+    responses: CapturedJsonResponse[],
+): { array: Record<string, unknown>[]; sourceUrl: string; sourcePath: string } | null => {
+    let best: { array: Record<string, unknown>[]; sourceUrl: string; sourcePath: string; score: number } | null = null
+    for (const response of responses) {
+        const found = findArrayInObject(response.json, '', 0)
+        for (const candidate of found) {
+            if (!looksLikeTransactionArray(candidate.array)) continue
+            const sample = candidate.array[0] as Record<string, unknown>
+            const { dateScore, amountScore, idScore } = objectHasHints(sample)
+            const score = candidate.array.length + dateScore * 10 + amountScore * 10 + idScore * 5
+            if (!best || score > best.score) {
+                best = {
+                    array: candidate.array as Record<string, unknown>[],
+                    sourceUrl: response.url,
+                    sourcePath: candidate.path,
+                    score,
+                }
+            }
+        }
+    }
+    if (!best) return null
+    return { array: best.array, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
+}
+
+const findValueByKeyHints = (
+    obj: Record<string, unknown>,
+    hints: string[],
+    excludeHints: string[] = [],
+): unknown => {
+    const lowerEntries = Object.entries(obj).map(([key, value]) => ({ key, lowerKey: key.toLowerCase(), value }))
+    const matched = lowerEntries.find((entry) =>
+        hints.some((hint) => entry.lowerKey.includes(hint)) &&
+        !excludeHints.some((hint) => entry.lowerKey.includes(hint)),
+    )
+    return matched?.value
+}
+
+const stringifyValue = (value: unknown): string => {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'boolean') return String(value)
+    return ''
+}
+
+const formatDateValueToYmd = (value: unknown): string => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+    const isoLike = raw.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/)
+    if (isoLike) {
+        const [, y, m, d] = isoLike
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) {
+        const offsetMs = parsed.getTimezoneOffset() * 60000
+        const local = new Date(parsed.getTime() - offsetMs)
+        return local.toISOString().slice(0, 10)
+    }
+    return ''
+}
+
+const formatDateValueToIso = (value: unknown): string | null => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return null
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString()
+    return null
+}
+
+const formatNumberWithCurrency = (value: unknown, currency: 'USD' | 'KRW'): string => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return ''
+    const cleaned = raw.replace(/[^\d.\-]/g, '')
+    if (!cleaned) return ''
+    const numeric = Number(cleaned)
+    if (!Number.isFinite(numeric)) return ''
+    const formatted = currency === 'USD'
+        ? numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : numeric.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    return `${formatted} ${currency}`
+}
+
+const formatExchangeRateValue = (value: unknown): string => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return ''
+    const cleaned = raw.replace(/[^\d.\-]/g, '')
+    if (!cleaned) return ''
+    const numeric = Number(cleaned)
+    if (!Number.isFinite(numeric) || numeric <= 0) return ''
+    return `1 USD = ${numeric.toLocaleString('en-US', { maximumFractionDigits: 4 })} KRW`
+}
+
+const normalizeMoinTransaction = (raw: Record<string, unknown>): MoinHistoryItem => {
+    const idValue = findValueByKeyHints(raw, ['transactionid', 'transferid', 'historyid', 'orderid', 'id', 'transactionno', 'transferno', 'no'])
+    const transactionId = stringifyValue(idValue) || null
+
+    const dateValue = findValueByKeyHints(raw, ['applieddate', 'appliedat', 'requesteddate', 'requestedat', 'transferdate', 'transferat', 'createdat', 'createddate', 'date', 'submitted', 'completedat', 'completeddate'])
+    const dateText = formatDateValueToYmd(dateValue)
+    const appliedAtIso = formatDateValueToIso(dateValue)
+
+    const recipientValue = findValueByKeyHints(raw, ['recipient', 'beneficiary', 'receivername', 'receiver', 'partnername', 'companyname'], ['country', 'phone', 'email', 'address'])
+        ?? findValueByKeyHints(raw, ['name'], ['file', 'event', 'method', 'status', 'product', 'sender', 'currency'])
+    const recipient = stringifyValue(recipientValue).trim()
+
+    const usdValue = findValueByKeyHints(raw, ['usd', 'receiveamount', 'receivingamount', 'beneficiaryamount', 'destamount', 'finalamount'], ['krw'])
+    const amountUsdText = formatNumberWithCurrency(usdValue, 'USD')
+
+    const krwValue = findValueByKeyHints(raw, ['sendamount', 'krw', 'sourceamount', 'totalamount', 'amount'], ['usd', 'fee', 'rate'])
+    const sendAmountKrwText = formatNumberWithCurrency(krwValue, 'KRW')
+
+    const feeValue = findValueByKeyHints(raw, ['fee', 'commission'])
+    const totalFeeKrwText = formatNumberWithCurrency(feeValue, 'KRW')
+
+    const rateValue = findValueByKeyHints(raw, ['rate', 'exchange'])
+    const exchangeRateText = formatExchangeRateValue(rateValue)
+
+    const statusValue = findValueByKeyHints(raw, ['status', 'state'])
+    const statusText = stringifyValue(statusValue).trim()
+
+    return {
+        detailUrl: transactionId
+            ? `https://www.moinbizplus.com/history/${transactionId}`
+            : 'https://www.moinbizplus.com/history/individual',
+        rowText: JSON.stringify(raw).slice(0, 400),
+        dateText,
+        recipient,
+        amountUsdText,
+        statusText,
+        transactionId,
+        sendAmountKrwText,
+        totalFeeKrwText,
+        exchangeRateText,
+        appliedAtIso,
+        rawTransaction: raw,
+    }
+}
+
+const summaryFromMoinHistoryItem = (item: MoinHistoryItem): MoinRemittancePricingSummary => ({
+    finalReceiveAmount: item.amountUsdText || '',
+    sendAmount: item.sendAmountKrwText || '',
+    totalFee: item.totalFeeKrwText || '',
+    exchangeRate: item.exchangeRateText || '',
+})
+
 export const fetchMoinRemittanceHistory = async (
     input: MoinHistoryFetchInput,
 ): Promise<MoinHistoryFetchResult> => {
@@ -1486,6 +1706,9 @@ export const fetchMoinRemittanceHistory = async (
     const steps: string[] = []
     const abortSignal = input.abortSignal
     let abortListenerCleanup: (() => void) | null = null
+
+    const capturedResponses: CapturedJsonResponse[] = []
+    let responseHandler: ((response: ResponseLike) => void) | null = null
 
     try {
         throwIfAbortRequested(abortSignal, 'Launch browser')
@@ -1508,10 +1731,35 @@ export const fetchMoinRemittanceHistory = async (
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
+        responseHandler = (response: ResponseLike) => {
+            try {
+                const url = response.url()
+                if (!isMoinHostUrl(url)) return
+                const method = response.request().method()
+                if (method === 'OPTIONS') return
+                const status = response.status()
+                if (status < 200 || status >= 400) return
+                const headers = response.headers()
+                const contentType = headers['content-type'] || headers['Content-Type'] || ''
+                if (!contentType.toLowerCase().includes('json')) return
+                void response.json().then((json) => {
+                    capturedResponses.push({ url, json })
+                }).catch(() => undefined)
+            } catch {
+                // Ignore listener errors — must not block navigation.
+            }
+        }
+        page.on('response', responseHandler)
+
         await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
 
+        const targetTransactionId = input.targetTransactionId?.trim() || null
+
         throwIfAbortRequested(abortSignal, 'Open history page')
-        await page.goto('https://www.moinbizplus.com/history/individual', {
+        const initialHistoryUrl = targetTransactionId
+            ? `https://www.moinbizplus.com/history/${targetTransactionId}`
+            : 'https://www.moinbizplus.com/history/individual'
+        await page.goto(initialHistoryUrl, {
             waitUntil: 'domcontentloaded',
             timeout: LONG_TIMEOUT_MS,
         }).catch(async () => {
@@ -1521,66 +1769,183 @@ export const fetchMoinRemittanceHistory = async (
             })
         })
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-        await page.waitForTimeout(2000)
+        await page.waitForTimeout(2500)
         steps.push(`history-page-url:${page.url()}`)
+        steps.push(`captured-responses-count:${capturedResponses.length}`)
 
-        const items = await inspectHistoryListItems(page)
-        steps.push(`history-items-count:${items.length}`)
-
-        const matched = matchHistoryItem(items, input.targetDate || null, input.recipientHint || null)
-        if (!matched) {
-            steps.push('history-no-match')
-            const diagnosticRaw = await inspectHistoryListDiagnostic(page)
-            const diagnostic = diagnosticRaw && typeof diagnosticRaw === 'object'
-                ? {
-                    listUrl: typeof diagnosticRaw.listUrl === 'string' ? diagnosticRaw.listUrl : page.url(),
-                    bodyTextPreview: typeof diagnosticRaw.bodyTextPreview === 'string' ? diagnosticRaw.bodyTextPreview : '',
-                    anchorHrefs: Array.isArray(diagnosticRaw.anchorHrefs) ? diagnosticRaw.anchorHrefs : [],
-                    clickableTextSamples: Array.isArray(diagnosticRaw.clickableTextSamples) ? diagnosticRaw.clickableTextSamples : [],
-                }
-                : null
-            return {
-                steps,
-                items,
-                matched: null,
-                matchedSummary: null,
-                matchedAppliedAtIso: null,
-                matchedDetailBodyText: null,
-                diagnostic,
+        // ---------- API-first path ----------
+        const transactionExtraction = extractTransactionsFromCapturedResponses(capturedResponses)
+        const apiItems: MoinHistoryItem[] = []
+        if (transactionExtraction) {
+            steps.push(`captured-tx-array-key:${transactionExtraction.sourcePath}`)
+            steps.push(`captured-tx-count:${transactionExtraction.array.length}`)
+            for (const raw of transactionExtraction.array) {
+                if (!raw || typeof raw !== 'object') continue
+                apiItems.push(normalizeMoinTransaction(raw as Record<string, unknown>))
             }
         }
-        steps.push(`history-matched:${matched.detailUrl}`)
 
-        await page.goto(matched.detailUrl, {
-            waitUntil: 'domcontentloaded',
-            timeout: LONG_TIMEOUT_MS,
-        })
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-        await page.waitForTimeout(1500)
-        steps.push(`history-detail-url:${page.url()}`)
-
-        const summary = await inspectRemittancePricingSummary(page)
-        steps.push(`history-summary:${JSON.stringify(summary).slice(0, 220)}`)
-
-        const appliedAtIso = await inspectHistoryDetailAppliedAt(page)
-        if (appliedAtIso) steps.push(`history-applied-at:${appliedAtIso}`)
-
+        let matched: MoinHistoryItem | null = null
+        let matchStrategy: 'api' | 'dom' | null = null
+        let summary: MoinRemittancePricingSummary | null = null
+        let appliedAtIso: string | null = null
         let detailBodyText: string | null = null
-        try {
-            const detailText = (await page.locator('body').textContent().catch(() => '')) || ''
-            detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
-        } catch {
-            detailBodyText = null
+
+        if (targetTransactionId) {
+            matched = apiItems.find((item) => item.transactionId === targetTransactionId)
+                || {
+                    detailUrl: `https://www.moinbizplus.com/history/${targetTransactionId}`,
+                    rowText: '',
+                    dateText: '',
+                    recipient: input.recipientHint || '',
+                    amountUsdText: '',
+                    statusText: '',
+                    transactionId: targetTransactionId,
+                }
+            matchStrategy = 'api'
+            steps.push('targeted-transaction-id-mode')
+        } else if (apiItems.length > 0) {
+            matched = matchHistoryItem(apiItems, input.targetDate || null, input.recipientHint || null)
+            if (matched) {
+                matchStrategy = 'api'
+                steps.push(`api-matched:${matched.transactionId || matched.detailUrl}`)
+            }
         }
+
+        if (matched && matchStrategy === 'api') {
+            summary = summaryFromMoinHistoryItem(matched)
+            appliedAtIso = matched.appliedAtIso || null
+
+            const summaryComplete = Boolean(summary.finalReceiveAmount && summary.sendAmount && summary.totalFee && summary.exchangeRate)
+            if (!summaryComplete && matched.transactionId) {
+                steps.push('api-summary-incomplete-fetching-detail')
+                throwIfAbortRequested(abortSignal, 'Fetch detail')
+                const beforeCount = capturedResponses.length
+                await page.goto(matched.detailUrl, {
+                    waitUntil: 'domcontentloaded',
+                    timeout: LONG_TIMEOUT_MS,
+                }).catch(() => undefined)
+                await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+                await page.waitForTimeout(1500)
+                steps.push(`history-detail-url:${page.url()}`)
+                const detailResponses = capturedResponses.slice(beforeCount)
+                const detailTxExtraction = extractTransactionsFromCapturedResponses(detailResponses)
+                if (detailTxExtraction && detailTxExtraction.array.length > 0) {
+                    const detailRaw = detailTxExtraction.array[0]
+                    const detailItem = normalizeMoinTransaction(detailRaw as Record<string, unknown>)
+                    summary = summaryFromMoinHistoryItem(detailItem)
+                    appliedAtIso = detailItem.appliedAtIso || appliedAtIso
+                    matched = { ...matched, ...detailItem }
+                } else {
+                    // Try DOM extraction on detail page as last resort.
+                    const domSummary = await inspectRemittancePricingSummary(page)
+                    if (domSummary.finalReceiveAmount || domSummary.sendAmount) {
+                        summary = domSummary
+                        steps.push('detail-summary-via-dom')
+                    }
+                    if (!appliedAtIso) {
+                        const fallbackAppliedAt = await inspectHistoryDetailAppliedAt(page)
+                        if (fallbackAppliedAt) appliedAtIso = fallbackAppliedAt
+                    }
+                }
+
+                try {
+                    const detailText = (await page.locator('body').textContent().catch(() => '')) || ''
+                    detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
+                } catch {
+                    detailBodyText = null
+                }
+            }
+
+            steps.push('tx-match-strategy:api')
+            return {
+                steps,
+                items: apiItems,
+                matched,
+                matchedSummary: summary,
+                matchedAppliedAtIso: appliedAtIso,
+                matchedDetailBodyText: detailBodyText,
+                matchStrategy: 'api',
+                diagnostic: null,
+            }
+        }
+
+        // ---------- DOM fallback path ----------
+        steps.push('falling-back-to-dom')
+        const domItems = await inspectHistoryListItems(page)
+        steps.push(`dom-items-count:${domItems.length}`)
+        const combinedItems = apiItems.length > 0 ? apiItems : domItems
+        const domMatched = matchHistoryItem(domItems, input.targetDate || null, input.recipientHint || null)
+
+        if (domMatched) {
+            matchStrategy = 'dom'
+            steps.push(`dom-matched:${domMatched.detailUrl}`)
+            await page.goto(domMatched.detailUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: LONG_TIMEOUT_MS,
+            }).catch(() => undefined)
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+            await page.waitForTimeout(1500)
+            steps.push(`history-detail-url:${page.url()}`)
+
+            summary = await inspectRemittancePricingSummary(page)
+            steps.push(`history-summary:${JSON.stringify(summary).slice(0, 220)}`)
+            appliedAtIso = await inspectHistoryDetailAppliedAt(page)
+            if (appliedAtIso) steps.push(`history-applied-at:${appliedAtIso}`)
+
+            try {
+                const detailText = (await page.locator('body').textContent().catch(() => '')) || ''
+                detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
+            } catch {
+                detailBodyText = null
+            }
+
+            steps.push('tx-match-strategy:dom')
+            return {
+                steps,
+                items: combinedItems,
+                matched: domMatched,
+                matchedSummary: summary,
+                matchedAppliedAtIso: appliedAtIso,
+                matchedDetailBodyText: detailBodyText,
+                matchStrategy: 'dom',
+                diagnostic: null,
+            }
+        }
+
+        // ---------- No match: build diagnostic ----------
+        steps.push('history-no-match')
+        const diagnosticRaw = await inspectHistoryListDiagnostic(page)
+        const baseDiagnostic = diagnosticRaw && typeof diagnosticRaw === 'object'
+            ? {
+                listUrl: typeof diagnosticRaw.listUrl === 'string' ? diagnosticRaw.listUrl : page.url(),
+                bodyTextPreview: typeof diagnosticRaw.bodyTextPreview === 'string' ? diagnosticRaw.bodyTextPreview : '',
+                anchorHrefs: Array.isArray(diagnosticRaw.anchorHrefs) ? diagnosticRaw.anchorHrefs : [],
+                clickableTextSamples: Array.isArray(diagnosticRaw.clickableTextSamples) ? diagnosticRaw.clickableTextSamples : [],
+            }
+            : { listUrl: page.url(), bodyTextPreview: '', anchorHrefs: [], clickableTextSamples: [] }
+
+        const capturedResponseUrls = capturedResponses.slice(-30).map((r) => r.url)
+        const largest = capturedResponses.reduce<CapturedJsonResponse | null>((acc, current) => {
+            const accLen = acc ? JSON.stringify(acc.json).length : 0
+            const currentLen = JSON.stringify(current.json).length
+            return currentLen > accLen ? current : acc
+        }, null)
+        const largestResponseSnippet = largest ? JSON.stringify(largest.json).slice(0, 1024) : ''
 
         return {
             steps,
-            items,
-            matched,
-            matchedSummary: summary,
-            matchedAppliedAtIso: appliedAtIso,
-            matchedDetailBodyText: detailBodyText,
-            diagnostic: null,
+            items: combinedItems,
+            matched: null,
+            matchedSummary: null,
+            matchedAppliedAtIso: null,
+            matchedDetailBodyText: null,
+            matchStrategy: null,
+            diagnostic: {
+                ...baseDiagnostic,
+                capturedResponseUrls,
+                largestResponseSnippet,
+            },
         }
     } finally {
         abortListenerCleanup?.()
