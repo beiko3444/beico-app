@@ -744,6 +744,79 @@ function getChineseHolidayShortLabel(fullName: string): string {
     return compact
 }
 
+const KOREAN_PUBLIC_HOLIDAYS: Record<string, string> = {
+    // 2025
+    '2025-01-01': '신정',
+    '2025-01-27': '임시공휴일',
+    '2025-01-28': '설날 연휴',
+    '2025-01-29': '설날',
+    '2025-01-30': '설날 연휴',
+    '2025-03-01': '삼일절',
+    '2025-03-03': '대체공휴일 (삼일절)',
+    '2025-05-05': '어린이날·부처님오신날',
+    '2025-05-06': '대체공휴일',
+    '2025-06-06': '현충일',
+    '2025-08-15': '광복절',
+    '2025-10-03': '개천절',
+    '2025-10-05': '추석 연휴',
+    '2025-10-06': '추석',
+    '2025-10-07': '추석 연휴',
+    '2025-10-08': '대체공휴일 (추석)',
+    '2025-10-09': '한글날',
+    '2025-12-25': '성탄절',
+    // 2026
+    '2026-01-01': '신정',
+    '2026-02-16': '설날 연휴',
+    '2026-02-17': '설날',
+    '2026-02-18': '설날 연휴',
+    '2026-03-01': '삼일절',
+    '2026-03-02': '대체공휴일 (삼일절)',
+    '2026-05-05': '어린이날',
+    '2026-05-24': '부처님오신날',
+    '2026-05-25': '대체공휴일 (부처님오신날)',
+    '2026-06-06': '현충일',
+    '2026-08-15': '광복절',
+    '2026-08-17': '대체공휴일 (광복절)',
+    '2026-09-24': '추석 연휴',
+    '2026-09-25': '추석',
+    '2026-09-26': '추석 연휴',
+    '2026-09-28': '대체공휴일 (추석)',
+    '2026-10-03': '개천절',
+    '2026-10-05': '대체공휴일 (개천절)',
+    '2026-10-09': '한글날',
+    '2026-12-25': '성탄절',
+    // 2027 (잠정)
+    '2027-01-01': '신정',
+    '2027-02-06': '설날 연휴',
+    '2027-02-07': '설날',
+    '2027-02-08': '설날 연휴',
+    '2027-03-01': '삼일절',
+    '2027-05-05': '어린이날',
+    '2027-05-13': '부처님오신날',
+    '2027-06-06': '현충일',
+    '2027-06-07': '대체공휴일 (현충일)',
+    '2027-08-15': '광복절',
+    '2027-08-16': '대체공휴일 (광복절)',
+    '2027-09-14': '추석 연휴',
+    '2027-09-15': '추석',
+    '2027-09-16': '추석 연휴',
+    '2027-10-03': '개천절',
+    '2027-10-04': '대체공휴일 (개천절)',
+    '2027-10-09': '한글날',
+    '2027-12-25': '성탄절',
+}
+
+function getKoreanHolidayName(ymd: string): string | null {
+    return KOREAN_PUBLIC_HOLIDAYS[ymd] || null
+}
+
+function getKoreanHolidayShortLabel(fullName: string): string {
+    const main = fullName.split(' (')[0]
+    const compact = main.replace('·', '/').replace(' 연휴', '')
+    if (compact.length > 5) return `${compact.slice(0, 4)}…`
+    return compact
+}
+
 function getCalendarWeekdayHeaderClass(dayOfWeek: number) {
     if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-500 dark:text-red-400'
     if (dayOfWeek === 5) return 'text-orange-500 dark:text-orange-400'
@@ -4155,8 +4228,10 @@ export default function WormOrderPage() {
                                     const rainBgClass = getCalendarRainBgClass(rainLevel)
                                     const dayOfWeek = dayCell.date.getDay()
                                     const chineseHolidayName = dayCell.isCurrentMonth ? getChineseHolidayName(ymd) : null
+                                    const koreanHolidayName = dayCell.isCurrentMonth ? getKoreanHolidayName(ymd) : null
+                                    const isPublicHoliday = Boolean(chineseHolidayName || koreanHolidayName)
                                     const dayOfWeekBgClass = !isSelected && dayCell.isCurrentMonth && !rainBgClass
-                                        ? (chineseHolidayName
+                                        ? (isPublicHoliday
                                             ? 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
                                             : getCalendarDayOfWeekBgClass(dayOfWeek))
                                         : ''
@@ -4176,12 +4251,13 @@ export default function WormOrderPage() {
                                         dayCell.isCurrentMonth &&
                                         !rainLevel &&
                                         !nextDayRainLevel &&
-                                        !chineseHolidayName &&
+                                        !isPublicHoliday &&
                                         dayOfWeek !== 0 &&
                                         dayOfWeek !== 5 &&
                                         dayOfWeek !== 6
                                     const cellTooltip = (() => {
                                         const parts = [monthPriceTooltip]
+                                        if (koreanHolidayName) parts.push(`한국 공휴일: ${koreanHolidayName}`)
                                         if (chineseHolidayName) parts.push(`중국 공휴일: ${chineseHolidayName}`)
                                         if (nextDayRainLevel) parts.push(`다음날 ${nextDayRainLevel === 'heavy' ? '강한 비' : '비'} 예보`)
                                         return parts.join(' · ')
@@ -4216,6 +4292,18 @@ export default function WormOrderPage() {
                                                     }`}>
                                                         {dayCell.date.getDate()}
                                                     </span>
+                                                    {koreanHolidayName && (
+                                                        <span
+                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
+                                                                isSelected
+                                                                    ? 'bg-white/20 text-white border border-white/30'
+                                                                    : 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800'
+                                                            }`}
+                                                            title={`한국 공휴일: ${koreanHolidayName}`}
+                                                        >
+                                                            {getKoreanHolidayShortLabel(koreanHolidayName)}
+                                                        </span>
+                                                    )}
                                                     {chineseHolidayName && (
                                                         <span
                                                             className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
