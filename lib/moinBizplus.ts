@@ -1577,6 +1577,79 @@ const extractTransactionsFromCapturedResponses = (
     return { array: best.array, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
 }
 
+const findObjectsInJson = (
+    value: unknown,
+    pathSoFar: string,
+    depth: number,
+): Array<{ path: string; obj: Record<string, unknown> }> => {
+    if (depth > 4) return []
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+    const collected: Array<{ path: string; obj: Record<string, unknown> }> = [
+        { path: pathSoFar || '<root>', obj: value as Record<string, unknown> },
+    ]
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        if (child && typeof child === 'object' && !Array.isArray(child)) {
+            const nextPath = pathSoFar ? `${pathSoFar}.${key}` : key
+            collected.push(...findObjectsInJson(child, nextPath, depth + 1))
+        }
+    }
+    return collected
+}
+
+const looksLikeSingleTransactionObject = (obj: Record<string, unknown>): number => {
+    const { dateScore, amountScore, idScore } = objectHasHints(obj)
+    const signals = (dateScore > 0 ? 1 : 0) + (amountScore > 0 ? 1 : 0) + (idScore > 0 ? 1 : 0)
+    if (signals < 2) return 0
+    return dateScore * 5 + amountScore * 10 + idScore * 3
+}
+
+const extractDetailObjectFromCapturedResponses = (
+    responses: CapturedJsonResponse[],
+    targetTransactionId?: string | null,
+): { obj: Record<string, unknown>; sourceUrl: string; sourcePath: string } | null => {
+    let best: { obj: Record<string, unknown>; sourceUrl: string; sourcePath: string; score: number } | null = null
+    for (const response of responses) {
+        const objects = findObjectsInJson(response.json, '', 0)
+        for (const candidate of objects) {
+            const baseScore = looksLikeSingleTransactionObject(candidate.obj)
+            if (baseScore === 0) continue
+            let score = baseScore
+            // Bonus if URL contains the transaction id
+            if (targetTransactionId && response.url.includes(targetTransactionId)) score += 50
+            // Bonus if object has a fee/rate field (detail pages usually have these)
+            const lowerKeys = Object.keys(candidate.obj).map((k) => k.toLowerCase())
+            if (lowerKeys.some((k) => k.includes('fee'))) score += 20
+            if (lowerKeys.some((k) => k.includes('rate') || k.includes('exchange'))) score += 20
+            if (lowerKeys.some((k) => k.includes('usd'))) score += 10
+            if (!best || score > best.score) {
+                best = {
+                    obj: candidate.obj,
+                    sourceUrl: response.url,
+                    sourcePath: candidate.path,
+                    score,
+                }
+            }
+        }
+    }
+    if (!best) return null
+    return { obj: best.obj, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
+}
+
+const mergeMoinHistoryItems = (base: MoinHistoryItem, detail: MoinHistoryItem): MoinHistoryItem => ({
+    ...base,
+    detailUrl: detail.detailUrl || base.detailUrl,
+    dateText: detail.dateText || base.dateText,
+    recipient: detail.recipient || base.recipient,
+    amountUsdText: detail.amountUsdText || base.amountUsdText,
+    statusText: detail.statusText || base.statusText,
+    transactionId: detail.transactionId || base.transactionId,
+    sendAmountKrwText: detail.sendAmountKrwText || base.sendAmountKrwText,
+    totalFeeKrwText: detail.totalFeeKrwText || base.totalFeeKrwText,
+    exchangeRateText: detail.exchangeRateText || base.exchangeRateText,
+    appliedAtIso: detail.appliedAtIso || base.appliedAtIso,
+    rawTransaction: detail.rawTransaction || base.rawTransaction,
+})
+
 const findValueByKeyHints = (
     obj: Record<string, unknown>,
     hints: string[],
@@ -1816,32 +1889,87 @@ export const fetchMoinRemittanceHistory = async (
             summary = summaryFromMoinHistoryItem(matched)
             appliedAtIso = matched.appliedAtIso || null
 
+            // Try to enrich from already-captured detail object (most common when targetTransactionId
+            // was set and we landed on /history/{id} directly).
+            if (matched.transactionId) {
+                const earlyDetail = extractDetailObjectFromCapturedResponses(
+                    capturedResponses,
+                    matched.transactionId,
+                )
+                if (earlyDetail) {
+                    steps.push(`early-detail-obj-source:${earlyDetail.sourcePath}`)
+                    const earlyItem = normalizeMoinTransaction(earlyDetail.obj)
+                    matched = mergeMoinHistoryItems(matched, earlyItem)
+                    summary = summaryFromMoinHistoryItem(matched)
+                    appliedAtIso = matched.appliedAtIso || appliedAtIso
+                }
+            }
+
             const summaryComplete = Boolean(summary.finalReceiveAmount && summary.sendAmount && summary.totalFee && summary.exchangeRate)
             if (!summaryComplete && matched.transactionId) {
                 steps.push('api-summary-incomplete-fetching-detail')
                 throwIfAbortRequested(abortSignal, 'Fetch detail')
                 const beforeCount = capturedResponses.length
-                await page.goto(matched.detailUrl, {
-                    waitUntil: 'domcontentloaded',
-                    timeout: LONG_TIMEOUT_MS,
-                }).catch(() => undefined)
-                await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-                await page.waitForTimeout(1500)
-                steps.push(`history-detail-url:${page.url()}`)
-                const detailResponses = capturedResponses.slice(beforeCount)
-                const detailTxExtraction = extractTransactionsFromCapturedResponses(detailResponses)
-                if (detailTxExtraction && detailTxExtraction.array.length > 0) {
-                    const detailRaw = detailTxExtraction.array[0]
-                    const detailItem = normalizeMoinTransaction(detailRaw as Record<string, unknown>)
-                    summary = summaryFromMoinHistoryItem(detailItem)
-                    appliedAtIso = detailItem.appliedAtIso || appliedAtIso
-                    matched = { ...matched, ...detailItem }
+                if (!page.url().includes(`/history/${matched.transactionId}`)) {
+                    await page.goto(matched.detailUrl, {
+                        waitUntil: 'domcontentloaded',
+                        timeout: LONG_TIMEOUT_MS,
+                    }).catch(() => undefined)
+                    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+                    await page.waitForTimeout(1500)
+                    steps.push(`history-detail-url:${page.url()}`)
                 } else {
-                    // Try DOM extraction on detail page as last resort.
+                    steps.push('detail-url-already-loaded')
+                    await page.waitForTimeout(1500)
+                }
+                const detailResponses = capturedResponses.slice(beforeCount)
+                steps.push(`detail-responses-count:${detailResponses.length}`)
+                const detailObjExtraction = extractDetailObjectFromCapturedResponses(
+                    detailResponses,
+                    matched.transactionId,
+                )
+                const detailTxExtraction = extractTransactionsFromCapturedResponses(detailResponses)
+                let detailItem: MoinHistoryItem | null = null
+                if (detailObjExtraction) {
+                    steps.push(`detail-obj-source:${detailObjExtraction.sourcePath}`)
+                    detailItem = normalizeMoinTransaction(detailObjExtraction.obj)
+                } else if (detailTxExtraction && detailTxExtraction.array.length > 0) {
+                    const preferred =
+                        detailTxExtraction.array.find((entry) => {
+                            if (!entry || typeof entry !== 'object') return false
+                            const idValue = findValueByKeyHints(entry as Record<string, unknown>, [
+                                'transactionid', 'transferid', 'historyid', 'orderid', 'id', 'no',
+                            ])
+                            return matched?.transactionId
+                                ? stringifyValue(idValue) === matched.transactionId
+                                : false
+                        }) || detailTxExtraction.array[0]
+                    if (preferred && typeof preferred === 'object') {
+                        detailItem = normalizeMoinTransaction(preferred as Record<string, unknown>)
+                    }
+                }
+
+                if (detailItem) {
+                    matched = mergeMoinHistoryItems(matched, detailItem)
+                    summary = summaryFromMoinHistoryItem(matched)
+                    appliedAtIso = matched.appliedAtIso || appliedAtIso
+                }
+
+                const stillIncomplete = !summary
+                    || !summary.finalReceiveAmount
+                    || !summary.sendAmount
+                    || !summary.totalFee
+                    || !summary.exchangeRate
+                if (stillIncomplete) {
                     const domSummary = await inspectRemittancePricingSummary(page)
-                    if (domSummary.finalReceiveAmount || domSummary.sendAmount) {
-                        summary = domSummary
+                    if (domSummary.finalReceiveAmount || domSummary.sendAmount || domSummary.totalFee || domSummary.exchangeRate) {
                         steps.push('detail-summary-via-dom')
+                        summary = {
+                            finalReceiveAmount: summary?.finalReceiveAmount || domSummary.finalReceiveAmount || '',
+                            sendAmount: summary?.sendAmount || domSummary.sendAmount || '',
+                            totalFee: summary?.totalFee || domSummary.totalFee || '',
+                            exchangeRate: summary?.exchangeRate || domSummary.exchangeRate || '',
+                        }
                     }
                     if (!appliedAtIso) {
                         const fallbackAppliedAt = await inspectHistoryDetailAppliedAt(page)
