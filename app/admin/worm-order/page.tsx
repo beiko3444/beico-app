@@ -641,6 +641,102 @@ function getCalendarDayOfWeekBgClass(dayOfWeek: number) {
     return ''
 }
 
+const CHINESE_PUBLIC_HOLIDAYS: Record<string, string> = {
+    // 2025
+    '2025-01-01': '원단 (元旦)',
+    '2025-01-28': '춘절 (除夕)',
+    '2025-01-29': '춘절 (春节)',
+    '2025-01-30': '춘절',
+    '2025-01-31': '춘절',
+    '2025-02-01': '춘절',
+    '2025-02-02': '춘절',
+    '2025-02-03': '춘절',
+    '2025-02-04': '춘절',
+    '2025-04-04': '청명절 (清明节)',
+    '2025-04-05': '청명절',
+    '2025-04-06': '청명절',
+    '2025-05-01': '노동절 (劳动节)',
+    '2025-05-02': '노동절',
+    '2025-05-03': '노동절',
+    '2025-05-04': '노동절',
+    '2025-05-05': '노동절',
+    '2025-05-31': '단오절 (端午节)',
+    '2025-06-01': '단오절',
+    '2025-06-02': '단오절',
+    '2025-10-01': '중추절·국경절 (中秋节·国庆节)',
+    '2025-10-02': '국경절',
+    '2025-10-03': '국경절',
+    '2025-10-04': '국경절',
+    '2025-10-05': '국경절',
+    '2025-10-06': '국경절',
+    '2025-10-07': '국경절',
+    '2025-10-08': '국경절',
+    // 2026
+    '2026-01-01': '원단 (元旦)',
+    '2026-02-16': '춘절 (除夕)',
+    '2026-02-17': '춘절 (春节)',
+    '2026-02-18': '춘절',
+    '2026-02-19': '춘절',
+    '2026-02-20': '춘절',
+    '2026-02-21': '춘절',
+    '2026-02-22': '춘절',
+    '2026-04-04': '청명절 (清明节)',
+    '2026-04-05': '청명절',
+    '2026-04-06': '청명절',
+    '2026-05-01': '노동절 (劳动节)',
+    '2026-05-02': '노동절',
+    '2026-05-03': '노동절',
+    '2026-05-04': '노동절',
+    '2026-05-05': '노동절',
+    '2026-06-19': '단오절 (端午节)',
+    '2026-06-20': '단오절',
+    '2026-06-21': '단오절',
+    '2026-09-25': '중추절 (中秋节)',
+    '2026-09-26': '중추절',
+    '2026-09-27': '중추절',
+    '2026-10-01': '국경절 (国庆节)',
+    '2026-10-02': '국경절',
+    '2026-10-03': '국경절',
+    '2026-10-04': '국경절',
+    '2026-10-05': '국경절',
+    '2026-10-06': '국경절',
+    '2026-10-07': '국경절',
+    // 2027 (잠정)
+    '2027-01-01': '원단 (元旦)',
+    '2027-02-06': '춘절 (除夕)',
+    '2027-02-07': '춘절 (春节)',
+    '2027-02-08': '춘절',
+    '2027-02-09': '춘절',
+    '2027-02-10': '춘절',
+    '2027-02-11': '춘절',
+    '2027-02-12': '춘절',
+    '2027-04-04': '청명절',
+    '2027-04-05': '청명절',
+    '2027-04-06': '청명절',
+    '2027-05-01': '노동절',
+    '2027-05-02': '노동절',
+    '2027-05-03': '노동절',
+    '2027-05-04': '노동절',
+    '2027-05-05': '노동절',
+    '2027-06-09': '단오절',
+    '2027-06-10': '단오절',
+    '2027-06-11': '단오절',
+    '2027-09-15': '중추절',
+    '2027-09-16': '중추절',
+    '2027-09-17': '중추절',
+    '2027-10-01': '국경절',
+    '2027-10-02': '국경절',
+    '2027-10-03': '국경절',
+    '2027-10-04': '국경절',
+    '2027-10-05': '국경절',
+    '2027-10-06': '국경절',
+    '2027-10-07': '국경절',
+}
+
+function getChineseHolidayName(ymd: string): string | null {
+    return CHINESE_PUBLIC_HOLIDAYS[ymd] || null
+}
+
 function getCalendarWeekdayHeaderClass(dayOfWeek: number) {
     if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-500 dark:text-red-400'
     if (dayOfWeek === 5) return 'text-orange-500 dark:text-orange-400'
@@ -4051,17 +4147,24 @@ export default function WormOrderPage() {
                                         : null
                                     const rainBgClass = getCalendarRainBgClass(rainLevel)
                                     const dayOfWeek = dayCell.date.getDay()
+                                    const chineseHolidayName = dayCell.isCurrentMonth ? getChineseHolidayName(ymd) : null
                                     const dayOfWeekBgClass = !isSelected && dayCell.isCurrentMonth && !rainBgClass
-                                        ? getCalendarDayOfWeekBgClass(dayOfWeek)
+                                        ? (chineseHolidayName
+                                            ? 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
+                                            : getCalendarDayOfWeekBgClass(dayOfWeek))
                                         : ''
                                     const cellBgClass = rainBgClass || dayOfWeekBgClass
                                     const isGoodDeliveryDay =
                                         !isPast &&
                                         dayCell.isCurrentMonth &&
                                         !rainLevel &&
+                                        !chineseHolidayName &&
                                         dayOfWeek !== 0 &&
                                         dayOfWeek !== 5 &&
                                         dayOfWeek !== 6
+                                    const cellTooltip = chineseHolidayName
+                                        ? `${monthPriceTooltip} · 중국 공휴일: ${chineseHolidayName}`
+                                        : monthPriceTooltip
                                     return (
                                         <button
                                             key={ymd}
@@ -4072,7 +4175,7 @@ export default function WormOrderPage() {
                                                 setActiveWormOrder(null)
                                             }}
                                             disabled={isPast}
-                                            title={monthPriceTooltip}
+                                            title={cellTooltip}
                                             className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
@@ -4082,15 +4185,29 @@ export default function WormOrderPage() {
                                             } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
-                                                <span className={`text-[11px] font-black inline-flex items-center justify-center ${
-                                                    isGoodDeliveryDay && !isSelected
-                                                        ? 'h-[18px] w-[18px] rounded-full border-[1.5px] border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                                                        : isSelected
-                                                            ? 'text-white'
-                                                            : 'text-slate-700 dark:text-gray-300'
-                                                }`}>
-                                                    {dayCell.date.getDate()}
-                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`text-[11px] font-black inline-flex items-center justify-center ${
+                                                        isGoodDeliveryDay && !isSelected
+                                                            ? 'h-[18px] w-[18px] rounded-full border-[1.5px] border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                                                            : isSelected
+                                                                ? 'text-white'
+                                                                : 'text-slate-700 dark:text-gray-300'
+                                                    }`}>
+                                                        {dayCell.date.getDate()}
+                                                    </span>
+                                                    {chineseHolidayName && (
+                                                        <span
+                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[8px] font-black leading-none ${
+                                                                isSelected
+                                                                    ? 'bg-white/20 text-white border border-white/30'
+                                                                    : 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800'
+                                                            }`}
+                                                            title={`중국 공휴일: ${chineseHolidayName}`}
+                                                        >
+                                                            中
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {isMonthStart && (
                                                     <span
                                                         className={`mt-1 inline-flex max-w-full items-center rounded-full px-1.5 py-[1px] text-[9px] font-black leading-none truncate ${getCalendarPriceBadgeClass(dayCell.colorType, isSelected)}`}
