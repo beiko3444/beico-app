@@ -614,6 +614,39 @@ function getCalendarPriceTintClass(colorType: CalendarPriceColorType) {
     return 'ring-1 ring-slate-200'
 }
 
+const HEAVY_RAIN_WEATHER_CODES = new Set<number>([65, 81, 82, 95, 96, 99])
+const RAIN_WEATHER_CODES = new Set<number>([51, 53, 55, 61, 63, 80])
+
+function classifyDayPrecipitation(
+    shanghai: CalendarDailyWeather | null,
+    busanGangseo: CalendarDailyWeather | null,
+): 'heavy' | 'rain' | null {
+    const codes = [shanghai?.weatherCode, busanGangseo?.weatherCode].filter(
+        (code): code is number => typeof code === 'number',
+    )
+    if (codes.some((code) => HEAVY_RAIN_WEATHER_CODES.has(code))) return 'heavy'
+    if (codes.some((code) => RAIN_WEATHER_CODES.has(code))) return 'rain'
+    return null
+}
+
+function getCalendarRainBgClass(level: 'heavy' | 'rain' | null) {
+    if (level === 'heavy') return 'bg-blue-100 border-blue-300 hover:bg-blue-200 dark:bg-blue-900/40 dark:border-blue-700 dark:hover:bg-blue-900/60'
+    if (level === 'rain') return 'bg-sky-50 border-sky-200 hover:bg-sky-100 dark:bg-sky-900/30 dark:border-sky-800 dark:hover:bg-sky-900/50'
+    return ''
+}
+
+function getCalendarDateTextClass(dayOfWeek: number) {
+    if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-600 dark:text-red-400'
+    if (dayOfWeek === 5) return 'text-orange-600 dark:text-orange-400'
+    return ''
+}
+
+function getCalendarWeekdayHeaderClass(dayOfWeek: number) {
+    if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-500 dark:text-red-400'
+    if (dayOfWeek === 5) return 'text-orange-500 dark:text-orange-400'
+    return 'text-slate-400'
+}
+
 function buildMonthCalendarDays(year: number, month: number): CalendarDayCell[] {
     const firstDay = new Date(year, month, 1)
     const firstWeekday = firstDay.getDay()
@@ -3961,9 +3994,9 @@ export default function WormOrderPage() {
                                 </button>
                             </div>
 
-                            <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-slate-400 text-center">
-                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday) => (
-                                    <span key={weekday}>{weekday}</span>
+                            <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-center">
+                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday, dayOfWeek) => (
+                                    <span key={weekday} className={getCalendarWeekdayHeaderClass(dayOfWeek)}>{weekday}</span>
                                 ))}
                             </div>
                             <div className="mt-1 grid grid-cols-7 gap-1">
@@ -3985,6 +4018,14 @@ export default function WormOrderPage() {
                                     const dayWeather = calendarWeatherByDate[ymd]
                                     const shanghaiWeather = dayWeather?.shanghai || null
                                     const busanGangseoWeather = dayWeather?.busanGangseo || null
+                                    const rainLevel = !isSelected && dayCell.isCurrentMonth
+                                        ? classifyDayPrecipitation(shanghaiWeather, busanGangseoWeather)
+                                        : null
+                                    const rainBgClass = getCalendarRainBgClass(rainLevel)
+                                    const dayOfWeek = dayCell.date.getDay()
+                                    const dateTextDayOfWeekClass = !isSelected && dayCell.isCurrentMonth
+                                        ? getCalendarDateTextClass(dayOfWeek)
+                                        : ''
                                     return (
                                         <button
                                             key={ymd}
@@ -4000,12 +4041,16 @@ export default function WormOrderPage() {
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
-                                                        ? 'bg-white dark:bg-[#1e1e1e] text-slate-700 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'
+                                                        ? `${rainBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
                                             } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
-                                                <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-slate-700 dark:text-gray-300'}`}>
+                                                <span className={`text-[11px] font-black ${
+                                                    isSelected
+                                                        ? 'text-white'
+                                                        : dateTextDayOfWeekClass || 'text-slate-700 dark:text-gray-300'
+                                                }`}>
                                                     {dayCell.date.getDate()}
                                                 </span>
                                                 {isMonthStart && (
