@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 
 type WormSize = {
@@ -670,6 +670,34 @@ function formatCalendarWeatherText(weather: CalendarDailyWeather | null) {
     const maxText = weather.maxTempC !== null ? `${weather.maxTempC}` : '-'
     const minText = weather.minTempC !== null ? `${weather.minTempC}` : '-'
     return `${weather.weatherText} ${maxText}/${minText}°`
+}
+
+function formatCalendarWeatherTempText(weather: CalendarDailyWeather | null) {
+    if (!weather) return '-'
+    const maxText = weather.maxTempC !== null ? `${weather.maxTempC}` : '-'
+    const minText = weather.minTempC !== null ? `${weather.minTempC}` : '-'
+    return `${maxText}/${minText}°`
+}
+
+type WeatherIconRender = {
+    Icon: typeof Sun
+    colorClass: string
+}
+
+function getCalendarWeatherIcon(weather: CalendarDailyWeather | null): WeatherIconRender | null {
+    if (!weather || weather.weatherCode === null) return null
+    const code = weather.weatherCode
+    if (code === 0 || code === 1) return { Icon: Sun, colorClass: 'text-amber-500' }
+    if (code === 2) return { Icon: CloudSun, colorClass: 'text-amber-400' }
+    if (code === 3) return { Icon: Cloud, colorClass: 'text-slate-400' }
+    if (code === 45 || code === 48) return { Icon: CloudFog, colorClass: 'text-slate-400' }
+    if (code === 51 || code === 53 || code === 55) return { Icon: CloudDrizzle, colorClass: 'text-sky-500' }
+    if (code === 61 || code === 63 || code === 80) return { Icon: CloudRain, colorClass: 'text-sky-600' }
+    if (code === 65 || code === 81 || code === 82) return { Icon: CloudRainWind, colorClass: 'text-blue-600' }
+    if (code === 71 || code === 73 || code === 75) return { Icon: CloudSnow, colorClass: 'text-sky-300' }
+    if (code === 96) return { Icon: CloudHail, colorClass: 'text-indigo-600' }
+    if (code === 95 || code === 99) return { Icon: CloudLightning, colorClass: 'text-indigo-600' }
+    return { Icon: Cloud, colorClass: 'text-slate-400' }
 }
 
 function isCalendarWeatherLocationKey(value: unknown): value is CalendarWeatherLocationKey {
@@ -4064,8 +4092,30 @@ export default function WormOrderPage() {
                                                 <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
                                                     isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
                                                 }`}>
-                                                    <p className="truncate">상해 {formatCalendarWeatherText(shanghaiWeather)}</p>
-                                                    <p className="truncate">부산 {formatCalendarWeatherText(busanGangseoWeather)}</p>
+                                                    {(() => {
+                                                        const shanghaiIcon = getCalendarWeatherIcon(shanghaiWeather)
+                                                        const busanIcon = getCalendarWeatherIcon(busanGangseoWeather)
+                                                        const shanghaiTitle = shanghaiWeather ? `상해 ${formatCalendarWeatherText(shanghaiWeather)}` : '상해 -'
+                                                        const busanTitle = busanGangseoWeather ? `부산 ${formatCalendarWeatherText(busanGangseoWeather)}` : '부산 -'
+                                                        return (
+                                                            <>
+                                                                <p className="flex items-center gap-1 truncate" title={shanghaiTitle}>
+                                                                    <span>상해</span>
+                                                                    {shanghaiIcon ? (
+                                                                        <shanghaiIcon.Icon size={11} strokeWidth={2.2} className={isSelected ? 'text-white/95 shrink-0' : `${shanghaiIcon.colorClass} shrink-0`} />
+                                                                    ) : null}
+                                                                    <span className="truncate">{formatCalendarWeatherTempText(shanghaiWeather)}</span>
+                                                                </p>
+                                                                <p className="flex items-center gap-1 truncate" title={busanTitle}>
+                                                                    <span>부산</span>
+                                                                    {busanIcon ? (
+                                                                        <busanIcon.Icon size={11} strokeWidth={2.2} className={isSelected ? 'text-white/95 shrink-0' : `${busanIcon.colorClass} shrink-0`} />
+                                                                    ) : null}
+                                                                    <span className="truncate">{formatCalendarWeatherTempText(busanGangseoWeather)}</span>
+                                                                </p>
+                                                            </>
+                                                        )
+                                                    })()}
                                                 </div>
                                             </div>
                                         </button>
