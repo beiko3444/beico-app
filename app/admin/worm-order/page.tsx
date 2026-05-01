@@ -635,9 +635,9 @@ function getCalendarRainBgClass(level: 'heavy' | 'rain' | null) {
     return ''
 }
 
-function getCalendarDateTextClass(dayOfWeek: number) {
-    if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-600 dark:text-red-400'
-    if (dayOfWeek === 5) return 'text-orange-600 dark:text-orange-400'
+function getCalendarDayOfWeekBgClass(dayOfWeek: number) {
+    if (dayOfWeek === 0 || dayOfWeek === 6) return 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
+    if (dayOfWeek === 5) return 'bg-orange-50 border-orange-200 hover:bg-orange-100 dark:bg-orange-900/30 dark:border-orange-800 dark:hover:bg-orange-900/50'
     return ''
 }
 
@@ -4051,9 +4051,10 @@ export default function WormOrderPage() {
                                         : null
                                     const rainBgClass = getCalendarRainBgClass(rainLevel)
                                     const dayOfWeek = dayCell.date.getDay()
-                                    const dateTextDayOfWeekClass = !isSelected && dayCell.isCurrentMonth
-                                        ? getCalendarDateTextClass(dayOfWeek)
+                                    const dayOfWeekBgClass = !isSelected && dayCell.isCurrentMonth && !rainBgClass
+                                        ? getCalendarDayOfWeekBgClass(dayOfWeek)
                                         : ''
+                                    const cellBgClass = rainBgClass || dayOfWeekBgClass
                                     return (
                                         <button
                                             key={ymd}
@@ -4069,7 +4070,7 @@ export default function WormOrderPage() {
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
-                                                        ? `${rainBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
+                                                        ? `${cellBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
                                             } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
@@ -4077,7 +4078,7 @@ export default function WormOrderPage() {
                                                 <span className={`text-[11px] font-black ${
                                                     isSelected
                                                         ? 'text-white'
-                                                        : dateTextDayOfWeekClass || 'text-slate-700 dark:text-gray-300'
+                                                        : 'text-slate-700 dark:text-gray-300'
                                                 }`}>
                                                     {dayCell.date.getDate()}
                                                 </span>
