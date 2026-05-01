@@ -4055,6 +4055,13 @@ export default function WormOrderPage() {
                                         ? getCalendarDayOfWeekBgClass(dayOfWeek)
                                         : ''
                                     const cellBgClass = rainBgClass || dayOfWeekBgClass
+                                    const isGoodDeliveryDay =
+                                        !isPast &&
+                                        dayCell.isCurrentMonth &&
+                                        !rainLevel &&
+                                        dayOfWeek !== 0 &&
+                                        dayOfWeek !== 5 &&
+                                        dayOfWeek !== 6
                                     return (
                                         <button
                                             key={ymd}
@@ -4075,10 +4082,12 @@ export default function WormOrderPage() {
                                             } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
-                                                <span className={`text-[11px] font-black ${
-                                                    isSelected
-                                                        ? 'text-white'
-                                                        : 'text-slate-700 dark:text-gray-300'
+                                                <span className={`text-[11px] font-black inline-flex items-center justify-center ${
+                                                    isGoodDeliveryDay && !isSelected
+                                                        ? 'h-[18px] w-[18px] rounded-full border-[1.5px] border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                                                        : isSelected
+                                                            ? 'text-white'
+                                                            : 'text-slate-700 dark:text-gray-300'
                                                 }`}>
                                                     {dayCell.date.getDate()}
                                                 </span>
