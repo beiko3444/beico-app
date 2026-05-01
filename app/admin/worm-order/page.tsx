@@ -4287,12 +4287,20 @@ export default function WormOrderPage() {
                                     const chineseHolidayName = dayCell.isCurrentMonth ? getChineseHolidayName(ymd) : null
                                     const koreanHolidayName = dayCell.isCurrentMonth ? getKoreanHolidayName(ymd) : null
                                     const isPublicHoliday = Boolean(chineseHolidayName || koreanHolidayName)
-                                    const dayOfWeekBgClass = !isSelected && dayCell.isCurrentMonth && !rainBgClass
-                                        ? (isPublicHoliday
-                                            ? 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
-                                            : getCalendarDayOfWeekBgClass(dayOfWeek))
-                                        : ''
-                                    const cellBgClass = rainBgClass || dayOfWeekBgClass
+                                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+                                    const isRedDay = isWeekend || isPublicHoliday
+                                    const RED_DAY_BG = 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
+                                    // Priority: 빨간 날(주말/공휴일) > 비/폭우 > 금요일 > 기본 흰색
+                                    let cellBgClass = ''
+                                    if (!isSelected && dayCell.isCurrentMonth) {
+                                        if (isRedDay) {
+                                            cellBgClass = RED_DAY_BG
+                                        } else if (rainBgClass) {
+                                            cellBgClass = rainBgClass
+                                        } else if (dayOfWeek === 5) {
+                                            cellBgClass = getCalendarDayOfWeekBgClass(dayOfWeek)
+                                        }
+                                    }
                                     const nextDay = new Date(dayCell.date)
                                     nextDay.setDate(nextDay.getDate() + 1)
                                     const nextDayYmd = formatLocalDateToYmd(nextDay)
