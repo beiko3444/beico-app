@@ -737,6 +737,13 @@ function getChineseHolidayName(ymd: string): string | null {
     return CHINESE_PUBLIC_HOLIDAYS[ymd] || null
 }
 
+function getChineseHolidayShortLabel(fullName: string): string {
+    const koreanPart = fullName.split(' ')[0] || fullName
+    const compact = koreanPart.replace('·', '/')
+    if (compact.length > 4) return `${compact.slice(0, 3)}…`
+    return compact
+}
+
 function getCalendarWeekdayHeaderClass(dayOfWeek: number) {
     if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-500 dark:text-red-400'
     if (dayOfWeek === 5) return 'text-orange-500 dark:text-orange-400'
@@ -4211,14 +4218,14 @@ export default function WormOrderPage() {
                                                     </span>
                                                     {chineseHolidayName && (
                                                         <span
-                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[8px] font-black leading-none ${
+                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
                                                                 isSelected
                                                                     ? 'bg-white/20 text-white border border-white/30'
                                                                     : 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800'
                                                             }`}
                                                             title={`중국 공휴일: ${chineseHolidayName}`}
                                                         >
-                                                            中
+                                                            {getChineseHolidayShortLabel(chineseHolidayName)}
                                                         </span>
                                                     )}
                                                 </div>
