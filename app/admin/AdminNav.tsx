@@ -270,7 +270,7 @@ export default function AdminNav({
                                             prefetch={false}
                                             className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] transition-colors ${isActive
                                                 ? 'bg-white text-black font-semibold'
-                                                : 'text-white/68 hover:text-white hover:bg-white/10 font-medium'
+                                                : 'text-white/82 hover:text-white hover:bg-white/10 font-medium'
                                                 }`}
                                         >
                                             {item.name}
@@ -375,7 +375,7 @@ export default function AdminNav({
                                     prefetch={false}
                                     className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] transition-colors ${isActive
                                         ? 'bg-white text-black font-semibold'
-                                        : 'text-white/68 hover:text-white hover:bg-white/10 font-medium'
+                                        : 'text-white/82 hover:text-white hover:bg-white/10 font-medium'
                                         }`}
                                 >
                                     {item.name}
