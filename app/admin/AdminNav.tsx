@@ -247,23 +247,53 @@ export default function AdminNav({
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[100]">
-            {/* Top header bar */}
             <div className="bg-black text-white px-4 py-2.5">
-                <div className="max-w-[1200px] mx-auto flex items-center justify-between">
-                    {/* Left: Logo + Title */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
-                            <LayoutGrid size={18} className="text-white" />
+                <div className="max-w-[1200px] mx-auto flex items-center justify-between gap-6">
+                    <div className="flex min-w-0 items-center gap-6">
+                        <div className="flex shrink-0 items-center gap-3">
+                            <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center">
+                                <LayoutGrid size={18} className="text-white" />
+                            </div>
+                            <span className="text-[12px] font-medium tracking-[-0.01em] text-white/88 whitespace-nowrap">관리자 콘솔</span>
                         </div>
-                        <span className="text-[12px] font-medium tracking-[-0.01em] text-white/88">관리자 콘솔</span>
+
+                        <div ref={tabContainerRef} className="hidden min-w-0 flex-1 overflow-x-auto scrollbar-hide lg:block">
+                            <nav className="flex items-center gap-1 whitespace-nowrap">
+                                {navItems.map((item) => {
+                                    const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
+
+                                    return (
+                                        <Link
+                                            key={item.path}
+                                            ref={isActive ? activeTabRef : undefined}
+                                            href={item.path}
+                                            prefetch={false}
+                                            className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] transition-colors ${isActive
+                                                ? 'bg-white text-black font-semibold'
+                                                : 'text-white/68 hover:text-white hover:bg-white/10 font-medium'
+                                                }`}
+                                        >
+                                            {item.name}
+                                            {item.count && item.count > 0 ? (
+                                                <span className={`flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full text-[10px] font-semibold ${isActive ? 'bg-black text-white' : 'bg-[var(--primary)] text-white'}`}>
+                                                    {item.count}
+                                                </span>
+                                            ) : null}
+                                            {item.alert ? (
+                                                <span className={`flex items-center justify-center h-[18px] w-[18px] rounded-full text-[10px] font-semibold ${isActive ? 'bg-black text-white' : 'bg-[var(--primary)] text-white'}`}>
+                                                    !
+                                                </span>
+                                            ) : null}
+                                        </Link>
+                                    )
+                                })}
+                            </nav>
+                        </div>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-2">
-                        {/* Theme toggle */}
+                    <div className="flex shrink-0 items-center gap-2">
                         <ThemeToggle className="bg-white/10 hover:bg-white/16 border border-white/10" />
 
-                        {/* Bell notification */}
                         <button className="relative w-9 h-9 rounded-full bg-white/10 border border-white/10 flex items-center justify-center hover:bg-white/16 transition-colors">
                             <Bell size={17} className="text-white/88" />
                             {totalAlerts > 0 && (
@@ -273,7 +303,6 @@ export default function AdminNav({
                             )}
                         </button>
 
-                        {/* Shipment count input + 건출고 */}
                         <div className="inline-flex h-9 items-stretch overflow-hidden rounded-full bg-white text-[var(--foreground)] border border-black/5">
                             <span className="inline-flex h-full items-center pl-3 pr-1 text-[#7a7a7a]">
                                 <Plus size={14} />
@@ -291,7 +320,6 @@ export default function AdminNav({
                             <span className="inline-flex h-full items-center pr-3 text-xs font-semibold text-[var(--foreground)] whitespace-nowrap">건 출고</span>
                         </div>
 
-                        {/* 집하요청 button */}
                         <button
                             onClick={handleSendSms}
                             disabled={sendingSms || loadingFromNumber}
@@ -301,13 +329,6 @@ export default function AdminNav({
                             <span>{sendingSms ? '요청중...' : '집하요청'}</span>
                         </button>
 
-                        {/* Logout button */}
-                        {/* 배포 재트리거용 텍스트 주석 */}
-                        {/* 재배포 트리거 주석 2 */}
-                        {/* 재배포 트리거 주석 3 */}
-                        {/* 재배포 트리거 주석 4 */}
-                        {/* 재배포 트리거 주석 5 */}
-                        {/* 재배포 트리거 주석 6 */}
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
                             className="h-9 px-4 rounded-full bg-white/10 border border-white/10 flex items-center justify-center text-xs font-medium text-white hover:bg-white/16 transition-colors whitespace-nowrap"
@@ -318,7 +339,6 @@ export default function AdminNav({
                     </div>
                 </div>
 
-                {/* SMS status row */}
                 {(smsStatus || smsSendLogs.length > 0) && (
                     <div className="max-w-[1200px] mx-auto flex items-center justify-end gap-2 mt-1.5">
                         {smsStatus ? (
@@ -341,12 +361,9 @@ export default function AdminNav({
                         ) : null}
                     </div>
                 )}
-            </div>
 
-            {/* Tab navigation bar */}
-            <div className="bg-[var(--surface-parchment)]/92 backdrop-blur-md border-b border-[var(--hairline)] px-4">
-                <div className="max-w-[1200px] mx-auto">
-                    <nav ref={tabContainerRef} className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
+                <div className="max-w-[1200px] mx-auto mt-2 lg:hidden">
+                    <nav ref={tabContainerRef} className="flex items-center gap-1 overflow-x-auto scrollbar-hide whitespace-nowrap pb-1">
                         {navItems.map((item) => {
                             const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
 
@@ -356,25 +373,22 @@ export default function AdminNav({
                                     ref={isActive ? activeTabRef : undefined}
                                     href={item.path}
                                     prefetch={false}
-                                    className={`relative px-4 py-3 text-[12px] transition-colors whitespace-nowrap flex items-center gap-1.5 ${isActive
-                                        ? 'text-[var(--foreground)] font-medium'
-                                        : 'text-[#6e6e73] hover:text-[var(--foreground)] font-normal'
+                                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-[12px] transition-colors ${isActive
+                                        ? 'bg-white text-black font-semibold'
+                                        : 'text-white/68 hover:text-white hover:bg-white/10 font-medium'
                                         }`}
                                 >
                                     {item.name}
                                     {item.count && item.count > 0 ? (
-                                        <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-[var(--primary)] text-white text-[10px] font-semibold">
+                                        <span className={`flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full text-[10px] font-semibold ${isActive ? 'bg-black text-white' : 'bg-[var(--primary)] text-white'}`}>
                                             {item.count}
                                         </span>
                                     ) : null}
                                     {item.alert ? (
-                                        <span className="flex items-center justify-center h-[18px] w-[18px] rounded-full bg-[var(--primary)] text-white text-[10px] font-semibold">
+                                        <span className={`flex items-center justify-center h-[18px] w-[18px] rounded-full text-[10px] font-semibold ${isActive ? 'bg-black text-white' : 'bg-[var(--primary)] text-white'}`}>
                                             !
                                         </span>
                                     ) : null}
-                                    {isActive && (
-                                        <span className="absolute bottom-0 left-2 right-2 h-[2px] bg-[var(--foreground)] rounded-t-full" />
-                                    )}
                                 </Link>
                             )
                         })}
