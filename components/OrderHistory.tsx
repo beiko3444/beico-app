@@ -286,6 +286,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 <Link
                                     href={`/invoice/${order.id}`}
                                     target="_blank"
+                                    style={{ color: 'inherit' }}
                                     className="flex-1 h-14 border-2 border-[#111827] dark:border-gray-600 text-[#111827] dark:text-white bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
                                 >
                                     <span className="text-[11px] md:text-[13px] font-bold">取引明細書を確認する</span>
@@ -294,6 +295,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 <a
                                     href="/beiko_Business%20Registration%20Certificate.png"
                                     download="beiko_Business_Registration_Certificate.png"
+                                    style={{ color: 'inherit' }}
                                     className="flex-1 h-14 border-2 border-gray-300 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-400 bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
                                 >
                                     <span className="text-[11px] md:text-[13px] font-bold">事業者登録証</span>

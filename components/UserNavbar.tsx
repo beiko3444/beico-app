@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation'
 import { ShoppingCart, History, User } from 'lucide-react'
 
 const NAV_ITEMS = [
-    { href: '/order', label: 'Order', subLabel: 'Order', icon: ShoppingCart },
-    { href: '/order/history', label: 'History', subLabel: 'History', icon: History },
-    { href: '/order/profile', label: 'My Page', subLabel: 'My Page', icon: User },
+    { href: '/order', label: '注文', subLabel: 'Order', icon: ShoppingCart },
+    { href: '/order/history', label: '履歴', subLabel: 'History', icon: History },
+    { href: '/order/profile', label: 'マイページ', subLabel: 'My Page', icon: User },
 ]
 
 export default function UserNavbar() {

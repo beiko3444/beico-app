@@ -5,10 +5,10 @@ import { usePathname } from 'next/navigation'
 import { Home, ShoppingCart, History, User } from 'lucide-react'
 
 const NAV_ITEMS = [
-    { href: '/', label: 'Home', icon: Home },
-    { href: '/order', label: 'Order', icon: ShoppingCart },
-    { href: '/order/history', label: 'History', icon: History },
-    { href: '/order/profile', label: 'My Page', icon: User },
+    { href: '/', label: 'ホーム', icon: Home },
+    { href: '/order', label: '注文', icon: ShoppingCart },
+    { href: '/order/history', label: '履歴', icon: History },
+    { href: '/order/profile', label: 'マイページ', icon: User },
 ]
 
 export default function MobileBottomNav() {
