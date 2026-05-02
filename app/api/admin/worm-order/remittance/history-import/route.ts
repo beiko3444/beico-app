@@ -38,6 +38,22 @@ const formatKstYmd = (date: Date) => {
     return `${year}-${month}-${day}`
 }
 
+const isCompleteRemittanceSummary = (
+    finalReceiveAmountUsd: number | null,
+    sendAmountKrw: number | null,
+    totalFeeKrw: number | null,
+    exchangeRateNumber: number | null,
+) => (
+    finalReceiveAmountUsd !== null &&
+    sendAmountKrw !== null &&
+    totalFeeKrw !== null &&
+    exchangeRateNumber !== null &&
+    Number.isFinite(finalReceiveAmountUsd) &&
+    Number.isFinite(sendAmountKrw) &&
+    Number.isFinite(totalFeeKrw) &&
+    Number.isFinite(exchangeRateNumber)
+)
+
 export async function POST(request: Request) {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -151,6 +167,33 @@ export async function POST(request: Request) {
             finalReceiveAmountUsd !== null
                 ? formatSummaryAmount(String(finalReceiveAmountUsd), 'USD')
                 : finalReceiveAmountText
+
+        if (!isCompleteRemittanceSummary(finalReceiveAmountUsd, sendAmountKrw, totalFeeKrw, exchangeRateNumber)) {
+            return NextResponse.json(
+                {
+                    ok: false,
+                    error: '송금 내역에서 총 송금액, 총 송금 한화, 총 수수료, 환율정보를 모두 가져오지 못했습니다. 다시 자동 가져오기를 시도하거나 후보 선택/직접 입력으로 보완해 주세요.',
+                    incomplete: true,
+                    missingFields: {
+                        finalReceiveAmount: finalReceiveAmountUsd === null,
+                        sendAmount: sendAmountKrw === null,
+                        totalFee: totalFeeKrw === null,
+                        exchangeRate: exchangeRateNumber === null,
+                    },
+                    parsedSummary: {
+                        finalReceiveAmount: normalizedFinalReceiveAmountText,
+                        sendAmount: normalizedSendAmountText,
+                        totalFee: normalizedTotalFeeText,
+                        exchangeRate: exchangeRateText,
+                    },
+                    items: result.items,
+                    steps: debug ? result.steps : undefined,
+                    diagnostic: debug ? result.diagnostic : undefined,
+                    matchStrategy: result.matchStrategy,
+                },
+                { status: 422 },
+            )
+        }
 
         const remittanceAppliedAt = result.matchedAppliedAtIso
             ? new Date(result.matchedAppliedAtIso)

@@ -763,12 +763,12 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
 
-            const extractSameLine = (line, words) => {
+            const extractSameLine = (line, words, key) => {
                 const escapeRegex = (input) => String(input).replace(/[\\^$.*+?()[\\]{}|]/g, '\\\\$&');
                 for (const word of words) {
                     const pattern = new RegExp(escapeRegex(word) + '\\\\s*[:：-]?\\\\s*(.+)$', 'i');
                     const match = line.match(pattern);
-                    if (match && hasDigit(match[1])) return clean(match[1]);
+                    if (match && hasDigit(match[1])) return moneySnippet(match[1], key) || clean(match[1]);
                 }
                 return '';
             };
@@ -803,7 +803,7 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                     .filter((row) => normalizedWords.some((word) => normalize(row.text).includes(word)));
 
                 for (const candidate of candidates) {
-                    const direct = extractSameLine(candidate.text, words);
+                    const direct = extractSameLine(candidate.text, words, key);
                     if (direct) return direct;
                     const directSnippet = moneySnippet(candidate.text, key);
                     if (directSnippet) return directSnippet;
@@ -835,7 +835,7 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                     const normalizedLine = normalize(line);
                     if (!normalizedWords.some((word) => normalizedLine.includes(word))) continue;
 
-                    const sameLine = extractSameLine(line, words);
+                    const sameLine = extractSameLine(line, words, key);
                     if (sameLine) return sameLine;
 
                     const sameLineSnippet = moneySnippet(line, key);
@@ -1597,9 +1597,35 @@ const findObjectsInJson = (
 }
 
 const looksLikeSingleTransactionObject = (obj: Record<string, unknown>): number => {
+    const lowerKeys = Object.keys(obj).map((k) => k.toLowerCase())
+    const looksLikeUserProfile =
+        lowerKeys.includes('user_uuid') ||
+        lowerKeys.includes('email_verified') ||
+        (
+            lowerKeys.includes('email') &&
+            lowerKeys.includes('first_name') &&
+            lowerKeys.includes('last_name')
+        )
+    const hasTransactionIdentityKey = lowerKeys.some((key) =>
+        key === 'transaction_id' ||
+        key === 'transactionid' ||
+        key === 'transfer_id' ||
+        key === 'transferid' ||
+        key === 'history_id' ||
+        key === 'historyid' ||
+        key === 'remittance_id' ||
+        key === 'remittanceid',
+    )
+
+    if (looksLikeUserProfile && !hasTransactionIdentityKey) {
+        return 0
+    }
+
     const { dateScore, amountScore, idScore } = objectHasHints(obj)
     const signals = (dateScore > 0 ? 1 : 0) + (amountScore > 0 ? 1 : 0) + (idScore > 0 ? 1 : 0)
     if (signals < 2) return 0
+    if (amountScore === 0 || idScore === 0) return 0
+
     return dateScore * 5 + amountScore * 10 + idScore * 3
 }
 
@@ -1635,9 +1661,12 @@ const extractDetailObjectFromCapturedResponses = (
     return { obj: best.obj, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
 }
 
+const isGenericMoinHistoryListUrl = (value: string | null | undefined) =>
+    !value || /\/history\/(?:individual|bulk)?(?:$|[?#])/i.test(value)
+
 const mergeMoinHistoryItems = (base: MoinHistoryItem, detail: MoinHistoryItem): MoinHistoryItem => ({
     ...base,
-    detailUrl: detail.detailUrl || base.detailUrl,
+    detailUrl: isGenericMoinHistoryListUrl(detail.detailUrl) ? base.detailUrl : detail.detailUrl,
     dateText: detail.dateText || base.dateText,
     recipient: detail.recipient || base.recipient,
     amountUsdText: detail.amountUsdText || base.amountUsdText,
@@ -1964,11 +1993,25 @@ export const fetchMoinRemittanceHistory = async (
                     const domSummary = await inspectRemittancePricingSummary(page)
                     if (domSummary.finalReceiveAmount || domSummary.sendAmount || domSummary.totalFee || domSummary.exchangeRate) {
                         steps.push('detail-summary-via-dom')
+                        const currentRate = parseFloat((summary?.exchangeRate || '').replace(/[^0-9.\-]/g, ''))
+                        const shouldPreferDomFinalReceive =
+                            !summary?.finalReceiveAmount ||
+                            summary.finalReceiveAmount.includes(KO_SEND_AMOUNT) ||
+                            summary.finalReceiveAmount.includes(KO_TOTAL_FEE) ||
+                            summary.finalReceiveAmount.includes(KO_EXCHANGE_RATE)
+                        const shouldPreferDomExchangeRate =
+                            !summary?.exchangeRate ||
+                            !Number.isFinite(currentRate) ||
+                            currentRate < 100
                         summary = {
-                            finalReceiveAmount: summary?.finalReceiveAmount || domSummary.finalReceiveAmount || '',
+                            finalReceiveAmount: shouldPreferDomFinalReceive
+                                ? domSummary.finalReceiveAmount || summary?.finalReceiveAmount || ''
+                                : summary.finalReceiveAmount,
                             sendAmount: summary?.sendAmount || domSummary.sendAmount || '',
                             totalFee: summary?.totalFee || domSummary.totalFee || '',
-                            exchangeRate: summary?.exchangeRate || domSummary.exchangeRate || '',
+                            exchangeRate: shouldPreferDomExchangeRate
+                                ? domSummary.exchangeRate || summary?.exchangeRate || ''
+                                : summary.exchangeRate,
                         }
                     }
                     if (!appliedAtIso) {
@@ -1982,6 +2025,16 @@ export const fetchMoinRemittanceHistory = async (
                     detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
                 } catch {
                     detailBodyText = null
+                }
+            }
+
+            if (matched && summary) {
+                matched = {
+                    ...matched,
+                    amountUsdText: summary.finalReceiveAmount || matched.amountUsdText,
+                    sendAmountKrwText: summary.sendAmount || matched.sendAmountKrwText,
+                    totalFeeKrwText: summary.totalFee || matched.totalFeeKrwText,
+                    exchangeRateText: summary.exchangeRate || matched.exchangeRateText,
                 }
             }
 

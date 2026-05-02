@@ -1182,6 +1182,24 @@ function resolveRemittanceTotalPaidKrw(order: WormOrderListItem): number | null 
     return Math.round(originKrw + feeKrw)
 }
 
+function isRemittanceSummaryComplete(order: WormOrderListItem) {
+    const sendAmountUsd = resolveRemittanceSendUsd(order)
+    const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
+    const totalFeeKrw = resolveRemittanceFeeKrw(order)
+    const exchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+
+    return (
+        sendAmountUsd !== null &&
+        totalPaidKrw !== null &&
+        totalFeeKrw !== null &&
+        exchangeRate !== null &&
+        Number.isFinite(sendAmountUsd) &&
+        Number.isFinite(totalPaidKrw) &&
+        Number.isFinite(totalFeeKrw) &&
+        Number.isFinite(exchangeRate)
+    )
+}
+
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
     if (!value || typeof value !== 'object') return null
 
@@ -4018,6 +4036,7 @@ export default function WormOrderPage() {
                                 const totalFeeKrw = resolveRemittanceFeeKrw(order)
                                 const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+                                const remittanceSummaryComplete = isRemittanceSummaryComplete(order)
                                 const exchangeRateText = parsedExchangeRate !== null
                                     ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
                                     : order.remittanceExchangeRateText || '-'
@@ -4044,6 +4063,11 @@ export default function WormOrderPage() {
                                                         {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
                                                     </span>
                                                 )}
+                                                {order.remittanceAppliedAt && !remittanceSummaryComplete && (
+                                                    <span className="text-[11px] font-bold text-rose-600">
+                                                        송금 정보 일부 누락 · 자동 가져오기 또는 직접 입력 필요
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
@@ -4060,7 +4084,7 @@ export default function WormOrderPage() {
                                         </td>
                                         <td className="px-3 py-2.5 text-right">
                                             <div className="flex items-center justify-end gap-1.5">
-                                                {!order.remittanceAppliedAt && (
+                                                {!remittanceSummaryComplete && (
                                                     <>
                                                         <button
                                                             type="button"
