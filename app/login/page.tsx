@@ -92,53 +92,62 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111] flex flex-col items-center justify-center p-4 font-sans text-[#333] dark:text-gray-200 relative">
-            {/* Theme toggle */}
-            <div className="absolute top-6 right-6">
-                <ThemeToggle className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333]" />
+        <div className="min-h-screen apple-page flex flex-col items-center justify-center p-4 text-[var(--foreground)] relative overflow-hidden">
+            <div className="absolute inset-0 bg-[var(--surface-parchment)]" />
+            <div className="absolute inset-x-0 top-0 h-[42vh] bg-white" />
+            <div className="absolute top-6 right-6 z-10">
+                <ThemeToggle className="bg-white/90 hover:bg-white border border-[var(--hairline)] rounded-full" />
             </div>
-            {/* Real-time Japanese Clock */}
-            <div className="absolute top-8 text-[11px] font-bold text-gray-800 dark:text-gray-400 tracking-widest" suppressHydrationWarning>
+            <div className="absolute top-8 text-[11px] font-medium text-[#6e6e73] tracking-[0.08em] z-10" suppressHydrationWarning>
                 {time ? formatJapaneseDate(time) : ''}
             </div>
 
-            {/* Logo Section */}
-            <div className="mb-5 flex flex-col items-center">
-                <div className="w-[110px] h-auto mb-4 relative">
-                    <img
-                        src="/logo.png"
-                        alt="BEIKO BAIT"
-                        className="w-full h-full object-contain"
-                    />
-                </div>
-
-                <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">卸売専用ポータル</h1>
-                <div className="flex flex-col items-center gap-1.5">
-                    <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-gray-400 leading-none">
-                        Wholesale Portal
-                    </p>
-                    <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-[#e34219] leading-none">
-                        For retailers & distributors
+            <div className="relative z-10 w-full max-w-[980px] grid lg:grid-cols-[1.2fr_420px] gap-8 items-center">
+                <div className="px-2 lg:px-0 text-center lg:text-left">
+                    <p className="text-[12px] tracking-[0.18em] uppercase text-[#6e6e73] mb-4">BEIKO BAIT WHOLESALE PORTAL</p>
+                    <h1 className="apple-hero-title mb-4">도구보다 먼저 제품이 보이는 관리 화면.</h1>
+                    <p className="apple-lead max-w-[620px] mx-auto lg:mx-0">
+                        파트너, 주문, 송금, 발주 흐름을 Apple식의 차분한 캔버스 위에 정리했습니다.
+                        과한 장식 대신 읽기 쉬운 타이포와 명확한 행동만 남겼습니다.
                     </p>
                 </div>
-            </div>
 
-            {/* Login Form */}
-            <div className="w-full max-w-[360px]">
+                <div className="apple-panel w-full max-w-[420px] mx-auto p-8 md:p-10">
+                <div className="mb-6 flex flex-col items-center">
+                    <div className="w-[110px] h-auto mb-4 relative">
+                        <img
+                            src="/logo.png"
+                            alt="BEIKO BAIT"
+                            className="w-full h-full object-contain"
+                        />
+                    </div>
+
+                    <h1 className="text-[32px] font-semibold text-[var(--foreground)] tracking-[-0.03em] mb-1">卸売専用ポータル</h1>
+                    <div className="flex flex-col items-center gap-1.5">
+                        <p className="text-[10px] font-medium tracking-[0.32em] uppercase text-[#6e6e73] leading-none">
+                            Wholesale Portal
+                        </p>
+                        <p className="text-[10px] font-medium tracking-[0.32em] uppercase text-[var(--primary)] leading-none">
+                            For retailers & distributors
+                        </p>
+                    </div>
+                </div>
+
+                <div className="w-full">
                 <form onSubmit={handleSubmit} className="flex flex-col gap-5">
 
                     {/* User ID Input */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1">ユーザーID / User ID</label>
+                        <label className="text-[12px] font-medium text-[#6e6e73] tracking-tight ml-1">ユーザーID / User ID</label>
                         <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
                                 <User size={18} className="stroke-[1.5]" />
                             </div>
                             <input
                                 type="text"
                                 value={username}
                                 onChange={(e) => setUsername(e.target.value)}
-                                className="w-full h-12 pl-12 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-300 dark:focus:border-[#555] shadow-sm transition-all text-[14px] font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white"
+                                className="apple-input w-full pl-12 pr-4 text-[15px] font-normal placeholder:text-[#b3b3b8]"
                                 placeholder="Enter ID"
                                 required
                             />
@@ -147,23 +156,23 @@ export default function LoginPage() {
 
                     {/* Password Input */}
                     <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1">パスワード / Password</label>
+                        <label className="text-[12px] font-medium text-[#6e6e73] tracking-tight ml-1">パスワード / Password</label>
                         <div className="relative group">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">
+                            <div className="absolute left-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
                                 <Lock size={18} className="stroke-[1.5]" />
                             </div>
                             <input
                                 type={showPassword ? "text" : "password"}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
-                                className="w-full h-12 pl-12 pr-12 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-300 dark:focus:border-[#555] shadow-sm transition-all text-[14px] font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white tracking-wider"
+                                className="apple-input w-full pl-12 pr-12 text-[15px] font-normal placeholder:text-[#b3b3b8] tracking-wider"
                                 placeholder="••••••••"
                                 required
                             />
                             <button
                                 type="button"
                                 onClick={() => setShowPassword(!showPassword)}
-                                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+                                className="absolute right-5 top-1/2 -translate-y-1/2 text-[#8d8d92] hover:text-[var(--foreground)] transition-colors"
                             >
                                 {showPassword ? <EyeOff size={18} className="stroke-[1.5]" /> : <Eye size={18} className="stroke-[1.5]" />}
                             </button>
@@ -172,14 +181,14 @@ export default function LoginPage() {
 
                     {/* Remember Me */}
                     <div className="flex items-center gap-2 cursor-pointer group px-1 mt-0.5" onClick={() => setRememberMe(!rememberMe)}>
-                        <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${rememberMe ? 'bg-white dark:bg-[#1e1e1e] border-gray-300 dark:border-[#555]' : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#333] group-hover:border-gray-300'}`}>
-                            {rememberMe && <ArrowRight size={10} className="text-[#333] rotate-[-45deg]" strokeWidth={2.5} />}
+                        <div className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${rememberMe ? 'bg-white border-[#6e6e73]' : 'bg-white border-[var(--hairline)] group-hover:border-[#8d8d92]'}`}>
+                            {rememberMe && <ArrowRight size={10} className="text-[var(--foreground)] rotate-[-45deg]" strokeWidth={2.5} />}
                         </div>
-                        <span className="text-[11px] font-medium text-gray-500 dark:text-gray-400 tracking-tight transition-colors group-hover:text-gray-800 dark:group-hover:text-gray-200">ログイン状態を保持 / Remember Me</span>
+                        <span className="text-[11px] font-normal text-[#6e6e73] tracking-tight transition-colors group-hover:text-[var(--foreground)]">ログイン状態を保持 / Remember Me</span>
                     </div>
 
                     {error && (
-                        <div className="text-red-500 dark:text-red-400 text-xs bg-red-50 dark:bg-red-900/20 px-4 py-3 rounded-lg border border-red-100 dark:border-red-800 flex flex-col items-center justify-center">
+                        <div className="text-red-500 text-xs bg-red-50 px-4 py-3 rounded-[11px] border border-red-100 flex flex-col items-center justify-center">
                             {typeof error === 'string' ? <span className="font-bold">{error}</span> : error}
                         </div>
                     )}
@@ -188,7 +197,7 @@ export default function LoginPage() {
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full h-12 mt-1 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-wide disabled:opacity-70"
+                        className="apple-button w-full mt-1 active:scale-[0.99] disabled:opacity-70"
                     >
                         {loading ? 'Processing...' : (
                             <>
@@ -199,28 +208,28 @@ export default function LoginPage() {
                 </form>
 
                 <div className="mt-3 text-center">
-                    <button type="button" className="text-[13px] font-bold text-[#e34219] hover:underline tracking-tight">
+                    <button type="button" className="text-[13px] font-medium text-[var(--primary)] hover:underline tracking-tight">
                         パスワードをお忘れですか？ / Forgot Password?
                     </button>
                 </div>
+                </div>
+
+                <div className="mt-6 w-full text-center">
+                    <div className="border-t border-[var(--hairline)] pt-4 mb-1 w-full"></div>
+
+                    <h3 className="text-[24px] font-semibold text-[var(--foreground)] mb-1 tracking-[-0.03em]">新規パートナー様 / New Partners</h3>
+                    <p className="text-[11px] text-[#6e6e73] leading-normal mb-4 font-normal px-6">
+                        Partner with BEIKO for professional-grade tackle & bait solutions.
+                    </p>
+
+                    <Link href="/signup" className="block w-full">
+                        <button className="w-full h-12 bg-[var(--foreground)] border border-[var(--foreground)] text-white rounded-full font-medium text-[14px] hover:bg-black transition-all tracking-tight leading-normal">
+                            卸売アカウントの申請 / Apply for Wholesale Account
+                        </button>
+                    </Link>
+                </div>
+                </div>
             </div>
-
-            {/* New Partners Section */}
-            <div className="mt-4 w-full max-w-[360px] text-center">
-                <div className="border-t border-gray-200 dark:border-[#333] pt-2 mb-1 w-full"></div>
-
-                <h3 className="text-[19px] font-black text-[#111827] dark:text-white mb-1 tracking-tight">新規パートナー様 / New Partners</h3>
-                <p className="text-[10.5px] text-gray-400 leading-normal mb-4 font-medium px-6">
-                    Partner with BEIKO for professional-grade tackle & bait solutions.
-                </p>
-
-                <Link href="/signup" className="block w-full">
-                    <button className="w-full h-12 bg-[#111827] dark:bg-white border-2 border-[#111827] dark:border-white text-white dark:text-[#111827] rounded-lg font-bold text-[14px] hover:bg-white hover:text-[#111827] dark:hover:bg-[#111827] dark:hover:text-white transition-all tracking-tight shadow-sm leading-normal">
-                        卸売アカウントの申請 / Apply for Wholesale Account
-                    </button>
-                </Link>
-            </div>
-
         </div>
     )
 }
