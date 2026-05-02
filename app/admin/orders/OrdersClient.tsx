@@ -194,6 +194,7 @@ export default function OrdersClient({
                         </div>
                     </div>
                 </div>
+            </div>
 
             {/* Statistics Dashboard Section */}
             {selectedPartner && stats && (
