@@ -26,7 +26,7 @@ export default function UserNavbar() {
                         style={{ color: 'inherit' }}
                         className={`
                             flex flex-col items-center group transition-colors duration-200 min-w-[60px]
-                            ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
+                            ${isActive ? 'text-[#e34219]' : 'text-[#9aa3b2] hover:text-[#7f8897] dark:text-[#9aa3b2] dark:hover:text-[#c4cad4]'}
                         `}
                     >
                         <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
