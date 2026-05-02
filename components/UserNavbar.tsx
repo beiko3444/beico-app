@@ -30,11 +30,11 @@ export default function UserNavbar() {
                         `}
                     >
                         <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
-                        <span className={`text-[12.5px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
-                            {item.subLabel}
-                        </span>
-                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <span className="mb-1 text-[12.5px] font-black leading-none">
                             {item.label}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] leading-none">
+                            {item.subLabel}
                         </span>
                     </Link>
                 )
