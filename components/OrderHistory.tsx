@@ -326,7 +326,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
                                             <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{item.product.nameJP || item.product.name}</h4>
                                             <p className="text-xs text-gray-900 dark:text-white font-medium leading-tight">{item.product.nameEN || item.product.name}</p>
-                                            <div className="text-[10px] text-blue-400 font-medium font-inter leading-tight">
+                                            <div className="text-[10px] text-gray-400 dark:text-gray-500 font-medium font-inter leading-tight">
                                                 Code: {item.product.productCode || '-'}
                                             </div>
                                             {item.product.barcode && (

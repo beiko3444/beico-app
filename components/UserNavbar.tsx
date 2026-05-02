@@ -23,6 +23,7 @@ export default function UserNavbar() {
                     <Link
                         key={item.href}
                         href={item.href}
+                        style={{ color: 'inherit' }}
                         className={`
                             flex flex-col items-center group transition-colors duration-200 min-w-[60px]
                             ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}

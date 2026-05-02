@@ -270,7 +270,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             ? 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
                                             : qty < product.minOrderQuantity
                                                 ? 'bg-[#fff5f5] dark:bg-[#2a1a1a] border-[#e34219]'
-                                                : 'bg-blue-50 dark:bg-[#1a1a2a] border-blue-600'
+                                                : 'bg-[#fff7f3] dark:bg-[#2a1a1a] border-[#e34219]'
                                             }`}>
                                             <button
                                                 onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
@@ -278,7 +278,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
                                                     : qty < product.minOrderQuantity
                                                         ? 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                        : 'text-blue-600 hover:bg-blue-100 dark:hover:bg-[#1a1a3a]'
+                                                        : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
                                                     }`}
                                             >
                                                 <Minus size={14} strokeWidth={2.5} />
@@ -296,7 +296,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     ? 'text-[#1e293b] dark:text-white'
                                                     : qty < product.minOrderQuantity
                                                         ? 'text-[#e34219]'
-                                                        : 'text-blue-600'
+                                                        : 'text-[#e34219]'
                                                     }`}
                                             />
                                             <button
@@ -305,7 +305,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
                                                     : qty < product.minOrderQuantity
                                                         ? 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                        : 'text-blue-600 hover:bg-blue-100 dark:hover:bg-[#1a1a3a]'
+                                                        : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
                                                     }`}
                                             >
                                                 <Plus size={14} strokeWidth={2.5} />

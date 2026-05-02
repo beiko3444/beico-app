@@ -24,6 +24,7 @@ export default function MobileBottomNav() {
                     <Link
                         key={item.href}
                         href={item.href}
+                        style={{ color: 'inherit' }}
                         className={`
                             flex flex-col items-center gap-1.5 transition-all duration-300
                             ${isActive ? 'text-[#e34219]' : 'text-gray-400'}
