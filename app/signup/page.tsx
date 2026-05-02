@@ -231,86 +231,86 @@ export default function SignupPage() {
 
                 <div className="w-full">
                     <div className="mb-5 flex items-center gap-6">
-                    <div className="w-[77px] h-auto relative shrink-0">
-                        <img
-                            src="/logo.png"
-                            alt="BEIKO BAIT"
-                            className="w-full h-full object-contain"
-                        />
+                        <div className="w-[77px] h-auto relative shrink-0">
+                            <img
+                                src="/logo.png"
+                                alt="BEIKO BAIT"
+                                className="w-full h-full object-contain"
+                            />
+                        </div>
+                        <div className="mt-2 flex flex-col justify-center">
+                            <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">{t.title}</h1>
+                            <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.32em] text-[#6e6e73]">
+                                {t.subtitle}
+                            </p>
+                        </div>
                     </div>
-                    <div className="flex flex-col justify-center mt-2">
-                        <h1 className="text-[28px] font-semibold text-[var(--foreground)] tracking-[-0.03em] mb-1">{t.title}</h1>
-                        <p className="text-[10px] font-medium tracking-[0.32em] uppercase text-[#6e6e73] whitespace-nowrap">
-                            {t.subtitle}
-                        </p>
-                    </div>
-                </div>
 
-                {error && (
-                    <div className="mb-6 rounded-[14px] border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                        {error}
-                    </div>
-                )}
+                    {error && (
+                        <div className="mb-6 rounded-[14px] border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
+                            {error}
+                        </div>
+                    )}
 
-                {step === 1 ? (
-                    <form onSubmit={handleNextStep} className="apple-panel space-y-5 p-6 md:p-8">
-                        <div className="space-y-1.5">
-                            <label className="ml-1 block text-[12px] font-medium tracking-tight text-[#6e6e73]">
-                                <span className="text-[var(--primary)]">*</span> 国籍 / Nationality / 국가
-                            </label>
-                            <div className="relative group">
-                                <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
-                                    <Globe size={18} strokeWidth={1.5} />
+                    {step === 1 ? (
+                        <form onSubmit={handleNextStep} className="apple-panel space-y-5 p-6 md:p-8">
+                            <div className="space-y-1.5">
+                                <label className="ml-1 block text-[12px] font-medium tracking-tight text-[#6e6e73]">
+                                    <span className="text-[var(--primary)]">*</span> 国籍 / Nationality / 국가
+                                </label>
+                                <div className="relative group">
+                                    <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
+                                        <Globe size={18} strokeWidth={1.5} />
+                                    </div>
+                                    <select
+                                        name="country"
+                                        value={formData.country}
+                                        onChange={(e) => {
+                                            handleChange(e as any)
+                                            setError('')
+                                        }}
+                                        required
+                                        className="apple-input h-12 w-full cursor-pointer appearance-none pl-12 pr-10 text-[15px] font-normal"
+                                    >
+                                        <option value="" disabled>{t.countryPlaceholder}</option>
+                                        <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
+                                        <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
+                                        <option value="USA">🇺🇸 米国 / USA / 미국</option>
+                                        <option value="China">🇨🇳 中国 / China / 중국</option>
+                                        <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
+                                        <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
+                                    </select>
+                                    <div className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
+                                        <ArrowRight size={14} className="rotate-90" />
+                                    </div>
                                 </div>
-                                <select
-                                    name="country"
-                                    value={formData.country}
-                                    onChange={(e) => {
-                                        handleChange(e as any)
-                                        setError('')
-                                    }}
-                                    required
-                                    className="apple-input h-12 w-full cursor-pointer appearance-none pl-12 pr-10 text-[15px] font-normal"
+                            </div>
+
+                            <div className="pt-4">
+                                <button
+                                    type="submit"
+                                    className="apple-button group w-full active:scale-[0.99]"
                                 >
-                                    <option value="" disabled>{t.countryPlaceholder}</option>
-                                    <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
-                                    <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
-                                    <option value="USA">🇺🇸 米国 / USA / 미국</option>
-                                    <option value="China">🇨🇳 中国 / China / 중국</option>
-                                    <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
-                                    <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
-                                </select>
-                                <div className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
-                                    <ArrowRight size={14} className="rotate-90" />
+                                    <span>{t.nextButton}</span>
+                                    <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
+                                </button>
+                            </div>
+                        </form>
+                    ) : (
+                        <form onSubmit={handleSubmit} className="apple-panel space-y-5 p-6 md:p-8">
+                            <div className="flex justify-between items-center mb-6">
+                                <button
+                                    type="button"
+                                    onClick={() => setStep(1)}
+                                    className="flex items-center gap-1.5 rounded-full border border-[var(--hairline)] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#6e6e73] transition-colors hover:text-[var(--foreground)]"
+                                >
+                                    <ArrowLeft size={12} strokeWidth={3} />
+                                    Change Nationality / 国籍変更 / 국가 변경
+                                </button>
+                                <div className="rounded-full border border-[var(--hairline)] bg-[var(--surface-parchment)] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--primary)]">
+                                    Step 2/2
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="pt-4">
-                            <button
-                                type="submit"
-                                className="apple-button group w-full active:scale-[0.99]"
-                            >
-                                <span>{t.nextButton}</span>
-                                <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
-                            </button>
-                        </div>
-                    </form>
-                ) : (
-                    <form onSubmit={handleSubmit} className="apple-panel space-y-5 p-6 md:p-8">
-                        <div className="flex justify-between items-center mb-6">
-                            <button
-                                type="button"
-                                onClick={() => setStep(1)}
-                                className="flex items-center gap-1.5 rounded-full border border-[var(--hairline)] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#6e6e73] transition-colors hover:text-[var(--foreground)]"
-                            >
-                                <ArrowLeft size={12} strokeWidth={3} />
-                                Change Nationality / 国籍変更 / 국가 변경
-                            </button>
-                            <div className="rounded-full border border-[var(--hairline)] bg-[var(--surface-parchment)] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--primary)]">
-                                Step 2/2
-                            </div>
-                        </div>
 
                         {/* User ID */}
                         <div className="space-y-1.5">
