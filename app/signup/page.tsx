@@ -19,7 +19,6 @@ const TRANSLATIONS: Record<string, any> = {
         nationality: "国籍 / Nationality",
         registrationNumber: "事業者登録番号 / Business Reg. Number",
         email: "メールアドレス / Email",
-        emailPlaceholder: "name@company.com",
         emailMemo: "(税金計算書発行用メールアドレス)",
         phone: "電話番号 / Phone",
         fax: "ファックス / Fax",
@@ -46,7 +45,6 @@ const TRANSLATIONS: Record<string, any> = {
         nationality: "국가 (Nationality)",
         registrationNumber: "사업자등록번호 (Business Reg. Number)",
         email: "이메일 (Email)",
-        emailPlaceholder: "name@company.com",
         emailMemo: "(세금계산서 발급용 이메일)",
         phone: "전화번호 (Phone)",
         fax: "팩스 (Fax)",
@@ -73,7 +71,6 @@ const TRANSLATIONS: Record<string, any> = {
         nationality: "Nationality",
         registrationNumber: "Business Registration Number",
         email: "Email",
-        emailPlaceholder: "name@company.com",
         emailMemo: "(For tax invoice issuance)",
         phone: "Phone",
         fax: "Fax",
@@ -215,102 +212,91 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen apple-page relative overflow-hidden py-10">
-            <div className="absolute inset-0 bg-[var(--surface-parchment)]" />
-            <div className="absolute inset-x-0 top-0 h-[34vh] bg-white" />
-
-            <div className="relative z-10 mx-auto flex w-full max-w-[1120px] flex-col gap-10 px-4 lg:grid lg:grid-cols-[1.05fr_500px] lg:items-start">
-                <div className="px-2 pt-6 lg:sticky lg:top-16">
-                    <p className="mb-4 text-[12px] uppercase tracking-[0.18em] text-[#6e6e73]">WHOLESALE REGISTRATION</p>
-                    <h1 className="apple-hero-title mb-4">파트너 온보딩도 제품처럼 단정하게.</h1>
-                    <p className="apple-lead max-w-[600px]">
-                        가입 단계는 최소한의 장식으로 정리하고, 정보 입력과 승인 흐름만 또렷하게 남겼습니다.
-                        로그인 화면과 같은 톤으로 연결되도록 표면, 버튼, 타이포를 통일했습니다.
-                    </p>
-                </div>
-
-                <div className="w-full">
-                    <div className="mb-5 flex items-center gap-6">
-                        <div className="w-[77px] h-auto relative shrink-0">
-                            <img
-                                src="/logo.png"
-                                alt="BEIKO BAIT"
-                                className="w-full h-full object-contain"
-                            />
-                        </div>
-                        <div className="mt-2 flex flex-col justify-center">
-                            <h1 className="mb-1 text-[28px] font-semibold tracking-[-0.03em] text-[var(--foreground)]">{t.title}</h1>
-                            <p className="whitespace-nowrap text-[10px] font-medium uppercase tracking-[0.32em] text-[#6e6e73]">
-                                {t.subtitle}
-                            </p>
-                        </div>
+        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111] flex flex-col items-center justify-center p-4 font-sans text-[#333] dark:text-gray-200 py-6">
+            <div className="w-full max-w-[500px] mb-5">
+                <div className="flex items-center gap-6">
+                    <div className="w-[77px] h-auto relative shrink-0">
+                        <img
+                            src="/logo.png"
+                            alt="BEIKO BAIT"
+                            className="w-full h-full object-contain"
+                        />
                     </div>
+                    <div className="flex flex-col justify-center mt-2">
+                        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">{t.title}</h1>
+                        <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                            {t.subtitle}
+                        </p>
+                    </div>
+                </div>
+            </div>
 
-                    {error && (
-                        <div className="mb-6 rounded-[14px] border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-600">
-                            {error}
+            <div className="w-full max-w-[500px]">
+                {error && (
+                    <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-[#e34219] text-[#e34219] dark:text-red-400 px-4 py-3 rounded-r-lg text-sm font-medium">
+                        ⚠️ {error}
+                    </div>
+                )}
+
+                {step === 1 ? (
+                    <form onSubmit={handleNextStep} className="space-y-5 bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
+                        <div className="space-y-1.5">
+                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                                <span className="text-[#e34219]">*</span> 国籍 / Nationality / 국가
+                            </label>
+                            <div className="relative group">
+                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors pointer-events-none">
+                                    <Globe size={18} strokeWidth={1.5} />
+                                </div>
+                                <select
+                                    name="country"
+                                    value={formData.country}
+                                    onChange={(e) => {
+                                        handleChange(e as any)
+                                        setError('')
+                                    }}
+                                    required
+                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium shadow-sm appearance-none cursor-pointer"
+                                >
+                                    <option value="" disabled>Select Nationality</option>
+                                    <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
+                                    <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
+                                    <option value="USA">🇺🇸 米国 / USA / 미국</option>
+                                    <option value="China">🇨🇳 中国 / China / 중국</option>
+                                    <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
+                                    <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
+                                </select>
+                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                    <ArrowRight size={14} className="rotate-90" />
+                                </div>
+                            </div>
                         </div>
-                    )}
 
-                    {step === 1 ? (
-                        <form onSubmit={handleNextStep} className="apple-panel space-y-5 p-6 md:p-8">
-                            <div className="space-y-1.5">
-                                <label className="ml-1 block text-[12px] font-medium tracking-tight text-[#6e6e73]">
-                                    <span className="text-[var(--primary)]">*</span> 国籍 / Nationality / 국가
-                                </label>
-                                <div className="relative group">
-                                    <div className="pointer-events-none absolute left-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
-                                        <Globe size={18} strokeWidth={1.5} />
-                                    </div>
-                                    <select
-                                        name="country"
-                                        value={formData.country}
-                                        onChange={(e) => {
-                                            handleChange(e as any)
-                                            setError('')
-                                        }}
-                                        required
-                                        className="apple-input h-12 w-full cursor-pointer appearance-none pl-12 pr-10 text-[15px] font-normal"
-                                    >
-                                        <option value="" disabled>{t.countryPlaceholder}</option>
-                                        <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
-                                        <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
-                                        <option value="USA">🇺🇸 米国 / USA / 미국</option>
-                                        <option value="China">🇨🇳 中国 / China / 중국</option>
-                                        <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
-                                        <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
-                                    </select>
-                                    <div className="pointer-events-none absolute right-5 top-1/2 -translate-y-1/2 text-[#8d8d92]">
-                                        <ArrowRight size={14} className="rotate-90" />
-                                    </div>
-                                </div>
+                        <div className="pt-4">
+                            <button
+                                type="submit"
+                                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight group"
+                            >
+                                <span>Next / 次へ / 다음</span>
+                                <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
+                            </button>
+                        </div>
+                    </form>
+                ) : (
+                    <form onSubmit={handleSubmit} className="space-y-5">
+                        <div className="flex justify-between items-center mb-6">
+                            <button
+                                type="button"
+                                onClick={() => setStep(1)}
+                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#2a2a2a]"
+                            >
+                                <ArrowLeft size={12} strokeWidth={3} />
+                                Change Nationality / 国籍変更 / 국가 변경
+                            </button>
+                            <div className="px-3 py-1 text-[10px] font-black text-[#e34219] dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-full border border-red-100 dark:border-red-800 uppercase tracking-widest">
+                                Step 2/2
                             </div>
-
-                            <div className="pt-4">
-                                <button
-                                    type="submit"
-                                    className="apple-button group w-full active:scale-[0.99]"
-                                >
-                                    <span>{t.nextButton}</span>
-                                    <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
-                                </button>
-                            </div>
-                        </form>
-                    ) : (
-                        <form onSubmit={handleSubmit} className="apple-panel space-y-5 p-6 md:p-8">
-                            <div className="flex justify-between items-center mb-6">
-                                <button
-                                    type="button"
-                                    onClick={() => setStep(1)}
-                                    className="flex items-center gap-1.5 rounded-full border border-[var(--hairline)] px-3 py-1.5 text-[11px] font-medium uppercase tracking-[0.12em] text-[#6e6e73] transition-colors hover:text-[var(--foreground)]"
-                                >
-                                    <ArrowLeft size={12} strokeWidth={3} />
-                                    Change Nationality / 国籍変更 / 국가 변경
-                                </button>
-                                <div className="rounded-full border border-[var(--hairline)] bg-[var(--surface-parchment)] px-3 py-1 text-[10px] font-medium uppercase tracking-[0.14em] text-[var(--primary)]">
-                                    Step 2/2
-                                </div>
-                            </div>
+                        </div>
 
                         {/* User ID */}
                         <div className="space-y-1.5">
@@ -612,12 +598,12 @@ export default function SignupPage() {
                     </form>
                 )}
 
+                {/* Footer */}
                 <div className="mt-8 text-center">
-                    <p className="text-xs font-medium tracking-wide text-[#6e6e73]">
-                        {t.loginText} <Link href="/login" className="ml-1 font-medium text-[var(--primary)] hover:underline">{t.loginLink}</Link>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium tracking-wide">
+                        {t.loginText} <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">{t.loginLink}</Link>
                     </p>
                 </div>
-            </div>
             </div>
         </div>
     )

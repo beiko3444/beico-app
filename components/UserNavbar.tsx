@@ -14,7 +14,7 @@ export default function UserNavbar() {
     const pathname = usePathname()
 
     return (
-        <nav className="flex items-center gap-2 md:gap-6">
+        <nav className="flex items-center gap-2 md:gap-8">
             {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
                 const Icon = item.icon
@@ -24,18 +24,17 @@ export default function UserNavbar() {
                         key={item.href}
                         href={item.href}
                         className={`
-                            relative flex min-w-[72px] flex-col items-center rounded-[18px] px-3 py-2 transition-colors duration-200
-                            ${isActive ? 'bg-[var(--surface-parchment)] text-[var(--foreground)]' : 'text-[#6e6e73] hover:text-[var(--foreground)]'}
+                            flex flex-col items-center group transition-colors duration-200 min-w-[60px]
+                            ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
                         `}
                     >
-                        <Icon size={22} strokeWidth={isActive ? 2.2 : 1.8} className="mb-1" />
-                        <span className={`mb-1 text-[12px] font-medium leading-none ${isActive ? 'text-[var(--foreground)]' : 'text-[#6e6e73]'}`}>
+                        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
+                        <span className={`text-[12.5px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
                             {item.subLabel}
                         </span>
-                        <span className={`text-[9px] font-medium uppercase tracking-[0.18em] leading-none ${isActive ? 'text-[var(--primary)]' : 'text-[#8d8d92]'}`}>
+                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
                             {item.label}
                         </span>
-                        {isActive && <span className="absolute inset-x-4 bottom-0 h-[2px] rounded-full bg-[var(--foreground)]" />}
                     </Link>
                 )
             })}

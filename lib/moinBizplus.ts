@@ -1381,13 +1381,21 @@ const inspectHistoryListItems = async (page: PageLike): Promise<MoinHistoryItem[
                 const statusText = statusMatch ? statusMatch[0] : '';
 
                 let recipient = '';
+                const blockedRecipientPatterns = [
+                    /송금|수수료|환율|입금|진행|완료|반려|취소|실패|상태/,
+                    /\b(?:usd|krw|us\$)\b/i,
+                    /^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}$/,
+                    /^[\d,.\s]+(?:usd|krw|원|\$)?$/i,
+                ];
                 const candidates = Array.from(rowEl.querySelectorAll('h1,h2,h3,h4,h5,h6,strong,b,span,p,div'))
                     .filter((el) => isVisible(el))
                     .map((el) => norm(el.textContent || ''))
                     .filter((text) => text.length > 0 && text.length < 80)
                     .filter((text) => !/^[\\d,.\\s]+$/.test(text));
                 for (const text of candidates) {
-                    if (/[A-Za-z]/.test(text) && !/송금|수수료|환율|입금|진행|완료|반려|취소|실패|상태/.test(text)) {
+                    const blocked = blockedRecipientPatterns.some((pattern) => pattern.test(text));
+                    const hasLetterLikeContent = /[A-Za-z\u00C0-\u024F\u0400-\u04FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(text);
+                    if (hasLetterLikeContent && !blocked) {
                         recipient = text;
                         break;
                     }
