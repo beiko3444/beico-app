@@ -878,7 +878,7 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
             finalReceiveAmount: typeof parsed.finalReceiveAmount === 'string' ? parsed.finalReceiveAmount.trim() : '',
             sendAmount: typeof parsed.sendAmount === 'string' ? parsed.sendAmount.trim() : '',
             totalFee: typeof parsed.totalFee === 'string' ? parsed.totalFee.trim() : '',
-            exchangeRate: typeof parsed.exchangeRate === 'string' ? parsed.exchangeRate.trim() : '',
+            exchangeRate: typeof parsed.exchangeRate === 'string' ? normalizeExchangeRateText(parsed.exchangeRate.trim()) : '',
         }
     } catch {
         return {
@@ -1472,26 +1472,31 @@ const matchHistoryItem = (
         : ''
 
     const targetTime = targetDate ? new Date(`${targetDate}T00:00:00+09:00`).getTime() : null
-    const tolerance = 14 * 24 * 60 * 60 * 1000
+    const autoMatchEndTime = targetTime !== null ? targetTime + 2 * 24 * 60 * 60 * 1000 : null
 
     const scored = items
         .map((item) => {
             let score = 0
+            if (targetTime !== null) {
+                if (!item.dateText) return { item, score: Number.NEGATIVE_INFINITY }
+                const itemTime = new Date(`${item.dateText}T00:00:00+09:00`).getTime()
+                if (
+                    !Number.isFinite(itemTime) ||
+                    itemTime < targetTime ||
+                    (autoMatchEndTime !== null && itemTime >= autoMatchEndTime)
+                ) {
+                    return { item, score: Number.NEGATIVE_INFINITY }
+                }
+
+                const distanceDays = Math.floor((itemTime - targetTime) / (24 * 60 * 60 * 1000))
+                score += Math.max(0, 500 - distanceDays * 120)
+            }
             if (recipientNorm) {
                 const itemRecipientNorm = (item.recipient || '').toLowerCase().replace(/[^a-z0-9]/g, '')
                 const itemRowNorm = (item.rowText || '').toLowerCase().replace(/[^a-z0-9]/g, '')
                 if (itemRecipientNorm.includes(recipientNorm) || itemRowNorm.includes(recipientNorm)) score += 1000
             }
             if (item.statusText && /(송금완료|입금완료|완료)/.test(item.statusText)) score += 200
-            if (targetTime && item.dateText) {
-                const itemTime = new Date(`${item.dateText}T00:00:00+09:00`).getTime()
-                if (Number.isFinite(itemTime)) {
-                    const distance = Math.abs(itemTime - targetTime)
-                    if (distance <= tolerance) {
-                        score += Math.max(0, 500 - Math.floor(distance / (24 * 60 * 60 * 1000)) * 30)
-                    }
-                }
-            }
             return { item, score }
         })
         .filter((entry) => entry.score > 0)
@@ -1746,7 +1751,15 @@ const formatExchangeRateValue = (value: unknown): string => {
     if (!cleaned) return ''
     const numeric = Number(cleaned)
     if (!Number.isFinite(numeric) || numeric <= 0) return ''
-    return `1 USD = ${numeric.toLocaleString('en-US', { maximumFractionDigits: 4 })} KRW`
+    return `1 USD = ${Math.round(numeric).toLocaleString('en-US')} KRW`
+}
+
+const normalizeExchangeRateText = (value: string) => {
+    const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
+    if (!matches || matches.length === 0) return value
+    const numeric = Number(matches[matches.length - 1].replace(/,/g, ''))
+    if (!Number.isFinite(numeric) || numeric <= 0) return value
+    return `1 USD = ${Math.round(numeric).toLocaleString('en-US')} KRW`
 }
 
 const normalizeMoinTransaction = (raw: Record<string, unknown>): MoinHistoryItem => {
@@ -1865,11 +1878,22 @@ export const fetchMoinRemittanceHistory = async (
             waitUntil: 'domcontentloaded',
             timeout: LONG_TIMEOUT_MS,
         }).catch(async () => {
-            await page.goto('https://www.moinbizplus.com/history', {
+            steps.push(`history-initial-goto-retry-from:${page.url()}`)
+            await page.goto('https://www.moinbizplus.com/history/individual', {
                 waitUntil: 'domcontentloaded',
                 timeout: LONG_TIMEOUT_MS,
+            }).catch((error) => {
+                steps.push(`history-goto-interrupted:${getErrorMessage(error).slice(0, 120)}`)
             })
         })
+        if (!page.url().includes('/history')) {
+            await page.goto('https://www.moinbizplus.com/history/individual', {
+                waitUntil: 'domcontentloaded',
+                timeout: LONG_TIMEOUT_MS,
+            }).catch((error) => {
+                steps.push(`history-final-goto-interrupted:${getErrorMessage(error).slice(0, 120)}`)
+            })
+        }
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
         await page.waitForTimeout(2500)
         steps.push(`history-page-url:${page.url()}`)

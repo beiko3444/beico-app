@@ -31,7 +31,7 @@ export const extractSummaryRateFromBlob = (blob: string | null) => {
     if (!rawAmount) return null
     const normalizedNumber = Number(String(rawAmount).replace(/,/g, ''))
     if (!Number.isFinite(normalizedNumber)) return null
-    return `1 USD = ${normalizedNumber.toLocaleString('en-US', { maximumFractionDigits: 4 })} KRW`
+    return `1 USD = ${Math.round(normalizedNumber).toLocaleString('en-US')} KRW`
 }
 
 export const parseSummaryNumber = (value: string | null, mode: 'default' | 'rate' = 'default') => {

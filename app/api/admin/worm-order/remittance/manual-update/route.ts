@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         const totalFeeText = totalFeeKrw !== null ? formatSummaryAmount(String(totalFeeKrw), 'KRW') : null
         const exchangeRateText =
             exchangeRate !== null
-                ? `1 USD = ${exchangeRate.toLocaleString('en-US', { maximumFractionDigits: 4 })} KRW`
+                ? `1 USD = ${Math.round(exchangeRate).toLocaleString('en-US')} KRW`
                 : null
 
         type Updates = {

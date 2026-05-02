@@ -4038,7 +4038,7 @@ export default function WormOrderPage() {
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
                                 const remittanceSummaryComplete = isRemittanceSummaryComplete(order)
                                 const exchangeRateText = parsedExchangeRate !== null
-                                    ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
+                                    ? `1 USD = ${Math.round(parsedExchangeRate).toLocaleString('ko-KR')} KRW`
                                     : order.remittanceExchangeRateText || '-'
                                 return (
                                     <tr
