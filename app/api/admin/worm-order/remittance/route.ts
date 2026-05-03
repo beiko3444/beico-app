@@ -76,7 +76,7 @@ const extractSummaryRateFromBlob = (blob: string | null) => {
     if (!rawAmount) return null
     const normalizedNumber = Number(String(rawAmount).replace(/,/g, ''))
     if (!Number.isFinite(normalizedNumber)) return null
-    return `1 USD = ${normalizedNumber.toLocaleString('en-US', { maximumFractionDigits: 4 })} KRW`
+    return `1 USD = ${Math.round(normalizedNumber).toLocaleString('en-US')} KRW`
 }
 
 const parseSummaryNumber = (value: string | null, mode: 'default' | 'rate' = 'default') => {
@@ -169,13 +169,11 @@ const resolveActiveLock = (entry: RemittanceAuthGuardEntry | undefined, now: num
 }
 
 const isAuthRelatedAutomationError = (error: MoinAutomationError) => {
-    const combined = `${error.step} ${error.message}`.toLowerCase()
+    if (error.step === 'Login Failed') return true
+    const message = error.message || ''
     return (
-        combined.includes('login failed') ||
-        combined.includes('password') ||
-        combined.includes('account locked') ||
-        combined.includes('locked') ||
-        combined.includes('credential')
+        message.includes('[Account locked]') ||
+        message.includes('[Password mismatch]')
     )
 }
 

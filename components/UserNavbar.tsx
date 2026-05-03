@@ -5,9 +5,9 @@ import { usePathname } from 'next/navigation'
 import { ShoppingCart, History, User } from 'lucide-react'
 
 const NAV_ITEMS = [
-    { href: '/order', label: 'Order', subLabel: 'Order', icon: ShoppingCart },
-    { href: '/order/history', label: 'History', subLabel: 'History', icon: History },
-    { href: '/order/profile', label: 'My Page', subLabel: 'My Page', icon: User },
+    { href: '/order', label: '注文', subLabel: 'Order', icon: ShoppingCart },
+    { href: '/order/history', label: '履歴', subLabel: 'History', icon: History },
+    { href: '/order/profile', label: 'マイページ', subLabel: 'My Page', icon: User },
 ]
 
 export default function UserNavbar() {
@@ -23,17 +23,18 @@ export default function UserNavbar() {
                     <Link
                         key={item.href}
                         href={item.href}
+                        style={{ color: 'inherit' }}
                         className={`
                             flex flex-col items-center group transition-colors duration-200 min-w-[60px]
-                            ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}
+                            ${isActive ? 'text-[#e34219]' : 'text-[#9aa3b2] hover:text-[#7f8897] dark:text-[#9aa3b2] dark:hover:text-[#c4cad4]'}
                         `}
                     >
                         <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
-                        <span className={`text-[12.5px] font-black leading-none mb-1 ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
-                            {item.subLabel}
-                        </span>
-                        <span className={`text-[9px] font-bold uppercase tracking-[0.2em] leading-none ${isActive ? 'text-[#e34219]' : 'text-gray-400 dark:text-gray-500'}`}>
+                        <span className="mb-1 text-[12.5px] font-black leading-none">
                             {item.label}
+                        </span>
+                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] leading-none">
+                            {item.subLabel}
                         </span>
                     </Link>
                 )

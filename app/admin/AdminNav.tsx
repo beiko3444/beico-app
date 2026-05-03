@@ -60,8 +60,6 @@ export default function AdminNav({
         { name: '지렁이 발주', path: '/admin/worm-order' },
         { name: 'P.I발급', path: '/admin/proforma' },
         { name: '전력관리', path: '/admin/electricity', alert: counts?.missingBill && counts.missingBill > 0 },
-        { name: '재고관리', path: '/admin/inventory' },
-        { name: '물류관리', path: '/admin/warehousing' },
     ]
 
     useEffect(() => {
@@ -234,6 +232,10 @@ export default function AdminNav({
     const totalAlerts = (counts?.pendingOrders || 0) + (counts?.lowStock || 0) + (counts?.pendingPartners || 0) + (counts?.missingBill || 0)
     const activeTabRef = useRef<HTMLAnchorElement>(null)
     const tabContainerRef = useRef<HTMLDivElement>(null)
+    const navLinkBaseClass = 'inline-flex h-9 min-w-[84px] items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold leading-none transition-colors'
+    const navLinkActiveClass = 'bg-white text-slate-950 shadow-sm'
+    const navLinkIdleClass = 'text-white/76 hover:bg-white/10 hover:text-white'
+    const navBadgeBaseClass = 'flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none'
 
     useEffect(() => {
         if (activeTabRef.current && tabContainerRef.current) {
@@ -249,35 +251,60 @@ export default function AdminNav({
 
     return (
         <div className="fixed top-0 left-0 right-0 z-[100]">
-            {/* Top header bar */}
-            <div className="bg-white dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-transparent px-4 py-2.5 shadow-sm dark:shadow-none">
-                <div className="max-w-7xl mx-auto flex items-center justify-between">
-                    {/* Left: Logo + Title */}
-                    <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 bg-gray-100 dark:bg-[#2a2a2a] rounded-lg flex items-center justify-center">
-                            <LayoutGrid size={18} className="text-gray-500 dark:text-gray-300" />
+            <div className="bg-[#050505] px-4 py-2.5 text-white">
+                <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
+                    <div className="flex min-w-0 items-center gap-4">
+                        <div className="flex shrink-0 items-center">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
+                                <LayoutGrid size={18} className="text-white" />
+                            </div>
                         </div>
-                        <span className="text-gray-900 dark:text-white text-sm font-bold tracking-tight">관리자 콘솔</span>
+
+                        <div ref={tabContainerRef} className="hidden min-w-0 flex-1 overflow-x-auto scrollbar-hide lg:block">
+                            <nav className="flex items-center gap-1.5 whitespace-nowrap">
+                                {navItems.map((item) => {
+                                    const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
+
+                                    return (
+                                        <Link
+                                            key={item.path}
+                                            ref={isActive ? activeTabRef : undefined}
+                                            href={item.path}
+                                            prefetch={false}
+                                            className={`${navLinkBaseClass} ${isActive ? navLinkActiveClass : navLinkIdleClass}`}
+                                        >
+                                            {item.name}
+                                            {item.count && item.count > 0 ? (
+                                                <span className={`${navBadgeBaseClass} ${isActive ? 'bg-slate-950 text-white' : 'bg-white/16 text-white'}`}>
+                                                    {item.count}
+                                                </span>
+                                            ) : null}
+                                            {item.alert ? (
+                                                <span className={`${navBadgeBaseClass} ${isActive ? 'bg-slate-950 text-white' : 'bg-white/16 text-white'}`}>
+                                                    !
+                                                </span>
+                                            ) : null}
+                                        </Link>
+                                    )
+                                })}
+                            </nav>
+                        </div>
                     </div>
 
-                    {/* Right: Actions */}
-                    <div className="flex items-center gap-2">
-                        {/* Theme toggle */}
-                        <ThemeToggle className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333]" />
+                    <div className="flex shrink-0 items-center gap-2">
+                        <ThemeToggle className="bg-white/10 hover:bg-white/16 border border-white/10" />
 
-                        {/* Bell notification */}
-                        <button className="relative w-9 h-9 rounded-lg bg-gray-100 dark:bg-[#2a2a2a] flex items-center justify-center hover:bg-gray-200 dark:hover:bg-[#333] transition-colors">
-                            <Bell size={17} className="text-gray-500 dark:text-gray-300" />
+                        <button className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 transition-colors hover:bg-white/16">
+                            <Bell size={17} className="text-white/88" />
                             {totalAlerts > 0 && (
-                                <span className="absolute -top-1 -right-1 flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#1473d8] px-1 text-[10px] font-bold leading-none text-white">
                                     {totalAlerts}
                                 </span>
                             )}
                         </button>
 
-                        {/* Shipment count input + 건출고 */}
-                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-lg bg-gray-100 dark:bg-[#2a2a2a]">
-                            <span className="inline-flex h-full items-center pl-2.5 pr-1 text-gray-400">
+                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-full border border-white/12 bg-white text-slate-950">
+                            <span className="inline-flex h-full items-center pl-3 pr-1 text-slate-500">
                                 <Plus size={14} />
                             </span>
                             <input
@@ -286,33 +313,25 @@ export default function AdminNav({
                                 inputMode="numeric"
                                 value={shipmentCount}
                                 onChange={(event) => setShipmentCount(event.target.value)}
-                                className="h-full w-[36px] border-none bg-transparent text-center text-xs font-bold text-gray-900 dark:text-white outline-none focus:outline-none"
+                                className="h-full w-[34px] border-none bg-transparent text-center text-[12px] font-semibold leading-none text-slate-950 outline-none focus:outline-none"
                                 placeholder="1"
                                 aria-label="출고 건수"
                             />
-                            <span className="inline-flex h-full items-center pr-2.5 text-xs font-bold text-gray-700 dark:text-white whitespace-nowrap">건 출고</span>
+                            <span className="inline-flex h-full items-center pr-3 text-[12px] font-semibold leading-none text-slate-950 whitespace-nowrap">건 출고</span>
                         </div>
 
-                        {/* 집하요청 button */}
                         <button
                             onClick={handleSendSms}
                             disabled={sendingSms || loadingFromNumber}
-                            className="h-9 px-3 text-xs font-bold text-gray-700 dark:text-white bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333] disabled:opacity-40 rounded-lg transition-colors flex items-center gap-1.5"
+                            className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#1473d8] px-3.5 text-[12px] font-semibold leading-none text-white transition-colors hover:bg-[#0f63bd] disabled:opacity-40"
                         >
                             <Download size={14} />
                             <span>{sendingSms ? '요청중...' : '집하요청'}</span>
                         </button>
 
-                        {/* Logout button */}
-                        {/* 배포 재트리거용 텍스트 주석 */}
-                        {/* 재배포 트리거 주석 2 */}
-                        {/* 재배포 트리거 주석 3 */}
-                        {/* 재배포 트리거 주석 4 */}
-                        {/* 재배포 트리거 주석 5 */}
-                        {/* 재배포 트리거 주석 6 */}
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
-                            className="h-9 px-3 rounded-lg bg-purple-200 flex items-center justify-center text-xs font-bold text-purple-700 hover:bg-purple-300 transition-colors whitespace-nowrap"
+                            className="flex h-9 items-center justify-center rounded-full border border-white/12 bg-white/10 px-3.5 text-[12px] font-semibold leading-none text-white transition-colors hover:bg-white/16 whitespace-nowrap"
                             title="로그아웃"
                         >
                             로그아웃
@@ -320,19 +339,18 @@ export default function AdminNav({
                     </div>
                 </div>
 
-                {/* SMS status row */}
                 {(smsStatus || smsSendLogs.length > 0) && (
-                    <div className="max-w-7xl mx-auto flex items-center justify-end gap-2 mt-1.5">
+                    <div className="max-w-[1200px] mx-auto flex items-center justify-end gap-2 mt-1.5">
                         {smsStatus ? (
-                            <span className={`text-[11px] font-semibold ${smsStatus.type === 'success' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                            <span className={`text-[11px] font-medium ${smsStatus.type === 'success' ? 'text-white/78' : 'text-[#ffb4b4]'}`}>
                                 {smsStatus.message}
                             </span>
                         ) : null}
                         {smsSendLogs.length > 0 ? (
                             <span
                                 className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${smsSendLogs[0].status === 'success'
-                                    ? 'border-green-200 dark:border-green-700 bg-green-50 dark:bg-green-900/40 text-green-700 dark:text-green-400'
-                                    : 'border-red-200 dark:border-red-700 bg-red-50 dark:bg-red-900/40 text-red-700 dark:text-red-400'
+                                    ? 'border-white/10 bg-white/8 text-white/88'
+                                    : 'border-[#6b1f1f] bg-[#3a1111] text-[#ffd6d6]'
                                     }`}
                                 title={smsSendLogs[0].detail}
                             >
@@ -343,12 +361,9 @@ export default function AdminNav({
                         ) : null}
                     </div>
                 )}
-            </div>
 
-            {/* Tab navigation bar */}
-            <div className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#333] px-4">
-                <div className="max-w-7xl mx-auto">
-                    <nav ref={tabContainerRef} className="flex items-center gap-0 overflow-x-auto scrollbar-hide">
+                <div className="max-w-[1200px] mx-auto mt-2 lg:hidden">
+                    <nav ref={tabContainerRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide whitespace-nowrap pb-1">
                         {navItems.map((item) => {
                             const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
 
@@ -358,25 +373,19 @@ export default function AdminNav({
                                     ref={isActive ? activeTabRef : undefined}
                                     href={item.path}
                                     prefetch={false}
-                                    className={`relative px-4 py-3 text-[13px] transition-colors whitespace-nowrap flex items-center gap-1.5 ${isActive
-                                        ? 'text-gray-900 dark:text-white font-bold'
-                                        : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 font-medium'
-                                        }`}
+                                    className={`${navLinkBaseClass} ${isActive ? navLinkActiveClass : navLinkIdleClass}`}
                                 >
                                     {item.name}
                                     {item.count && item.count > 0 ? (
-                                        <span className="flex items-center justify-center h-[18px] min-w-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                        <span className={`${navBadgeBaseClass} ${isActive ? 'bg-slate-950 text-white' : 'bg-white/16 text-white'}`}>
                                             {item.count}
                                         </span>
                                     ) : null}
                                     {item.alert ? (
-                                        <span className="flex items-center justify-center h-[18px] w-[18px] rounded-full bg-red-500 text-white text-[10px] font-bold">
+                                        <span className={`${navBadgeBaseClass} ${isActive ? 'bg-slate-950 text-white' : 'bg-white/16 text-white'}`}>
                                             !
                                         </span>
                                     ) : null}
-                                    {isActive && (
-                                        <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-gray-900 dark:bg-white rounded-t-full" />
-                                    )}
                                 </Link>
                             )
                         })}

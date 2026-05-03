@@ -57,6 +57,8 @@ export default function ElectricityClient() {
     const [invoiceRemarks, setInvoiceRemarks] = useState('')
     const [paymentChecklist, setPaymentChecklist] = useState<Record<string, PaymentChecklistStatus>>({})
     const [monthlyLandlordTotals, setMonthlyLandlordTotals] = useState<Record<number, number | null>>({})
+    const [rentPaidDates, setRentPaidDates] = useState<Record<number, string | null>>({})
+    const [savingRentMonth, setSavingRentMonth] = useState<number | null>(null)
 
     // Landlord Input States
     const [landlordInputs, setLandlordInputs] = useState({
@@ -296,6 +298,52 @@ export default function ElectricityClient() {
 
         fetchMonthlyLandlordTotals()
     }, [activeTab, selectedYear])
+
+    useEffect(() => {
+        if (activeTab !== 'payment') return
+
+        const fetchRentPayments = async () => {
+            try {
+                const res = await fetch(`/api/admin/electricity/rent-payment?year=${selectedYear}`)
+                if (!res.ok) return
+                const data = await res.json()
+                const payments = Array.isArray(data?.payments) ? data.payments : []
+                const next: Record<number, string | null> = {}
+                for (const entry of payments) {
+                    const month = Number(entry?.month)
+                    if (!Number.isFinite(month)) continue
+                    next[month] = entry?.paidDate ? String(entry.paidDate).slice(0, 10) : null
+                }
+                setRentPaidDates(next)
+            } catch (error) {
+                console.error('Failed to fetch rent payments', error)
+            }
+        }
+
+        fetchRentPayments()
+    }, [activeTab, selectedYear])
+
+    const saveRentPaidDate = async (month: number, paidDate: string | null) => {
+        setSavingRentMonth(month)
+        try {
+            const res = await fetch('/api/admin/electricity/rent-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    year: selectedYear,
+                    month,
+                    paidDate: paidDate || null,
+                }),
+            })
+            if (!res.ok) throw new Error('save-failed')
+            setRentPaidDates(prev => ({ ...prev, [month]: paidDate || null }))
+        } catch (error) {
+            console.error('Failed to save rent paid date', error)
+            alert('월세 입금일자 저장에 실패했습니다.')
+        } finally {
+            setSavingRentMonth(null)
+        }
+    }
 
     const saveData = async (bData: BillData | null, lData: LandlordData | null, currentRawText?: string, currentHistory?: any[]) => {
         setLoading(true)
@@ -680,6 +728,13 @@ export default function ElectricityClient() {
         return new Date(value).toLocaleString('ko-KR')
     }
 
+    const formatRentPaidDateLabel = (value: string | null | undefined) => {
+        if (!value) return '미입금'
+        const [, m, d] = value.split('-')
+        if (!m || !d) return value
+        return `${Number(m)}월 ${Number(d)}일`
+    }
+
     const getRentPaymentInfo = (year: number, month: number) => {
         const nextMonth = month === 12 ? 1 : month + 1;
         const nextYear = month === 12 ? year + 1 : year;
@@ -1004,7 +1059,7 @@ export default function ElectricityClient() {
                                                 • 납부금액: <span className="font-bold text-gray-900 dark:text-white">{rentInfo.amount}</span>
                                             </div>
                                             <div className="text-xs text-gray-600 dark:text-gray-400">
-                                                • 납부상태: <span className="font-bold text-gray-900 dark:text-white">{rentInfo.paidDate}</span>
+                                                • 납부상태: <span className="font-bold text-gray-900 dark:text-white">{formatRentPaidDateLabel(rentPaidDates[selectedMonth])}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1072,8 +1127,14 @@ export default function ElectricityClient() {
                                                         <td className="px-4 py-3 font-bold text-gray-900 dark:text-white cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
                                                             {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center text-gray-700 dark:text-gray-400 whitespace-nowrap">
-                                                            {rowRentInfo.paidDate}
+                                                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                            <input
+                                                                type="date"
+                                                                value={rentPaidDates[m] || ''}
+                                                                onChange={(e) => saveRentPaidDate(m, e.target.value || null)}
+                                                                disabled={savingRentMonth === m}
+                                                                className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-900 dark:text-white text-xs rounded-md focus:ring-[#d9361b] focus:border-[#d9361b] px-2 py-1 font-medium disabled:opacity-60"
+                                                            />
                                                         </td>
                                                         <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                                             {rowRentInfo.amount}

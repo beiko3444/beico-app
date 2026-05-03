@@ -58,6 +58,15 @@ type BrowserContextLike = {
     newPage: () => Promise<PageLike>
 }
 
+type ResponseLike = {
+    url: () => string
+    status: () => number
+    headers: () => Record<string, string>
+    request: () => { method: () => string }
+    json: () => Promise<unknown>
+    text: () => Promise<string>
+}
+
 type PageLike = {
     goto: (url: string, options?: Record<string, unknown>) => Promise<void>
     url: () => string
@@ -70,6 +79,8 @@ type PageLike = {
     waitForTimeout: (ms: number) => Promise<void>
     content: () => Promise<string>
     evaluate: (fn: string | ((...args: unknown[]) => unknown), ...args: unknown[]) => Promise<unknown>
+    on: (event: 'response', handler: (response: ResponseLike) => void) => void
+    off?: (event: 'response', handler: (response: ResponseLike) => void) => void
 }
 
 type LocatorLike = {
@@ -408,6 +419,94 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const collectMoinLoginSubmitDiagnostics = async (page: PageLike) => {
+    return String(
+        await page.evaluate(`
+            (() => {
+                const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+                const isVisible = (el) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                };
+                const inputs = Array.from(document.querySelectorAll('input')).map((el) => ({
+                    type: el.getAttribute('type') || '',
+                    name: el.getAttribute('name') || '',
+                    testid: el.getAttribute('data-testid') || '',
+                    visible: isVisible(el),
+                    disabled: Boolean(el.disabled),
+                    valueLength: String(el.value || '').length,
+                }));
+                const buttons = Array.from(document.querySelectorAll('button, [role="button"]')).map((el) => ({
+                    tag: el.tagName || '',
+                    type: el.getAttribute('type') || '',
+                    name: el.getAttribute('name') || '',
+                    testid: el.getAttribute('data-testid') || '',
+                    text: normalize(el.textContent || ''),
+                    visible: isVisible(el),
+                    disabled: Boolean(el.disabled) || el.getAttribute('aria-disabled') === 'true',
+                }));
+                return JSON.stringify({ inputs, buttons });
+            })()
+        `).catch((error) => `diag-failed:${getErrorMessage(error)}`)
+    )
+}
+
+const clickMoinLoginSubmit = async (
+    page: PageLike,
+    abortSignal: AbortSignal | undefined,
+): Promise<string> => {
+    const loginBtnSelectors = [
+        'button[data-testid="button-login"]',
+        'button[name="login_button"]',
+        'form button[type="submit"]',
+        `button[type="submit"]:has-text("${KO_LOGIN}")`,
+    ]
+
+    let sawVisibleDisabledSubmit = false
+    const errors: string[] = []
+
+    for (const selector of loginBtnSelectors) {
+        throwIfAbortRequested(abortSignal, 'Submit login')
+        try {
+            const btn = page.locator(selector).first()
+            await btn.waitFor({ state: 'visible', timeout: 5000 })
+
+            for (let attempt = 0; attempt < 16; attempt++) {
+                throwIfAbortRequested(abortSignal, 'Submit login')
+                const disabled = await btn.isDisabled().catch(() => false)
+                const enabled = await btn.isEnabled().catch(() => !disabled)
+                if (!disabled && enabled) {
+                    await btn.click({ timeout: 5000 })
+                    return selector
+                }
+                sawVisibleDisabledSubmit = true
+                await page.waitForTimeout(500)
+            }
+
+            const diagnostics = await collectMoinLoginSubmitDiagnostics(page)
+            throw new MoinAutomationError(
+                'Submit login',
+                `MOIN login submit button did not become enabled after credentials were typed. Please verify the configured login ID/password format before retrying. diag=${diagnostics}`,
+            )
+        } catch (error) {
+            if (error instanceof MoinAutomationError) throw error
+            errors.push(`${selector}: ${getErrorMessage(error)}`)
+        }
+    }
+
+    const diagnostics = await collectMoinLoginSubmitDiagnostics(page)
+    const reason = sawVisibleDisabledSubmit
+        ? 'MOIN login submit button was visible but stayed disabled after credentials were typed.'
+        : 'Could not find the MOIN login submit button.'
+
+    throw new MoinAutomationError(
+        'Submit login',
+        `${reason} Please verify the configured login ID/password format before retrying. diag=${diagnostics} selectors=${errors.join(' | ')}`,
+    )
+}
+
 const findVisibleCompanyTextLocator = async (page: PageLike, timeoutMs: number): Promise<LocatorLike | null> => {
     const variantCandidates = Array.from(new Set([TARGET_COMPANY_NAME, ...TARGET_COMPANY_NAME_VARIANTS].filter(Boolean)))
     const candidates: Array<string | RegExp> = [TARGET_COMPANY_NAME_REGEX, ...variantCandidates]
@@ -466,19 +565,213 @@ const scrollToCompanyTextCandidate = async (page: PageLike) => {
     return Boolean(found)
 }
 
+const clickCompanyRowCandidate = async (page: PageLike, companyNames: string[]) => {
+    const result = await page.evaluate(`
+        (() => {
+            const companies = ${JSON.stringify(companyNames)};
+            const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+            const normalizedCompanies = companies.map(normalize).filter(Boolean);
+            const requiredTokens = ['shanghai', 'oikki', 'trading'];
+            const textOf = (el) => String((el && el.textContent) || '').replace(/\\s+/g, ' ').trim();
+            const matchesCompany = (el) => {
+                const normalized = normalize(textOf(el));
+                if (!normalized) return false;
+                if (normalizedCompanies.some((company) => normalized.includes(company))) return true;
+                return requiredTokens.every((token) => normalized.includes(token));
+            };
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const clickWithMouseEvents = (target) => {
+                if (!target || !isVisible(target) || isDisabled(target)) return false;
+                try {
+                    target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+                } catch {}
+                const eventInit = { bubbles: true, cancelable: true, view: window };
+                try { target.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+                if (typeof target.click === 'function') target.click();
+                return true;
+            };
+            const isClickable = (el) => {
+                if (!el) return false;
+                const tag = (el.tagName || '').toLowerCase();
+                const role = (el.getAttribute('role') || '').toLowerCase();
+                const style = window.getComputedStyle(el);
+                return tag === 'button' || tag === 'a' || role === 'button' || el.getAttribute('onclick') || style.cursor === 'pointer' || el.tabIndex >= 0;
+            };
+            const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+            const leaves = Array.from(document.querySelectorAll('*'))
+                .filter((el) => isVisible(el) && matchesCompany(el))
+                .sort((a, b) => {
+                    const ra = a.getBoundingClientRect();
+                    const rb = b.getBoundingClientRect();
+                    return (ra.width * ra.height) - (rb.width * rb.height);
+                })
+                .slice(0, 8);
+
+            for (const leaf of leaves) {
+                let scope = leaf;
+                for (let depth = 0; depth < 8 && scope; depth += 1) {
+                    const rect = scope.getBoundingClientRect();
+                    const area = rect.width * rect.height;
+                    if (area > viewportArea * 0.65) {
+                        scope = scope.parentElement;
+                        continue;
+                    }
+
+                    const selectable = Array.from(scope.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'))
+                        .find((el) => isVisible(el) && !isDisabled(el));
+                    if (selectable && clickWithMouseEvents(selectable)) return 'clicked-row-select-control';
+
+                    if (isClickable(scope) && clickWithMouseEvents(scope)) return 'clicked-row-clickable-scope';
+
+                    const clickable = Array.from(scope.querySelectorAll('button, a, [role="button"], [onclick]'))
+                        .find((el) => isVisible(el) && !isDisabled(el));
+                    if (clickable && clickWithMouseEvents(clickable)) return 'clicked-row-child-clickable';
+
+                    if (depth >= 2 && clickWithMouseEvents(scope)) return 'clicked-row-container';
+
+                    scope = scope.parentElement;
+                }
+            }
+
+            return 'row-select-not-found';
+        })()
+    `).catch(() => 'row-select-error')
+
+    return String(result || 'row-select-unknown')
+}
+
+const clickFirstRecipientSearchResult = async (page: PageLike, keyword: string) => {
+    const result = await page.evaluate(`
+        (() => {
+            const keyword = ${JSON.stringify(keyword)};
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
+            const emptyHints = ['검색 결과가 없습니다', '결과가 없습니다', '수취인이 없습니다', '등록된 수취인이 없습니다', 'no result', 'no recipient'];
+            const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const normalize = (value) => norm(value).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+            const keywordNorm = normalize(keyword);
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const textOf = (el) => norm((el && el.textContent) || '');
+            const inputHint = (el) => [
+                el.placeholder || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('name') || '',
+                el.getAttribute('id') || '',
+            ].join(' ').toLowerCase();
+            const isRecipientSearch = (el) => {
+                const hint = inputHint(el);
+                return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
+            };
+            const searchInput = Array.from(document.querySelectorAll('input'))
+                .find((el) => isVisible(el) && isRecipientSearch(el));
+            if (!searchInput) return 'search-result-input-not-found';
+
+            const inputRect = searchInput.getBoundingClientRect();
+            const bodyText = normalize((document.body && document.body.innerText) || '');
+            if (emptyHints.some((hint) => bodyText.includes(normalize(hint)))) {
+                return 'search-result-empty';
+            }
+
+            const clickWithMouseEvents = (target) => {
+                if (!target || !isVisible(target) || isDisabled(target)) return false;
+                try {
+                    target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+                } catch {}
+                const eventInit = { bubbles: true, cancelable: true, view: window };
+                try { target.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+                if (typeof target.click === 'function') target.click();
+                return true;
+            };
+            const isClickable = (el) => {
+                if (!el) return false;
+                const tag = (el.tagName || '').toLowerCase();
+                const role = (el.getAttribute('role') || '').toLowerCase();
+                const style = window.getComputedStyle(el);
+                return tag === 'button' || tag === 'a' || role === 'button' || el.getAttribute('onclick') || style.cursor === 'pointer' || el.tabIndex >= 0;
+            };
+            const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+            const rows = Array.from(document.querySelectorAll('li, tr, label, article, section, [role="row"], [role="option"], div'))
+                .filter((el) => isVisible(el))
+                .map((el) => {
+                    const rect = el.getBoundingClientRect();
+                    const text = textOf(el);
+                    const area = rect.width * rect.height;
+                    const hasSelectable = Boolean(el.querySelector('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'));
+                    const hasKeyword = keywordNorm ? normalize(text).includes(keywordNorm) : false;
+                    return { el, rect, text, area, hasSelectable, hasKeyword };
+                })
+                .filter((row) => row.rect.top > inputRect.bottom - 8)
+                .filter((row) => row.text.length >= 3 && row.text.length <= 700)
+                .filter((row) => row.area > 1200 && row.area < viewportArea * 0.5)
+                .filter((row) => !normalize(row.text).includes(normalize('다음단계')))
+                .filter((row) => !normalize(row.text).includes(normalize('신규 수취인 등록')))
+                .sort((a, b) => {
+                    const keywordScore = Number(b.hasKeyword) - Number(a.hasKeyword);
+                    if (keywordScore !== 0) return keywordScore;
+                    const selectableScore = Number(b.hasSelectable) - Number(a.hasSelectable);
+                    if (selectableScore !== 0) return selectableScore;
+                    return a.rect.top - b.rect.top || a.area - b.area;
+                });
+
+            for (const row of rows.slice(0, 6)) {
+                const selectable = Array.from(row.el.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'))
+                    .find((el) => isVisible(el) && !isDisabled(el));
+                if (selectable && clickWithMouseEvents(selectable)) return 'clicked-search-result-select-control';
+                if (isClickable(row.el) && clickWithMouseEvents(row.el)) return 'clicked-search-result-row';
+                const clickable = Array.from(row.el.querySelectorAll('button, a, [role="button"], [onclick]'))
+                    .find((el) => isVisible(el) && !isDisabled(el));
+                if (clickable && clickWithMouseEvents(clickable)) return 'clicked-search-result-child-clickable';
+            }
+
+            return rows.length > 0 ? 'search-result-click-miss' : 'search-result-row-not-found';
+        })()
+    `).catch(() => 'search-result-error')
+
+    return String(result || 'search-result-unknown')
+}
+
 const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
     const result = await page.evaluate(`
         (() => {
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
             const keyword = ${JSON.stringify(keyword)};
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
+            const inputHint = (el) => [
+                el.placeholder || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('name') || '',
+                el.getAttribute('id') || '',
+            ].join(' ').toLowerCase();
+            const isRecipientSearch = (el) => {
+                const hint = inputHint(el);
+                return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
+            };
             const input = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && (el.placeholder || '').includes(recipientPlaceholder));
+                .find((el) => isVisible(el) && isRecipientSearch(el));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -500,14 +793,25 @@ const clearRecipientSearchKeyword = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
+            const inputHint = (el) => [
+                el.placeholder || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('name') || '',
+                el.getAttribute('id') || '',
+            ].join(' ').toLowerCase();
+            const isRecipientSearch = (el) => {
+                const hint = inputHint(el);
+                return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
+            };
             const input = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && (el.placeholder || '').includes(recipientPlaceholder));
+                .find((el) => isVisible(el) && isRecipientSearch(el));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -564,9 +868,7 @@ const inspectTransferInputs = async (page: PageLike) => {
                 amountKeywordVisible:
                     bodyText.includes(amountEntry) ||
                     bodyText.includes(receiveAmount) ||
-                    bodyText.includes(sendAmount) ||
-                    bodyText.includes('USD') ||
-                    bodyText.includes('KRW'),
+                    bodyText.includes(sendAmount),
             };
         })()
     `) as {
@@ -754,12 +1056,12 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
 
-            const extractSameLine = (line, words) => {
+            const extractSameLine = (line, words, key) => {
                 const escapeRegex = (input) => String(input).replace(/[\\^$.*+?()[\\]{}|]/g, '\\\\$&');
                 for (const word of words) {
                     const pattern = new RegExp(escapeRegex(word) + '\\\\s*[:：-]?\\\\s*(.+)$', 'i');
                     const match = line.match(pattern);
-                    if (match && hasDigit(match[1])) return clean(match[1]);
+                    if (match && hasDigit(match[1])) return moneySnippet(match[1], key) || clean(match[1]);
                 }
                 return '';
             };
@@ -794,7 +1096,7 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                     .filter((row) => normalizedWords.some((word) => normalize(row.text).includes(word)));
 
                 for (const candidate of candidates) {
-                    const direct = extractSameLine(candidate.text, words);
+                    const direct = extractSameLine(candidate.text, words, key);
                     if (direct) return direct;
                     const directSnippet = moneySnippet(candidate.text, key);
                     if (directSnippet) return directSnippet;
@@ -826,7 +1128,7 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                     const normalizedLine = normalize(line);
                     if (!normalizedWords.some((word) => normalizedLine.includes(word))) continue;
 
-                    const sameLine = extractSameLine(line, words);
+                    const sameLine = extractSameLine(line, words, key);
                     if (sameLine) return sameLine;
 
                     const sameLineSnippet = moneySnippet(line, key);
@@ -869,7 +1171,7 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
             finalReceiveAmount: typeof parsed.finalReceiveAmount === 'string' ? parsed.finalReceiveAmount.trim() : '',
             sendAmount: typeof parsed.sendAmount === 'string' ? parsed.sendAmount.trim() : '',
             totalFee: typeof parsed.totalFee === 'string' ? parsed.totalFee.trim() : '',
-            exchangeRate: typeof parsed.exchangeRate === 'string' ? parsed.exchangeRate.trim() : '',
+            exchangeRate: typeof parsed.exchangeRate === 'string' ? normalizeExchangeRateText(parsed.exchangeRate.trim()) : '',
         }
     } catch {
         return {
@@ -1012,9 +1314,8 @@ const clickCompanyScopedRemit = async (
                 '[role="dialog"], [class*="modal"], [class*="Modal"], [class*="drawer"], [class*="Drawer"], [class*="popup"], [class*="Popup"]'
             )).filter(isVisible);
             const companyModalScopes = modalScopes.filter((scope) => hasCompanyText(scope));
-            const prioritizedModalScopes = companyModalScopes.length > 0 ? companyModalScopes : modalScopes;
 
-            for (const scope of prioritizedModalScopes) {
+            for (const scope of companyModalScopes) {
                 const companyRef = Array.from(scope.querySelectorAll('*'))
                     .filter((el) => isVisible(el) && hasCompanyText(el))
                     .sort((a, b) => {
@@ -1129,6 +1430,1000 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
     )
 }
 
+const performMoinLogin = async (
+    page: PageLike,
+    loginId: string,
+    loginPassword: string,
+    steps: string[],
+    abortSignal: AbortSignal | undefined,
+): Promise<void> => {
+    throwIfAbortRequested(abortSignal, 'Open login page')
+    const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
+    steps.push(`open-login-page:${loginWaitUntil}`)
+
+    throwIfAbortRequested(abortSignal, 'Fill login ID')
+    await typeFirstVisible(
+        page,
+        [
+            'input[name="email"]',
+            'input[type="email"]',
+            'input[name="username"]',
+            'input[autocomplete="username"]',
+            'input[autocomplete="email"]',
+        ],
+        loginId,
+        'Fill login ID',
+        DEFAULT_TIMEOUT_MS,
+    )
+    steps.push('fill-login-id')
+
+    throwIfAbortRequested(abortSignal, 'Fill login password')
+    await typeFirstVisible(
+        page,
+        ['input[name="password"]', 'input[type="password"]', 'input[autocomplete="current-password"]'],
+        loginPassword,
+        'Fill login password',
+        DEFAULT_TIMEOUT_MS,
+    )
+    steps.push('fill-login-password')
+
+    const clickDelay = 1500 + Math.floor(Math.random() * 1000)
+    throwIfAbortRequested(abortSignal, 'Submit login')
+    await page.waitForTimeout(clickDelay)
+
+    const loginUrlBefore = page.url()
+    await clickMoinLoginSubmit(page, abortSignal)
+    steps.push('submit-login')
+
+    let loginFailed = false
+    try {
+        throwIfAbortRequested(abortSignal, 'Verify login')
+        await Promise.race([
+            waitForUrlChange(page, loginUrlBefore, 10000).then((url) => {
+                if (url.includes('/login')) loginFailed = true
+            }),
+            page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_ATTEMPT_EXCEEDED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_LOCK).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_LOCKED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+        ])
+    } catch {
+        // Ignore timeouts from race
+    }
+
+    throwIfAbortRequested(abortSignal, 'Verify login')
+    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
+
+    if (loginFailed || page.url().includes('/login')) {
+        const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
+        if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
+            throw new MoinAutomationError(
+                'Login Failed',
+                '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.',
+            )
+        } else if (bodyText.includes(KO_PASSWORD_MISMATCH)) {
+            throw new MoinAutomationError(
+                'Login Failed',
+                '[Password mismatch] The password is incorrect. Please verify the password before trying again.',
+            )
+        } else {
+            throw new MoinAutomationError(
+                'Login Failed',
+                `Login failed (URL: ${page.url()}). Please verify the account credentials.`,
+            )
+        }
+    }
+
+    steps.push(`post-login-url:${page.url()}`)
+}
+
+export type MoinHistoryItem = {
+    detailUrl: string
+    rowText: string
+    dateText: string
+    recipient: string
+    amountUsdText: string
+    statusText: string
+    transactionId?: string | null
+    sendAmountKrwText?: string
+    totalFeeKrwText?: string
+    exchangeRateText?: string
+    appliedAtIso?: string | null
+    rawTransaction?: Record<string, unknown> | null
+}
+
+export type MoinHistoryFetchInput = {
+    loginId: string
+    loginPassword: string
+    targetDate?: string | null
+    recipientHint?: string | null
+    targetTransactionId?: string | null
+    headless?: boolean
+    abortSignal?: AbortSignal
+}
+
+export type MoinHistoryFetchResult = {
+    steps: string[]
+    items: MoinHistoryItem[]
+    matched: MoinHistoryItem | null
+    matchedSummary: MoinRemittancePricingSummary | null
+    matchedAppliedAtIso: string | null
+    matchedDetailBodyText: string | null
+    matchStrategy: 'api' | 'dom' | null
+    diagnostic: {
+        listUrl: string
+        bodyTextPreview: string
+        anchorHrefs: string[]
+        clickableTextSamples: string[]
+        capturedResponseUrls?: string[]
+        largestResponseSnippet?: string
+    } | null
+}
+
+const inspectHistoryListDiagnostic = async (page: PageLike) => {
+    const raw = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+
+            const bodyText = norm((document.body && document.body.innerText) || '').slice(0, 1500);
+            const anchorHrefs = Array.from(document.querySelectorAll('a[href]'))
+                .filter((el) => isVisible(el))
+                .map((el) => el.getAttribute('href') || '')
+                .filter((href) => href && !href.startsWith('#'))
+                .slice(0, 60);
+            const clickableTextSamples = Array.from(document.querySelectorAll('[role="button"], button, [onclick], [data-testid]'))
+                .filter((el) => isVisible(el))
+                .map((el) => norm(el.textContent || ''))
+                .filter((text) => text.length > 0 && text.length <= 80)
+                .slice(0, 30);
+
+            return JSON.stringify({
+                listUrl: window.location.href,
+                bodyTextPreview: bodyText,
+                anchorHrefs,
+                clickableTextSamples,
+            });
+        })()
+    `) as string
+
+    try {
+        return JSON.parse(raw || '{}')
+    } catch {
+        return null
+    }
+}
+
+const inspectHistoryListItems = async (page: PageLike): Promise<MoinHistoryItem[]> => {
+    const result = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const detailLinks = Array.from(document.querySelectorAll('a[href*="/history/"]'))
+                .filter((el) => isVisible(el))
+                .filter((el) => {
+                    const href = el.getAttribute('href') || '';
+                    return /\\/history\\/[^/]+$/i.test(href) && !/\\/history\\/(individual|bulk)$/i.test(href);
+                });
+
+            const rows = [];
+            const seen = new Set();
+            for (const link of detailLinks) {
+                const href = link.getAttribute('href') || '';
+                if (seen.has(href)) continue;
+                seen.add(href);
+
+                const rowEl = link.closest('li, tr, article, [class*="row"], [class*="Row"], [class*="item"], [class*="Item"], [class*="card"], [class*="Card"]') || link;
+                const rowText = norm(rowEl.textContent || '');
+
+                const dateMatch = rowText.match(/\\b(20\\d{2})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})\\b/);
+                const dateText = dateMatch
+                    ? dateMatch[1] + '-' + String(dateMatch[2]).padStart(2, '0') + '-' + String(dateMatch[3]).padStart(2, '0')
+                    : '';
+
+                const usdMatch = rowText.match(/[\\d,]+(?:\\.\\d{1,2})?\\s*(?:US\\$|USD|\\$)/i)
+                    || rowText.match(/(?:US\\$|USD|\\$)\\s*[\\d,]+(?:\\.\\d{1,2})?/i);
+                const amountUsdText = usdMatch ? norm(usdMatch[0]) : '';
+
+                const statusMatch = rowText.match(/(송금완료|입금완료|진행중|승인대기|작성중|취소|반려|실패|환불|완료)/);
+                const statusText = statusMatch ? statusMatch[0] : '';
+
+                let recipient = '';
+                const blockedRecipientPatterns = [
+                    /송금|수수료|환율|입금|진행|완료|반려|취소|실패|상태/,
+                    /\b(?:usd|krw|us\$)\b/i,
+                    /^\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}$/,
+                    /^[\d,.\s]+(?:usd|krw|원|\$)?$/i,
+                ];
+                const candidates = Array.from(rowEl.querySelectorAll('h1,h2,h3,h4,h5,h6,strong,b,span,p,div'))
+                    .filter((el) => isVisible(el))
+                    .map((el) => norm(el.textContent || ''))
+                    .filter((text) => text.length > 0 && text.length < 80)
+                    .filter((text) => !/^[\\d,.\\s]+$/.test(text));
+                for (const text of candidates) {
+                    const blocked = blockedRecipientPatterns.some((pattern) => pattern.test(text));
+                    const hasLetterLikeContent = /[A-Za-z\u00C0-\u024F\u0400-\u04FF\u3040-\u30FF\u4E00-\u9FFF\uAC00-\uD7AF]/.test(text);
+                    if (hasLetterLikeContent && !blocked) {
+                        recipient = text;
+                        break;
+                    }
+                }
+
+                const absoluteUrl = href.startsWith('http')
+                    ? href
+                    : new URL(href, window.location.origin).toString();
+
+                rows.push({
+                    detailUrl: absoluteUrl,
+                    rowText: rowText.slice(0, 400),
+                    dateText,
+                    recipient,
+                    amountUsdText,
+                    statusText,
+                });
+            }
+
+            return JSON.stringify(rows.slice(0, 30));
+        })()
+    `) as string
+
+    try {
+        const parsed = JSON.parse(result || '[]')
+        if (!Array.isArray(parsed)) return []
+        return parsed as MoinHistoryItem[]
+    } catch {
+        return []
+    }
+}
+
+const inspectHistoryDetailAppliedAt = async (page: PageLike): Promise<string | null> => {
+    const raw = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
+            };
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const bodyText = norm((document.body && document.body.innerText) || '');
+
+            const dateTimeMatch = bodyText.match(/(20\\d{2})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})\\s+(\\d{1,2}):(\\d{2})(?::(\\d{2}))?/);
+            if (dateTimeMatch) {
+                const year = dateTimeMatch[1];
+                const month = String(dateTimeMatch[2]).padStart(2, '0');
+                const day = String(dateTimeMatch[3]).padStart(2, '0');
+                const hour = String(dateTimeMatch[4]).padStart(2, '0');
+                const minute = dateTimeMatch[5];
+                const second = dateTimeMatch[6] ? dateTimeMatch[6] : '00';
+                return year + '-' + month + '-' + day + 'T' + hour + ':' + minute + ':' + second + '+09:00';
+            }
+
+            const dateOnlyMatch = bodyText.match(/(20\\d{2})[.\\-/](\\d{1,2})[.\\-/](\\d{1,2})/);
+            if (dateOnlyMatch) {
+                const year = dateOnlyMatch[1];
+                const month = String(dateOnlyMatch[2]).padStart(2, '0');
+                const day = String(dateOnlyMatch[3]).padStart(2, '0');
+                return year + '-' + month + '-' + day + 'T00:00:00+09:00';
+            }
+
+            return '';
+        })()
+    `) as string
+
+    if (!raw) return null
+    const parsed = new Date(raw)
+    return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
+}
+
+const matchHistoryItem = (
+    items: MoinHistoryItem[],
+    targetDate: string | null,
+    recipientHint: string | null,
+): MoinHistoryItem | null => {
+    if (items.length === 0) return null
+
+    const recipientNorm = recipientHint
+        ? recipientHint.toLowerCase().replace(/[^a-z0-9]/g, '')
+        : ''
+
+    const targetTime = targetDate ? new Date(`${targetDate}T00:00:00+09:00`).getTime() : null
+    const autoMatchEndTime = targetTime !== null ? targetTime + 2 * 24 * 60 * 60 * 1000 : null
+
+    const scored = items
+        .map((item) => {
+            let score = 0
+            if (targetTime !== null) {
+                if (!item.dateText) return { item, score: Number.NEGATIVE_INFINITY }
+                const itemTime = new Date(`${item.dateText}T00:00:00+09:00`).getTime()
+                if (
+                    !Number.isFinite(itemTime) ||
+                    itemTime < targetTime ||
+                    (autoMatchEndTime !== null && itemTime >= autoMatchEndTime)
+                ) {
+                    return { item, score: Number.NEGATIVE_INFINITY }
+                }
+
+                const distanceDays = Math.floor((itemTime - targetTime) / (24 * 60 * 60 * 1000))
+                score += Math.max(0, 500 - distanceDays * 120)
+            }
+            if (recipientNorm) {
+                const itemRecipientNorm = (item.recipient || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+                const itemRowNorm = (item.rowText || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+                if (itemRecipientNorm.includes(recipientNorm) || itemRowNorm.includes(recipientNorm)) score += 1000
+            }
+            if (item.statusText && /(송금완료|입금완료|완료)/.test(item.statusText)) score += 200
+            return { item, score }
+        })
+        .filter((entry) => entry.score > 0)
+        .sort((a, b) => b.score - a.score)
+
+    return scored.length > 0 ? scored[0].item : null
+}
+
+type CapturedJsonResponse = {
+    url: string
+    json: unknown
+}
+
+const isMoinHostUrl = (url: string) =>
+    /(?:^https?:\/\/)?(?:[a-z0-9-]+\.)*(?:moinbizplus\.com|themoin\.com)\b/i.test(url)
+
+const findArrayInObject = (
+    value: unknown,
+    pathSoFar: string,
+    depth: number,
+): Array<{ path: string; array: unknown[] }> => {
+    if (depth > 4) return []
+    if (Array.isArray(value)) {
+        return [{ path: pathSoFar || '<root>', array: value }]
+    }
+    if (!value || typeof value !== 'object') return []
+    const collected: Array<{ path: string; array: unknown[] }> = []
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        const nextPath = pathSoFar ? `${pathSoFar}.${key}` : key
+        collected.push(...findArrayInObject(child, nextPath, depth + 1))
+    }
+    return collected
+}
+
+const TX_DATE_KEY_HINTS = ['date', 'at', 'time', 'created', 'apply', 'requested', 'transfer', 'completed', 'submitted']
+const TX_AMOUNT_KEY_HINTS = ['amount', 'krw', 'usd', 'fee', 'rate', 'send', 'receive', 'total']
+const TX_ID_KEY_HINTS = ['id', 'no', 'number', 'transactionid', 'transferid', 'historyid']
+
+const objectHasHints = (obj: Record<string, unknown>) => {
+    const lowerKeys = Object.keys(obj).map((k) => k.toLowerCase())
+    let dateScore = 0
+    let amountScore = 0
+    let idScore = 0
+    for (const key of lowerKeys) {
+        if (TX_DATE_KEY_HINTS.some((hint) => key.includes(hint))) dateScore += 1
+        if (TX_AMOUNT_KEY_HINTS.some((hint) => key.includes(hint))) amountScore += 1
+        if (TX_ID_KEY_HINTS.some((hint) => key.includes(hint))) idScore += 1
+    }
+    return { dateScore, amountScore, idScore }
+}
+
+const looksLikeTransactionArray = (arr: unknown[]) => {
+    if (arr.length === 0 || arr.length > 500) return false
+    const sample = arr[0]
+    if (!sample || typeof sample !== 'object' || Array.isArray(sample)) return false
+    const { dateScore, amountScore, idScore } = objectHasHints(sample as Record<string, unknown>)
+    const signals = (dateScore > 0 ? 1 : 0) + (amountScore > 0 ? 1 : 0) + (idScore > 0 ? 1 : 0)
+    return signals >= 2
+}
+
+const extractTransactionsFromCapturedResponses = (
+    responses: CapturedJsonResponse[],
+): { array: Record<string, unknown>[]; sourceUrl: string; sourcePath: string } | null => {
+    let best: { array: Record<string, unknown>[]; sourceUrl: string; sourcePath: string; score: number } | null = null
+    for (const response of responses) {
+        const found = findArrayInObject(response.json, '', 0)
+        for (const candidate of found) {
+            if (!looksLikeTransactionArray(candidate.array)) continue
+            const sample = candidate.array[0] as Record<string, unknown>
+            const { dateScore, amountScore, idScore } = objectHasHints(sample)
+            const score = candidate.array.length + dateScore * 10 + amountScore * 10 + idScore * 5
+            if (!best || score > best.score) {
+                best = {
+                    array: candidate.array as Record<string, unknown>[],
+                    sourceUrl: response.url,
+                    sourcePath: candidate.path,
+                    score,
+                }
+            }
+        }
+    }
+    if (!best) return null
+    return { array: best.array, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
+}
+
+const findObjectsInJson = (
+    value: unknown,
+    pathSoFar: string,
+    depth: number,
+): Array<{ path: string; obj: Record<string, unknown> }> => {
+    if (depth > 4) return []
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return []
+    const collected: Array<{ path: string; obj: Record<string, unknown> }> = [
+        { path: pathSoFar || '<root>', obj: value as Record<string, unknown> },
+    ]
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+        if (child && typeof child === 'object' && !Array.isArray(child)) {
+            const nextPath = pathSoFar ? `${pathSoFar}.${key}` : key
+            collected.push(...findObjectsInJson(child, nextPath, depth + 1))
+        }
+    }
+    return collected
+}
+
+const looksLikeSingleTransactionObject = (obj: Record<string, unknown>): number => {
+    const lowerKeys = Object.keys(obj).map((k) => k.toLowerCase())
+    const looksLikeUserProfile =
+        lowerKeys.includes('user_uuid') ||
+        lowerKeys.includes('email_verified') ||
+        (
+            lowerKeys.includes('email') &&
+            lowerKeys.includes('first_name') &&
+            lowerKeys.includes('last_name')
+        )
+    const hasTransactionIdentityKey = lowerKeys.some((key) =>
+        key === 'transaction_id' ||
+        key === 'transactionid' ||
+        key === 'transfer_id' ||
+        key === 'transferid' ||
+        key === 'history_id' ||
+        key === 'historyid' ||
+        key === 'remittance_id' ||
+        key === 'remittanceid',
+    )
+
+    if (looksLikeUserProfile && !hasTransactionIdentityKey) {
+        return 0
+    }
+
+    const { dateScore, amountScore, idScore } = objectHasHints(obj)
+    const signals = (dateScore > 0 ? 1 : 0) + (amountScore > 0 ? 1 : 0) + (idScore > 0 ? 1 : 0)
+    if (signals < 2) return 0
+    if (amountScore === 0 || idScore === 0) return 0
+
+    return dateScore * 5 + amountScore * 10 + idScore * 3
+}
+
+const extractDetailObjectFromCapturedResponses = (
+    responses: CapturedJsonResponse[],
+    targetTransactionId?: string | null,
+): { obj: Record<string, unknown>; sourceUrl: string; sourcePath: string } | null => {
+    let best: { obj: Record<string, unknown>; sourceUrl: string; sourcePath: string; score: number } | null = null
+    for (const response of responses) {
+        const objects = findObjectsInJson(response.json, '', 0)
+        for (const candidate of objects) {
+            const baseScore = looksLikeSingleTransactionObject(candidate.obj)
+            if (baseScore === 0) continue
+            let score = baseScore
+            // Bonus if URL contains the transaction id
+            if (targetTransactionId && response.url.includes(targetTransactionId)) score += 50
+            // Bonus if object has a fee/rate field (detail pages usually have these)
+            const lowerKeys = Object.keys(candidate.obj).map((k) => k.toLowerCase())
+            if (lowerKeys.some((k) => k.includes('fee'))) score += 20
+            if (lowerKeys.some((k) => k.includes('rate') || k.includes('exchange'))) score += 20
+            if (lowerKeys.some((k) => k.includes('usd'))) score += 10
+            if (!best || score > best.score) {
+                best = {
+                    obj: candidate.obj,
+                    sourceUrl: response.url,
+                    sourcePath: candidate.path,
+                    score,
+                }
+            }
+        }
+    }
+    if (!best) return null
+    return { obj: best.obj, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
+}
+
+const isGenericMoinHistoryListUrl = (value: string | null | undefined) =>
+    !value || /\/history\/(?:individual|bulk)?(?:$|[?#])/i.test(value)
+
+const mergeMoinHistoryItems = (base: MoinHistoryItem, detail: MoinHistoryItem): MoinHistoryItem => ({
+    ...base,
+    detailUrl: isGenericMoinHistoryListUrl(detail.detailUrl) ? base.detailUrl : detail.detailUrl,
+    dateText: detail.dateText || base.dateText,
+    recipient: detail.recipient || base.recipient,
+    amountUsdText: detail.amountUsdText || base.amountUsdText,
+    statusText: detail.statusText || base.statusText,
+    transactionId: detail.transactionId || base.transactionId,
+    sendAmountKrwText: detail.sendAmountKrwText || base.sendAmountKrwText,
+    totalFeeKrwText: detail.totalFeeKrwText || base.totalFeeKrwText,
+    exchangeRateText: detail.exchangeRateText || base.exchangeRateText,
+    appliedAtIso: detail.appliedAtIso || base.appliedAtIso,
+    rawTransaction: detail.rawTransaction || base.rawTransaction,
+})
+
+const findValueByKeyHints = (
+    obj: Record<string, unknown>,
+    hints: string[],
+    excludeHints: string[] = [],
+): unknown => {
+    const lowerEntries = Object.entries(obj).map(([key, value]) => ({ key, lowerKey: key.toLowerCase(), value }))
+    const matched = lowerEntries.find((entry) =>
+        hints.some((hint) => entry.lowerKey.includes(hint)) &&
+        !excludeHints.some((hint) => entry.lowerKey.includes(hint)),
+    )
+    return matched?.value
+}
+
+const stringifyValue = (value: unknown): string => {
+    if (value === null || value === undefined) return ''
+    if (typeof value === 'number') return Number.isFinite(value) ? String(value) : ''
+    if (typeof value === 'string') return value
+    if (typeof value === 'boolean') return String(value)
+    return ''
+}
+
+const formatDateValueToYmd = (value: unknown): string => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+    const isoLike = raw.match(/^(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})/)
+    if (isoLike) {
+        const [, y, m, d] = isoLike
+        return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
+    }
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) {
+        const offsetMs = parsed.getTimezoneOffset() * 60000
+        const local = new Date(parsed.getTime() - offsetMs)
+        return local.toISOString().slice(0, 10)
+    }
+    return ''
+}
+
+const formatDateValueToIso = (value: unknown): string | null => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return null
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString()
+    return null
+}
+
+const formatNumberWithCurrency = (value: unknown, currency: 'USD' | 'KRW'): string => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return ''
+    const cleaned = raw.replace(/[^\d.\-]/g, '')
+    if (!cleaned) return ''
+    const numeric = Number(cleaned)
+    if (!Number.isFinite(numeric)) return ''
+    const formatted = currency === 'USD'
+        ? numeric.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+        : numeric.toLocaleString('en-US', { maximumFractionDigits: 0 })
+    return `${formatted} ${currency}`
+}
+
+const formatExchangeRateValue = (value: unknown): string => {
+    const raw = stringifyValue(value).trim()
+    if (!raw) return ''
+    const cleaned = raw.replace(/[^\d.\-]/g, '')
+    if (!cleaned) return ''
+    const numeric = Number(cleaned)
+    if (!Number.isFinite(numeric) || numeric <= 0) return ''
+    return `1 USD = ${Math.round(numeric).toLocaleString('en-US')} KRW`
+}
+
+const normalizeExchangeRateText = (value: string) => {
+    const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
+    if (!matches || matches.length === 0) return value
+    const numeric = Number(matches[matches.length - 1].replace(/,/g, ''))
+    if (!Number.isFinite(numeric) || numeric <= 0) return value
+    return `1 USD = ${Math.round(numeric).toLocaleString('en-US')} KRW`
+}
+
+const normalizeMoinTransaction = (raw: Record<string, unknown>): MoinHistoryItem => {
+    const idValue = findValueByKeyHints(raw, ['transactionid', 'transferid', 'historyid', 'orderid', 'id', 'transactionno', 'transferno', 'no'])
+    const transactionId = stringifyValue(idValue) || null
+
+    const dateValue = findValueByKeyHints(raw, ['applieddate', 'appliedat', 'requesteddate', 'requestedat', 'transferdate', 'transferat', 'createdat', 'createddate', 'date', 'submitted', 'completedat', 'completeddate'])
+    const dateText = formatDateValueToYmd(dateValue)
+    const appliedAtIso = formatDateValueToIso(dateValue)
+
+    const recipientValue = findValueByKeyHints(raw, ['recipient', 'beneficiary', 'receivername', 'receiver', 'partnername', 'companyname'], ['country', 'phone', 'email', 'address'])
+        ?? findValueByKeyHints(raw, ['name'], ['file', 'event', 'method', 'status', 'product', 'sender', 'currency'])
+    const recipient = stringifyValue(recipientValue).trim()
+
+    const usdValue = findValueByKeyHints(raw, ['usd', 'receiveamount', 'receivingamount', 'beneficiaryamount', 'destamount', 'finalamount'], ['krw'])
+    const amountUsdText = formatNumberWithCurrency(usdValue, 'USD')
+
+    const krwValue = findValueByKeyHints(raw, ['sendamount', 'krw', 'sourceamount', 'totalamount', 'amount'], ['usd', 'fee', 'rate'])
+    const sendAmountKrwText = formatNumberWithCurrency(krwValue, 'KRW')
+
+    const feeValue = findValueByKeyHints(raw, ['fee', 'commission'])
+    const totalFeeKrwText = formatNumberWithCurrency(feeValue, 'KRW')
+
+    const rateValue = findValueByKeyHints(raw, ['rate', 'exchange'])
+    const exchangeRateText = formatExchangeRateValue(rateValue)
+
+    const statusValue = findValueByKeyHints(raw, ['status', 'state'])
+    const statusText = stringifyValue(statusValue).trim()
+
+    return {
+        detailUrl: transactionId
+            ? `https://www.moinbizplus.com/history/${transactionId}`
+            : 'https://www.moinbizplus.com/history/individual',
+        rowText: JSON.stringify(raw).slice(0, 400),
+        dateText,
+        recipient,
+        amountUsdText,
+        statusText,
+        transactionId,
+        sendAmountKrwText,
+        totalFeeKrwText,
+        exchangeRateText,
+        appliedAtIso,
+        rawTransaction: raw,
+    }
+}
+
+const summaryFromMoinHistoryItem = (item: MoinHistoryItem): MoinRemittancePricingSummary => ({
+    finalReceiveAmount: item.amountUsdText || '',
+    sendAmount: item.sendAmountKrwText || '',
+    totalFee: item.totalFeeKrwText || '',
+    exchangeRate: item.exchangeRateText || '',
+})
+
+export const fetchMoinRemittanceHistory = async (
+    input: MoinHistoryFetchInput,
+): Promise<MoinHistoryFetchResult> => {
+    let browser: BrowserLike | null = null
+    const steps: string[] = []
+    const abortSignal = input.abortSignal
+    let abortListenerCleanup: (() => void) | null = null
+
+    const capturedResponses: CapturedJsonResponse[] = []
+    let responseHandler: ((response: ResponseLike) => void) | null = null
+
+    try {
+        throwIfAbortRequested(abortSignal, 'Launch browser')
+        const launched = await launchBrowser(input.headless ?? true)
+        browser = launched.browser
+        steps.push(`runtime:${launched.runtime}`)
+
+        if (abortSignal) {
+            const onAbort = () => {
+                steps.push('cancel-requested')
+                if (browser) void browser.close().catch(() => undefined)
+            }
+            abortSignal.addEventListener('abort', onAbort, { once: true })
+            abortListenerCleanup = () => abortSignal.removeEventListener('abort', onAbort)
+            throwIfAbortRequested(abortSignal, 'Initialize browser')
+        }
+
+        const context = await browser.newContext({ locale: 'ko-KR' })
+        const page = await context.newPage()
+        page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
+        page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
+
+        responseHandler = (response: ResponseLike) => {
+            try {
+                const url = response.url()
+                if (!isMoinHostUrl(url)) return
+                const method = response.request().method()
+                if (method === 'OPTIONS') return
+                const status = response.status()
+                if (status < 200 || status >= 400) return
+                const headers = response.headers()
+                const contentType = headers['content-type'] || headers['Content-Type'] || ''
+                if (!contentType.toLowerCase().includes('json')) return
+                void response.json().then((json) => {
+                    capturedResponses.push({ url, json })
+                }).catch(() => undefined)
+            } catch {
+                // Ignore listener errors — must not block navigation.
+            }
+        }
+        page.on('response', responseHandler)
+
+        await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
+
+        const targetTransactionId = input.targetTransactionId?.trim() || null
+
+        throwIfAbortRequested(abortSignal, 'Open history page')
+        const initialHistoryUrl = targetTransactionId
+            ? `https://www.moinbizplus.com/history/${targetTransactionId}`
+            : 'https://www.moinbizplus.com/history/individual'
+        await page.goto(initialHistoryUrl, {
+            waitUntil: 'domcontentloaded',
+            timeout: LONG_TIMEOUT_MS,
+        }).catch(async () => {
+            steps.push(`history-initial-goto-retry-from:${page.url()}`)
+            await page.goto('https://www.moinbizplus.com/history/individual', {
+                waitUntil: 'domcontentloaded',
+                timeout: LONG_TIMEOUT_MS,
+            }).catch((error) => {
+                steps.push(`history-goto-interrupted:${getErrorMessage(error).slice(0, 120)}`)
+            })
+        })
+        if (!page.url().includes('/history')) {
+            await page.goto('https://www.moinbizplus.com/history/individual', {
+                waitUntil: 'domcontentloaded',
+                timeout: LONG_TIMEOUT_MS,
+            }).catch((error) => {
+                steps.push(`history-final-goto-interrupted:${getErrorMessage(error).slice(0, 120)}`)
+            })
+        }
+        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+        await page.waitForTimeout(2500)
+        steps.push(`history-page-url:${page.url()}`)
+        steps.push(`captured-responses-count:${capturedResponses.length}`)
+
+        // ---------- API-first path ----------
+        const transactionExtraction = extractTransactionsFromCapturedResponses(capturedResponses)
+        const apiItems: MoinHistoryItem[] = []
+        if (transactionExtraction) {
+            steps.push(`captured-tx-array-key:${transactionExtraction.sourcePath}`)
+            steps.push(`captured-tx-count:${transactionExtraction.array.length}`)
+            for (const raw of transactionExtraction.array) {
+                if (!raw || typeof raw !== 'object') continue
+                apiItems.push(normalizeMoinTransaction(raw as Record<string, unknown>))
+            }
+        }
+
+        let matched: MoinHistoryItem | null = null
+        let matchStrategy: 'api' | 'dom' | null = null
+        let summary: MoinRemittancePricingSummary | null = null
+        let appliedAtIso: string | null = null
+        let detailBodyText: string | null = null
+
+        if (targetTransactionId) {
+            matched = apiItems.find((item) => item.transactionId === targetTransactionId)
+                || {
+                    detailUrl: `https://www.moinbizplus.com/history/${targetTransactionId}`,
+                    rowText: '',
+                    dateText: '',
+                    recipient: input.recipientHint || '',
+                    amountUsdText: '',
+                    statusText: '',
+                    transactionId: targetTransactionId,
+                }
+            matchStrategy = 'api'
+            steps.push('targeted-transaction-id-mode')
+        } else if (apiItems.length > 0) {
+            matched = matchHistoryItem(apiItems, input.targetDate || null, input.recipientHint || null)
+            if (matched) {
+                matchStrategy = 'api'
+                steps.push(`api-matched:${matched.transactionId || matched.detailUrl}`)
+            }
+        }
+
+        if (matched && matchStrategy === 'api') {
+            summary = summaryFromMoinHistoryItem(matched)
+            appliedAtIso = matched.appliedAtIso || null
+
+            // Try to enrich from already-captured detail object (most common when targetTransactionId
+            // was set and we landed on /history/{id} directly).
+            if (matched.transactionId) {
+                const earlyDetail = extractDetailObjectFromCapturedResponses(
+                    capturedResponses,
+                    matched.transactionId,
+                )
+                if (earlyDetail) {
+                    steps.push(`early-detail-obj-source:${earlyDetail.sourcePath}`)
+                    const earlyItem = normalizeMoinTransaction(earlyDetail.obj)
+                    matched = mergeMoinHistoryItems(matched, earlyItem)
+                    summary = summaryFromMoinHistoryItem(matched)
+                    appliedAtIso = matched.appliedAtIso || appliedAtIso
+                }
+            }
+
+            const summaryComplete = Boolean(summary.finalReceiveAmount && summary.sendAmount && summary.totalFee && summary.exchangeRate)
+            if (!summaryComplete && matched.transactionId) {
+                steps.push('api-summary-incomplete-fetching-detail')
+                throwIfAbortRequested(abortSignal, 'Fetch detail')
+                const beforeCount = capturedResponses.length
+                if (!page.url().includes(`/history/${matched.transactionId}`)) {
+                    await page.goto(matched.detailUrl, {
+                        waitUntil: 'domcontentloaded',
+                        timeout: LONG_TIMEOUT_MS,
+                    }).catch(() => undefined)
+                    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+                    await page.waitForTimeout(1500)
+                    steps.push(`history-detail-url:${page.url()}`)
+                } else {
+                    steps.push('detail-url-already-loaded')
+                    await page.waitForTimeout(1500)
+                }
+                const detailResponses = capturedResponses.slice(beforeCount)
+                steps.push(`detail-responses-count:${detailResponses.length}`)
+                const detailObjExtraction = extractDetailObjectFromCapturedResponses(
+                    detailResponses,
+                    matched.transactionId,
+                )
+                const detailTxExtraction = extractTransactionsFromCapturedResponses(detailResponses)
+                let detailItem: MoinHistoryItem | null = null
+                if (detailObjExtraction) {
+                    steps.push(`detail-obj-source:${detailObjExtraction.sourcePath}`)
+                    detailItem = normalizeMoinTransaction(detailObjExtraction.obj)
+                } else if (detailTxExtraction && detailTxExtraction.array.length > 0) {
+                    const preferred =
+                        detailTxExtraction.array.find((entry) => {
+                            if (!entry || typeof entry !== 'object') return false
+                            const idValue = findValueByKeyHints(entry as Record<string, unknown>, [
+                                'transactionid', 'transferid', 'historyid', 'orderid', 'id', 'no',
+                            ])
+                            return matched?.transactionId
+                                ? stringifyValue(idValue) === matched.transactionId
+                                : false
+                        }) || detailTxExtraction.array[0]
+                    if (preferred && typeof preferred === 'object') {
+                        detailItem = normalizeMoinTransaction(preferred as Record<string, unknown>)
+                    }
+                }
+
+                if (detailItem) {
+                    matched = mergeMoinHistoryItems(matched, detailItem)
+                    summary = summaryFromMoinHistoryItem(matched)
+                    appliedAtIso = matched.appliedAtIso || appliedAtIso
+                }
+
+                const stillIncomplete = !summary
+                    || !summary.finalReceiveAmount
+                    || !summary.sendAmount
+                    || !summary.totalFee
+                    || !summary.exchangeRate
+                if (stillIncomplete) {
+                    const domSummary = await inspectRemittancePricingSummary(page)
+                    if (domSummary.finalReceiveAmount || domSummary.sendAmount || domSummary.totalFee || domSummary.exchangeRate) {
+                        steps.push('detail-summary-via-dom')
+                        const currentRate = parseFloat((summary?.exchangeRate || '').replace(/[^0-9.\-]/g, ''))
+                        const shouldPreferDomFinalReceive =
+                            !summary?.finalReceiveAmount ||
+                            summary.finalReceiveAmount.includes(KO_SEND_AMOUNT) ||
+                            summary.finalReceiveAmount.includes(KO_TOTAL_FEE) ||
+                            summary.finalReceiveAmount.includes(KO_EXCHANGE_RATE)
+                        const shouldPreferDomExchangeRate =
+                            !summary?.exchangeRate ||
+                            !Number.isFinite(currentRate) ||
+                            currentRate < 100
+                        summary = {
+                            finalReceiveAmount: shouldPreferDomFinalReceive
+                                ? domSummary.finalReceiveAmount || summary?.finalReceiveAmount || ''
+                                : summary.finalReceiveAmount,
+                            sendAmount: summary?.sendAmount || domSummary.sendAmount || '',
+                            totalFee: summary?.totalFee || domSummary.totalFee || '',
+                            exchangeRate: shouldPreferDomExchangeRate
+                                ? domSummary.exchangeRate || summary?.exchangeRate || ''
+                                : summary.exchangeRate,
+                        }
+                    }
+                    if (!appliedAtIso) {
+                        const fallbackAppliedAt = await inspectHistoryDetailAppliedAt(page)
+                        if (fallbackAppliedAt) appliedAtIso = fallbackAppliedAt
+                    }
+                }
+
+                try {
+                    const detailText = (await page.locator('body').textContent().catch(() => '')) || ''
+                    detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
+                } catch {
+                    detailBodyText = null
+                }
+            }
+
+            if (matched && summary) {
+                matched = {
+                    ...matched,
+                    amountUsdText: summary.finalReceiveAmount || matched.amountUsdText,
+                    sendAmountKrwText: summary.sendAmount || matched.sendAmountKrwText,
+                    totalFeeKrwText: summary.totalFee || matched.totalFeeKrwText,
+                    exchangeRateText: summary.exchangeRate || matched.exchangeRateText,
+                }
+            }
+
+            steps.push('tx-match-strategy:api')
+            return {
+                steps,
+                items: apiItems,
+                matched,
+                matchedSummary: summary,
+                matchedAppliedAtIso: appliedAtIso,
+                matchedDetailBodyText: detailBodyText,
+                matchStrategy: 'api',
+                diagnostic: null,
+            }
+        }
+
+        // ---------- DOM fallback path ----------
+        steps.push('falling-back-to-dom')
+        const domItems = await inspectHistoryListItems(page)
+        steps.push(`dom-items-count:${domItems.length}`)
+        const combinedItems = apiItems.length > 0 ? apiItems : domItems
+        const domMatched = matchHistoryItem(domItems, input.targetDate || null, input.recipientHint || null)
+
+        if (domMatched) {
+            matchStrategy = 'dom'
+            steps.push(`dom-matched:${domMatched.detailUrl}`)
+            await page.goto(domMatched.detailUrl, {
+                waitUntil: 'domcontentloaded',
+                timeout: LONG_TIMEOUT_MS,
+            }).catch(() => undefined)
+            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+            await page.waitForTimeout(1500)
+            steps.push(`history-detail-url:${page.url()}`)
+
+            summary = await inspectRemittancePricingSummary(page)
+            steps.push(`history-summary:${JSON.stringify(summary).slice(0, 220)}`)
+            appliedAtIso = await inspectHistoryDetailAppliedAt(page)
+            if (appliedAtIso) steps.push(`history-applied-at:${appliedAtIso}`)
+
+            try {
+                const detailText = (await page.locator('body').textContent().catch(() => '')) || ''
+                detailBodyText = detailText.replace(/\s+/g, ' ').trim().slice(0, 2000)
+            } catch {
+                detailBodyText = null
+            }
+
+            steps.push('tx-match-strategy:dom')
+            return {
+                steps,
+                items: combinedItems,
+                matched: domMatched,
+                matchedSummary: summary,
+                matchedAppliedAtIso: appliedAtIso,
+                matchedDetailBodyText: detailBodyText,
+                matchStrategy: 'dom',
+                diagnostic: null,
+            }
+        }
+
+        // ---------- No match: build diagnostic ----------
+        steps.push('history-no-match')
+        const diagnosticRaw = await inspectHistoryListDiagnostic(page)
+        const baseDiagnostic = diagnosticRaw && typeof diagnosticRaw === 'object'
+            ? {
+                listUrl: typeof diagnosticRaw.listUrl === 'string' ? diagnosticRaw.listUrl : page.url(),
+                bodyTextPreview: typeof diagnosticRaw.bodyTextPreview === 'string' ? diagnosticRaw.bodyTextPreview : '',
+                anchorHrefs: Array.isArray(diagnosticRaw.anchorHrefs) ? diagnosticRaw.anchorHrefs : [],
+                clickableTextSamples: Array.isArray(diagnosticRaw.clickableTextSamples) ? diagnosticRaw.clickableTextSamples : [],
+            }
+            : { listUrl: page.url(), bodyTextPreview: '', anchorHrefs: [], clickableTextSamples: [] }
+
+        const capturedResponseUrls = capturedResponses.slice(-30).map((r) => r.url)
+        const largest = capturedResponses.reduce<CapturedJsonResponse | null>((acc, current) => {
+            const accLen = acc ? JSON.stringify(acc.json).length : 0
+            const currentLen = JSON.stringify(current.json).length
+            return currentLen > accLen ? current : acc
+        }, null)
+        const largestResponseSnippet = largest ? JSON.stringify(largest.json).slice(0, 1024) : ''
+
+        return {
+            steps,
+            items: combinedItems,
+            matched: null,
+            matchedSummary: null,
+            matchedAppliedAtIso: null,
+            matchedDetailBodyText: null,
+            matchStrategy: null,
+            diagnostic: {
+                ...baseDiagnostic,
+                capturedResponseUrls,
+                largestResponseSnippet,
+            },
+        }
+    } finally {
+        abortListenerCleanup?.()
+        if (browser) await browser.close().catch(() => undefined)
+    }
+}
+
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
     let browser: BrowserLike | null = null
     const steps: string[] = []
@@ -1201,44 +2496,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // ???? Step 3: Submit login ??????????????????????????????????????????????????????????????????????????????????????
         const loginUrlBefore = page.url()
 
-        // Wait for login button to become enabled
-        const loginBtnSelectors = [
-            `button[type="submit"]:has-text("${KO_LOGIN}")`,
-            `button:has-text("${KO_LOGIN}")`,
-            `[role="button"]:has-text("${KO_LOGIN}")`,
-            'button[type="submit"]',
-        ]
-
-        let loginClicked = false
-        for (const selector of loginBtnSelectors) {
-            throwIfAbortRequested(abortSignal, 'Submit login')
-            try {
-                const btn = page.locator(selector).first()
-                await btn.waitFor({ state: 'visible', timeout: 5000 })
-
-                // Wait up to 3 seconds for button to become enabled
-                for (let attempt = 0; attempt < 6; attempt++) {
-                    try {
-                        const disabled = await btn.isDisabled()
-                        if (!disabled) break
-                    } catch {
-                        break // isDisabled not available, just proceed
-                    }
-                    throwIfAbortRequested(abortSignal, 'Submit login')
-                    await page.waitForTimeout(500)
-                }
-
-                await btn.click({ timeout: 5000 })
-                loginClicked = true
-                break
-            } catch {
-                // Try next selector
-            }
-        }
-
-        if (!loginClicked) {
-            throw new MoinAutomationError('Submit login', `Could not click login button. (url: ${page.url()})`)
-        }
+        await clickMoinLoginSubmit(page, abortSignal)
         steps.push('submit-login')
 
         // ???? Step 3.5: Check for explicit login errors ??????????????????????????????????????????????
@@ -1356,12 +2614,26 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push('purchase-remit-tab-not-found')
         }
 
+        // The current MOIN recipient screen can virtualize or filter recipient cards.
+        // Search first, then scan for the company text in the narrowed list.
+        let recipientSearchPrefilled = false
+        try {
+            const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
+            steps.push(`recipient-search-prefill:${searchResult}`)
+            recipientSearchPrefilled = searchResult === 'recipient-search-filled'
+            await page.waitForTimeout(1500)
+            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+        } catch {
+            steps.push('recipient-search-prefill-error')
+        }
+
         // ???? Step 4.5: Find the company card and click it ????????????????????????????????????????
         // The recipient page shows cards with company names.
         // Clicking a card opens a MODAL POPUP (not a page navigation!).
         // The modal shows recipient details and has "??瑜곸젧???얄뵛" / "??酉????얄뵛" buttons.
 
         // First, check if company name is visible (may need to scroll)
+        let recipientSelectedFromSearchResult = false
         let companyTextEl = await findVisibleCompanyTextLocator(page, 8000)
         if (companyTextEl) {
             steps.push('company-text-visible')
@@ -1371,32 +2643,36 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             await page.waitForTimeout(1000)
             companyTextEl = await findVisibleCompanyTextLocator(page, 10000)
             if (!companyTextEl) {
-                let pageInfo = `url: ${page.url()}`
-                try {
-                    const html = await page.content()
-                    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-                    if (bodyMatch) {
-                        const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                        pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
+                if (recipientSearchPrefilled) {
+                    const searchResultClick = await clickFirstRecipientSearchResult(page, TARGET_COMPANY_SEARCH_KEYWORD)
+                    steps.push(`recipient-search-result-click:${searchResultClick}`)
+                    if (searchResultClick.startsWith('clicked-')) {
+                        recipientSelectedFromSearchResult = true
                     }
-                } catch { /* ignore */ }
+                }
 
-                throw new MoinAutomationError(
-                    'Select company',
-                    `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
-                )
+                if (recipientSelectedFromSearchResult) {
+                    steps.push('company-text-hidden-selected-search-result')
+                } else {
+                    let pageInfo = `url: ${page.url()}`
+                    try {
+                        const html = await page.content()
+                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+                        if (bodyMatch) {
+                            const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                            pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
+                        }
+                    } catch { /* ignore */ }
+
+                    throw new MoinAutomationError(
+                        'Select company',
+                        `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
+                    )
+                }
             }
-            steps.push('company-text-visible-after-scroll')
-        }
-
-        // Narrow candidate list by company keyword when recipient search input is present.
-        try {
-            const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
-            steps.push(`recipient-search-prefill:${searchResult}`)
-            await page.waitForTimeout(600)
-            await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
-        } catch {
-            steps.push('recipient-search-prefill-error')
+            if (companyTextEl) {
+                steps.push('company-text-visible-after-scroll')
+            }
         }
 
         // Click the company card to open the modal popup
@@ -1418,6 +2694,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 steps.push(`company-text-click-failed:attempt${attempt}`)
             }
 
+            try {
+                const rowSelectResult = await clickCompanyRowCandidate(page, TARGET_COMPANY_NAME_VARIANTS)
+                steps.push(`recipient-row-select-click:${rowSelectResult}:attempt${attempt}`)
+            } catch (err) {
+                steps.push(`recipient-row-select-click-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}:attempt${attempt}`)
+            }
+
             throwIfAbortRequested(abortSignal, 'Open remit modal')
             await page.waitForTimeout(1000)
 
@@ -1437,9 +2720,35 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         if (!remitClicked) {
+            try {
+                await clickNextStep(page, 12000)
+                steps.push('recipient-next-step-after-company')
+                await page.waitForTimeout(1500)
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
+                const nextStepInspection = await inspectTransferInputs(page)
+                if (nextStepInspection.amountKeywordVisible || !nextStepInspection.aliasSearchVisible) {
+                    remitClicked = true
+                    steps.push(`recipient-next-step-loaded:${JSON.stringify({
+                        aliasSearchVisible: nextStepInspection.aliasSearchVisible,
+                        amountKeywordVisible: nextStepInspection.amountKeywordVisible,
+                        inputCount: nextStepInspection.visibleInputs.length,
+                    })}`)
+                } else {
+                    steps.push(`recipient-next-step-still-recipient:${JSON.stringify({
+                        aliasSearchVisible: nextStepInspection.aliasSearchVisible,
+                        amountKeywordVisible: nextStepInspection.amountKeywordVisible,
+                        buttons: nextStepInspection.nextButtons.slice(0, 8),
+                    })}`)
+                }
+            } catch (err) {
+                steps.push(`recipient-next-step-after-company-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`)
+            }
+        }
+
+        if (!remitClicked) {
             throw new MoinAutomationError(
                 'Click remit button in modal',
-                `Could not click the "${KO_REMIT}" button in the target company context. Last result: ${remitClickReason}. (url: ${page.url()})`
+                `Could not click the "${KO_REMIT}" button or continue with "${KO_NEXT_STEP_SPACED}" in the target company context. Last result: ${remitClickReason}. (url: ${page.url()})`
             )
         }
 
@@ -1870,4 +3179,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             await browser.close().catch(() => undefined)
         }
     }
+}
+
+export const __moinBizplusTestHooks = {
+    clickMoinLoginSubmit,
 }

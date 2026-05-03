@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
+import { emailBodyToDisplayText } from '@/lib/wormEmailBody'
 
 type WormSize = {
     id: string
@@ -86,7 +87,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'shipping' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'cargoCustomsMail' | 'shipping' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -98,6 +99,33 @@ type PipelineStepDefinition = {
     actionLabel: string
     target: PipelineSectionTarget
     warning?: string
+}
+
+function EmailBodyPreview({ loading, text }: { loading: boolean; text: string }) {
+    const displayText = useMemo(() => emailBodyToDisplayText(text), [text])
+
+    if (loading && !text) {
+        return (
+            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
+                <Loader2 size={16} className="animate-spin mr-2" />
+                메일 본문을 불러오는 중...
+            </div>
+        )
+    }
+
+    if (!displayText) {
+        return (
+            <div className="w-full min-h-[220px] flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-[13px] font-medium text-slate-400 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
+                표시할 본문 내용이 없습니다.
+            </div>
+        )
+    }
+
+    return (
+        <div className="w-full whitespace-pre-wrap break-words leading-relaxed text-gray-800 dark:text-gray-100">
+            {displayText}
+        </div>
+    )
 }
 
 type RemittanceProgressStage = {
@@ -232,6 +260,19 @@ type WormOrderListItem = {
     updatedAt: string
 }
 
+type RemittanceCandidate = {
+    transactionId?: string | null
+    detailUrl?: string
+    dateText?: string
+    recipient?: string
+    amountUsdText?: string
+    sendAmountKrwText?: string
+    totalFeeKrwText?: string
+    exchangeRateText?: string
+    statusText?: string
+    appliedAtIso?: string | null
+}
+
 type WormForwardLogItem = {
     id: string
     orderId: string | null
@@ -335,8 +376,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'SEMI',
         owner: '관리자',
         details: ['첨부파일 선택', '수신자 입력', '메일 전송 확인'],
-        actionLabel: '수동 처리',
-        target: 'none',
+        actionLabel: '문서전달',
+        target: 'cargoCustomsMail',
     },
     {
         id: 10,
@@ -407,7 +448,7 @@ const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressSt
     { keys: ['open-login-page'], stage: { percent: 12, label: '모인 로그인 페이지에 접속하는 중...' } },
     { keys: ['fill-login-id', 'fill-login-password'], stage: { percent: 20, label: '로그인 계정 정보를 입력하는 중...' } },
     { keys: ['submit-login', 'post-login-url'], stage: { percent: 28, label: '로그인을 제출하고 확인하는 중...' } },
-    { keys: ['company-text-visible', 'nav-to-recipient', 'already-on-recipient-page'], stage: { percent: 36, label: '수취인/거래처를 찾는 중...' } },
+    { keys: ['recipient-search-prefill', 'company-text-visible', 'company-scroll-miss', 'nav-to-recipient', 'already-on-recipient-page'], stage: { percent: 36, label: '수취인/거래처를 찾는 중...' } },
     { keys: ['clicked-company-text', 'js-card-click'], stage: { percent: 42, label: '수취인 카드를 클릭하는 중...' } },
     { keys: ['modal-opened', 'remit-btn'], stage: { percent: 48, label: '수취인 정보 팝업이 열렸습니다...' } },
     { keys: ['clicked-remit-btn', 'clicked-remit-text'], stage: { percent: 54, label: '송금하기 버튼을 클릭하는 중...' } },
@@ -430,6 +471,24 @@ const resolveRemittanceStageFromStep = (stepLike: string | null | undefined): Re
     }
 
     return null
+}
+
+const formatRemittanceAutomationError = (message: string) => {
+    const normalized = message.replace(/\s+/g, ' ').trim()
+    if (!normalized) return '송금 자동화 중 오류가 발생했습니다.'
+
+    if (/Select company: Could not find target company text/i.test(normalized)) {
+        return '모인 수취인 목록에서 Shanghai Oikki Trading 거래처를 찾지 못했습니다. 수취인 검색/목록 화면이 바뀌었거나 해당 거래처가 숨김 처리되었을 수 있습니다.'
+    }
+
+    const withoutPageDump = normalized
+        .replace(/\s*\|\s*page-text\(first 800\):.*$/i, '')
+        .replace(/\s*\[steps:.*$/i, '')
+        .trim()
+
+    return withoutPageDump.length > 420
+        ? `${withoutPageDump.slice(0, 420)}...`
+        : withoutPageDump
 }
 
 const extractLatestAutomationStep = (message: string): string | null => {
@@ -614,6 +673,215 @@ function getCalendarPriceTintClass(colorType: CalendarPriceColorType) {
     return 'ring-1 ring-slate-200'
 }
 
+const HEAVY_RAIN_WEATHER_CODES = new Set<number>([65, 81, 82, 95, 96, 99])
+const RAIN_WEATHER_CODES = new Set<number>([51, 53, 55, 61, 63, 80])
+
+function classifyDayPrecipitation(
+    shanghai: CalendarDailyWeather | null,
+    busanGangseo: CalendarDailyWeather | null,
+): 'heavy' | 'rain' | null {
+    const codes = [shanghai?.weatherCode, busanGangseo?.weatherCode].filter(
+        (code): code is number => typeof code === 'number',
+    )
+    if (codes.some((code) => HEAVY_RAIN_WEATHER_CODES.has(code))) return 'heavy'
+    if (codes.some((code) => RAIN_WEATHER_CODES.has(code))) return 'rain'
+    return null
+}
+
+function getCalendarRainBgClass(level: 'heavy' | 'rain' | null) {
+    if (level === 'heavy') return 'bg-blue-100 border-blue-300 hover:bg-blue-200 dark:bg-blue-900/40 dark:border-blue-700 dark:hover:bg-blue-900/60'
+    if (level === 'rain') return 'bg-sky-50 border-sky-200 hover:bg-sky-100 dark:bg-sky-900/30 dark:border-sky-800 dark:hover:bg-sky-900/50'
+    return ''
+}
+
+function getCalendarDayOfWeekBgClass(dayOfWeek: number) {
+    if (dayOfWeek === 0 || dayOfWeek === 6) return 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
+    if (dayOfWeek === 5) return 'bg-orange-50 border-orange-200 hover:bg-orange-100 dark:bg-orange-900/30 dark:border-orange-800 dark:hover:bg-orange-900/50'
+    return ''
+}
+
+const CHINESE_PUBLIC_HOLIDAYS: Record<string, string> = {
+    // 2025
+    '2025-01-01': '원단 (元旦)',
+    '2025-01-28': '춘절 (除夕)',
+    '2025-01-29': '춘절 (春节)',
+    '2025-01-30': '춘절',
+    '2025-01-31': '춘절',
+    '2025-02-01': '춘절',
+    '2025-02-02': '춘절',
+    '2025-02-03': '춘절',
+    '2025-02-04': '춘절',
+    '2025-04-04': '청명절 (清明节)',
+    '2025-04-05': '청명절',
+    '2025-04-06': '청명절',
+    '2025-05-01': '노동절 (劳动节)',
+    '2025-05-02': '노동절',
+    '2025-05-03': '노동절',
+    '2025-05-04': '노동절',
+    '2025-05-05': '노동절',
+    '2025-05-31': '단오절 (端午节)',
+    '2025-06-01': '단오절',
+    '2025-06-02': '단오절',
+    '2025-10-01': '중추절·국경절 (中秋节·国庆节)',
+    '2025-10-02': '국경절',
+    '2025-10-03': '국경절',
+    '2025-10-04': '국경절',
+    '2025-10-05': '국경절',
+    '2025-10-06': '국경절',
+    '2025-10-07': '국경절',
+    '2025-10-08': '국경절',
+    // 2026
+    '2026-01-01': '원단 (元旦)',
+    '2026-02-16': '춘절 (除夕)',
+    '2026-02-17': '춘절 (春节)',
+    '2026-02-18': '춘절',
+    '2026-02-19': '춘절',
+    '2026-02-20': '춘절',
+    '2026-02-21': '춘절',
+    '2026-02-22': '춘절',
+    '2026-04-04': '청명절 (清明节)',
+    '2026-04-05': '청명절',
+    '2026-04-06': '청명절',
+    '2026-05-01': '노동절 (劳动节)',
+    '2026-05-02': '노동절',
+    '2026-05-03': '노동절',
+    '2026-05-04': '노동절',
+    '2026-05-05': '노동절',
+    '2026-06-19': '단오절 (端午节)',
+    '2026-06-20': '단오절',
+    '2026-06-21': '단오절',
+    '2026-09-25': '중추절 (中秋节)',
+    '2026-09-26': '중추절',
+    '2026-09-27': '중추절',
+    '2026-10-01': '국경절 (国庆节)',
+    '2026-10-02': '국경절',
+    '2026-10-03': '국경절',
+    '2026-10-04': '국경절',
+    '2026-10-05': '국경절',
+    '2026-10-06': '국경절',
+    '2026-10-07': '국경절',
+    // 2027 (잠정)
+    '2027-01-01': '원단 (元旦)',
+    '2027-02-06': '춘절 (除夕)',
+    '2027-02-07': '춘절 (春节)',
+    '2027-02-08': '춘절',
+    '2027-02-09': '춘절',
+    '2027-02-10': '춘절',
+    '2027-02-11': '춘절',
+    '2027-02-12': '춘절',
+    '2027-04-04': '청명절',
+    '2027-04-05': '청명절',
+    '2027-04-06': '청명절',
+    '2027-05-01': '노동절',
+    '2027-05-02': '노동절',
+    '2027-05-03': '노동절',
+    '2027-05-04': '노동절',
+    '2027-05-05': '노동절',
+    '2027-06-09': '단오절',
+    '2027-06-10': '단오절',
+    '2027-06-11': '단오절',
+    '2027-09-15': '중추절',
+    '2027-09-16': '중추절',
+    '2027-09-17': '중추절',
+    '2027-10-01': '국경절',
+    '2027-10-02': '국경절',
+    '2027-10-03': '국경절',
+    '2027-10-04': '국경절',
+    '2027-10-05': '국경절',
+    '2027-10-06': '국경절',
+    '2027-10-07': '국경절',
+}
+
+function getChineseHolidayName(ymd: string): string | null {
+    return CHINESE_PUBLIC_HOLIDAYS[ymd] || null
+}
+
+function getChineseHolidayShortLabel(fullName: string): string {
+    const koreanPart = fullName.split(' ')[0] || fullName
+    const compact = koreanPart.replace('·', '/')
+    if (compact.length > 4) return `${compact.slice(0, 3)}…`
+    return compact
+}
+
+const KOREAN_PUBLIC_HOLIDAYS: Record<string, string> = {
+    // 2025
+    '2025-01-01': '신정',
+    '2025-01-27': '임시공휴일',
+    '2025-01-28': '설날 연휴',
+    '2025-01-29': '설날',
+    '2025-01-30': '설날 연휴',
+    '2025-03-01': '삼일절',
+    '2025-03-03': '대체공휴일 (삼일절)',
+    '2025-05-05': '어린이날·부처님오신날',
+    '2025-05-06': '대체공휴일',
+    '2025-06-06': '현충일',
+    '2025-08-15': '광복절',
+    '2025-10-03': '개천절',
+    '2025-10-05': '추석 연휴',
+    '2025-10-06': '추석',
+    '2025-10-07': '추석 연휴',
+    '2025-10-08': '대체공휴일 (추석)',
+    '2025-10-09': '한글날',
+    '2025-12-25': '성탄절',
+    // 2026
+    '2026-01-01': '신정',
+    '2026-02-16': '설날 연휴',
+    '2026-02-17': '설날',
+    '2026-02-18': '설날 연휴',
+    '2026-03-01': '삼일절',
+    '2026-03-02': '대체공휴일 (삼일절)',
+    '2026-05-05': '어린이날',
+    '2026-05-24': '부처님오신날',
+    '2026-05-25': '대체공휴일 (부처님오신날)',
+    '2026-06-06': '현충일',
+    '2026-08-15': '광복절',
+    '2026-08-17': '대체공휴일 (광복절)',
+    '2026-09-24': '추석 연휴',
+    '2026-09-25': '추석',
+    '2026-09-26': '추석 연휴',
+    '2026-09-28': '대체공휴일 (추석)',
+    '2026-10-03': '개천절',
+    '2026-10-05': '대체공휴일 (개천절)',
+    '2026-10-09': '한글날',
+    '2026-12-25': '성탄절',
+    // 2027 (잠정)
+    '2027-01-01': '신정',
+    '2027-02-06': '설날 연휴',
+    '2027-02-07': '설날',
+    '2027-02-08': '설날 연휴',
+    '2027-03-01': '삼일절',
+    '2027-05-05': '어린이날',
+    '2027-05-13': '부처님오신날',
+    '2027-06-06': '현충일',
+    '2027-06-07': '대체공휴일 (현충일)',
+    '2027-08-15': '광복절',
+    '2027-08-16': '대체공휴일 (광복절)',
+    '2027-09-14': '추석 연휴',
+    '2027-09-15': '추석',
+    '2027-09-16': '추석 연휴',
+    '2027-10-03': '개천절',
+    '2027-10-04': '대체공휴일 (개천절)',
+    '2027-10-09': '한글날',
+    '2027-12-25': '성탄절',
+}
+
+function getKoreanHolidayName(ymd: string): string | null {
+    return KOREAN_PUBLIC_HOLIDAYS[ymd] || null
+}
+
+function getKoreanHolidayShortLabel(fullName: string): string {
+    const main = fullName.split(' (')[0]
+    const compact = main.replace('·', '/').replace(' 연휴', '')
+    if (compact.length > 5) return `${compact.slice(0, 4)}…`
+    return compact
+}
+
+function getCalendarWeekdayHeaderClass(dayOfWeek: number) {
+    if (dayOfWeek === 0 || dayOfWeek === 6) return 'text-red-500 dark:text-red-400'
+    if (dayOfWeek === 5) return 'text-orange-500 dark:text-orange-400'
+    return 'text-slate-400'
+}
+
 function buildMonthCalendarDays(year: number, month: number): CalendarDayCell[] {
     const firstDay = new Date(year, month, 1)
     const firstWeekday = firstDay.getDay()
@@ -637,6 +905,34 @@ function formatCalendarWeatherText(weather: CalendarDailyWeather | null) {
     const maxText = weather.maxTempC !== null ? `${weather.maxTempC}` : '-'
     const minText = weather.minTempC !== null ? `${weather.minTempC}` : '-'
     return `${weather.weatherText} ${maxText}/${minText}°`
+}
+
+function formatCalendarWeatherTempText(weather: CalendarDailyWeather | null) {
+    if (!weather) return '-'
+    const maxText = weather.maxTempC !== null ? `${weather.maxTempC}` : '-'
+    const minText = weather.minTempC !== null ? `${weather.minTempC}` : '-'
+    return `${maxText}/${minText}°`
+}
+
+type WeatherIconRender = {
+    Icon: typeof Sun
+    colorClass: string
+}
+
+function getCalendarWeatherIcon(weather: CalendarDailyWeather | null): WeatherIconRender | null {
+    if (!weather || weather.weatherCode === null) return null
+    const code = weather.weatherCode
+    if (code === 0 || code === 1) return { Icon: Sun, colorClass: 'text-amber-500' }
+    if (code === 2) return { Icon: CloudSun, colorClass: 'text-amber-400' }
+    if (code === 3) return { Icon: Cloud, colorClass: 'text-slate-400' }
+    if (code === 45 || code === 48) return { Icon: CloudFog, colorClass: 'text-slate-400' }
+    if (code === 51 || code === 53 || code === 55) return { Icon: CloudDrizzle, colorClass: 'text-sky-500' }
+    if (code === 61 || code === 63 || code === 80) return { Icon: CloudRain, colorClass: 'text-sky-600' }
+    if (code === 65 || code === 81 || code === 82) return { Icon: CloudRainWind, colorClass: 'text-blue-600' }
+    if (code === 71 || code === 73 || code === 75) return { Icon: CloudSnow, colorClass: 'text-sky-300' }
+    if (code === 96) return { Icon: CloudHail, colorClass: 'text-indigo-600' }
+    if (code === 95 || code === 99) return { Icon: CloudLightning, colorClass: 'text-indigo-600' }
+    return { Icon: Cloud, colorClass: 'text-slate-400' }
 }
 
 function isCalendarWeatherLocationKey(value: unknown): value is CalendarWeatherLocationKey {
@@ -908,10 +1204,11 @@ function resolveRemittanceFeeKrw(order: WormOrderListItem): number | null {
 }
 
 function resolveRemittanceOriginKrw(order: WormOrderListItem): number | null {
-    const totalPaidKrw = resolveRemittanceSendKrw(order)
+    const directSendKrw = parseSummaryAmountByCurrency(order.remittanceSendAmountText, 'krw')
+        ?? order.remittanceSendAmount
     const feeKrw = resolveRemittanceFeeKrw(order)
-    if (totalPaidKrw !== null && feeKrw !== null) {
-        const originKrw = totalPaidKrw - feeKrw
+    if (directSendKrw !== null && feeKrw !== null) {
+        const originKrw = directSendKrw - feeKrw
         if (originKrw >= 0) return originKrw
     }
 
@@ -929,6 +1226,24 @@ function resolveRemittanceTotalPaidKrw(order: WormOrderListItem): number | null 
     if (originKrw === null) return null
     const feeKrw = resolveRemittanceFeeKrw(order) ?? 0
     return Math.round(originKrw + feeKrw)
+}
+
+function isRemittanceSummaryComplete(order: WormOrderListItem) {
+    const sendAmountUsd = resolveRemittanceSendUsd(order)
+    const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
+    const totalFeeKrw = resolveRemittanceFeeKrw(order)
+    const exchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+
+    return (
+        sendAmountUsd !== null &&
+        totalPaidKrw !== null &&
+        totalFeeKrw !== null &&
+        exchangeRate !== null &&
+        Number.isFinite(sendAmountUsd) &&
+        Number.isFinite(totalPaidKrw) &&
+        Number.isFinite(totalFeeKrw) &&
+        Number.isFinite(exchangeRate)
+    )
 }
 
 function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null {
@@ -1364,6 +1679,21 @@ export default function WormOrderPage() {
     const [wormOrderListLoading, setWormOrderListLoading] = useState(false)
     const [wormOrderListError, setWormOrderListError] = useState('')
     const [deletingWormOrderId, setDeletingWormOrderId] = useState<string | null>(null)
+    const [importingWormOrderId, setImportingWormOrderId] = useState<string | null>(null)
+    const [remittanceCandidates, setRemittanceCandidates] = useState<RemittanceCandidate[] | null>(null)
+    const [remittanceCandidatesOrder, setRemittanceCandidatesOrder] = useState<WormOrderListItem | null>(null)
+    const [remittanceCandidatePicking, setRemittanceCandidatePicking] = useState<string | null>(null)
+    const [remittanceCandidateError, setRemittanceCandidateError] = useState('')
+    const [manualRemittanceOrder, setManualRemittanceOrder] = useState<WormOrderListItem | null>(null)
+    const [manualRemittanceForm, setManualRemittanceForm] = useState({
+        appliedAt: '',
+        finalReceiveAmountUsd: '',
+        sendAmountKrw: '',
+        totalFeeKrw: '',
+        exchangeRate: '',
+    })
+    const [manualRemittanceSaving, setManualRemittanceSaving] = useState(false)
+    const [manualRemittanceError, setManualRemittanceError] = useState('')
     const [blNumberQuery, setBlNumberQuery] = useState('')
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
@@ -1375,6 +1705,7 @@ export default function WormOrderPage() {
     const bankPaymentSectionRef = useRef<HTMLDivElement>(null)
     const notificationSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
+    const cargoCustomsMailSectionRef = useRef<HTMLDivElement>(null)
     const shippingSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
     const remittanceRequestAbortControllerRef = useRef<AbortController | null>(null)
@@ -1648,6 +1979,7 @@ export default function WormOrderPage() {
                     uids: [matchedInvoiceEmail.uid, matchedAwbUid],
                     toEmail: forwardEmail.trim(),
                     orderId: activeWormOrder?.id || null,
+                    forwardDate: customsForwardDate || null,
                 }),
             })
             const data = await res.json()
@@ -1670,12 +2002,6 @@ export default function WormOrderPage() {
     // ── 자동 페치 & 게이지 관련 State ──
     const [fetchProgress, setFetchProgress] = useState(0)
     const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>('all')
-    const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>(() => (
-        PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
-            acc[step.id] = step.id <= 3
-            return acc
-        }, {})
-    ))
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
     const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate[]> => {
@@ -2062,6 +2388,151 @@ export default function WormOrderPage() {
         setInvoicePdf(null)
         setUseManualRemittanceInput(false)
     }, [activeWormOrder?.id])
+
+    const handleImportRemittanceHistory = useCallback(async (order: WormOrderListItem) => {
+        const shouldImport = window.confirm(
+            `${order.orderNumber} 발주의 송금 정보를 모인 비즈플러스 거래내역에서 가져옵니다.\n\n` +
+            `브라우저 자동화로 약 30~60초가 소요됩니다. 계속할까요?`,
+        )
+        if (!shouldImport) return
+
+        setWormOrderListError('')
+        setImportingWormOrderId(order.id)
+        try {
+            const response = await fetch('/api/admin/worm-order/remittance/history-import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    targetDate: order.receiveDate
+                        ? new Date(order.receiveDate).toISOString().slice(0, 10)
+                        : null,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok || !result?.ok) {
+                const items: RemittanceCandidate[] = Array.isArray(result?.items) ? result.items : []
+                if (items.length > 0) {
+                    setRemittanceCandidates(items.slice(0, 12))
+                    setRemittanceCandidatesOrder(order)
+                    setRemittanceCandidateError('')
+                    return
+                }
+                const baseMsg = typeof result?.error === 'string' ? result.error : '송금 정보 가져오기에 실패했습니다.'
+                throw new Error(baseMsg)
+            }
+            await fetchWormOrders()
+            alert(result?.message || '송금 정보를 가져와 저장했습니다.')
+        } catch (error) {
+            setWormOrderListError(error instanceof Error ? error.message : '송금 정보 가져오기 중 오류가 발생했습니다.')
+        } finally {
+            setImportingWormOrderId(null)
+        }
+    }, [fetchWormOrders])
+
+    const handlePickRemittanceCandidate = useCallback(async (candidate: RemittanceCandidate) => {
+        const order = remittanceCandidatesOrder
+        if (!order) return
+        const transactionId = candidate.transactionId
+        if (!transactionId) {
+            setRemittanceCandidateError('이 후보는 거래 ID가 없어서 자동으로 가져올 수 없습니다. 직접 입력으로 저장해 주세요.')
+            return
+        }
+        setRemittanceCandidateError('')
+        setRemittanceCandidatePicking(transactionId)
+        try {
+            const response = await fetch('/api/admin/worm-order/remittance/history-import', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: order.id,
+                    transactionId,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok || !result?.ok) {
+                const baseMsg = typeof result?.error === 'string' ? result.error : '선택한 거래에서 정보를 가져오지 못했습니다.'
+                throw new Error(baseMsg)
+            }
+            setRemittanceCandidates(null)
+            setRemittanceCandidatesOrder(null)
+            await fetchWormOrders()
+            alert(result?.message || '송금 정보를 가져와 저장했습니다.')
+        } catch (error) {
+            setRemittanceCandidateError(error instanceof Error ? error.message : '선택한 거래 가져오기에 실패했습니다.')
+        } finally {
+            setRemittanceCandidatePicking(null)
+        }
+    }, [remittanceCandidatesOrder, fetchWormOrders])
+
+    const openManualRemittanceModal = useCallback((order: WormOrderListItem) => {
+        const initialAppliedAt = (() => {
+            const base = order.remittanceAppliedAt
+                ? new Date(order.remittanceAppliedAt)
+                : (order.receiveDate ? new Date(order.receiveDate) : new Date())
+            const offsetMs = base.getTimezoneOffset() * 60000
+            return new Date(base.getTime() - offsetMs).toISOString().slice(0, 16)
+        })()
+        const parseLeadingNumber = (value: string | null) => {
+            if (!value) return ''
+            const match = value.match(/-?\d[\d,]*(?:\.\d+)?/)
+            return match ? match[0].replace(/,/g, '') : ''
+        }
+        const parseTrailingRate = (value: string | null) => {
+            if (!value) return ''
+            const matches = value.match(/-?\d[\d,]*(?:\.\d+)?/g)
+            if (!matches || matches.length === 0) return ''
+            return matches[matches.length - 1].replace(/,/g, '')
+        }
+        setManualRemittanceOrder(order)
+        setManualRemittanceForm({
+            appliedAt: initialAppliedAt,
+            finalReceiveAmountUsd: parseLeadingNumber(order.remittanceFinalReceiveAmountText),
+            sendAmountKrw: order.remittanceSendAmount !== null
+                ? String(order.remittanceSendAmount)
+                : parseLeadingNumber(order.remittanceSendAmountText),
+            totalFeeKrw: order.remittanceTotalFee !== null
+                ? String(order.remittanceTotalFee)
+                : parseLeadingNumber(order.remittanceTotalFeeText),
+            exchangeRate: order.remittanceExchangeRate !== null
+                ? String(order.remittanceExchangeRate)
+                : parseTrailingRate(order.remittanceExchangeRateText),
+        })
+        setManualRemittanceError('')
+    }, [])
+
+    const handleSaveManualRemittance = useCallback(async () => {
+        if (!manualRemittanceOrder) return
+        setManualRemittanceSaving(true)
+        setManualRemittanceError('')
+        try {
+            const appliedAtIso = manualRemittanceForm.appliedAt
+                ? new Date(manualRemittanceForm.appliedAt).toISOString()
+                : null
+            const response = await fetch('/api/admin/worm-order/remittance/manual-update', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    orderId: manualRemittanceOrder.id,
+                    appliedAt: appliedAtIso,
+                    finalReceiveAmountUsd: manualRemittanceForm.finalReceiveAmountUsd || null,
+                    sendAmountKrw: manualRemittanceForm.sendAmountKrw || null,
+                    totalFeeKrw: manualRemittanceForm.totalFeeKrw || null,
+                    exchangeRate: manualRemittanceForm.exchangeRate || null,
+                }),
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok || !result?.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '저장에 실패했습니다.')
+            }
+            setManualRemittanceOrder(null)
+            await fetchWormOrders()
+        } catch (error) {
+            setManualRemittanceError(error instanceof Error ? error.message : '저장에 실패했습니다.')
+        } finally {
+            setManualRemittanceSaving(false)
+        }
+    }, [manualRemittanceOrder, manualRemittanceForm, fetchWormOrders])
 
     const handleDeleteWormOrder = useCallback(async (order: WormOrderListItem) => {
         const shouldDelete = window.confirm(`삭제할까요?\n${order.orderNumber}`)
@@ -2760,7 +3231,22 @@ export default function WormOrderPage() {
     const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
     const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
     const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbUid)
-    const customsForwardDateText = useMemo(() => formatKstDateDot(new Date()), [])
+    const todayKstYmd = useMemo(() => {
+        const parts = new Intl.DateTimeFormat('en-CA', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+        }).formatToParts(new Date())
+        const year = parts.find((part) => part.type === 'year')?.value ?? '0000'
+        const month = parts.find((part) => part.type === 'month')?.value ?? '00'
+        const day = parts.find((part) => part.type === 'day')?.value ?? '00'
+        return `${year}-${month}-${day}`
+    }, [])
+    const [customsForwardDate, setCustomsForwardDate] = useState<string>(todayKstYmd)
+    const customsForwardDateText = customsForwardDate
+        ? customsForwardDate.replace(/-/g, '.')
+        : formatKstDateDot(new Date())
     const customsForwardSubject = `${customsForwardDateText} ${CUSTOMS_FORWARD_SUBJECT_SUFFIX}`
     const customsForwardBody = `안녕하세요 관세사님- ${customsForwardDateText}  엑스트래커 갯지렁이 생물 통관 진행 요청드립니다.
 <직접배차>예정입니다- 감사합니다:)
@@ -3090,6 +3576,7 @@ export default function WormOrderPage() {
             const lower = message.toLowerCase()
             const latestStep = extractLatestAutomationStep(message)
             const resolvedStage = resolveRemittanceStageFromStep(latestStep)
+            const displayMessage = formatRemittanceAutomationError(message)
 
             if (resolvedStage) {
                 setRemittanceProgress((prev) => Math.max(prev, resolvedStage.percent))
@@ -3104,9 +3591,9 @@ export default function WormOrderPage() {
                 (lower.includes('cannot find module') && (lower.includes('playwright-core') || lower.includes('@sparticuz/chromium')))
 
             if (missingBrowserRuntime) {
-                setRemittanceError(`${message} (Install deps and redeploy: npm install playwright-core @sparticuz/chromium)`)
+                setRemittanceError(`${displayMessage} (Install deps and redeploy: npm install playwright-core @sparticuz/chromium)`)
             } else {
-                setRemittanceError(message)
+                setRemittanceError(displayMessage)
             }
         } finally {
             if (remittanceProgressTimerRef.current) {
@@ -3223,15 +3710,23 @@ export default function WormOrderPage() {
         }
 
         result[1] = generatedMessage.trim() ? 'done' : totalBoxes > 0 ? 'active' : 'todo'
-        result[2] = hasFetched && emails.length > 0 ? 'done' : loadingEmails ? 'active' : 'todo'
-        result[3] = remittanceSuccess
+        result[2] = matchedInvoiceEmail?.uid
             ? 'done'
-            : remittanceSubmitting || Boolean(transferAmountUsd.trim()) || Boolean(invoicePdf)
+            : loadingEmails || matchingEmailUid !== null || invoiceOcrRunningUid !== null || hasFetched
+                ? 'active'
+                : 'todo'
+        result[3] = remittanceSuccess || isActiveOrderRemittanceApplied
+            ? 'done'
+            : remittanceSubmitting || isAutoRemittanceReady || isManualRemittanceReady
                 ? 'active'
                 : 'todo'
         result[4] = remittanceManuallyDone ? 'done' : result[3] === 'done' ? 'active' : 'todo'
-        result[5] = paymentNotificationCopied ? 'done' : remittanceManuallyDone ? 'active' : 'todo'
-        result[6] = fallbackAwbCandidate ? 'done' : awbLoading ? 'active' : 'todo'
+        result[5] = paymentNotificationCopied ? 'done' : remittanceManuallyDone || result[3] === 'done' ? 'active' : 'todo'
+        result[6] = matchedAwbUid || persistedAwbNumber
+            ? 'done'
+            : awbLoading || loadingDocEmails || docHasFetched
+                ? 'active'
+                : 'todo'
         result[7] = customsProgressResult
             ? 'done'
             : customsProgressLoading || Boolean(blNumberQuery.trim())
@@ -3245,10 +3740,10 @@ export default function WormOrderPage() {
             : 'todo'
         result[9] = forwardSuccess
             ? 'done'
-            : forwarding || isCustomsForwardReady || Boolean(forwardEmail.trim())
+            : forwarding || isCustomsForwardReady
                 ? 'active'
                 : 'todo'
-        result[10] = hasWarehouseMail ? 'done' : hasFetched ? 'active' : 'todo'
+        result[10] = hasWarehouseMail ? 'done' : 'todo'
         result[11] = 'todo'
         result[12] = 'todo'
         result[13] = shippingTrackingNumber ? 'done' : shippingSubmitting ? 'active' : 'todo'
@@ -3260,25 +3755,30 @@ export default function WormOrderPage() {
         customsProgressLoading,
         customsProgressResult,
         detailRows,
-        emails,
-        fallbackAwbCandidate,
-        forwardEmail,
+        docHasFetched,
         forwarding,
         forwardSuccess,
         generatedMessage,
         hasFetched,
         hasWarehouseMail,
-        invoicePdf,
+        invoiceOcrRunningUid,
+        isActiveOrderRemittanceApplied,
+        isAutoRemittanceReady,
+        isManualRemittanceReady,
         isCustomsForwardReady,
+        loadingDocEmails,
         loadingEmails,
+        matchedAwbUid,
+        matchedInvoiceEmail?.uid,
+        matchingEmailUid,
         paymentNotificationCopied,
+        persistedAwbNumber,
         remittanceManuallyDone,
         remittanceSubmitting,
         remittanceSuccess,
         shippingSubmitting,
         shippingTrackingNumber,
         totalBoxes,
-        transferAmountUsd,
     ])
 
     const pipelineModeCounts = useMemo(() => {
@@ -3296,6 +3796,19 @@ export default function WormOrderPage() {
         () => PIPELINE_STEP_DEFINITIONS.find((step) => pipelineStatusMap[step.id] !== 'done')?.id ?? 12,
         [pipelineStatusMap],
     )
+    const activeStepDefinition = useMemo(
+        () => PIPELINE_STEP_DEFINITIONS.find((step) => step.id === activeStepId) || null,
+        [activeStepId],
+    )
+    const pipelineFilterOptions = useMemo<Array<{ value: PipelineFilter; label: string; count: number }>>(
+        () => [
+            { value: 'all', label: '전체', count: PIPELINE_STEP_DEFINITIONS.length },
+            { value: 'AUTO', label: '자동', count: pipelineModeCounts.AUTO },
+            { value: 'SEMI', label: '반자동', count: pipelineModeCounts.SEMI },
+            { value: 'MANUAL', label: '수동', count: pipelineModeCounts.MANUAL },
+        ],
+        [pipelineModeCounts],
+    )
     const filteredPipelineSteps = useMemo(
         () => PIPELINE_STEP_DEFINITIONS.filter((step) => pipelineFilter === 'all' || step.mode === pipelineFilter),
         [pipelineFilter],
@@ -3304,10 +3817,6 @@ export default function WormOrderPage() {
         () => new Set(filteredPipelineSteps.map((step) => step.id)),
         [filteredPipelineSteps],
     )
-
-    const togglePipelineStep = useCallback((stepId: number) => {
-        setExpandedSteps((prev) => ({ ...prev, [stepId]: !prev[stepId] }))
-    }, [])
 
     const scrollToPipelineSection = useCallback((target: PipelineSectionTarget) => {
         if (target === 'order') {
@@ -3338,6 +3847,10 @@ export default function WormOrderPage() {
             customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
         }
+        if (target === 'cargoCustomsMail') {
+            cargoCustomsMailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
         if (target === 'shipping') {
             shippingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
@@ -3345,7 +3858,13 @@ export default function WormOrderPage() {
 
     const handlePipelineStepAction = useCallback((step: PipelineStepDefinition) => {
         if (step.target !== 'none') {
-            scrollToPipelineSection(step.target)
+            const targetIsHiddenByFilter = pipelineFilter !== 'all' && pipelineFilter !== step.mode
+            if (targetIsHiddenByFilter) {
+                setPipelineFilter('all')
+                window.setTimeout(() => scrollToPipelineSection(step.target), 0)
+            } else {
+                scrollToPipelineSection(step.target)
+            }
         }
 
         if (step.id === 1 && selectedOrders.length > 0 && !generatedMessage) {
@@ -3373,6 +3892,7 @@ export default function WormOrderPage() {
         handleGenerate,
         loadingDocEmails,
         loadingEmails,
+        pipelineFilter,
         scrollToPipelineSection,
         selectedOrders.length,
     ])
@@ -3455,12 +3975,6 @@ export default function WormOrderPage() {
         setShippingSuccess('')
         setShippingTrackingNumber('')
         setShippingProgressLabel('대기 중')
-        setExpandedSteps(
-            PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
-                acc[step.id] = step.id <= 3
-                return acc
-            }, {}),
-        )
         setCreatingOrder(false)
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
@@ -3591,8 +4105,9 @@ export default function WormOrderPage() {
                                 const totalFeeKrw = resolveRemittanceFeeKrw(order)
                                 const totalPaidKrw = resolveRemittanceTotalPaidKrw(order)
                                 const parsedExchangeRate = parseSummaryRate(order.remittanceExchangeRateText) ?? order.remittanceExchangeRate
+                                const remittanceSummaryComplete = isRemittanceSummaryComplete(order)
                                 const exchangeRateText = parsedExchangeRate !== null
-                                    ? `1 USD = ${parsedExchangeRate.toLocaleString('ko-KR', { maximumFractionDigits: 4 })} KRW`
+                                    ? `1 USD = ${Math.round(parsedExchangeRate).toLocaleString('ko-KR')} KRW`
                                     : order.remittanceExchangeRateText || '-'
                                 return (
                                     <tr
@@ -3617,6 +4132,11 @@ export default function WormOrderPage() {
                                                         {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
                                                     </span>
                                                 )}
+                                                {order.remittanceAppliedAt && !remittanceSummaryComplete && (
+                                                    <span className="text-[11px] font-bold text-rose-600">
+                                                        송금 정보 일부 누락 · 자동 가져오기 또는 직접 입력 필요
+                                                    </span>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
@@ -3632,23 +4152,59 @@ export default function WormOrderPage() {
                                             {exchangeRateText}
                                         </td>
                                         <td className="px-3 py-2.5 text-right">
-                                            <button
-                                                type="button"
-                                                onClick={(event) => {
-                                                    event.stopPropagation()
-                                                    void handleDeleteWormOrder(order)
-                                                }}
-                                                disabled={deletingWormOrderId === order.id}
-                                                className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
-                                                aria-label={`${order.orderNumber} 삭제`}
-                                            >
-                                                {deletingWormOrderId === order.id ? (
-                                                    <Loader2 size={13} className="animate-spin" />
-                                                ) : (
-                                                    <Trash2 size={13} />
+                                            <div className="flex items-center justify-end gap-1.5">
+                                                {!remittanceSummaryComplete && (
+                                                    <>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                void handleImportRemittanceHistory(order)
+                                                            }}
+                                                            disabled={importingWormOrderId === order.id}
+                                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                            aria-label={`${order.orderNumber} 송금정보 가져오기`}
+                                                            title="모인 비즈플러스 거래내역에서 자동으로 가져옵니다"
+                                                        >
+                                                            {importingWormOrderId === order.id ? (
+                                                                <Loader2 size={13} className="animate-spin" />
+                                                            ) : (
+                                                                <ScanSearch size={13} />
+                                                            )}
+                                                            자동
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            onClick={(event) => {
+                                                                event.stopPropagation()
+                                                                openManualRemittanceModal(order)
+                                                            }}
+                                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                                            aria-label={`${order.orderNumber} 송금정보 직접 입력`}
+                                                            title="송금 금액·수수료·환율을 직접 입력해 저장합니다"
+                                                        >
+                                                            직접 입력
+                                                        </button>
+                                                    </>
                                                 )}
-                                                삭제
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    onClick={(event) => {
+                                                        event.stopPropagation()
+                                                        void handleDeleteWormOrder(order)
+                                                    }}
+                                                    disabled={deletingWormOrderId === order.id}
+                                                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    aria-label={`${order.orderNumber} 삭제`}
+                                                >
+                                                    {deletingWormOrderId === order.id ? (
+                                                        <Loader2 size={13} className="animate-spin" />
+                                                    ) : (
+                                                        <Trash2 size={13} />
+                                                    )}
+                                                    삭제
+                                                </button>
+                                            </div>
                                         </td>
                                     </tr>
                                 )
@@ -3666,72 +4222,109 @@ export default function WormOrderPage() {
             </section>
 
             <div className="flex flex-col gap-4">
-                        {filteredPipelineSteps.map((step) => {
-                            const runtimeStatus = pipelineStatusMap[step.id]
-                            const isExpanded = expandedSteps[step.id] ?? false
-
-                            return (
-                                <section
-                                    key={step.id}
-                                    style={{ order: stepRenderOrderMap.get(step.id) ?? fallbackOrderBase }}
-                                    className={`rounded-2xl border bg-white dark:bg-[#1e1e1e] shadow-sm dark:shadow-none transition-colors ${
-                                    runtimeStatus === 'done'
-                                        ? 'border-emerald-200'
-                                        : runtimeStatus === 'active'
-                                            ? 'border-[#e34219]'
-                                            : 'border-gray-200 dark:border-[#2a2a2a]'
-                                }`}
+                <section
+                    style={{ order: 0 }}
+                    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-5"
+                >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <h2 className="text-base font-black text-slate-900 dark:text-white">작업 흐름</h2>
+                            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">
+                                단계 설명은 이곳에서만 확인하고, 아래에는 실제 실행 패널만 표시합니다.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            {pipelineFilterOptions.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setPipelineFilter(option.value)}
+                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${
+                                        pipelineFilter === option.value
+                                            ? 'border-[#e34219] bg-[#fff3ef] text-[#d9361b]'
+                                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525]'
+                                    }`}
                                 >
+                                    {option.label}
+                                    <span className="text-[10px] opacity-70">{option.count}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {activeStepDefinition && (
+                        <div className="mt-4 rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-4 py-3 dark:border-[#3a2a24] dark:bg-[#1a1a1a]">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#d9361b]">현재 처리 단계</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] px-1.5 text-xs font-black text-white">
+                                            {activeStepDefinition.id}
+                                        </span>
+                                        <p className="text-sm font-black text-slate-900 dark:text-white">{activeStepDefinition.title}</p>
+                                        <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[activeStepDefinition.id])}`}>
+                                            {getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs font-medium text-slate-600 dark:text-gray-400">{activeStepDefinition.summary}</p>
+                                </div>
+                                {activeStepDefinition.target !== 'none' && (
                                     <button
                                         type="button"
-                                        onClick={() => togglePipelineStep(step.id)}
-                                        className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left"
+                                        onClick={() => handlePipelineStepAction(activeStepDefinition)}
+                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#e34219] px-3 text-xs font-bold text-white hover:bg-[#cd3b17]"
                                     >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-black px-1.5 shrink-0 ${
-                                                runtimeStatus === 'done'
-                                                    ? 'bg-emerald-500 text-white'
-                                                    : runtimeStatus === 'active'
-                                                        ? 'bg-[#e34219] text-white'
-                                                        : 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-600 dark:text-gray-400'
-                                            }`}>
-                                                {step.id}
-                                            </span>
-                                            <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">{step.title}</h2>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
+                                        {activeStepDefinition.actionLabel}
+                                        <ArrowRight size={13} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {filteredPipelineSteps.map((step) => {
+                            const runtimeStatus = pipelineStatusMap[step.id]
+                            const isCurrent = step.id === activeStepId
+                            return (
+                                <button
+                                    key={step.id}
+                                    type="button"
+                                    onClick={() => handlePipelineStepAction(step)}
+                                    className={`group flex min-h-[84px] items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                                        runtimeStatus === 'done'
+                                            ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
+                                            : isCurrent
+                                                ? 'border-[#e34219] bg-[#fff3ef] hover:bg-[#ffeadd]'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
+                                    }`}
+                                >
+                                    <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black ${
+                                        runtimeStatus === 'done'
+                                            ? 'bg-emerald-500 text-white'
+                                            : isCurrent
+                                                ? 'bg-[#e34219] text-white'
+                                                : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
+                                    }`}>
+                                        {step.id}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13px] font-black leading-snug text-slate-900 dark:text-white">{step.title}</span>
+                                        <span className="mt-1 block line-clamp-2 text-[11px] font-medium leading-snug text-slate-500 dark:text-gray-400">{step.summary}</span>
+                                        <span className="mt-2 flex flex-wrap items-center gap-1.5">
                                             <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
                                                 {getPipelineModeLabel(step.mode)}
                                             </span>
                                             <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
                                                 {getPipelineRuntimeLabel(runtimeStatus)}
                                             </span>
-                                            {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                                        </div>
-                                    </button>
-
-                                    {isExpanded && (
-                                        <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
-                                            <p className="text-xs text-slate-500 dark:text-gray-400">
-                                                <span className="font-semibold text-slate-600 dark:text-gray-400">처리주체</span> {step.owner}
-                                                {step.warning && <span className="ml-2 text-orange-600">· {step.warning}</span>}
-                                            </p>
-
-                                            {step.target !== 'none' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePipelineStepAction(step)}
-                                                    className="h-8 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 bg-[#e34219] text-white hover:bg-[#cd3b17]"
-                                                >
-                                                    {step.actionLabel}
-                                                    <ArrowRight size={13} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </section>
+                                        </span>
+                                    </span>
+                                </button>
                             )
                         })}
+                    </div>
+                </section>
             {showOrderTools && (
                 <div
                     ref={orderSectionRef}
@@ -3792,9 +4385,9 @@ export default function WormOrderPage() {
                                 </button>
                             </div>
 
-                            <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-slate-400 text-center">
-                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday) => (
-                                    <span key={weekday}>{weekday}</span>
+                            <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-center">
+                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday, dayOfWeek) => (
+                                    <span key={weekday} className={getCalendarWeekdayHeaderClass(dayOfWeek)}>{weekday}</span>
                                 ))}
                             </div>
                             <div className="mt-1 grid grid-cols-7 gap-1">
@@ -3816,6 +4409,54 @@ export default function WormOrderPage() {
                                     const dayWeather = calendarWeatherByDate[ymd]
                                     const shanghaiWeather = dayWeather?.shanghai || null
                                     const busanGangseoWeather = dayWeather?.busanGangseo || null
+                                    const rainLevel = !isSelected && dayCell.isCurrentMonth
+                                        ? classifyDayPrecipitation(shanghaiWeather, busanGangseoWeather)
+                                        : null
+                                    const rainBgClass = getCalendarRainBgClass(rainLevel)
+                                    const dayOfWeek = dayCell.date.getDay()
+                                    const chineseHolidayName = dayCell.isCurrentMonth ? getChineseHolidayName(ymd) : null
+                                    const koreanHolidayName = dayCell.isCurrentMonth ? getKoreanHolidayName(ymd) : null
+                                    const isPublicHoliday = Boolean(chineseHolidayName || koreanHolidayName)
+                                    const isWeekend = dayOfWeek === 0 || dayOfWeek === 6
+                                    const isRedDay = isWeekend || isPublicHoliday
+                                    const RED_DAY_BG = 'bg-rose-50 border-rose-200 hover:bg-rose-100 dark:bg-rose-900/30 dark:border-rose-800 dark:hover:bg-rose-900/50'
+                                    // Priority: 빨간 날(주말/공휴일) > 비/폭우 > 금요일 > 기본 흰색
+                                    let cellBgClass = ''
+                                    if (!isSelected && dayCell.isCurrentMonth) {
+                                        if (isRedDay) {
+                                            cellBgClass = RED_DAY_BG
+                                        } else if (rainBgClass) {
+                                            cellBgClass = rainBgClass
+                                        } else if (dayOfWeek === 5) {
+                                            cellBgClass = getCalendarDayOfWeekBgClass(dayOfWeek)
+                                        }
+                                    }
+                                    const nextDay = new Date(dayCell.date)
+                                    nextDay.setDate(nextDay.getDate() + 1)
+                                    const nextDayYmd = formatLocalDateToYmd(nextDay)
+                                    const nextDayWeather = calendarWeatherByDate[nextDayYmd]
+                                    const nextDayRainLevel = nextDayWeather
+                                        ? classifyDayPrecipitation(
+                                            nextDayWeather.shanghai || null,
+                                            nextDayWeather.busanGangseo || null,
+                                          )
+                                        : null
+                                    const isGoodDeliveryDay =
+                                        !isPast &&
+                                        dayCell.isCurrentMonth &&
+                                        !rainLevel &&
+                                        !nextDayRainLevel &&
+                                        !isPublicHoliday &&
+                                        dayOfWeek !== 0 &&
+                                        dayOfWeek !== 5 &&
+                                        dayOfWeek !== 6
+                                    const cellTooltip = (() => {
+                                        const parts = [monthPriceTooltip]
+                                        if (koreanHolidayName) parts.push(`한국 공휴일: ${koreanHolidayName}`)
+                                        if (chineseHolidayName) parts.push(`중국 공휴일: ${chineseHolidayName}`)
+                                        if (nextDayRainLevel) parts.push(`다음날 ${nextDayRainLevel === 'heavy' ? '강한 비' : '비'} 예보`)
+                                        return parts.join(' · ')
+                                    })()
                                     return (
                                         <button
                                             key={ymd}
@@ -3826,19 +4467,51 @@ export default function WormOrderPage() {
                                                 setActiveWormOrder(null)
                                             }}
                                             disabled={isPast}
-                                            title={monthPriceTooltip}
+                                            title={cellTooltip}
                                             className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
-                                                        ? 'bg-white dark:bg-[#1e1e1e] text-slate-700 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'
+                                                        ? `${cellBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
                                             } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
-                                                <span className={`text-[11px] font-black ${isSelected ? 'text-white' : 'text-slate-700 dark:text-gray-300'}`}>
-                                                    {dayCell.date.getDate()}
-                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className={`text-[11px] font-black inline-flex items-center justify-center ${
+                                                        isGoodDeliveryDay && !isSelected
+                                                            ? 'h-[18px] w-[18px] rounded-full border-[1.5px] border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                                                            : isSelected
+                                                                ? 'text-white'
+                                                                : 'text-slate-700 dark:text-gray-300'
+                                                    }`}>
+                                                        {dayCell.date.getDate()}
+                                                    </span>
+                                                    {koreanHolidayName && (
+                                                        <span
+                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
+                                                                isSelected
+                                                                    ? 'bg-white/20 text-white border border-white/30'
+                                                                    : 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800'
+                                                            }`}
+                                                            title={`한국 공휴일: ${koreanHolidayName}`}
+                                                        >
+                                                            {getKoreanHolidayShortLabel(koreanHolidayName)}
+                                                        </span>
+                                                    )}
+                                                    {chineseHolidayName && (
+                                                        <span
+                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
+                                                                isSelected
+                                                                    ? 'bg-white/20 text-white border border-white/30'
+                                                                    : 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800'
+                                                            }`}
+                                                            title={`중국 공휴일: ${chineseHolidayName}`}
+                                                        >
+                                                            {getChineseHolidayShortLabel(chineseHolidayName)}
+                                                        </span>
+                                                    )}
+                                                </div>
                                                 {isMonthStart && (
                                                     <span
                                                         className={`mt-1 inline-flex max-w-full items-center rounded-full px-1.5 py-[1px] text-[9px] font-black leading-none truncate ${getCalendarPriceBadgeClass(dayCell.colorType, isSelected)}`}
@@ -3850,8 +4523,30 @@ export default function WormOrderPage() {
                                                 <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
                                                     isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
                                                 }`}>
-                                                    <p className="truncate">상해 {formatCalendarWeatherText(shanghaiWeather)}</p>
-                                                    <p className="truncate">부산 {formatCalendarWeatherText(busanGangseoWeather)}</p>
+                                                    {(() => {
+                                                        const shanghaiIcon = getCalendarWeatherIcon(shanghaiWeather)
+                                                        const busanIcon = getCalendarWeatherIcon(busanGangseoWeather)
+                                                        const shanghaiTitle = shanghaiWeather ? `상해 ${formatCalendarWeatherText(shanghaiWeather)}` : '상해 -'
+                                                        const busanTitle = busanGangseoWeather ? `부산 ${formatCalendarWeatherText(busanGangseoWeather)}` : '부산 -'
+                                                        return (
+                                                            <>
+                                                                <p className="flex items-center gap-1 truncate" title={shanghaiTitle}>
+                                                                    <span>상해</span>
+                                                                    {shanghaiIcon ? (
+                                                                        <shanghaiIcon.Icon size={11} strokeWidth={2.2} className={isSelected ? 'text-white/95 shrink-0' : `${shanghaiIcon.colorClass} shrink-0`} />
+                                                                    ) : null}
+                                                                    <span className="truncate">{formatCalendarWeatherTempText(shanghaiWeather)}</span>
+                                                                </p>
+                                                                <p className="flex items-center gap-1 truncate" title={busanTitle}>
+                                                                    <span>부산</span>
+                                                                    {busanIcon ? (
+                                                                        <busanIcon.Icon size={11} strokeWidth={2.2} className={isSelected ? 'text-white/95 shrink-0' : `${busanIcon.colorClass} shrink-0`} />
+                                                                    ) : null}
+                                                                    <span className="truncate">{formatCalendarWeatherTempText(busanGangseoWeather)}</span>
+                                                                </p>
+                                                            </>
+                                                        )
+                                                    })()}
                                                 </div>
                                             </div>
                                         </button>
@@ -4007,11 +4702,11 @@ export default function WormOrderPage() {
                     <div>
                         <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Mail size={18} className="text-slate-500 dark:text-gray-400" />
-                            인보이스 메일 수신
+                            메일센터 · 인보이스
                             {loadingEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </h2>
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
-                            제목/본문에 &apos;invoice&apos; 또는 &apos;payment&apos;가 포함된 메일만 조회합니다.
+                            Michael 발신자의 invoice/payment 메일을 이 발주에 매칭합니다.
                             {activeWormOrder && <span className="ml-2 font-semibold text-slate-600 dark:text-gray-400">현재 발주: {activeWormOrder.orderNumber}</span>}
                         </p>
                         {emailCacheSavedAt && (
@@ -4026,7 +4721,7 @@ export default function WormOrderPage() {
                         className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
                         {loadingEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : '인박스 모니터'}</span>
+                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : '메일 스캔'}</span>
                     </button>
                 </div>
                 <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
@@ -4059,9 +4754,8 @@ export default function WormOrderPage() {
                                     const isSelected = selectedEmailUid === email.uid
                                     const isMatched = email.matchedOrderId === activeWormOrder?.id
                                     return (
-                                        <button
+                                        <div
                                             key={email.uid}
-                                            onClick={() => setSelectedEmailUid(email.uid)}
                                             className={`w-full text-left p-4 transition-colors ${
                                                 isMatched && isSelected
                                                     ? 'bg-emerald-100 border-l-4 border-emerald-600 pl-[13px]'
@@ -4072,21 +4766,29 @@ export default function WormOrderPage() {
                                                     : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50 dark:hover:bg-[#252525]'
                                             }`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
-                                                    {new Date(email.date).toLocaleDateString()}
-                                                </span>
-                                                {email.hasAttachments && <span className="text-[11px]">📎</span>}
-                                            </div>
-                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                                                {index + 1}. {email.subject}
-                                            </h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedEmailUid(email.uid)}
+                                                className="w-full text-left"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
+                                                        {new Date(email.date).toLocaleDateString()}
+                                                    </span>
+                                                    {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                                </div>
+                                                <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                    {index + 1}. {email.subject}
+                                                </h3>
+                                            </button>
                                             <div className="mt-2 flex items-center gap-2">
-                                                <span
+                                                <button
+                                                    type="button"
                                                     onClick={(event) => {
                                                         event.stopPropagation()
                                                         void handleMatchEmailToActiveOrder(email)
                                                     }}
+                                                    disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id || matchingEmailUid === email.uid}
                                                     className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
@@ -4096,69 +4798,63 @@ export default function WormOrderPage() {
                                                                     ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
                                                                     : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
-                                                    role="button"
-                                                    aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
                                                 >
                                                     {email.matchedOrderId === activeWormOrder?.id
                                                         ? '매칭완료'
                                                         : matchingEmailUid === email.uid
                                                             ? '매칭중...'
                                                             : '매칭하기'}
-                                                </span>
+                                                </button>
                                                 {email.matchedOrderNumber && (
                                                     <span className="text-[10px] font-semibold text-emerald-700">
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
                                                 {email.matchedOrderId && (
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             void handleUnmatchEmail(email)
                                                         }}
+                                                        disabled={unmatchingEmailUid === email.uid}
                                                         className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
                                                             unmatchingEmailUid === email.uid
                                                                 ? 'bg-slate-100 text-slate-400 cursor-progress'
                                                                 : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
                                                         }`}
-                                                        role="button"
                                                     >
                                                         {unmatchingEmailUid === email.uid ? '해제중...' : '매칭해제'}
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                             {email.matchedOrderId && (
-                                                <div className="mt-1.5 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5">
-                                                    <table className="w-full text-[10px]">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td className="py-0.5 font-semibold text-emerald-700 pr-2 whitespace-nowrap">유닛프라이스</td>
-                                                                <td className="py-0.5 font-bold text-emerald-900 text-right">{formatUsdAmount(email.invoiceUnitPriceUsd)}</td>
-                                                                <td className="py-0.5 text-emerald-700 text-right pl-2">{formatKrwAmount(email.invoiceUnitPriceKrw)}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="py-0.5 font-semibold text-emerald-700 pr-2 whitespace-nowrap">토탈어마운트</td>
-                                                                <td className="py-0.5 font-bold text-emerald-900 text-right">{formatUsdAmount(email.invoiceTotalAmountUsd)}</td>
-                                                                <td className="py-0.5 text-emerald-700 text-right pl-2">{formatKrwAmount(email.invoiceTotalAmountKrw)}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="py-0.5 font-medium text-emerald-700/80 pr-2 whitespace-nowrap">환율</td>
-                                                                <td colSpan={2} className="py-0.5 text-emerald-700/80 text-right">
-                                                                    {email.usdKrwRate !== null ? `1 USD = ₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}
-                                                                </td>
-                                                            </tr>
-                                                            {email.invoiceOcrError && (
-                                                                <tr>
-                                                                    <td colSpan={3} className="py-0.5 font-semibold text-rose-600">{email.invoiceOcrError}</td>
-                                                                </tr>
-                                                            )}
-                                                        </tbody>
-                                                    </table>
+                                                <div className="mt-1.5 space-y-1 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5 text-[10px]">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="font-semibold text-emerald-700">유닛프라이스</span>
+                                                        <span className="font-bold text-emerald-900">
+                                                            {formatUsdAmount(email.invoiceUnitPriceUsd)} · {formatKrwAmount(email.invoiceUnitPriceKrw)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="font-semibold text-emerald-700">토탈어마운트</span>
+                                                        <span className="font-bold text-emerald-900">
+                                                            {formatUsdAmount(email.invoiceTotalAmountUsd)} · {formatKrwAmount(email.invoiceTotalAmountKrw)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2 text-emerald-700/80">
+                                                        <span className="font-medium">환율</span>
+                                                        <span>{email.usdKrwRate !== null ? `1 USD = ₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}</span>
+                                                    </div>
+                                                    {email.invoiceOcrError && (
+                                                        <p className="font-semibold text-rose-600">{email.invoiceOcrError}</p>
+                                                    )}
                                                 </div>
                                             )}
                                             {email.awbNumber && (
                                                 <div className="mt-2 flex items-center gap-2">
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
@@ -4166,13 +4862,13 @@ export default function WormOrderPage() {
                                                         className="inline-flex h-6 items-center rounded-md bg-[#e34219] px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-[#cd3b17] transition-colors"
                                                     >
                                                         조회하기
-                                                    </span>
+                                                    </button>
                                                     <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
                                                         AWB {email.awbNumber}
                                                     </p>
                                                 </div>
                                             )}
-                                        </button>
+                                        </div>
                                     )
                                 })}
                             </div>
@@ -4264,18 +4960,7 @@ export default function WormOrderPage() {
                                     </div>
                                     {/* 메일 본문 내용 */}
                                     <div className="p-6 overflow-y-auto bg-white dark:bg-[#1e1e1e] flex-1 text-[14px]">
-                                        {loadingEmailDetail && !selectedEmail.text ? (
-                                            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
-                                                <Loader2 size={16} className="animate-spin mr-2" />
-                                                메일 본문을 불러오는 중...
-                                            </div>
-                                        ) : (
-                                            <div 
-                                                className="w-full text-gray-800 break-words leading-relaxed max-w-none"
-                                                style={{ whiteSpace: selectedEmail.text.includes('<html') ? 'normal' : 'pre-wrap' }}
-                                                dangerouslySetInnerHTML={{ __html: selectedEmail.text || '' }} 
-                                            />
-                                        )}
+                                        <EmailBodyPreview loading={loadingEmailDetail} text={selectedEmail.text} />
                                     </div>
                                 </div>
                             )
@@ -4299,11 +4984,11 @@ export default function WormOrderPage() {
                     <div>
                         <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Package size={18} className="text-blue-500" />
-                            AWB 메일 수신
+                            메일센터 · AWB 문서
                             {loadingDocEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span>}
                         </h2>
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
-                            제목에 &apos;documents&apos;가 포함된 선적 서류 메일을 조회합니다.
+                            documents 메일을 이 발주에 매칭하고 AWB를 추출합니다.
                         </p>
                     </div>
                     <button
@@ -4345,9 +5030,8 @@ export default function WormOrderPage() {
                                     const isSelected = selectedDocEmailUid === email.uid
                                     const isMatched = email.matchedOrderId === activeWormOrder?.id
                                     return (
-                                        <button
+                                        <div
                                             key={email.uid}
-                                            onClick={() => setSelectedDocEmailUid(email.uid)}
                                             className={`w-full text-left p-4 transition-colors ${
                                                 isMatched && isSelected
                                                     ? 'bg-blue-200/60 border-l-4 border-blue-700 pl-[13px]'
@@ -4358,22 +5042,30 @@ export default function WormOrderPage() {
                                                     : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50 dark:hover:bg-[#252525]'
                                             }`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
-                                                    {new Date(email.date).toLocaleDateString()}
-                                                </span>
-                                                {email.hasAttachments && <span className="text-[11px]">📎</span>}
-                                            </div>
-                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                                                {index + 1}. {email.subject}
-                                            </h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedDocEmailUid(email.uid)}
+                                                className="w-full text-left"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
+                                                        {new Date(email.date).toLocaleDateString()}
+                                                    </span>
+                                                    {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                                </div>
+                                                <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                    {index + 1}. {email.subject}
+                                                </h3>
+                                            </button>
                                             {/* 매칭/해제 버튼 */}
                                             <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                                <span
+                                                <button
+                                                    type="button"
                                                     onClick={(event) => {
                                                         event.stopPropagation()
                                                         void handleMatchDocEmailToOrder(email)
                                                     }}
+                                                    disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id || matchingDocEmailUid === email.uid}
                                                     className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
@@ -4383,40 +5075,40 @@ export default function WormOrderPage() {
                                                                     ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
                                                                     : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
-                                                    role="button"
-                                                    aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
                                                 >
                                                     {email.matchedOrderId === activeWormOrder?.id
                                                         ? '매칭완료'
                                                         : matchingDocEmailUid === email.uid
                                                             ? '매칭중...'
                                                             : '매칭하기'}
-                                                </span>
+                                                </button>
                                                 {email.matchedOrderNumber && (
                                                     <span className="text-[10px] font-semibold text-emerald-700">
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
                                                 {email.matchedOrderId && (
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             void handleUnmatchDocEmail(email)
                                                         }}
+                                                        disabled={unmatchingDocEmailUid === email.uid}
                                                         className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
                                                             unmatchingDocEmailUid === email.uid
                                                                 ? 'bg-slate-100 text-slate-400 cursor-progress'
                                                                 : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
                                                         }`}
-                                                        role="button"
                                                     >
                                                         {unmatchingDocEmailUid === email.uid ? '해제중...' : '매칭해제'}
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                             {email.awbNumber && (
                                                 <div className="mt-1.5 flex items-center gap-2">
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
@@ -4424,13 +5116,13 @@ export default function WormOrderPage() {
                                                         className="inline-flex h-6 items-center rounded-md bg-blue-600 px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-blue-700 transition-colors"
                                                     >
                                                         통관조회
-                                                    </span>
+                                                    </button>
                                                     <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
                                                         AWB {email.awbNumber}
                                                     </p>
                                                 </div>
                                             )}
-                                        </button>
+                                        </div>
                                     )
                                 })}
                             </div>
@@ -4580,18 +5272,7 @@ export default function WormOrderPage() {
                                     </div>
                                     {/* 메일 본문 */}
                                     <div className="p-6 overflow-y-auto bg-white dark:bg-[#1e1e1e] flex-1 text-[14px]">
-                                        {loadingDocEmailDetail && !selectedDoc.text ? (
-                                            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
-                                                <Loader2 size={16} className="animate-spin mr-2" />
-                                                메일 본문을 불러오는 중...
-                                            </div>
-                                        ) : (
-                                            <div
-                                                className="w-full text-gray-800 break-words leading-relaxed max-w-none"
-                                                style={{ whiteSpace: selectedDoc.text.includes('<html') ? 'normal' : 'pre-wrap' }}
-                                                dangerouslySetInnerHTML={{ __html: selectedDoc.text || '' }}
-                                            />
-                                        )}
+                                        <EmailBodyPreview loading={loadingDocEmailDetail} text={selectedDoc.text} />
                                     </div>
                                 </div>
                             )
@@ -5139,6 +5820,7 @@ export default function WormOrderPage() {
 
             {showCargoCustomsMailTools && (
                 <div
+                    ref={cargoCustomsMailSectionRef}
                     style={{ order: cargoCustomsMailToolOrderBase + 5 }}
                     className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
@@ -5173,6 +5855,26 @@ export default function WormOrderPage() {
                                 className="w-full h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
                             />
                             <p className="text-[11px] text-slate-500 dark:text-gray-400">기본값: {DEFAULT_CUSTOMS_FORWARD_EMAIL} (필요 시 변경 가능)</p>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">통관 진행일</label>
+                            <div className="flex items-center gap-2">
+                                <input
+                                    type="date"
+                                    value={customsForwardDate}
+                                    onChange={(event) => setCustomsForwardDate(event.target.value)}
+                                    className="h-10 px-3 rounded-lg border border-gray-300 text-sm font-medium"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={() => setCustomsForwardDate(todayKstYmd)}
+                                    className="h-10 px-3 rounded-lg border border-gray-300 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                >
+                                    오늘
+                                </button>
+                            </div>
+                            <p className="text-[11px] text-slate-500 dark:text-gray-400">제목과 본문에 들어갈 날짜입니다. 기본값은 오늘(KST)이며 캘린더에서 변경할 수 있습니다.</p>
                         </div>
 
                         <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
@@ -5324,6 +6026,211 @@ export default function WormOrderPage() {
                                 )}
                             </div>
                         )}
+                    </div>
+                </div>
+            )}
+
+            {remittanceCandidates && remittanceCandidatesOrder && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => {
+                        if (remittanceCandidatePicking) return
+                        setRemittanceCandidates(null)
+                        setRemittanceCandidatesOrder(null)
+                        setRemittanceCandidateError('')
+                    }}
+                >
+                    <div
+                        className="w-full max-w-2xl rounded-2xl bg-white shadow-xl max-h-[85vh] flex flex-col"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">모인 거래내역에서 직접 선택</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5">
+                                    {remittanceCandidatesOrder.orderNumber} · 자동 매칭이 어려워 후보를 보여드립니다. 발주에 해당하는 거래를 클릭해 주세요.
+                                </p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (remittanceCandidatePicking) return
+                                    setRemittanceCandidates(null)
+                                    setRemittanceCandidatesOrder(null)
+                                    setRemittanceCandidateError('')
+                                }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
+                                aria-label="닫기"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 space-y-2 overflow-y-auto">
+                            {remittanceCandidates.map((candidate, index) => {
+                                const tid = candidate.transactionId || ''
+                                const isPicking = remittanceCandidatePicking === tid
+                                const disabled = !tid || Boolean(remittanceCandidatePicking)
+                                return (
+                                    <button
+                                        key={tid || `candidate-${index}`}
+                                        type="button"
+                                        onClick={() => { void handlePickRemittanceCandidate(candidate) }}
+                                        disabled={disabled}
+                                        className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-sky-300 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+                                    >
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+                                                <span>{candidate.dateText || '날짜 미상'}</span>
+                                                {candidate.statusText && (
+                                                    <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                                        {candidate.statusText}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-slate-600 mt-0.5 truncate">
+                                                {candidate.recipient || '수취인 미상'}
+                                            </p>
+                                            <p className="text-[11px] text-slate-500 mt-0.5">
+                                                {[candidate.amountUsdText, candidate.sendAmountKrwText, candidate.totalFeeKrwText, candidate.exchangeRateText]
+                                                    .filter(Boolean).join(' · ') || '금액 정보 없음'}
+                                            </p>
+                                        </div>
+                                        {isPicking ? (
+                                            <Loader2 size={16} className="animate-spin text-sky-600 shrink-0" />
+                                        ) : (
+                                            <ArrowRight size={16} className="text-slate-400 shrink-0" />
+                                        )}
+                                    </button>
+                                )
+                            })}
+                            {remittanceCandidateError && (
+                                <p className="text-xs font-semibold text-rose-600 mt-2">{remittanceCandidateError}</p>
+                            )}
+                        </div>
+                        <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
+                            <span>거래 ID 가 없는 후보는 클릭할 수 없습니다 — 직접 입력으로 저장해 주세요.</span>
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    if (remittanceCandidatePicking) return
+                                    setRemittanceCandidates(null)
+                                    setRemittanceCandidatesOrder(null)
+                                    setRemittanceCandidateError('')
+                                    if (remittanceCandidatesOrder) openManualRemittanceModal(remittanceCandidatesOrder)
+                                }}
+                                disabled={Boolean(remittanceCandidatePicking)}
+                                className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                                직접 입력으로 전환
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {manualRemittanceOrder && (
+                <div
+                    className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4"
+                    onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                >
+                    <div
+                        className="w-full max-w-md rounded-2xl bg-white shadow-xl"
+                        onClick={(event) => event.stopPropagation()}
+                    >
+                        <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                            <div>
+                                <h3 className="text-base font-black text-slate-900">송금정보 직접 입력</h3>
+                                <p className="text-[11px] text-slate-500 mt-0.5">{manualRemittanceOrder.orderNumber}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"
+                                aria-label="닫기"
+                            >
+                                <X size={16} />
+                            </button>
+                        </div>
+                        <div className="px-5 py-4 space-y-3">
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">신청시각</label>
+                                <input
+                                    type="datetime-local"
+                                    value={manualRemittanceForm.appliedAt}
+                                    onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, appliedAt: event.target.value }))}
+                                    className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 송금액 (USD)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="1050"
+                                        value={manualRemittanceForm.finalReceiveAmountUsd}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, finalReceiveAmountUsd: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">환율 (1 USD =)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        placeholder="1481.8829"
+                                        value={manualRemittanceForm.exchangeRate}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, exchangeRate: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 송금 한화 (KRW)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="1590589"
+                                        value={manualRemittanceForm.sendAmountKrw}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, sendAmountKrw: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 수수료 (KRW)</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        placeholder="34612"
+                                        value={manualRemittanceForm.totalFeeKrw}
+                                        onChange={(event) => setManualRemittanceForm((prev) => ({ ...prev, totalFeeKrw: event.target.value }))}
+                                        className="h-10 w-full rounded-lg border border-slate-200 px-3 text-sm font-medium"
+                                    />
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-slate-500">금액은 숫자만 입력하면 됩니다 (콤마/통화 기호 자동 제거).</p>
+                            {manualRemittanceError && (
+                                <p className="text-xs font-semibold text-rose-600">{manualRemittanceError}</p>
+                            )}
+                        </div>
+                        <div className="px-5 py-4 border-t border-slate-100 flex items-center justify-end gap-2">
+                            <button
+                                type="button"
+                                onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
+                                disabled={manualRemittanceSaving}
+                                className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                            >
+                                취소
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => { void handleSaveManualRemittance() }}
+                                disabled={manualRemittanceSaving}
+                                className="h-9 px-4 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-black disabled:opacity-60 inline-flex items-center gap-1.5"
+                            >
+                                {manualRemittanceSaving && <Loader2 size={13} className="animate-spin" />}
+                                저장
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}

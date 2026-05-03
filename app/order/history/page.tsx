@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma"
-import { getProductImageUrl } from "@/lib/product-image-url"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import OrderHistory from "@/components/OrderHistory"
@@ -47,21 +46,7 @@ export default async function OrderHistoryPage() {
         orderBy: { createdAt: 'desc' },
     })
 
-    const ordersWithImageUrls = orders.map(order => ({
-        ...order,
-        items: order.items.map(item => {
-            const { imageUrl, updatedAt, ...product } = item.product
-            return {
-                ...item,
-                product: {
-                    ...product,
-                    imageUrl: imageUrl ? getProductImageUrl(product.id, updatedAt) : null,
-                },
-            }
-        }),
-    }))
-
     return (
-        <OrderHistory orders={ordersWithImageUrls} userCountry={session.user.country} />
+        <OrderHistory orders={orders} userCountry={session.user.country} />
     )
 }

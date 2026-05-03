@@ -5,7 +5,7 @@ import { redirect } from "next/navigation"
 import InvoiceButtons from "@/components/InvoiceButtons"
 import InvoiceWrapper from "@/components/InvoiceWrapper"
 
-export default async function InvoicePage({ params }: { params: { id: string } }) {
+export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions)
     if (!session) redirect('/login')
 

@@ -3,76 +3,244 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  /* New Point Color: #d9361b */
-  --color-brand-blue: #d9361b;
-  --color-brand-light-blue: #d9361b;
-  /* Avoid other reds, reuse point color */
-  --color-brand-grey: #f0f0f0;
-  --color-brand-orange: #d9361b;
-  /* Using point color as primary accent */
+  --color-brand-blue: #0066cc;
+  --color-brand-light-blue: #0071e3;
+  --color-brand-grey: #f5f5f7;
+  --color-brand-orange: #0066cc;
 
-  --font-sans: "Apple SD Gothic Neo", "Hiragino Sans", "Yu Gothic", "Noto Sans CJK KR", "Noto Sans CJK JP", var(--font-geist-sans), var(--font-noto-sans-jp), ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Hiragino Sans", "Yu Gothic", "Noto Sans CJK KR", "Noto Sans CJK JP", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-noto: var(--font-noto-sans-jp);
   --font-inter: var(--font-inter);
 }
 
 :root {
   --background: #ffffff;
-  --foreground: #0A2342;
+  --foreground: #1d1d1f;
   --card: #ffffff;
-  --card-hover: #f9fafb;
-  --border: #f3f4f6;
-  --border-strong: #e5e7eb;
-  --muted: #f9fafb;
-  --muted-foreground: #6b7280;
+  --card-hover: #fafafc;
+  --border: #f0f0f0;
+  --border-strong: #e0e0e0;
+  --muted: #f5f5f7;
+  --muted-foreground: #7a7a7a;
   --input-bg: #ffffff;
-  --input-border: #e5e7eb;
-  --surface: #f9f9f9;
+  --input-border: #d2d2d7;
+  --surface: #fafafc;
+  --surface-parchment: #f5f5f7;
+  --surface-dark: #272729;
+  --surface-dark-2: #2a2a2c;
+  --surface-black: #000000;
+  --primary: #0066cc;
+  --primary-focus: #0071e3;
+  --primary-on-dark: #2997ff;
+  --hairline: #e0e0e0;
+  --shadow-product: 0 24px 60px rgba(0, 0, 0, 0.18);
+  --radius-xs: 5px;
+  --radius-sm: 8px;
+  --radius-md: 11px;
+  --radius-lg: 18px;
+  --radius-pill: 9999px;
 }
 
 .dark {
-  --background: #111111;
-  --foreground: #e5e5e5;
-  --card: #1e1e1e;
-  --card-hover: #252525;
-  --border: #2a2a2a;
-  --border-strong: #333333;
-  --muted: #1a1a1a;
-  --muted-foreground: #999999;
-  --input-bg: #1e1e1e;
-  --input-border: #333333;
-  --surface: #141414;
+  --background: #000000;
+  --foreground: #ffffff;
+  --card: #1d1d1f;
+  --card-hover: #272729;
+  --border: #2a2a2c;
+  --border-strong: #3a3a3c;
+  --muted: #1d1d1f;
+  --muted-foreground: #cccccc;
+  --input-bg: #1d1d1f;
+  --input-border: #3a3a3c;
+  --surface: #1d1d1f;
+  --surface-parchment: #1d1d1f;
+  --surface-dark: #272729;
+  --surface-dark-2: #2a2a2c;
+  --surface-black: #000000;
+  --primary: #2997ff;
+  --primary-focus: #2997ff;
+  --primary-on-dark: #2997ff;
+  --hairline: #3a3a3c;
+  --shadow-product: 0 24px 60px rgba(0, 0, 0, 0.42);
   color-scheme: dark;
+}
+
+html {
+  background: var(--background);
+  color: var(--foreground);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans);
+  letter-spacing: -0.022em;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+a {
+  color: var(--primary);
+  transition: color 160ms ease;
+}
+
+a:hover {
+  color: var(--primary-focus);
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease, opacity 180ms ease, transform 180ms ease;
+}
+
+input,
+textarea,
+select {
+  background: var(--input-bg);
+  border-color: var(--input-border);
+}
+
+input:focus,
+textarea:focus,
+select:focus {
+  outline: none;
+  border-color: var(--primary-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary-focus) 16%, transparent);
+}
+
+::selection {
+  background: color-mix(in srgb, var(--primary) 18%, white);
+}
+
+.apple-page {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.apple-admin-shell {
+  min-height: 100vh;
+  background:
+    linear-gradient(180deg, var(--surface-parchment) 0, var(--background) 120px);
+}
+
+.apple-panel {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: none;
+}
+
+.apple-panel-dark {
+  background: var(--surface-dark);
+  color: #fff;
+  border: 1px solid transparent;
+  border-radius: 0;
+}
+
+.apple-hero-title {
+  font-family: var(--font-sans);
+  font-size: clamp(2.5rem, 4vw, 3.5rem);
+  font-weight: 600;
+  line-height: 1.07;
+  letter-spacing: -0.035em;
+}
+
+.apple-section-title {
+  font-size: clamp(2rem, 3vw, 2.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+}
+
+.apple-lead {
+  font-size: clamp(1.125rem, 1.8vw, 1.5rem);
+  line-height: 1.45;
+  color: var(--muted-foreground);
+}
+
+.apple-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 11px 22px;
+  border-radius: var(--radius-pill);
+  background: var(--primary);
+  color: #fff;
+  border: 1px solid transparent;
+  font-size: 17px;
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.022em;
+}
+
+.apple-button:hover {
+  background: var(--primary-focus);
+  color: #fff;
+}
+
+.apple-button-secondary {
+  background: var(--background);
+  color: var(--primary);
+  border-color: var(--hairline);
+}
+
+.apple-input {
+  min-height: 44px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--input-border);
+  background: var(--input-bg);
+  padding: 12px 20px;
+}
+
+.apple-tile-light {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.apple-tile-parchment {
+  background: var(--surface-parchment);
+  color: var(--foreground);
+}
+
+.apple-tile-dark {
+  background: var(--surface-dark);
+  color: #fff;
+}
+
+.apple-product-shadow {
+  box-shadow: var(--shadow-product);
 }
 
 .glass-panel {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border: 1px solid color-mix(in srgb, var(--hairline) 72%, transparent);
+  box-shadow: none;
 }
 
 .dark .glass-panel {
-  background: rgba(30, 30, 30, 0.8);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.3);
+  background: color-mix(in srgb, var(--surface-dark) 88%, transparent);
+  border: 1px solid color-mix(in srgb, var(--hairline) 65%, transparent);
+  box-shadow: none;
 }
 
 .glass-button {
-  background: rgba(217, 54, 27, 0.9);
+  background: var(--primary);
   color: white;
+  border-radius: var(--radius-pill);
 }
 
 .glass-button:hover {
-  background: rgba(217, 54, 27, 1);
-  box-shadow: 0 4px 12px rgba(217, 54, 27, 0.3);
+  background: var(--primary-focus);
+  box-shadow: none;
 }
 
 @keyframes gradient-move {

@@ -103,94 +103,95 @@ export default function OrdersClient({
 
     return (
         <div className="space-y-6">
-            {/* Sticky Header with Title and Partner Filter */}
-            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-4">
+            <div className="sticky top-0 z-40 -mx-4 border-b border-gray-100 bg-white/92 px-4 py-3 shadow-sm backdrop-blur-xl transition-all duration-300 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]/90 dark:shadow-none">
+                <div className="flex flex-col gap-3">
+                    <div className="flex flex-col justify-between gap-3 xl:flex-row xl:items-center">
                         <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-500 hover:text-[#d9361b] transition-all" title="Dashboard">
+                            <Link href="/admin" className="rounded-full p-2 text-gray-400 transition-all hover:bg-gray-100 hover:text-[#d9361b] dark:text-gray-500 dark:hover:bg-[#252525]" title="Dashboard">
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                             </Link>
-                            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">주문 관리</h1>
+                            <div>
+                                <h1 className="text-xl font-black tracking-tight text-gray-900 dark:text-white">주문 관리</h1>
+                                <p className="text-[11px] font-medium text-gray-400 dark:text-gray-500">거래처, 월, 진행상태 기준으로 바로 필터링합니다.</p>
+                            </div>
                         </div>
 
-                        <div className="h-4 w-px bg-gray-200 dark:bg-[#2a2a2a]"></div>
+                        <div className="flex flex-wrap items-center gap-2">
+                            {pendingTaxCount > 0 && (
+                                <Link
+                                    href={type === 'invoice' ? '/admin/orders' : '/admin/orders?type=invoice'}
+                                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-all ${type === 'invoice' ? 'bg-[#d9361b] border-[#d9361b] text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-red-200 dark:border-red-900 text-[#d9361b] hover:bg-red-50 dark:hover:bg-[#252525]'}`}
+                                >
+                                    <span className="text-[10px]">📄</span>
+                                    <span className="text-[10px] font-black">{pendingTaxCount} <span className="ml-1 font-bold opacity-70">미발행</span></span>
+                                </Link>
+                            )}
 
-                        {/* Partner Select Toggle */}
+                            {missingTrackingCount > 0 && (
+                                <Link
+                                    href={type === 'tracking' ? '/admin/orders' : '/admin/orders?type=tracking'}
+                                    className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-all ${type === 'tracking' ? 'bg-gray-800 border-gray-800 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]'}`}
+                                >
+                                    <span className="text-[10px]">📦</span>
+                                    <span className="text-[10px] font-black">{missingTrackingCount} <span className="ml-1 font-bold opacity-70">송장누락</span></span>
+                                </Link>
+                            )}
+
+                            <Link
+                                href={type === 'inprogress' ? '/admin/orders' : '/admin/orders?type=inprogress'}
+                                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-all ${type === 'inprogress' ? 'bg-orange-500 border-orange-500 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-orange-200 dark:border-orange-900 text-orange-600 hover:bg-orange-50 dark:hover:bg-[#252525]'}`}
+                            >
+                                <span className="text-[10px]">⏳</span>
+                                <span className="text-[10px] font-black">거래중</span>
+                            </Link>
+
+                            <Link
+                                href={type === 'completed' ? '/admin/orders' : '/admin/orders?type=completed'}
+                                className={`flex items-center gap-2 rounded-full border px-3 py-1.5 transition-all ${type === 'completed' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-emerald-200 dark:border-emerald-900 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-[#252525]'}`}
+                            >
+                                <span className="text-[10px]">✅</span>
+                                <span className="text-[10px] font-black">거래완료</span>
+                            </Link>
+                        </div>
+                    </div>
+
+                    <div className="grid gap-3 md:grid-cols-[minmax(220px,1.1fr)_180px_auto]">
                         <div className="relative">
                             <select
                                 value={selectedPartner || ''}
                                 onChange={(e) => setSelectedPartner(e.target.value || null)}
-                                className="appearance-none bg-gray-50/50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] text-[#d9361b] text-[11px] font-black rounded-lg focus:ring-[#d9361b] focus:border-[#d9361b] block w-full pl-2.5 pr-8 py-1 transition-all hover:bg-white dark:hover:bg-[#252525] cursor-pointer min-w-[140px]"
+                                className="block w-full appearance-none rounded-xl border border-gray-200 bg-white pl-10 pr-10 py-3 text-[13px] font-bold text-gray-900 transition-all hover:bg-gray-50 focus:border-[#d9361b] focus:ring-[#d9361b] dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-100 dark:hover:bg-[#252525]"
                             >
-                                <option value="">🏢 모든 거래처 보기</option>
+                                <option value="">모든 거래처 보기</option>
                                 {partners.map(partner => (
                                     <option key={partner} value={partner}>{partner}</option>
                                 ))}
                             </select>
-                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-[#d9361b] opacity-50">
-                                <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                            <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-gray-400">
+                                <span className="text-sm">🏢</span>
+                            </div>
+                            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-gray-300">
+                                <svg className="h-4 w-4 fill-current" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
                             </div>
                         </div>
 
-                        {/* Month Picker */}
-                        <div className="relative">
-                            <input
-                                type="month"
-                                value={selectedMonth}
-                                onChange={(e) => setSelectedMonth(e.target.value)}
-                                className="bg-gray-50/50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] text-gray-700 dark:text-gray-200 text-[11px] font-black rounded-lg focus:ring-gray-300 focus:border-gray-300 block w-full px-2.5 py-1.5 transition-all hover:bg-white dark:hover:bg-[#252525] cursor-pointer h-[26px]"
-                            />
+                        <input
+                            type="month"
+                            value={selectedMonth}
+                            onChange={(e) => setSelectedMonth(e.target.value)}
+                            className="h-full rounded-xl border border-gray-200 bg-white px-4 py-3 text-[13px] font-bold text-gray-800 transition-all hover:bg-gray-50 focus:border-[#d9361b] focus:ring-[#d9361b] dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-100 dark:hover:bg-[#252525]"
+                        />
+
+                        <div className="flex flex-wrap items-center gap-2">
+                            {selectedPartner && (
+                                <button
+                                    onClick={() => setSelectedPartner(null)}
+                                    className="flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-3 text-[12px] font-bold text-gray-600 transition-all hover:bg-gray-50 hover:text-gray-900 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525] dark:hover:text-white"
+                                >
+                                    <span>초기화</span>
+                                </button>
+                            )}
                         </div>
-                    </div>
-
-                    {/* Right-aligned Status Badges */}
-                    <div className="flex items-center gap-2">
-                        {selectedPartner && (
-                            <button
-                                onClick={() => setSelectedPartner(null)}
-                                className="flex items-center gap-2 px-3 py-1 rounded-full border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525] hover:text-gray-900 dark:hover:text-white transition-all shadow-sm dark:shadow-none"
-                            >
-                                <span className="text-[10px]">🏠</span>
-                                <span className="text-[10px] font-black">모든 거래처</span>
-                            </button>
-                        )}
-
-                        {pendingTaxCount > 0 && (
-                            <Link
-                                href={type === 'invoice' ? '/admin/orders' : '/admin/orders?type=invoice'}
-                                className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'invoice' ? 'bg-[#d9361b] border-[#d9361b] text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-red-200 dark:border-red-900 text-[#d9361b] hover:bg-red-50 dark:hover:bg-[#252525]'}`}
-                            >
-                                <span className="text-[10px]">📄</span>
-                                <span className="text-[10px] font-black">{pendingTaxCount} <span className="opacity-70 font-bold ml-1">미발행</span></span>
-                            </Link>
-                        )}
-
-                        {missingTrackingCount > 0 && (
-                            <Link
-                                href={type === 'tracking' ? '/admin/orders' : '/admin/orders?type=tracking'}
-                                className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'tracking' ? 'bg-gray-800 border-gray-800 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a] text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]'}`}
-                            >
-                                <span className="text-[10px]">📦</span>
-                                <span className="text-[10px] font-black">{missingTrackingCount} <span className="opacity-70 font-bold ml-1">송장누락</span></span>
-                            </Link>
-                        )}
-
-                        <Link
-                            href={type === 'inprogress' ? '/admin/orders' : '/admin/orders?type=inprogress'}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'inprogress' ? 'bg-orange-500 border-orange-500 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-orange-200 dark:border-orange-900 text-orange-600 hover:bg-orange-50 dark:hover:bg-[#252525]'}`}
-                        >
-                            <span className="text-[10px]">⏳</span>
-                            <span className="text-[10px] font-black">거래중</span>
-                        </Link>
-
-                        <Link
-                            href={type === 'completed' ? '/admin/orders' : '/admin/orders?type=completed'}
-                            className={`flex items-center gap-2 px-3 py-1 rounded-full border transition-all ${type === 'completed' ? 'bg-blue-600 border-blue-600 text-white shadow-lg scale-105' : 'bg-white dark:bg-[#1e1e1e] border-blue-200 dark:border-blue-900 text-blue-600 hover:bg-blue-50 dark:hover:bg-[#252525]'}`}
-                        >
-                            <span className="text-[10px]">✅</span>
-                            <span className="text-[10px] font-black">거래완료</span>
-                        </Link>
                     </div>
                 </div>
             </div>
@@ -301,7 +302,7 @@ export default function OrdersClient({
 
 
 
-            <div className="flex flex-col gap-10">
+            <div className="flex flex-col gap-8">
                 {filteredOrders.length === 0 ? (
                     <div className="text-center py-20 bg-white dark:bg-[#1e1e1e] rounded-2xl border-2 border-dashed border-gray-200 dark:border-[#2a2a2a]">
                         <p className="text-gray-400 dark:text-gray-500 font-medium">검색 결과가 없습니다.</p>
@@ -315,7 +316,7 @@ export default function OrdersClient({
                     filteredOrders.map((order, idx) => (
                         <div key={order.id}>
                             {idx > 0 && (
-                                <div className="flex items-center gap-3 mb-8 max-w-[480px] mx-auto px-4">
+                                <div className="mb-6 flex items-center gap-3 px-2">
                                     <div className="flex-1 h-[2px] bg-gray-300 dark:bg-[#2a2a2a] rounded-full" />
                                     <span className="text-[9px] font-black text-gray-400 dark:text-gray-500 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
                                     <div className="flex-1 h-[2px] bg-gray-300 dark:bg-[#2a2a2a] rounded-full" />
