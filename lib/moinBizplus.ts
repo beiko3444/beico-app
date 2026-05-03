@@ -419,6 +419,94 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const collectMoinLoginSubmitDiagnostics = async (page: PageLike) => {
+    return String(
+        await page.evaluate(`
+            (() => {
+                const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+                const isVisible = (el) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                };
+                const inputs = Array.from(document.querySelectorAll('input')).map((el) => ({
+                    type: el.getAttribute('type') || '',
+                    name: el.getAttribute('name') || '',
+                    testid: el.getAttribute('data-testid') || '',
+                    visible: isVisible(el),
+                    disabled: Boolean(el.disabled),
+                    valueLength: String(el.value || '').length,
+                }));
+                const buttons = Array.from(document.querySelectorAll('button, [role="button"]')).map((el) => ({
+                    tag: el.tagName || '',
+                    type: el.getAttribute('type') || '',
+                    name: el.getAttribute('name') || '',
+                    testid: el.getAttribute('data-testid') || '',
+                    text: normalize(el.textContent || ''),
+                    visible: isVisible(el),
+                    disabled: Boolean(el.disabled) || el.getAttribute('aria-disabled') === 'true',
+                }));
+                return JSON.stringify({ inputs, buttons });
+            })()
+        `).catch((error) => `diag-failed:${getErrorMessage(error)}`)
+    )
+}
+
+const clickMoinLoginSubmit = async (
+    page: PageLike,
+    abortSignal: AbortSignal | undefined,
+): Promise<string> => {
+    const loginBtnSelectors = [
+        'button[data-testid="button-login"]',
+        'button[name="login_button"]',
+        'form button[type="submit"]',
+        `button[type="submit"]:has-text("${KO_LOGIN}")`,
+    ]
+
+    let sawVisibleDisabledSubmit = false
+    const errors: string[] = []
+
+    for (const selector of loginBtnSelectors) {
+        throwIfAbortRequested(abortSignal, 'Submit login')
+        try {
+            const btn = page.locator(selector).first()
+            await btn.waitFor({ state: 'visible', timeout: 5000 })
+
+            for (let attempt = 0; attempt < 16; attempt++) {
+                throwIfAbortRequested(abortSignal, 'Submit login')
+                const disabled = await btn.isDisabled().catch(() => false)
+                const enabled = await btn.isEnabled().catch(() => !disabled)
+                if (!disabled && enabled) {
+                    await btn.click({ timeout: 5000 })
+                    return selector
+                }
+                sawVisibleDisabledSubmit = true
+                await page.waitForTimeout(500)
+            }
+
+            const diagnostics = await collectMoinLoginSubmitDiagnostics(page)
+            throw new MoinAutomationError(
+                'Submit login',
+                `MOIN login submit button did not become enabled after credentials were typed. Please verify the configured login ID/password format before retrying. diag=${diagnostics}`,
+            )
+        } catch (error) {
+            if (error instanceof MoinAutomationError) throw error
+            errors.push(`${selector}: ${getErrorMessage(error)}`)
+        }
+    }
+
+    const diagnostics = await collectMoinLoginSubmitDiagnostics(page)
+    const reason = sawVisibleDisabledSubmit
+        ? 'MOIN login submit button was visible but stayed disabled after credentials were typed.'
+        : 'Could not find the MOIN login submit button.'
+
+    throw new MoinAutomationError(
+        'Submit login',
+        `${reason} Please verify the configured login ID/password format before retrying. diag=${diagnostics} selectors=${errors.join(' | ')}`,
+    )
+}
+
 const findVisibleCompanyTextLocator = async (page: PageLike, timeoutMs: number): Promise<LocatorLike | null> => {
     const variantCandidates = Array.from(new Set([TARGET_COMPANY_NAME, ...TARGET_COMPANY_NAME_VARIANTS].filter(Boolean)))
     const candidates: Array<string | RegExp> = [TARGET_COMPANY_NAME_REGEX, ...variantCandidates]
@@ -1384,42 +1472,7 @@ const performMoinLogin = async (
     await page.waitForTimeout(clickDelay)
 
     const loginUrlBefore = page.url()
-    const loginBtnSelectors = [
-        `button[type="submit"]:has-text("${KO_LOGIN}")`,
-        `button:has-text("${KO_LOGIN}")`,
-        `[role="button"]:has-text("${KO_LOGIN}")`,
-        'button[type="submit"]',
-    ]
-
-    let loginClicked = false
-    for (const selector of loginBtnSelectors) {
-        throwIfAbortRequested(abortSignal, 'Submit login')
-        try {
-            const btn = page.locator(selector).first()
-            await btn.waitFor({ state: 'visible', timeout: 5000 })
-
-            for (let attempt = 0; attempt < 6; attempt++) {
-                try {
-                    const disabled = await btn.isDisabled()
-                    if (!disabled) break
-                } catch {
-                    break
-                }
-                throwIfAbortRequested(abortSignal, 'Submit login')
-                await page.waitForTimeout(500)
-            }
-
-            await btn.click({ timeout: 5000 })
-            loginClicked = true
-            break
-        } catch {
-            // Try next selector
-        }
-    }
-
-    if (!loginClicked) {
-        throw new MoinAutomationError('Submit login', `Could not click login button. (url: ${page.url()})`)
-    }
+    await clickMoinLoginSubmit(page, abortSignal)
     steps.push('submit-login')
 
     let loginFailed = false
@@ -2443,44 +2496,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // ???? Step 3: Submit login ??????????????????????????????????????????????????????????????????????????????????????
         const loginUrlBefore = page.url()
 
-        // Wait for login button to become enabled
-        const loginBtnSelectors = [
-            `button[type="submit"]:has-text("${KO_LOGIN}")`,
-            `button:has-text("${KO_LOGIN}")`,
-            `[role="button"]:has-text("${KO_LOGIN}")`,
-            'button[type="submit"]',
-        ]
-
-        let loginClicked = false
-        for (const selector of loginBtnSelectors) {
-            throwIfAbortRequested(abortSignal, 'Submit login')
-            try {
-                const btn = page.locator(selector).first()
-                await btn.waitFor({ state: 'visible', timeout: 5000 })
-
-                // Wait up to 3 seconds for button to become enabled
-                for (let attempt = 0; attempt < 6; attempt++) {
-                    try {
-                        const disabled = await btn.isDisabled()
-                        if (!disabled) break
-                    } catch {
-                        break // isDisabled not available, just proceed
-                    }
-                    throwIfAbortRequested(abortSignal, 'Submit login')
-                    await page.waitForTimeout(500)
-                }
-
-                await btn.click({ timeout: 5000 })
-                loginClicked = true
-                break
-            } catch {
-                // Try next selector
-            }
-        }
-
-        if (!loginClicked) {
-            throw new MoinAutomationError('Submit login', `Could not click login button. (url: ${page.url()})`)
-        }
+        await clickMoinLoginSubmit(page, abortSignal)
         steps.push('submit-login')
 
         // ???? Step 3.5: Check for explicit login errors ??????????????????????????????????????????????
@@ -3163,4 +3179,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             await browser.close().catch(() => undefined)
         }
     }
+}
+
+export const __moinBizplusTestHooks = {
+    clickMoinLoginSubmit,
 }
