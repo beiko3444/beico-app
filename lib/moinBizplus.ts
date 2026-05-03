@@ -561,6 +561,105 @@ const clickCompanyRowCandidate = async (page: PageLike, companyNames: string[]) 
     return String(result || 'row-select-unknown')
 }
 
+const clickFirstRecipientSearchResult = async (page: PageLike, keyword: string) => {
+    const result = await page.evaluate(`
+        (() => {
+            const keyword = ${JSON.stringify(keyword)};
+            const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
+            const emptyHints = ['검색 결과가 없습니다', '결과가 없습니다', '수취인이 없습니다', '등록된 수취인이 없습니다', 'no result', 'no recipient'];
+            const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const normalize = (value) => norm(value).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+            const keywordNorm = normalize(keyword);
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const textOf = (el) => norm((el && el.textContent) || '');
+            const inputHint = (el) => [
+                el.placeholder || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('name') || '',
+                el.getAttribute('id') || '',
+            ].join(' ').toLowerCase();
+            const isRecipientSearch = (el) => {
+                const hint = inputHint(el);
+                return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
+            };
+            const searchInput = Array.from(document.querySelectorAll('input'))
+                .find((el) => isVisible(el) && isRecipientSearch(el));
+            if (!searchInput) return 'search-result-input-not-found';
+
+            const inputRect = searchInput.getBoundingClientRect();
+            const bodyText = normalize((document.body && document.body.innerText) || '');
+            if (emptyHints.some((hint) => bodyText.includes(normalize(hint)))) {
+                return 'search-result-empty';
+            }
+
+            const clickWithMouseEvents = (target) => {
+                if (!target || !isVisible(target) || isDisabled(target)) return false;
+                try {
+                    target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+                } catch {}
+                const eventInit = { bubbles: true, cancelable: true, view: window };
+                try { target.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+                if (typeof target.click === 'function') target.click();
+                return true;
+            };
+            const isClickable = (el) => {
+                if (!el) return false;
+                const tag = (el.tagName || '').toLowerCase();
+                const role = (el.getAttribute('role') || '').toLowerCase();
+                const style = window.getComputedStyle(el);
+                return tag === 'button' || tag === 'a' || role === 'button' || el.getAttribute('onclick') || style.cursor === 'pointer' || el.tabIndex >= 0;
+            };
+            const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+            const rows = Array.from(document.querySelectorAll('li, tr, label, article, section, [role="row"], [role="option"], div'))
+                .filter((el) => isVisible(el))
+                .map((el) => {
+                    const rect = el.getBoundingClientRect();
+                    const text = textOf(el);
+                    const area = rect.width * rect.height;
+                    const hasSelectable = Boolean(el.querySelector('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'));
+                    const hasKeyword = keywordNorm ? normalize(text).includes(keywordNorm) : false;
+                    return { el, rect, text, area, hasSelectable, hasKeyword };
+                })
+                .filter((row) => row.rect.top > inputRect.bottom - 8)
+                .filter((row) => row.text.length >= 3 && row.text.length <= 700)
+                .filter((row) => row.area > 1200 && row.area < viewportArea * 0.5)
+                .filter((row) => !normalize(row.text).includes(normalize('다음단계')))
+                .filter((row) => !normalize(row.text).includes(normalize('신규 수취인 등록')))
+                .sort((a, b) => {
+                    const keywordScore = Number(b.hasKeyword) - Number(a.hasKeyword);
+                    if (keywordScore !== 0) return keywordScore;
+                    const selectableScore = Number(b.hasSelectable) - Number(a.hasSelectable);
+                    if (selectableScore !== 0) return selectableScore;
+                    return a.rect.top - b.rect.top || a.area - b.area;
+                });
+
+            for (const row of rows.slice(0, 6)) {
+                const selectable = Array.from(row.el.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'))
+                    .find((el) => isVisible(el) && !isDisabled(el));
+                if (selectable && clickWithMouseEvents(selectable)) return 'clicked-search-result-select-control';
+                if (isClickable(row.el) && clickWithMouseEvents(row.el)) return 'clicked-search-result-row';
+                const clickable = Array.from(row.el.querySelectorAll('button, a, [role="button"], [onclick]'))
+                    .find((el) => isVisible(el) && !isDisabled(el));
+                if (clickable && clickWithMouseEvents(clickable)) return 'clicked-search-result-child-clickable';
+            }
+
+            return rows.length > 0 ? 'search-result-click-miss' : 'search-result-row-not-found';
+        })()
+    `).catch(() => 'search-result-error')
+
+    return String(result || 'search-result-unknown')
+}
+
 const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
     const result = await page.evaluate(`
         (() => {
@@ -2501,9 +2600,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // The current MOIN recipient screen can virtualize or filter recipient cards.
         // Search first, then scan for the company text in the narrowed list.
+        let recipientSearchPrefilled = false
         try {
             const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
             steps.push(`recipient-search-prefill:${searchResult}`)
+            recipientSearchPrefilled = searchResult === 'recipient-search-filled'
             await page.waitForTimeout(1500)
             await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
         } catch {
@@ -2516,6 +2617,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // The modal shows recipient details and has "??瑜곸젧???얄뵛" / "??酉????얄뵛" buttons.
 
         // First, check if company name is visible (may need to scroll)
+        let recipientSelectedFromSearchResult = false
         let companyTextEl = await findVisibleCompanyTextLocator(page, 8000)
         if (companyTextEl) {
             steps.push('company-text-visible')
@@ -2525,22 +2627,36 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             await page.waitForTimeout(1000)
             companyTextEl = await findVisibleCompanyTextLocator(page, 10000)
             if (!companyTextEl) {
-                let pageInfo = `url: ${page.url()}`
-                try {
-                    const html = await page.content()
-                    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-                    if (bodyMatch) {
-                        const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                        pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
+                if (recipientSearchPrefilled) {
+                    const searchResultClick = await clickFirstRecipientSearchResult(page, TARGET_COMPANY_SEARCH_KEYWORD)
+                    steps.push(`recipient-search-result-click:${searchResultClick}`)
+                    if (searchResultClick.startsWith('clicked-')) {
+                        recipientSelectedFromSearchResult = true
                     }
-                } catch { /* ignore */ }
+                }
 
-                throw new MoinAutomationError(
-                    'Select company',
-                    `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
-                )
+                if (recipientSelectedFromSearchResult) {
+                    steps.push('company-text-hidden-selected-search-result')
+                } else {
+                    let pageInfo = `url: ${page.url()}`
+                    try {
+                        const html = await page.content()
+                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+                        if (bodyMatch) {
+                            const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                            pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
+                        }
+                    } catch { /* ignore */ }
+
+                    throw new MoinAutomationError(
+                        'Select company',
+                        `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
+                    )
+                }
             }
-            steps.push('company-text-visible-after-scroll')
+            if (companyTextEl) {
+                steps.push('company-text-visible-after-scroll')
+            }
         }
 
         // Click the company card to open the modal popup
