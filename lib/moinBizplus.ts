@@ -482,14 +482,25 @@ const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
         (() => {
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
             const keyword = ${JSON.stringify(keyword)};
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
+            const inputHint = (el) => [
+                el.placeholder || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('name') || '',
+                el.getAttribute('id') || '',
+            ].join(' ').toLowerCase();
+            const isRecipientSearch = (el) => {
+                const hint = inputHint(el);
+                return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
+            };
             const input = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && (el.placeholder || '').includes(recipientPlaceholder));
+                .find((el) => isVisible(el) && isRecipientSearch(el));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -511,14 +522,25 @@ const clearRecipientSearchKeyword = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
                 const style = window.getComputedStyle(el);
                 return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden';
             };
+            const inputHint = (el) => [
+                el.placeholder || '',
+                el.getAttribute('aria-label') || '',
+                el.getAttribute('name') || '',
+                el.getAttribute('id') || '',
+            ].join(' ').toLowerCase();
+            const isRecipientSearch = (el) => {
+                const hint = inputHint(el);
+                return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
+            };
             const input = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && (el.placeholder || '').includes(recipientPlaceholder));
+                .find((el) => isVisible(el) && isRecipientSearch(el));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -2393,6 +2415,17 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push('purchase-remit-tab-not-found')
         }
 
+        // The current MOIN recipient screen can virtualize or filter recipient cards.
+        // Search first, then scan for the company text in the narrowed list.
+        try {
+            const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
+            steps.push(`recipient-search-prefill:${searchResult}`)
+            await page.waitForTimeout(1500)
+            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+        } catch {
+            steps.push('recipient-search-prefill-error')
+        }
+
         // ???? Step 4.5: Find the company card and click it ????????????????????????????????????????
         // The recipient page shows cards with company names.
         // Clicking a card opens a MODAL POPUP (not a page navigation!).
@@ -2424,16 +2457,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 )
             }
             steps.push('company-text-visible-after-scroll')
-        }
-
-        // Narrow candidate list by company keyword when recipient search input is present.
-        try {
-            const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
-            steps.push(`recipient-search-prefill:${searchResult}`)
-            await page.waitForTimeout(600)
-            await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
-        } catch {
-            steps.push('recipient-search-prefill-error')
         }
 
         // Click the company card to open the modal popup

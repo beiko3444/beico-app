@@ -448,7 +448,7 @@ const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressSt
     { keys: ['open-login-page'], stage: { percent: 12, label: '모인 로그인 페이지에 접속하는 중...' } },
     { keys: ['fill-login-id', 'fill-login-password'], stage: { percent: 20, label: '로그인 계정 정보를 입력하는 중...' } },
     { keys: ['submit-login', 'post-login-url'], stage: { percent: 28, label: '로그인을 제출하고 확인하는 중...' } },
-    { keys: ['company-text-visible', 'nav-to-recipient', 'already-on-recipient-page'], stage: { percent: 36, label: '수취인/거래처를 찾는 중...' } },
+    { keys: ['recipient-search-prefill', 'company-text-visible', 'company-scroll-miss', 'nav-to-recipient', 'already-on-recipient-page'], stage: { percent: 36, label: '수취인/거래처를 찾는 중...' } },
     { keys: ['clicked-company-text', 'js-card-click'], stage: { percent: 42, label: '수취인 카드를 클릭하는 중...' } },
     { keys: ['modal-opened', 'remit-btn'], stage: { percent: 48, label: '수취인 정보 팝업이 열렸습니다...' } },
     { keys: ['clicked-remit-btn', 'clicked-remit-text'], stage: { percent: 54, label: '송금하기 버튼을 클릭하는 중...' } },
@@ -471,6 +471,24 @@ const resolveRemittanceStageFromStep = (stepLike: string | null | undefined): Re
     }
 
     return null
+}
+
+const formatRemittanceAutomationError = (message: string) => {
+    const normalized = message.replace(/\s+/g, ' ').trim()
+    if (!normalized) return '송금 자동화 중 오류가 발생했습니다.'
+
+    if (/Select company: Could not find target company text/i.test(normalized)) {
+        return '모인 수취인 목록에서 Shanghai Oikki Trading 거래처를 찾지 못했습니다. 수취인 검색/목록 화면이 바뀌었거나 해당 거래처가 숨김 처리되었을 수 있습니다.'
+    }
+
+    const withoutPageDump = normalized
+        .replace(/\s*\|\s*page-text\(first 800\):.*$/i, '')
+        .replace(/\s*\[steps:.*$/i, '')
+        .trim()
+
+    return withoutPageDump.length > 420
+        ? `${withoutPageDump.slice(0, 420)}...`
+        : withoutPageDump
 }
 
 const extractLatestAutomationStep = (message: string): string | null => {
@@ -3558,6 +3576,7 @@ export default function WormOrderPage() {
             const lower = message.toLowerCase()
             const latestStep = extractLatestAutomationStep(message)
             const resolvedStage = resolveRemittanceStageFromStep(latestStep)
+            const displayMessage = formatRemittanceAutomationError(message)
 
             if (resolvedStage) {
                 setRemittanceProgress((prev) => Math.max(prev, resolvedStage.percent))
@@ -3572,9 +3591,9 @@ export default function WormOrderPage() {
                 (lower.includes('cannot find module') && (lower.includes('playwright-core') || lower.includes('@sparticuz/chromium')))
 
             if (missingBrowserRuntime) {
-                setRemittanceError(`${message} (Install deps and redeploy: npm install playwright-core @sparticuz/chromium)`)
+                setRemittanceError(`${displayMessage} (Install deps and redeploy: npm install playwright-core @sparticuz/chromium)`)
             } else {
-                setRemittanceError(message)
+                setRemittanceError(displayMessage)
             }
         } finally {
             if (remittanceProgressTimerRef.current) {
