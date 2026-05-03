@@ -1,6 +1,13 @@
 const MOIN_BIZPLUS_LOGIN_URL = 'https://www.moinbizplus.com/login'
 const TARGET_COMPANY_NAME = 'Shanghai Oikki Trading Co.,Ltd'
 const TARGET_COMPANY_SEARCH_KEYWORD = 'Oikki'
+const TARGET_COMPANY_SEARCH_KEYWORDS = [
+    TARGET_COMPANY_SEARCH_KEYWORD,
+    'Shanghai',
+    'Shanghai Oikki Trading',
+    'Michael',
+    'Michael Lee',
+]
 const TARGET_COMPANY_NAME_VARIANTS = [
     TARGET_COMPANY_NAME,
     'Shanghai Oikki Trading Co Ltd',
@@ -8,6 +15,8 @@ const TARGET_COMPANY_NAME_VARIANTS = [
     'Shanghai Oikki Trading',
     'Oikki Trading',
     'Oikki',
+    'Michael Lee',
+    'michael-lee12580',
 ]
 const TARGET_COMPANY_NAME_REGEX = /Shanghai\s*Oikki\s*Trading\s*Co\.?\s*,?\s*Ltd/i
 const DEFAULT_TIMEOUT_MS = 45000
@@ -654,7 +663,7 @@ const clickFirstRecipientSearchResult = async (page: PageLike, keyword: string) 
         (() => {
             const keyword = ${JSON.stringify(keyword)};
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
-            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', '받는분', '검색', 'recipient', 'company', 'alias', 'search'];
             const emptyHints = ['검색 결과가 없습니다', '결과가 없습니다', '수취인이 없습니다', '등록된 수취인이 없습니다', 'no result', 'no recipient'];
             const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
             const normalize = (value) => norm(value).toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
@@ -677,8 +686,10 @@ const clickFirstRecipientSearchResult = async (page: PageLike, keyword: string) 
                 const hint = inputHint(el);
                 return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
             };
-            const searchInput = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && isRecipientSearch(el));
+            const visibleInputs = Array.from(document.querySelectorAll('input'))
+                .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
+            const searchInput = visibleInputs.find((el) => isRecipientSearch(el))
+                || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
             if (!searchInput) return 'search-result-input-not-found';
 
             const inputRect = searchInput.getBoundingClientRect();
@@ -753,7 +764,7 @@ const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
         (() => {
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
             const keyword = ${JSON.stringify(keyword)};
-            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', '받는분', '검색', 'recipient', 'company', 'alias', 'search'];
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
@@ -770,17 +781,23 @@ const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
                 const hint = inputHint(el);
                 return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
             };
-            const input = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && isRecipientSearch(el));
+            const visibleInputs = Array.from(document.querySelectorAll('input'))
+                .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
+            const input = visibleInputs.find((el) => isRecipientSearch(el))
+                || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
             if (!nativeSetter) return 'native-setter-not-found';
 
+            const InputEventCtor = window.InputEvent || Event;
+            input.focus();
+            input.click();
             nativeSetter.call(input, keyword);
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new InputEventCtor('input', { bubbles: true, inputType: 'insertText', data: keyword }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
             input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+            input.dispatchEvent(new KeyboardEvent('keypress', { key: 'Enter', bubbles: true }));
             input.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', bubbles: true }));
             return 'recipient-search-filled';
         })()
@@ -793,7 +810,7 @@ const clearRecipientSearchKeyword = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
-            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', 'recipient', 'company', 'alias'];
+            const searchHints = [recipientPlaceholder, '수취인', '회사명', '별칭', '받는 분', '받는분', '검색', 'recipient', 'company', 'alias', 'search'];
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
@@ -810,15 +827,19 @@ const clearRecipientSearchKeyword = async (page: PageLike) => {
                 const hint = inputHint(el);
                 return searchHints.some((token) => token && hint.includes(String(token).toLowerCase()));
             };
-            const input = Array.from(document.querySelectorAll('input'))
-                .find((el) => isVisible(el) && isRecipientSearch(el));
+            const visibleInputs = Array.from(document.querySelectorAll('input'))
+                .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
+            const input = visibleInputs.find((el) => isRecipientSearch(el))
+                || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
             if (!nativeSetter) return 'native-setter-not-found';
 
+            const InputEventCtor = window.InputEvent || Event;
+            input.focus();
             nativeSetter.call(input, '');
-            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new InputEventCtor('input', { bubbles: true, inputType: 'deleteContentBackward', data: null }));
             input.dispatchEvent(new Event('change', { bubbles: true }));
             return 'recipient-search-cleared';
         })()
@@ -2617,14 +2638,32 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // The current MOIN recipient screen can virtualize or filter recipient cards.
         // Search first, then scan for the company text in the narrowed list.
         let recipientSearchPrefilled = false
-        try {
-            const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
-            steps.push(`recipient-search-prefill:${searchResult}`)
-            recipientSearchPrefilled = searchResult === 'recipient-search-filled'
-            await page.waitForTimeout(1500)
-            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
-        } catch {
-            steps.push('recipient-search-prefill-error')
+        let lastRecipientSearchKeyword = TARGET_COMPANY_SEARCH_KEYWORD
+        let companyTextEl: LocatorLike | null = null
+        for (const keyword of TARGET_COMPANY_SEARCH_KEYWORDS) {
+            throwIfAbortRequested(abortSignal, 'Search recipient')
+            lastRecipientSearchKeyword = keyword
+            try {
+                if (recipientSearchPrefilled) {
+                    const clearResult = await clearRecipientSearchKeyword(page)
+                    steps.push(`recipient-search-clear:${clearResult}`)
+                    await page.waitForTimeout(300)
+                }
+
+                const searchResult = await fillRecipientSearchKeyword(page, keyword)
+                steps.push(`recipient-search-prefill:${keyword}:${searchResult}`)
+                recipientSearchPrefilled = searchResult === 'recipient-search-filled'
+                await page.waitForTimeout(1500)
+                await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+
+                companyTextEl = await findVisibleCompanyTextLocator(page, 4500)
+                if (companyTextEl) {
+                    steps.push(`company-text-visible-after-search:${keyword}`)
+                    break
+                }
+            } catch {
+                steps.push(`recipient-search-prefill-error:${keyword}`)
+            }
         }
 
         // ???? Step 4.5: Find the company card and click it ????????????????????????????????????????
@@ -2634,7 +2673,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // First, check if company name is visible (may need to scroll)
         let recipientSelectedFromSearchResult = false
-        let companyTextEl = await findVisibleCompanyTextLocator(page, 8000)
+        if (!companyTextEl) {
+            companyTextEl = await findVisibleCompanyTextLocator(page, 8000)
+        }
         if (companyTextEl) {
             steps.push('company-text-visible')
         } else {
@@ -2644,7 +2685,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             companyTextEl = await findVisibleCompanyTextLocator(page, 10000)
             if (!companyTextEl) {
                 if (recipientSearchPrefilled) {
-                    const searchResultClick = await clickFirstRecipientSearchResult(page, TARGET_COMPANY_SEARCH_KEYWORD)
+                    const searchResultClick = await clickFirstRecipientSearchResult(page, lastRecipientSearchKeyword)
                     steps.push(`recipient-search-result-click:${searchResultClick}`)
                     if (searchResultClick.startsWith('clicked-')) {
                         recipientSelectedFromSearchResult = true
@@ -2784,8 +2825,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     throwIfAbortRequested(abortSignal, 'Open amount step')
                     const clearResult = await clearRecipientSearchKeyword(page)
                     steps.push(`recovery-recipient-search-clear:${clearResult}`)
-                    const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
-                    steps.push(`recovery-recipient-search:${searchResult}`)
+                    const searchResult = await fillRecipientSearchKeyword(page, lastRecipientSearchKeyword)
+                    steps.push(`recovery-recipient-search:${lastRecipientSearchKeyword}:${searchResult}`)
                     await page.waitForTimeout(900)
                     await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
                     const recoveryCompanyEl = await findVisibleCompanyTextLocator(page, 5000)
@@ -2806,8 +2847,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     throwIfAbortRequested(abortSignal, 'Open amount step')
                     const clearResult = await clearRecipientSearchKeyword(page)
                     steps.push(`recovery-recipient-search-clear-2:${clearResult}`)
-                    const searchResult = await fillRecipientSearchKeyword(page, TARGET_COMPANY_SEARCH_KEYWORD)
-                    steps.push(`recovery-recipient-search-2:${searchResult}`)
+                    const searchResult = await fillRecipientSearchKeyword(page, lastRecipientSearchKeyword)
+                    steps.push(`recovery-recipient-search-2:${lastRecipientSearchKeyword}:${searchResult}`)
                     await page.waitForTimeout(700)
                     const secondRecoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME_VARIANTS, KO_REMIT)
                     steps.push(`recovery-company-scoped-remit-2:${secondRecoveryReason}`)
