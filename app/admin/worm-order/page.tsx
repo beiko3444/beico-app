@@ -1,8 +1,9 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
+import { ArrowRight, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
+import { emailBodyToDisplayText } from '@/lib/wormEmailBody'
 
 type WormSize = {
     id: string
@@ -86,7 +87,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'shipping' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'cargoCustomsMail' | 'shipping' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -98,6 +99,33 @@ type PipelineStepDefinition = {
     actionLabel: string
     target: PipelineSectionTarget
     warning?: string
+}
+
+function EmailBodyPreview({ loading, text }: { loading: boolean; text: string }) {
+    const displayText = useMemo(() => emailBodyToDisplayText(text), [text])
+
+    if (loading && !text) {
+        return (
+            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
+                <Loader2 size={16} className="animate-spin mr-2" />
+                메일 본문을 불러오는 중...
+            </div>
+        )
+    }
+
+    if (!displayText) {
+        return (
+            <div className="w-full min-h-[220px] flex items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-[13px] font-medium text-slate-400 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
+                표시할 본문 내용이 없습니다.
+            </div>
+        )
+    }
+
+    return (
+        <div className="w-full whitespace-pre-wrap break-words leading-relaxed text-gray-800 dark:text-gray-100">
+            {displayText}
+        </div>
+    )
 }
 
 type RemittanceProgressStage = {
@@ -348,8 +376,8 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         mode: 'SEMI',
         owner: '관리자',
         details: ['첨부파일 선택', '수신자 입력', '메일 전송 확인'],
-        actionLabel: '수동 처리',
-        target: 'none',
+        actionLabel: '문서전달',
+        target: 'cargoCustomsMail',
     },
     {
         id: 10,
@@ -1659,6 +1687,7 @@ export default function WormOrderPage() {
     const bankPaymentSectionRef = useRef<HTMLDivElement>(null)
     const notificationSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
+    const cargoCustomsMailSectionRef = useRef<HTMLDivElement>(null)
     const shippingSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
     const remittanceRequestAbortControllerRef = useRef<AbortController | null>(null)
@@ -1955,12 +1984,6 @@ export default function WormOrderPage() {
     // ── 자동 페치 & 게이지 관련 State ──
     const [fetchProgress, setFetchProgress] = useState(0)
     const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>('all')
-    const [expandedSteps, setExpandedSteps] = useState<Record<number, boolean>>(() => (
-        PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
-            acc[step.id] = step.id <= 3
-            return acc
-        }, {})
-    ))
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
     const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate[]> => {
@@ -3668,15 +3691,23 @@ export default function WormOrderPage() {
         }
 
         result[1] = generatedMessage.trim() ? 'done' : totalBoxes > 0 ? 'active' : 'todo'
-        result[2] = hasFetched && emails.length > 0 ? 'done' : loadingEmails ? 'active' : 'todo'
-        result[3] = remittanceSuccess
+        result[2] = matchedInvoiceEmail?.uid
             ? 'done'
-            : remittanceSubmitting || Boolean(transferAmountUsd.trim()) || Boolean(invoicePdf)
+            : loadingEmails || matchingEmailUid !== null || invoiceOcrRunningUid !== null || hasFetched
+                ? 'active'
+                : 'todo'
+        result[3] = remittanceSuccess || isActiveOrderRemittanceApplied
+            ? 'done'
+            : remittanceSubmitting || isAutoRemittanceReady || isManualRemittanceReady
                 ? 'active'
                 : 'todo'
         result[4] = remittanceManuallyDone ? 'done' : result[3] === 'done' ? 'active' : 'todo'
-        result[5] = paymentNotificationCopied ? 'done' : remittanceManuallyDone ? 'active' : 'todo'
-        result[6] = fallbackAwbCandidate ? 'done' : awbLoading ? 'active' : 'todo'
+        result[5] = paymentNotificationCopied ? 'done' : remittanceManuallyDone || result[3] === 'done' ? 'active' : 'todo'
+        result[6] = matchedAwbUid || persistedAwbNumber
+            ? 'done'
+            : awbLoading || loadingDocEmails || docHasFetched
+                ? 'active'
+                : 'todo'
         result[7] = customsProgressResult
             ? 'done'
             : customsProgressLoading || Boolean(blNumberQuery.trim())
@@ -3690,10 +3721,10 @@ export default function WormOrderPage() {
             : 'todo'
         result[9] = forwardSuccess
             ? 'done'
-            : forwarding || isCustomsForwardReady || Boolean(forwardEmail.trim())
+            : forwarding || isCustomsForwardReady
                 ? 'active'
                 : 'todo'
-        result[10] = hasWarehouseMail ? 'done' : hasFetched ? 'active' : 'todo'
+        result[10] = hasWarehouseMail ? 'done' : 'todo'
         result[11] = 'todo'
         result[12] = 'todo'
         result[13] = shippingTrackingNumber ? 'done' : shippingSubmitting ? 'active' : 'todo'
@@ -3705,25 +3736,30 @@ export default function WormOrderPage() {
         customsProgressLoading,
         customsProgressResult,
         detailRows,
-        emails,
-        fallbackAwbCandidate,
-        forwardEmail,
+        docHasFetched,
         forwarding,
         forwardSuccess,
         generatedMessage,
         hasFetched,
         hasWarehouseMail,
-        invoicePdf,
+        invoiceOcrRunningUid,
+        isActiveOrderRemittanceApplied,
+        isAutoRemittanceReady,
+        isManualRemittanceReady,
         isCustomsForwardReady,
+        loadingDocEmails,
         loadingEmails,
+        matchedAwbUid,
+        matchedInvoiceEmail?.uid,
+        matchingEmailUid,
         paymentNotificationCopied,
+        persistedAwbNumber,
         remittanceManuallyDone,
         remittanceSubmitting,
         remittanceSuccess,
         shippingSubmitting,
         shippingTrackingNumber,
         totalBoxes,
-        transferAmountUsd,
     ])
 
     const pipelineModeCounts = useMemo(() => {
@@ -3741,6 +3777,19 @@ export default function WormOrderPage() {
         () => PIPELINE_STEP_DEFINITIONS.find((step) => pipelineStatusMap[step.id] !== 'done')?.id ?? 12,
         [pipelineStatusMap],
     )
+    const activeStepDefinition = useMemo(
+        () => PIPELINE_STEP_DEFINITIONS.find((step) => step.id === activeStepId) || null,
+        [activeStepId],
+    )
+    const pipelineFilterOptions = useMemo<Array<{ value: PipelineFilter; label: string; count: number }>>(
+        () => [
+            { value: 'all', label: '전체', count: PIPELINE_STEP_DEFINITIONS.length },
+            { value: 'AUTO', label: '자동', count: pipelineModeCounts.AUTO },
+            { value: 'SEMI', label: '반자동', count: pipelineModeCounts.SEMI },
+            { value: 'MANUAL', label: '수동', count: pipelineModeCounts.MANUAL },
+        ],
+        [pipelineModeCounts],
+    )
     const filteredPipelineSteps = useMemo(
         () => PIPELINE_STEP_DEFINITIONS.filter((step) => pipelineFilter === 'all' || step.mode === pipelineFilter),
         [pipelineFilter],
@@ -3749,10 +3798,6 @@ export default function WormOrderPage() {
         () => new Set(filteredPipelineSteps.map((step) => step.id)),
         [filteredPipelineSteps],
     )
-
-    const togglePipelineStep = useCallback((stepId: number) => {
-        setExpandedSteps((prev) => ({ ...prev, [stepId]: !prev[stepId] }))
-    }, [])
 
     const scrollToPipelineSection = useCallback((target: PipelineSectionTarget) => {
         if (target === 'order') {
@@ -3783,6 +3828,10 @@ export default function WormOrderPage() {
             customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
         }
+        if (target === 'cargoCustomsMail') {
+            cargoCustomsMailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+            return
+        }
         if (target === 'shipping') {
             shippingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
@@ -3790,7 +3839,13 @@ export default function WormOrderPage() {
 
     const handlePipelineStepAction = useCallback((step: PipelineStepDefinition) => {
         if (step.target !== 'none') {
-            scrollToPipelineSection(step.target)
+            const targetIsHiddenByFilter = pipelineFilter !== 'all' && pipelineFilter !== step.mode
+            if (targetIsHiddenByFilter) {
+                setPipelineFilter('all')
+                window.setTimeout(() => scrollToPipelineSection(step.target), 0)
+            } else {
+                scrollToPipelineSection(step.target)
+            }
         }
 
         if (step.id === 1 && selectedOrders.length > 0 && !generatedMessage) {
@@ -3818,6 +3873,7 @@ export default function WormOrderPage() {
         handleGenerate,
         loadingDocEmails,
         loadingEmails,
+        pipelineFilter,
         scrollToPipelineSection,
         selectedOrders.length,
     ])
@@ -3900,12 +3956,6 @@ export default function WormOrderPage() {
         setShippingSuccess('')
         setShippingTrackingNumber('')
         setShippingProgressLabel('대기 중')
-        setExpandedSteps(
-            PIPELINE_STEP_DEFINITIONS.reduce<Record<number, boolean>>((acc, step) => {
-                acc[step.id] = step.id <= 3
-                return acc
-            }, {}),
-        )
         setCreatingOrder(false)
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
@@ -4153,72 +4203,109 @@ export default function WormOrderPage() {
             </section>
 
             <div className="flex flex-col gap-4">
-                        {filteredPipelineSteps.map((step) => {
-                            const runtimeStatus = pipelineStatusMap[step.id]
-                            const isExpanded = expandedSteps[step.id] ?? false
-
-                            return (
-                                <section
-                                    key={step.id}
-                                    style={{ order: stepRenderOrderMap.get(step.id) ?? fallbackOrderBase }}
-                                    className={`rounded-2xl border bg-white dark:bg-[#1e1e1e] shadow-sm dark:shadow-none transition-colors ${
-                                    runtimeStatus === 'done'
-                                        ? 'border-emerald-200'
-                                        : runtimeStatus === 'active'
-                                            ? 'border-[#e34219]'
-                                            : 'border-gray-200 dark:border-[#2a2a2a]'
-                                }`}
+                <section
+                    style={{ order: 0 }}
+                    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-5"
+                >
+                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div>
+                            <h2 className="text-base font-black text-slate-900 dark:text-white">작업 흐름</h2>
+                            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">
+                                단계 설명은 이곳에서만 확인하고, 아래에는 실제 실행 패널만 표시합니다.
+                            </p>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5">
+                            {pipelineFilterOptions.map((option) => (
+                                <button
+                                    key={option.value}
+                                    type="button"
+                                    onClick={() => setPipelineFilter(option.value)}
+                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${
+                                        pipelineFilter === option.value
+                                            ? 'border-[#e34219] bg-[#fff3ef] text-[#d9361b]'
+                                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525]'
+                                    }`}
                                 >
+                                    {option.label}
+                                    <span className="text-[10px] opacity-70">{option.count}</span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {activeStepDefinition && (
+                        <div className="mt-4 rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-4 py-3 dark:border-[#3a2a24] dark:bg-[#1a1a1a]">
+                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                                <div className="min-w-0">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#d9361b]">현재 처리 단계</p>
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] px-1.5 text-xs font-black text-white">
+                                            {activeStepDefinition.id}
+                                        </span>
+                                        <p className="text-sm font-black text-slate-900 dark:text-white">{activeStepDefinition.title}</p>
+                                        <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[activeStepDefinition.id])}`}>
+                                            {getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs font-medium text-slate-600 dark:text-gray-400">{activeStepDefinition.summary}</p>
+                                </div>
+                                {activeStepDefinition.target !== 'none' && (
                                     <button
                                         type="button"
-                                        onClick={() => togglePipelineStep(step.id)}
-                                        className="w-full px-4 py-3 flex items-center justify-between gap-3 text-left"
+                                        onClick={() => handlePipelineStepAction(activeStepDefinition)}
+                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#e34219] px-3 text-xs font-bold text-white hover:bg-[#cd3b17]"
                                     >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                            <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-black px-1.5 shrink-0 ${
-                                                runtimeStatus === 'done'
-                                                    ? 'bg-emerald-500 text-white'
-                                                    : runtimeStatus === 'active'
-                                                        ? 'bg-[#e34219] text-white'
-                                                        : 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-600 dark:text-gray-400'
-                                            }`}>
-                                                {step.id}
-                                            </span>
-                                            <h2 className="text-sm font-bold text-slate-900 dark:text-white truncate">{step.title}</h2>
-                                        </div>
-                                        <div className="flex items-center gap-1.5 shrink-0">
+                                        {activeStepDefinition.actionLabel}
+                                        <ArrowRight size={13} />
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                        {filteredPipelineSteps.map((step) => {
+                            const runtimeStatus = pipelineStatusMap[step.id]
+                            const isCurrent = step.id === activeStepId
+                            return (
+                                <button
+                                    key={step.id}
+                                    type="button"
+                                    onClick={() => handlePipelineStepAction(step)}
+                                    className={`group flex min-h-[84px] items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                                        runtimeStatus === 'done'
+                                            ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
+                                            : isCurrent
+                                                ? 'border-[#e34219] bg-[#fff3ef] hover:bg-[#ffeadd]'
+                                                : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
+                                    }`}
+                                >
+                                    <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black ${
+                                        runtimeStatus === 'done'
+                                            ? 'bg-emerald-500 text-white'
+                                            : isCurrent
+                                                ? 'bg-[#e34219] text-white'
+                                                : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
+                                    }`}>
+                                        {step.id}
+                                    </span>
+                                    <span className="min-w-0 flex-1">
+                                        <span className="block text-[13px] font-black leading-snug text-slate-900 dark:text-white">{step.title}</span>
+                                        <span className="mt-1 block line-clamp-2 text-[11px] font-medium leading-snug text-slate-500 dark:text-gray-400">{step.summary}</span>
+                                        <span className="mt-2 flex flex-wrap items-center gap-1.5">
                                             <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
                                                 {getPipelineModeLabel(step.mode)}
                                             </span>
                                             <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
                                                 {getPipelineRuntimeLabel(runtimeStatus)}
                                             </span>
-                                            {isExpanded ? <ChevronUp size={14} className="text-slate-400" /> : <ChevronDown size={14} className="text-slate-400" />}
-                                        </div>
-                                    </button>
-
-                                    {isExpanded && (
-                                        <div className="border-t border-gray-100 px-4 py-3 space-y-2.5">
-                                            <p className="text-xs text-slate-500 dark:text-gray-400">
-                                                <span className="font-semibold text-slate-600 dark:text-gray-400">처리주체</span> {step.owner}
-                                                {step.warning && <span className="ml-2 text-orange-600">· {step.warning}</span>}
-                                            </p>
-
-                                            {step.target !== 'none' && (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handlePipelineStepAction(step)}
-                                                    className="h-8 px-3 rounded-lg text-xs font-bold inline-flex items-center gap-1.5 bg-[#e34219] text-white hover:bg-[#cd3b17]"
-                                                >
-                                                    {step.actionLabel}
-                                                    <ArrowRight size={13} />
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-                                </section>
+                                        </span>
+                                    </span>
+                                </button>
                             )
                         })}
+                    </div>
+                </section>
             {showOrderTools && (
                 <div
                     ref={orderSectionRef}
@@ -4596,11 +4683,11 @@ export default function WormOrderPage() {
                     <div>
                         <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Mail size={18} className="text-slate-500 dark:text-gray-400" />
-                            인보이스 메일 수신
+                            메일센터 · 인보이스
                             {loadingEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-orange-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-orange-500"></span></span>}
                         </h2>
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
-                            제목/본문에 &apos;invoice&apos; 또는 &apos;payment&apos;가 포함된 메일만 조회합니다.
+                            Michael 발신자의 invoice/payment 메일을 이 발주에 매칭합니다.
                             {activeWormOrder && <span className="ml-2 font-semibold text-slate-600 dark:text-gray-400">현재 발주: {activeWormOrder.orderNumber}</span>}
                         </p>
                         {emailCacheSavedAt && (
@@ -4615,7 +4702,7 @@ export default function WormOrderPage() {
                         className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
                         {loadingEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : '인박스 모니터'}</span>
+                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : '메일 스캔'}</span>
                     </button>
                 </div>
                 <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
@@ -4648,9 +4735,8 @@ export default function WormOrderPage() {
                                     const isSelected = selectedEmailUid === email.uid
                                     const isMatched = email.matchedOrderId === activeWormOrder?.id
                                     return (
-                                        <button
+                                        <div
                                             key={email.uid}
-                                            onClick={() => setSelectedEmailUid(email.uid)}
                                             className={`w-full text-left p-4 transition-colors ${
                                                 isMatched && isSelected
                                                     ? 'bg-emerald-100 border-l-4 border-emerald-600 pl-[13px]'
@@ -4661,21 +4747,29 @@ export default function WormOrderPage() {
                                                     : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50 dark:hover:bg-[#252525]'
                                             }`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
-                                                    {new Date(email.date).toLocaleDateString()}
-                                                </span>
-                                                {email.hasAttachments && <span className="text-[11px]">📎</span>}
-                                            </div>
-                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                                                {index + 1}. {email.subject}
-                                            </h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedEmailUid(email.uid)}
+                                                className="w-full text-left"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
+                                                        {new Date(email.date).toLocaleDateString()}
+                                                    </span>
+                                                    {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                                </div>
+                                                <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                    {index + 1}. {email.subject}
+                                                </h3>
+                                            </button>
                                             <div className="mt-2 flex items-center gap-2">
-                                                <span
+                                                <button
+                                                    type="button"
                                                     onClick={(event) => {
                                                         event.stopPropagation()
                                                         void handleMatchEmailToActiveOrder(email)
                                                     }}
+                                                    disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id || matchingEmailUid === email.uid}
                                                     className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
@@ -4685,69 +4779,63 @@ export default function WormOrderPage() {
                                                                     ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
                                                                     : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
-                                                    role="button"
-                                                    aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
                                                 >
                                                     {email.matchedOrderId === activeWormOrder?.id
                                                         ? '매칭완료'
                                                         : matchingEmailUid === email.uid
                                                             ? '매칭중...'
                                                             : '매칭하기'}
-                                                </span>
+                                                </button>
                                                 {email.matchedOrderNumber && (
                                                     <span className="text-[10px] font-semibold text-emerald-700">
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
                                                 {email.matchedOrderId && (
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             void handleUnmatchEmail(email)
                                                         }}
+                                                        disabled={unmatchingEmailUid === email.uid}
                                                         className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
                                                             unmatchingEmailUid === email.uid
                                                                 ? 'bg-slate-100 text-slate-400 cursor-progress'
                                                                 : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
                                                         }`}
-                                                        role="button"
                                                     >
                                                         {unmatchingEmailUid === email.uid ? '해제중...' : '매칭해제'}
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                             {email.matchedOrderId && (
-                                                <div className="mt-1.5 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5">
-                                                    <table className="w-full text-[10px]">
-                                                        <tbody>
-                                                            <tr>
-                                                                <td className="py-0.5 font-semibold text-emerald-700 pr-2 whitespace-nowrap">유닛프라이스</td>
-                                                                <td className="py-0.5 font-bold text-emerald-900 text-right">{formatUsdAmount(email.invoiceUnitPriceUsd)}</td>
-                                                                <td className="py-0.5 text-emerald-700 text-right pl-2">{formatKrwAmount(email.invoiceUnitPriceKrw)}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="py-0.5 font-semibold text-emerald-700 pr-2 whitespace-nowrap">토탈어마운트</td>
-                                                                <td className="py-0.5 font-bold text-emerald-900 text-right">{formatUsdAmount(email.invoiceTotalAmountUsd)}</td>
-                                                                <td className="py-0.5 text-emerald-700 text-right pl-2">{formatKrwAmount(email.invoiceTotalAmountKrw)}</td>
-                                                            </tr>
-                                                            <tr>
-                                                                <td className="py-0.5 font-medium text-emerald-700/80 pr-2 whitespace-nowrap">환율</td>
-                                                                <td colSpan={2} className="py-0.5 text-emerald-700/80 text-right">
-                                                                    {email.usdKrwRate !== null ? `1 USD = ₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}
-                                                                </td>
-                                                            </tr>
-                                                            {email.invoiceOcrError && (
-                                                                <tr>
-                                                                    <td colSpan={3} className="py-0.5 font-semibold text-rose-600">{email.invoiceOcrError}</td>
-                                                                </tr>
-                                                            )}
-                                                        </tbody>
-                                                    </table>
+                                                <div className="mt-1.5 space-y-1 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5 text-[10px]">
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="font-semibold text-emerald-700">유닛프라이스</span>
+                                                        <span className="font-bold text-emerald-900">
+                                                            {formatUsdAmount(email.invoiceUnitPriceUsd)} · {formatKrwAmount(email.invoiceUnitPriceKrw)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2">
+                                                        <span className="font-semibold text-emerald-700">토탈어마운트</span>
+                                                        <span className="font-bold text-emerald-900">
+                                                            {formatUsdAmount(email.invoiceTotalAmountUsd)} · {formatKrwAmount(email.invoiceTotalAmountKrw)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="flex items-center justify-between gap-2 text-emerald-700/80">
+                                                        <span className="font-medium">환율</span>
+                                                        <span>{email.usdKrwRate !== null ? `1 USD = ₩${Math.round(email.usdKrwRate).toLocaleString()}` : '-'}</span>
+                                                    </div>
+                                                    {email.invoiceOcrError && (
+                                                        <p className="font-semibold text-rose-600">{email.invoiceOcrError}</p>
+                                                    )}
                                                 </div>
                                             )}
                                             {email.awbNumber && (
                                                 <div className="mt-2 flex items-center gap-2">
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
@@ -4755,13 +4843,13 @@ export default function WormOrderPage() {
                                                         className="inline-flex h-6 items-center rounded-md bg-[#e34219] px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-[#cd3b17] transition-colors"
                                                     >
                                                         조회하기
-                                                    </span>
+                                                    </button>
                                                     <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
                                                         AWB {email.awbNumber}
                                                     </p>
                                                 </div>
                                             )}
-                                        </button>
+                                        </div>
                                     )
                                 })}
                             </div>
@@ -4853,18 +4941,7 @@ export default function WormOrderPage() {
                                     </div>
                                     {/* 메일 본문 내용 */}
                                     <div className="p-6 overflow-y-auto bg-white dark:bg-[#1e1e1e] flex-1 text-[14px]">
-                                        {loadingEmailDetail && !selectedEmail.text ? (
-                                            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
-                                                <Loader2 size={16} className="animate-spin mr-2" />
-                                                메일 본문을 불러오는 중...
-                                            </div>
-                                        ) : (
-                                            <div 
-                                                className="w-full text-gray-800 break-words leading-relaxed max-w-none"
-                                                style={{ whiteSpace: selectedEmail.text.includes('<html') ? 'normal' : 'pre-wrap' }}
-                                                dangerouslySetInnerHTML={{ __html: selectedEmail.text || '' }} 
-                                            />
-                                        )}
+                                        <EmailBodyPreview loading={loadingEmailDetail} text={selectedEmail.text} />
                                     </div>
                                 </div>
                             )
@@ -4888,11 +4965,11 @@ export default function WormOrderPage() {
                     <div>
                         <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Package size={18} className="text-blue-500" />
-                            AWB 메일 수신
+                            메일센터 · AWB 문서
                             {loadingDocEmails && <span className="flex h-2 w-2 ml-1"><span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-blue-400 opacity-75"></span><span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500"></span></span>}
                         </h2>
                         <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">
-                            제목에 &apos;documents&apos;가 포함된 선적 서류 메일을 조회합니다.
+                            documents 메일을 이 발주에 매칭하고 AWB를 추출합니다.
                         </p>
                     </div>
                     <button
@@ -4934,9 +5011,8 @@ export default function WormOrderPage() {
                                     const isSelected = selectedDocEmailUid === email.uid
                                     const isMatched = email.matchedOrderId === activeWormOrder?.id
                                     return (
-                                        <button
+                                        <div
                                             key={email.uid}
-                                            onClick={() => setSelectedDocEmailUid(email.uid)}
                                             className={`w-full text-left p-4 transition-colors ${
                                                 isMatched && isSelected
                                                     ? 'bg-blue-200/60 border-l-4 border-blue-700 pl-[13px]'
@@ -4947,22 +5023,30 @@ export default function WormOrderPage() {
                                                     : 'border-l-[3px] border-transparent pl-4 hover:bg-slate-50 dark:hover:bg-[#252525]'
                                             }`}
                                         >
-                                            <div className="flex justify-between items-start mb-2">
-                                                <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
-                                                    {new Date(email.date).toLocaleDateString()}
-                                                </span>
-                                                {email.hasAttachments && <span className="text-[11px]">📎</span>}
-                                            </div>
-                                            <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
-                                                {index + 1}. {email.subject}
-                                            </h3>
+                                            <button
+                                                type="button"
+                                                onClick={() => setSelectedDocEmailUid(email.uid)}
+                                                className="w-full text-left"
+                                            >
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
+                                                        {new Date(email.date).toLocaleDateString()}
+                                                    </span>
+                                                    {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                                </div>
+                                                <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
+                                                    {index + 1}. {email.subject}
+                                                </h3>
+                                            </button>
                                             {/* 매칭/해제 버튼 */}
                                             <div className="mt-2 flex items-center gap-2 flex-wrap">
-                                                <span
+                                                <button
+                                                    type="button"
                                                     onClick={(event) => {
                                                         event.stopPropagation()
                                                         void handleMatchDocEmailToOrder(email)
                                                     }}
+                                                    disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id || matchingDocEmailUid === email.uid}
                                                     className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
@@ -4972,40 +5056,40 @@ export default function WormOrderPage() {
                                                                     ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
                                                                     : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
-                                                    role="button"
-                                                    aria-disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id}
                                                 >
                                                     {email.matchedOrderId === activeWormOrder?.id
                                                         ? '매칭완료'
                                                         : matchingDocEmailUid === email.uid
                                                             ? '매칭중...'
                                                             : '매칭하기'}
-                                                </span>
+                                                </button>
                                                 {email.matchedOrderNumber && (
                                                     <span className="text-[10px] font-semibold text-emerald-700">
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
                                                 {email.matchedOrderId && (
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             void handleUnmatchDocEmail(email)
                                                         }}
+                                                        disabled={unmatchingDocEmailUid === email.uid}
                                                         className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
                                                             unmatchingDocEmailUid === email.uid
                                                                 ? 'bg-slate-100 text-slate-400 cursor-progress'
                                                                 : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
                                                         }`}
-                                                        role="button"
                                                     >
                                                         {unmatchingDocEmailUid === email.uid ? '해제중...' : '매칭해제'}
-                                                    </span>
+                                                    </button>
                                                 )}
                                             </div>
                                             {email.awbNumber && (
                                                 <div className="mt-1.5 flex items-center gap-2">
-                                                    <span
+                                                    <button
+                                                        type="button"
                                                         onClick={(event) => {
                                                             event.stopPropagation()
                                                             handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
@@ -5013,13 +5097,13 @@ export default function WormOrderPage() {
                                                         className="inline-flex h-6 items-center rounded-md bg-blue-600 px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-blue-700 transition-colors"
                                                     >
                                                         통관조회
-                                                    </span>
+                                                    </button>
                                                     <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
                                                         AWB {email.awbNumber}
                                                     </p>
                                                 </div>
                                             )}
-                                        </button>
+                                        </div>
                                     )
                                 })}
                             </div>
@@ -5169,18 +5253,7 @@ export default function WormOrderPage() {
                                     </div>
                                     {/* 메일 본문 */}
                                     <div className="p-6 overflow-y-auto bg-white dark:bg-[#1e1e1e] flex-1 text-[14px]">
-                                        {loadingDocEmailDetail && !selectedDoc.text ? (
-                                            <div className="w-full h-full min-h-[220px] flex items-center justify-center text-slate-400 font-medium">
-                                                <Loader2 size={16} className="animate-spin mr-2" />
-                                                메일 본문을 불러오는 중...
-                                            </div>
-                                        ) : (
-                                            <div
-                                                className="w-full text-gray-800 break-words leading-relaxed max-w-none"
-                                                style={{ whiteSpace: selectedDoc.text.includes('<html') ? 'normal' : 'pre-wrap' }}
-                                                dangerouslySetInnerHTML={{ __html: selectedDoc.text || '' }}
-                                            />
-                                        )}
+                                        <EmailBodyPreview loading={loadingDocEmailDetail} text={selectedDoc.text} />
                                     </div>
                                 </div>
                             )
@@ -5728,6 +5801,7 @@ export default function WormOrderPage() {
 
             {showCargoCustomsMailTools && (
                 <div
+                    ref={cargoCustomsMailSectionRef}
                     style={{ order: cargoCustomsMailToolOrderBase + 5 }}
                     className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
