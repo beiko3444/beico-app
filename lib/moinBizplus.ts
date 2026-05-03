@@ -431,6 +431,29 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const assertMoinRemittanceOpen = async (page: PageLike, step = 'Check MOIN operating hours') => {
+    const bodyText = await page.locator('body').textContent().catch(() => '') || ''
+    const compactText = bodyText.replace(/\s+/g, ' ').trim()
+    const isRestricted =
+        compactText.includes(KO_REMIT_RESTRICTED_NOTICE) ||
+        compactText.includes(KO_REMIT_AVAILABLE_TIME) ||
+        compactText.includes(KO_REMIT_RESTRICTED)
+
+    if (!isRestricted) return
+
+    const hoursMatch = compactText.match(/월요일\s*오전\s*4시\s*~\s*금요일\s*오후\s*6시/)
+    const blockedMatch = compactText.match(/금요일\s*오후\s*6시\s*~\s*월요일\s*오전\s*4시/)
+    const summary = [
+        hoursMatch ? `available: ${hoursMatch[0]}` : null,
+        blockedMatch ? `restricted: ${blockedMatch[0]}` : null,
+    ].filter(Boolean).join(' | ')
+
+    throw new MoinAutomationError(
+        step,
+        `MOIN BizPlus is currently blocking remittance applications. ${summary || compactText.slice(0, 260)}`
+    )
+}
+
 const collectMoinLoginSubmitDiagnostics = async (page: PageLike) => {
     return String(
         await page.evaluate(`
@@ -2618,6 +2641,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         throwIfAbortRequested(abortSignal, 'Load recipient list')
         await page.waitForTimeout(2000)
         await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
+        await assertMoinRemittanceOpen(page, 'MOIN operating hours')
 
         // New flow: the recipient list can be behind the "구매대행송금" tab.
         try {
@@ -2634,7 +2658,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push('open-purchase-remit-tab')
             await page.waitForTimeout(1200)
             await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
-        } catch {
+            await assertMoinRemittanceOpen(page, 'MOIN operating hours')
+        } catch (error) {
+            if (error instanceof MoinAutomationError) throw error
             steps.push('purchase-remit-tab-not-found')
         }
 
