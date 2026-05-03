@@ -477,6 +477,90 @@ const scrollToCompanyTextCandidate = async (page: PageLike) => {
     return Boolean(found)
 }
 
+const clickCompanyRowCandidate = async (page: PageLike, companyNames: string[]) => {
+    const result = await page.evaluate(`
+        (() => {
+            const companies = ${JSON.stringify(companyNames)};
+            const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+            const normalizedCompanies = companies.map(normalize).filter(Boolean);
+            const requiredTokens = ['shanghai', 'oikki', 'trading'];
+            const textOf = (el) => String((el && el.textContent) || '').replace(/\\s+/g, ' ').trim();
+            const matchesCompany = (el) => {
+                const normalized = normalize(textOf(el));
+                if (!normalized) return false;
+                if (normalizedCompanies.some((company) => normalized.includes(company))) return true;
+                return requiredTokens.every((token) => normalized.includes(token));
+            };
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const clickWithMouseEvents = (target) => {
+                if (!target || !isVisible(target) || isDisabled(target)) return false;
+                try {
+                    target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' });
+                } catch {}
+                const eventInit = { bubbles: true, cancelable: true, view: window };
+                try { target.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+                try { target.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+                if (typeof target.click === 'function') target.click();
+                return true;
+            };
+            const isClickable = (el) => {
+                if (!el) return false;
+                const tag = (el.tagName || '').toLowerCase();
+                const role = (el.getAttribute('role') || '').toLowerCase();
+                const style = window.getComputedStyle(el);
+                return tag === 'button' || tag === 'a' || role === 'button' || el.getAttribute('onclick') || style.cursor === 'pointer' || el.tabIndex >= 0;
+            };
+            const viewportArea = Math.max(1, window.innerWidth * window.innerHeight);
+            const leaves = Array.from(document.querySelectorAll('*'))
+                .filter((el) => isVisible(el) && matchesCompany(el))
+                .sort((a, b) => {
+                    const ra = a.getBoundingClientRect();
+                    const rb = b.getBoundingClientRect();
+                    return (ra.width * ra.height) - (rb.width * rb.height);
+                })
+                .slice(0, 8);
+
+            for (const leaf of leaves) {
+                let scope = leaf;
+                for (let depth = 0; depth < 8 && scope; depth += 1) {
+                    const rect = scope.getBoundingClientRect();
+                    const area = rect.width * rect.height;
+                    if (area > viewportArea * 0.65) {
+                        scope = scope.parentElement;
+                        continue;
+                    }
+
+                    const selectable = Array.from(scope.querySelectorAll('input[type="radio"], input[type="checkbox"], [role="radio"], [role="checkbox"]'))
+                        .find((el) => isVisible(el) && !isDisabled(el));
+                    if (selectable && clickWithMouseEvents(selectable)) return 'clicked-row-select-control';
+
+                    if (isClickable(scope) && clickWithMouseEvents(scope)) return 'clicked-row-clickable-scope';
+
+                    const clickable = Array.from(scope.querySelectorAll('button, a, [role="button"], [onclick]'))
+                        .find((el) => isVisible(el) && !isDisabled(el));
+                    if (clickable && clickWithMouseEvents(clickable)) return 'clicked-row-child-clickable';
+
+                    if (depth >= 2 && clickWithMouseEvents(scope)) return 'clicked-row-container';
+
+                    scope = scope.parentElement;
+                }
+            }
+
+            return 'row-select-not-found';
+        })()
+    `).catch(() => 'row-select-error')
+
+    return String(result || 'row-select-unknown')
+}
+
 const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
     const result = await page.evaluate(`
         (() => {
@@ -2478,6 +2562,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 steps.push(`company-text-click-failed:attempt${attempt}`)
             }
 
+            try {
+                const rowSelectResult = await clickCompanyRowCandidate(page, TARGET_COMPANY_NAME_VARIANTS)
+                steps.push(`recipient-row-select-click:${rowSelectResult}:attempt${attempt}`)
+            } catch (err) {
+                steps.push(`recipient-row-select-click-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}:attempt${attempt}`)
+            }
+
             throwIfAbortRequested(abortSignal, 'Open remit modal')
             await page.waitForTimeout(1000)
 
@@ -2497,9 +2588,35 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         if (!remitClicked) {
+            try {
+                await clickNextStep(page, 12000)
+                steps.push('recipient-next-step-after-company')
+                await page.waitForTimeout(1500)
+                await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => undefined)
+                const nextStepInspection = await inspectTransferInputs(page)
+                if (nextStepInspection.amountKeywordVisible || !nextStepInspection.aliasSearchVisible) {
+                    remitClicked = true
+                    steps.push(`recipient-next-step-loaded:${JSON.stringify({
+                        aliasSearchVisible: nextStepInspection.aliasSearchVisible,
+                        amountKeywordVisible: nextStepInspection.amountKeywordVisible,
+                        inputCount: nextStepInspection.visibleInputs.length,
+                    })}`)
+                } else {
+                    steps.push(`recipient-next-step-still-recipient:${JSON.stringify({
+                        aliasSearchVisible: nextStepInspection.aliasSearchVisible,
+                        amountKeywordVisible: nextStepInspection.amountKeywordVisible,
+                        buttons: nextStepInspection.nextButtons.slice(0, 8),
+                    })}`)
+                }
+            } catch (err) {
+                steps.push(`recipient-next-step-after-company-error:${err instanceof Error ? err.message.slice(0, 120) : 'unknown'}`)
+            }
+        }
+
+        if (!remitClicked) {
             throw new MoinAutomationError(
                 'Click remit button in modal',
-                `Could not click the "${KO_REMIT}" button in the target company context. Last result: ${remitClickReason}. (url: ${page.url()})`
+                `Could not click the "${KO_REMIT}" button or continue with "${KO_NEXT_STEP_SPACED}" in the target company context. Last result: ${remitClickReason}. (url: ${page.url()})`
             )
         }
 
