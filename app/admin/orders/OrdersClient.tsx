@@ -316,7 +316,11 @@ export default function OrdersClient({
                     filteredOrders.map((order, idx) => (
                         <div key={order.id}>
                             {idx > 0 && (
+<<<<<<< Updated upstream
                                 <div className="mb-6 flex items-center gap-3 px-2">
+=======
+                                <div className="flex items-center gap-3 mb-8 max-w-[1680px] mx-auto px-4">
+>>>>>>> Stashed changes
                                     <div className="flex-1 h-[2px] bg-gray-300 dark:bg-[#2a2a2a] rounded-full" />
                                     <span className="text-[9px] font-black text-gray-400 dark:text-gray-500 tracking-widest">{idx + 1} / {filteredOrders.length}</span>
                                     <div className="flex-1 h-[2px] bg-gray-300 dark:bg-[#2a2a2a] rounded-full" />
