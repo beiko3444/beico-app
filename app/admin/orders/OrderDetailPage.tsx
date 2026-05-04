@@ -2,8 +2,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { signOut } from 'next-auth/react'
 import {
   AlertTriangle,
+  Bell,
   Check,
   ChevronDown,
   ChevronRight,
@@ -12,13 +14,10 @@ import {
   Clock3,
   Copy,
   FileText,
-  HelpCircle,
-  Mail,
   MapPin,
   MessageSquare,
   MoreHorizontal,
   Package,
-  Phone,
   ReceiptText,
   Store,
   Truck,
@@ -658,14 +657,28 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           <ChevronRight className="h-3.5 w-3.5 text-[#94A3B8]" />
           <span className="font-semibold text-[#0F172A]">주문 상세</span>
         </div>
-        <button
-          type="button"
-          onClick={() => handlePrototypeAction('도움말 준비 중입니다.')}
-          className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-[#64748B] transition hover:text-[#334155]"
-        >
-          <HelpCircle className="h-4 w-4" />
-          도움말
-        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" className="flex h-[46px] w-[46px] items-center justify-center rounded-full border border-[#D8DEE9] bg-white text-[#334155] transition hover:bg-slate-50">
+            <Bell className="h-4 w-4" />
+          </button>
+          <button type="button" className="inline-flex h-[46px] items-center rounded-full border border-[#D8DEE9] bg-white px-4 text-[14px] font-extrabold text-[#111827]">
+            1건 출고
+          </button>
+          <button
+            type="button"
+            onClick={() => handlePrototypeAction('집하요청 기능은 상단 사이드바 전환 후 연결 예정입니다.')}
+            className="inline-flex h-[46px] items-center rounded-full bg-gradient-to-b from-[#2F80ED] to-[#1769D9] px-5 text-[14px] font-extrabold text-white shadow-[0_10px_24px_rgba(47,128,237,0.35)]"
+          >
+            집하요청
+          </button>
+          <button
+            type="button"
+            onClick={() => signOut({ callbackUrl: '/login' })}
+            className="inline-flex h-[46px] items-center rounded-full border border-[#D8DEE9] bg-white px-4 text-[14px] font-bold text-[#334155] transition hover:bg-slate-50"
+          >
+            로그아웃
+          </button>
+        </div>
       </section>
 
       <div className="rounded-[22px] border border-[#BDEFD8] bg-[linear-gradient(135deg,#F0FFF8_0%,#FFFFFF_58%,#F8FAFF_100%)] p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:p-8">
