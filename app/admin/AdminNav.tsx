@@ -29,7 +29,7 @@ export default function AdminNav({
   const missingBill = (counts?.missingBill || 0) > 0
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-[1000] w-[220px] border-r border-white/10 bg-gradient-to-b from-[#081225] to-[#06101F] p-4 shadow-[12px_0_40px_rgba(15,23,42,0.12)] md:w-[260px] md:px-[18px] md:py-6">
+    <aside className="fixed inset-y-0 left-0 z-[1000] flex w-[220px] flex-col border-r border-white/10 bg-gradient-to-b from-[#081225] to-[#06101F] p-4 shadow-[12px_0_40px_rgba(15,23,42,0.12)] md:w-[260px] md:px-[18px] md:py-6">
       <div className="mb-6 border-b border-white/10 pb-5">
         <div className="text-[22px] font-black tracking-[-0.04em] text-white">Xtracker</div>
         <div className="mt-1 text-[12px] font-medium text-white/60">Admin Console</div>
@@ -55,18 +55,11 @@ export default function AdminNav({
         ))}
       </nav>
 
-      <div className="mt-6 border-t border-white/10 pt-4">
-        <button
-          type="button"
-          onClick={() => alert('설정 기능은 준비 중입니다.')}
-          className="flex h-12 w-full items-center rounded-xl px-4 text-left text-[15px] font-bold tracking-[-0.02em] text-white/70 transition hover:bg-white/5 hover:text-white"
-        >
-          설정
-        </button>
+      <div className="mt-auto border-t border-white/10 pt-4">
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="mt-1 flex h-12 w-full items-center rounded-xl px-4 text-left text-[15px] font-bold tracking-[-0.02em] text-white/70 transition hover:bg-white/5 hover:text-white"
+          className="flex h-12 w-full items-center rounded-xl px-4 text-left text-[15px] font-bold tracking-[-0.02em] text-white/70 transition hover:bg-white/5 hover:text-white"
         >
           로그아웃
         </button>
