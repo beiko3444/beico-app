@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Bell, Download, LayoutGrid, Plus } from 'lucide-react'
+import { Bell, Download, LayoutGrid, Plus, User } from 'lucide-react'
 import ThemeToggle from '@/components/ThemeToggle'
 
 type SmsStatusType = 'success' | 'error'
@@ -232,9 +232,9 @@ export default function AdminNav({
     const totalAlerts = (counts?.pendingOrders || 0) + (counts?.lowStock || 0) + (counts?.pendingPartners || 0) + (counts?.missingBill || 0)
     const activeTabRef = useRef<HTMLAnchorElement>(null)
     const tabContainerRef = useRef<HTMLDivElement>(null)
-    const navLinkBaseClass = 'inline-flex h-9 min-w-[84px] items-center justify-center gap-1.5 rounded-full px-3 text-[12px] font-semibold leading-none transition-colors'
-    const navLinkActiveClass = 'bg-white text-slate-950 shadow-sm'
-    const navLinkIdleClass = 'text-white/76 hover:bg-white/10 hover:text-white'
+    const navLinkBaseClass = 'inline-flex h-[42px] min-w-[92px] items-center justify-center gap-1.5 rounded-full px-[14px] text-[15px] font-bold leading-none tracking-[-0.02em] transition-all duration-150'
+    const navLinkActiveClass = 'bg-white text-[#1F6FE5] shadow-[0_8px_22px_rgba(0,0,0,0.18)]'
+    const navLinkIdleClass = 'text-[rgba(255,255,255,0.78)] hover:bg-white/10 hover:text-white'
     const navBadgeBaseClass = 'flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] font-bold leading-none'
 
     useEffect(() => {
@@ -250,18 +250,37 @@ export default function AdminNav({
     }, [pathname])
 
     return (
-        <div className="fixed top-0 left-0 right-0 z-[100]">
-            <div className="bg-[#050505] px-4 py-2.5 text-white">
-                <div className="mx-auto flex max-w-[1200px] items-center justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-4">
+        <div className="sticky top-[14px] z-[1000] px-[18px] text-white">
+            <div
+                className="rounded-[18px] border border-white/10 bg-gradient-to-b from-[#0F1A2E] to-[#081225] shadow-[0_18px_45px_rgba(8,18,37,0.22)]"
+                style={{
+                    ['--nav-bg-start' as string]: '#0F1A2E',
+                    ['--nav-bg-end' as string]: '#081225',
+                    ['--nav-text' as string]: 'rgba(255,255,255,0.78)',
+                    ['--nav-text-hover' as string]: '#FFFFFF',
+                    ['--nav-active-bg' as string]: '#FFFFFF',
+                    ['--nav-active-text' as string]: '#1F6FE5',
+                    ['--primary-blue' as string]: '#2F80ED',
+                    ['--primary-blue-dark' as string]: '#1769D9',
+                    ['--nav-radius' as string]: '18px',
+                    ['--pill-radius' as string]: '999px',
+                    ['--nav-height' as string]: '74px',
+                }}
+            >
+                <div className="mx-auto flex h-[74px] max-w-[1400px] items-center justify-between gap-4 px-[22px]">
+                    <div className="flex min-w-0 items-center gap-7">
                         <div className="flex shrink-0 items-center">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
-                                <LayoutGrid size={18} className="text-white" />
-                            </div>
+                            <button
+                                type="button"
+                                aria-label="메뉴"
+                                className="flex h-12 w-12 items-center justify-center rounded-[14px] bg-white/10 transition-colors hover:bg-white/15"
+                            >
+                                <LayoutGrid size={22} className="text-white/90" />
+                            </button>
                         </div>
 
                         <div ref={tabContainerRef} className="hidden min-w-0 flex-1 overflow-x-auto scrollbar-hide lg:block">
-                            <nav className="flex items-center gap-1.5 whitespace-nowrap">
+                            <nav className="flex items-center gap-2 whitespace-nowrap">
                                 {navItems.map((item) => {
                                     const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
 
@@ -291,21 +310,21 @@ export default function AdminNav({
                         </div>
                     </div>
 
-                    <div className="flex shrink-0 items-center gap-2">
-                        <ThemeToggle className="bg-white/10 hover:bg-white/16 border border-white/10" />
+                    <div className="flex shrink-0 items-center gap-2.5">
+                        <ThemeToggle className="h-[46px] w-[46px] rounded-full border border-white/10 bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] hover:bg-white/15" />
 
-                        <button className="relative flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/10 transition-colors hover:bg-white/16">
-                            <Bell size={17} className="text-white/88" />
+                        <button className="relative flex h-[46px] w-[46px] items-center justify-center rounded-full border border-white/10 bg-white/10 shadow-[inset_0_0_0_1px_rgba(255,255,255,0.03)] transition-colors hover:bg-white/15">
+                            <Bell size={18} className="text-white/90" />
                             {totalAlerts > 0 && (
-                                <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#1473d8] px-1 text-[10px] font-bold leading-none text-white">
+                                <span className="absolute -right-[3px] -top-1 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-[#0F1A2E] bg-[#2F80ED] px-1 text-[11px] font-extrabold leading-none text-white">
                                     {totalAlerts}
                                 </span>
                             )}
                         </button>
 
-                        <div className="inline-flex h-9 items-stretch overflow-hidden rounded-full border border-white/12 bg-white text-slate-950">
-                            <span className="inline-flex h-full items-center pl-3 pr-1 text-slate-500">
-                                <Plus size={14} />
+                        <div className="inline-flex h-[46px] items-stretch overflow-hidden rounded-full border border-white/12 bg-white text-slate-950 shadow-[0_8px_20px_rgba(0,0,0,0.14)]">
+                            <span className="inline-flex h-full items-center pl-4 pr-1 text-slate-500">
+                                <Plus size={18} />
                             </span>
                             <input
                                 type="number"
@@ -313,34 +332,35 @@ export default function AdminNav({
                                 inputMode="numeric"
                                 value={shipmentCount}
                                 onChange={(event) => setShipmentCount(event.target.value)}
-                                className="h-full w-[34px] border-none bg-transparent text-center text-[12px] font-semibold leading-none text-slate-950 outline-none focus:outline-none"
+                                className="h-full w-[42px] border-none bg-transparent text-center text-[18px] font-black leading-none text-slate-950 outline-none focus:outline-none"
                                 placeholder="1"
                                 aria-label="출고 건수"
                             />
-                            <span className="inline-flex h-full items-center pr-3 text-[12px] font-semibold leading-none text-slate-950 whitespace-nowrap">건 출고</span>
+                            <span className="inline-flex h-full items-center gap-2 pr-4 text-[15px] font-bold leading-none text-slate-800 whitespace-nowrap">건 출고</span>
                         </div>
 
                         <button
                             onClick={handleSendSms}
                             disabled={sendingSms || loadingFromNumber}
-                            className="flex h-9 items-center justify-center gap-1.5 rounded-full bg-[#1473d8] px-3.5 text-[12px] font-semibold leading-none text-white transition-colors hover:bg-[#0f63bd] disabled:opacity-40"
+                            className="flex h-[46px] items-center justify-center gap-2 rounded-full bg-gradient-to-b from-[#2F80ED] to-[#1769D9] px-5 text-[15px] font-extrabold leading-none text-white shadow-[0_10px_24px_rgba(47,128,237,0.35)] transition-all hover:from-[#3B8DF5] hover:to-[#1F6FE5] disabled:opacity-40"
                         >
-                            <Download size={14} />
+                            <Download size={16} />
                             <span>{sendingSms ? '요청중...' : '집하요청'}</span>
                         </button>
 
                         <button
                             onClick={() => signOut({ callbackUrl: '/login' })}
-                            className="flex h-9 items-center justify-center rounded-full border border-white/12 bg-white/10 px-3.5 text-[12px] font-semibold leading-none text-white transition-colors hover:bg-white/16 whitespace-nowrap"
+                            className="flex h-[46px] items-center justify-center gap-2 rounded-full border border-white/15 bg-white/10 px-[18px] text-[15px] font-bold leading-none text-white transition-colors hover:bg-white/15 whitespace-nowrap"
                             title="로그아웃"
                         >
+                            <User size={16} className="text-white/90" />
                             로그아웃
                         </button>
                     </div>
                 </div>
 
                 {(smsStatus || smsSendLogs.length > 0) && (
-                    <div className="max-w-[1200px] mx-auto flex items-center justify-end gap-2 mt-1.5">
+                    <div className="mx-auto flex max-w-[1400px] items-center justify-end gap-2 px-[22px] py-2">
                         {smsStatus ? (
                             <span className={`text-[11px] font-medium ${smsStatus.type === 'success' ? 'text-white/78' : 'text-[#ffb4b4]'}`}>
                                 {smsStatus.message}
@@ -362,7 +382,7 @@ export default function AdminNav({
                     </div>
                 )}
 
-                <div className="max-w-[1200px] mx-auto mt-2 lg:hidden">
+                <div className="mx-auto max-w-[1400px] px-[22px] pb-3 lg:hidden">
                     <nav ref={tabContainerRef} className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide whitespace-nowrap pb-1">
                         {navItems.map((item) => {
                             const isActive = pathname === item.path || (item.path !== '/admin' && pathname.startsWith(item.path))
