@@ -296,7 +296,7 @@ export default function AdminOrderCard({ order }: { order: any }) {
                     </div>
                 </div>
 
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.72fr)]">
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.72fr)] xl:items-start">
                     {/* ── 거래처 정보 ── */}
                     <Section title="거래처 정보" icon={<Building2 size={14} className="text-gray-400 dark:text-gray-500" />}>
                         <div className="flex flex-col relative z-10">
