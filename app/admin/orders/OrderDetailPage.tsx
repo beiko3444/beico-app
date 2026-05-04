@@ -9,7 +9,6 @@ import {
   Check,
   ChevronDown,
   ChevronRight,
-  CircleDollarSign,
   ClipboardList,
   Clock3,
   Copy,
@@ -17,11 +16,11 @@ import {
   MapPin,
   MessageSquare,
   MoreHorizontal,
+  Wallet,
   Package,
   ReceiptText,
   Store,
   Truck,
-  Wallet,
 } from 'lucide-react'
 
 type Tone = 'blue' | 'green' | 'orange' | 'red' | 'gray'
@@ -393,16 +392,6 @@ function DropdownButton({
   )
 }
 
-function TimelineDot({ status }: { status: StepState }) {
-  if (status === 'done') {
-    return <span className="flex h-8 w-8 items-center justify-center rounded-full border border-emerald-200 bg-emerald-50 text-emerald-600"><Check className="h-4 w-4" /></span>
-  }
-  if (status === 'current') {
-    return <span className="flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-blue-50 text-blue-600"><Clock3 className="h-4 w-4" /></span>
-  }
-  return <span className="flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-400">•</span>
-}
-
 export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const router = useRouter()
   const detail = useMemo(() => buildOrderDetailData(order), [order])
@@ -448,12 +437,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
     [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
   )
-
-  const nextActionDescription = trackingNumber.trim().length > 0
-    ? '거래명세표 또는 세금계산서 발행으로 마감 작업을 진행하세요.'
-    : currentStatus === 'DEPOSIT_COMPLETED' || adminDepositConfirmedAt
-      ? '송장 정보를 입력하고 배송준비 처리 버튼으로 다음 단계를 진행하세요.'
-      : '입금 확인을 먼저 처리한 뒤 배송 작업을 진행하세요.'
 
   const canIssueDocuments = currentStatus !== 'CANCELED'
 
@@ -710,6 +693,16 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               <span>주문 채널 {detail.channelLabel}</span>
               <span>처리 상태 {currentStatusMeta.label}</span>
             </div>
+            <div className="mt-4 rounded-[14px] border border-[#E6EAF2] bg-white/70 px-4 py-3">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
+                {processSteps.map((step) => (
+                  <span key={step.label} className={`${step.status === 'current' ? 'font-extrabold text-[#1D4ED8]' : step.status === 'done' ? 'font-bold text-[#059669]' : 'font-semibold text-[#64748B]'}`}>
+                    {step.label}
+                    {step.time ? ` · ${step.time}` : ''}
+                  </span>
+                ))}
+              </div>
+            </div>
           </div>
 
           <div className="flex w-full flex-col gap-3 xl:w-[300px]">
@@ -755,6 +748,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 { label: '연락처', value: detail.customer.phone, copyKey: 'phone' },
                 { label: '이메일', value: detail.customer.email, copyKey: 'email' },
                 { label: '업태/종목', value: detail.customer.businessType },
+                { label: '배송지 주소', value: detail.shipping.address, copyKey: 'address' },
+                { label: '배송 수령인', value: detail.shipping.recipient },
+                { label: '배송 연락처', value: detail.shipping.phone, copyKey: 'shipping-phone' },
               ].map((field) => (
                 <div key={field.label} className="min-h-[112px] rounded-[14px] border border-[#E6EAF2] bg-[#F8FAFC] px-[18px] py-[18px]">
                   <div className="flex items-center justify-between gap-3">
@@ -770,15 +766,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           <DetailCard
             title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개)`}
             icon={<Package className="h-4 w-4" />}
-            actions={
-              <button
-                type="button"
-                onClick={() => handlePrototypeAction('상품 추가 기능은 준비 중입니다.')}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-bold text-slate-600 transition hover:bg-slate-50"
-              >
-                상품 추가
-              </button>
-            }
           >
             <div className="hidden overflow-hidden rounded-2xl border border-[#E6EAF2] lg:block">
               <table className="w-full table-fixed border-collapse">
@@ -849,23 +836,11 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
             <div className="mt-6 border-t border-[#E6EAF2] px-6 py-6">
               <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <button
-                    type="button"
-                    onClick={() => handlePrototypeAction('상품 추가 기능은 준비 중입니다.')}
-                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50"
-                  >
-                    상품 추가
-                  </button>
-                  <div className="text-[12px] font-medium text-slate-500">
-                    주문상품 카드 안에서 배송비와 부가세까지 함께 확인할 수 있습니다.
-                  </div>
-                </div>
-
+                <div />
                 <div className="grid gap-2 rounded-2xl border border-[#E6EAF2] bg-[#F8FAFC] p-5">
                   <div className="flex items-center justify-between gap-4 text-[13px]">
                     <span className="font-medium text-slate-500">상품 공급가 합계</span>
-                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.productSupplyPrice)}</span>
+                    <span className="font-black text-slate-900">{formatCurrency(detail.products.reduce((sum, item) => sum + item.total, 0))}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 text-[13px]">
                     <span className="font-medium text-slate-500">배송비</span>
@@ -884,95 +859,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
           </DetailCard>
 
-          <DetailCard
-            title="배송지"
-            icon={<MapPin className="h-4 w-4" />}
-            actions={
-              <button
-                type="button"
-                onClick={() => handlePrototypeAction('배송지 변경 기능은 준비 중입니다.')}
-                className="rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-bold text-slate-600 transition hover:bg-slate-50"
-              >
-                배송지 변경
-              </button>
-            }
-          >
-            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
-              <div className="min-h-[150px] rounded-[14px] border border-[#E6EAF2] bg-[#F8FAFC] px-5 py-5">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-500">주소</div>
-                    <div className="mt-2 text-[15px] font-bold leading-7 text-slate-900">{detail.shipping.address}</div>
-                  </div>
-                  <CopyButton copied={copiedField === 'address'} onClick={() => showCopyToast('address', detail.shipping.address)} />
-                </div>
-                <div className="mt-3 text-[12px] font-medium text-slate-500">{detail.shipping.memo}</div>
-              </div>
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="rounded-[14px] border border-[#E6EAF2] bg-[#F8FAFC] px-5 py-5">
-                  <div className="text-[11px] font-bold text-slate-500">수령인</div>
-                  <div className="mt-2 text-[15px] font-black text-slate-900">{detail.shipping.recipient}</div>
-                </div>
-                <div className="rounded-[14px] border border-[#E6EAF2] bg-[#F8FAFC] px-5 py-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-bold text-slate-500">연락처</div>
-                      <div className="mt-2 text-[15px] font-black text-slate-900">{detail.shipping.phone}</div>
-                    </div>
-                    <CopyButton copied={copiedField === 'shipping-phone'} onClick={() => showCopyToast('shipping-phone', detail.shipping.phone)} />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </DetailCard>
-
         </div>
 
         <aside className="space-y-5 xl:sticky xl:top-[104px]">
-          <DetailCard title="주문 진행 상태" icon={<Clock3 className="h-4 w-4" />}>
-            <div className="space-y-3">
-              {processSteps.map((step, index) => (
-                <div key={step.label} className="flex gap-3">
-                  <div className="flex flex-col items-center">
-                    <TimelineDot status={step.status} />
-                    {index < processSteps.length - 1 ? <span className="mt-1 h-full w-px bg-slate-200" /> : null}
-                  </div>
-                  <div className="pb-4">
-                    <div className="text-[14px] font-black text-slate-900">{step.label}</div>
-                    <div className="mt-1 text-[12px] font-medium text-slate-500">{step.time || '대기 중'}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="mt-5 rounded-[14px] border border-blue-200 bg-blue-50 px-4 py-4">
-              <div className="text-[12px] font-black text-blue-700">다음 작업</div>
-              <p className="mt-2 text-[13px] leading-6 text-blue-900/80">{nextActionDescription}</p>
-            </div>
-          </DetailCard>
-
-          <DetailCard title="결제 요약" icon={<CircleDollarSign className="h-4 w-4" />}>
-            <div className="space-y-3">
-              {[
-                { label: '총 수량', value: `${detail.payment.totalQuantity.toLocaleString('ko-KR')}개` },
-                { label: '상품 공급가', value: formatCurrency(detail.payment.productSupplyPrice) },
-                { label: '배송비', value: formatCurrency(detail.payment.shippingFee) },
-                { label: '부가세', value: formatCurrency(detail.payment.vat) },
-              ].map((item) => (
-                <div key={item.label} className="flex items-center justify-between rounded-xl bg-[#F8FAFC] px-4 py-3">
-                  <span className="text-[13px] font-medium text-slate-500">{item.label}</span>
-                  <span className="text-[15px] font-black text-slate-900">{item.value}</span>
-                </div>
-              ))}
-            </div>
-            <div className="mt-4 rounded-2xl border border-blue-500 bg-gradient-to-br from-[#2563EB] to-[#1054E8] px-5 py-5 text-white shadow-[0_14px_28px_rgba(37,99,235,0.28)]">
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[12px] font-bold text-blue-100">최종 결제금액</div>
-                <Wallet className="h-5 w-5 text-blue-100" />
-              </div>
-              <div className="mt-2 text-[32px] font-black leading-none">{formatCurrency(detail.payment.finalAmount)}</div>
-            </div>
-          </DetailCard>
-
           <DetailCard title="배송 처리" icon={<Truck className="h-4 w-4" />}>
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
