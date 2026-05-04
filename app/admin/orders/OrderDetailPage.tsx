@@ -4,9 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   AlertTriangle,
-  Building2,
   Check,
-  CheckCircle2,
   ChevronDown,
   CircleDollarSign,
   ClipboardList,
@@ -15,7 +13,6 @@ import {
   FileText,
   Mail,
   MapPin,
-  MessageCircle,
   MessageSquare,
   MoreHorizontal,
   Package,
@@ -88,13 +85,6 @@ interface ProcessStep {
   time: string | null
 }
 
-interface ProcessHistoryItem {
-  label: string
-  time: string
-  actor: string
-  status: StepState
-}
-
 interface NormalizedOrderDetail {
   id: string
   orderId: string
@@ -135,7 +125,8 @@ interface NormalizedOrderDetail {
   rawStatus: string
 }
 
-const CARRIER_OPTIONS = ['Rosen', 'CJ대한통운', '한진택배', '우체국택배', '롯데택배']
+const DEFAULT_CARRIER = '로젠택배'
+const CARRIER_OPTIONS = [DEFAULT_CARRIER]
 
 const sampleOrderData: NormalizedOrderDetail = {
   id: '20260504001',
@@ -161,7 +152,7 @@ const sampleOrderData: NormalizedOrderDetail = {
     phone: '010-5459-8311',
     address: '서울특별시 관악구 호암로 453 1층, 아울렛낚시',
     memo: '기본 배송지',
-    carrier: 'Rosen',
+    carrier: DEFAULT_CARRIER,
     trackingNumber: '',
   },
   payment: {
@@ -283,7 +274,7 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
       phone: partnerProfile?.contact || '-',
       address: partnerProfile?.address || '-',
       memo: '기본 배송지',
-      carrier: order.courier || 'Rosen',
+      carrier: order.courier === 'Rosen' ? DEFAULT_CARRIER : (order.courier || DEFAULT_CARRIER),
       trackingNumber: trackingNumbers[0] || '',
     },
     payment: {
@@ -319,22 +310,6 @@ function createProcessSteps(detail: NormalizedOrderDetail, trackingNumber: strin
   ]
 }
 
-function createHistoryItems(detail: NormalizedOrderDetail, trackingNumber: string, currentStatus: string): ProcessHistoryItem[] {
-  const steps = createProcessSteps(detail, trackingNumber, currentStatus)
-
-  return steps.map((step) => ({
-    label: step.label,
-    time: step.time || '대기 중',
-    actor:
-      step.status === 'done' && step.label === '주문접수'
-        ? '시스템'
-        : step.status === 'done' || step.status === 'current'
-          ? '관리자'
-          : '',
-    status: step.status,
-  }))
-}
-
 function toneClasses(tone: Tone) {
   switch (tone) {
     case 'blue':
@@ -347,17 +322,6 @@ function toneClasses(tone: Tone) {
       return 'border-red-200 bg-red-50 text-red-700'
     default:
       return 'border-slate-200 bg-slate-50 text-slate-700'
-  }
-}
-
-function cardToneClasses(status: StepState) {
-  switch (status) {
-    case 'done':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-    case 'current':
-      return 'border-blue-200 bg-blue-50 text-blue-700'
-    default:
-      return 'border-slate-200 bg-slate-50 text-slate-500'
   }
 }
 
@@ -444,7 +408,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
   const [currentStatus, setCurrentStatus] = useState(detail.rawStatus)
   const [taxInvoiceIssued, setTaxInvoiceIssued] = useState(detail.taxInvoiceIssued)
-  const [carrier, setCarrier] = useState(detail.shipping.carrier || 'Rosen')
+  const [carrier, setCarrier] = useState(detail.shipping.carrier || DEFAULT_CARRIER)
   const [trackingNumber, setTrackingNumber] = useState(detail.shipping.trackingNumber)
   const [isEditingTracking, setIsEditingTracking] = useState(!detail.shipping.trackingNumber)
   const [adminDepositConfirmedAt, setAdminDepositConfirmedAt] = useState(detail.adminDepositConfirmedAt)
@@ -459,7 +423,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   useEffect(() => {
     setCurrentStatus(detail.rawStatus)
     setTaxInvoiceIssued(detail.taxInvoiceIssued)
-    setCarrier(detail.shipping.carrier || 'Rosen')
+    setCarrier(detail.shipping.carrier || DEFAULT_CARRIER)
     setTrackingNumber(detail.shipping.trackingNumber)
     setIsEditingTracking(!detail.shipping.trackingNumber)
     setAdminDepositConfirmedAt(detail.adminDepositConfirmedAt)
@@ -476,14 +440,12 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     [detail, trackingNumber, currentStatus]
   )
 
-  const historyItems = useMemo(
-    () => createHistoryItems(detail, trackingNumber, currentStatus),
-    [detail, trackingNumber, currentStatus]
-  )
-
+  const isCompletedOrder = trackingNumber.trim().length > 0 && taxInvoiceIssued
   const currentStatusMeta = useMemo(
-    () => mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued),
-    [currentStatus, trackingNumber, taxInvoiceIssued]
+    () => (isCompletedOrder
+      ? { label: '거래완료', tone: 'green' as Tone }
+      : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
+    [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
   )
 
   const nextActionDescription = trackingNumber.trim().length > 0
@@ -493,7 +455,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       : '입금 확인을 먼저 처리한 뒤 배송 작업을 진행하세요.'
 
   const canIssueDocuments = currentStatus !== 'CANCELED'
-  const canHandleShipping = currentStatus === 'DEPOSIT_COMPLETED' || currentStatus === 'SHIPPED' || Boolean(adminDepositConfirmedAt)
 
   const showCopyToast = (fieldKey: string, value: string) => {
     if (!value || value === '-') return
@@ -672,15 +633,26 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
       ) : null}
 
-      <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+      <div className={`rounded-[28px] border p-6 shadow-[0_12px_30px_rgba(15,23,42,0.04)] ${
+        isCompletedOrder
+          ? 'border-emerald-200 bg-gradient-to-br from-emerald-50 to-white'
+          : 'border-slate-200 bg-white'
+      }`}>
         <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
           <div>
             <div className="text-[13px] font-medium text-slate-400">주문 관리 &gt; 주문 상세</div>
             <div className="mt-3 flex flex-wrap items-center gap-3">
-              <h2 className="text-[30px] font-black tracking-tight text-slate-950">주문 #{detail.orderNumber}</h2>
+              <h2 className="text-[34px] font-black tracking-tight text-slate-950">{detail.customer.company}</h2>
+              <span className="text-[28px] font-black tracking-tight text-slate-300">/</span>
+              <div className="text-[28px] font-black tracking-tight text-slate-950">주문 #{detail.orderNumber}</div>
               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-black ${toneClasses(currentStatusMeta.tone)}`}>
                 {currentStatusMeta.label}
               </span>
+              {isCompletedOrder ? (
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-700">
+                  배송완료 + 계산서 발행완료
+                </span>
+              ) : null}
               {taxInvoiceIssued ? (
                 <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-700">
                   세금계산서 발행 완료
@@ -707,9 +679,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </DropdownButton>
 
             <DropdownButton label="더보기" open={moreMenuOpen} onToggle={() => setMoreMenuOpen((prev) => !prev)}>
-              <button type="button" onClick={() => handlePrototypeAction('주문 메모 추가 기능은 준비 중입니다.')} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
-                <MessageCircle className="h-4 w-4" /> 주문 메모 추가
-              </button>
               <button type="button" onClick={() => handlePrototypeAction('주문 복제 기능은 준비 중입니다.')} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
                 <Package className="h-4 w-4" /> 주문 복제
               </button>
@@ -717,38 +686,37 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 <MoreHorizontal className="h-4 w-4" /> 인쇄하기
               </button>
             </DropdownButton>
+            <button
+              type="button"
+              onClick={() => setDeleteModalOpen(true)}
+              className="rounded-xl border border-red-200 bg-white px-3 py-2 text-[13px] font-bold text-red-600 transition hover:bg-red-50"
+            >
+              주문 삭제
+            </button>
           </div>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
         <div className="space-y-6">
-          <DetailCard title="고객 요약" icon={<Store className="h-4 w-4" />}>
-            <div className="grid gap-3 xl:grid-cols-[1.4fr_1fr_1.3fr_1fr]">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500"><Store className="h-4 w-4" /> 거래처</div>
-                <div className="mt-2 text-[16px] font-black text-slate-900">{detail.customer.company}</div>
-                <div className="mt-1 text-[13px] font-medium text-slate-500">담당자 {detail.customer.manager}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-500">
-                  <span className="flex items-center gap-2"><Phone className="h-4 w-4" /> 연락처</span>
-                  <CopyButton copied={copiedField === 'phone'} onClick={() => showCopyToast('phone', detail.customer.phone)} />
+          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />}>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {[
+                { label: '거래처', value: detail.customer.company },
+                { label: '담당자', value: detail.customer.manager },
+                { label: '사업자번호', value: detail.customer.businessNumber, copyKey: 'business-number' },
+                { label: '연락처', value: detail.customer.phone, copyKey: 'phone' },
+                { label: '이메일', value: detail.customer.email, copyKey: 'email' },
+                { label: '업태/종목', value: detail.customer.businessType },
+              ].map((field) => (
+                <div key={field.label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-[11px] font-bold text-slate-500">{field.label}</div>
+                    {field.copyKey ? <CopyButton copied={copiedField === field.copyKey} onClick={() => showCopyToast(field.copyKey, field.value)} /> : null}
+                  </div>
+                  <div className="mt-2 break-all text-[16px] font-black text-slate-900">{field.value}</div>
                 </div>
-                <div className="mt-2 text-[16px] font-black text-slate-900">{detail.customer.phone}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex items-center justify-between gap-2 text-[11px] font-bold text-slate-500">
-                  <span className="flex items-center gap-2"><Mail className="h-4 w-4" /> 이메일</span>
-                  <CopyButton copied={copiedField === 'email'} onClick={() => showCopyToast('email', detail.customer.email)} />
-                </div>
-                <div className="mt-2 break-all text-[16px] font-black text-slate-900">{detail.customer.email}</div>
-              </div>
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
-                <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500"><MessageCircle className="h-4 w-4" /> 문의</div>
-                <div className="mt-2 text-[15px] font-black text-slate-900">직접 연락</div>
-                <div className="mt-1 text-[12px] font-medium text-slate-500">빠른 확인이 필요한 주문</div>
-              </div>
+              ))}
             </div>
           </DetailCard>
 
@@ -832,15 +800,40 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               ))}
             </div>
 
-            <div className="mt-5 flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
-              <button
-                type="button"
-                onClick={() => handlePrototypeAction('상품 추가 기능은 준비 중입니다.')}
-                className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50"
-              >
-                상품 추가
-              </button>
-              <div className="text-[14px] font-bold text-slate-600">상품 공급가 합계 <span className="ml-2 text-[18px] font-black text-slate-950">{formatCurrency(detail.payment.productSupplyPrice)}</span></div>
+            <div className="mt-5 border-t border-slate-200 pt-4">
+              <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <button
+                    type="button"
+                    onClick={() => handlePrototypeAction('상품 추가 기능은 준비 중입니다.')}
+                    className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    상품 추가
+                  </button>
+                  <div className="text-[12px] font-medium text-slate-500">
+                    주문상품 카드 안에서 배송비와 부가세까지 함께 확인할 수 있습니다.
+                  </div>
+                </div>
+
+                <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 min-[520px]:grid-cols-2 xl:min-w-[440px]">
+                  <div className="flex items-center justify-between gap-4 text-[13px]">
+                    <span className="font-medium text-slate-500">상품 공급가 합계</span>
+                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.productSupplyPrice)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 text-[13px]">
+                    <span className="font-medium text-slate-500">배송비</span>
+                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.shippingFee)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 text-[13px]">
+                    <span className="font-medium text-slate-500">부가세</span>
+                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.vat)}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-2 text-[14px]">
+                    <span className="font-bold text-slate-600">최종 결제금액</span>
+                    <span className="text-[20px] font-black text-slate-950">{formatCurrency(detail.payment.finalAmount)}</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </DetailCard>
 
@@ -886,50 +879,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
           </DetailCard>
 
-          <DetailCard title="거래처 정보" icon={<Building2 className="h-4 w-4" />}>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-              {[
-                { label: '사업자번호', value: detail.customer.businessNumber, copyKey: 'business-number' },
-                { label: '상호', value: detail.customer.company },
-                { label: '성명', value: detail.customer.manager },
-                { label: '이메일', value: detail.customer.email, copyKey: 'client-email' },
-                { label: '연락처', value: detail.customer.phone, copyKey: 'client-phone' },
-                { label: '업태/종목', value: detail.customer.businessType },
-              ].map((field) => (
-                <div key={field.label} className="rounded-2xl border border-slate-200 px-4 py-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="text-[11px] font-bold text-slate-500">{field.label}</div>
-                    {field.copyKey ? <CopyButton copied={copiedField === field.copyKey} onClick={() => showCopyToast(field.copyKey, field.value)} /> : null}
-                  </div>
-                  <div className="mt-2 break-all text-[15px] font-black text-slate-900">{field.value}</div>
-                </div>
-              ))}
-            </div>
-          </DetailCard>
-
-          <DetailCard title="처리 이력" icon={<Clock3 className="h-4 w-4" />} actions={<button type="button" onClick={() => handlePrototypeAction('전체 이력 보기는 준비 중입니다.')} className="rounded-xl border border-slate-200 px-3 py-2 text-[12px] font-bold text-slate-600 transition hover:bg-slate-50">전체 이력 보기</button>}>
-            <div className="space-y-4">
-              {historyItems.map((item, index) => (
-                <div key={`${item.label}-${index}`} className="relative flex gap-4">
-                  <div className="relative flex flex-col items-center">
-                    <TimelineDot status={item.status} />
-                    {index < historyItems.length - 1 ? <span className="mt-1 h-full w-px bg-slate-200" /> : null}
-                  </div>
-                  <div className="flex-1 rounded-2xl border border-slate-200 px-4 py-4">
-                    <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <div className="text-[15px] font-black text-slate-900">{item.label}</div>
-                        <div className="mt-1 text-[12px] font-medium text-slate-500">{item.actor || '대기 중'}</div>
-                      </div>
-                      <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-bold ${cardToneClasses(item.status)}`}>
-                        {item.time}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </DetailCard>
         </div>
 
         <aside className="space-y-4 xl:sticky xl:top-6">
@@ -1058,19 +1007,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
           </DetailCard>
 
-          <DetailCard title="위험 작업" icon={<AlertTriangle className="h-4 w-4" />}>
-            <div className="rounded-2xl border border-red-200 bg-red-50 px-4 py-4">
-              <div className="text-[13px] font-black text-red-700">주문 삭제</div>
-              <p className="mt-2 text-[12px] leading-6 text-red-700/80">삭제된 주문은 복구할 수 없습니다. 주문번호 입력 확인 후 삭제하세요.</p>
-              <button
-                type="button"
-                onClick={() => setDeleteModalOpen(true)}
-                className="mt-4 inline-flex rounded-xl border border-red-200 bg-white px-4 py-2 text-[13px] font-bold text-red-600 transition hover:bg-red-100"
-              >
-                주문 삭제
-              </button>
-            </div>
-          </DetailCard>
         </aside>
       </div>
     </div>
