@@ -26,13 +26,11 @@ export default function AdminNav({
   ]
 
   const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
-  const missingBill = (counts?.missingBill || 0) > 0
-
   return (
     <aside className="fixed inset-y-0 left-0 z-[1000] w-[260px] min-h-screen border-r border-white/10 bg-gradient-to-b from-[#0B1220] to-[#080E1A] px-[22px] pb-6 pt-[34px] shadow-[18px_0_50px_rgba(11,18,32,0.18)]">
       <div className="border-b border-white/10 px-3 pb-7">
-        <div className="text-[34px] font-black leading-none tracking-[-0.05em] text-[#EF3B1D]">Xtracker</div>
-        <div className="mt-3 text-[12px] font-extrabold uppercase tracking-[0.22em] text-white/55">Admin Console</div>
+        <div className="text-[34px] font-black leading-none tracking-[-0.05em] text-[#EF3B1D]">beiko</div>
+        <div className="mt-3 text-[12px] font-extrabold uppercase tracking-[0.22em] text-white/55">WHOLESALE PORTAL</div>
       </div>
 
       <nav className="mt-7 flex flex-col gap-2">
@@ -53,9 +51,6 @@ export default function AdminNav({
                 ACTIVE
               </span>
             ) : null}
-            {item.path === '/admin/electricity' && missingBill ? (
-              <span className="ml-2 text-[12px] text-white/90">*</span>
-            ) : null}
           </Link>
         ))}
       </nav>
@@ -64,7 +59,7 @@ export default function AdminNav({
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex h-12 w-full items-center rounded-full border border-transparent px-[18px] text-left text-[15px] font-extrabold tracking-[-0.02em] text-white/70 transition-all duration-150 hover:border-white/10 hover:bg-white/10 hover:text-white"
+          className="flex h-12 w-full items-center justify-center rounded-full border border-[rgba(239,59,29,0.7)] bg-transparent px-[18px] text-[15px] font-extrabold tracking-[-0.02em] text-white transition-all duration-150 hover:border-[#EF3B1D] hover:bg-[rgba(239,59,29,0.1)] hover:text-[#EF3B1D]"
         >
           로그아웃
         </button>
