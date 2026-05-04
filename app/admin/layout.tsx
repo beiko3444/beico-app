@@ -92,9 +92,9 @@ export default async function AdminLayout({
     const userName = session.user.name || '관리자'
 
     return (
-        <div className="apple-admin-shell relative min-h-screen bg-[#F5F7FB]">
+        <div className="apple-admin-shell relative min-h-screen bg-[#F7F7F8]">
             <AdminNav counts={counts} userName={userName} />
-            <main className="min-h-screen pb-16 pl-0 md:pl-[220px] lg:pl-[260px]">
+            <main className="ml-[260px] min-h-screen bg-[#F7F7F8] p-8 pb-12">
                 {children}
             </main>
         </div>

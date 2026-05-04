@@ -29,25 +29,30 @@ export default function AdminNav({
   const missingBill = (counts?.missingBill || 0) > 0
 
   return (
-    <aside className="fixed inset-y-0 left-0 z-[1000] flex w-[220px] flex-col border-r border-white/10 bg-gradient-to-b from-[#081225] to-[#06101F] p-4 shadow-[12px_0_40px_rgba(15,23,42,0.12)] md:w-[260px] md:px-[18px] md:py-6">
-      <div className="mb-6 border-b border-white/10 pb-5">
-        <div className="text-[22px] font-black tracking-[-0.04em] text-white">Xtracker</div>
-        <div className="mt-1 text-[12px] font-medium text-white/60">Admin Console</div>
+    <aside className="fixed inset-y-0 left-0 z-[1000] w-[260px] min-h-screen border-r border-white/10 bg-gradient-to-b from-[#0B1220] to-[#080E1A] px-[22px] pb-6 pt-[34px] shadow-[18px_0_50px_rgba(11,18,32,0.18)]">
+      <div className="border-b border-white/10 px-3 pb-7">
+        <div className="text-[34px] font-black leading-none tracking-[-0.05em] text-[#EF3B1D]">Xtracker</div>
+        <div className="mt-3 text-[12px] font-extrabold uppercase tracking-[0.22em] text-white/55">Admin Console</div>
       </div>
 
-      <nav className="space-y-1.5">
+      <nav className="mt-7 flex flex-col gap-2">
         {navItems.map((item) => (
           <Link
             key={item.path}
             href={item.path}
             prefetch={false}
-            className={`flex h-12 items-center rounded-xl px-4 text-[15px] font-bold tracking-[-0.02em] transition ${
+            className={`flex h-12 items-center justify-between rounded-full border px-[18px] text-[15px] font-extrabold tracking-[-0.02em] transition-all duration-150 ${
               isActive(item.path)
-                ? 'bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] text-white shadow-[0_12px_24px_rgba(37,99,235,0.32)]'
-                : 'text-white/70 hover:bg-white/5 hover:text-white'
+                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_14px_28px_rgba(239,59,29,0.32)]'
+                : 'border-transparent bg-transparent text-white/70 hover:border-white/10 hover:bg-white/10 hover:text-white'
             }`}
           >
-            {item.name}
+            <span>{item.name}</span>
+            {isActive(item.path) ? (
+              <span className="inline-flex h-[22px] items-center justify-center rounded-full bg-white/20 px-2 text-[10px] font-black tracking-[0.08em] text-white">
+                ACTIVE
+              </span>
+            ) : null}
             {item.path === '/admin/electricity' && missingBill ? (
               <span className="ml-2 text-[12px] text-white/90">*</span>
             ) : null}
@@ -55,11 +60,11 @@ export default function AdminNav({
         ))}
       </nav>
 
-      <div className="mt-auto border-t border-white/10 pt-4">
+      <div className="absolute bottom-6 left-[22px] right-[22px] border-t border-white/10 pt-[18px]">
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex h-12 w-full items-center rounded-xl px-4 text-left text-[15px] font-bold tracking-[-0.02em] text-white/70 transition hover:bg-white/5 hover:text-white"
+          className="flex h-12 w-full items-center rounded-full border border-transparent px-[18px] text-left text-[15px] font-extrabold tracking-[-0.02em] text-white/70 transition-all duration-150 hover:border-white/10 hover:bg-white/10 hover:text-white"
         >
           로그아웃
         </button>
