@@ -183,13 +183,8 @@ export default function AdminOrderCard({ order }: { order: any }) {
     ]
 
     return (
-<<<<<<< Updated upstream
-        <div className="relative w-full font-sans">
-            <div className={`space-y-4 rounded-3xl ${order.taxInvoiceIssued ? 'bg-emerald-50/50 dark:bg-emerald-900/10 p-3 border border-emerald-100 dark:border-emerald-800 shadow-[inset_0_2px_10px_rgba(16,185,129,0.05)] dark:shadow-none' : ''}`}>
-=======
         <div className="relative w-full max-w-[1680px] mx-auto font-sans">
             <div className={`space-y-4 rounded-3xl ${order.taxInvoiceIssued ? 'bg-emerald-50/50 dark:bg-emerald-900/10 p-3 -m-3 border border-emerald-100 dark:border-emerald-800 shadow-[inset_0_2px_10px_rgba(16,185,129,0.05)] dark:shadow-none' : ''}`}>
->>>>>>> Stashed changes
                 {/* ── 헤더 카드 (완전 라이트 테마) ── */}
                 <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-[0_4px_20px_rgba(0,0,0,0.04)] dark:shadow-none overflow-hidden">
                     <div className="px-6 pt-5 pb-4">
@@ -301,12 +296,8 @@ export default function AdminOrderCard({ order }: { order: any }) {
                     </div>
                 </div>
 
-<<<<<<< Updated upstream
-                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(340px,420px)]">
-=======
                 <div className="grid gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(360px,0.72fr)]">
                     {/* ── 거래처 정보 ── */}
->>>>>>> Stashed changes
                     <Section title="거래처 정보" icon={<Building2 size={14} className="text-gray-400 dark:text-gray-500" />}>
                         <div className="flex flex-col relative z-10">
                             <InfoRow label="사업자번호" value={order.user.partnerProfile?.businessRegNumber || '-'} copyable copyKey="biz" copiedField={copiedField} onCopy={copyToClipboard} />
@@ -318,33 +309,6 @@ export default function AdminOrderCard({ order }: { order: any }) {
                         </div>
                     </Section>
 
-<<<<<<< Updated upstream
-                    <Section title="배송 처리" icon={<Truck size={14} className="text-gray-400 dark:text-gray-500" />}>
-                        <div className="mb-3 relative z-10">
-                            <OrderActions order={order} />
-                        </div>
-                        {(depositConfirmedAt || adminDepositConfirmedAt) && (
-                            <div className="pt-3 border-t border-gray-100 dark:border-[#2a2a2a] flex flex-wrap gap-x-4 gap-y-2">
-                                {depositConfirmedAt && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">거래처 확인</span>
-                                        <span className="text-[11px] font-bold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-[#2a2a2a] px-2 py-0.5 rounded flex items-center gap-1">
-                                            <Check size={10} /> {depositConfirmedAt}
-                                        </span>
-                                    </div>
-                                )}
-                                {adminDepositConfirmedAt && (
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">관리자 확인</span>
-                                        <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/20 px-2 py-0.5 rounded flex items-center gap-1">
-                                            <Check size={10} /> {adminDepositConfirmedAt}
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-                    </Section>
-=======
                     <div className="space-y-4 xl:sticky xl:top-24 self-start">
                         {/* ── 배송 정보 + 액션 ── */}
                         <Section title="배송 처리" icon={<Truck size={14} className="text-gray-400 dark:text-gray-500" />}>
@@ -403,7 +367,6 @@ export default function AdminOrderCard({ order }: { order: any }) {
                             </div>
                         </Section>
                     </div>
->>>>>>> Stashed changes
                 </div>
 
                 <Section title={`주문 상품 (총 ${totalQuantity.toLocaleString()}개)`} icon={<Package size={14} className="text-gray-400 dark:text-gray-500" />}>
