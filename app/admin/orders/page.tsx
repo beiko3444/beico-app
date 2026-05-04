@@ -67,30 +67,12 @@ export default async function OrdersPage() {
     if (!session || session.user.role !== 'ADMIN') {
         redirect('/login')
     }
-
-    const [orders, pendingTaxCount, missingTrackingCount] = await Promise.all([
-        prisma.order.findMany({
-            select: orderListSelect,
-            orderBy: {
-                createdAt: 'desc'
-            }
-        }),
-        prisma.order.count({
-            where: {
-                status: 'APPROVED',
-                taxInvoiceIssued: false
-            }
-        }),
-        prisma.order.count({
-            where: {
-                status: 'APPROVED',
-                OR: [
-                    { trackingNumber: null },
-                    { trackingNumber: '' }
-                ]
-            }
-        })
-    ])
+    const orders = await prisma.order.findMany({
+        select: orderListSelect,
+        orderBy: {
+            createdAt: 'desc'
+        }
+    })
 
     const ordersWithImageUrls = orders.map(order => ({
         ...order,
@@ -109,8 +91,6 @@ export default async function OrdersPage() {
     return (
         <OrdersClient
             orders={ordersWithImageUrls}
-            pendingTaxCount={pendingTaxCount}
-            missingTrackingCount={missingTrackingCount}
         />
     )
 }
