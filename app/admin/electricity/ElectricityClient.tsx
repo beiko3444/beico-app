@@ -16,6 +16,7 @@ type BillData = {
 }
 
 type LandlordData = {
+    hasReading: boolean
     prevMeter: number
     currMeter: number
     waterHeaterKw: number
@@ -209,21 +210,25 @@ export default function ElectricityClient() {
                             meterPrevious: data.meterPrevious || ''
                         })
 
-                        if (data.landlordMeterCurr !== null || data.meterPhotoUrl) {
+                        const hasCurrentBillEntry = hasBillEntry(data)
+                        const hasLandlordReading = hasCurrentBillEntry && data.landlordMeterCurr !== null
+
+                        if (hasLandlordReading || data.meterPhotoUrl) {
                             setLandlordData({
-                                prevMeter: data.landlordMeterPrev || 0,
-                                currMeter: data.landlordMeterCurr || 0,
-                                waterHeaterKw: data.waterHeaterKw || 0,
-                                outdoorLightKw: data.outdoorLightKw || 0,
+                                hasReading: hasLandlordReading,
+                                prevMeter: hasLandlordReading ? data.landlordMeterPrev || 0 : 0,
+                                currMeter: hasLandlordReading ? data.landlordMeterCurr || 0 : 0,
+                                waterHeaterKw: hasLandlordReading ? data.waterHeaterKw || 0 : 0,
+                                outdoorLightKw: hasLandlordReading ? data.outdoorLightKw || 0 : 0,
                                 photo: data.meterPhotoUrl || null,
                                 photoUploadedAt: data.meterPhotoUploadedAt || null
                             })
                             // Init inputs
                             setLandlordInputs({
-                                prevMeter: formatWithCommas(data.landlordMeterPrev || 0),
-                                currMeter: formatWithCommas(data.landlordMeterCurr || 0),
-                                waterHeaterKw: formatWithCommas(data.waterHeaterKw || 0),
-                                outdoorLightKw: formatWithCommas(data.outdoorLightKw || 0)
+                                prevMeter: hasLandlordReading ? formatWithCommas(data.landlordMeterPrev || 0) : '',
+                                currMeter: hasLandlordReading ? formatWithCommas(data.landlordMeterCurr || 0) : '',
+                                waterHeaterKw: hasLandlordReading ? formatWithCommas(data.waterHeaterKw || 0) : '',
+                                outdoorLightKw: hasLandlordReading ? formatWithCommas(data.outdoorLightKw || 0) : '110'
                             })
                             setLandlordPhoto(data.meterPhotoUrl || null)
                         }
@@ -270,7 +275,7 @@ export default function ElectricityClient() {
                         if (prevData.landlordMeterCurr !== undefined) {
                             setLandlordInputs(p => ({
                                 ...p,
-                                prevMeter: formatWithCommas(prevData.landlordMeterCurr || 0)
+                                prevMeter: p.prevMeter || formatWithCommas(prevData.landlordMeterCurr || 0)
                             }))
                         }
                     } else {
@@ -408,6 +413,7 @@ export default function ElectricityClient() {
         setLoading(true)
         try {
             const billDataProvided = bData !== null
+            const hasLandlordReading = Boolean(lData?.hasReading)
             const shares = calculateCurrentShares(bData, lData)
 
             const payload = {
@@ -424,11 +430,11 @@ export default function ElectricityClient() {
                     beicoTotal: shares.beicoTotal,
                     landlordTotal: shares.landlordTotal
                 }) : null,
-                landlordMeterPrev: lData ? lData.prevMeter : null,
-                landlordMeterCurr: lData ? lData.currMeter : null,
-                landlordUsage: lData ? (lData.currMeter - lData.prevMeter + lData.waterHeaterKw + lData.outdoorLightKw) : null,
-                waterHeaterKw: lData ? lData.waterHeaterKw : null,
-                outdoorLightKw: lData ? lData.outdoorLightKw : null,
+                landlordMeterPrev: hasLandlordReading ? lData!.prevMeter : null,
+                landlordMeterCurr: hasLandlordReading ? lData!.currMeter : null,
+                landlordUsage: hasLandlordReading ? (lData!.currMeter - lData!.prevMeter + lData!.waterHeaterKw + lData!.outdoorLightKw) : null,
+                waterHeaterKw: hasLandlordReading ? lData!.waterHeaterKw : null,
+                outdoorLightKw: hasLandlordReading ? lData!.outdoorLightKw : null,
                 meterPhotoUrl: lData ? lData.photo : null,
                 rawText: billDataProvided ? (currentRawText !== undefined ? currentRawText : rawText) : null,
                 extractionHistory: billDataProvided ? JSON.stringify(currentHistory !== undefined ? currentHistory : extractionHistory) : null
@@ -568,6 +574,7 @@ export default function ElectricityClient() {
     }
 
     const calculateLandlordBill = async () => {
+        const hasCurrentMeterInput = landlordInputs.currMeter.trim() !== ''
         const prev = parseFloat(landlordInputs.prevMeter.replace(/,/g, '')) || 0
         const curr = parseFloat(landlordInputs.currMeter.replace(/,/g, '')) || 0
         const water = parseFloat(landlordInputs.waterHeaterKw.replace(/,/g, '')) || 0
@@ -580,6 +587,7 @@ export default function ElectricityClient() {
             : null
 
         const newLandlordData: LandlordData = {
+            hasReading: hasCurrentMeterInput,
             prevMeter: prev,
             currMeter: curr,
             waterHeaterKw: water,
@@ -652,7 +660,7 @@ export default function ElectricityClient() {
         const totalFund = bData.parsedDetails['전력기금'] || 0
 
         const landlordBaseCost = Math.round(baseTotal * (20 / 30))
-        const landlordUsageKwh = lData ? (lData.currMeter - lData.prevMeter) + lData.waterHeaterKw + lData.outdoorLightKw : 0
+        const landlordUsageKwh = lData?.hasReading ? (lData.currMeter - lData.prevMeter) + lData.waterHeaterKw + lData.outdoorLightKw : 0
         const totalKwh = bData.currentUsage || 0
         const usageRatioLandlord = totalKwh > 0 ? (landlordUsageKwh / totalKwh) : 0
 
@@ -737,7 +745,7 @@ export default function ElectricityClient() {
     const landlordBaseCost = Math.round(baseTotal * (20 / 30))
     const beicoBaseCost = baseTotal - landlordBaseCost
 
-    const landlordUsageKwh = landlordData
+    const landlordUsageKwh = landlordData?.hasReading
         ? (landlordData.currMeter - landlordData.prevMeter) + landlordData.waterHeaterKw + landlordData.outdoorLightKw
         : 0
     const totalKwh = billData?.currentUsage || 1

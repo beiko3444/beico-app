@@ -67,6 +67,7 @@ export async function POST(request: Request) {
         const photoChanged = hasPhotoInput && body.meterPhotoUrl !== existingUsage?.meterPhotoUrl
         const photoUploadedAt = photoChanged ? new Date() : undefined
         const billDataRemoved = body.rawBillData === null
+        const landlordDataRemoved = body.landlordMeterCurr === null
 
         const usage = await prisma.electricityUsage.upsert({
             where: {
@@ -81,6 +82,13 @@ export async function POST(request: Request) {
                 month,
                 ...(photoRemoved ? { meterPhotoUrl: null, meterPhotoUploadedAt: null } : {}),
                 ...(photoUploadedAt ? { meterPhotoUploadedAt: photoUploadedAt } : {}),
+                ...(landlordDataRemoved ? {
+                    landlordMeterPrev: null,
+                    landlordMeterCurr: null,
+                    landlordUsage: null,
+                    waterHeaterKw: null,
+                    outdoorLightKw: null
+                } : {}),
                 ...(billDataRemoved ? {
                     readingDate: "-",
                     usagePeriod: "-",
