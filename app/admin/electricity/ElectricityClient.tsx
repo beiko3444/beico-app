@@ -59,6 +59,7 @@ export default function ElectricityClient() {
     const [invoiceRemarks, setInvoiceRemarks] = useState('')
     const [paymentChecklist, setPaymentChecklist] = useState<Record<string, PaymentChecklistStatus>>({})
     const [monthlyLandlordTotals, setMonthlyLandlordTotals] = useState<Record<number, number | null>>({})
+    const [monthlyBillStatuses, setMonthlyBillStatuses] = useState<Record<number, boolean>>({})
     const [rentPaidDates, setRentPaidDates] = useState<Record<number, string | null>>({})
     const [savingRentMonth, setSavingRentMonth] = useState<number | null>(null)
 
@@ -123,6 +124,23 @@ export default function ElectricityClient() {
 
     const getPaymentStatus = (year: number, month: number) => {
         return paymentChecklist[monthKey(year, month)] || defaultPaymentStatus
+    }
+
+    const hasBillEntry = (data: any) => {
+        if (!data || !data.year) return false
+        if (typeof data.rawText === 'string' && data.rawText.trim().length > 0) return true
+        if ((Number(data.totalUsage) || 0) > 0 || (Number(data.totalAmount) || 0) > 0) return true
+
+        if (typeof data.rawBillData !== 'string') return false
+        try {
+            const parsed = JSON.parse(data.rawBillData)
+            return Object.entries(parsed).some(([key, value]) => {
+                if (key === 'beicoTotal' || key === 'landlordTotal') return false
+                return typeof value === 'number' && value !== 0
+            })
+        } catch {
+            return false
+        }
     }
 
     const updatePaymentStatus = (
@@ -319,6 +337,28 @@ export default function ElectricityClient() {
     }, [activeTab, selectedYear])
 
     useEffect(() => {
+        const fetchMonthlyBillStatuses = async () => {
+            try {
+                const monthEntries = await Promise.all(
+                    Array.from({ length: 12 }, (_, idx) => idx + 1).map(async (month) => {
+                        const res = await fetch(`/api/admin/electricity?year=${selectedYear}&month=${month}`)
+                        if (!res.ok) return [month, false] as const
+
+                        const data = await res.json()
+                        return [month, hasBillEntry(data)] as const
+                    })
+                )
+
+                setMonthlyBillStatuses(Object.fromEntries(monthEntries))
+            } catch (error) {
+                console.error('Failed to fetch monthly bill statuses', error)
+            }
+        }
+
+        fetchMonthlyBillStatuses()
+    }, [selectedYear])
+
+    useEffect(() => {
         if (activeTab !== 'payment') return
 
         const fetchRentPayments = async () => {
@@ -402,6 +442,11 @@ export default function ElectricityClient() {
             if (!res.ok) {
                 const err = await res.json()
                 alert(`저장 실패: ${err.error}`)
+            } else {
+                setMonthlyBillStatuses(prev => ({
+                    ...prev,
+                    [payload.month]: Boolean(bData)
+                }))
             }
         } catch (e) {
             console.error(e)
@@ -844,18 +889,23 @@ export default function ElectricityClient() {
                         {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
                     </select>
                     <div className="flex gap-2 min-w-max">
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => (
-                            <button
-                                key={month}
-                                onClick={() => setSelectedMonth(month)}
-                                className={`px-4 py-2 rounded-xl text-sm font-bold transition-all ${selectedMonth === month
-                                    ? 'bg-[#d9361b] text-white shadow-md transform scale-105'
-                                    : 'bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'
-                                    }`}
-                            >
-                                {month}월
-                            </button>
-                        ))}
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
+                            const hasBill = monthlyBillStatuses[month]
+                            const isSelected = selectedMonth === month
+
+                            return (
+                                <button
+                                    key={month}
+                                    onClick={() => setSelectedMonth(month)}
+                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${hasBill
+                                        ? 'bg-[#d9361b] text-white border-[#d9361b] hover:bg-red-600'
+                                        : 'bg-white dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#252525]'
+                                        } ${isSelected ? 'shadow-md transform scale-105 ring-2 ring-[#d9361b]/25' : ''}`}
+                                >
+                                    {month}월
+                                </button>
+                            )
+                        })}
                     </div>
                 </div>
 
