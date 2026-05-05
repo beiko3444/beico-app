@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
+import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 import { emailBodyToDisplayText } from '@/lib/wormEmailBody'
 
@@ -3800,6 +3800,17 @@ export default function WormOrderPage() {
         () => PIPELINE_STEP_DEFINITIONS.find((step) => step.id === activeStepId) || null,
         [activeStepId],
     )
+    const workflowNavigatorWindow = useMemo(() => {
+        const currentIndex = Math.max(0, PIPELINE_STEP_DEFINITIONS.findIndex((step) => step.id === activeStepId))
+        const windowSize = 5
+        const start = Math.max(0, Math.min(currentIndex - 2, PIPELINE_STEP_DEFINITIONS.length - windowSize))
+        const end = Math.min(PIPELINE_STEP_DEFINITIONS.length, start + windowSize)
+        return {
+            steps: PIPELINE_STEP_DEFINITIONS.slice(start, end),
+            hasBefore: start > 0,
+            hasAfter: end < PIPELINE_STEP_DEFINITIONS.length,
+        }
+    }, [activeStepId])
     const pipelineFilterOptions = useMemo<Array<{ value: PipelineFilter; label: string; count: number }>>(
         () => [
             { value: 'all', label: '전체', count: PIPELINE_STEP_DEFINITIONS.length },
@@ -4252,73 +4263,31 @@ export default function WormOrderPage() {
                         </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[280px_minmax(0,1fr)]">
-                        <aside className="xl:sticky xl:top-[96px] xl:self-start">
-                            <div className="rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-3 py-3 dark:border-[#3a2a24] dark:bg-[#1a1a1a]">
-                                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#d9361b]">현재 처리 단계</p>
-                                {activeStepDefinition ? (
-                                    <>
-                                        <div className="mt-2 flex items-start gap-2">
-                                            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] px-1.5 text-xs font-black text-white">
-                                                {activeStepDefinition.id}
-                                            </span>
-                                            <div className="min-w-0">
-                                                <p className="text-[13px] font-black leading-snug text-slate-900 dark:text-white">{activeStepDefinition.title}</p>
-                                                <span className={`mt-1 inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[activeStepDefinition.id])}`}>
-                                                    {getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}
-                                                </span>
-                                                <p className="mt-1 text-[11px] font-medium leading-snug text-slate-600 dark:text-gray-400">{activeStepDefinition.summary}</p>
-                                            </div>
-                                        </div>
-                                        {activeStepDefinition.target !== 'none' && (
-                                            <button
-                                                type="button"
-                                                onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                                                className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[#e34219] px-3 text-[11px] font-bold text-white hover:bg-[#cd3b17]"
-                                            >
-                                                {activeStepDefinition.actionLabel}
-                                                <ArrowRight size={12} />
-                                            </button>
-                                        )}
-                                    </>
-                                ) : (
-                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-gray-400">활성 단계가 없습니다.</p>
-                                )}
-                            </div>
-                            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-                                <p className="px-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Process</p>
-                                <div className="mt-2 space-y-1.5">
-                                    {filteredPipelineSteps.map((step) => {
-                                        const runtimeStatus = pipelineStatusMap[step.id]
-                                        const isCurrent = step.id === activeStepId
-                                        return (
-                                            <button
-                                                key={`sticky-${step.id}`}
-                                                type="button"
-                                                onClick={() => handlePipelineStepAction(step)}
-                                                className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${
-                                                    isCurrent
-                                                        ? 'border-[#e34219] bg-[#fff3ef]'
-                                                        : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
-                                                }`}
-                                            >
-                                                <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[10px] font-black ${
-                                                    runtimeStatus === 'done'
-                                                        ? 'bg-emerald-500 text-white'
-                                                        : isCurrent
-                                                            ? 'bg-[#e34219] text-white'
-                                                            : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
-                                                }`}>
-                                                    {step.id}
-                                                </span>
-                                                <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-700 dark:text-gray-300">{step.title}</span>
-                                            </button>
-                                        )
-                                    })}
+                    {activeStepDefinition && (
+                        <div className="mt-4 flex items-center justify-between rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-3 py-2 xl:hidden">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] text-xs font-black text-white">
+                                    {activeStepDefinition.id}
+                                </span>
+                                <div className="min-w-0">
+                                    <p className="truncate text-xs font-black text-slate-900">{activeStepDefinition.title}</p>
+                                    <p className="text-[10px] font-bold text-[#d9361b]">{getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}</p>
                                 </div>
                             </div>
-                        </aside>
+                            {activeStepDefinition.target !== 'none' && (
+                                <button
+                                    type="button"
+                                    onClick={() => handlePipelineStepAction(activeStepDefinition)}
+                                    className="inline-flex h-7 items-center justify-center gap-1 rounded-lg bg-[#e34219] px-2.5 text-[11px] font-bold text-white"
+                                >
+                                    이동
+                                    <ArrowRight size={11} />
+                                </button>
+                            )}
+                        </div>
+                    )}
 
+                    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_140px]">
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
                             {filteredPipelineSteps.map((step) => {
                                 const runtimeStatus = pipelineStatusMap[step.id]
@@ -4361,6 +4330,97 @@ export default function WormOrderPage() {
                                 )
                             })}
                         </div>
+
+                        <aside className="hidden xl:block">
+                            <div className="sticky top-[120px] rounded-[24px] border border-[#E5EAF0] bg-white px-3 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.10)] dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                                <p className="mb-3 text-center text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Flow</p>
+                                <div className="relative space-y-2">
+                                    {workflowNavigatorWindow.hasBefore && (
+                                        <div className="flex h-5 items-center justify-center text-[13px] font-black text-slate-300">...</div>
+                                    )}
+                                    {workflowNavigatorWindow.steps.map((step, index) => {
+                                        const runtimeStatus = pipelineStatusMap[step.id]
+                                        const isCurrent = step.id === activeStepId
+                                        const isLastVisible = index === workflowNavigatorWindow.steps.length - 1
+                                        return (
+                                            <button
+                                                key={`flow-nav-${step.id}`}
+                                                type="button"
+                                                onClick={() => handlePipelineStepAction(step)}
+                                                className="relative flex w-full items-start gap-2 text-left"
+                                                title={step.title}
+                                            >
+                                                <span className="relative flex w-6 shrink-0 justify-center">
+                                                    {!isLastVisible || workflowNavigatorWindow.hasAfter ? (
+                                                        <span className="absolute left-1/2 top-6 h-[30px] w-px -translate-x-1/2 bg-[#E5EAF0]" />
+                                                    ) : null}
+                                                    <span className={`relative z-10 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-[10px] font-black ${
+                                                        runtimeStatus === 'done'
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : isCurrent
+                                                                ? 'bg-[#e34219] text-white shadow-[0_0_0_4px_rgba(227,66,25,0.14)]'
+                                                                : 'bg-slate-200 text-slate-600'
+                                                    }`}>
+                                                        {step.id}
+                                                    </span>
+                                                    {isCurrent && (
+                                                        <span className="absolute -right-0.5 top-0 z-20 h-2 w-2 rounded-full bg-[#ff6b3a] ring-2 ring-white" />
+                                                    )}
+                                                </span>
+                                                <span className={`line-clamp-2 min-w-0 pt-0.5 text-[11px] font-extrabold leading-tight ${
+                                                    isCurrent
+                                                        ? 'text-[#d9361b]'
+                                                        : runtimeStatus === 'done'
+                                                            ? 'text-emerald-700'
+                                                            : 'text-slate-500'
+                                                }`}>
+                                                    {step.title}
+                                                </span>
+                                            </button>
+                                        )
+                                    })}
+                                    {workflowNavigatorWindow.hasAfter && (
+                                        <div className="flex flex-col items-center justify-center gap-0.5 pt-0.5 text-slate-300">
+                                            <span className="text-[13px] font-black leading-none">...</span>
+                                            <ChevronDown size={14} />
+                                        </div>
+                                    )}
+                                </div>
+                                <details className="group mt-3">
+                                    <summary className="flex h-7 cursor-pointer list-none items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 text-[10px] font-black text-slate-500 hover:bg-slate-100">
+                                        전체
+                                        <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
+                                    </summary>
+                                    <div className="mt-2 max-h-[260px] space-y-1 overflow-y-auto pr-1">
+                                        {PIPELINE_STEP_DEFINITIONS.map((step) => {
+                                            const runtimeStatus = pipelineStatusMap[step.id]
+                                            const isCurrent = step.id === activeStepId
+                                            return (
+                                                <button
+                                                    key={`flow-all-${step.id}`}
+                                                    type="button"
+                                                    onClick={() => handlePipelineStepAction(step)}
+                                                    className={`flex w-full items-center gap-1.5 rounded-lg px-1.5 py-1 text-left text-[10px] font-bold ${
+                                                        isCurrent ? 'bg-[#fff3ef] text-[#d9361b]' : 'text-slate-500 hover:bg-slate-50'
+                                                    }`}
+                                                >
+                                                    <span className={`inline-flex h-4 min-w-4 items-center justify-center rounded-full text-[9px] ${
+                                                        runtimeStatus === 'done'
+                                                            ? 'bg-emerald-500 text-white'
+                                                            : isCurrent
+                                                                ? 'bg-[#e34219] text-white'
+                                                                : 'bg-slate-200 text-slate-600'
+                                                    }`}>
+                                                        {step.id}
+                                                    </span>
+                                                    <span className="truncate">{step.title}</span>
+                                                </button>
+                                            )
+                                        })}
+                                    </div>
+                                </details>
+                            </div>
+                        </aside>
                     </div>
                 </section>
             {showOrderTools && (
