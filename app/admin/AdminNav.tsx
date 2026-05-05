@@ -110,29 +110,29 @@ export default function AdminNav({
   }
 
   return (
-    <aside className="fixed bottom-0 left-0 top-0 z-[1000] flex h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-6 pb-6 pt-8 box-border shadow-[10px_0_30px_rgba(15,23,42,0.05)]">
+    <aside className="fixed bottom-0 left-0 top-0 z-[1000] box-border flex h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-[26px] pb-6 pt-7 shadow-[12px_0_34px_rgba(15,23,42,0.06)]">
       <div className="shrink-0">
-        <div className="text-[34px] font-black leading-none tracking-[-0.05em] text-[#EF3B1D]">beiko</div>
-        <div className="mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.24em] text-[#9CA3AF]">WHOLESALE PORTAL</div>
+        <div className="text-[36px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
+        <div className="mt-[13px] text-[12px] font-extrabold uppercase tracking-[0.24em] text-[#7D8491]">WHOLESALE PORTAL</div>
       </div>
-      <div className="mb-[22px] mt-7 h-px shrink-0 bg-[#E5E7EB]" />
+      <div className="mb-7 mt-8 h-px shrink-0 bg-[#E5E7EB]" />
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-[6px] overflow-y-auto pb-5">
+      <nav className="flex min-h-0 flex-1 flex-col gap-[10px] overflow-y-auto pb-5 pr-0.5">
         {navItems.map((item) => (
           <Link
             key={item.path}
             href={item.path}
             prefetch={false}
-            className={`flex h-11 min-h-11 items-center justify-between rounded-full border px-4 text-[15px] font-bold tracking-[-0.02em] no-underline transition-all duration-150 ${
+            className={`flex h-[46px] min-h-[46px] items-center justify-between rounded-[15px] border px-[18px] text-[16px] font-extrabold tracking-[-0.035em] no-underline transition-all duration-150 ${
               isActive(item.path)
-                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_22px_rgba(239,59,29,0.22)]'
-                : 'border-transparent bg-transparent text-[#4B5563] hover:border-[#E5E7EB] hover:bg-[#F3F4F6] hover:text-[#111827]'
+                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_14px_28px_rgba(239,59,29,0.24)]'
+                : 'border-transparent bg-transparent text-[#1F2937] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
             }`}
-            style={{ color: isActive(item.path) ? '#FFFFFF' : '#4B5563' }}
+            style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
           >
             <span className="text-inherit">{item.name}</span>
             {isActive(item.path) ? (
-              <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-1 text-[10px] font-black tracking-[0.08em] text-white">
+              <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-3 py-1.5 text-[10px] font-black tracking-[0.1em] text-white">
                 ACTIVE
               </span>
             ) : null}
@@ -140,8 +140,11 @@ export default function AdminNav({
         ))}
       </nav>
 
-      <div className="mt-2 shrink-0 rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] p-3">
-        <div className="text-[12px] font-semibold text-[#6B7280]">출고 건수</div>
+      <div className="mt-2 shrink-0 rounded-[18px] border border-[#E5E7EB] bg-[#FAFAFB] p-3 shadow-[0_8px_20px_rgba(15,23,42,0.04)]">
+        <div className="flex items-center justify-between">
+          <span className="text-[12px] font-extrabold tracking-[-0.01em] text-[#111827]">집하 문자</span>
+          <span className="text-[11px] font-bold text-[#8A93A3]">기사 전송</span>
+        </div>
         <div className="mt-2 flex h-10 items-center rounded-full border border-[#D1D5DB] bg-white px-2 text-slate-900">
           <input
             type="number"
@@ -149,26 +152,26 @@ export default function AdminNav({
             inputMode="numeric"
             value={shipmentCount}
             onChange={(event) => setShipmentCount(event.target.value)}
-            className="h-full w-12 border-none bg-transparent text-center text-[15px] font-bold outline-none"
+            className="h-full w-12 border-none bg-transparent text-center text-[15px] font-extrabold outline-none"
             aria-label="출고 건수"
           />
-          <span className="pr-2 text-[12px] font-bold text-slate-700">건</span>
+          <span className="pr-2 text-[12px] font-extrabold text-[#374151]">건 출고</span>
         </div>
         <button
           type="button"
           onClick={handleSendPickupSms}
           disabled={sendingSms || loadingFromNumber}
-          className="mt-2 flex h-10 w-full items-center justify-center rounded-full bg-[#EF3B1D] text-[13px] font-bold text-white transition hover:bg-[#D92F16] disabled:opacity-50"
+          className="mt-2 flex h-10 w-full items-center justify-center rounded-full bg-[#EF3B1D] text-[13px] font-extrabold text-white shadow-[0_8px_18px_rgba(239,59,29,0.18)] transition hover:bg-[#D92F16] disabled:opacity-50"
         >
-          {sendingSms ? '요청중...' : '집하요청 문자발송'}
+          {sendingSms ? '요청중...' : '문자발송'}
         </button>
       </div>
 
-      <div className="mt-4 shrink-0 border-t border-[#E5E7EB] pt-[18px]">
+      <div className="mt-5 shrink-0 border-t border-[#E5E7EB] pt-6">
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex h-[46px] w-full items-center justify-center rounded-full border-none bg-[#0B1220] px-[18px] text-[15px] font-extrabold tracking-[-0.02em] text-white shadow-[0_8px_18px_rgba(11,18,32,0.16)] transition-all duration-150 hover:bg-[#111827]"
+          className="flex h-[46px] w-full items-center justify-center rounded-full border-none bg-[#0B1220] px-[18px] text-[15px] font-extrabold tracking-[-0.02em] text-white shadow-[0_10px_22px_rgba(11,18,32,0.18)] transition-all duration-150 hover:bg-[#111827]"
         >
           로그아웃
         </button>
