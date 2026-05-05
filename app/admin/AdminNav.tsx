@@ -75,6 +75,10 @@ export default function AdminNav({
       alert('발송 건수를 1 이상으로 입력해 주세요.')
       return
     }
+    const shouldSend = confirm(`집하요청 문자 ${pickupCount}건을 발송하시겠습니까?`)
+    if (!shouldSend) {
+      return
+    }
 
     const now = new Date()
     const contents = [
