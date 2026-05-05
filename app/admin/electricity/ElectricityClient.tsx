@@ -21,6 +21,7 @@ type LandlordData = {
     waterHeaterKw: number
     outdoorLightKw: number
     photo: string | null
+    photoUploadedAt: string | null
 }
 
 type PaymentChecklistStatus = {
@@ -44,6 +45,7 @@ export default function ElectricityClient() {
     const [billData, setBillData] = useState<BillData | null>(null)
     const [landlordData, setLandlordData] = useState<LandlordData | null>(null)
     const [prevMonthPhoto, setPrevMonthPhoto] = useState<string | null>(null)
+    const [prevMonthPhotoUploadedAt, setPrevMonthPhotoUploadedAt] = useState<string | null>(null)
 
     // UI States
     const [isUsageModalOpen, setIsUsageModalOpen] = useState(false)
@@ -93,6 +95,19 @@ export default function ElectricityClient() {
         return parseInt(s, 10).toLocaleString();
     };
 
+    const formatPhotoUploadedAt = (value: string | null | undefined) => {
+        if (!value) return '업로드일 기록 없음'
+        const date = new Date(value)
+        if (Number.isNaN(date.getTime())) return '업로드일 기록 없음'
+        return date.toLocaleString('ko-KR', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        })
+    }
+
     const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
 
     const defaultPaymentStatus: PaymentChecklistStatus = {
@@ -128,6 +143,7 @@ export default function ElectricityClient() {
             setBillData(null)
             setLandlordData(null)
             setPrevMonthPhoto(null)
+            setPrevMonthPhotoUploadedAt(null)
             setRawText('')
             setExtractionHistory([])
             setLandlordInputs({
@@ -174,13 +190,14 @@ export default function ElectricityClient() {
                             meterPrevious: data.meterPrevious || ''
                         })
 
-                        if (data.landlordMeterCurr !== null) {
+                        if (data.landlordMeterCurr !== null || data.meterPhotoUrl) {
                             setLandlordData({
                                 prevMeter: data.landlordMeterPrev || 0,
                                 currMeter: data.landlordMeterCurr || 0,
                                 waterHeaterKw: data.waterHeaterKw || 0,
                                 outdoorLightKw: data.outdoorLightKw || 0,
-                                photo: data.meterPhotoUrl || null
+                                photo: data.meterPhotoUrl || null,
+                                photoUploadedAt: data.meterPhotoUploadedAt || null
                             })
                             // Init inputs
                             setLandlordInputs({
@@ -228,6 +245,7 @@ export default function ElectricityClient() {
                         setPrevMonthData(prevData)
                         if (prevData.meterPhotoUrl) {
                             setPrevMonthPhoto(prevData.meterPhotoUrl)
+                            setPrevMonthPhotoUploadedAt(prevData.meterPhotoUploadedAt || null)
                         }
                         // Set previous meter reading for landlord if current month data doesn't exist or doesn't have it
                         if (prevData.landlordMeterCurr !== undefined) {
@@ -507,12 +525,17 @@ export default function ElectricityClient() {
         const water = parseFloat(landlordInputs.waterHeaterKw.replace(/,/g, '')) || 0
         const light = parseFloat(landlordInputs.outdoorLightKw.replace(/,/g, '')) || 0
 
-        const newLandlordData = {
+        const nextPhotoUploadedAt = landlordPhoto && landlordPhoto !== landlordData?.photo
+            ? new Date().toISOString()
+            : landlordData?.photoUploadedAt || null
+
+        const newLandlordData: LandlordData = {
             prevMeter: prev,
             currMeter: curr,
             waterHeaterKw: water,
             outdoorLightKw: light,
-            photo: landlordPhoto
+            photo: landlordPhoto,
+            photoUploadedAt: nextPhotoUploadedAt
         }
 
         setLandlordData(newLandlordData)
@@ -842,6 +865,42 @@ export default function ElectricityClient() {
                         <button onClick={() => setIsInvoiceOpen(true)} className="px-5 py-2.5 bg-[#d9361b] hover:bg-red-600 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-2 shadow-sm ml-auto">
                             📄 청구서 발행
                         </button>
+                    </div>
+                )}
+
+                {activeTab === 'analysis' && (
+                    <div className="pt-3 border-t border-gray-50 dark:border-[#2a2a2a]">
+                        <div className="flex items-center justify-between gap-3 mb-3">
+                            <div>
+                                <h2 className="text-sm font-black text-gray-900 dark:text-white">선택 월 단자함/계량기 사진</h2>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                    {selectedYear}년 {selectedMonth}월 · 사진 업로드일: {formatPhotoUploadedAt(landlordData?.photoUploadedAt)}
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setIsLandlordModalOpen(true)}
+                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-xl text-xs font-bold transition-all border border-green-700 shadow-sm whitespace-nowrap"
+                            >
+                                {landlordData?.photo ? '사진 수정' : '사진 업로드'}
+                            </button>
+                        </div>
+                        <div
+                            className={`aspect-[16/9] sm:aspect-[21/9] rounded-2xl border overflow-hidden ${landlordData?.photo
+                                ? 'bg-black border-gray-200 dark:border-[#2a2a2a] cursor-pointer'
+                                : 'bg-gray-50 dark:bg-[#1a1a1a] border-dashed border-gray-300 dark:border-[#2a2a2a]'
+                                }`}
+                            onClick={() => landlordData?.photo && setIsPhotoModalOpen(true)}
+                        >
+                            {landlordData?.photo ? (
+                                <img src={landlordData.photo} className="w-full h-full object-contain" alt={`${selectedMonth}월 계량기 사진`} />
+                            ) : (
+                                <div className="w-full h-full flex flex-col items-center justify-center text-gray-400 dark:text-gray-500">
+                                    <div className="text-sm font-bold">사진 데이터 없음</div>
+                                    <div className="text-xs mt-1">선택한 월의 계량기 사진을 업로드하세요.</div>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 )}
             </div>
@@ -1319,6 +1378,7 @@ export default function ElectricityClient() {
                                         <div className="text-right">
                                             <div className="text-xs text-gray-400 dark:text-gray-400">전월 지침</div>
                                             <div className="text-xl font-black dark:text-white">{landlordData.prevMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400 dark:text-gray-400">kWh</span></div>
+                                            <div className="text-[11px] text-gray-400 dark:text-gray-400 mt-1">사진 업로드일: {formatPhotoUploadedAt(prevMonthPhotoUploadedAt)}</div>
                                         </div>
                                     </div>
                                     <div className="aspect-[4/3] bg-gray-100 dark:bg-[#252525] rounded-2xl border-4 border-gray-100 dark:border-[#2a2a2a] overflow-hidden shadow-inner">
@@ -1336,6 +1396,7 @@ export default function ElectricityClient() {
                                         <div className="text-right">
                                             <div className="text-xs text-gray-400 dark:text-gray-400">당월 지침</div>
                                             <div className="text-xl font-black text-[#d9361b]">{landlordData.currMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400 dark:text-gray-400">kWh</span></div>
+                                            <div className="text-[11px] text-gray-400 dark:text-gray-400 mt-1">사진 업로드일: {formatPhotoUploadedAt(landlordData.photoUploadedAt)}</div>
                                         </div>
                                     </div>
                                     <div className="aspect-[4/3] bg-gray-100 dark:bg-[#252525] rounded-2xl border-4 border-red-50 dark:border-red-950 overflow-hidden shadow-xl">

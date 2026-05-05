@@ -138,6 +138,7 @@ model ElectricityUsage {
   waterHeaterKw     Float?
   outdoorLightKw    Float?
   meterPhotoUrl     String?
+  meterPhotoUploadedAt DateTime?
   rawText           String?
   extractionHistory String?
   createdAt         DateTime @default(now())

@@ -46,8 +46,25 @@ export async function POST(request: Request) {
 
         // Filter out null/undefined from body to avoid overwriting or creating with invalid values
         const baseData = Object.fromEntries(
-            Object.entries(body).filter(([k, v]) => v !== null && v !== undefined && k !== 'id')
+            Object.entries(body).filter(([k, v]) => v !== null && v !== undefined && k !== 'id' && k !== 'meterPhotoUploadedAt')
         );
+
+        const existingUsage = await prisma.electricityUsage.findUnique({
+            where: {
+                year_month: {
+                    year,
+                    month
+                }
+            },
+            select: {
+                meterPhotoUrl: true,
+                meterPhotoUploadedAt: true
+            }
+        })
+
+        const hasPhotoInput = typeof body.meterPhotoUrl === 'string' && body.meterPhotoUrl.length > 0
+        const photoChanged = hasPhotoInput && body.meterPhotoUrl !== existingUsage?.meterPhotoUrl
+        const photoUploadedAt = photoChanged ? new Date() : undefined
 
         const usage = await prisma.electricityUsage.upsert({
             where: {
@@ -60,6 +77,7 @@ export async function POST(request: Request) {
                 ...baseData,
                 year,
                 month,
+                ...(photoUploadedAt ? { meterPhotoUploadedAt: photoUploadedAt } : {}),
                 updatedAt: new Date()
             },
             create: {
@@ -73,6 +91,7 @@ export async function POST(request: Request) {
                 totalUsage: body.totalUsage || 0,
                 totalAmount: body.totalAmount || 0,
                 rawBillData: body.rawBillData || "{}",
+                ...(hasPhotoInput ? { meterPhotoUploadedAt: photoUploadedAt || new Date() } : {}),
                 ...baseData
             }
         })
