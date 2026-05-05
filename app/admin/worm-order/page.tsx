@@ -4235,9 +4235,9 @@ export default function WormOrderPage() {
             <div className="flex flex-col gap-4">
                 <section
                     style={{ order: 0 }}
-                    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-5"
+                    className="contents"
                 >
-                    <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                    <div className="hidden">
                         <div>
                             <h2 className="text-base font-black text-slate-900 dark:text-white">작업 흐름</h2>
                             <p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">
@@ -4287,8 +4287,8 @@ export default function WormOrderPage() {
                         </div>
                     )}
 
-                    <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_140px]">
-                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                    <div className="contents">
+                        <div className="hidden">
                             {filteredPipelineSteps.map((step) => {
                                 const runtimeStatus = pipelineStatusMap[step.id]
                                 const isCurrent = step.id === activeStepId
@@ -4332,9 +4332,9 @@ export default function WormOrderPage() {
                         </div>
 
                         <aside className="hidden xl:block">
-                            <div className="sticky top-[120px] rounded-[24px] border border-[#E5EAF0] bg-white px-3 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.10)] dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-                                <p className="mb-3 text-center text-[10px] font-black uppercase tracking-[0.12em] text-slate-400">Flow</p>
-                                <div className="relative space-y-2">
+                            <div className="fixed right-8 top-[120px] z-[900] w-[220px] rounded-[24px] border border-[#E5EAF0] bg-white px-5 py-6 shadow-[0_22px_46px_rgba(15,23,42,0.16)] dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                                <p className="mb-4 text-center text-[12px] font-black uppercase tracking-[0.22em] text-slate-400">Flow</p>
+                                <div className="relative space-y-3">
                                     {workflowNavigatorWindow.hasBefore && (
                                         <div className="flex h-5 items-center justify-center text-[13px] font-black text-slate-300">...</div>
                                     )}
@@ -4347,14 +4347,14 @@ export default function WormOrderPage() {
                                                 key={`flow-nav-${step.id}`}
                                                 type="button"
                                                 onClick={() => handlePipelineStepAction(step)}
-                                                className="relative flex w-full items-start gap-2 text-left"
+                                                className="relative flex w-full items-start gap-3 text-left"
                                                 title={step.title}
                                             >
                                                 <span className="relative flex w-6 shrink-0 justify-center">
                                                     {!isLastVisible || workflowNavigatorWindow.hasAfter ? (
-                                                        <span className="absolute left-1/2 top-6 h-[30px] w-px -translate-x-1/2 bg-[#E5EAF0]" />
+                                                        <span className="absolute left-1/2 top-7 h-[38px] w-px -translate-x-1/2 bg-[#E5EAF0]" />
                                                     ) : null}
-                                                    <span className={`relative z-10 inline-flex h-6 min-w-6 items-center justify-center rounded-full text-[10px] font-black ${
+                                                    <span className={`relative z-10 inline-flex h-8 min-w-8 items-center justify-center rounded-full text-[14px] font-black ${
                                                         runtimeStatus === 'done'
                                                             ? 'bg-emerald-500 text-white'
                                                             : isCurrent
@@ -4364,10 +4364,10 @@ export default function WormOrderPage() {
                                                         {step.id}
                                                     </span>
                                                     {isCurrent && (
-                                                        <span className="absolute -right-0.5 top-0 z-20 h-2 w-2 rounded-full bg-[#ff6b3a] ring-2 ring-white" />
+                                                        <span className="absolute -right-0.5 top-0 z-20 h-3 w-3 rounded-full bg-[#ff6b3a] ring-2 ring-white" />
                                                     )}
                                                 </span>
-                                                <span className={`line-clamp-2 min-w-0 pt-0.5 text-[11px] font-extrabold leading-tight ${
+                                                <span className={`min-w-0 flex-1 pt-0.5 text-[14px] font-extrabold leading-snug ${
                                                     isCurrent
                                                         ? 'text-[#d9361b]'
                                                         : runtimeStatus === 'done'
@@ -4386,10 +4386,10 @@ export default function WormOrderPage() {
                                         </div>
                                     )}
                                 </div>
-                                <details className="group mt-3">
-                                    <summary className="flex h-7 cursor-pointer list-none items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 text-[10px] font-black text-slate-500 hover:bg-slate-100">
+                                <details className="group mt-5">
+                                    <summary className="flex h-11 cursor-pointer list-none items-center justify-center gap-1 rounded-full border border-slate-200 bg-slate-50 text-[13px] font-black text-slate-500 hover:bg-slate-100">
                                         전체
-                                        <ChevronDown size={12} className="transition-transform group-open:rotate-180" />
+                                        <ChevronDown size={14} className="transition-transform group-open:rotate-180" />
                                     </summary>
                                     <div className="mt-2 max-h-[260px] space-y-1 overflow-y-auto pr-1">
                                         {PIPELINE_STEP_DEFINITIONS.map((step) => {
