@@ -110,25 +110,25 @@ export default function AdminNav({
   }
 
   return (
-    <aside className="fixed bottom-0 left-0 top-0 z-[1000] flex h-screen w-[260px] flex-col overflow-hidden box-border bg-gradient-to-b from-[#0B1220] to-[#080E1A] px-6 pb-6 pt-8">
-      <div className="mb-7 shrink-0">
+    <aside className="fixed bottom-0 left-0 top-0 z-[1000] flex h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-6 pb-6 pt-8 box-border shadow-[10px_0_30px_rgba(15,23,42,0.05)]">
+      <div className="shrink-0">
         <div className="text-[34px] font-black leading-none tracking-[-0.05em] text-[#EF3B1D]">beiko</div>
-        <div className="mt-3 text-[12px] font-extrabold uppercase tracking-[0.22em] text-white/55">WHOLESALE PORTAL</div>
+        <div className="mt-[14px] text-[12px] font-extrabold uppercase tracking-[0.24em] text-[#9CA3AF]">WHOLESALE PORTAL</div>
       </div>
-      <div className="mb-[22px] h-px shrink-0 bg-white/10" />
+      <div className="mb-[22px] mt-7 h-px shrink-0 bg-[#E5E7EB]" />
 
-      <nav className="flex flex-1 flex-col gap-1 overflow-y-auto pb-5">
+      <nav className="flex min-h-0 flex-1 flex-col gap-[6px] overflow-y-auto pb-5">
         {navItems.map((item) => (
           <Link
             key={item.path}
             href={item.path}
             prefetch={false}
-            className={`flex h-[42px] min-h-[42px] items-center justify-between rounded-xl border px-[14px] text-[15px] font-bold tracking-[-0.02em] no-underline transition-all duration-150 ${
+            className={`flex h-11 min-h-11 items-center justify-between rounded-full border px-4 text-[15px] font-bold tracking-[-0.02em] no-underline transition-all duration-150 ${
               isActive(item.path)
-                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_24px_rgba(239,59,29,0.28)]'
-                : 'border-transparent bg-transparent text-white/70 hover:bg-white/10 hover:text-white'
+                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_22px_rgba(239,59,29,0.22)]'
+                : 'border-transparent bg-transparent text-[#4B5563] hover:border-[#E5E7EB] hover:bg-[#F3F4F6] hover:text-[#111827]'
             }`}
-            style={{ color: isActive(item.path) ? '#FFFFFF' : 'rgba(255,255,255,0.72)' }}
+            style={{ color: isActive(item.path) ? '#FFFFFF' : '#4B5563' }}
           >
             <span className="text-inherit">{item.name}</span>
             {isActive(item.path) ? (
@@ -140,9 +140,9 @@ export default function AdminNav({
         ))}
       </nav>
 
-      <div className="mt-2 shrink-0 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
-        <div className="text-[12px] font-semibold text-white/60">출고 건수</div>
-        <div className="mt-2 flex h-10 items-center rounded-full border border-white/15 bg-white px-2 text-slate-900">
+      <div className="mt-2 shrink-0 rounded-2xl border border-[#D1D5DB] bg-[#F9FAFB] p-3">
+        <div className="text-[12px] font-semibold text-[#6B7280]">출고 건수</div>
+        <div className="mt-2 flex h-10 items-center rounded-full border border-[#D1D5DB] bg-white px-2 text-slate-900">
           <input
             type="number"
             min={1}
@@ -158,17 +158,17 @@ export default function AdminNav({
           type="button"
           onClick={handleSendPickupSms}
           disabled={sendingSms || loadingFromNumber}
-          className="mt-2 flex h-10 w-full items-center justify-center rounded-full bg-[#EF3B1D] text-[13px] font-bold text-white transition hover:bg-[#da3418] disabled:opacity-50"
+          className="mt-2 flex h-10 w-full items-center justify-center rounded-full bg-[#EF3B1D] text-[13px] font-bold text-white transition hover:bg-[#D92F16] disabled:opacity-50"
         >
           {sendingSms ? '요청중...' : '집하요청 문자발송'}
         </button>
       </div>
 
-      <div className="mt-4 shrink-0 border-t border-white/10 pt-[18px]">
+      <div className="mt-4 shrink-0 border-t border-[#E5E7EB] pt-[18px]">
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex h-11 w-full items-center justify-center rounded-full border border-[rgba(239,59,29,0.75)] bg-transparent px-[18px] text-[15px] font-bold tracking-[-0.02em] text-white transition-all duration-150 hover:border-[#EF3B1D] hover:bg-[rgba(239,59,29,0.1)] hover:text-[#EF3B1D]"
+          className="flex h-[46px] w-full items-center justify-center rounded-full border-none bg-[#0B1220] px-[18px] text-[15px] font-extrabold tracking-[-0.02em] text-white shadow-[0_8px_18px_rgba(11,18,32,0.16)] transition-all duration-150 hover:bg-[#111827]"
         >
           로그아웃
         </button>
