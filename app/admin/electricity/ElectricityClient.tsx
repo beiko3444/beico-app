@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 
 type BillData = {
@@ -63,6 +63,7 @@ export default function ElectricityClient() {
     const [monthlyBillStatuses, setMonthlyBillStatuses] = useState<Record<number, boolean>>({})
     const [rentPaidDates, setRentPaidDates] = useState<Record<number, string | null>>({})
     const [savingRentMonth, setSavingRentMonth] = useState<number | null>(null)
+    const monthlyLandlordTotalsCache = useRef<Record<number, Record<number, number | null>>>({})
 
     // Landlord Input States
     const [landlordInputs, setLandlordInputs] = useState({
@@ -311,34 +312,38 @@ export default function ElectricityClient() {
 
     useEffect(() => {
         if (activeTab !== 'payment') return
+        let cancelled = false
 
         const fetchMonthlyLandlordTotals = async () => {
+            const cachedTotals = monthlyLandlordTotalsCache.current[selectedYear]
+            if (cachedTotals) {
+                if (!cancelled) setMonthlyLandlordTotals(cachedTotals)
+                return
+            }
+
             try {
-                const monthEntries = await Promise.all(
-                    Array.from({ length: 12 }, (_, idx) => idx + 1).map(async (month) => {
-                        const res = await fetch(`/api/admin/electricity?year=${selectedYear}&month=${month}`)
-                        if (!res.ok) return [month, null] as const
+                const res = await fetch(`/api/admin/electricity/monthly-summary?year=${selectedYear}`)
+                if (!res.ok) {
+                    if (!cancelled) setMonthlyLandlordTotals({})
+                    return
+                }
 
-                        const data = await res.json()
-                        if (!data || !data.year || !data.rawBillData) return [month, null] as const
+                const data = await res.json()
+                const totals = data?.monthlyLandlordTotals && typeof data.monthlyLandlordTotals === 'object'
+                    ? data.monthlyLandlordTotals
+                    : {}
 
-                        try {
-                            const parsedRaw = JSON.parse(data.rawBillData)
-                            const amount = typeof parsedRaw.landlordTotal === 'number' ? parsedRaw.landlordTotal : null
-                            return [month, amount] as const
-                        } catch {
-                            return [month, null] as const
-                        }
-                    })
-                )
-
-                setMonthlyLandlordTotals(Object.fromEntries(monthEntries))
+                monthlyLandlordTotalsCache.current[selectedYear] = totals
+                if (!cancelled) setMonthlyLandlordTotals(totals)
             } catch (error) {
                 console.error('Failed to fetch monthly landlord totals', error)
             }
         }
 
         fetchMonthlyLandlordTotals()
+        return () => {
+            cancelled = true
+        }
     }, [activeTab, selectedYear])
 
     useEffect(() => {
@@ -455,6 +460,7 @@ export default function ElectricityClient() {
                     ...prev,
                     [payload.month]: hasBillEntry(savedData)
                 }))
+                delete monthlyLandlordTotalsCache.current[payload.year]
             }
         } catch (e) {
             console.error(e)
