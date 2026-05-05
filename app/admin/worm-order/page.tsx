@@ -4252,77 +4252,115 @@ export default function WormOrderPage() {
                         </div>
                     </div>
 
-                    {activeStepDefinition && (
-                        <div className="mt-4 rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-4 py-3 dark:border-[#3a2a24] dark:bg-[#1a1a1a]">
-                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                <div className="min-w-0">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#d9361b]">현재 처리 단계</p>
-                                    <div className="mt-1 flex flex-wrap items-center gap-2">
-                                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] px-1.5 text-xs font-black text-white">
-                                            {activeStepDefinition.id}
-                                        </span>
-                                        <p className="text-sm font-black text-slate-900 dark:text-white">{activeStepDefinition.title}</p>
-                                        <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[activeStepDefinition.id])}`}>
-                                            {getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}
-                                        </span>
-                                    </div>
-                                    <p className="mt-1 text-xs font-medium text-slate-600 dark:text-gray-400">{activeStepDefinition.summary}</p>
-                                </div>
-                                {activeStepDefinition.target !== 'none' && (
-                                    <button
-                                        type="button"
-                                        onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                                        className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[#e34219] px-3 text-xs font-bold text-white hover:bg-[#cd3b17]"
-                                    >
-                                        {activeStepDefinition.actionLabel}
-                                        <ArrowRight size={13} />
-                                    </button>
+                    <div className="mt-4 grid grid-cols-1 gap-3 xl:grid-cols-[280px_minmax(0,1fr)]">
+                        <aside className="xl:sticky xl:top-[96px] xl:self-start">
+                            <div className="rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-3 py-3 dark:border-[#3a2a24] dark:bg-[#1a1a1a]">
+                                <p className="text-[11px] font-black uppercase tracking-[0.14em] text-[#d9361b]">현재 처리 단계</p>
+                                {activeStepDefinition ? (
+                                    <>
+                                        <div className="mt-2 flex items-start gap-2">
+                                            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] px-1.5 text-xs font-black text-white">
+                                                {activeStepDefinition.id}
+                                            </span>
+                                            <div className="min-w-0">
+                                                <p className="text-[13px] font-black leading-snug text-slate-900 dark:text-white">{activeStepDefinition.title}</p>
+                                                <span className={`mt-1 inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[activeStepDefinition.id])}`}>
+                                                    {getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}
+                                                </span>
+                                                <p className="mt-1 text-[11px] font-medium leading-snug text-slate-600 dark:text-gray-400">{activeStepDefinition.summary}</p>
+                                            </div>
+                                        </div>
+                                        {activeStepDefinition.target !== 'none' && (
+                                            <button
+                                                type="button"
+                                                onClick={() => handlePipelineStepAction(activeStepDefinition)}
+                                                className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-lg bg-[#e34219] px-3 text-[11px] font-bold text-white hover:bg-[#cd3b17]"
+                                            >
+                                                {activeStepDefinition.actionLabel}
+                                                <ArrowRight size={12} />
+                                            </button>
+                                        )}
+                                    </>
+                                ) : (
+                                    <p className="mt-2 text-[11px] text-slate-500 dark:text-gray-400">활성 단계가 없습니다.</p>
                                 )}
                             </div>
-                        </div>
-                    )}
+                            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-2 dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+                                <p className="px-1 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500 dark:text-gray-400">Process</p>
+                                <div className="mt-2 space-y-1.5">
+                                    {filteredPipelineSteps.map((step) => {
+                                        const runtimeStatus = pipelineStatusMap[step.id]
+                                        const isCurrent = step.id === activeStepId
+                                        return (
+                                            <button
+                                                key={`sticky-${step.id}`}
+                                                type="button"
+                                                onClick={() => handlePipelineStepAction(step)}
+                                                className={`flex w-full items-center gap-2 rounded-lg border px-2 py-1.5 text-left transition-colors ${
+                                                    isCurrent
+                                                        ? 'border-[#e34219] bg-[#fff3ef]'
+                                                        : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
+                                                }`}
+                                            >
+                                                <span className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full text-[10px] font-black ${
+                                                    runtimeStatus === 'done'
+                                                        ? 'bg-emerald-500 text-white'
+                                                        : isCurrent
+                                                            ? 'bg-[#e34219] text-white'
+                                                            : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
+                                                }`}>
+                                                    {step.id}
+                                                </span>
+                                                <span className="min-w-0 flex-1 truncate text-[11px] font-bold text-slate-700 dark:text-gray-300">{step.title}</span>
+                                            </button>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        </aside>
 
-                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-                        {filteredPipelineSteps.map((step) => {
-                            const runtimeStatus = pipelineStatusMap[step.id]
-                            const isCurrent = step.id === activeStepId
-                            return (
-                                <button
-                                    key={step.id}
-                                    type="button"
-                                    onClick={() => handlePipelineStepAction(step)}
-                                    className={`group flex min-h-[84px] items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-                                        runtimeStatus === 'done'
-                                            ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
-                                            : isCurrent
-                                                ? 'border-[#e34219] bg-[#fff3ef] hover:bg-[#ffeadd]'
-                                                : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
-                                    }`}
-                                >
-                                    <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black ${
-                                        runtimeStatus === 'done'
-                                            ? 'bg-emerald-500 text-white'
-                                            : isCurrent
-                                                ? 'bg-[#e34219] text-white'
-                                                : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
-                                    }`}>
-                                        {step.id}
-                                    </span>
-                                    <span className="min-w-0 flex-1">
-                                        <span className="block text-[13px] font-black leading-snug text-slate-900 dark:text-white">{step.title}</span>
-                                        <span className="mt-1 block line-clamp-2 text-[11px] font-medium leading-snug text-slate-500 dark:text-gray-400">{step.summary}</span>
-                                        <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                                            <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
-                                                {getPipelineModeLabel(step.mode)}
-                                            </span>
-                                            <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                                {getPipelineRuntimeLabel(runtimeStatus)}
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            {filteredPipelineSteps.map((step) => {
+                                const runtimeStatus = pipelineStatusMap[step.id]
+                                const isCurrent = step.id === activeStepId
+                                return (
+                                    <button
+                                        key={step.id}
+                                        type="button"
+                                        onClick={() => handlePipelineStepAction(step)}
+                                        className={`group flex min-h-[84px] items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
+                                            runtimeStatus === 'done'
+                                                ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
+                                                : isCurrent
+                                                    ? 'border-[#e34219] bg-[#fff3ef] hover:bg-[#ffeadd]'
+                                                    : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
+                                        }`}
+                                    >
+                                        <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black ${
+                                            runtimeStatus === 'done'
+                                                ? 'bg-emerald-500 text-white'
+                                                : isCurrent
+                                                    ? 'bg-[#e34219] text-white'
+                                                    : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
+                                        }`}>
+                                            {step.id}
+                                        </span>
+                                        <span className="min-w-0 flex-1">
+                                            <span className="block text-[13px] font-black leading-snug text-slate-900 dark:text-white">{step.title}</span>
+                                            <span className="mt-1 block line-clamp-2 text-[11px] font-medium leading-snug text-slate-500 dark:text-gray-400">{step.summary}</span>
+                                            <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                                                <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                                    {getPipelineModeLabel(step.mode)}
+                                                </span>
+                                                <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                                    {getPipelineRuntimeLabel(runtimeStatus)}
+                                                </span>
                                             </span>
                                         </span>
-                                    </span>
-                                </button>
-                            )
-                        })}
+                                    </button>
+                                )
+                            })}
+                        </div>
                     </div>
                 </section>
             {showOrderTools && (
