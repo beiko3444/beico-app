@@ -31,11 +31,21 @@ export async function createEmployee(formData: FormData) {
     if (dailyHours <= 0) return { error: '1일근로시간을 0보다 크게 입력해 주세요.' }
 
     try {
-        await prisma.attendanceEmployee.create({
+        const employee = await prisma.attendanceEmployee.create({
             data: { name, hourlyWage, dailyHours }
         })
         revalidatePath(attendancePath)
-        return { success: true }
+        return {
+            success: true,
+            employee: {
+                id: employee.id,
+                name: employee.name,
+                hourlyWage: employee.hourlyWage,
+                dailyHours: employee.dailyHours,
+                active: employee.active,
+                records: []
+            }
+        }
     } catch (error) {
         console.error(error)
         return { error: '직원 추가에 실패했습니다.' }

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState, useTransition } from 'react'
+import React, { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, UserRound } from 'lucide-react'
 import { createEmployee, deleteEmployee, toggleAttendanceDate, updateEmployee } from './actions'
@@ -35,6 +35,11 @@ export default function TasksClient({ initialEmployees }: { initialEmployees: At
     const [currentMonth, setCurrentMonth] = useState(new Date())
     const [isPending, startTransition] = useTransition()
 
+    useEffect(() => {
+        setEmployees(initialEmployees)
+        setSelectedEmployeeId(prev => prev || initialEmployees[0]?.id || '')
+    }, [initialEmployees])
+
     const selectedEmployee = employees.find(employee => employee.id === selectedEmployeeId) || employees[0] || null
     const selectedWorkDates = useMemo(() => {
         return new Set((selectedEmployee?.records || []).map(record => dateKey(new Date(record.workDate))))
@@ -66,6 +71,10 @@ export default function TasksClient({ initialEmployees }: { initialEmployees: At
             if (result.error) {
                 alert(result.error)
                 return
+            }
+            if (result.employee) {
+                setEmployees(prev => [...prev, result.employee])
+                setSelectedEmployeeId(result.employee.id)
             }
             router.refresh()
         })
