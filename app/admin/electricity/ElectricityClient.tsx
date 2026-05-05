@@ -144,6 +144,7 @@ export default function ElectricityClient() {
             setLandlordData(null)
             setPrevMonthPhoto(null)
             setPrevMonthPhotoUploadedAt(null)
+            setLandlordPhoto(null)
             setRawText('')
             setExtractionHistory([])
             setLandlordInputs({
@@ -546,6 +547,7 @@ export default function ElectricityClient() {
     const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+        e.currentTarget.value = ''
 
         const reader = new FileReader()
         reader.onload = (ev) => {
