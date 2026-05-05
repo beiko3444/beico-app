@@ -1,20 +1,17 @@
-
 import { prisma } from '@/lib/prisma'
-import { unstable_cache } from 'next/cache'
 import TasksClient from './TasksClient'
 
 export const dynamic = 'force-dynamic'
 
-const getCachedTasks = unstable_cache(
-    async () => prisma.task.findMany({
-        orderBy: { date: 'asc' }
-    }),
-    ['admin-tasks-page-v1'],
-    { revalidate: 60 }
-)
-
 export default async function TasksPage() {
-    const tasks = await getCachedTasks()
+    const employees = await prisma.attendanceEmployee.findMany({
+        orderBy: [{ active: 'desc' }, { createdAt: 'asc' }],
+        include: {
+            records: {
+                orderBy: { workDate: 'asc' }
+            }
+        }
+    })
 
-    return <TasksClient initialTasks={tasks} />
+    return <TasksClient initialEmployees={employees} />
 }

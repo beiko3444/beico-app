@@ -22,7 +22,7 @@ export default function AdminNav({
     { name: '상품관리', path: '/admin/products' },
     { name: '파트너관리', path: '/admin/partners' },
     { name: '생산관리', path: '/admin/production' },
-    { name: '업무관리', path: '/admin/tasks' },
+    { name: '근태관리', path: '/admin/tasks' },
     { name: '카드사용내역', path: '/admin/card-usage' },
     { name: '문자발송서비스', path: '/admin/sms' },
     { name: '지렁이 발주', path: '/admin/worm-order' },
