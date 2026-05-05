@@ -407,6 +407,7 @@ export default function ElectricityClient() {
     const saveData = async (bData: BillData | null, lData: LandlordData | null, currentRawText?: string, currentHistory?: any[]) => {
         setLoading(true)
         try {
+            const billDataProvided = bData !== null
             const shares = calculateCurrentShares(bData, lData)
 
             const payload = {
@@ -429,8 +430,8 @@ export default function ElectricityClient() {
                 waterHeaterKw: lData ? lData.waterHeaterKw : null,
                 outdoorLightKw: lData ? lData.outdoorLightKw : null,
                 meterPhotoUrl: lData ? lData.photo : null,
-                rawText: currentRawText !== undefined ? currentRawText : rawText,
-                extractionHistory: JSON.stringify(currentHistory !== undefined ? currentHistory : extractionHistory)
+                rawText: billDataProvided ? (currentRawText !== undefined ? currentRawText : rawText) : null,
+                extractionHistory: billDataProvided ? JSON.stringify(currentHistory !== undefined ? currentHistory : extractionHistory) : null
             }
 
             const res = await fetch('/api/admin/electricity', {
@@ -443,9 +444,10 @@ export default function ElectricityClient() {
                 const err = await res.json()
                 alert(`저장 실패: ${err.error}`)
             } else {
+                const savedData = await res.json()
                 setMonthlyBillStatuses(prev => ({
                     ...prev,
-                    [payload.month]: Boolean(bData)
+                    [payload.month]: hasBillEntry(savedData)
                 }))
             }
         } catch (e) {
