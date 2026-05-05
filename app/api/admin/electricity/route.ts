@@ -63,6 +63,7 @@ export async function POST(request: Request) {
         })
 
         const hasPhotoInput = typeof body.meterPhotoUrl === 'string' && body.meterPhotoUrl.length > 0
+        const photoRemoved = body.meterPhotoUrl === null && Boolean(existingUsage?.meterPhotoUrl)
         const photoChanged = hasPhotoInput && body.meterPhotoUrl !== existingUsage?.meterPhotoUrl
         const photoUploadedAt = photoChanged ? new Date() : undefined
 
@@ -77,6 +78,7 @@ export async function POST(request: Request) {
                 ...baseData,
                 year,
                 month,
+                ...(photoRemoved ? { meterPhotoUrl: null, meterPhotoUploadedAt: null } : {}),
                 ...(photoUploadedAt ? { meterPhotoUploadedAt: photoUploadedAt } : {}),
                 updatedAt: new Date()
             },

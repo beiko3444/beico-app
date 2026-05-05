@@ -526,9 +526,11 @@ export default function ElectricityClient() {
         const water = parseFloat(landlordInputs.waterHeaterKw.replace(/,/g, '')) || 0
         const light = parseFloat(landlordInputs.outdoorLightKw.replace(/,/g, '')) || 0
 
-        const nextPhotoUploadedAt = landlordPhoto && landlordPhoto !== landlordData?.photo
-            ? new Date().toISOString()
-            : landlordData?.photoUploadedAt || null
+        const nextPhotoUploadedAt = landlordPhoto
+            ? landlordPhoto !== landlordData?.photo
+                ? new Date().toISOString()
+                : landlordData?.photoUploadedAt || null
+            : null
 
         const newLandlordData: LandlordData = {
             prevMeter: prev,
@@ -584,6 +586,10 @@ export default function ElectricityClient() {
             img.src = ev.target?.result as string
         }
         reader.readAsDataURL(file)
+    }
+
+    const handlePhotoDelete = () => {
+        setLandlordPhoto(null)
     }
 
     const calculateCurrentShares = (bData: BillData | null, lData: LandlordData | null) => {
@@ -1349,6 +1355,17 @@ export default function ElectricityClient() {
                                             </div>
                                         )}
                                     </div>
+                                    {landlordPhoto && (
+                                        <div className="mt-2 flex justify-end">
+                                            <button
+                                                type="button"
+                                                onClick={handlePhotoDelete}
+                                                className="px-3 py-1.5 text-xs font-bold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors"
+                                            >
+                                                사진 삭제
+                                            </button>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                             <div className="flex gap-2 justify-end mt-6">
