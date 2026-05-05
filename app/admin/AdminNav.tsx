@@ -12,6 +12,7 @@ export default function AdminNav({
   userName?: string
 }) {
   const pathname = usePathname()
+  const [shipmentCount, setShipmentCount] = useState('1')
   const [fromNumber, setFromNumber] = useState('')
   const [loadingFromNumber, setLoadingFromNumber] = useState(true)
   const [sendingSms, setSendingSms] = useState(false)
@@ -64,11 +65,14 @@ export default function AdminNav({
     }
   }, [])
 
-  const pickupCount = 1
-
   const handleSendPickupSms = async () => {
     if (!fromNumber) {
       alert('발신번호를 찾지 못했습니다. 문자발송서비스에서 발신번호를 먼저 확인해 주세요.')
+      return
+    }
+    const pickupCount = Number.parseInt(shipmentCount, 10)
+    if (!Number.isFinite(pickupCount) || pickupCount < 1) {
+      alert('발송 건수를 1 이상으로 입력해 주세요.')
       return
     }
 
@@ -135,7 +139,18 @@ export default function AdminNav({
       <div className="mt-1 flex h-16 shrink-0 items-center justify-between gap-2.5 rounded-2xl border border-[#FFD4C8] bg-[#FFF6F3] px-[14px] py-3 transition-colors hover:bg-[#FFF1EC]">
         <div className="min-w-0">
           <div className="text-[13px] font-extrabold leading-none tracking-[-0.01em] text-[#111827]">집하 문자</div>
-          <div className="mt-1 text-[12px] font-bold leading-none text-[#EF3B1D]">{pickupCount}건 대기</div>
+          <div className="mt-1 flex items-center gap-1 text-[12px] font-bold leading-none text-[#EF3B1D]">
+            <input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={shipmentCount}
+              onChange={(event) => setShipmentCount(event.target.value)}
+              className="h-[18px] w-[30px] rounded border border-[#FFD4C8] bg-white px-1 text-center text-[11px] font-extrabold text-[#EF3B1D] outline-none"
+              aria-label="발송 건수"
+            />
+            <span>건 대기</span>
+          </div>
         </div>
         <button
           type="button"
