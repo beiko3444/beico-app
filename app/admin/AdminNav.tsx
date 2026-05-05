@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function AdminNav({
   counts,
@@ -12,7 +12,6 @@ export default function AdminNav({
   userName?: string
 }) {
   const pathname = usePathname()
-  const [shipmentCount, setShipmentCount] = useState('1')
   const [fromNumber, setFromNumber] = useState('')
   const [loadingFromNumber, setLoadingFromNumber] = useState(true)
   const [sendingSms, setSendingSms] = useState(false)
@@ -65,25 +64,18 @@ export default function AdminNav({
     }
   }, [])
 
-  const parsedShipmentCount = useMemo(() => {
-    const value = Number.parseInt(shipmentCount, 10)
-    return Number.isFinite(value) && value > 0 ? value : 0
-  }, [shipmentCount])
+  const pickupCount = 1
 
   const handleSendPickupSms = async () => {
     if (!fromNumber) {
       alert('발신번호를 찾지 못했습니다. 문자발송서비스에서 발신번호를 먼저 확인해 주세요.')
       return
     }
-    if (!parsedShipmentCount) {
-      alert('출고 건수를 1 이상으로 입력해 주세요.')
-      return
-    }
 
     const now = new Date()
     const contents = [
       '소장님, 엑스트래커입니다.',
-      `${now.getMonth() + 1}/${now.getDate()} 출고 ${parsedShipmentCount}건 집하 부탁드립니다.`,
+      `${now.getMonth() + 1}/${now.getDate()} 출고 ${pickupCount}건 집하 부탁드립니다.`,
       '감사합니다.',
     ].join('\n')
 
@@ -101,7 +93,7 @@ export default function AdminNav({
       })
       const result: { error?: string } = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(result.error || '문자 발송에 실패했습니다.')
-      alert(`집하요청 문자 발송 완료 (${parsedShipmentCount}건)`)
+      alert(`집하요청 문자 발송 완료 (${pickupCount}건)`)
     } catch (error) {
       alert(error instanceof Error ? error.message : '문자 발송에 실패했습니다.')
     } finally {
@@ -140,30 +132,18 @@ export default function AdminNav({
         ))}
       </nav>
 
-      <div className="mt-1 shrink-0 rounded-[14px] border border-[#E5E7EB] bg-[#FAFAFB] p-2 shadow-[0_6px_16px_rgba(15,23,42,0.035)]">
-        <div className="mb-1 flex items-center justify-between px-1">
-          <span className="text-[11px] font-extrabold tracking-[-0.01em] text-[#111827]">집하 문자</span>
-          <span className="text-[10px] font-bold text-[#8A93A3]">기사 전송</span>
-        </div>
-        <div className="flex h-9 items-center rounded-full border border-[#D1D5DB] bg-white px-2 text-slate-900">
-          <input
-            type="number"
-            min={1}
-            inputMode="numeric"
-            value={shipmentCount}
-            onChange={(event) => setShipmentCount(event.target.value)}
-            className="h-full w-12 border-none bg-transparent text-center text-[15px] font-extrabold outline-none"
-            aria-label="출고 건수"
-          />
-          <span className="pr-2 text-[11px] font-extrabold text-[#374151]">건</span>
+      <div className="mt-1 flex h-16 shrink-0 items-center justify-between gap-2.5 rounded-2xl border border-[#FFD4C8] bg-[#FFF6F3] px-[14px] py-3 transition-colors hover:bg-[#FFF1EC]">
+        <div className="min-w-0">
+          <div className="text-[13px] font-extrabold leading-none tracking-[-0.01em] text-[#111827]">집하 문자</div>
+          <div className="mt-1 text-[12px] font-bold leading-none text-[#EF3B1D]">{pickupCount}건 대기</div>
         </div>
         <button
           type="button"
           onClick={handleSendPickupSms}
           disabled={sendingSms || loadingFromNumber}
-          className="mt-1.5 flex h-9 w-full items-center justify-center rounded-full bg-[#EF3B1D] text-[12px] font-extrabold text-white shadow-[0_6px_14px_rgba(239,59,29,0.16)] transition hover:bg-[#D92F16] disabled:opacity-50"
+          className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[13px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {sendingSms ? '요청중...' : '문자발송'}
+          {sendingSms ? '요청중' : '발송'}
         </button>
       </div>
 
