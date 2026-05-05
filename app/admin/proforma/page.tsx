@@ -71,6 +71,19 @@ const readNumber = (value: unknown): number => {
     return 0
 }
 
+const toIsoStringSafe = (value: unknown): string => {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+        return value.toISOString()
+    }
+    if (typeof value === 'string') {
+        const parsed = new Date(value)
+        if (!Number.isNaN(parsed.getTime())) {
+            return parsed.toISOString()
+        }
+    }
+    return new Date().toISOString()
+}
+
 type RegionalPriceNode = {
     wholesale?: unknown
     cost?: unknown
@@ -101,7 +114,17 @@ export default async function ProformaPage() {
         redirect('/login')
     }
 
-    const { partners, products, issued } = await getCachedProformaPageData()
+    let partners: Awaited<ReturnType<typeof getCachedProformaPageData>>['partners'] = []
+    let products: Awaited<ReturnType<typeof getCachedProformaPageData>>['products'] = []
+    let issued: Awaited<ReturnType<typeof getCachedProformaPageData>>['issued'] = []
+    try {
+        const data = await getCachedProformaPageData()
+        partners = data.partners
+        products = data.products
+        issued = data.issued
+    } catch (error) {
+        console.error('Failed to load PI page data:', error)
+    }
 
     const partnerOptions: PartnerOption[] = partners.map((partner) => ({
         id: partner.id,
@@ -126,20 +149,23 @@ export default async function ProformaPage() {
 
     const issuedInvoices: IssuedInvoice[] = issued.map((invoice) => ({
         id: invoice.id,
-        invoiceNumber: invoice.invoiceNumber,
-        issueDate: invoice.issueDate.toISOString(),
-        partnerName: invoice.partnerName,
-        totalUsd: invoice.totalUsd,
-        productionTime: invoice.productionTime,
+        invoiceNumber: invoice.invoiceNumber || '-',
+        issueDate: toIsoStringSafe(invoice.issueDate),
+        partnerName: invoice.partnerName || '-',
+        totalUsd: readNumber(invoice.totalUsd),
+        productionTime:
+            typeof invoice.productionTime === 'string' && invoice.productionTime.trim().length > 0
+                ? invoice.productionTime
+                : '3-5 days after receiving the deposit',
         items: invoice.items.map((item) => ({
             id: item.id,
             productId: item.productId,
-            productName: item.productName,
+            productName: item.productName || '-',
             productNameEN: item.productNameEN,
             productCode: item.productCode ? String(item.productCode).toUpperCase() : null,
-            quantity: item.quantity,
-            unitPriceUsd: item.unitPriceUsd,
-            amountUsd: item.amountUsd
+            quantity: Math.max(1, Number(item.quantity || 0)),
+            unitPriceUsd: readNumber(item.unitPriceUsd),
+            amountUsd: readNumber(item.amountUsd)
         }))
     }))
 
@@ -150,7 +176,7 @@ export default async function ProformaPage() {
                     <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-400 hover:text-[#e53b19] transition-all" title="Dashboard">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
                     </Link>
-                    <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">P.I발급 작성</h1>
+                    <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">PI발급 작성</h1>
                 </div>
             </div>
 

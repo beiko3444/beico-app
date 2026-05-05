@@ -25,7 +25,7 @@ export default function AdminNav({
     { name: '카드사용내역', path: '/admin/card-usage' },
     { name: '문자발송서비스', path: '/admin/sms' },
     { name: '지렁이 발주', path: '/admin/worm-order' },
-    { name: 'P.발급', path: '/admin/proforma' },
+    { name: 'PI발급', path: '/admin/proforma' },
     { name: '전력관리', path: '/admin/electricity' },
   ]
 
