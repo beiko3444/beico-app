@@ -61,6 +61,7 @@ export default function ElectricityClient() {
     const [paymentChecklist, setPaymentChecklist] = useState<Record<string, PaymentChecklistStatus>>({})
     const [monthlyLandlordTotals, setMonthlyLandlordTotals] = useState<Record<number, number | null>>({})
     const [monthlyBillStatuses, setMonthlyBillStatuses] = useState<Record<number, boolean>>({})
+    const [monthlyMeterReadings, setMonthlyMeterReadings] = useState<Record<number, number | null>>({})
     const [rentPaidDates, setRentPaidDates] = useState<Record<number, string | null>>({})
     const [savingRentMonth, setSavingRentMonth] = useState<number | null>(null)
     const monthlyLandlordTotalsCache = useRef<Record<number, Record<number, number | null>>>({})
@@ -112,6 +113,11 @@ export default function ElectricityClient() {
     }
 
     const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
+
+    const previousMonthYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear
+    const previousMonth = selectedMonth === 1 ? 12 : selectedMonth - 1
+    const previousMonthLabel = `${previousMonthYear}년 ${previousMonth}월`
+    const currentMonthLabel = `${selectedYear}년 ${selectedMonth}월`
 
     const defaultPaymentStatus: PaymentChecklistStatus = {
         rentTaxInvoiceIssued: false,
@@ -352,14 +358,17 @@ export default function ElectricityClient() {
                 const monthEntries = await Promise.all(
                     Array.from({ length: 12 }, (_, idx) => idx + 1).map(async (month) => {
                         const res = await fetch(`/api/admin/electricity?year=${selectedYear}&month=${month}`)
-                        if (!res.ok) return [month, false] as const
+                        if (!res.ok) return [month, false, null] as const
 
                         const data = await res.json()
-                        return [month, hasBillEntry(data)] as const
+                        const hasBill = hasBillEntry(data)
+                        const reading = hasBill && data.landlordMeterCurr !== null ? Number(data.landlordMeterCurr) : null
+                        return [month, hasBill, Number.isFinite(reading) ? reading : null] as const
                     })
                 )
 
-                setMonthlyBillStatuses(Object.fromEntries(monthEntries))
+                setMonthlyBillStatuses(Object.fromEntries(monthEntries.map(([month, hasBill]) => [month, hasBill])))
+                setMonthlyMeterReadings(Object.fromEntries(monthEntries.map(([month, , reading]) => [month, reading])))
             } catch (error) {
                 console.error('Failed to fetch monthly bill statuses', error)
             }
@@ -459,6 +468,12 @@ export default function ElectricityClient() {
                 setMonthlyBillStatuses(prev => ({
                     ...prev,
                     [payload.month]: hasBillEntry(savedData)
+                }))
+                setMonthlyMeterReadings(prev => ({
+                    ...prev,
+                    [payload.month]: hasBillEntry(savedData) && savedData.landlordMeterCurr !== null
+                        ? Number(savedData.landlordMeterCurr)
+                        : null
                 }))
                 delete monthlyLandlordTotalsCache.current[payload.year]
             }
@@ -908,17 +923,21 @@ export default function ElectricityClient() {
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
                             const hasBill = monthlyBillStatuses[month]
                             const isSelected = selectedMonth === month
+                            const meterReading = monthlyMeterReadings[month]
 
                             return (
                                 <button
                                     key={month}
                                     onClick={() => setSelectedMonth(month)}
-                                    className={`px-4 py-2 rounded-xl text-sm font-bold transition-all border ${hasBill
+                                    className={`min-w-[72px] px-3 py-2 rounded-xl text-sm font-bold transition-all border ${hasBill
                                         ? 'bg-[#d9361b] text-white border-[#d9361b] hover:bg-red-600'
                                         : 'bg-white dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#252525]'
                                         } ${isSelected ? 'shadow-md transform scale-105 ring-2 ring-[#d9361b]/25' : ''}`}
                                 >
-                                    {month}월
+                                    <span className="block leading-tight">{month}월</span>
+                                    <span className={`mt-0.5 block text-[10px] leading-tight ${hasBill ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}`}>
+                                        {meterReading !== null && meterReading !== undefined ? meterReading.toLocaleString() : '-'}
+                                    </span>
                                 </button>
                             )
                         })}
@@ -1459,9 +1478,9 @@ export default function ElectricityClient() {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 font-sans">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">전월 계량기</span>
+                                        <span className="px-4 py-1.5 bg-gray-500 text-white rounded-full text-sm font-bold">전월 계량기 · {previousMonthLabel}</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400 dark:text-gray-400">전월 지침</div>
+                                            <div className="text-xs text-gray-400 dark:text-gray-400">{previousMonthLabel} 지침</div>
                                             <div className="text-xl font-black dark:text-white">{landlordData.prevMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400 dark:text-gray-400">kWh</span></div>
                                             <div className="text-[11px] text-gray-400 dark:text-gray-400 mt-1">사진 업로드일: {formatPhotoUploadedAt(prevMonthPhotoUploadedAt)}</div>
                                         </div>
@@ -1477,9 +1496,9 @@ export default function ElectricityClient() {
 
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
-                                        <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">당월 계량기</span>
+                                        <span className="px-4 py-1.5 bg-[#d9361b] text-white rounded-full text-sm font-bold shadow-md">당월 계량기 · {currentMonthLabel}</span>
                                         <div className="text-right">
-                                            <div className="text-xs text-gray-400 dark:text-gray-400">당월 지침</div>
+                                            <div className="text-xs text-gray-400 dark:text-gray-400">{currentMonthLabel} 지침</div>
                                             <div className="text-xl font-black text-[#d9361b]">{landlordData.currMeter.toLocaleString()} <span className="text-sm font-normal text-gray-400 dark:text-gray-400">kWh</span></div>
                                             <div className="text-[11px] text-gray-400 dark:text-gray-400 mt-1">사진 업로드일: {formatPhotoUploadedAt(landlordData.photoUploadedAt)}</div>
                                         </div>
