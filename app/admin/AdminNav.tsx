@@ -30,6 +30,13 @@ export default function AdminNav({
     { name: '전력관리', path: '/admin/electricity' },
   ]
 
+  const alertCountByPath: Record<string, number> = {
+    '/admin/orders': counts?.pendingOrders ?? 0,
+    '/admin/products': counts?.lowStock ?? 0,
+    '/admin/partners': counts?.pendingPartners ?? 0,
+    '/admin/electricity': counts?.missingBill ?? 0,
+  }
+
   const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
 
   useEffect(() => {
@@ -131,11 +138,23 @@ export default function AdminNav({
             style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
           >
             <span className="text-inherit">{item.name}</span>
-            {isActive(item.path) ? (
-              <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-1 text-[9px] font-black tracking-[0.08em] text-white">
-                ACTIVE
-              </span>
-            ) : null}
+            <span className="inline-flex items-center gap-1.5">
+              {alertCountByPath[item.path] > 0 ? (
+                <span
+                  className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
+                    isActive(item.path) ? 'bg-white/25 text-white' : 'bg-[#EF3B1D] text-white'
+                  }`}
+                  aria-label={`${alertCountByPath[item.path]}건 알림`}
+                >
+                  {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
+                </span>
+              ) : null}
+              {isActive(item.path) ? (
+                <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-1 text-[9px] font-black tracking-[0.08em] text-white">
+                  ACTIVE
+                </span>
+              ) : null}
+            </span>
           </Link>
         ))}
       </nav>
