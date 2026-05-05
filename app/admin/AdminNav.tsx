@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import { useEffect, useMemo, useState } from 'react'
 
 export default function AdminNav({
   counts,
@@ -11,6 +12,10 @@ export default function AdminNav({
   userName?: string
 }) {
   const pathname = usePathname()
+  const [shipmentCount, setShipmentCount] = useState('1')
+  const [fromNumber, setFromNumber] = useState('')
+  const [loadingFromNumber, setLoadingFromNumber] = useState(true)
+  const [sendingSms, setSendingSms] = useState(false)
 
   const navItems = [
     { name: '주문관리', path: '/admin/orders' },
@@ -26,6 +31,84 @@ export default function AdminNav({
   ]
 
   const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
+
+  useEffect(() => {
+    let mounted = true
+
+    async function loadFromNumber() {
+      setLoadingFromNumber(true)
+      try {
+        const response = await fetch('/api/admin/sms?mode=sender')
+        const result: {
+          defaultFromNumber?: string
+          fromNumbers?: Array<{ number?: string }>
+          error?: string
+        } = await response.json()
+
+        if (!mounted) return
+        if (!response.ok) throw new Error(result.error || '발신번호를 불러오지 못했습니다.')
+
+        const defaultFrom = typeof result.defaultFromNumber === 'string' ? result.defaultFromNumber : ''
+        const firstFrom = Array.isArray(result.fromNumbers) ? (result.fromNumbers[0]?.number || '') : ''
+        setFromNumber(defaultFrom || firstFrom)
+      } catch (error) {
+        if (!mounted) return
+        alert(error instanceof Error ? error.message : '발신번호를 불러오지 못했습니다.')
+      } finally {
+        if (mounted) setLoadingFromNumber(false)
+      }
+    }
+
+    loadFromNumber()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
+  const parsedShipmentCount = useMemo(() => {
+    const value = Number.parseInt(shipmentCount, 10)
+    return Number.isFinite(value) && value > 0 ? value : 0
+  }, [shipmentCount])
+
+  const handleSendPickupSms = async () => {
+    if (!fromNumber) {
+      alert('발신번호를 찾지 못했습니다. 문자발송서비스에서 발신번호를 먼저 확인해 주세요.')
+      return
+    }
+    if (!parsedShipmentCount) {
+      alert('출고 건수를 1 이상으로 입력해 주세요.')
+      return
+    }
+
+    const now = new Date()
+    const contents = [
+      '소장님, 엑스트래커입니다.',
+      `${now.getMonth() + 1}/${now.getDate()} 출고 ${parsedShipmentCount}건 집하 부탁드립니다.`,
+      '감사합니다.',
+    ].join('\n')
+
+    try {
+      setSendingSms(true)
+      const response = await fetch('/api/admin/sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fromNumber,
+          toName: '소장님',
+          toNumber: '01027104466',
+          contents,
+        }),
+      })
+      const result: { error?: string } = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(result.error || '문자 발송에 실패했습니다.')
+      alert(`집하요청 문자 발송 완료 (${parsedShipmentCount}건)`)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '문자 발송에 실패했습니다.')
+    } finally {
+      setSendingSms(false)
+    }
+  }
+
   return (
     <aside className="fixed bottom-0 left-0 top-0 z-[1000] flex h-screen w-[260px] flex-col overflow-hidden box-border bg-gradient-to-b from-[#0B1220] to-[#080E1A] px-6 pb-6 pt-8">
       <div className="mb-7 shrink-0">
@@ -56,6 +139,30 @@ export default function AdminNav({
           </Link>
         ))}
       </nav>
+
+      <div className="mt-2 shrink-0 rounded-2xl border border-white/10 bg-white/[0.03] p-3">
+        <div className="text-[12px] font-semibold text-white/60">출고 건수</div>
+        <div className="mt-2 flex h-10 items-center rounded-full border border-white/15 bg-white px-2 text-slate-900">
+          <input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            value={shipmentCount}
+            onChange={(event) => setShipmentCount(event.target.value)}
+            className="h-full w-12 border-none bg-transparent text-center text-[15px] font-bold outline-none"
+            aria-label="출고 건수"
+          />
+          <span className="pr-2 text-[12px] font-bold text-slate-700">건</span>
+        </div>
+        <button
+          type="button"
+          onClick={handleSendPickupSms}
+          disabled={sendingSms || loadingFromNumber}
+          className="mt-2 flex h-10 w-full items-center justify-center rounded-full bg-[#EF3B1D] text-[13px] font-bold text-white transition hover:bg-[#da3418] disabled:opacity-50"
+        >
+          {sendingSms ? '요청중...' : '집하요청 문자발송'}
+        </button>
+      </div>
 
       <div className="mt-4 shrink-0 border-t border-white/10 pt-[18px]">
         <button
