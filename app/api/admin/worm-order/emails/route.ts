@@ -4,8 +4,21 @@ import { requireAdminSession } from '@/lib/requireAdmin'
 
 export const dynamic = 'force-dynamic'
 
+const EMAIL_SCAN_TIMEOUT_MS = 55000
+
 function isUuid(value: string) {
     return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const timeout = new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs)
+    })
+
+    return Promise.race([promise, timeout]).finally(() => {
+        if (timer) clearTimeout(timer)
+    })
 }
 
 export async function GET(request: Request) {
@@ -26,15 +39,19 @@ export async function GET(request: Request) {
         const isInvoiceInboxRequest = keywordTokens.includes('invoice') || keywordTokens.includes('payment')
         const subjectKeyword = isInvoiceInboxRequest ? 'invoice,payment' : requestedSubjectKeyword
 
-        const emails = await loadWormEmailList({
-            subjectKeyword,
-            scanLimit: 40,
-            listLimit: 20,
-            orderId,
-            senderEmail: isInvoiceInboxRequest ? 'michael@oikki.com' : null,
-            keywordMatchInSource: isInvoiceInboxRequest,
-            forceRefresh,
-        })
+        const emails = await withTimeout(
+            loadWormEmailList({
+                subjectKeyword,
+                scanLimit: 40,
+                listLimit: 20,
+                orderId,
+                senderEmail: isInvoiceInboxRequest ? 'michael@oikki.com' : null,
+                keywordMatchInSource: isInvoiceInboxRequest,
+                forceRefresh,
+            }),
+            EMAIL_SCAN_TIMEOUT_MS,
+            'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.',
+        )
         return NextResponse.json(
             { emails },
             {
@@ -46,6 +63,7 @@ export async function GET(request: Request) {
     } catch (error: unknown) {
         console.error('Daum IMAP 연동 에러:', error)
         const message = error instanceof Error ? error.message : '이메일 로딩 실패'
-        return NextResponse.json({ error: message }, { status: 500 })
+        const status = message.includes('시간이 초과') ? 504 : 500
+        return NextResponse.json({ error: message }, { status })
     }
 }

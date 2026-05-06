@@ -1,4 +1,5 @@
 import { ImapFlow } from 'imapflow'
+import type { MessageStructureObject } from 'imapflow'
 import { simpleParser, type ParsedMail } from 'mailparser'
 import { prisma } from '@/lib/prisma'
 
@@ -15,6 +16,10 @@ type EmailListCacheEntry = {
 
 const PARSED_MAIL_CACHE_TTL_MS = 5 * 60 * 1000
 const EMAIL_LIST_CACHE_TTL_MS = 45 * 1000
+const IMAP_CONNECTION_TIMEOUT_MS = 15000
+const IMAP_GREETING_TIMEOUT_MS = 12000
+const IMAP_SOCKET_TIMEOUT_MS = 45000
+const EMAIL_SCAN_SOURCE_PREVIEW_BYTES = 64 * 1024
 
 const globalWormOrderCache = globalThis as unknown as {
   wormParsedMailCache?: Map<string, ParsedMailCacheEntry>
@@ -117,6 +122,9 @@ function createImapClient() {
     secure: true,
     auth: { user, pass },
     logger: false,
+    connectionTimeout: IMAP_CONNECTION_TIMEOUT_MS,
+    greetingTimeout: IMAP_GREETING_TIMEOUT_MS,
+    socketTimeout: IMAP_SOCKET_TIMEOUT_MS,
   })
 }
 
@@ -128,7 +136,7 @@ async function withInboxLock<T>(work: (client: ImapFlow) => Promise<T>) {
     return await work(client)
   } finally {
     lock.release()
-    await client.logout()
+    await client.logout().catch(() => undefined)
   }
 }
 
@@ -143,6 +151,18 @@ function hasAttachmentBySource(sourceBuf: Buffer) {
     sourceBuf.includes(Buffer.from('Content-Disposition: attachment', 'utf8')) ||
     sourceBuf.includes(Buffer.from('content-disposition: attachment', 'utf8'))
   )
+}
+
+function hasAttachmentByBodyStructure(node: MessageStructureObject | undefined): boolean {
+  if (!node) return false
+
+  const disposition = String(node.disposition || '').toLowerCase()
+  const type = String(node.type || '').toLowerCase()
+  if (disposition === 'attachment') return true
+  if (node.dispositionParameters?.filename || node.parameters?.name) return true
+  if (type && !type.startsWith('text/') && !type.startsWith('multipart/')) return true
+
+  return (node.childNodes || []).some((child) => hasAttachmentByBodyStructure(child))
 }
 
 function getEmailListCache(key: string) {
@@ -543,13 +563,13 @@ export async function loadWormEmailList(options?: {
     for await (const msg of client.fetch(seqRange, {
       uid: true,
       envelope: true,
-      source: true,
+      source: keywordMatchInSource ? { maxLength: EMAIL_SCAN_SOURCE_PREVIEW_BYTES } : false,
+      bodyStructure: true,
       internalDate: true,
     })) {
-      if (!msg || !msg.source || !msg.uid) continue
+      if (!msg || !msg.uid) continue
 
       const sourceBuf = toBuffer(msg.source)
-      if (sourceBuf.length === 0) continue
 
       const subject = msg.envelope?.subject || '(제목 없음)'
       const subjectLower = subject.toLowerCase()
@@ -568,7 +588,7 @@ export async function loadWormEmailList(options?: {
         continue
       }
       const dateObj = msg.envelope?.date || msg.internalDate || new Date()
-      const hasAttachments = hasAttachmentBySource(sourceBuf)
+      const hasAttachments = hasAttachmentByBodyStructure(msg.bodyStructure) || hasAttachmentBySource(sourceBuf)
 
       rows.push({
         uid: String(msg.uid),

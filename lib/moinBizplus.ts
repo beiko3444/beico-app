@@ -1302,11 +1302,26 @@ const clickCompanyScopedRemit = async (
         (() => {
             const companies = ${JSON.stringify(companyNames)};
             const remit = ${JSON.stringify(remitText)};
+            const actionLabels = Array.from(new Set([
+                remit,
+                ${JSON.stringify(KO_REMIT_SHORT)},
+                ${JSON.stringify(KO_REMIT_REQUEST)},
+                ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)},
+                ${JSON.stringify(KO_NEXT_STEP)},
+                ${JSON.stringify(KO_NEXT_STEP_SPACED)},
+                ${JSON.stringify(KO_NEXT)},
+            ].filter(Boolean)));
 
             const norm = (s) => (s || '').replace(/\\s+/g, ' ').trim();
             const normalizeAlphaNum = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
-            const textOf = (el) => norm((el && el.textContent) || '');
+            const textOf = (el) => norm([
+                (el && el.textContent) || '',
+                (el && el.value) || '',
+                (el && el.getAttribute && el.getAttribute('aria-label')) || '',
+                (el && el.getAttribute && el.getAttribute('title')) || '',
+            ].join(' '));
             const hasText = (el, text) => textOf(el).includes(norm(text));
+            const hasActionText = (el) => actionLabels.some((label) => label && hasText(el, label));
             const describe = (el) => {
                 if (!el) return 'none';
                 const tag = (el.tagName || '').toLowerCase();
@@ -1382,6 +1397,8 @@ const clickCompanyScopedRemit = async (
                 const text = textOf(target);
                 const exactMatch = text === norm(remit) ? -100000 : 0;
                 const hasRemit = text.includes(norm(remit)) ? -10000 : 0;
+                const hasShortRemit = text.includes(${JSON.stringify(KO_REMIT_SHORT)}) ? -4000 : 0;
+                const hasNext = text.includes(${JSON.stringify(KO_NEXT)}) ? -2000 : 0;
                 const semanticBoost = isSemanticButton(target) ? -5000 : 0;
                 const tagBoost = (target.tagName || '').toLowerCase() === 'a' ? -1500 : 0;
                 let distance = 0;
@@ -1393,15 +1410,15 @@ const clickCompanyScopedRemit = async (
                     const dy = ty - reference.y;
                     distance = dx * dx + dy * dy;
                 }
-                return exactMatch + hasRemit + semanticBoost + tagBoost + distance;
+                return exactMatch + hasRemit + hasShortRemit + hasNext + semanticBoost + tagBoost + distance;
             };
             const collectRemitCandidates = (scope) => {
                 const clickableRemit = Array.from(scope.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]'))
-                    .filter((el) => isVisible(el) && hasText(el, remit))
+                    .filter((el) => isVisible(el) && hasActionText(el))
                     .map((el) => toClickable(el))
                     .filter(Boolean);
                 const textNodes = Array.from(scope.querySelectorAll('div, span, p, strong, b'))
-                    .filter((el) => isVisible(el) && hasText(el, remit))
+                    .filter((el) => isVisible(el) && hasActionText(el))
                     .map((el) => toClickable(el))
                     .filter(Boolean);
                 const merged = clickableRemit.concat(textNodes);
@@ -1473,6 +1490,35 @@ const clickCompanyScopedRemit = async (
                     }
 
                     scope = scope.parentElement;
+                }
+            }
+
+            // Some MOIN layouts select the recipient row first and render the
+            // continue/remit button outside the company card. If the recipient
+            // has been narrowed to the target company, click the closest safe
+            // visible action button instead of failing at the card boundary.
+            if (companyLeaves.length > 0) {
+                const baseRect = companyLeaves[0].getBoundingClientRect();
+                const basePoint = { x: baseRect.left + baseRect.width / 2, y: baseRect.top + baseRect.height / 2 };
+                const globalCandidates = Array.from(document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"], a'))
+                    .filter((el) => isVisible(el) && hasActionText(el))
+                    .map((el) => toClickable(el))
+                    .filter(Boolean)
+                    .filter((el, index, arr) => arr.indexOf(el) === index)
+                    .filter((el) => {
+                        const tag = (el.tagName || '').toLowerCase();
+                        const href = tag === 'a' ? String(el.getAttribute('href') || '') : '';
+                        const text = textOf(el);
+                        if (href.includes('/login')) return false;
+                        if (href.includes('/transfer/recipient') && text.includes(${JSON.stringify(KO_REMIT)})) return false;
+                        return true;
+                    })
+                    .sort((a, b) => scoreRemitCandidate(a, basePoint) - scoreRemitCandidate(b, basePoint));
+
+                for (const target of globalCandidates.slice(0, 5)) {
+                    if (clickWithMouseEvents(target)) {
+                        return 'clicked-global-recipient-action:' + describe(target);
+                    }
                 }
             }
 

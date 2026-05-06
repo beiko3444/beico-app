@@ -2573,6 +2573,8 @@ export default function WormOrderPage() {
         setEmailError('')
         setEmailMatchMessage('')
         setFetchProgress(0)
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), 65000)
 
         // 가짜(Fake) 프로그레스 메이커 (로딩 중일 때 90%까지 꾸준히 증가)
         let currentProgress = 0
@@ -2592,7 +2594,7 @@ export default function WormOrderPage() {
                 params.set('orderId', activeWormOrder.id)
             }
 
-            const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`)
+            const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`, { signal: controller.signal })
             clearInterval(interval)
             setFetchProgress(100) // 100% 꽉 채우기
 
@@ -2621,12 +2623,15 @@ export default function WormOrderPage() {
         } catch (err: any) {
             clearInterval(interval)
             setFetchProgress(0)
-            const message = err.message || 'Failed to fetch emails'
+            const message = err?.name === 'AbortError'
+                ? 'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+                : err.message || 'Failed to fetch emails'
             const hasCachedEmails = emails.length > 0 || Object.keys(emailDetails).length > 0
             setEmailError(hasCachedEmails ? `${message} Showing saved email cache.` : message)
             setHasFetched(true)
             setUsingOfflineEmailCache(hasCachedEmails)
         } finally {
+            window.clearTimeout(timeoutId)
             setLoadingEmails(false)
         }
     }
@@ -2822,6 +2827,8 @@ export default function WormOrderPage() {
         setLoadingDocEmails(true)
         setDocEmailError('')
         setDocFetchProgress(0)
+        const controller = new AbortController()
+        const timeoutId = window.setTimeout(() => controller.abort(), 65000)
 
         let currentProgress = 0
         const interval = setInterval(() => {
@@ -2837,7 +2844,7 @@ export default function WormOrderPage() {
                 params.set('orderId', activeWormOrder.id)
             }
 
-            const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`)
+            const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`, { signal: controller.signal })
             clearInterval(interval)
             setDocFetchProgress(100)
 
@@ -2862,9 +2869,12 @@ export default function WormOrderPage() {
         } catch (err: any) {
             clearInterval(interval)
             setDocFetchProgress(0)
-            setDocEmailError(err.message || 'Failed to fetch document emails')
+            setDocEmailError(err?.name === 'AbortError'
+                ? 'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
+                : err.message || 'Failed to fetch document emails')
             setDocHasFetched(true)
         } finally {
+            window.clearTimeout(timeoutId)
             setLoadingDocEmails(false)
         }
     }
