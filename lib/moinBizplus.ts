@@ -3930,4 +3930,5 @@ export const __moinBizplusTestHooks = {
     getMoinRemittanceWindowState,
     normalizeMoinTransaction,
     fillMissingHistoryRecipients,
+    classifyMoinLoginFailure,
 }
