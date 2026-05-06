@@ -29,7 +29,9 @@ const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
 const KO_REMIT_SHORT = '\uC1A1\uAE08'
 const KO_PASSWORD_MISMATCH = '\uBE44\uBC00\uBC88\uD638\uAC00 \uC77C\uCE58\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4'
-const KO_ATTEMPT_EXCEEDED = '\uCD08\uACFC'
+const KO_LOGIN_ATTEMPT_REMAINING = '\uBE44\uBC00\uBC88\uD638 \uC2E4\uD328 \uB0A8\uC740 \uC2DC\uB3C4'
+const KO_LOGIN_ATTEMPT_EXCEEDED = '\uB85C\uADF8\uC778 \uC2DC\uB3C4 \uD69F\uC218\uB97C \uCD08\uACFC'
+const KO_ACCOUNT_PROTECTED_LIMIT = '\uACC4\uC815 \uBCF4\uD638\uB97C \uC704\uD574 \uC81C\uD55C\uB428'
 const KO_LOCK = '\uC7A0\uAE08'
 const KO_LOCKED = '\uC7A0\uACA8'
 const KO_REMIT_REQUEST = '\uC1A1\uAE08 \uC2E0\uCCAD'
@@ -76,6 +78,21 @@ const KO_ACCEPTED_STATE_KEYWORDS = [
     '\uCC98\uB9AC\uC911',
     '\uC9C4\uD589\uC911',
 ]
+
+const classifyMoinLoginFailure = (bodyText: string): 'locked' | 'password' | null => {
+    if (!bodyText) return null
+    if (bodyText.includes(KO_PASSWORD_MISMATCH)) return 'password'
+
+    const lockIndicators = [
+        KO_LOGIN_ATTEMPT_REMAINING,
+        KO_LOGIN_ATTEMPT_EXCEEDED,
+        KO_ACCOUNT_PROTECTED_LIMIT,
+        KO_LOCK,
+        KO_LOCKED,
+    ]
+    if (lockIndicators.some((indicator) => bodyText.includes(indicator))) return 'locked'
+    return null
+}
 
 const MOIN_REMITTANCE_TIME_ZONE = 'Asia/Seoul'
 const MOIN_REMITTANCE_OPEN_WEEK_MINUTE = 1 * 24 * 60 + 4 * 60
@@ -2019,9 +2036,8 @@ const performMoinLogin = async (
                 if (url.includes('/login')) loginFailed = true
             }),
             page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
-            page.getByText(KO_ATTEMPT_EXCEEDED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
-            page.getByText(KO_LOCK).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
-            page.getByText(KO_LOCKED).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_LOGIN_ATTEMPT_REMAINING).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
+            page.getByText(KO_ACCOUNT_PROTECTED_LIMIT).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
         ])
     } catch {
         // Ignore timeouts from race
@@ -2032,12 +2048,13 @@ const performMoinLogin = async (
 
     if (loginFailed || page.url().includes('/login')) {
         const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
-        if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
+        const failureType = classifyMoinLoginFailure(bodyText)
+        if (failureType === 'locked') {
             throw new MoinAutomationError(
                 'Login Failed',
                 '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.',
             )
-        } else if (bodyText.includes(KO_PASSWORD_MISMATCH)) {
+        } else if (failureType === 'password') {
             throw new MoinAutomationError(
                 'Login Failed',
                 '[Password mismatch] The password is incorrect. Please verify the password before trying again.',
@@ -3149,9 +3166,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     if (url.includes('/login')) loginFailed = true
                 }),
                 page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true }),
-                page.getByText(KO_ATTEMPT_EXCEEDED).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true }),
-                page.getByText(KO_LOCK).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true }),
-                page.getByText(KO_LOCKED).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true })
+                page.getByText(KO_LOGIN_ATTEMPT_REMAINING).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true }),
+                page.getByText(KO_ACCOUNT_PROTECTED_LIMIT).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true })
             ])
         } catch {
             // Ignore timeouts from race
@@ -3171,13 +3187,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         if (loginFailed || page.url().includes('/login')) {
             // Extract text from the page to see the exact error for the user
             const bodyText = await page.locator('body').textContent().catch(() => '') || ''
-
-            if (bodyText.includes(KO_ATTEMPT_EXCEEDED) || bodyText.includes(KO_LOCK) || bodyText.includes(KO_LOCKED)) {
+            const failureType = classifyMoinLoginFailure(bodyText)
+            if (failureType === 'locked') {
                 throw new MoinAutomationError(
                     'Login Failed',
                     '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.'
                 )
-            } else if (bodyText.includes(KO_PASSWORD_MISMATCH)) {
+            } else if (failureType === 'password') {
                 throw new MoinAutomationError(
                     'Login Failed',
                     '[Password mismatch] The password is incorrect. Please verify the password before trying again.'

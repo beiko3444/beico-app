@@ -3399,14 +3399,6 @@ export default function WormOrderPage() {
         setRemittanceProgress(REMITTANCE_SIMULATED_STAGES[0]?.percent ?? 5)
         setRemittanceProgressLabel(REMITTANCE_SIMULATED_STAGES[0]?.label ?? '자동화 시작 중...')
 
-        let simulatedStageIndex = 0
-        remittanceProgressTimerRef.current = window.setInterval(() => {
-            simulatedStageIndex = Math.min(simulatedStageIndex + 1, REMITTANCE_SIMULATED_STAGES.length - 1)
-            const stage = REMITTANCE_SIMULATED_STAGES[simulatedStageIndex]
-            setRemittanceProgress((prev) => Math.max(prev, stage.percent))
-            setRemittanceProgressLabel(stage.label)
-        }, 3500)
-
         let requestAbortController: AbortController | null = null
         setRemittanceSubmitting(true)
         try {
