@@ -1979,6 +1979,27 @@ const matchHistoryItem = (
     return scored.length > 0 ? scored[0].item : null
 }
 
+const fillMissingHistoryRecipients = (
+    items: MoinHistoryItem[],
+    recipientHint: string | null | undefined,
+) => {
+    const hint = (recipientHint || '').trim()
+    if (!hint) return items
+
+    const hintNorm = hint.toLowerCase().replace(/[^a-z0-9]/g, '')
+    if (!hintNorm) return items
+
+    return items.map((item) => {
+        if (item.recipient) return item
+        const rowNorm = (item.rowText || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        const rawNorm = JSON.stringify(item.rawTransaction || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+        if (rowNorm.includes(hintNorm) || rawNorm.includes(hintNorm)) {
+            return { ...item, recipient: hint }
+        }
+        return item
+    })
+}
+
 type CapturedJsonResponse = {
     url: string
     json: unknown
@@ -2164,11 +2185,27 @@ const findValueByKeyHints = (
     excludeHints: string[] = [],
 ): unknown => {
     const lowerEntries = Object.entries(obj).map(([key, value]) => ({ key, lowerKey: key.toLowerCase(), value }))
-    const matched = lowerEntries.find((entry) =>
+    const isMatch = (entry: { lowerKey: string }) =>
         hints.some((hint) => entry.lowerKey.includes(hint)) &&
-        !excludeHints.some((hint) => entry.lowerKey.includes(hint)),
-    )
-    return matched?.value
+        !excludeHints.some((hint) => entry.lowerKey.includes(hint))
+
+    const directPrimitive = lowerEntries.find((entry) => isMatch(entry) && stringifyValue(entry.value).trim())
+    if (directPrimitive) return directPrimitive.value
+
+    const directObject = lowerEntries.find((entry) => isMatch(entry) && entry.value && typeof entry.value === 'object')
+    if (directObject) {
+        const objectValue = stringifyValue(directObject.value).trim()
+        if (objectValue) return objectValue
+    }
+
+    for (const entry of lowerEntries) {
+        if (!entry.value || typeof entry.value !== 'object' || Array.isArray(entry.value)) continue
+        if (excludeHints.some((hint) => entry.lowerKey.includes(hint))) continue
+        const nested = findValueByKeyHints(entry.value as Record<string, unknown>, hints, excludeHints)
+        if (stringifyValue(nested).trim()) return nested
+    }
+
+    return undefined
 }
 
 const stringifyValue = (value: unknown): string => {
@@ -2176,6 +2213,35 @@ const stringifyValue = (value: unknown): string => {
     if (typeof value === 'number') return Number.isFinite(value) ? String(value) : ''
     if (typeof value === 'string') return value
     if (typeof value === 'boolean') return String(value)
+    if (Array.isArray(value)) {
+        return value
+            .map((item) => stringifyValue(item).trim())
+            .filter(Boolean)
+            .join(' ')
+    }
+    if (typeof value === 'object') {
+        const objectValue = value as Record<string, unknown>
+        for (const key of [
+            'name',
+            'companyName',
+            'company_name',
+            'recipientName',
+            'recipient_name',
+            'receiverName',
+            'receiver_name',
+            'beneficiaryName',
+            'beneficiary_name',
+            'partnerName',
+            'partner_name',
+            'displayName',
+            'display_name',
+            'alias',
+            'nickname',
+        ]) {
+            const text = stringifyValue(objectValue[key]).trim()
+            if (text) return text
+        }
+    }
     return ''
 }
 
@@ -2244,8 +2310,32 @@ const normalizeMoinTransaction = (raw: Record<string, unknown>): MoinHistoryItem
     const dateText = formatDateValueToYmd(dateValue)
     const appliedAtIso = formatDateValueToIso(dateValue)
 
-    const recipientValue = findValueByKeyHints(raw, ['recipient', 'beneficiary', 'receivername', 'receiver', 'partnername', 'companyname'], ['country', 'phone', 'email', 'address'])
-        ?? findValueByKeyHints(raw, ['name'], ['file', 'event', 'method', 'status', 'product', 'sender', 'currency'])
+    const recipientValue = findValueByKeyHints(
+        raw,
+        [
+            'recipient',
+            'beneficiary',
+            'receivername',
+            'receiver_name',
+            'receivercompany',
+            'receiver_company',
+            'receiver',
+            'partnername',
+            'partner_name',
+            'partner',
+            'companyname',
+            'company_name',
+            'recipientcompany',
+            'recipient_company',
+            'counterparty',
+            'payee',
+            'vendor',
+            'alias',
+            'nickname',
+        ],
+        ['country', 'phone', 'email', 'address', 'bank', 'account'],
+    )
+        ?? findValueByKeyHints(raw, ['name'], ['file', 'event', 'method', 'status', 'product', 'sender', 'currency', 'bank', 'account'])
     const recipient = stringifyValue(recipientValue).trim()
 
     const usdValue = findValueByKeyHints(raw, ['usd', 'receiveamount', 'receivingamount', 'beneficiaryamount', 'destamount', 'finalamount'], ['krw'])
@@ -2384,6 +2474,7 @@ export const fetchMoinRemittanceHistory = async (
                 apiItems.push(normalizeMoinTransaction(raw as Record<string, unknown>))
             }
         }
+        const enrichedApiItems = fillMissingHistoryRecipients(apiItems, input.recipientHint)
 
         let matched: MoinHistoryItem | null = null
         let matchStrategy: 'api' | 'dom' | null = null
@@ -2392,7 +2483,7 @@ export const fetchMoinRemittanceHistory = async (
         let detailBodyText: string | null = null
 
         if (targetTransactionId) {
-            matched = apiItems.find((item) => item.transactionId === targetTransactionId)
+            matched = enrichedApiItems.find((item) => item.transactionId === targetTransactionId)
                 || {
                     detailUrl: `https://www.moinbizplus.com/history/${targetTransactionId}`,
                     rowText: '',
@@ -2404,8 +2495,8 @@ export const fetchMoinRemittanceHistory = async (
                 }
             matchStrategy = 'api'
             steps.push('targeted-transaction-id-mode')
-        } else if (apiItems.length > 0) {
-            matched = matchHistoryItem(apiItems, input.targetDate || null, input.recipientHint || null)
+        } else if (enrichedApiItems.length > 0) {
+            matched = matchHistoryItem(enrichedApiItems, input.targetDate || null, input.recipientHint || null)
             if (matched) {
                 matchStrategy = 'api'
                 steps.push(`api-matched:${matched.transactionId || matched.detailUrl}`)
@@ -2539,7 +2630,7 @@ export const fetchMoinRemittanceHistory = async (
             steps.push('tx-match-strategy:api')
             return {
                 steps,
-                items: apiItems,
+                items: enrichedApiItems,
                 matched,
                 matchedSummary: summary,
                 matchedAppliedAtIso: appliedAtIso,
@@ -2553,7 +2644,7 @@ export const fetchMoinRemittanceHistory = async (
         steps.push('falling-back-to-dom')
         const domItems = await inspectHistoryListItems(page)
         steps.push(`dom-items-count:${domItems.length}`)
-        const combinedItems = apiItems.length > 0 ? apiItems : domItems
+        const combinedItems = enrichedApiItems.length > 0 ? enrichedApiItems : domItems
         const domMatched = matchHistoryItem(domItems, input.targetDate || null, input.recipientHint || null)
 
         if (domMatched) {
@@ -2582,7 +2673,7 @@ export const fetchMoinRemittanceHistory = async (
             steps.push('tx-match-strategy:dom')
             return {
                 steps,
-                items: combinedItems,
+                items: fillMissingHistoryRecipients(combinedItems, input.recipientHint),
                 matched: domMatched,
                 matchedSummary: summary,
                 matchedAppliedAtIso: appliedAtIso,
@@ -2614,7 +2705,7 @@ export const fetchMoinRemittanceHistory = async (
 
         return {
             steps,
-            items: combinedItems,
+            items: fillMissingHistoryRecipients(combinedItems, input.recipientHint),
             matched: null,
             matchedSummary: null,
             matchedAppliedAtIso: null,
@@ -3429,4 +3520,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 export const __moinBizplusTestHooks = {
     clickMoinLoginSubmit,
     getMoinRemittanceWindowState,
+    normalizeMoinTransaction,
+    fillMissingHistoryRecipients,
 }
