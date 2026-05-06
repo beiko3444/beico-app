@@ -110,6 +110,7 @@ type PageLike = {
 
 type LocatorLike = {
     first: () => LocatorLike
+    nth: (index: number) => LocatorLike
     locator: (selector: string) => LocatorLike
     waitFor: (options?: Record<string, unknown>) => Promise<void>
     click: (options?: Record<string, unknown>) => Promise<void>
@@ -259,6 +260,49 @@ const clickFirstVisible = async (
     throw new MoinAutomationError(step, `Could not find a clickable element for step: ${step} (url: ${page.url()})`)
 }
 
+const clickLastVisible = async (
+    page: PageLike,
+    selectors: string[],
+    step: string,
+    timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<string> => {
+    const errors: string[] = []
+    const deadline = Date.now() + timeoutMs
+
+    while (Date.now() < deadline) {
+        for (const selector of selectors) {
+            try {
+                const matches = page.locator(selector)
+                const count = await matches.count().catch(() => 0)
+
+                for (let index = count - 1; index >= 0; index -= 1) {
+                    const target = matches.nth(index)
+                    try {
+                        const visible = await target.isVisible().catch(() => false)
+                        if (!visible) continue
+                        const disabled = await target.isDisabled().catch(() => false)
+                        const enabled = await target.isEnabled().catch(() => !disabled)
+                        if (disabled || !enabled) continue
+                        await target.click({ timeout: 5000 })
+                        return `${selector}#${index}`
+                    } catch (error) {
+                        errors.push(`${selector}#${index}: ${getErrorMessage(error)}`)
+                    }
+                }
+            } catch (error) {
+                errors.push(`${selector}: ${getErrorMessage(error)}`)
+            }
+        }
+
+        await page.waitForTimeout(400)
+    }
+
+    throw new MoinAutomationError(
+        step,
+        `Could not find a clickable final element for step: ${step} (url: ${page.url()}) selectors=${errors.slice(-8).join(' | ')}`
+    )
+}
+
 const fillFirstVisible = async (
     page: PageLike,
     selectors: string[],
@@ -404,6 +448,44 @@ const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => 
         'Click next step',
         timeoutMs
     )
+}
+
+const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+    const finalSubmitSelectors = [
+        `button:has-text("${KO_REMIT_REQUEST}")`,
+        `[role="button"]:has-text("${KO_REMIT_REQUEST}")`,
+        `a:has-text("${KO_REMIT_REQUEST}")`,
+        `input[type="button"][value*="${KO_REMIT_REQUEST}"]`,
+        `input[type="submit"][value*="${KO_REMIT_REQUEST}"]`,
+        `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
+        `[role="button"]:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
+        `a:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
+        `input[type="button"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
+        `input[type="submit"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
+        `button:has-text("${KO_REMIT}")`,
+        `[role="button"]:has-text("${KO_REMIT}")`,
+        `a:has-text("${KO_REMIT}")`,
+        `input[type="button"][value*="${KO_REMIT}"]`,
+        `input[type="submit"][value*="${KO_REMIT}"]`,
+        `button:has-text("${KO_NEXT_STEP}")`,
+        `[role="button"]:has-text("${KO_NEXT_STEP}")`,
+        `a:has-text("${KO_NEXT_STEP}")`,
+        `button:has-text("${KO_NEXT_STEP_SPACED}")`,
+        `[role="button"]:has-text("${KO_NEXT_STEP_SPACED}")`,
+        `a:has-text("${KO_NEXT_STEP_SPACED}")`,
+        `button:has-text("${KO_APPLY}")`,
+        `[role="button"]:has-text("${KO_APPLY}")`,
+        `a:has-text("${KO_APPLY}")`,
+        `input[type="button"][value*="${KO_APPLY}"]`,
+        `input[type="submit"][value*="${KO_APPLY}"]`,
+        `button:has-text("${KO_SUBMIT}")`,
+        `[role="button"]:has-text("${KO_SUBMIT}")`,
+        `a:has-text("${KO_SUBMIT}")`,
+        `input[type="button"][value*="${KO_SUBMIT}"]`,
+        `input[type="submit"][value*="${KO_SUBMIT}"]`,
+    ]
+
+    return clickLastVisible(page, finalSubmitSelectors, 'Submit remittance', timeoutMs)
 }
 
 const checkAgreement = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
@@ -3484,24 +3566,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             }
         }
 
-        // ???? Step 11: Submit remittance ??????????????????????????????????????????????????????????????????????????
-        // On the ?筌먲퐢沅??筌먦끉逾?page, the submit button says "??酉????ル―?? (not "???깅쾳 ??節띉?)
+        // Step 11: Submit remittance. The final page can render several similar
+        // action buttons, so click the last visible matching action.
         throwIfAbortRequested(abortSignal, 'Submit remittance')
-        await clickFirstVisible(
-            page,
-            [
-                `button:has-text("${KO_REMIT_REQUEST}")`,
-                `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
-                `button:has-text("${KO_REMIT}")`,
-                `button:has-text("${KO_NEXT_STEP}")`,
-                `button:has-text("${KO_NEXT_STEP_SPACED}")`,
-                `button:has-text("${KO_APPLY}")`,
-                `button:has-text("${KO_SUBMIT}")`,
-            ],
-            'Submit remittance',
-            DEFAULT_TIMEOUT_MS
-        )
-        steps.push('submit-remittance')
+        const submitSelectorUsed = await clickFinalRemittanceSubmit(page, DEFAULT_TIMEOUT_MS)
+        steps.push(`submit-remittance:${submitSelectorUsed}`)
 
         // Step 12: Verify completion strictly to avoid false positives.
         // Do not treat simple network idle as success.
@@ -3607,6 +3676,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
 export const __moinBizplusTestHooks = {
     clickMoinLoginSubmit,
+    clickLastVisible,
     getMoinRemittanceWindowState,
     normalizeMoinTransaction,
     fillMissingHistoryRecipients,

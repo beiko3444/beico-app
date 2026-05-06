@@ -398,7 +398,7 @@ export async function POST(request: Request) {
                 invoiceBuffer,
                 headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
                 abortSignal: runningJob.abortController.signal,
-                prepareOnly: true,
+                prepareOnly: false,
             })
 
             let result: Awaited<ReturnType<typeof submitMoinRemittance>>
