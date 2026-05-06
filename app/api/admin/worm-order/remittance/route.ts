@@ -252,7 +252,8 @@ export async function POST(request: Request) {
         const formData = await request.formData()
 
         const moinLoginId = (process.env.MOIN_BIZPLUS_LOGIN_ID || '').trim()
-        const moinPassword = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
+        const moinPasswordRaw = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
+        const moinPassword = moinPasswordRaw.trim()
         const amountRaw = readString(formData.get('amountUsd'))
         const orderIdRaw = readString(formData.get('orderId'))
         const invoicePdf = formData.get('invoicePdf')
@@ -264,11 +265,8 @@ export async function POST(request: Request) {
             )
         }
 
-        if (moinPassword.startsWith(' ') || moinPassword.endsWith(' ')) {
-            return NextResponse.json(
-                { error: 'Password has leading or trailing spaces. Please remove them and try again.' },
-                { status: 400 }
-            )
+        if (moinPasswordRaw !== moinPassword) {
+            console.warn('MOIN_BIZPLUS_LOGIN_PASSWORD had leading/trailing whitespace and was normalized before login.')
         }
 
         const parsedAmount = Number(amountRaw.replace(/,/g, ''))

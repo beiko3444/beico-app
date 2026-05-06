@@ -61,12 +61,16 @@ export async function POST(request: Request) {
     }
 
     const moinLoginId = (process.env.MOIN_BIZPLUS_LOGIN_ID || '').trim()
-    const moinPassword = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
+    const moinPasswordRaw = process.env.MOIN_BIZPLUS_LOGIN_PASSWORD || ''
+    const moinPassword = moinPasswordRaw.trim()
     if (!moinLoginId || !moinPassword) {
         return NextResponse.json(
             { error: 'Server is not configured: set MOIN_BIZPLUS_LOGIN_ID and MOIN_BIZPLUS_LOGIN_PASSWORD.' },
             { status: 500 },
         )
+    }
+    if (moinPasswordRaw !== moinPassword) {
+        console.warn('MOIN_BIZPLUS_LOGIN_PASSWORD had leading/trailing whitespace and was normalized before history import login.')
     }
 
     const url = new URL(request.url)
