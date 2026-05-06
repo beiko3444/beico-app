@@ -177,6 +177,13 @@ const isAuthRelatedAutomationError = (error: MoinAutomationError) => {
     )
 }
 
+const wasMoinSubmitted = (error: MoinAutomationError) => /submit-remittance/i.test(error.message || '')
+
+const isRetryableBrowserClosure = (error: MoinAutomationError) => (
+    error.step === 'Browser closed unexpectedly' &&
+    !wasMoinSubmitted(error)
+)
+
 const registerAuthFailure = (state: RemittanceAuthGuardState, credentialKey: string, now: number) => {
     const prev = state.failures.get(credentialKey)
     const shouldReset = !prev || now - prev.lastFailedAt > AUTH_FAILURE_RESET_MS
@@ -382,7 +389,7 @@ export async function POST(request: Request) {
 
         const invoiceBuffer = Buffer.from(await invoicePdf.arrayBuffer())
         try {
-            const result = await submitMoinRemittance({
+            const runMoinRemittance = () => submitMoinRemittance({
                 loginId: moinLoginId,
                 loginPassword: moinPassword,
                 amountUsd: parsedAmount.toFixed(2),
@@ -392,6 +399,18 @@ export async function POST(request: Request) {
                 headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
                 abortSignal: runningJob.abortController.signal,
             })
+
+            let result: Awaited<ReturnType<typeof submitMoinRemittance>>
+            try {
+                result = await runMoinRemittance()
+            } catch (error) {
+                if (error instanceof MoinAutomationError && isRetryableBrowserClosure(error)) {
+                    console.warn('Retrying MOIN remittance after browser closed before submit:', error.message)
+                    result = await runMoinRemittance()
+                } else {
+                    throw error
+                }
+            }
 
             clearAuthFailure(guardState, credentialKey)
 
@@ -537,6 +556,7 @@ export async function POST(request: Request) {
                             attemptsRemaining,
                             locked: lockActive,
                             lockedUntil: lockActive ? new Date(failure.lockedUntil!).toISOString() : null,
+                            diagnostic: error.diagnostic ?? null,
                         },
                         { status: lockActive ? 429 : 401 }
                     )
@@ -545,6 +565,7 @@ export async function POST(request: Request) {
                 return NextResponse.json(
                     {
                         error: `${error.step}: ${error.message}`,
+                        diagnostic: error.diagnostic ?? null,
                     },
                     { status: 502 }
                 )

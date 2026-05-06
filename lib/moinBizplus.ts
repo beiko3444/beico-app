@@ -151,11 +151,13 @@ export type MoinRemittancePricingSummary = {
 
 export class MoinAutomationError extends Error {
     step: string
+    diagnostic?: unknown
 
-    constructor(step: string, message: string) {
+    constructor(step: string, message: string, diagnostic?: unknown) {
         super(message)
         this.name = 'MoinAutomationError'
         this.step = step
+        this.diagnostic = diagnostic
     }
 }
 
@@ -170,6 +172,9 @@ const getErrorMessage = (error: unknown) => {
     if (error instanceof Error && error.message) return error.message
     return String(error)
 }
+
+const isTargetClosedAutomationError = (error: unknown) =>
+    /target page, context or browser has been closed|browser has been closed|context has been closed|target closed/i.test(getErrorMessage(error))
 
 const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) => {
     if (signal?.aborted) {
@@ -978,6 +983,65 @@ const inspectTransferInputs = async (page: PageLike) => {
     }
 
     return result
+}
+
+const collectMoinFailureDiagnostic = async (page: PageLike | null, steps: string[]) => {
+    if (!page) {
+        return {
+            url: 'no-page',
+            lastSteps: steps.slice(-12),
+            pageAvailable: false,
+        }
+    }
+
+    try {
+        const pageSnapshot = await page.evaluate(`
+            (() => {
+                const normalize = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+                const isVisible = (el) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                };
+                const buttons = Array.from(document.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"]'))
+                    .filter((el) => isVisible(el))
+                    .map((el) => ({
+                        tag: el.tagName || '',
+                        text: normalize(el.textContent || el.value || el.getAttribute('aria-label') || ''),
+                        href: el.tagName === 'A' ? el.getAttribute('href') || '' : '',
+                        disabled: Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true',
+                    }))
+                    .filter((row) => row.text || row.href)
+                    .slice(0, 30);
+                const inputs = Array.from(document.querySelectorAll('input, textarea, select'))
+                    .filter((el) => isVisible(el))
+                    .map((el) => ({
+                        tag: el.tagName || '',
+                        type: el.getAttribute('type') || '',
+                        name: el.getAttribute('name') || '',
+                        id: el.getAttribute('id') || '',
+                        placeholder: el.getAttribute('placeholder') || '',
+                    }))
+                    .slice(0, 20);
+                const bodyPreview = normalize((document.body && document.body.innerText) || '').slice(0, 1200);
+                return { url: location.href, buttons, inputs, bodyPreview };
+            })()
+        `)
+
+        return {
+            ...(pageSnapshot as Record<string, unknown>),
+            lastSteps: steps.slice(-12),
+            pageAvailable: true,
+        }
+    } catch (error) {
+        return {
+            url: 'page-unavailable',
+            lastSteps: steps.slice(-12),
+            pageAvailable: false,
+            diagnosticError: getErrorMessage(error),
+        }
+    }
 }
 
 const inspectAmountFieldValue = async (page: PageLike, expectedAmount: string) => {
@@ -2570,6 +2634,7 @@ export const fetchMoinRemittanceHistory = async (
 
 export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<MoinRemittanceResult> => {
     let browser: BrowserLike | null = null
+    let page: PageLike | null = null
     const steps: string[] = []
     const abortSignal = input.abortSignal
     let abortListenerCleanup: (() => void) | null = null
@@ -2595,7 +2660,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         throwIfAbortRequested(abortSignal, 'Create browser context')
         const context = await browser.newContext({ locale: 'ko-KR' })
-        const page = await context.newPage()
+        page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
@@ -3329,13 +3394,26 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         if (error instanceof MoinAutomationError) {
             // Append accumulated steps to help debugging
+            if (error.diagnostic === undefined) {
+                error.diagnostic = await collectMoinFailureDiagnostic(page, steps)
+            }
             error.message = `${error.message} [steps: ${steps.join(' -> ')}]`
             throw error
         }
 
+        const diagnostic = await collectMoinFailureDiagnostic(page, steps)
+        if (isTargetClosedAutomationError(error)) {
+            throw new MoinAutomationError(
+                'Browser closed unexpectedly',
+                `MOIN automation browser closed before completion. This usually means Chromium crashed or the MOIN page closed during the current step. [lastSteps: ${steps.slice(-8).join(' -> ')}] [steps: ${steps.join(' -> ')}]`,
+                diagnostic,
+            )
+        }
+
         throw new MoinAutomationError(
             'Automation',
-            `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' -> ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`
+            `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' -> ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`,
+            diagnostic,
         )
     } finally {
         if (abortListenerCleanup) {

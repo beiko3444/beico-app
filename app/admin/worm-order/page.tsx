@@ -3504,7 +3504,13 @@ export default function WormOrderPage() {
                     }
                 }
 
-                throw new Error(typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.')
+                const diagnostic = result?.diagnostic && typeof result.diagnostic === 'object'
+                    ? result.diagnostic as { lastSteps?: unknown; url?: unknown; diagnosticError?: unknown }
+                    : null
+                const diagnosticSuffix = diagnostic
+                    ? ` [diagnostic: url=${typeof diagnostic.url === 'string' ? diagnostic.url : 'unknown'} lastSteps=${Array.isArray(diagnostic.lastSteps) ? diagnostic.lastSteps.slice(-6).join(' -> ') : 'none'}${typeof diagnostic.diagnosticError === 'string' ? ` diagnosticError=${diagnostic.diagnosticError}` : ''}]`
+                    : ''
+                throw new Error(`${typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.'}${diagnosticSuffix}`)
             }
 
             const automationSteps = Array.isArray(result?.result?.steps) ? result.result.steps as string[] : []

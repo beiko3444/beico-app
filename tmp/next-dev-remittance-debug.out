@@ -1,0 +1,12 @@
+
+> beico-app@0.1.1 dev
+> next dev
+
+▲ Next.js 16.1.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://192.168.45.122:3000
+
+✓ Starting...
+✓ Ready in 1640ms
+ GET /login 200 in 2.8s (compile: 2.7s, render: 161ms)
+[?25h
