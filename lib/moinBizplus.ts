@@ -21,6 +21,8 @@ const TARGET_COMPANY_NAME_VARIANTS = [
 const TARGET_COMPANY_NAME_REGEX = /Shanghai\s*Oikki\s*Trading\s*Co\.?\s*,?\s*Ltd/i
 const DEFAULT_TIMEOUT_MS = 45000
 const LONG_TIMEOUT_MS = 60000
+const COMPLETION_POLL_INTERVAL_MS = 650
+const COMPLETION_FAST_TIMEOUT_MS = 12000
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
@@ -59,6 +61,19 @@ const KO_SUCCESS_KEYWORDS = [
     '\uC1A1\uAE08 \uC644\uB8CC',
     '\uC2E0\uCCAD\uC774 \uC644\uB8CC',
     '\uC811\uC218\uB418\uC5C8',
+]
+const KO_ACCEPTED_STATE_KEYWORDS = [
+    '\uC1A1\uAE08 \uC9C4\uD589',
+    '\uC1A1\uAE08\uC9C4\uD589',
+    '\uC1A1\uAE08 \uC2E0\uCCAD\uC911',
+    '\uC1A1\uAE08\uC2E0\uCCAD\uC911',
+    '\uC1A1\uAE08 \uC811\uC218',
+    '\uC1A1\uAE08\uC811\uC218',
+    '\uC2E0\uCCAD \uC811\uC218',
+    '\uC2E0\uCCAD\uC811\uC218',
+    '\uC811\uC218\uB418\uC5C8',
+    '\uCC98\uB9AC\uC911',
+    '\uC9C4\uD589\uC911',
 ]
 
 const MOIN_REMITTANCE_TIME_ZONE = 'Asia/Seoul'
@@ -1223,6 +1238,7 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
             const successKeywords = ${JSON.stringify(KO_SUCCESS_KEYWORDS)};
+            const acceptedStateKeywords = ${JSON.stringify(KO_ACCEPTED_STATE_KEYWORDS)};
             const recipientPlaceholder = ${JSON.stringify(KO_RECIPIENT_SEARCH_PLACEHOLDER)};
             const remitRequest = ${JSON.stringify(KO_REMIT_REQUEST)};
             const remitRequestCompact = ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)};
@@ -1256,6 +1272,7 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
                 }));
 
             const hasSuccessKeyword = successKeywords.some((kw) => bodyText.includes(String(kw)));
+            const hasAcceptedStateKeyword = acceptedStateKeywords.some((kw) => bodyText.includes(String(kw)));
             const hasRecipientSearchInput = visibleInputs.some((inp) => (inp.placeholder || '').includes(recipientPlaceholder));
             const hasSubmitLikeButton = buttons.some((txt) =>
                 txt.includes(remitRequest) ||
@@ -1269,6 +1286,7 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
             return {
                 url: location.href,
                 hasSuccessKeyword,
+                hasAcceptedStateKeyword,
                 hasRecipientSearchInput,
                 hasSubmitLikeButton,
                 buttons,
@@ -1278,6 +1296,7 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
     `) as {
         url: string
         hasSuccessKeyword: boolean
+        hasAcceptedStateKeyword: boolean
         hasRecipientSearchInput: boolean
         hasSubmitLikeButton: boolean
         buttons: string[]
@@ -3572,15 +3591,15 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const submitSelectorUsed = await clickFinalRemittanceSubmit(page, DEFAULT_TIMEOUT_MS)
         steps.push(`submit-remittance:${submitSelectorUsed}`)
 
-        // Step 12: Verify completion strictly to avoid false positives.
-        // Do not treat simple network idle as success.
+        // Step 12: Verify completion without waiting for network idle. MOIN pages
+        // can keep background requests open, so short DOM polls are much faster.
         let completionConfirmed = false
         const submitUrl = page.url()
         let completionSnapshot = await inspectRemittanceCompletion(page)
-        for (let attempt = 0; attempt < 8; attempt++) {
+        const completionDeadline = Date.now() + COMPLETION_FAST_TIMEOUT_MS
+        for (let attempt = 0; Date.now() < completionDeadline; attempt += 1) {
             throwIfAbortRequested(abortSignal, 'Verify completion')
-            await page.waitForTimeout(2500)
-            await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => undefined)
+            await page.waitForTimeout(COMPLETION_POLL_INTERVAL_MS)
 
             const textMatched = await page.getByText(KO_SUCCESS_PATTERN).first().isVisible().catch(() => false)
             completionSnapshot = await inspectRemittanceCompletion(page)
@@ -3589,6 +3608,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 url: completionSnapshot.url.replace('https://www.moinbizplus.com', ''),
                 textMatched,
                 hasSuccessKeyword: completionSnapshot.hasSuccessKeyword,
+                hasAcceptedStateKeyword: completionSnapshot.hasAcceptedStateKeyword,
                 hasRecipientSearchInput: completionSnapshot.hasRecipientSearchInput,
                 hasSubmitLikeButton: completionSnapshot.hasSubmitLikeButton,
                 buttons: completionSnapshot.buttons.slice(0, 6),
@@ -3606,6 +3626,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             if (urlChanged && movedOutOfSubmitState) {
                 completionConfirmed = true
                 steps.push('completion-inferred-by-state-change')
+                break
+            }
+
+            if (movedOutOfSubmitState && completionSnapshot.hasAcceptedStateKeyword) {
+                completionConfirmed = true
+                steps.push('completion-inferred-by-accepted-state')
                 break
             }
         }
