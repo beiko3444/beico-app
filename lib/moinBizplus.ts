@@ -1511,12 +1511,15 @@ const clickCompanyScopedRemit = async (
             };
             const scoreRemitCandidate = (target, reference) => {
                 const text = textOf(target);
+                const tag = (target.tagName || '').toLowerCase();
+                const href = tag === 'a' ? String(target.getAttribute('href') || '') : '';
                 const exactMatch = text === norm(remit) ? -100000 : 0;
                 const hasRemit = text.includes(norm(remit)) ? -10000 : 0;
                 const hasShortRemit = text.includes(${JSON.stringify(KO_REMIT_SHORT)}) ? -4000 : 0;
                 const hasNext = text.includes(${JSON.stringify(KO_NEXT)}) ? -2000 : 0;
                 const semanticBoost = isSemanticButton(target) ? -5000 : 0;
-                const tagBoost = (target.tagName || '').toLowerCase() === 'a' ? -1500 : 0;
+                const tagBoost = tag === 'a' ? -1500 : 0;
+                const transferAmountLinkBoost = href.includes('/transfer/amount') ? -60000 : 0;
                 let distance = 0;
                 if (reference) {
                     const rect = target.getBoundingClientRect();
@@ -1526,7 +1529,7 @@ const clickCompanyScopedRemit = async (
                     const dy = ty - reference.y;
                     distance = dx * dx + dy * dy;
                 }
-                return exactMatch + hasRemit + hasShortRemit + hasNext + semanticBoost + tagBoost + distance;
+                return exactMatch + hasRemit + hasShortRemit + hasNext + semanticBoost + tagBoost + transferAmountLinkBoost + distance;
             };
             const collectRemitCandidates = (scope) => {
                 const clickableRemit = Array.from(scope.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]'))
@@ -1627,6 +1630,8 @@ const clickCompanyScopedRemit = async (
                         const text = textOf(el);
                         if (href.includes('/login')) return false;
                         if (href.includes('/transfer/recipient') && text.includes(${JSON.stringify(KO_REMIT)})) return false;
+                        if (href.includes('notion.site')) return false;
+                        if (/^https?:\\/\\//i.test(href) && !href.includes('moinbizplus.com') && !href.includes('themoin.com')) return false;
                         return true;
                     })
                     .sort((a, b) => scoreRemitCandidate(a, basePoint) - scoreRemitCandidate(b, basePoint));
