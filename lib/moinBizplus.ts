@@ -2212,7 +2212,20 @@ const performMoinLogin = async (
         steps.push(`login-warning-nonblocking:url:${loginCheckUrl}`)
     }
 
-    if (loginCheckUrl.includes('/login')) {
+    if (!loginFailed && loginCheckUrl.includes('/login')) {
+        try {
+            await page.goto(MOIN_BIZPLUS_RECIPIENT_URL, {
+                waitUntil: 'domcontentloaded',
+                timeout: 8000,
+            })
+            steps.push('post-login-direct-recipient-check')
+        } catch (error) {
+            steps.push(`post-login-direct-recipient-check-error:${getErrorMessage(error).slice(0, 100)}`)
+        }
+    }
+
+    const postFallbackLoginCheckUrl = page.url()
+    if (postFallbackLoginCheckUrl.includes('/login')) {
         const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
         const failureType = classifyMoinLoginFailure(bodyText)
         if (failureType === 'locked') {
@@ -2228,7 +2241,7 @@ const performMoinLogin = async (
         } else {
             throw new MoinAutomationError(
                 'Login Failed',
-                    `Login failed (URL: ${loginCheckUrl}). Please verify the account credentials.`,
+                    `Login failed (URL: ${postFallbackLoginCheckUrl}). Please verify the account credentials.`,
                 )
             }
         }
