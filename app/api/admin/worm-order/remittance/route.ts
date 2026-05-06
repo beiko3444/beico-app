@@ -414,6 +414,7 @@ export async function POST(request: Request) {
             }
 
             clearAuthFailure(guardState, credentialKey)
+            console.info('MOIN remittance timings:', result.steps.filter((step) => step.startsWith('timing:')).join(' | '))
 
             const pricingSummary = result.pricingSummary
             if (result.stoppedBeforeConfirmation) {

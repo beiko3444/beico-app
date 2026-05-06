@@ -4,7 +4,7 @@ import fs from 'node:fs'
 const source = fs.readFileSync(new URL('../lib/moinBizplus.ts', import.meta.url), 'utf8')
 
 const recipientListMarker = '// Wait for the recipient list to load'
-const companyFindMarker = 'companyTextEl = await findVisibleCompanyTextLocator(page, 4500)'
+const companyFindPattern = /companyTextEl = await findVisibleCompanyTextLocator\(page, \d+\)/
 const searchPrefillMarker = 'fillRecipientSearchKeyword(page, keyword)'
 const searchKeywordListMarker = 'TARGET_COMPANY_SEARCH_KEYWORDS'
 const searchResultMarker = 'recipient-search-result-click'
@@ -12,7 +12,8 @@ const rowSelectMarker = 'recipient-row-select-click'
 const nextStepFallbackMarker = 'recipient-next-step-after-company'
 
 const recipientListIndex = source.indexOf(recipientListMarker)
-const companyFindIndex = source.indexOf(companyFindMarker)
+const companyFindMatch = source.match(companyFindPattern)
+const companyFindIndex = companyFindMatch?.index ?? -1
 const searchPrefillIndex = source.indexOf(searchPrefillMarker)
 const searchResultIndex = source.indexOf(searchResultMarker)
 const rowSelectIndex = source.indexOf(rowSelectMarker)
