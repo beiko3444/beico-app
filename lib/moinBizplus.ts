@@ -20,12 +20,10 @@ const TARGET_COMPANY_NAME_VARIANTS = [
     'michael-lee12580',
 ]
 const TARGET_COMPANY_NAME_REGEX = /Shanghai\s*Oikki\s*Trading\s*Co\.?\s*,?\s*Ltd/i
-const DEFAULT_TIMEOUT_MS = 18000
-const LONG_TIMEOUT_MS = 35000
-const FAST_ELEMENT_TIMEOUT_MS = 7000
-const SHORT_SETTLE_MS = 350
-const COMPLETION_POLL_INTERVAL_MS = 650
-const COMPLETION_FAST_TIMEOUT_MS = 6500
+const DEFAULT_TIMEOUT_MS = 8000
+const LONG_TIMEOUT_MS = 18000
+const FAST_ELEMENT_TIMEOUT_MS = 1200
+const COMPLETION_FAST_TIMEOUT_MS = 2200
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
@@ -278,6 +276,48 @@ const clickFirstVisible = async (
     throw new MoinAutomationError(step, `Could not find a clickable element for step: ${step} (url: ${page.url()})`)
 }
 
+const clickVisibleTextAction = async (
+    page: PageLike,
+    labels: string[],
+    preferLast = false
+): Promise<string | null> => {
+    const result = await page.evaluate(`
+        (() => {
+            const labels = ${JSON.stringify(labels)};
+            const preferLast = ${JSON.stringify(preferLast)};
+            const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const textOf = (el) => norm([
+                (el && el.textContent) || '',
+                (el && el.value) || '',
+                (el && el.getAttribute && el.getAttribute('aria-label')) || '',
+                (el && el.getAttribute && el.getAttribute('title')) || '',
+            ].join(' '));
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]'))
+                .filter((el) => isVisible(el) && !isDisabled(el))
+                .filter((el) => labels.some((label) => label && textOf(el).includes(label)));
+            const target = preferLast ? candidates[candidates.length - 1] : candidates[0];
+            if (!target) return null;
+            try { target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' }); } catch {}
+            const eventInit = { bubbles: true, cancelable: true, view: window };
+            try { target.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+            try { target.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+            try { target.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+            try { target.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+            if (typeof target.click === 'function') target.click();
+            return 'dom:' + textOf(target).slice(0, 80);
+        })()
+    `).catch(() => null)
+
+    return typeof result === 'string' && result ? result : null
+}
+
 const clickLastVisible = async (
     page: PageLike,
     selectors: string[],
@@ -312,7 +352,7 @@ const clickLastVisible = async (
             }
         }
 
-        await page.waitForTimeout(250)
+        await Promise.resolve()
     }
 
     throw new MoinAutomationError(
@@ -362,10 +402,8 @@ const typeFirstVisible = async (
             await target.click({ timeout: 5000 })
             // Clear any existing value first
             await target.fill('')
-            // Type character-by-character to trigger React onChange and avoid bot detection
-            // Fast per-character input keeps React state updates reliable without slow human-delay simulation.
-            const typingDelay = 18 + Math.floor(Math.random() * 18)
-            await target.pressSequentially(value, { delay: typingDelay })
+            // Type character-by-character to trigger React onChange without artificial delay.
+            await target.pressSequentially(value, { delay: 0 })
             return
         } catch {
             // Try next selector.
@@ -412,15 +450,14 @@ const uploadFirstFileInput = async (
             const disabled = await btn.isDisabled().catch(() => false)
             if (disabled) continue
             await btn.click({ timeout: 3000 })
-            await page.waitForTimeout(SHORT_SETTLE_MS)
             if (await trySetFiles()) return
         } catch {
             // Continue
         }
     }
 
-    // Last attempt after short wait (lazy render).
-    await page.waitForTimeout(SHORT_SETTLE_MS)
+    // Last immediate attempt after upload trigger handlers run.
+    await Promise.resolve()
     if (await trySetFiles()) return
 
     const uploadDiag = await page.evaluate(`
@@ -455,6 +492,9 @@ const uploadFirstFileInput = async (
 }
 
 const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+    const domClicked = await clickVisibleTextAction(page, [KO_NEXT_STEP, KO_NEXT_STEP_SPACED, KO_NEXT])
+    if (domClicked) return
+
     await clickFirstVisible(
         page,
         [
@@ -469,6 +509,21 @@ const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => 
 }
 
 const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+    const domClicked = await clickVisibleTextAction(
+        page,
+        [
+            KO_REMIT_REQUEST,
+            KO_REMIT_REQUEST_COMPACT,
+            KO_REMIT,
+            KO_NEXT_STEP,
+            KO_NEXT_STEP_SPACED,
+            KO_APPLY,
+            KO_SUBMIT,
+        ],
+        true
+    )
+    if (domClicked) return domClicked
+
     const finalSubmitSelectors = [
         `button:has-text("${KO_REMIT_REQUEST}")`,
         `[role="button"]:has-text("${KO_REMIT_REQUEST}")`,
@@ -576,7 +631,7 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
         if (currentUrl !== startUrl && !currentUrl.includes('/login')) {
             return currentUrl
         }
-        await page.waitForTimeout(250)
+        await Promise.resolve()
     }
     return page.url()
 }
@@ -584,13 +639,13 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
 const waitForFastCondition = async (
     page: PageLike,
     check: () => Promise<boolean>,
-    timeoutMs: number,
-    intervalMs = 250
+    timeoutMs: number
 ) => {
+    void page
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
         if (await check().catch(() => false)) return true
-        await page.waitForTimeout(intervalMs)
+        await Promise.resolve()
     }
     return false
 }
@@ -719,7 +774,7 @@ const clickMoinLoginSubmit = async (
                     return selector
                 }
                 sawVisibleDisabledSubmit = true
-                await page.waitForTimeout(250)
+                await Promise.resolve()
             }
 
             const diagnostics = await collectMoinLoginSubmitDiagnostics(page)
@@ -761,7 +816,7 @@ const findVisibleCompanyTextLocator = async (page: PageLike, timeoutMs: number):
                 // Try next text pattern.
             }
         }
-        await page.waitForTimeout(180)
+        await Promise.resolve()
     }
 
     return null
@@ -1881,9 +1936,7 @@ const performMoinLogin = async (
     )
     steps.push('fill-login-password')
 
-    const clickDelay = 1500 + Math.floor(Math.random() * 1000)
     throwIfAbortRequested(abortSignal, 'Submit login')
-    await page.waitForTimeout(clickDelay)
 
     const loginUrlBefore = page.url()
     await clickMoinLoginSubmit(page, abortSignal)
@@ -1906,7 +1959,7 @@ const performMoinLogin = async (
     }
 
     throwIfAbortRequested(abortSignal, 'Verify login')
-    await page.waitForLoadState('networkidle', { timeout: 5000 }).catch(() => undefined)
+    await Promise.resolve()
 
     if (loginFailed || page.url().includes('/login')) {
         const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
@@ -2664,8 +2717,8 @@ export const fetchMoinRemittanceHistory = async (
                 steps.push(`history-final-goto-interrupted:${getErrorMessage(error).slice(0, 120)}`)
             })
         }
-        await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-        await page.waitForTimeout(2500)
+        await Promise.resolve()
+        await Promise.resolve()
         steps.push(`history-page-url:${page.url()}`)
         steps.push(`captured-responses-count:${capturedResponses.length}`)
 
@@ -2739,12 +2792,12 @@ export const fetchMoinRemittanceHistory = async (
                         waitUntil: 'domcontentloaded',
                         timeout: LONG_TIMEOUT_MS,
                     }).catch(() => undefined)
-                    await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-                    await page.waitForTimeout(1500)
+                    await Promise.resolve()
+                    await Promise.resolve()
                     steps.push(`history-detail-url:${page.url()}`)
                 } else {
                     steps.push('detail-url-already-loaded')
-                    await page.waitForTimeout(1500)
+                    await Promise.resolve()
                 }
                 const detailResponses = capturedResponses.slice(beforeCount)
                 steps.push(`detail-responses-count:${detailResponses.length}`)
@@ -2860,8 +2913,8 @@ export const fetchMoinRemittanceHistory = async (
                 waitUntil: 'domcontentloaded',
                 timeout: LONG_TIMEOUT_MS,
             }).catch(() => undefined)
-            await page.waitForLoadState('networkidle', { timeout: 15000 }).catch(() => undefined)
-            await page.waitForTimeout(1500)
+            await Promise.resolve()
+            await Promise.resolve()
             steps.push(`history-detail-url:${page.url()}`)
 
             summary = await inspectRemittancePricingSummary(page)
@@ -3008,10 +3061,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         )
         steps.push('fill-login-password')
 
-        // Let React process input events and enable the login button.
-        const clickDelay = 180 + Math.floor(Math.random() * 160)
         throwIfAbortRequested(abortSignal, 'Submit login')
-        await page.waitForTimeout(clickDelay)
 
         // ???? Step 3: Submit login ??????????????????????????????????????????????????????????????????????????????????????
         const loginUrlBefore = page.url()
@@ -3037,8 +3087,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         } catch {
             // Ignore timeouts from race
         }
-        await page.waitForTimeout(SHORT_SETTLE_MS)
-
         if (!loginFailed && page.url().includes('/login')) {
             try {
                 await page.goto(MOIN_BIZPLUS_RECIPIENT_URL, {
@@ -3049,7 +3097,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             } catch (error) {
                 steps.push(`post-login-direct-recipient-check-error:${getErrorMessage(error).slice(0, 100)}`)
             }
-            await page.waitForTimeout(SHORT_SETTLE_MS)
         }
 
         if (loginFailed || page.url().includes('/login')) {
@@ -3115,7 +3162,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         if (isVisible) {
                             await link.click({ timeout: 5000 })
                             throwIfAbortRequested(abortSignal, 'Navigate recipient page')
-                            await page.waitForTimeout(600)
                             navigated = true
                             steps.push(`nav-to-recipient:${selector}`)
                             break
@@ -3146,19 +3192,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // New flow: the recipient list can be behind the "구매대행송금" tab.
         try {
-            await clickFirstVisible(
-                page,
-                [
-                    `button:has-text("${KO_PURCHASE_REMIT}")`,
-                    `[role="button"]:has-text("${KO_PURCHASE_REMIT}")`,
-                    `a:has-text("${KO_PURCHASE_REMIT}")`,
-                ],
-                'Open purchase-remit tab',
-                3500
-            )
-            steps.push('open-purchase-remit-tab')
-            await page.waitForTimeout(500)
-            await assertMoinRemittanceOpen(page, 'MOIN operating hours')
+            const purchaseTabClicked = await clickVisibleTextAction(page, [KO_PURCHASE_REMIT])
+            if (purchaseTabClicked) {
+                steps.push(`open-purchase-remit-tab:${purchaseTabClicked}`)
+                await assertMoinRemittanceOpen(page, 'MOIN operating hours')
+            } else {
+                steps.push('purchase-remit-tab-not-found')
+            }
         } catch (error) {
             if (error instanceof MoinAutomationError) throw error
             steps.push('purchase-remit-tab-not-found')
@@ -3176,13 +3216,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 if (recipientSearchPrefilled) {
                     const clearResult = await clearRecipientSearchKeyword(page)
                     steps.push(`recipient-search-clear:${clearResult}`)
-                    await page.waitForTimeout(150)
                 }
 
                 const searchResult = await fillRecipientSearchKeyword(page, keyword)
                 steps.push(`recipient-search-prefill:${keyword}:${searchResult}`)
                 recipientSearchPrefilled = searchResult === 'recipient-search-filled'
-                await page.waitForTimeout(450)
 
                 companyTextEl = await findVisibleCompanyTextLocator(page, 2200)
                 if (companyTextEl) {
@@ -3210,7 +3248,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         } else {
             const scrolled = await scrollToCompanyTextCandidate(page)
             steps.push(scrolled ? 'company-scroll-hit' : 'company-scroll-miss')
-            await page.waitForTimeout(350)
             companyTextEl = await findVisibleCompanyTextLocator(page, 4000)
             if (!companyTextEl) {
                 if (recipientSearchPrefilled) {
@@ -3272,7 +3309,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             }
 
             throwIfAbortRequested(abortSignal, 'Open remit modal')
-            await page.waitForTimeout(450)
 
             try {
                 remitClickReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME_VARIANTS, KO_REMIT)
@@ -3286,14 +3322,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             }
 
             throwIfAbortRequested(abortSignal, 'Open remit modal')
-            await page.waitForTimeout(350)
         }
 
         if (!remitClicked) {
             try {
                 await clickNextStep(page, 12000)
                 steps.push('recipient-next-step-after-company')
-                await page.waitForTimeout(600)
                 const nextStepInspection = await inspectTransferInputs(page)
                 if (nextStepInspection.amountKeywordVisible || !nextStepInspection.aliasSearchVisible) {
                     remitClicked = true
@@ -3360,12 +3394,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     steps.push(`recovery-recipient-search-clear:${clearResult}`)
                     const searchResult = await fillRecipientSearchKeyword(page, lastRecipientSearchKeyword)
                     steps.push(`recovery-recipient-search:${lastRecipientSearchKeyword}:${searchResult}`)
-                    await page.waitForTimeout(400)
                     const recoveryCompanyEl = await findVisibleCompanyTextLocator(page, 2500)
                     if (recoveryCompanyEl) {
                         await recoveryCompanyEl.click({ timeout: 3000 })
                         steps.push('recovery-clicked-company-text')
-                        await page.waitForTimeout(250)
                     } else {
                         steps.push('recovery-company-text-not-found')
                     }
@@ -3381,7 +3413,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     steps.push(`recovery-recipient-search-clear-2:${clearResult}`)
                     const searchResult = await fillRecipientSearchKeyword(page, lastRecipientSearchKeyword)
                     steps.push(`recovery-recipient-search-2:${lastRecipientSearchKeyword}:${searchResult}`)
-                    await page.waitForTimeout(350)
                     const secondRecoveryReason = await clickCompanyScopedRemit(page, TARGET_COMPANY_NAME_VARIANTS, KO_REMIT)
                     steps.push(`recovery-company-scoped-remit-2:${secondRecoveryReason}`)
                     if (!secondRecoveryReason.startsWith('clicked-')) {
@@ -3403,9 +3434,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         steps.push('step2-amount-form-loaded')
         pushTiming('amount-step-ready')
 
-        // Give React a short moment to finish mounting the input handlers.
         throwIfAbortRequested(abortSignal, 'Fill USD amount')
-        await page.waitForTimeout(300)
 
         // ???? Step 6: Fill USD amount ????????????????????????????????????????????????????????????????????????????????
         // The amount page has two sections:
@@ -3468,8 +3497,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 await target.waitFor({ state: 'visible', timeout: 3000 })
                 await target.click({ timeout: 3000 })
                 await target.fill('')
-                await target.pressSequentially(input.amountUsd, { delay: 30 })
-                await page.waitForTimeout(200)
+                await target.pressSequentially(input.amountUsd, { delay: 0 })
                 const inspect = await inspectAmountFieldValue(page, input.amountUsd)
                 if (inspect.matched) {
                     amountFilled = true
@@ -3528,8 +3556,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     const target = page.locator(selector).first()
                     await target.click({ timeout: 3000, force: true })
                     await target.fill('')
-                    await target.pressSequentially(input.amountUsd, { delay: 30 })
-                    await page.waitForTimeout(200)
+                    await target.pressSequentially(input.amountUsd, { delay: 0 })
                     const inspect = await inspectAmountFieldValue(page, input.amountUsd)
                     if (inspect.matched) {
                         amountFilled = true
@@ -3700,7 +3727,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const completionDeadline = Date.now() + COMPLETION_FAST_TIMEOUT_MS
         for (let attempt = 0; Date.now() < completionDeadline; attempt += 1) {
             throwIfAbortRequested(abortSignal, 'Verify completion')
-            await page.waitForTimeout(COMPLETION_POLL_INTERVAL_MS)
+            await Promise.resolve()
 
             const textMatched = await page.getByText(KO_SUCCESS_PATTERN).first().isVisible().catch(() => false)
             completionSnapshot = await inspectRemittanceCompletion(page)
