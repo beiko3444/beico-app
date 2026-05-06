@@ -850,10 +850,10 @@ const collectMoinLoginSubmitDiagnostics = async (page: PageLike) => {
     )
 }
 
-const submitMoinLoginFormDirectly = async (page: PageLike): Promise<string | null> => {
+const refreshMoinLoginInputEvents = async (page: PageLike): Promise<string | null> => {
     const result = await page.evaluate(`
         (() => {
-            const marker = 'login-submit-dom';
+            const marker = 'login-input-refresh-dom';
             const isVisible = (el) => {
                 if (!el) return false;
                 const rect = el.getBoundingClientRect();
@@ -876,47 +876,11 @@ const submitMoinLoginFormDirectly = async (page: PageLike): Promise<string | nul
             if (!email || !password || !email.value || !password.value) return null;
             emitInputEvents(email);
             emitInputEvents(password);
-
-            const form = password.closest('form') || email.closest('form') || document.querySelector('form');
-            const button = (form && form.querySelector('button[data-testid="button-login"], button[name="login_button"], button[type="submit"], input[type="submit"]'))
-                || document.querySelector('button[data-testid="button-login"], button[name="login_button"], form button[type="submit"], input[type="submit"]');
-            if (button) {
-                button.disabled = false;
-                button.removeAttribute('disabled');
-                button.removeAttribute('aria-disabled');
-            }
-            if (form) {
-                try {
-                    if (typeof form.requestSubmit === 'function') {
-                        form.requestSubmit(button || undefined);
-                        return marker + ':requestSubmit';
-                    }
-                } catch {
-                    // Fall through to event/click fallback.
-                }
-                let submitEvent;
-                try {
-                    submitEvent = new SubmitEvent('submit', { bubbles: true, cancelable: true, submitter: button || null });
-                } catch {
-                    submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-                }
-                const submitted = form.dispatchEvent(submitEvent);
-                if (!submitted) return marker + ':submit-event';
-            }
-            if (button && typeof button.click === 'function') {
-                const eventInit = { bubbles: true, cancelable: true, view: window };
-                try { button.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
-                try { button.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
-                try { button.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
-                try { button.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
-                button.click();
-                return marker + ':button-click';
-            }
-            return null;
+            return marker + ':events';
         })()
     `).catch(() => null)
 
-    return typeof result === 'string' && result.startsWith('login-submit-dom:') ? result : null
+    return typeof result === 'string' && result.startsWith('login-input-refresh-dom:') ? result : null
 }
 
 const clickMoinLoginSubmit = async (
@@ -939,16 +903,22 @@ const clickMoinLoginSubmit = async (
             const btn = page.locator(selector).first()
             await btn.waitFor({ state: 'visible', timeout: 3000 })
 
-            const directSubmit = await submitMoinLoginFormDirectly(page)
-            if (directSubmit) return directSubmit
+            const enableDeadline = Date.now() + 5000
+            while (Date.now() < enableDeadline) {
+                throwIfAbortRequested(abortSignal, 'Submit login')
+                await refreshMoinLoginInputEvents(page)
+
+                const disabled = await btn.isDisabled().catch(() => false)
+                const enabled = await btn.isEnabled().catch(() => !disabled)
+                if (!disabled && enabled) {
+                    await btn.click({ timeout: 5000 })
+                    return selector
+                }
+
+                await page.waitForTimeout(120)
+            }
 
             throwIfAbortRequested(abortSignal, 'Submit login')
-            const disabled = await btn.isDisabled().catch(() => false)
-            const enabled = await btn.isEnabled().catch(() => !disabled)
-            if (!disabled && enabled) {
-                await btn.click({ timeout: 5000 })
-                return selector
-            }
             sawVisibleDisabledSubmit = true
 
             const diagnostics = await collectMoinLoginSubmitDiagnostics(page)

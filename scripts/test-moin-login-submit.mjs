@@ -42,7 +42,7 @@ class MissingLocator extends FakeLocator {
 class FakePage {
   constructor(selectors, options = {}) {
     this.selectors = selectors
-    this.directSubmitResult = options.directSubmitResult ?? null
+    this.enableAfterRefresh = options.enableAfterRefresh ?? false
     this.locatorCalls = []
     this.waits = []
   }
@@ -61,7 +61,12 @@ class FakePage {
   }
 
   async evaluate(script = '') {
-    if (String(script).includes('login-submit-dom')) return this.directSubmitResult
+    if (String(script).includes('login-input-refresh-dom')) {
+      if (this.enableAfterRefresh) {
+        for (const locator of Object.values(this.selectors)) locator.disabled = false
+      }
+      return 'login-input-refresh-dom:events'
+    }
 
     return JSON.stringify({
       buttons: [
@@ -72,7 +77,7 @@ class FakePage {
   }
 }
 
-test('MOIN login submit bypasses a temporarily disabled form submit with direct form submit', async () => {
+test('MOIN login submit waits for the real form submit to become enabled before clicking', async () => {
   assert.ok(moin.__moinBizplusTestHooks?.clickMoinLoginSubmit, 'MOIN login test hook is unavailable')
 
   const submit = new FakeLocator('submit', { disabled: true })
@@ -85,13 +90,13 @@ test('MOIN login submit bypasses a temporarily disabled form submit with direct 
       'button[type="submit"]:has-text("로그인")': submit,
       'button:has-text("로그인")': headerLogin,
     },
-    { directSubmitResult: 'login-submit-dom:requestSubmit' },
+    { enableAfterRefresh: true },
   )
 
   const result = await moin.__moinBizplusTestHooks.clickMoinLoginSubmit(page, undefined)
 
-  assert.equal(result, 'login-submit-dom:requestSubmit')
-  assert.equal(submit.clicked, 0)
+  assert.equal(result, 'button[data-testid="button-login"]')
+  assert.equal(submit.clicked, 1)
   assert.equal(headerLogin.clicked, 0)
   assert.ok(!page.locatorCalls.includes('button:has-text("로그인")'))
 })
