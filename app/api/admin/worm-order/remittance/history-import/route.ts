@@ -250,6 +250,11 @@ export async function POST(request: Request) {
             )
         }
         if (error instanceof MoinAutomationError) {
+            console.warn('MOIN history import automation failed:', {
+                step: error.step,
+                message: error.message,
+                diagnostic: error.diagnostic ?? null,
+            })
             return NextResponse.json(
                 { error: `${error.step}: ${error.message}` },
                 { status: 502 },

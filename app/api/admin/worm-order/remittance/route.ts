@@ -555,6 +555,12 @@ export async function POST(request: Request) {
             }
 
             if (error instanceof MoinAutomationError) {
+                console.warn('MOIN remittance automation failed:', {
+                    step: error.step,
+                    message: error.message,
+                    authRelated: isAuthRelatedAutomationError(error),
+                    diagnostic: error.diagnostic ?? null,
+                })
                 if (isAuthRelatedAutomationError(error)) {
                     const failure = registerAuthFailure(guardState, credentialKey, Date.now())
                     const attemptsRemaining = Math.max(0, AUTH_FAILURE_THRESHOLD - failure.failedCount)

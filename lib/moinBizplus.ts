@@ -116,6 +116,12 @@ type BrowserLike = {
     close: () => Promise<void>
 }
 
+type ProxyConfig = {
+    server: string
+    username?: string
+    password?: string
+}
+
 type BrowserContextLike = {
     newPage: () => Promise<PageLike>
 }
@@ -227,8 +233,36 @@ const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) =>
     }
 }
 
-const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
+const resolveMoinProxyFromEnv = (): { proxy: ProxyConfig; source: string } | null => {
+    const candidates: Array<[string, string | undefined]> = [
+        ['MOIN_BIZPLUS_PROXY_URL', process.env.MOIN_BIZPLUS_PROXY_URL],
+        ['FIXIE_URL', process.env.FIXIE_URL],
+        ['QUOTAGUARDSTATIC_URL', process.env.QUOTAGUARDSTATIC_URL],
+        ['HTTPS_PROXY', process.env.HTTPS_PROXY],
+        ['HTTP_PROXY', process.env.HTTP_PROXY],
+    ]
+
+    for (const [source, raw] of candidates) {
+        if (!raw) continue
+        try {
+            const url = new URL(raw)
+            const proxy: ProxyConfig = { server: `${url.protocol}//${url.host}` }
+            if (url.username) proxy.username = decodeURIComponent(url.username)
+            if (url.password) proxy.password = decodeURIComponent(url.password)
+            return { proxy, source }
+        } catch {
+            // Ignore malformed proxy URLs and try the next configured value.
+        }
+    }
+
+    return null
+}
+
+const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string; proxySource: string | null }> => {
     const runtimeErrors: string[] = []
+    const proxyEntry = resolveMoinProxyFromEnv()
+    const proxy = proxyEntry?.proxy
+    const proxySource = proxyEntry?.source ?? null
 
     // Attempt 1: @sparticuz/chromium (for Vercel/AWS Lambda)
     try {
@@ -241,9 +275,10 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
             headless,
             executablePath,
             args: chromium.args?.length ? chromium.args : ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(proxy ? { proxy } : {}),
         })
 
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core+sparticuz' }
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core+sparticuz', proxySource }
     } catch (error) {
         runtimeErrors.push(`playwright-core+sparticuz: ${getErrorMessage(error)}`)
     }
@@ -261,9 +296,10 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
             headless,
             executablePath: customExecutablePath,
             args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(proxy ? { proxy } : {}),
         })
 
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path' }
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path', proxySource }
     } catch (error) {
         runtimeErrors.push(`playwright-core-custom-path: ${getErrorMessage(error)}`)
     }
@@ -2869,6 +2905,7 @@ export const fetchMoinRemittanceHistory = async (
         const launched = await launchBrowser(input.headless ?? true)
         browser = launched.browser
         steps.push(`runtime:${launched.runtime}`)
+        steps.push(`proxy:${launched.proxySource || 'none'}`)
 
         if (abortSignal) {
             const onAbort = () => {
@@ -3223,6 +3260,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const launched = await launchBrowser(input.headless ?? true)
         browser = launched.browser
         steps.push(`runtime:${launched.runtime}`)
+        steps.push(`proxy:${launched.proxySource || 'none'}`)
         pushTiming('browser-launched')
         throwIfAbortRequested(abortSignal, 'Launch browser')
 
