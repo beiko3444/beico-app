@@ -24,6 +24,7 @@ const DEFAULT_TIMEOUT_MS = 8000
 const LONG_TIMEOUT_MS = 18000
 const FAST_ELEMENT_TIMEOUT_MS = 1200
 const COMPLETION_FAST_TIMEOUT_MS = 2200
+const DESKTOP_VIEWPORT = { width: 1440, height: 1024 }
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
@@ -1985,6 +1986,69 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
     )
 }
 
+const dismissMoinUiOverlays = async (page: PageLike): Promise<number> => {
+    const result = await page.evaluate(`
+        (() => {
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const clickIt = (el) => {
+                if (!el || !isVisible(el)) return false;
+                const eventInit = { bubbles: true, cancelable: true, view: window };
+                try { el.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+                try { el.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+                try { el.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+                try { el.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+                if (typeof el.click === 'function') el.click();
+                return true;
+            };
+            const textOf = (el) => String((el && el.textContent) || '').replace(/\\s+/g, ' ').trim().toLowerCase();
+            const isCloseLike = (el) => {
+                const text = textOf(el);
+                const aria = String(el.getAttribute('aria-label') || '').toLowerCase();
+                const cls = String(el.className || '').toLowerCase();
+                return (
+                    text === 'x' ||
+                    text === '×' ||
+                    text.includes('닫기') ||
+                    text.includes('close') ||
+                    aria.includes('닫기') ||
+                    aria.includes('close') ||
+                    cls.includes('close')
+                );
+            };
+
+            let clicked = 0;
+            const scopes = Array.from(document.querySelectorAll('[role="dialog"], [class*="modal"], [class*="popup"], [class*="layer"]'));
+            for (const scope of scopes) {
+                if (!isVisible(scope)) continue;
+                const closeCandidate = Array.from(scope.querySelectorAll('button, [role="button"], a, span, div')).find((el) => isCloseLike(el));
+                if (closeCandidate && clickIt(closeCandidate)) clicked += 1;
+            }
+
+            const banner = Array.from(document.querySelectorAll('body *')).find((el) => {
+                if (!isVisible(el)) return false;
+                const text = textOf(el);
+                return text.includes('새로워진 수취인') || text.includes('pc에 최적화');
+            });
+            if (banner) {
+                const bannerScope = banner.closest('[role="dialog"], [class*="modal"], [class*="popup"], [class*="banner"], [class*="notice"]') || banner.parentElement;
+                if (bannerScope) {
+                    const closeCandidate = Array.from(bannerScope.querySelectorAll('button, [role="button"], a, span, div')).find((el) => isCloseLike(el));
+                    if (closeCandidate && clickIt(closeCandidate)) clicked += 1;
+                }
+            }
+
+            return clicked;
+        })()
+    `).catch(() => 0)
+
+    return Number(result || 0)
+}
+
 const performMoinLogin = async (
     page: PageLike,
     loginId: string,
@@ -1995,6 +2059,10 @@ const performMoinLogin = async (
     throwIfAbortRequested(abortSignal, 'Open login page')
     const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
     steps.push(`open-login-page:${loginWaitUntil}`)
+    const overlayDismissed = await dismissMoinUiOverlays(page)
+    if (overlayDismissed > 0) {
+        steps.push(`dismiss-overlays:${overlayDismissed}`)
+    }
 
     throwIfAbortRequested(abortSignal, 'Fill login ID')
     await typeFirstVisible(
@@ -2755,7 +2823,7 @@ export const fetchMoinRemittanceHistory = async (
             throwIfAbortRequested(abortSignal, 'Initialize browser')
         }
 
-        const context = await browser.newContext({ locale: 'ko-KR' })
+        const context = await browser.newContext({ locale: 'ko-KR', viewport: DESKTOP_VIEWPORT })
         const page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
@@ -3114,7 +3182,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         throwIfAbortRequested(abortSignal, 'Create browser context')
-        const context = await browser.newContext({ locale: 'ko-KR' })
+        const context = await browser.newContext({ locale: 'ko-KR', viewport: DESKTOP_VIEWPORT })
         page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
@@ -3124,6 +3192,10 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
         steps.push(`open-login-page:${loginWaitUntil}`)
         pushTiming('login-page-opened')
+        const overlayDismissed = await dismissMoinUiOverlays(page)
+        if (overlayDismissed > 0) {
+            steps.push(`dismiss-overlays:${overlayDismissed}`)
+        }
 
         // ???? Step 2: Fill login credentials (type char-by-char for React) ????
         throwIfAbortRequested(abortSignal, 'Fill login ID')
