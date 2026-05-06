@@ -2103,35 +2103,63 @@ const dismissMoinUiOverlays = async (page: PageLike): Promise<number> => {
                 const text = textOf(el);
                 const aria = String(el.getAttribute('aria-label') || '').toLowerCase();
                 const cls = String(el.className || '').toLowerCase();
+                const title = String(el.getAttribute('title') || '').toLowerCase();
                 return (
                     text === 'x' ||
                     text === '×' ||
+                    text === '✕' ||
+                    text === '× 닫기' ||
                     text.includes('닫기') ||
                     text.includes('close') ||
                     aria.includes('닫기') ||
                     aria.includes('close') ||
+                    title.includes('닫기') ||
+                    title.includes('close') ||
                     cls.includes('close')
                 );
+            };
+            const visibleButtonsIn = (root) => Array.from(root.querySelectorAll('button, [role="button"], a, span, div'))
+                .filter((el) => isVisible(el));
+            const clickCloseInScope = (scope) => {
+                if (!scope || !isVisible(scope)) return false;
+                const explicit = visibleButtonsIn(scope).find((el) => isCloseLike(el));
+                if (explicit && clickIt(explicit)) return true;
+
+                const scopeRect = scope.getBoundingClientRect();
+                const geometric = visibleButtonsIn(scope)
+                    .map((el) => ({ el, rect: el.getBoundingClientRect(), text: textOf(el) }))
+                    .filter(({ rect, text }) => {
+                        if (!rect.width || !rect.height) return false;
+                        if (text && text !== 'x' && text !== '×' && text !== '✕') return false;
+                        return (
+                            rect.left >= scopeRect.left + scopeRect.width * 0.55 &&
+                            rect.top <= scopeRect.top + Math.max(90, scopeRect.height * 0.35)
+                        );
+                    })
+                    .sort((a, b) => (b.rect.left - a.rect.left) || (a.rect.top - b.rect.top))[0]?.el;
+                return Boolean(geometric && clickIt(geometric));
             };
 
             let clicked = 0;
             const scopes = Array.from(document.querySelectorAll('[role="dialog"], [class*="modal"], [class*="popup"], [class*="layer"]'));
             for (const scope of scopes) {
-                if (!isVisible(scope)) continue;
-                const closeCandidate = Array.from(scope.querySelectorAll('button, [role="button"], a, span, div')).find((el) => isCloseLike(el));
-                if (closeCandidate && clickIt(closeCandidate)) clicked += 1;
+                if (clickCloseInScope(scope)) clicked += 1;
             }
 
-            const banner = Array.from(document.querySelectorAll('body *')).find((el) => {
+            const overlayMarkers = Array.from(document.querySelectorAll('body *')).filter((el) => {
                 if (!isVisible(el)) return false;
                 const text = textOf(el);
                 return text.includes('새로워진 수취인') || text.includes('pc에 최적화');
             });
-            if (banner) {
-                const bannerScope = banner.closest('[role="dialog"], [class*="modal"], [class*="popup"], [class*="banner"], [class*="notice"]') || banner.parentElement;
-                if (bannerScope) {
-                    const closeCandidate = Array.from(bannerScope.querySelectorAll('button, [role="button"], a, span, div')).find((el) => isCloseLike(el));
-                    if (closeCandidate && clickIt(closeCandidate)) clicked += 1;
+
+            for (const marker of overlayMarkers) {
+                let current = marker;
+                for (let depth = 0; current && current !== document.body && depth < 8; depth += 1) {
+                    if (clickCloseInScope(current)) {
+                        clicked += 1;
+                        break;
+                    }
+                    current = current.parentElement;
                 }
             }
 
@@ -4107,6 +4135,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 export const __moinBizplusTestHooks = {
     typeFirstVisible,
     clickMoinLoginSubmit,
+    dismissMoinUiOverlays,
     clickLastVisible,
     getMoinRemittanceWindowState,
     normalizeMoinTransaction,
