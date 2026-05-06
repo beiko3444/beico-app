@@ -2046,7 +2046,12 @@ const performMoinLogin = async (
     throwIfAbortRequested(abortSignal, 'Verify login')
     await Promise.resolve()
 
-    if (loginFailed || page.url().includes('/login')) {
+    const loginCheckUrl = page.url()
+    if (loginFailed && !loginCheckUrl.includes('/login')) {
+        steps.push(`login-warning-nonblocking:url:${loginCheckUrl}`)
+    }
+
+    if (loginCheckUrl.includes('/login')) {
         const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
         const failureType = classifyMoinLoginFailure(bodyText)
         if (failureType === 'locked') {
@@ -2062,10 +2067,10 @@ const performMoinLogin = async (
         } else {
             throw new MoinAutomationError(
                 'Login Failed',
-                `Login failed (URL: ${page.url()}). Please verify the account credentials.`,
-            )
+                    `Login failed (URL: ${loginCheckUrl}). Please verify the account credentials.`,
+                )
+            }
         }
-    }
 
     steps.push(`post-login-url:${page.url()}`)
 }
@@ -3184,7 +3189,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             }
         }
 
-        if (loginFailed || page.url().includes('/login')) {
+        const loginCheckUrl = page.url()
+        if (loginFailed && !loginCheckUrl.includes('/login')) {
+            steps.push(`login-warning-nonblocking:url:${loginCheckUrl}`)
+        }
+
+        if (loginCheckUrl.includes('/login')) {
             // Extract text from the page to see the exact error for the user
             const bodyText = await page.locator('body').textContent().catch(() => '') || ''
             const failureType = classifyMoinLoginFailure(bodyText)
@@ -3201,7 +3211,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             } else {
                 throw new MoinAutomationError(
                     'Login Failed',
-                    `Login failed (URL: ${page.url()}). Please verify the account credentials.`
+                    `Login failed (URL: ${loginCheckUrl}). Please verify the account credentials.`
                 )
             }
         }
