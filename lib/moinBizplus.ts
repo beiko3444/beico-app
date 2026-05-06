@@ -25,6 +25,7 @@ const LONG_TIMEOUT_MS = 18000
 const FAST_ELEMENT_TIMEOUT_MS = 1200
 const COMPLETION_FAST_TIMEOUT_MS = 2200
 const DESKTOP_VIEWPORT = { width: 1440, height: 1024 }
+const LOGIN_TYPING_DELAY_MS = 24
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
@@ -420,8 +421,8 @@ const typeFirstVisible = async (
             await target.click({ timeout: 5000 })
             // Clear any existing value first
             await target.fill('')
-            // Type character-by-character to trigger React onChange without artificial delay.
-            await target.pressSequentially(value, { delay: 0 })
+            // MOIN's login form intermittently ignores zero-delay synthetic typing.
+            await target.pressSequentially(value, { delay: LOGIN_TYPING_DELAY_MS })
             return
         } catch {
             // Try next selector.
@@ -3997,6 +3998,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 }
 
 export const __moinBizplusTestHooks = {
+    typeFirstVisible,
     clickMoinLoginSubmit,
     clickLastVisible,
     getMoinRemittanceWindowState,
