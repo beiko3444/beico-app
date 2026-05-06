@@ -273,6 +273,71 @@ type RemittanceCandidate = {
     appliedAtIso?: string | null
 }
 
+const formatMoinDiagnosticSuffix = (diagnostic: unknown) => {
+    if (!diagnostic || typeof diagnostic !== 'object') return ''
+
+    const value = diagnostic as {
+        url?: unknown
+        lastSteps?: unknown
+        inputs?: unknown
+        buttons?: unknown
+        bodyPreview?: unknown
+        diagnosticError?: unknown
+    }
+    const parts: string[] = []
+
+    if (typeof value.url === 'string' && value.url.trim()) {
+        parts.push(`url=${value.url}`)
+    }
+    if (Array.isArray(value.lastSteps)) {
+        const lastSteps = value.lastSteps
+            .filter((step): step is string => typeof step === 'string' && step.trim().length > 0)
+            .slice(-8)
+        if (lastSteps.length > 0) {
+            parts.push(`steps=${lastSteps.join(' -> ')}`)
+        }
+    }
+    if (Array.isArray(value.inputs)) {
+        const inputs = value.inputs
+            .filter((input): input is { type?: unknown; name?: unknown; id?: unknown; placeholder?: unknown } => Boolean(input) && typeof input === 'object')
+            .slice(0, 8)
+            .map((input) => [
+                typeof input.type === 'string' ? input.type : '',
+                typeof input.name === 'string' ? input.name : '',
+                typeof input.id === 'string' ? input.id : '',
+                typeof input.placeholder === 'string' ? input.placeholder : '',
+            ].filter(Boolean).join('/'))
+            .filter(Boolean)
+        if (inputs.length > 0) {
+            parts.push(`inputs=${inputs.join(', ')}`)
+        }
+    }
+    if (Array.isArray(value.buttons)) {
+        const buttons = value.buttons
+            .filter((button): button is { text?: unknown; href?: unknown; disabled?: unknown } => Boolean(button) && typeof button === 'object')
+            .slice(0, 8)
+            .map((button) => {
+                const text = typeof button.text === 'string' && button.text.trim()
+                    ? button.text.trim()
+                    : (typeof button.href === 'string' ? button.href.trim() : '')
+                if (!text) return ''
+                return button.disabled === true ? `${text}(disabled)` : text
+            })
+            .filter(Boolean)
+        if (buttons.length > 0) {
+            parts.push(`buttons=${buttons.join(', ')}`)
+        }
+    }
+    if (typeof value.bodyPreview === 'string' && value.bodyPreview.trim()) {
+        parts.push(`body=${value.bodyPreview.trim().slice(0, 260)}`)
+    }
+    if (typeof value.diagnosticError === 'string' && value.diagnosticError.trim()) {
+        parts.push(`diagError=${value.diagnosticError}`)
+    }
+
+    return parts.length > 0 ? `\n진단: ${parts.join(' | ')}` : ''
+}
+
 type WormForwardLogItem = {
     id: string
     orderId: string | null
@@ -2420,7 +2485,7 @@ export default function WormOrderPage() {
                     return
                 }
                 const baseMsg = typeof result?.error === 'string' ? result.error : '송금 정보 가져오기에 실패했습니다.'
-                throw new Error(baseMsg)
+                throw new Error(`${baseMsg}${formatMoinDiagnosticSuffix(result?.diagnostic)}`)
             }
             await fetchWormOrders()
             alert(result?.message || '송금 정보를 가져와 저장했습니다.')
@@ -2453,7 +2518,7 @@ export default function WormOrderPage() {
             const result = await response.json().catch(() => null)
             if (!response.ok || !result?.ok) {
                 const baseMsg = typeof result?.error === 'string' ? result.error : '선택한 거래에서 정보를 가져오지 못했습니다.'
-                throw new Error(baseMsg)
+                throw new Error(`${baseMsg}${formatMoinDiagnosticSuffix(result?.diagnostic)}`)
             }
             setRemittanceCandidates(null)
             setRemittanceCandidatesOrder(null)
@@ -4124,7 +4189,7 @@ export default function WormOrderPage() {
                 </div>
 
                 {wormOrderListError && (
-                    <p className="mt-3 text-xs font-semibold text-red-600">{wormOrderListError}</p>
+                    <p className="mt-3 whitespace-pre-wrap text-xs font-semibold text-red-600">{wormOrderListError}</p>
                 )}
 
                 <div className="mt-3 overflow-x-auto">

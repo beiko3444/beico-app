@@ -256,7 +256,10 @@ export async function POST(request: Request) {
                 diagnostic: error.diagnostic ?? null,
             })
             return NextResponse.json(
-                { error: `${error.step}: ${error.message}` },
+                {
+                    error: `${error.step}: ${error.message}`,
+                    diagnostic: error.diagnostic ?? null,
+                },
                 { status: 502 },
             )
         }
