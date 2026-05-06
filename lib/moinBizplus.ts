@@ -61,6 +61,19 @@ const KO_SUCCESS_KEYWORDS = [
     '\uC811\uC218\uB418\uC5C8',
 ]
 
+const MOIN_REMITTANCE_TIME_ZONE = 'Asia/Seoul'
+const MOIN_REMITTANCE_OPEN_WEEK_MINUTE = 1 * 24 * 60 + 4 * 60
+const MOIN_REMITTANCE_CLOSE_WEEK_MINUTE = 5 * 24 * 60 + 18 * 60
+const WEEKDAY_INDEX: Record<string, number> = {
+    sun: 0,
+    mon: 1,
+    tue: 2,
+    wed: 3,
+    thu: 4,
+    fri: 5,
+    sat: 6,
+}
+
 type BrowserLike = {
     newContext: (options?: Record<string, unknown>) => Promise<BrowserContextLike>
     close: () => Promise<void>
@@ -431,6 +444,38 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
     return page.url()
 }
 
+const getMoinRemittanceWindowState = (date = new Date()) => {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: MOIN_REMITTANCE_TIME_ZONE,
+        weekday: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        hourCycle: 'h23',
+    }).formatToParts(date)
+
+    const weekdayToken = parts.find((part) => part.type === 'weekday')?.value.toLowerCase().slice(0, 3)
+    const weekday = weekdayToken ? WEEKDAY_INDEX[weekdayToken] : undefined
+    const hour = Number(parts.find((part) => part.type === 'hour')?.value)
+    const minute = Number(parts.find((part) => part.type === 'minute')?.value)
+
+    if (weekday === undefined || !Number.isFinite(hour) || !Number.isFinite(minute)) {
+        return {
+            isOpen: true,
+            weekMinute: null,
+            label: 'unknown KST time',
+        }
+    }
+
+    const weekMinute = weekday * 24 * 60 + hour * 60 + minute
+    return {
+        isOpen:
+            weekMinute >= MOIN_REMITTANCE_OPEN_WEEK_MINUTE &&
+            weekMinute < MOIN_REMITTANCE_CLOSE_WEEK_MINUTE,
+        weekMinute,
+        label: `${weekdayToken?.toUpperCase() ?? 'UNK'} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')} KST`,
+    }
+}
+
 const assertMoinRemittanceOpen = async (page: PageLike, step = 'Check MOIN operating hours') => {
     const bodyText = await page.locator('body').textContent().catch(() => '') || ''
     const compactText = bodyText.replace(/\s+/g, ' ').trim()
@@ -441,9 +486,15 @@ const assertMoinRemittanceOpen = async (page: PageLike, step = 'Check MOIN opera
 
     if (!isRestricted) return
 
+    // MOIN keeps the operating-hours guide visible during open hours, so the
+    // guide text alone must not be treated as an actual service block.
+    const windowState = getMoinRemittanceWindowState()
+    if (windowState.isOpen) return
+
     const hoursMatch = compactText.match(/월요일\s*오전\s*4시\s*~\s*금요일\s*오후\s*6시/)
     const blockedMatch = compactText.match(/금요일\s*오후\s*6시\s*~\s*월요일\s*오전\s*4시/)
     const summary = [
+        `current: ${windowState.label}`,
         hoursMatch ? `available: ${hoursMatch[0]}` : null,
         blockedMatch ? `restricted: ${blockedMatch[0]}` : null,
     ].filter(Boolean).join(' | ')
@@ -3253,4 +3304,5 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
 export const __moinBizplusTestHooks = {
     clickMoinLoginSubmit,
+    getMoinRemittanceWindowState,
 }
