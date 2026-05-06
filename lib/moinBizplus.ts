@@ -26,6 +26,8 @@ const FAST_ELEMENT_TIMEOUT_MS = 1200
 const COMPLETION_FAST_TIMEOUT_MS = 2200
 const DESKTOP_VIEWPORT = { width: 1440, height: 1024 }
 const LOGIN_TYPING_DELAY_MS = 24
+const FORM_TYPING_DELAY_MS = 24
+const TRANSFER_ACTION_TIMEOUT_MS = 4500
 
 const KO_LOGIN = '\uB85C\uADF8\uC778'
 const KO_REMIT = '\uC1A1\uAE08\uD558\uAE30'
@@ -402,6 +404,76 @@ const fillFirstVisible = async (
     throw new MoinAutomationError(step, `Could not find a fillable input for step: ${step} (url: ${page.url()})`)
 }
 
+const typeInputDirectly = async (
+    page: PageLike,
+    selectors: string[],
+    value: string,
+): Promise<string | null> => {
+    const result = await page.evaluate(`
+        (() => {
+            const selectors = ${JSON.stringify(selectors)};
+            const value = ${JSON.stringify(value)};
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            for (const selector of selectors) {
+                let candidates = [];
+                try {
+                    candidates = Array.from(document.querySelectorAll(selector));
+                } catch {
+                    continue;
+                }
+                const input = candidates.find((el) => isVisible(el) && !el.disabled && !el.readOnly);
+                if (!input) continue;
+                try { input.focus(); } catch {}
+                if (setter) setter.call(input, '');
+                else input.value = '';
+                input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward', data: null }));
+                if (setter) setter.call(input, value);
+                else input.value = value;
+                input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: value }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+                input.dispatchEvent(new Event('blur', { bubbles: true }));
+                return 'direct-input:' + selector;
+            }
+            return null;
+        })()
+    `).catch(() => null)
+
+    return typeof result === 'string' && result ? result : null
+}
+
+const collectInputDiagnostics = async (page: PageLike): Promise<string> => {
+    return String(
+        await page.evaluate(`
+            (() => {
+                const isVisible = (el) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                };
+                const inputs = Array.from(document.querySelectorAll('input')).map((el) => ({
+                    type: el.getAttribute('type') || '',
+                    name: el.getAttribute('name') || '',
+                    placeholder: el.getAttribute('placeholder') || '',
+                    autocomplete: el.getAttribute('autocomplete') || '',
+                    visible: isVisible(el),
+                    disabled: Boolean(el.disabled),
+                    readOnly: Boolean(el.readOnly),
+                    valueLength: String(el.value || '').length,
+                }));
+                return JSON.stringify(inputs).slice(0, 1200);
+            })()
+        `).catch((error) => `diag-failed:${getErrorMessage(error)}`)
+    )
+}
+
 /**
  * Type characters one-by-one into an input field.
  * This triggers proper React synthetic onChange events that fill() may miss.
@@ -414,22 +486,30 @@ const typeFirstVisible = async (
     step: string,
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
+    const errors: string[] = []
     for (const selector of selectors) {
         try {
             const target = page.locator(selector).first()
-            await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, FAST_ELEMENT_TIMEOUT_MS) })
+            await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS) })
             await target.click({ timeout: 5000 })
             // Clear any existing value first
             await target.fill('')
             // MOIN's login form intermittently ignores zero-delay synthetic typing.
             await target.pressSequentially(value, { delay: LOGIN_TYPING_DELAY_MS })
             return
-        } catch {
-            // Try next selector.
+        } catch (error) {
+            errors.push(`${selector}: ${getErrorMessage(error).slice(0, 180)}`)
         }
     }
 
-    throw new MoinAutomationError(step, `Could not find a typeable input for step: ${step} (url: ${page.url()})`)
+    const directResult = await typeInputDirectly(page, selectors, value)
+    if (directResult) return
+
+    const diag = await collectInputDiagnostics(page)
+    throw new MoinAutomationError(
+        step,
+        `Could not find a typeable input for step: ${step} (url: ${page.url()}) errors=${errors.slice(-5).join(' | ')} inputs=${diag}`
+    )
 }
 
 const uploadFirstFileInput = async (
@@ -459,9 +539,15 @@ const uploadFirstFileInput = async (
         'button:has-text("파일")',
         'button:has-text("첨부")',
         'button:has-text("업로드")',
+        'button:has-text("PDF")',
+        'button:has-text("Invoice")',
+        'button:has-text("invoice")',
         '[role="button"]:has-text("파일")',
         '[role="button"]:has-text("첨부")',
         '[role="button"]:has-text("업로드")',
+        '[role="button"]:has-text("PDF")',
+        '[role="button"]:has-text("Invoice")',
+        '[role="button"]:has-text("invoice")',
     ]) {
         try {
             const btn = page.locator(trigger).first()
@@ -3665,7 +3751,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 await target.waitFor({ state: 'visible', timeout: 3000 })
                 await target.click({ timeout: 3000 })
                 await target.fill('')
-                await target.pressSequentially(input.amountUsd, { delay: 0 })
+                await target.pressSequentially(input.amountUsd, { delay: FORM_TYPING_DELAY_MS })
                 const inspect = await inspectAmountFieldValue(page, input.amountUsd)
                 if (inspect.matched) {
                     amountFilled = true
@@ -3724,7 +3810,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                     const target = page.locator(selector).first()
                     await target.click({ timeout: 3000, force: true })
                     await target.fill('')
-                    await target.pressSequentially(input.amountUsd, { delay: 0 })
+                    await target.pressSequentially(input.amountUsd, { delay: FORM_TYPING_DELAY_MS })
                     const inspect = await inspectAmountFieldValue(page, input.amountUsd)
                     if (inspect.matched) {
                         amountFilled = true
@@ -3802,7 +3888,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         for (let attempt = 0; attempt < 2; attempt += 1) {
             throwIfAbortRequested(abortSignal, 'Next after amount')
             const beforeUrl = page.url()
-            await clickNextStep(page, FAST_ELEMENT_TIMEOUT_MS)
+            await clickNextStep(page, TRANSFER_ACTION_TIMEOUT_MS)
             const uploadWaitPage = page
             await waitForFastCondition(uploadWaitPage, async () => {
                 const currentUrl = uploadWaitPage.url()
@@ -3832,7 +3918,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 mimeType: input.invoiceMimeType,
                 buffer: input.invoiceBuffer,
             },
-            FAST_ELEMENT_TIMEOUT_MS
+            TRANSFER_ACTION_TIMEOUT_MS
         )
         steps.push('upload-invoice')
         pushTiming('invoice-uploaded')
@@ -3840,7 +3926,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // ???? Step 9: Next step after upload ??????????????????????????????????????????????????????????????????
         throwIfAbortRequested(abortSignal, 'Next after upload')
         const uploadUrl = page.url()
-        await clickNextStep(page, FAST_ELEMENT_TIMEOUT_MS)
+        await clickNextStep(page, TRANSFER_ACTION_TIMEOUT_MS)
         const confirmationPage = page
         await waitForFastCondition(confirmationPage, async () => {
             const currentUrl = confirmationPage.url()
@@ -3853,7 +3939,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // ???? Step 10: Check agreement ??????????????????????????????????????????????????????????????????????????????
         throwIfAbortRequested(abortSignal, 'Agreement')
-        await checkAgreement(page, FAST_ELEMENT_TIMEOUT_MS)
+        await checkAgreement(page, TRANSFER_ACTION_TIMEOUT_MS)
         steps.push('check-agreement')
 
         throwIfAbortRequested(abortSignal, 'Inspect pricing summary')
@@ -3883,7 +3969,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // Step 11: Submit remittance. The final page can render several similar
         // action buttons, so click the last visible matching action.
         throwIfAbortRequested(abortSignal, 'Submit remittance')
-        const submitSelectorUsed = await clickFinalRemittanceSubmit(page, FAST_ELEMENT_TIMEOUT_MS)
+        const submitSelectorUsed = await clickFinalRemittanceSubmit(page, TRANSFER_ACTION_TIMEOUT_MS)
         steps.push(`submit-remittance:${submitSelectorUsed}`)
         pushTiming('final-submit-clicked')
 
