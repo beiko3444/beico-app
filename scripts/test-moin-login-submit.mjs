@@ -40,8 +40,9 @@ class MissingLocator extends FakeLocator {
 }
 
 class FakePage {
-  constructor(selectors) {
+  constructor(selectors, options = {}) {
     this.selectors = selectors
+    this.directSubmitResult = options.directSubmitResult ?? null
     this.locatorCalls = []
     this.waits = []
   }
@@ -59,7 +60,9 @@ class FakePage {
     this.waits.push(ms)
   }
 
-  async evaluate() {
+  async evaluate(script = '') {
+    if (String(script).includes('login-submit-dom')) return this.directSubmitResult
+
     return JSON.stringify({
       buttons: [
         { text: '로그인', name: 'login_button', testid: 'button-login', disabled: true },
@@ -69,7 +72,31 @@ class FakePage {
   }
 }
 
-test('MOIN login submit does not click the header login button when the form submit is disabled', async () => {
+test('MOIN login submit bypasses a temporarily disabled form submit with direct form submit', async () => {
+  assert.ok(moin.__moinBizplusTestHooks?.clickMoinLoginSubmit, 'MOIN login test hook is unavailable')
+
+  const submit = new FakeLocator('submit', { disabled: true })
+  const headerLogin = new FakeLocator('header-login')
+  const page = new FakePage(
+    {
+      'button[data-testid="button-login"]': submit,
+      'button[name="login_button"]': submit,
+      'form button[type="submit"]': submit,
+      'button[type="submit"]:has-text("로그인")': submit,
+      'button:has-text("로그인")': headerLogin,
+    },
+    { directSubmitResult: 'login-submit-dom:requestSubmit' },
+  )
+
+  const result = await moin.__moinBizplusTestHooks.clickMoinLoginSubmit(page, undefined)
+
+  assert.equal(result, 'login-submit-dom:requestSubmit')
+  assert.equal(submit.clicked, 0)
+  assert.equal(headerLogin.clicked, 0)
+  assert.ok(!page.locatorCalls.includes('button:has-text("로그인")'))
+})
+
+test('MOIN login submit still rejects a disabled form submit when direct submit is unavailable', async () => {
   assert.ok(moin.__moinBizplusTestHooks?.clickMoinLoginSubmit, 'MOIN login test hook is unavailable')
 
   const submit = new FakeLocator('submit', { disabled: true })
