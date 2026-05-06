@@ -133,6 +133,7 @@ export type MoinRemittanceInput = {
     invoiceBuffer: Buffer
     headless?: boolean
     abortSignal?: AbortSignal
+    prepareOnly?: boolean
 }
 
 export type MoinRemittanceResult = {
@@ -140,6 +141,12 @@ export type MoinRemittanceResult = {
     completedAt: string
     steps: string[]
     pricingSummary: MoinRemittancePricingSummary | null
+    submitted: boolean
+    stoppedBeforeConfirmation?: boolean
+    finalActionCandidates?: string[]
+    selectorsUsed?: string[]
+    finalPageTitle?: string
+    finalBodyPreview?: string
 }
 
 export type MoinRemittancePricingSummary = {
@@ -1196,6 +1203,51 @@ const inspectRemittanceCompletion = async (page: PageLike) => {
     }
 
     return result
+}
+
+const inspectPreSubmitState = async (page: PageLike) => {
+    const result = await page.evaluate(`
+        (() => {
+            const norm = (value) => (value || '').replace(/\\s+/g, ' ').trim();
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const title = document.title || '';
+            const bodyText = norm((document.body && document.body.innerText) || '');
+            const buttons = Array.from(document.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"]'))
+                .filter((el) => isVisible(el))
+                .map((el) => norm([
+                    el.textContent || '',
+                    el.getAttribute && el.getAttribute('aria-label') || '',
+                    el.getAttribute && el.getAttribute('title') || '',
+                    el.getAttribute && el.getAttribute('value') || '',
+                ].join(' ')))
+                .filter(Boolean)
+                .slice(0, 30);
+            const finalKeywords = [${JSON.stringify(KO_REMIT)}, ${JSON.stringify(KO_REMIT_SHORT)}, ${JSON.stringify(KO_REMIT_REQUEST)}, ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)}, ${JSON.stringify(KO_APPLY)}, ${JSON.stringify(KO_SUBMIT)}, ${JSON.stringify(KO_NEXT)}, ${JSON.stringify(KO_NEXT_STEP)}, ${JSON.stringify(KO_NEXT_STEP_SPACED)}, '확인', '완료', '계속'];
+            const finalActionCandidates = buttons.filter((text) => finalKeywords.some((keyword) => keyword && text.includes(keyword))).slice(0, 12);
+            return {
+                title,
+                bodyPreview: bodyText.slice(0, 3000),
+                finalActionCandidates,
+            };
+        })()
+    `) as {
+        title: string
+        bodyPreview: string
+        finalActionCandidates: string[]
+    }
+
+    return {
+        title: typeof result.title === 'string' ? result.title : '',
+        bodyPreview: typeof result.bodyPreview === 'string' ? result.bodyPreview : '',
+        finalActionCandidates: Array.isArray(result.finalActionCandidates)
+            ? result.finalActionCandidates.filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
+            : [],
+    }
 }
 
 const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemittancePricingSummary> => {
@@ -2728,6 +2780,15 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
     let page: PageLike | null = null
     const steps: string[] = []
     const abortSignal = input.abortSignal
+    const selectorsUsed = [
+        'input[name="email"]',
+        'input[name="password"]',
+        'button[name="login_button"]',
+        'input[placeholder="받는 분 이름, 회사명, 수취인 별칭"]',
+        `page.locator('div[role="button"]').filter({ hasText: '${TARGET_COMPANY_NAME}' })`,
+        `button:has-text("${KO_NEXT_STEP}")`,
+        `button:has-text("${KO_NEXT_STEP_SPACED}")`,
+    ]
     let abortListenerCleanup: (() => void) | null = null
 
     try {
@@ -3399,6 +3460,25 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         const pricingSummary = await inspectRemittancePricingSummary(page)
         steps.push(`pricing-summary:${JSON.stringify(pricingSummary).slice(0, 220)}`)
 
+        if (input.prepareOnly !== false) {
+            const preSubmitSnapshot = await inspectPreSubmitState(page)
+            steps.push(`prepare-only-final-candidates:${JSON.stringify(preSubmitSnapshot.finalActionCandidates).slice(0, 220)}`)
+            steps.push('stopped-before-final-confirmation')
+
+            return {
+                finalUrl: page.url(),
+                completedAt: new Date().toISOString(),
+                steps,
+                pricingSummary,
+                submitted: false,
+                stoppedBeforeConfirmation: true,
+                finalActionCandidates: preSubmitSnapshot.finalActionCandidates,
+                selectorsUsed,
+                finalPageTitle: preSubmitSnapshot.title,
+                finalBodyPreview: preSubmitSnapshot.bodyPreview,
+            }
+        }
+
         // ???? Step 11: Submit remittance ??????????????????????????????????????????????????????????????????????????
         // On the ?筌먲퐢沅??筌먦끉逾?page, the submit button says "??酉????ル―?? (not "???깅쾳 ??節띉?)
         throwIfAbortRequested(abortSignal, 'Submit remittance')
@@ -3469,6 +3549,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             completedAt: new Date().toISOString(),
             steps,
             pricingSummary,
+            submitted: true,
+            stoppedBeforeConfirmation: false,
+            selectorsUsed,
         }
     } catch (error) {
         if (error instanceof MoinAutomationCanceledError) {

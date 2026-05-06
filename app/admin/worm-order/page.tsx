@@ -456,6 +456,7 @@ const REMITTANCE_STEP_HINTS: Array<{ keys: string[]; stage: RemittanceProgressSt
     { keys: ['fill-usd-amount', 'next-after-amount'], stage: { percent: 68, label: '송금 금액을 입력하는 중...' } },
     { keys: ['upload-invoice', 'next-after-upload'], stage: { percent: 78, label: '인보이스 PDF를 업로드하는 중...' } },
     { keys: ['check-agreement'], stage: { percent: 88, label: '약관 동의 및 제출 준비 중...' } },
+    { keys: ['stopped-before-final-confirmation', 'prepare-only-final-candidates'], stage: { percent: 94, label: '최종 송금 확인 직전까지 준비 완료...' } },
     { keys: ['submit-remittance'], stage: { percent: 96, label: '최종 송금 신청 중...' } },
 ]
 
@@ -3518,16 +3519,29 @@ export default function WormOrderPage() {
             const resolvedStage = resolveRemittanceStageFromStep(lastAutomationStep)
             const pricingSummary = sanitizeRemittancePricingSummary(result?.result?.pricingSummary)
             const savedOrder = result?.savedOrder
+            const preparedOnly = result?.preparedOnly === true || result?.result?.stoppedBeforeConfirmation === true
+            const finalActionCandidates = Array.isArray(result?.result?.finalActionCandidates)
+                ? (result.result.finalActionCandidates as unknown[]).filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
+                : []
+            const selectorHints = Array.isArray(result?.result?.selectorsUsed)
+                ? (result.result.selectorsUsed as unknown[]).filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
+                : []
 
             setRemittanceAttemptsRemaining(null)
             setRemittanceLockedUntil(null)
-            setRemittanceSuccess('모인 BizPlus 송금 신청이 완료되었습니다.')
-            setRemittanceProgress(100)
-            setRemittanceProgressLabel(resolvedStage?.label || '송금 신청이 완료되었습니다.')
+            if (preparedOnly) {
+                setRemittanceSuccess('모인 BizPlus 최종 확인 직전까지 자동 준비를 완료했습니다. 마지막 송금 버튼은 자동으로 누르지 않았습니다.')
+                setRemittanceProgress(Math.max(resolvedStage?.percent ?? 94, 94))
+                setRemittanceProgressLabel('최종 송금 확인 직전에서 안전하게 멈췄습니다.')
+            } else {
+                setRemittanceSuccess('모인 BizPlus 송금 신청이 완료되었습니다.')
+                setRemittanceProgress(100)
+                setRemittanceProgressLabel(resolvedStage?.label || '송금 신청이 완료되었습니다.')
+            }
             setRemittancePricingSummary(pricingSummary)
             setRemittancePricingSummaryOrderId(activeWormOrderRecord.id)
 
-            if (savedOrder?.orderNumber) {
+            if (!preparedOnly && savedOrder?.orderNumber) {
                 setRemittanceSaveInfo({
                     orderNumber: savedOrder.orderNumber,
                     savedAt: typeof savedOrder.remittanceAppliedAt === 'string'
@@ -3538,8 +3552,20 @@ export default function WormOrderPage() {
                 setRemittanceSaveInfo(null)
             }
 
-            setRemittanceSaveWarning(typeof result?.saveWarning === 'string' ? result.saveWarning : '')
-            if (savedOrder?.id) {
+            const prepareOnlyWarning = preparedOnly
+                ? [
+                    typeof result?.saveWarning === 'string' ? result.saveWarning : '',
+                    finalActionCandidates.length > 0 ? `최종 후보 버튼: ${finalActionCandidates.join(', ')}` : '',
+                    selectorHints.length > 0 ? `사용 셀렉터: ${selectorHints.join(' | ')}` : '',
+                ].filter(Boolean).join(' / ')
+                : ''
+
+            setRemittanceSaveWarning(
+                preparedOnly
+                    ? prepareOnlyWarning
+                    : (typeof result?.saveWarning === 'string' ? result.saveWarning : '')
+            )
+            if (!preparedOnly && savedOrder?.id) {
                 setWormOrderList((prev) => prev.map((order) => (
                     order.id === savedOrder.id
                         ? {

@@ -398,6 +398,7 @@ export async function POST(request: Request) {
                 invoiceBuffer,
                 headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
                 abortSignal: runningJob.abortController.signal,
+                prepareOnly: true,
             })
 
             let result: Awaited<ReturnType<typeof submitMoinRemittance>>
@@ -415,6 +416,17 @@ export async function POST(request: Request) {
             clearAuthFailure(guardState, credentialKey)
 
             const pricingSummary = result.pricingSummary
+            if (result.stoppedBeforeConfirmation) {
+                return NextResponse.json({
+                    ok: true,
+                    preparedOnly: true,
+                    message: 'Final confirmation required before remittance submission.',
+                    result,
+                    savedOrder: null,
+                    saveWarning: '모인 BizPlus 최종 확인 화면 직전까지 자동으로 준비했습니다. 마지막 송금 버튼은 자동으로 누르지 않았습니다.',
+                })
+            }
+
             let savedOrder:
                 | {
                     id: string
