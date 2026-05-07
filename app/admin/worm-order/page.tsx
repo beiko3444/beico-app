@@ -4418,7 +4418,10 @@ export default function WormOrderPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-                <div className="min-w-0 flex flex-col gap-6">
+                <div className="xl:col-start-2 xl:row-start-1">
+                    {workflowFlowPanel}
+                </div>
+                <div className="min-w-0 flex flex-col gap-6 xl:col-start-1 xl:row-start-1">
             <section className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] shadow-sm dark:shadow-none p-4 md:p-5">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                     <div>
@@ -6390,9 +6393,6 @@ export default function WormOrderPage() {
                     </div>
                 </div>
             )}
-                </div>
-                <div className="order-first xl:order-none xl:col-start-2 xl:row-start-1">
-                    {workflowFlowPanel}
                 </div>
             </div>
 
