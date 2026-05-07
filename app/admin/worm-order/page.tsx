@@ -649,12 +649,6 @@ function formatYmdWithKoreanWeekday(ymd: string, separator: '-' | '/' = '-') {
     return `${dateText} (${KOREAN_WEEKDAY_LABELS[date.getDay()]})`
 }
 
-function getWormOrderCalendarShortLabel(orderNumber: string) {
-    const lastSegment = orderNumber.split('/').filter(Boolean).pop()
-    if (!lastSegment) return ''
-    return lastSegment.length > 2 ? lastSegment.slice(-2) : lastSegment
-}
-
 function clampCalendarWeatherRange(startDate: string, endDate: string) {
     const start = parseYmdToLocalDate(startDate)
     const end = parseYmdToLocalDate(endDate)
@@ -4780,8 +4774,7 @@ export default function WormOrderPage() {
                                 {calendarDays.map((dayCell) => {
                                     const ymd = formatLocalDateToYmd(dayCell.date)
                                     const ordersOnDate = wormOrdersByReceiveDate.get(ymd) || []
-                                    const visibleOrdersOnDate = ordersOnDate.slice(0, 3)
-                                    const hiddenOrderCount = Math.max(0, ordersOnDate.length - visibleOrdersOnDate.length)
+                                    const hasOrderOnDate = ordersOnDate.length > 0 && dayCell.isCurrentMonth
                                     const isSelected = receiveDate === ymd
                                     const isMonthStart = dayCell.date.getDate() === 1
                                     const dayStart = new Date(
@@ -4860,13 +4853,13 @@ export default function WormOrderPage() {
                                             }}
                                             disabled={isPast}
                                             title={cellTooltip}
-                                            className={`min-h-[92px] rounded-lg px-1.5 py-1 text-left transition-colors ${
+                                            className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
                                                         ? `${cellBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
-                                            } ${monthPriceTintClass} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                            } ${monthPriceTintClass} ${hasOrderOnDate ? 'border-2 border-[#e34219] shadow-[inset_0_0_0_1px_rgba(227,66,25,0.18)]' : ''} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
                                                 <div className="flex items-center gap-1">
@@ -4903,19 +4896,6 @@ export default function WormOrderPage() {
                                                             {getChineseHolidayShortLabel(chineseHolidayName)}
                                                         </span>
                                                     )}
-                                                    {ordersOnDate.length > 0 && dayCell.isCurrentMonth && (
-                                                        <span
-                                                            className={`ml-auto inline-flex h-[18px] items-center gap-0.5 rounded-full px-1.5 text-[9px] font-black leading-none ${
-                                                                isSelected
-                                                                    ? 'bg-white/20 text-white border border-white/30'
-                                                                    : 'bg-[#fff3ef] text-[#d9361b] border border-[#f5c4b8]'
-                                                            }`}
-                                                            title={`발주 ${ordersOnDate.length}건: ${ordersOnDate.map((order) => order.orderNumber).join(', ')}`}
-                                                        >
-                                                            <Package size={9} />
-                                                            {ordersOnDate.length}
-                                                        </span>
-                                                    )}
                                                 </div>
                                                 {isMonthStart && (
                                                     <span
@@ -4924,38 +4904,6 @@ export default function WormOrderPage() {
                                                     >
                                                         {dayCell.priceStatus}
                                                     </span>
-                                                )}
-                                                {ordersOnDate.length > 0 && dayCell.isCurrentMonth && (
-                                                    <div className="mt-1 flex flex-wrap gap-0.5">
-                                                        {visibleOrdersOnDate.map((order) => {
-                                                            const shortLabel = getWormOrderCalendarShortLabel(order.orderNumber)
-                                                            return (
-                                                                <span
-                                                                    key={order.id}
-                                                                    className={`inline-flex max-w-full items-center gap-0.5 rounded px-1 py-[1px] text-[8px] font-black leading-none ${
-                                                                        isSelected
-                                                                            ? 'bg-white/20 text-white border border-white/30'
-                                                                            : 'bg-white text-[#d9361b] border border-[#f5c4b8]'
-                                                                    }`}
-                                                                    title={order.orderNumber}
-                                                                >
-                                                                    <Package size={8} />
-                                                                    {shortLabel || '발주'}
-                                                                </span>
-                                                            )
-                                                        })}
-                                                        {hiddenOrderCount > 0 && (
-                                                            <span
-                                                                className={`inline-flex items-center rounded px-1 py-[1px] text-[8px] font-black leading-none ${
-                                                                    isSelected
-                                                                        ? 'bg-white/20 text-white border border-white/30'
-                                                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
-                                                                }`}
-                                                            >
-                                                                +{hiddenOrderCount}
-                                                            </span>
-                                                        )}
-                                                    </div>
                                                 )}
                                                 <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
                                                     isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
