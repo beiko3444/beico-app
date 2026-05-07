@@ -28,15 +28,16 @@ class MissingLocator {
 }
 
 class FakeLoginPage {
-  constructor() {
+  constructor(options = {}) {
     this.gotoWaits = []
     this.loginInput = new FakeLoginInputLocator()
+    this.throwFor = new Set(options.throwFor || [])
   }
 
   async goto(_url, options = {}) {
     this.gotoWaits.push(options.waitUntil)
-    if (options.waitUntil === 'domcontentloaded') {
-      throw new Error('page.goto: Timeout 18000ms exceeded. waiting until "domcontentloaded"')
+    if (this.throwFor.has(options.waitUntil)) {
+      throw new Error(`page.goto: Timeout 18000ms exceeded. waiting until "${options.waitUntil}"`)
     }
   }
 
@@ -46,7 +47,7 @@ class FakeLoginPage {
   }
 }
 
-test('MOIN login page opening falls back when domcontentloaded waits on slow third-party scripts', async () => {
+test('MOIN login page opening checks input after commit before waiting for domcontentloaded', async () => {
   const openLogin = moin.__moinBizplusTestHooks?.openMoinLoginPage
   assert.ok(openLogin, 'MOIN open login hook is unavailable')
 
@@ -55,6 +56,19 @@ test('MOIN login page opening falls back when domcontentloaded waits on slow thi
   const waitUntil = await openLogin(page, 18000)
 
   assert.equal(waitUntil, 'commit')
-  assert.deepEqual(page.gotoWaits, ['domcontentloaded', 'commit'])
+  assert.deepEqual(page.gotoWaits, ['commit'])
+  assert.ok(page.loginInput.visibleChecks > 0)
+})
+
+test('MOIN login page opening still checks for input after a navigation timeout', async () => {
+  const openLogin = moin.__moinBizplusTestHooks?.openMoinLoginPage
+  assert.ok(openLogin, 'MOIN open login hook is unavailable')
+
+  const page = new FakeLoginPage({ throwFor: ['commit'] })
+
+  const waitUntil = await openLogin(page, 18000)
+
+  assert.equal(waitUntil, 'commit')
+  assert.deepEqual(page.gotoWaits, ['commit'])
   assert.ok(page.loginInput.visibleChecks > 0)
 })

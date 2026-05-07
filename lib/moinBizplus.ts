@@ -2175,10 +2175,22 @@ const clickCompanyScopedRemit = async (
 
     return String(result || 'unknown')
 }
+const waitForMoinLoginInput = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+    const errors: string[] = []
+    for (const selector of MOIN_LOGIN_ID_SELECTORS) {
+        try {
+            await page.locator(selector).first().waitFor({ state: 'visible', timeout: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS) })
+            return selector
+        } catch (error) {
+            errors.push(`${selector}: ${getErrorMessage(error).slice(0, 120)}`)
+        }
+    }
+    throw new Error(`Login input fields were not visible after navigation. ${errors.slice(0, 4).join(' | ')}`)
+}
+
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
-    const waitStrategies: Array<'domcontentloaded' | 'commit' | 'load'> = ['domcontentloaded', 'commit', 'load']
-    const loginSelectors = MOIN_LOGIN_ID_SELECTORS
+    const waitStrategies: Array<'commit' | 'domcontentloaded' | 'load'> = ['commit', 'domcontentloaded', 'load']
 
     for (const waitUntil of waitStrategies) {
         try {
@@ -2187,25 +2199,17 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
                 timeout: timeoutMs,
             })
 
-            let loginInputVisible = false
-            for (const selector of loginSelectors) {
-                try {
-                    await page.locator(selector).first().waitFor({ state: 'visible', timeout: 3000 })
-                    loginInputVisible = true
-                    break
-                } catch {
-                    // Try the next selector.
-                }
-            }
-
-            if (!loginInputVisible) {
-                throw new Error('Login input fields were not visible after navigation.')
-            }
-
+            await waitForMoinLoginInput(page, Math.min(timeoutMs, 12000))
             return waitUntil
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
             navigationErrors.push(`${waitUntil}: ${reason}`)
+            try {
+                await waitForMoinLoginInput(page, 3000)
+                return waitUntil
+            } catch {
+                // Continue with the next navigation strategy.
+            }
         }
     }
 
