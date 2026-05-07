@@ -2435,6 +2435,13 @@ export default function WormOrderPage() {
             remittanceProgressTimerRef.current = null
         }
 
+        setQuantitiesByType(createInitialQuantitiesByType())
+        setGeneratedMessage('')
+        setValidationError('')
+        setOrderCreateError('')
+        setOrderCreateNotice('')
+        setCopied(false)
+
         setEmails([])
         setEmailDetails({})
         setSelectedEmailUid(null)
@@ -2477,6 +2484,7 @@ export default function WormOrderPage() {
         setForwardLogs([])
         setForwardLogsLoading(false)
         setForwardLogsError('')
+        setForwardEmail(DEFAULT_CUSTOMS_FORWARD_EMAIL)
 
         setTransferAmountUsd('')
         setInvoicePdf(null)
