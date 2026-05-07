@@ -2177,7 +2177,7 @@ const clickCompanyScopedRemit = async (
 }
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
-    const waitStrategies: Array<'domcontentloaded' | 'load'> = ['domcontentloaded']
+    const waitStrategies: Array<'domcontentloaded' | 'commit' | 'load'> = ['domcontentloaded', 'commit', 'load']
     const loginSelectors = MOIN_LOGIN_ID_SELECTORS
 
     for (const waitUntil of waitStrategies) {
@@ -2314,6 +2314,7 @@ const performMoinLogin = async (
     abortSignal: AbortSignal | undefined,
 ): Promise<void> => {
     throwIfAbortRequested(abortSignal, 'Open login page')
+    steps.push('open-login-page:start')
     const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
     steps.push(`open-login-page:${loginWaitUntil}`)
     const overlayDismissed = await dismissMoinUiOverlays(page)
@@ -3447,6 +3448,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // ???? Step 1: Go directly to login page ??????????????????????????????????????????????????????????
         throwIfAbortRequested(abortSignal, 'Open login page')
+        steps.push('open-login-page:start')
         const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
         steps.push(`open-login-page:${loginWaitUntil}`)
         pushTiming('login-page-opened')
@@ -4261,6 +4263,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 export const __moinBizplusTestHooks = {
     typeFirstVisible,
     clickMoinLoginSubmit,
+    openMoinLoginPage,
     dismissMoinUiOverlays,
     clickLastVisible,
     getMoinRemittanceWindowState,

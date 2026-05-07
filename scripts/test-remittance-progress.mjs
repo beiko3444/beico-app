@@ -22,3 +22,10 @@ test('remittance progress extracts latest step from unicode arrow steps', () => 
 
   assert.equal(latest, 'fill-login-id')
 })
+
+test('remittance progress maps login page start failures to login page stage', () => {
+  assert.deepEqual(progress.resolveRemittanceStageFromStep('open-login-page:start'), {
+    percent: 12,
+    label: '모인 로그인 페이지에 접속하는 중...',
+  })
+})
