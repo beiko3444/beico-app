@@ -5,15 +5,15 @@ const moin = await import('../lib/moinBizplus.ts')
 
 class FakeLoginInputLocator {
   constructor() {
-    this.visibleChecks = 0
+    this.waitChecks = []
   }
 
   first() {
     return this
   }
 
-  async waitFor() {
-    this.visibleChecks += 1
+  async waitFor(options = {}) {
+    this.waitChecks.push(options)
   }
 }
 
@@ -42,12 +42,12 @@ class FakeLoginPage {
   }
 
   locator(selector) {
-    if (selector === 'input[name="email"]') return this.loginInput
+    if (selector === 'input[data-testid="input-email"]') return this.loginInput
     return new MissingLocator()
   }
 }
 
-test('MOIN login page opening checks input after commit before waiting for domcontentloaded', async () => {
+test('MOIN login page opening checks attached data-testid input after commit before waiting for domcontentloaded', async () => {
   const openLogin = moin.__moinBizplusTestHooks?.openMoinLoginPage
   assert.ok(openLogin, 'MOIN open login hook is unavailable')
 
@@ -57,10 +57,10 @@ test('MOIN login page opening checks input after commit before waiting for domco
 
   assert.equal(waitUntil, 'commit')
   assert.deepEqual(page.gotoWaits, ['commit'])
-  assert.ok(page.loginInput.visibleChecks > 0)
+  assert.deepEqual(page.loginInput.waitChecks.map((options) => options.state), ['attached'])
 })
 
-test('MOIN login page opening still checks for input after a navigation timeout', async () => {
+test('MOIN login page opening still checks data-testid input after a navigation timeout', async () => {
   const openLogin = moin.__moinBizplusTestHooks?.openMoinLoginPage
   assert.ok(openLogin, 'MOIN open login hook is unavailable')
 
@@ -70,5 +70,5 @@ test('MOIN login page opening still checks for input after a navigation timeout'
 
   assert.equal(waitUntil, 'commit')
   assert.deepEqual(page.gotoWaits, ['commit'])
-  assert.ok(page.loginInput.visibleChecks > 0)
+  assert.deepEqual(page.loginInput.waitChecks.map((options) => options.state), ['attached'])
 })

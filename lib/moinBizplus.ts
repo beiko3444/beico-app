@@ -84,6 +84,7 @@ const KO_ACCEPTED_STATE_KEYWORDS = [
 ]
 
 const MOIN_LOGIN_ID_SELECTORS = [
+    'input[data-testid="input-email"]',
     'input[name="email"]',
     'input[type="email"]',
     'input[name="username"]',
@@ -97,6 +98,7 @@ const MOIN_LOGIN_ID_SELECTORS = [
 ]
 
 const MOIN_LOGIN_PASSWORD_SELECTORS = [
+    'input[data-testid="input-password"]',
     'input[name="password"]',
     'input[type="password"]',
     'input[autocomplete="current-password"]',
@@ -2179,13 +2181,13 @@ const waitForMoinLoginInput = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT
     const errors: string[] = []
     for (const selector of MOIN_LOGIN_ID_SELECTORS) {
         try {
-            await page.locator(selector).first().waitFor({ state: 'visible', timeout: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS) })
+            await page.locator(selector).first().waitFor({ state: 'attached', timeout: timeoutMs })
             return selector
         } catch (error) {
             errors.push(`${selector}: ${getErrorMessage(error).slice(0, 120)}`)
         }
     }
-    throw new Error(`Login input fields were not visible after navigation. ${errors.slice(0, 4).join(' | ')}`)
+    throw new Error(`Login input fields were not attached after navigation. ${errors.slice(0, 4).join(' | ')}`)
 }
 
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
