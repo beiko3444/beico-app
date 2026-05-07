@@ -1741,6 +1741,15 @@ export default function WormOrderPage() {
     const invoicePreviewTaskIdRef = useRef(0)
     const customsProgressCacheRef = useRef<Map<string, { savedAt: number; result: CustomsProgressResult | null; error: string }>>(new Map())
     const calendarWeatherRequestIdRef = useRef(0)
+    const activeWormOrderIdRef = useRef<string | null>(null)
+    const lastResetWormOrderIdRef = useRef<string | null | undefined>(undefined)
+    const emailFetchRequestIdRef = useRef(0)
+    const emailDetailRequestIdRef = useRef(0)
+    const docEmailFetchRequestIdRef = useRef(0)
+    const docEmailDetailRequestIdRef = useRef(0)
+    const forwardLogsRequestIdRef = useRef(0)
+    const customsProgressRequestIdRef = useRef(0)
+    const awbOcrRequestIdRef = useRef(0)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -1752,6 +1761,7 @@ export default function WormOrderPage() {
     const [emailError, setEmailError] = useState('')
     const [hasFetched, setHasFetched] = useState(false)
     const [selectedEmailUid, setSelectedEmailUid] = useState<string | null>(null)
+    const [unmatchingEmailUid, setUnmatchingEmailUid] = useState<string | null>(null)
     const [emailCacheSavedAt, setEmailCacheSavedAt] = useState<string | null>(null)
     const [usingOfflineEmailCache, setUsingOfflineEmailCache] = useState(false)
     const hasHydratedEmailCacheRef = useRef(false)
@@ -1916,6 +1926,10 @@ export default function WormOrderPage() {
     const [shippingTrackingNumber, setShippingTrackingNumber] = useState('')
     const [shippingProgressLabel, setShippingProgressLabel] = useState('대기 중')
 
+    useEffect(() => {
+        activeWormOrderIdRef.current = activeWormOrder?.id ?? null
+    }, [activeWormOrder?.id])
+
     const handleSubmitLogenShipping = useCallback(async () => {
         if (shippingSubmitting) return
         if (!shippingRecipientPhone || !shippingRecipientName || !shippingRecipientAddress) {
@@ -1955,6 +1969,7 @@ export default function WormOrderPage() {
 
     const loadForwardLogs = useCallback(async (orderId: string) => {
         if (!orderId) return
+        const requestId = ++forwardLogsRequestIdRef.current
         setForwardLogsLoading(true)
         setForwardLogsError('')
         try {
@@ -1968,17 +1983,23 @@ export default function WormOrderPage() {
                 throw new Error(typeof data?.error === 'string' ? data.error : '발송 이력을 불러오지 못했습니다.')
             }
             const nextLogs = Array.isArray(data?.logs) ? data.logs : []
+            if (requestId !== forwardLogsRequestIdRef.current || activeWormOrderIdRef.current !== orderId) return
             setForwardLogs(nextLogs)
         } catch (error) {
+            if (requestId !== forwardLogsRequestIdRef.current || activeWormOrderIdRef.current !== orderId) return
             setForwardLogsError(error instanceof Error ? error.message : '발송 이력을 불러오지 못했습니다.')
         } finally {
-            setForwardLogsLoading(false)
+            if (requestId === forwardLogsRequestIdRef.current && activeWormOrderIdRef.current === orderId) {
+                setForwardLogsLoading(false)
+            }
         }
     }, [])
 
     useEffect(() => {
         if (!activeWormOrder?.id) {
+            forwardLogsRequestIdRef.current += 1
             setForwardLogs([])
+            setForwardLogsLoading(false)
             setForwardLogsError('')
             return
         }
@@ -2118,6 +2139,7 @@ export default function WormOrderPage() {
     }, [])
 
     const runAwbOcr = useCallback(async (emailMeta: Pick<WormEmailDetail, 'uid' | 'subject' | 'date' | 'skmIndices'>) => {
+        const requestId = ++awbOcrRequestIdRef.current
         setAwbNumber(null)
         setAwbLoading(true)
         setAwbError('')
@@ -2134,6 +2156,7 @@ export default function WormOrderPage() {
             }
 
             const ranked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
+            if (requestId !== awbOcrRequestIdRef.current) return
             setAwbCandidates(ranked.slice(0, 6))
 
             if (ranked.length > 0) {
@@ -2148,10 +2171,13 @@ export default function WormOrderPage() {
 
             setAwbError('모든 SKM 문서에서 운송장 번호를 찾지 못했습니다. 브라우저 콘솔(F12)에서 OCR 원문을 확인해주세요.')
         } catch (err: any) {
+            if (requestId !== awbOcrRequestIdRef.current) return
             console.error('AWB OCR Error:', err)
             setAwbError(err.message || 'OCR 처리 실패')
         } finally {
-            setAwbLoading(false)
+            if (requestId === awbOcrRequestIdRef.current) {
+                setAwbLoading(false)
+            }
         }
     }, [ocrOnePdf, persistAwbCache])
 
@@ -2161,12 +2187,14 @@ export default function WormOrderPage() {
             return cachedDetail
         }
 
+        const requestId = ++emailDetailRequestIdRef.current
         setLoadingEmailDetail(true)
         try {
             const res = await fetch(`/api/admin/worm-order/emails/detail?uid=${encodeURIComponent(uid)}`)
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || '메일 상세 조회 실패')
 
+            if (requestId !== emailDetailRequestIdRef.current) return null
             setEmailError('')
             setUsingOfflineEmailCache(false)
             setEmailCacheSavedAt(new Date().toISOString())
@@ -2179,10 +2207,13 @@ export default function WormOrderPage() {
             }
             return data
         } catch (err: any) {
+            if (requestId !== emailDetailRequestIdRef.current) return null
             setEmailError(err.message || '메일 상세 조회 실패')
             return null
         } finally {
-            setLoadingEmailDetail(false)
+            if (requestId === emailDetailRequestIdRef.current) {
+                setLoadingEmailDetail(false)
+            }
         }
     }, [applyAwbNumberToEmailState, emailDetails, selectedEmailUid])
 
@@ -2389,6 +2420,115 @@ export default function WormOrderPage() {
         }
     }, [])
 
+    const resetOrderScopedUiState = useCallback(() => {
+        emailFetchRequestIdRef.current += 1
+        emailDetailRequestIdRef.current += 1
+        docEmailFetchRequestIdRef.current += 1
+        docEmailDetailRequestIdRef.current += 1
+        forwardLogsRequestIdRef.current += 1
+        customsProgressRequestIdRef.current += 1
+        awbOcrRequestIdRef.current += 1
+        invoicePreviewTaskIdRef.current += 1
+
+        if (remittanceProgressTimerRef.current) {
+            window.clearInterval(remittanceProgressTimerRef.current)
+            remittanceProgressTimerRef.current = null
+        }
+
+        setEmails([])
+        setEmailDetails({})
+        setSelectedEmailUid(null)
+        setHasFetched(false)
+        setLoadingEmails(false)
+        setLoadingEmailDetail(false)
+        setMatchingEmailUid(null)
+        setUnmatchingEmailUid(null)
+        setInvoiceOcrRunningUid(null)
+        setEmailError('')
+        setEmailMatchMessage('')
+        setFetchProgress(0)
+        setEmailCacheSavedAt(null)
+        setUsingOfflineEmailCache(false)
+
+        setDocEmails([])
+        setDocEmailDetails({})
+        setSelectedDocEmailUid(null)
+        setDocHasFetched(false)
+        setLoadingDocEmails(false)
+        setLoadingDocEmailDetail(false)
+        setMatchingDocEmailUid(null)
+        setUnmatchingDocEmailUid(null)
+        setDocEmailError('')
+        setDocEmailMatchMessage('')
+        setDocFetchProgress(0)
+
+        setAwbNumber(null)
+        setAwbLoading(false)
+        setAwbError('')
+        setAwbCandidates([])
+
+        setBlNumberQuery('')
+        setCustomsProgressResult(null)
+        setCustomsProgressError('')
+        setCustomsProgressLoading(false)
+
+        setForwardError('')
+        setForwardSuccess('')
+        setForwardLogs([])
+        setForwardLogsLoading(false)
+        setForwardLogsError('')
+
+        setTransferAmountUsd('')
+        setInvoicePdf(null)
+        setUseManualRemittanceInput(false)
+        setInvoicePreviewLoading(false)
+        setInvoicePreviewError('')
+        replaceInvoicePreviewUrl(null)
+
+        setRemittanceError('')
+        setRemittanceSuccess('')
+        setRemittanceProgress(0)
+        setRemittanceProgressLabel('대기 중')
+        setRemittanceAttemptsRemaining(null)
+        setRemittanceLockedUntil(null)
+        setRemittancePricingSummary(null)
+        setRemittancePricingSummaryOrderId(null)
+        setRemittanceSaveInfo(null)
+        setRemittanceSaveWarning('')
+        setRemittanceManuallyDone(false)
+        setPaymentNotificationCopied(false)
+        setRemittanceCandidates(null)
+        setRemittanceCandidatesOrder(null)
+        setRemittanceCandidatePicking(null)
+        setRemittanceCandidateError('')
+        setManualRemittanceOrder(null)
+        setManualRemittanceForm({
+            appliedAt: '',
+            finalReceiveAmountUsd: '',
+            sendAmountKrw: '',
+            totalFeeKrw: '',
+            exchangeRate: '',
+        })
+        setManualRemittanceError('')
+
+        setShippingRecipientPhone('')
+        setShippingRecipientName('')
+        setShippingRecipientAddress('')
+        setShippingRecipientDetailAddress('')
+        setShippingError('')
+        setShippingSuccess('')
+        setShippingTrackingNumber('')
+        setShippingProgressLabel('대기 중')
+    }, [replaceInvoicePreviewUrl])
+
+    useEffect(() => {
+        const nextOrderId = activeWormOrder?.id ?? null
+        if (lastResetWormOrderIdRef.current === nextOrderId) return
+
+        lastResetWormOrderIdRef.current = nextOrderId
+        resetOrderScopedUiState()
+    }, [activeWormOrder?.id, resetOrderScopedUiState])
+
     const handleSelectWormOrder = useCallback((order: WormOrderListItem) => {
         const receiveDateText = toKstDateInputString(order.receiveDate)
         const isSameOrder = activeWormOrder?.id === order.id
@@ -2405,16 +2545,10 @@ export default function WormOrderPage() {
         // Keep already-fetched inbox state when user re-selects the same order.
         if (isSameOrder) return
 
-        setEmails([])
-        setEmailDetails({})
-        setSelectedEmailUid(null)
-        setHasFetched(false)
-        setEmailError('')
-        setEmailMatchMessage('')
-        setTransferAmountUsd('')
-        setInvoicePdf(null)
-        setUseManualRemittanceInput(false)
-    }, [activeWormOrder?.id])
+        activeWormOrderIdRef.current = order.id
+        lastResetWormOrderIdRef.current = order.id
+        resetOrderScopedUiState()
+    }, [activeWormOrder?.id, resetOrderScopedUiState])
 
     const handleImportRemittanceHistory = useCallback(async (order: WormOrderListItem) => {
         const shouldImport = window.confirm(
@@ -2596,6 +2730,8 @@ export default function WormOrderPage() {
     }, [receiveDate])
 
     const fetchEmails = async (forceRefresh = true) => {
+        const requestId = ++emailFetchRequestIdRef.current
+        const requestOrderId = activeWormOrder?.id || null
         setLoadingEmails(true)
         setEmailError('')
         setEmailMatchMessage('')
@@ -2617,16 +2753,18 @@ export default function WormOrderPage() {
             if (forceRefresh) {
                 params.set('forceRefresh', '1')
             }
-            if (activeWormOrder?.id) {
-                params.set('orderId', activeWormOrder.id)
+            if (requestOrderId) {
+                params.set('orderId', requestOrderId)
             }
 
             const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`, { signal: controller.signal })
             clearInterval(interval)
+            if (requestId !== emailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             setFetchProgress(100) // 100% 꽉 채우기
 
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to fetch emails')
+            if (requestId !== emailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             
             const fetchedEmails: WormEmailListItem[] = Array.isArray(data.emails)
                 ? data.emails
@@ -2646,9 +2784,14 @@ export default function WormOrderPage() {
             setEmailCacheSavedAt(new Date().toISOString())
             
             // 0.5초 뒤 게이지 숨김
-            setTimeout(() => setFetchProgress(0), 500)
+            setTimeout(() => {
+                if (requestId === emailFetchRequestIdRef.current && activeWormOrderIdRef.current === requestOrderId) {
+                    setFetchProgress(0)
+                }
+            }, 500)
         } catch (err: any) {
             clearInterval(interval)
+            if (requestId !== emailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             setFetchProgress(0)
             const message = err?.name === 'AbortError'
                 ? 'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
@@ -2659,7 +2802,9 @@ export default function WormOrderPage() {
             setUsingOfflineEmailCache(hasCachedEmails)
         } finally {
             window.clearTimeout(timeoutId)
-            setLoadingEmails(false)
+            if (requestId === emailFetchRequestIdRef.current && activeWormOrderIdRef.current === requestOrderId) {
+                setLoadingEmails(false)
+            }
         }
     }
 
@@ -2804,7 +2949,6 @@ export default function WormOrderPage() {
     }, [activeWormOrder, applyMatchResultToEmailState, requestEmailMatchAndInvoiceOcr])
 
     // ── 매칭 해제 ──
-    const [unmatchingEmailUid, setUnmatchingEmailUid] = useState<string | null>(null)
     const handleUnmatchEmail = async (email: WormEmailListItem) => {
         if (!email.matchedOrderId) return
         setUnmatchingEmailUid(email.uid)
@@ -2851,6 +2995,8 @@ export default function WormOrderPage() {
 
     // ── Document 메일 페치 ──
     const fetchDocumentEmails = async () => {
+        const requestId = ++docEmailFetchRequestIdRef.current
+        const requestOrderId = activeWormOrder?.id || null
         setLoadingDocEmails(true)
         setDocEmailError('')
         setDocFetchProgress(0)
@@ -2867,16 +3013,18 @@ export default function WormOrderPage() {
         try {
             const params = new URLSearchParams()
             params.set('subjectKeyword', 'documents,documets')
-            if (activeWormOrder?.id) {
-                params.set('orderId', activeWormOrder.id)
+            if (requestOrderId) {
+                params.set('orderId', requestOrderId)
             }
 
             const res = await fetch(`/api/admin/worm-order/emails?${params.toString()}`, { signal: controller.signal })
             clearInterval(interval)
+            if (requestId !== docEmailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             setDocFetchProgress(100)
 
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || 'Failed to fetch document emails')
+            if (requestId !== docEmailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
 
             const fetchedEmails: WormEmailListItem[] = Array.isArray(data.emails)
                 ? data.emails
@@ -2892,9 +3040,14 @@ export default function WormOrderPage() {
             setDocEmailDetails((prev) => pruneEmailDetails(prev, fetchedEmails))
             setSelectedDocEmailUid(nextSelectedUid)
             setDocHasFetched(true)
-            setTimeout(() => setDocFetchProgress(0), 500)
+            setTimeout(() => {
+                if (requestId === docEmailFetchRequestIdRef.current && activeWormOrderIdRef.current === requestOrderId) {
+                    setDocFetchProgress(0)
+                }
+            }, 500)
         } catch (err: any) {
             clearInterval(interval)
+            if (requestId !== docEmailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             setDocFetchProgress(0)
             setDocEmailError(err?.name === 'AbortError'
                 ? 'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
@@ -2902,7 +3055,9 @@ export default function WormOrderPage() {
             setDocHasFetched(true)
         } finally {
             window.clearTimeout(timeoutId)
-            setLoadingDocEmails(false)
+            if (requestId === docEmailFetchRequestIdRef.current && activeWormOrderIdRef.current === requestOrderId) {
+                setLoadingDocEmails(false)
+            }
         }
     }
 
@@ -2910,12 +3065,14 @@ export default function WormOrderPage() {
     const fetchDocEmailDetail = useCallback(async (uid: string): Promise<WormEmailDetail | null> => {
         if (docEmailDetails[uid]) return docEmailDetails[uid]
 
+        const requestId = ++docEmailDetailRequestIdRef.current
         setLoadingDocEmailDetail(true)
         try {
             const res = await fetch(`/api/admin/worm-order/emails/detail?uid=${encodeURIComponent(uid)}`)
             const data = await res.json()
             if (!res.ok) throw new Error(data.error || '메일 상세 조회 실패')
 
+            if (requestId !== docEmailDetailRequestIdRef.current) return null
             setDocEmailError('')
             setDocEmailDetails(prev => ({ ...prev, [uid]: data }))
             if (typeof data?.awbNumber === 'string' && data.awbNumber) {
@@ -2926,10 +3083,13 @@ export default function WormOrderPage() {
             }
             return data
         } catch (err: any) {
+            if (requestId !== docEmailDetailRequestIdRef.current) return null
             setDocEmailError(err.message || '메일 상세 조회 실패')
             return null
         } finally {
-            setLoadingDocEmailDetail(false)
+            if (requestId === docEmailDetailRequestIdRef.current) {
+                setLoadingDocEmailDetail(false)
+            }
         }
     }, [docEmailDetails, selectedDocEmailUid])
 
@@ -3754,6 +3914,7 @@ export default function WormOrderPage() {
             return
         }
 
+        const requestId = ++customsProgressRequestIdRef.current
         setCustomsProgressLoading(true)
         try {
             const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(normalizedBlNo)}`, { method: 'GET' })
@@ -3764,6 +3925,7 @@ export default function WormOrderPage() {
             }
 
             const parsed = result as CustomsProgressResult
+            if (requestId !== customsProgressRequestIdRef.current) return
             setCustomsProgressResult(parsed)
             customsProgressCacheRef.current.set(normalizedBlNo, {
                 savedAt: Date.now(),
@@ -3771,10 +3933,13 @@ export default function WormOrderPage() {
                 error: '',
             })
         } catch (error) {
+            if (requestId !== customsProgressRequestIdRef.current) return
             const message = error instanceof Error ? error.message : '화물통관 진행정보 조회에 실패했습니다.'
             setCustomsProgressError(message)
         } finally {
-            setCustomsProgressLoading(false)
+            if (requestId === customsProgressRequestIdRef.current) {
+                setCustomsProgressLoading(false)
+            }
         }
     }
 
