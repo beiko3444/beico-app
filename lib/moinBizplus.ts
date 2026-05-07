@@ -243,6 +243,26 @@ export class MoinAutomationCanceledError extends MoinAutomationError {
     }
 }
 
+const createMoinLoginFailureError = (loginUrl: string, bodyText: string) => {
+    const failureType = classifyMoinLoginFailure(bodyText)
+    if (failureType === 'locked') {
+        return new MoinAutomationError(
+            'Login Failed',
+            '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.'
+        )
+    }
+    if (failureType === 'password') {
+        return new MoinAutomationError(
+            'Login Failed',
+            '[Password mismatch] The password is incorrect. Please verify the password before trying again.'
+        )
+    }
+    return new MoinAutomationError(
+        'Login Failed',
+        `Login failed (URL: ${loginUrl}). Please verify the account credentials.`
+    )
+}
+
 const getErrorMessage = (error: unknown) => {
     if (error instanceof Error && error.message) return error.message
     return String(error)
@@ -2328,6 +2348,7 @@ const performMoinLogin = async (
     steps.push('submit-login')
 
     let loginFailed = false
+    let loginFailureBodyText = ''
     try {
         throwIfAbortRequested(abortSignal, 'Verify login')
         await Promise.race([
@@ -2346,6 +2367,13 @@ const performMoinLogin = async (
     await Promise.resolve()
 
     const loginCheckUrl = page.url()
+    if (loginCheckUrl.includes('/login')) {
+        loginFailureBodyText = (await page.locator('body').textContent().catch(() => '')) || ''
+        if (classifyMoinLoginFailure(loginFailureBodyText)) {
+            throw createMoinLoginFailureError(loginCheckUrl, loginFailureBodyText)
+        }
+    }
+
     if (loginFailed && !loginCheckUrl.includes('/login')) {
         steps.push(`login-warning-nonblocking:url:${loginCheckUrl}`)
     }
@@ -2364,25 +2392,9 @@ const performMoinLogin = async (
 
     const postFallbackLoginCheckUrl = page.url()
     if (postFallbackLoginCheckUrl.includes('/login')) {
-        const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
-        const failureType = classifyMoinLoginFailure(bodyText)
-        if (failureType === 'locked') {
-            throw new MoinAutomationError(
-                'Login Failed',
-                '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.',
-            )
-        } else if (failureType === 'password') {
-            throw new MoinAutomationError(
-                'Login Failed',
-                '[Password mismatch] The password is incorrect. Please verify the password before trying again.',
-            )
-        } else {
-            throw new MoinAutomationError(
-                'Login Failed',
-                    `Login failed (URL: ${postFallbackLoginCheckUrl}). Please verify the account credentials.`,
-                )
-            }
-        }
+        const bodyText = loginFailureBodyText || ((await page.locator('body').textContent().catch(() => '')) || '')
+        throw createMoinLoginFailureError(postFallbackLoginCheckUrl, bodyText)
+    }
 
     steps.push(`post-login-url:${page.url()}`)
 }
@@ -3476,6 +3488,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // MOIN bizplus shows a red banner for invalid password or locked accounts.
         // Check login state quickly. Later navigation to the transfer page is the real success signal.
         let loginFailed = false
+        let loginFailureBodyText = ''
         try {
             throwIfAbortRequested(abortSignal, 'Verify login')
             await Promise.race([
@@ -3488,6 +3501,12 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             ])
         } catch {
             // Ignore timeouts from race
+        }
+        if (page.url().includes('/login')) {
+            loginFailureBodyText = (await page.locator('body').textContent().catch(() => '')) || ''
+            if (classifyMoinLoginFailure(loginFailureBodyText)) {
+                throw createMoinLoginFailureError(page.url(), loginFailureBodyText)
+            }
         }
         if (!loginFailed && page.url().includes('/login')) {
             try {
@@ -3507,25 +3526,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         if (loginCheckUrl.includes('/login')) {
-            // Extract text from the page to see the exact error for the user
-            const bodyText = await page.locator('body').textContent().catch(() => '') || ''
-            const failureType = classifyMoinLoginFailure(bodyText)
-            if (failureType === 'locked') {
-                throw new MoinAutomationError(
-                    'Login Failed',
-                    '[Account locked] Login attempts were exceeded. Please reset the password directly on MOIN Bizplus before trying again.'
-                )
-            } else if (failureType === 'password') {
-                throw new MoinAutomationError(
-                    'Login Failed',
-                    '[Password mismatch] The password is incorrect. Please verify the password before trying again.'
-                )
-            } else {
-                throw new MoinAutomationError(
-                    'Login Failed',
-                    `Login failed (URL: ${loginCheckUrl}). Please verify the account credentials.`
-                )
-            }
+            const bodyText = loginFailureBodyText || ((await page.locator('body').textContent().catch(() => '')) || '')
+            throw createMoinLoginFailureError(loginCheckUrl, bodyText)
         }
 
         const postLoginUrl = page.url()
@@ -4265,4 +4267,5 @@ export const __moinBizplusTestHooks = {
     normalizeMoinTransaction,
     fillMissingHistoryRecipients,
     classifyMoinLoginFailure,
+    createMoinLoginFailureError,
 }

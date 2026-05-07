@@ -26,3 +26,16 @@ test('MOIN login classifier detects account protection lock wording', () => {
   const result = classify('비밀번호 실패 남은 시도: 1회 (계정 보호를 위해 제한됨)')
   assert.equal(result, 'locked')
 })
+
+test('MOIN login failure error preserves pre-fallback password mismatch text', () => {
+  const buildError = moin.__moinBizplusTestHooks?.createMoinLoginFailureError
+  assert.ok(buildError, 'MOIN login failure error hook is unavailable')
+
+  const error = buildError(
+    'https://www.moinbizplus.com/login',
+    '비밀번호가 일치하지 않습니다',
+  )
+
+  assert.equal(error.step, 'Login Failed')
+  assert.match(error.message, /\[Password mismatch\]/)
+})
