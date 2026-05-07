@@ -208,6 +208,7 @@ const CALENDAR_WEATHER_LOCATION_CONFIGS: Array<{
         timezone: 'Asia/Seoul',
     },
 ]
+const KOREAN_WEEKDAY_LABELS = ['일', '월', '화', '수', '목', '금', '토'] as const
 
 const CALENDAR_WEATHER_CODE_LABELS: Record<number, string> = {
     0: '맑음',
@@ -636,6 +637,22 @@ function formatLocalDateToYmd(date: Date) {
     const month = String(date.getMonth() + 1).padStart(2, '0')
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
+}
+
+function formatYmdWithKoreanWeekday(ymd: string, separator: '-' | '/' = '-') {
+    const date = parseYmdToLocalDate(ymd)
+    if (!date) return separator === '/' ? ymd.replace(/-/g, '/') : ymd
+
+    const dateText = separator === '/'
+        ? ymd.replace(/-/g, '/')
+        : ymd
+    return `${dateText} (${KOREAN_WEEKDAY_LABELS[date.getDay()]})`
+}
+
+function getWormOrderCalendarShortLabel(orderNumber: string) {
+    const lastSegment = orderNumber.split('/').filter(Boolean).pop()
+    if (!lastSegment) return ''
+    return lastSegment.length > 2 ? lastSegment.slice(-2) : lastSegment
 }
 
 function clampCalendarWeatherRange(startDate: string, endDate: string) {
@@ -3223,6 +3240,17 @@ export default function WormOrderPage() {
         () => buildMonthCalendarDays(calendarCursor.year, calendarCursor.month),
         [calendarCursor.month, calendarCursor.year],
     )
+    const wormOrdersByReceiveDate = useMemo(() => {
+        const grouped = new Map<string, WormOrderListItem[]>()
+        wormOrderList.forEach((order) => {
+            const ymd = toKstDateInputString(order.receiveDate)
+            if (!ymd) return
+            const orders = grouped.get(ymd) || []
+            orders.push(order)
+            grouped.set(ymd, orders)
+        })
+        return grouped
+    }, [wormOrderList])
     const calendarRange = useMemo(() => {
         if (calendarDays.length === 0) {
             return { startDate: today, endDate: today }
@@ -4460,7 +4488,7 @@ export default function WormOrderPage() {
                             {wormOrderList.map((order) => {
                                 const isActiveOrder = activeWormOrder?.id === order.id
                                 const orderDateText = toKstDateInputString(order.receiveDate)
-                                const orderNumberDisplay = orderDateText ? orderDateText.replace(/-/g, '/') : order.orderNumber
+                                const orderNumberDisplay = orderDateText ? formatYmdWithKoreanWeekday(orderDateText, '/') : order.orderNumber
                                 const sendAmountUsd = resolveRemittanceSendUsd(order)
                                 const originKrw = resolveRemittanceOriginKrw(order)
                                 const totalFeeKrw = resolveRemittanceFeeKrw(order)
@@ -4744,13 +4772,16 @@ export default function WormOrderPage() {
                             </div>
 
                             <div className="mt-3 grid grid-cols-7 gap-1 text-[11px] font-bold text-center">
-                                {['일', '월', '화', '수', '목', '금', '토'].map((weekday, dayOfWeek) => (
+                                {KOREAN_WEEKDAY_LABELS.map((weekday, dayOfWeek) => (
                                     <span key={weekday} className={getCalendarWeekdayHeaderClass(dayOfWeek)}>{weekday}</span>
                                 ))}
                             </div>
                             <div className="mt-1 grid grid-cols-7 gap-1">
                                 {calendarDays.map((dayCell) => {
                                     const ymd = formatLocalDateToYmd(dayCell.date)
+                                    const ordersOnDate = wormOrdersByReceiveDate.get(ymd) || []
+                                    const visibleOrdersOnDate = ordersOnDate.slice(0, 3)
+                                    const hiddenOrderCount = Math.max(0, ordersOnDate.length - visibleOrdersOnDate.length)
                                     const isSelected = receiveDate === ymd
                                     const isMonthStart = dayCell.date.getDate() === 1
                                     const dayStart = new Date(
@@ -4810,6 +4841,9 @@ export default function WormOrderPage() {
                                         dayOfWeek !== 6
                                     const cellTooltip = (() => {
                                         const parts = [monthPriceTooltip]
+                                        if (ordersOnDate.length > 0) {
+                                            parts.push(`발주 ${ordersOnDate.length}건: ${ordersOnDate.map((order) => order.orderNumber).join(', ')}`)
+                                        }
                                         if (koreanHolidayName) parts.push(`한국 공휴일: ${koreanHolidayName}`)
                                         if (chineseHolidayName) parts.push(`중국 공휴일: ${chineseHolidayName}`)
                                         if (nextDayRainLevel) parts.push(`다음날 ${nextDayRainLevel === 'heavy' ? '강한 비' : '비'} 예보`)
@@ -4826,7 +4860,7 @@ export default function WormOrderPage() {
                                             }}
                                             disabled={isPast}
                                             title={cellTooltip}
-                                            className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
+                                            className={`min-h-[92px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
                                                     ? 'bg-[#e34219] text-white'
                                                     : dayCell.isCurrentMonth
@@ -4869,6 +4903,19 @@ export default function WormOrderPage() {
                                                             {getChineseHolidayShortLabel(chineseHolidayName)}
                                                         </span>
                                                     )}
+                                                    {ordersOnDate.length > 0 && dayCell.isCurrentMonth && (
+                                                        <span
+                                                            className={`ml-auto inline-flex h-[18px] items-center gap-0.5 rounded-full px-1.5 text-[9px] font-black leading-none ${
+                                                                isSelected
+                                                                    ? 'bg-white/20 text-white border border-white/30'
+                                                                    : 'bg-[#fff3ef] text-[#d9361b] border border-[#f5c4b8]'
+                                                            }`}
+                                                            title={`발주 ${ordersOnDate.length}건: ${ordersOnDate.map((order) => order.orderNumber).join(', ')}`}
+                                                        >
+                                                            <Package size={9} />
+                                                            {ordersOnDate.length}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 {isMonthStart && (
                                                     <span
@@ -4877,6 +4924,38 @@ export default function WormOrderPage() {
                                                     >
                                                         {dayCell.priceStatus}
                                                     </span>
+                                                )}
+                                                {ordersOnDate.length > 0 && dayCell.isCurrentMonth && (
+                                                    <div className="mt-1 flex flex-wrap gap-0.5">
+                                                        {visibleOrdersOnDate.map((order) => {
+                                                            const shortLabel = getWormOrderCalendarShortLabel(order.orderNumber)
+                                                            return (
+                                                                <span
+                                                                    key={order.id}
+                                                                    className={`inline-flex max-w-full items-center gap-0.5 rounded px-1 py-[1px] text-[8px] font-black leading-none ${
+                                                                        isSelected
+                                                                            ? 'bg-white/20 text-white border border-white/30'
+                                                                            : 'bg-white text-[#d9361b] border border-[#f5c4b8]'
+                                                                    }`}
+                                                                    title={order.orderNumber}
+                                                                >
+                                                                    <Package size={8} />
+                                                                    {shortLabel || '발주'}
+                                                                </span>
+                                                            )
+                                                        })}
+                                                        {hiddenOrderCount > 0 && (
+                                                            <span
+                                                                className={`inline-flex items-center rounded px-1 py-[1px] text-[8px] font-black leading-none ${
+                                                                    isSelected
+                                                                        ? 'bg-white/20 text-white border border-white/30'
+                                                                        : 'bg-slate-100 text-slate-600 border border-slate-200'
+                                                                }`}
+                                                            >
+                                                                +{hiddenOrderCount}
+                                                            </span>
+                                                        )}
+                                                    </div>
                                                 )}
                                                 <div className={`mt-1.5 space-y-0.5 text-[9px] font-semibold leading-[1.2] ${
                                                     isSelected ? 'text-white/95' : 'text-slate-500 dark:text-gray-400'
