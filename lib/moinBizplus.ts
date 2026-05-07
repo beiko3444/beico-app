@@ -83,6 +83,30 @@ const KO_ACCEPTED_STATE_KEYWORDS = [
     '\uC9C4\uD589\uC911',
 ]
 
+const MOIN_LOGIN_ID_SELECTORS = [
+    'input[name="email"]',
+    'input[type="email"]',
+    'input[name="username"]',
+    'input[autocomplete="username"]',
+    'input[autocomplete="email"]',
+    'label:has-text("이메일") input',
+    'xpath=//label[contains(normalize-space(),"이메일")]//input[1]',
+    'main form label:nth-of-type(1) input',
+    'main form input:not([type="password"])',
+    'label.sc-3e129e50-2:nth-of-type(1) input.sc-4f2c4f04-2',
+]
+
+const MOIN_LOGIN_PASSWORD_SELECTORS = [
+    'input[name="password"]',
+    'input[type="password"]',
+    'input[autocomplete="current-password"]',
+    'label:has-text("비밀번호") input',
+    'xpath=//label[contains(normalize-space(),"비밀번호")]//input[1]',
+    'main form label:nth-of-type(2) input',
+    'main form input:nth-of-type(2)',
+    'label.sc-3e129e50-2:nth-of-type(2) input.sc-4f2c4f04-2',
+]
+
 const classifyMoinLoginFailure = (bodyText: string): 'locked' | 'password' | null => {
     if (!bodyText) return null
     if (bodyText.includes(KO_PASSWORD_MISMATCH)) return 'password'
@@ -905,10 +929,23 @@ const refreshMoinLoginInputEvents = async (page: PageLike): Promise<string | nul
                 input.dispatchEvent(new Event('change', { bubbles: true }));
                 input.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
             };
+            const textOf = (el) => String((el && el.textContent) || '').replace(/\\s+/g, ' ').trim();
+            const visibleInputs = Array.from(document.querySelectorAll('input')).filter((el) => isVisible(el));
+            const inputInLabel = (labelText) => {
+                const label = Array.from(document.querySelectorAll('label')).find((el) => textOf(el).includes(labelText));
+                return label ? Array.from(label.querySelectorAll('input')).find((el) => isVisible(el)) : null;
+            };
             const email = Array.from(document.querySelectorAll('input[name="email"], input[type="email"], input[name="username"], input[autocomplete="username"], input[autocomplete="email"]'))
-                .find((el) => isVisible(el));
+                .find((el) => isVisible(el))
+                || inputInLabel('이메일')
+                || visibleInputs.find((el) => String(el.getAttribute('type') || '').toLowerCase() !== 'password')
+                || visibleInputs[0];
             const password = Array.from(document.querySelectorAll('input[name="password"], input[type="password"], input[autocomplete="current-password"]'))
-                .find((el) => isVisible(el));
+                .find((el) => isVisible(el))
+                || inputInLabel('비밀번호')
+                || visibleInputs.find((el) => el !== email && String(el.getAttribute('type') || '').toLowerCase() === 'password')
+                || visibleInputs.find((el) => el !== email)
+                || visibleInputs[1];
             if (!email || !password || !email.value || !password.value) return null;
             emitInputEvents(email);
             emitInputEvents(password);
@@ -927,6 +964,9 @@ const clickMoinLoginSubmit = async (
         'button[data-testid="button-login"]',
         'button[name="login_button"]',
         'form button[type="submit"]',
+        `main form button:has-text("${KO_LOGIN}")`,
+        'main form button',
+        'main._1e468ni3 form.sc-fecb0d03-0 button.sc-b0b8b050-0.sc-b0b8b050-1',
         `button[type="submit"]:has-text("${KO_LOGIN}")`,
     ]
 
@@ -936,26 +976,38 @@ const clickMoinLoginSubmit = async (
     for (const selector of loginBtnSelectors) {
         throwIfAbortRequested(abortSignal, 'Submit login')
         try {
-            const btn = page.locator(selector).first()
-            await btn.waitFor({ state: 'visible', timeout: 3000 })
+            const matches = page.locator(selector)
+            await matches.first().waitFor({ state: 'visible', timeout: 3000 })
 
             const enableDeadline = Date.now() + 5000
             while (Date.now() < enableDeadline) {
                 throwIfAbortRequested(abortSignal, 'Submit login')
                 await refreshMoinLoginInputEvents(page)
 
-                const disabled = await btn.isDisabled().catch(() => false)
-                const enabled = await btn.isEnabled().catch(() => !disabled)
-                if (!disabled && enabled) {
-                    await btn.click({ timeout: 5000 })
-                    return selector
+                const count = typeof matches.count === 'function'
+                    ? await matches.count().catch(() => 0)
+                    : 1
+                for (let index = 0; index < count; index += 1) {
+                    const btn = typeof matches.nth === 'function'
+                        ? matches.nth(index)
+                        : matches.first()
+                    const visible = typeof btn.isVisible === 'function'
+                        ? await btn.isVisible().catch(() => false)
+                        : true
+                    if (!visible) continue
+                    const disabled = await btn.isDisabled().catch(() => false)
+                    const enabled = await btn.isEnabled().catch(() => !disabled)
+                    if (!disabled && enabled) {
+                        await btn.click({ timeout: 5000 })
+                        return count === 1 ? selector : `${selector}#${index}`
+                    }
+                    sawVisibleDisabledSubmit = true
                 }
 
                 await page.waitForTimeout(120)
             }
 
             throwIfAbortRequested(abortSignal, 'Submit login')
-            sawVisibleDisabledSubmit = true
 
             const diagnostics = await collectMoinLoginSubmitDiagnostics(page)
             throw new MoinAutomationError(
@@ -1501,6 +1553,76 @@ const inspectAmountFieldValue = async (page: PageLike, expectedAmount: string) =
     }
 }
 
+const fillMoinUsdAmountByDom = async (page: PageLike, amount: string): Promise<string> => {
+    const result = await page.evaluate(`
+        (() => {
+            const amount = ${JSON.stringify(amount)};
+            const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const visibleInputs = Array.from(document.querySelectorAll('input'))
+                .filter((inp) => isVisible(inp) && !inp.disabled && !inp.readOnly)
+                .filter((inp) => ['text', 'number', 'tel', ''].includes(String(inp.type || '').toLowerCase()));
+
+            const scoreInput = (inp, index) => {
+                let score = 0;
+                const hint = norm([
+                    inp.name || '',
+                    inp.id || '',
+                    inp.placeholder || '',
+                    inp.getAttribute('aria-label') || '',
+                ].join(' ')).toLowerCase();
+                if (/recipient|alias|company|name|수취인|회사명|별칭|받는 분/.test(hint)) score -= 10000;
+                if (/usd|receive|receiving|beneficiary|받는 금액/.test(hint)) score += 500;
+                if (/krw|send|sending|보내는 금액/.test(hint)) score -= 500;
+
+                let current = inp;
+                for (let depth = 0; current && current !== document.body && depth < 7; depth += 1) {
+                    const text = norm(current.textContent || '');
+                    const lower = text.toLowerCase();
+                    if (text.includes('USD') || lower.includes('usd')) score += 500 - depth * 30;
+                    if (text.includes('받는 금액')) score += 600 - depth * 30;
+                    if (text.includes('중국')) score += 150 - depth * 10;
+                    if (text.includes('KRW') || lower.includes('krw')) score -= 350 - depth * 20;
+                    if (text.includes('보내는 금액')) score -= 600 - depth * 30;
+                    current = current.parentElement;
+                }
+
+                const rect = inp.getBoundingClientRect();
+                score += Math.min(300, rect.top / 5);
+                score += index;
+                return score;
+            };
+
+            const ranked = visibleInputs
+                .map((inp, index) => ({ inp, index, score: scoreInput(inp, index) }))
+                .sort((a, b) => b.score - a.score);
+            const target = ranked[0]?.inp || null;
+            if (!target) return 'no-usd-input';
+
+            try { target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' }); } catch {}
+            try { target.focus(); } catch {}
+            const nativeInputValueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+            if (nativeInputValueSetter) nativeInputValueSetter.call(target, '');
+            else target.value = '';
+            target.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward', data: null }));
+            if (nativeInputValueSetter) nativeInputValueSetter.call(target, amount);
+            else target.value = amount;
+            target.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: amount }));
+            target.dispatchEvent(new Event('change', { bubbles: true }));
+            target.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
+            target.dispatchEvent(new Event('blur', { bubbles: true }));
+            return 'dom-usd-filled:index=' + ranked[0].index + ':score=' + ranked[0].score;
+        })()
+    `).catch((error) => `dom-usd-error:${getErrorMessage(error)}`)
+
+    return typeof result === 'string' ? result : 'dom-usd-unknown'
+}
+
 const hasUploadInput = async (page: PageLike) => {
     const result = await page.evaluate(`
         (() => {
@@ -2036,13 +2158,7 @@ const clickCompanyScopedRemit = async (
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
     const waitStrategies: Array<'domcontentloaded' | 'load'> = ['domcontentloaded']
-    const loginSelectors = [
-        'input[name="email"]',
-        'input[type="email"]',
-        'input[name="username"]',
-        'input[autocomplete="username"]',
-        'input[autocomplete="email"]',
-    ]
+    const loginSelectors = MOIN_LOGIN_ID_SELECTORS
 
     for (const waitUntil of waitStrategies) {
         try {
@@ -2188,13 +2304,7 @@ const performMoinLogin = async (
     throwIfAbortRequested(abortSignal, 'Fill login ID')
     await typeFirstVisible(
         page,
-        [
-            'input[name="email"]',
-            'input[type="email"]',
-            'input[name="username"]',
-            'input[autocomplete="username"]',
-            'input[autocomplete="email"]',
-        ],
+        MOIN_LOGIN_ID_SELECTORS,
         loginId,
         'Fill login ID',
         DEFAULT_TIMEOUT_MS,
@@ -2204,7 +2314,7 @@ const performMoinLogin = async (
     throwIfAbortRequested(abortSignal, 'Fill login password')
     await typeFirstVisible(
         page,
-        ['input[name="password"]', 'input[type="password"]', 'input[autocomplete="current-password"]'],
+        MOIN_LOGIN_PASSWORD_SELECTORS,
         loginPassword,
         'Fill login password',
         DEFAULT_TIMEOUT_MS,
@@ -3337,13 +3447,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         throwIfAbortRequested(abortSignal, 'Fill login ID')
         await typeFirstVisible(
             page,
-            [
-                'input[name="email"]',
-                'input[type="email"]',
-                'input[name="username"]',
-                'input[autocomplete="username"]',
-                'input[autocomplete="email"]',
-            ],
+            MOIN_LOGIN_ID_SELECTORS,
             input.loginId,
             'Fill login ID',
             DEFAULT_TIMEOUT_MS
@@ -3353,7 +3457,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         throwIfAbortRequested(abortSignal, 'Fill login password')
         await typeFirstVisible(
             page,
-            ['input[name="password"]', 'input[type="password"]', 'input[autocomplete="current-password"]'],
+            MOIN_LOGIN_PASSWORD_SELECTORS,
             input.loginPassword,
             'Fill login password',
             DEFAULT_TIMEOUT_MS
@@ -3773,6 +3877,21 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // Try to fill the USD amount with various selectors
         let amountFilled = false
 
+        // Prefer the visible "받는 금액 / USD" input from the current MOIN layout.
+        try {
+            throwIfAbortRequested(abortSignal, 'Fill USD amount')
+            const domFillResult = await fillMoinUsdAmountByDom(page, input.amountUsd)
+            const inspect = await inspectAmountFieldValue(page, input.amountUsd)
+            if (inspect.matched) {
+                amountFilled = true
+                steps.push(`fill-usd-dom:${domFillResult}:ok`)
+            } else {
+                steps.push(`fill-usd-dom:${domFillResult}:mismatch:${inspect.bestValue || 'empty'}`)
+            }
+        } catch (err) {
+            steps.push(`fill-usd-dom-error:${err instanceof Error ? err.message.slice(0, 100) : 'unknown'}`)
+        }
+
         // Strategy 1: Specific selectors for the receiving amount
         const usdSelectors = [
             // Near "?꾩룇猷???ル?녽뇡? / "USD" text
@@ -3787,6 +3906,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             'input[name*="receive" i]',
             'input[name*="amount" i]',
             'input[id*="amount" i]',
+            'div.sc-1e23ebf0-0.gEjWbH:nth-of-type(3) div.sc-1e23ebf0-4.lnBVuY:nth-of-type(1) input.pxv49w0.dor4d38',
             // By label/text proximity
             'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
             `xpath=//*[contains(normalize-space(),"${KO_AMOUNT}")]/following::input[1]`,
@@ -3961,7 +4081,11 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         throwIfAbortRequested(abortSignal, 'Upload invoice')
         await uploadFirstFileInput(
             page,
-            ['input[type="file"][accept*="pdf" i]', 'input[type="file"]'],
+            [
+                'input[type="file"][accept*="pdf" i]',
+                'div.sc-e5a15f5f-0.bvOTtB form.sc-679b5ea5-0 input.sc-fa9b96ed-1.hmXYJM',
+                'input[type="file"]',
+            ],
             {
                 name: input.invoiceFileName,
                 mimeType: input.invoiceMimeType,
