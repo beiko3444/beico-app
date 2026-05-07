@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { MoinAutomationCanceledError, MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
 import { prisma } from '@/lib/prisma'
+import { getRemittanceRunningJobElapsedMs, isRemittanceRunningJobStale } from '@/lib/remittanceRunningJob'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -204,6 +205,35 @@ const clearAuthFailure = (state: RemittanceAuthGuardState, credentialKey: string
     state.failures.delete(credentialKey)
 }
 
+const clearRunningJob = (state: RemittanceAuthGuardState, runningJob: RemittanceRunningJob) => {
+    state.runningJobsByCredential.delete(runningJob.credentialKey)
+    state.runningJobsByOrderId.delete(runningJob.orderId)
+    state.inFlight.delete(runningJob.credentialKey)
+}
+
+const clearStaleRunningJob = (
+    state: RemittanceAuthGuardState,
+    runningJob: RemittanceRunningJob | null | undefined,
+    now: number,
+) => {
+    if (!runningJob || !isRemittanceRunningJobStale(runningJob.startedAt, now)) return false
+    runningJob.abortController.abort()
+    clearRunningJob(state, runningJob)
+    return true
+}
+
+const buildRunningJobResponse = (runningJob: RemittanceRunningJob, now: number, message: string) => {
+    const elapsedMs = getRemittanceRunningJobElapsedMs(runningJob.startedAt, now)
+    return {
+        error: message,
+        running: true,
+        cancelAvailable: true,
+        orderId: runningJob.orderId,
+        startedAt: new Date(runningJob.startedAt).toISOString(),
+        elapsedMs,
+    }
+}
+
 export async function DELETE(request: Request) {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -234,6 +264,7 @@ export async function DELETE(request: Request) {
     }
 
     runningJob.abortController.abort()
+    clearRunningJob(guardState, runningJob)
     return NextResponse.json({
         ok: true,
         canceled: true,
@@ -359,17 +390,36 @@ export async function POST(request: Request) {
             )
         }
 
+        const runningByCredential = guardState.runningJobsByCredential.get(credentialKey) || null
+        clearStaleRunningJob(guardState, runningByCredential, now)
+
         if (guardState.inFlight.has(credentialKey)) {
-            return NextResponse.json(
-                { error: 'A remittance request is already in progress for this login ID. Please wait.' },
-                { status: 409 }
-            )
+            const runningJob = guardState.runningJobsByCredential.get(credentialKey) || null
+            if (!runningJob) {
+                guardState.inFlight.delete(credentialKey)
+            } else {
+                return NextResponse.json(
+                    buildRunningJobResponse(
+                        runningJob,
+                        now,
+                        '이미 송금 자동화가 실행 중입니다. 기존 실행을 취소한 뒤 다시 시작할 수 있습니다.',
+                    ),
+                    { status: 409 }
+                )
+            }
         }
 
-        const runningByOrder = guardState.runningJobsByOrderId.get(targetOrder.id)
-        if (runningByOrder) {
+        const runningByOrder = guardState.runningJobsByOrderId.get(targetOrder.id) || null
+        clearStaleRunningJob(guardState, runningByOrder, now)
+
+        const activeRunningByOrder = guardState.runningJobsByOrderId.get(targetOrder.id) || null
+        if (activeRunningByOrder) {
             return NextResponse.json(
-                { error: `해당 발주는 이미 송금 신청이 진행 중입니다. (${targetOrder.orderNumber})` },
+                buildRunningJobResponse(
+                    activeRunningByOrder,
+                    now,
+                    `해당 발주는 이미 송금 신청이 진행 중입니다. (${targetOrder.orderNumber})`,
+                ),
                 { status: 409 }
             )
         }

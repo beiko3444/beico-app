@@ -1690,6 +1690,7 @@ export default function WormOrderPage() {
     const [remittanceSuccess, setRemittanceSuccess] = useState('')
     const [remittanceSubmitting, setRemittanceSubmitting] = useState(false)
     const [remittanceCancelling, setRemittanceCancelling] = useState(false)
+    const [remittanceServerRunActive, setRemittanceServerRunActive] = useState(false)
     const [remittanceProgress, setRemittanceProgress] = useState(0)
     const [remittanceProgressLabel, setRemittanceProgressLabel] = useState('대기 중')
     const [remittanceAttemptsRemaining, setRemittanceAttemptsRemaining] = useState<number | null>(null)
@@ -3244,6 +3245,7 @@ export default function WormOrderPage() {
     )
     const remittanceRunDisabled =
         remittanceSubmitting ||
+        remittanceServerRunActive ||
         isRemittanceLocked ||
         isActiveOrderRemittanceApplied ||
         !activeWormOrderRecord ||
@@ -3367,6 +3369,7 @@ export default function WormOrderPage() {
         setRemittanceError('')
         setRemittanceSuccess('')
         setRemittanceCancelling(false)
+        setRemittanceServerRunActive(false)
         setRemittanceAttemptsRemaining(null)
         setRemittanceProgress(0)
         setRemittanceProgressLabel('대기 중')
@@ -3511,6 +3514,18 @@ export default function WormOrderPage() {
             const result = await response.json()
 
             if (!response.ok) {
+                if (result?.running === true) {
+                    setRemittanceServerRunActive(result.cancelAvailable === true)
+                    setRemittanceProgress((prev) => Math.max(prev, 12))
+                    setRemittanceProgressLabel('기존 송금 자동화가 서버에서 실행 중입니다.')
+                    setRemittanceError(
+                        typeof result?.error === 'string'
+                            ? result.error
+                            : '이미 송금 자동화가 실행 중입니다. 기존 실행을 취소한 뒤 다시 시작할 수 있습니다.'
+                    )
+                    return
+                }
+
                 if (typeof result?.attemptsRemaining === 'number') {
                     setRemittanceAttemptsRemaining(result.attemptsRemaining)
                 }
@@ -3546,6 +3561,7 @@ export default function WormOrderPage() {
 
             setRemittanceAttemptsRemaining(null)
             setRemittanceLockedUntil(null)
+            setRemittanceServerRunActive(false)
             if (preparedOnly) {
                 setRemittanceSuccess('모인 BizPlus 최종 확인 직전까지 자동 준비를 완료했습니다. 마지막 송금 버튼은 자동으로 누르지 않았습니다.')
                 setRemittanceProgress(Math.max(resolvedStage?.percent ?? 94, 94))
@@ -3672,7 +3688,7 @@ export default function WormOrderPage() {
     }
 
     const handleCancelRemittance = useCallback(async () => {
-        if (!remittanceSubmitting) return
+        if (!remittanceSubmitting && !remittanceServerRunActive) return
 
         remittanceCancelRequestedRef.current = true
         setRemittanceCancelling(true)
@@ -3688,11 +3704,26 @@ export default function WormOrderPage() {
             const cancelUrl = activeWormOrder?.id
                 ? `/api/admin/worm-order/remittance?orderId=${encodeURIComponent(activeWormOrder.id)}`
                 : '/api/admin/worm-order/remittance'
-            await fetch(cancelUrl, { method: 'DELETE' })
+            const response = await fetch(cancelUrl, { method: 'DELETE' })
+            const result = await response.json().catch(() => null)
+            if (response.ok) {
+                setRemittanceServerRunActive(false)
+                setRemittanceError('')
+                setRemittanceProgressLabel(
+                    result?.canceled
+                        ? '기존 송금 자동화를 취소했습니다.'
+                        : '진행 중인 송금 자동화가 없습니다.'
+                )
+            }
         } catch {
             // Ignore transport errors here; local abort already requested.
+        } finally {
+            if (!remittanceSubmitting) {
+                remittanceCancelRequestedRef.current = false
+                setRemittanceCancelling(false)
+            }
         }
-    }, [activeWormOrder?.id, remittanceSubmitting])
+    }, [activeWormOrder?.id, remittanceServerRunActive, remittanceSubmitting])
 
     const handleCustomsProgressSearch = async (
         nextBlNo?: string,
@@ -5655,6 +5686,8 @@ export default function WormOrderPage() {
                                 '송금완료'
                             ) : isRemittanceLocked ? (
                                 `잠금 ${remittanceLockRemainingText}`
+                            ) : remittanceServerRunActive ? (
+                                '기존 실행중'
                             ) : remittanceSubmitting ? (
                                 <>
                                     <Loader2 size={15} className="animate-spin" />
@@ -5665,7 +5698,7 @@ export default function WormOrderPage() {
                             )}
                         </button>
 
-                        {(remittanceSubmitting || remittanceCancelling) && (
+                        {(remittanceSubmitting || remittanceCancelling || remittanceServerRunActive) && (
                             <button
                                 type="button"
                                 onClick={handleCancelRemittance}
