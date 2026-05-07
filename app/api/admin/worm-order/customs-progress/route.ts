@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/requireAdmin'
+import {
+    buildUnipassSearchParams,
+    normalizeBlNo,
+    resolveUnipassQueryAttempts,
+    type UnipassQueryKind,
+} from '@/lib/unipassCustoms'
 
 const DEFAULT_UNIPASS_API_KEY = 'r290g216h033p330q080i040q6'
 const UNIPASS_API_URL = 'https://unipass.customs.go.kr:38010/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo'
@@ -15,25 +21,11 @@ type CachedCustomsProgress = {
 
 const customsProgressCache = new Map<string, CachedCustomsProgress>()
 
-type QueryKind = 'mblNo' | 'hblNo'
-
 type Api001ParseResult = {
     tCnt: number
     ntceInfo: string
     summaryRecords: Array<Record<string, string>>
     detailRecords: Array<Record<string, string>>
-}
-
-function formatBlYear(year: number) {
-    return String(year % 100).padStart(2, '0')
-}
-
-function normalizeBlNo(input: string) {
-    return input
-        .replace(/\s+/g, '')
-        .trim()
-        .replace(/[^0-9a-zA-Z]/g, '')
-        .toUpperCase()
 }
 
 function decodeXmlValue(input: string) {
@@ -86,12 +78,8 @@ function parseApi001Xml(xml: string): Api001ParseResult {
     return { tCnt, ntceInfo, summaryRecords, detailRecords }
 }
 
-async function requestApi001(apiKey: string, blNo: string, blYy: string, kind: QueryKind) {
-    const params = new URLSearchParams({
-        crkyCn: apiKey,
-        blYy,
-        [kind]: blNo,
-    })
+async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null }) {
+    const params = buildUnipassSearchParams(apiKey, blNo, attempt)
 
     const response = await fetch(`${UNIPASS_API_URL}?${params.toString()}`, {
         method: 'GET',
@@ -140,44 +128,40 @@ export async function GET(request: NextRequest) {
     }
 
     const currentYear = new Date().getFullYear()
-    const attempts: Array<{ kind: QueryKind; blYy: string; tCnt: number; ntceInfo: string }> = []
+    const attempts: Array<{ kind: UnipassQueryKind; blYy: string | null; tCnt: number; ntceInfo: string }> = []
 
-    for (let delta = 0; delta < LOOKBACK_YEARS; delta += 1) {
-        const blYy = formatBlYear(currentYear - delta)
+    for (const attempt of resolveUnipassQueryAttempts(blNo, currentYear, LOOKBACK_YEARS)) {
+        try {
+            const parsed = await requestApi001(apiKey, blNo, attempt)
+            attempts.push({ ...attempt, tCnt: parsed.tCnt, ntceInfo: parsed.ntceInfo })
 
-        for (const kind of ['mblNo', 'hblNo'] as const) {
-            try {
-                const parsed = await requestApi001(apiKey, blNo, blYy, kind)
-                attempts.push({ kind, blYy, tCnt: parsed.tCnt, ntceInfo: parsed.ntceInfo })
-
-                const hasData = parsed.tCnt > 0 || parsed.summaryRecords.length > 0 || parsed.detailRecords.length > 0
-                const looksLikeListMode = parsed.ntceInfo.startsWith('[N00]')
-                if (hasData || looksLikeListMode) {
-                    const payload = {
-                        blNo,
-                        query: { kind, blYy },
-                        tCnt: parsed.tCnt,
-                        ntceInfo: parsed.ntceInfo,
-                        summaryRecords: parsed.summaryRecords,
-                        detailRecords: parsed.detailRecords,
-                        attempts,
-                    }
-                    customsProgressCache.set(cacheKey, {
-                        expiresAt: Date.now() + CUSTOMS_PROGRESS_CACHE_TTL_MS,
-                        status: 200,
-                        payload,
-                    })
-                    return NextResponse.json(payload, {
-                        status: 200,
-                        headers: {
-                            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-                        },
-                    })
+            const hasData = parsed.tCnt > 0 || parsed.summaryRecords.length > 0 || parsed.detailRecords.length > 0
+            const looksLikeListMode = parsed.ntceInfo.startsWith('[N00]')
+            if (hasData || looksLikeListMode) {
+                const payload = {
+                    blNo,
+                    query: attempt,
+                    tCnt: parsed.tCnt,
+                    ntceInfo: parsed.ntceInfo,
+                    summaryRecords: parsed.summaryRecords,
+                    detailRecords: parsed.detailRecords,
+                    attempts,
                 }
-            } catch (error) {
-                const message = error instanceof Error ? error.message : '조회 중 오류가 발생했습니다.'
-                attempts.push({ kind, blYy, tCnt: -1, ntceInfo: message })
+                customsProgressCache.set(cacheKey, {
+                    expiresAt: Date.now() + CUSTOMS_PROGRESS_CACHE_TTL_MS,
+                    status: 200,
+                    payload,
+                })
+                return NextResponse.json(payload, {
+                    status: 200,
+                    headers: {
+                        'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
+                    },
+                })
             }
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '조회 중 오류가 발생했습니다.'
+            attempts.push({ ...attempt, tCnt: -1, ntceInfo: message })
         }
     }
 

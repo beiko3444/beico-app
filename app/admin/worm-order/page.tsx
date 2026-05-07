@@ -76,8 +76,8 @@ type WormEmailOfflineCache = {
 type CustomsProgressResult = {
     blNo: string
     query: {
-        kind: 'mblNo' | 'hblNo'
-        blYy: string
+        kind: 'cargMtNo' | 'mblNo' | 'hblNo'
+        blYy: string | null
     }
     tCnt: number
     ntceInfo: string
@@ -5919,7 +5919,11 @@ export default function WormOrderPage() {
                     <div className="rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] p-4 space-y-4">
                         <div className="text-xs text-gray-600 flex flex-wrap gap-x-4 gap-y-1">
                             <span><span className="font-bold text-gray-800">B/L:</span> {customsProgressResult.blNo}</span>
-                            <span><span className="font-bold text-gray-800">조회조건:</span> {customsProgressResult.query.kind} / {customsProgressResult.query.blYy}</span>
+                            <span>
+                                <span className="font-bold text-gray-800">조회조건:</span>{' '}
+                                {customsProgressResult.query.kind}
+                                {customsProgressResult.query.blYy ? ` / ${customsProgressResult.query.blYy}` : ''}
+                            </span>
                             <span><span className="font-bold text-gray-800">결과건수(tCnt):</span> {customsProgressResult.tCnt}</span>
                         </div>
 
