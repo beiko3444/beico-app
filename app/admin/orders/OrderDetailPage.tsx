@@ -86,6 +86,7 @@ interface ProductLineItem {
   supplyPrice: number
   vat: number
   total: number
+  kind?: 'product' | 'shipping'
 }
 
 interface NormalizedOrderDetail {
@@ -365,6 +366,27 @@ function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void 
 export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const router = useRouter()
   const detail = useMemo(() => buildOrderDetailData(order), [order])
+  const productRows = useMemo<ProductLineItem[]>(() => {
+    if (detail.payment.shippingFee <= 0) return detail.products
+
+    const shippingVat = Math.round(detail.payment.shippingFee * 0.1)
+
+    return [
+      ...detail.products,
+      {
+        id: 'shipping-fee',
+        name: '배송비',
+        option: `${detail.payment.totalQuantity.toLocaleString('ko-KR')}개 기준`,
+        imageUrl: null,
+        quantity: 1,
+        unitPrice: detail.payment.shippingFee,
+        supplyPrice: detail.payment.shippingFee,
+        vat: shippingVat,
+        total: detail.payment.shippingFee + shippingVat,
+        kind: 'shipping',
+      },
+    ]
+  }, [detail])
 
   const [currentStatus, setCurrentStatus] = useState(detail.rawStatus)
   const [taxInvoiceIssued, setTaxInvoiceIssued] = useState(detail.taxInvoiceIssued)
@@ -634,14 +656,10 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-3">
               {[
                 { label: '거래처', value: detail.customer.company },
-                { label: '담당자', value: detail.customer.manager },
                 { label: '사업자번호', value: detail.customer.businessNumber, copyKey: 'business-number' },
                 { label: '연락처', value: detail.customer.phone, copyKey: 'phone' },
                 { label: '이메일', value: detail.customer.email, copyKey: 'email' },
-                { label: '업태/종목', value: detail.customer.businessType },
                 { label: '배송지 주소', value: detail.shipping.address, copyKey: 'address' },
-                { label: '배송 수령인', value: detail.shipping.recipient },
-                { label: '배송 연락처', value: detail.shipping.phone, copyKey: 'shipping-phone' },
               ].map((field) => (
                 <div key={field.label} className="min-h-[112px] rounded-[14px] border border-[#E6EAF2] bg-[#F8FAFC] px-[18px] py-[18px]">
                   <div className="flex items-center justify-between gap-3">
@@ -655,7 +673,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </DetailCard>
 
           <DetailCard
-            title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개)`}
+            title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개${detail.payment.shippingFee > 0 ? ', 배송비 포함' : ''})`}
             icon={<Package className="h-4 w-4" />}
           >
             <div className="hidden overflow-hidden rounded-2xl border border-[#E6EAF2] lg:block">
@@ -671,12 +689,14 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                   </tr>
                 </thead>
                 <tbody>
-                  {detail.products.map((product) => (
-                    <tr key={product.id} className="border-t border-slate-200 align-top">
+                  {productRows.map((product) => (
+                    <tr key={product.id} className={`border-t border-slate-200 align-top ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
                       <td className="h-20 px-6 py-2.5">
                         <div className="flex items-center gap-4">
                           <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-[10px] border border-slate-200 bg-slate-50">
-                            {product.imageUrl ? (
+                            {product.kind === 'shipping' ? (
+                              <Truck className="h-6 w-6 text-slate-400" />
+                            ) : product.imageUrl ? (
                               <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
                             ) : (
                               <Package className="h-6 w-6 text-slate-300" />
@@ -684,11 +704,11 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                           </div>
                           <div className="min-w-0">
                             <div className="truncate text-[15px] font-black text-slate-900">{product.name}</div>
-                            <div className="mt-1.5 inline-flex rounded-full border border-orange-200 bg-[#FFF1E8] px-2 py-0.5 text-[11px] font-bold text-orange-600">{product.option}</div>
+                            <div className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-[#FFF1E8] text-orange-600'}`}>{product.option}</div>
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-4 text-right text-[14px] font-bold text-slate-800">{product.quantity.toLocaleString('ko-KR')}개</td>
+                      <td className="px-4 py-4 text-right text-[14px] font-bold text-slate-800">{product.kind === 'shipping' ? '1건' : `${product.quantity.toLocaleString('ko-KR')}개`}</td>
                       <td className="px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.unitPrice)}</td>
                       <td className="px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.supplyPrice)}</td>
                       <td className="px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.vat)}</td>
@@ -700,11 +720,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
 
             <div className="space-y-3 lg:hidden">
-              {detail.products.map((product) => (
-                <div key={product.id} className="rounded-2xl border border-slate-200 p-4">
+              {productRows.map((product) => (
+                <div key={product.id} className={`rounded-2xl border border-slate-200 p-4 ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
                   <div className="flex gap-4">
                     <div className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-                      {product.imageUrl ? (
+                      {product.kind === 'shipping' ? (
+                        <Truck className="h-7 w-7 text-slate-400" />
+                      ) : product.imageUrl ? (
                         <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
                       ) : (
                         <Package className="h-6 w-6 text-slate-300" />
@@ -712,11 +734,11 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-[15px] font-black text-slate-900">{product.name}</div>
-                      <div className="mt-2 inline-flex rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700">{product.option}</div>
+                      <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-orange-50 text-orange-700'}`}>{product.option}</div>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">수량</span><div className="mt-1 font-bold text-slate-900">{product.quantity}개</div></div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">수량</span><div className="mt-1 font-bold text-slate-900">{product.kind === 'shipping' ? '1건' : `${product.quantity}개`}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">단가</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.unitPrice)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">공급가</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.supplyPrice)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">부가세</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.vat)}</div></div>
