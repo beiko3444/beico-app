@@ -9,11 +9,9 @@ import {
   Bell,
   Check,
   ChevronRight,
-  ClipboardList,
   Copy,
   FileText,
   MessageSquare,
-  MoreHorizontal,
   Package,
   ReceiptText,
   Store,
@@ -504,9 +502,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     router.push(`/invoice/${detail.orderId}`)
   }
 
-  const handlePrototypeAction = (message: string) => {
-    alert(message)
-  }
 
   return (
     <div
@@ -622,12 +617,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
               <ReceiptText className="h-4 w-4" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
             </button>
-            <button type="button" onClick={() => handlePrototypeAction('견적서 출력은 준비 중입니다.')} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
-              <ClipboardList className="h-4 w-4" /> 견적서 출력
-            </button>
-            <button type="button" onClick={() => window.print()} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
-              <MoreHorizontal className="h-4 w-4" /> 인쇄하기
-            </button>
             <button
               type="button"
               onClick={() => setDeleteModalOpen(true)}
@@ -684,9 +673,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 <tbody>
                   {detail.products.map((product) => (
                     <tr key={product.id} className="border-t border-slate-200 align-top">
-                      <td className="h-24 px-6 py-3">
+                      <td className="h-20 px-6 py-2.5">
                         <div className="flex items-center gap-4">
-                          <div className="flex h-14 w-14 items-center justify-center overflow-hidden rounded-[10px] border border-slate-200 bg-slate-50">
+                          <div className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-[10px] border border-slate-200 bg-slate-50">
                             {product.imageUrl ? (
                               <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
                             ) : (
@@ -695,7 +684,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                           </div>
                           <div className="min-w-0">
                             <div className="truncate text-[15px] font-black text-slate-900">{product.name}</div>
-                            <div className="mt-2 inline-flex rounded-full border border-orange-200 bg-[#FFF1E8] px-2.5 py-1 text-[11px] font-bold text-orange-600">{product.option}</div>
+                            <div className="mt-1.5 inline-flex rounded-full border border-orange-200 bg-[#FFF1E8] px-2 py-0.5 text-[11px] font-bold text-orange-600">{product.option}</div>
                           </div>
                         </div>
                       </td>
