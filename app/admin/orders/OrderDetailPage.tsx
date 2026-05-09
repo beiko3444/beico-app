@@ -8,16 +8,12 @@ import {
   AlertTriangle,
   Bell,
   Check,
-  ChevronDown,
   ChevronRight,
   ClipboardList,
-  Clock3,
   Copy,
   FileText,
-  MapPin,
   MessageSquare,
   MoreHorizontal,
-  Wallet,
   Package,
   ReceiptText,
   Store,
@@ -25,7 +21,6 @@ import {
 } from 'lucide-react'
 
 type Tone = 'blue' | 'green' | 'orange' | 'red' | 'gray'
-type StepState = 'done' | 'current' | 'pending'
 
 interface OrderDetailPageProps {
   order?: OrderRecord | null
@@ -93,12 +88,6 @@ interface ProductLineItem {
   supplyPrice: number
   vat: number
   total: number
-}
-
-interface ProcessStep {
-  label: string
-  status: StepState
-  time: string | null
 }
 
 interface NormalizedOrderDetail {
@@ -189,7 +178,7 @@ const sampleOrderData: NormalizedOrderDetail = {
       unitPrice: 4000,
       supplyPrice: 400000,
       vat: 40000,
-      total: 400000,
+      total: 440000,
     },
   ],
   depositConfirmedAt: '2026-05-04 10:31',
@@ -274,7 +263,7 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
       unitPrice: Math.round(item.price),
       supplyPrice,
       vat,
-      total: supplyPrice,
+      total: supplyPrice + vat,
     }
   })
 
@@ -321,25 +310,6 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
     depositSmsMessages: order.depositSmsMessages || [],
     rawStatus: order.status,
   }
-}
-
-function createProcessSteps(detail: NormalizedOrderDetail, trackingNumber: string, currentStatus: string) {
-  const hasTracking = trackingNumber.trim().length > 0 || currentStatus === 'SHIPPED'
-  const isDepositCompleted = currentStatus === 'DEPOSIT_COMPLETED' || currentStatus === 'SHIPPED' || Boolean(detail.adminDepositConfirmedAt)
-
-  const states: StepState[] = hasTracking
-    ? ['done', 'done', 'done', 'done', 'current']
-    : isDepositCompleted
-      ? ['done', 'done', 'current', 'pending', 'pending']
-      : ['done', 'current', 'pending', 'pending', 'pending']
-
-  return [
-    { label: '주문접수', status: states[0], time: detail.createdAtText },
-    { label: '입금대기', status: states[1], time: detail.depositConfirmedAt || detail.createdAtText },
-    { label: '입금확인', status: states[2], time: detail.adminDepositConfirmedAt || detail.depositConfirmedAt },
-    { label: '배송준비', status: states[3], time: hasTracking ? '송장 저장 완료' : null },
-    { label: '배송완료', status: states[4], time: hasTracking ? '출고 처리 완료' : null },
-  ]
 }
 
 function toneClasses(tone: Tone) {
@@ -394,36 +364,6 @@ function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void 
   )
 }
 
-function DropdownButton({
-  label,
-  open,
-  onToggle,
-  children,
-}: {
-  label: string
-  open: boolean
-  onToggle: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <div className="relative w-full">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="inline-flex h-12 w-full items-center justify-between gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[14px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-      >
-        <span>{label}</span>
-        <ChevronDown className={`h-4 w-4 transition ${open ? 'rotate-180' : ''}`} />
-      </button>
-      {open ? (
-        <div className="absolute right-0 top-[calc(100%+8px)] z-30 min-w-[190px] rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
-          {children}
-        </div>
-      ) : null}
-    </div>
-  )
-}
-
 export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const router = useRouter()
   const detail = useMemo(() => buildOrderDetailData(order), [order])
@@ -432,13 +372,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const [taxInvoiceIssued, setTaxInvoiceIssued] = useState(detail.taxInvoiceIssued)
   const [carrier, setCarrier] = useState(detail.shipping.carrier || DEFAULT_CARRIER)
   const [trackingNumber, setTrackingNumber] = useState(detail.shipping.trackingNumber)
-  const [isEditingTracking, setIsEditingTracking] = useState(!detail.shipping.trackingNumber)
-  const [adminDepositConfirmedAt, setAdminDepositConfirmedAt] = useState(detail.adminDepositConfirmedAt)
   const [copiedField, setCopiedField] = useState<string | null>(null)
   const [toastMessage, setToastMessage] = useState('')
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
-  const [documentMenuOpen, setDocumentMenuOpen] = useState(false)
-  const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
 
@@ -447,8 +383,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     setTaxInvoiceIssued(detail.taxInvoiceIssued)
     setCarrier(detail.shipping.carrier || DEFAULT_CARRIER)
     setTrackingNumber(detail.shipping.trackingNumber)
-    setIsEditingTracking(!detail.shipping.trackingNumber)
-    setAdminDepositConfirmedAt(detail.adminDepositConfirmedAt)
   }, [detail])
 
   useEffect(() => {
@@ -456,11 +390,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     const timeout = window.setTimeout(() => setToastMessage(''), 1500)
     return () => window.clearTimeout(timeout)
   }, [toastMessage])
-
-  const processSteps = useMemo(
-    () => createProcessSteps(detail, trackingNumber, currentStatus),
-    [detail, trackingNumber, currentStatus]
-  )
 
   const isCompletedOrder = trackingNumber.trim().length > 0 && taxInvoiceIssued
   const currentStatusMeta = useMemo(
@@ -494,21 +423,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     }
   }
 
-  const handleConfirmDeposit = async () => {
-    try {
-      setLoadingAction('deposit')
-      const now = new Date().toISOString()
-      await patchOrder({ adminDepositConfirmedAt: now })
-      setCurrentStatus('DEPOSIT_COMPLETED')
-      setAdminDepositConfirmedAt(formatDateTime(now))
-      router.refresh()
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '입금확인 처리에 실패했습니다.')
-    } finally {
-      setLoadingAction(null)
-    }
-  }
-
   const validateShipping = () => {
     if (!carrier) return '택배사를 선택해야 합니다.'
     if (!trackingNumber.trim()) return '송장번호를 입력해야 합니다.'
@@ -516,7 +430,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     return null
   }
 
-  const handleSaveTracking = async (advanceStatus: boolean) => {
+  const handleSaveTracking = async () => {
     const errorMessage = validateShipping()
     if (errorMessage) {
       alert(errorMessage)
@@ -524,19 +438,16 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     }
 
     try {
-      setLoadingAction(advanceStatus ? 'ship' : 'save-tracking')
+      setLoadingAction('ship')
       await patchOrder({
         courier: carrier,
         trackingNumber: trackingNumber.trim(),
-        ...(advanceStatus ? { status: 'SHIPPED' } : {}),
+        status: 'SHIPPED',
       })
-      if (advanceStatus) {
-        setCurrentStatus('SHIPPED')
-      }
-      setIsEditingTracking(false)
+      setCurrentStatus('SHIPPED')
       router.refresh()
     } catch (error) {
-      alert(error instanceof Error ? error.message : '송장 저장에 실패했습니다.')
+      alert(error instanceof Error ? error.message : '배송 처리에 실패했습니다.')
     } finally {
       setLoadingAction(null)
     }
@@ -688,7 +599,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       </section>
 
       <div className="rounded-[22px] border border-[#BDEFD8] bg-[linear-gradient(135deg,#F0FFF8_0%,#FFFFFF_58%,#F8FAFF_100%)] p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:p-8">
-        <div className="grid items-center gap-7 xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="grid items-center gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#E9FFF4] text-[#12B981]">
@@ -698,71 +609,29 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               <span className="hidden h-7 w-px bg-[#CBD5E1] md:block" />
               <div className="text-[22px] font-black tracking-[-0.04em] text-[#1769D9] md:text-[28px]">주문 #{detail.orderNumber}</div>
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
-              {isCompletedOrder ? (
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-700">
-                  배송완료 + 계산서 발행완료
-                </span>
-              ) : null}
-              {taxInvoiceIssued ? (
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-700">
-                  세금계산서 발행 완료
-                </span>
-              ) : null}
-              {latestDepositSms?.matchStatus === 'AUTO_CONFIRMED' ? (
-                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-black text-emerald-700">
-                  문자 자동입금 확인
-                </span>
-              ) : null}
-              {latestDepositSms && latestDepositSms.matchStatus !== 'AUTO_CONFIRMED' ? (
-                <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-black ${toneClasses(latestDepositSmsMeta?.tone || 'gray')}`}>
-                  입금문자 {latestDepositSmsMeta?.label}
-                </span>
-              ) : null}
-            </div>
-            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] text-[#64748B]">
-              <span>주문일시 {detail.createdAtText}</span>
-              <span>주문 채널 {detail.channelLabel}</span>
-              <span>처리 상태 {currentStatusMeta.label}</span>
-            </div>
-            <div className="mt-4 rounded-[14px] border border-[#E6EAF2] bg-white/70 px-4 py-3">
-              <div className="flex flex-wrap items-center gap-x-5 gap-y-2 text-[13px]">
-                {processSteps.map((step) => (
-                  <span key={step.label} className={`${step.status === 'current' ? 'font-extrabold text-[#1D4ED8]' : step.status === 'done' ? 'font-bold text-[#059669]' : 'font-semibold text-[#64748B]'}`}>
-                    {step.label}
-                    {step.time ? ` · ${step.time}` : ''}
-                  </span>
-                ))}
-              </div>
+              <span className="text-[14px] font-semibold text-[#64748B]">주문일시 {detail.createdAtText}</span>
             </div>
           </div>
 
-          <div className="flex w-full flex-col gap-3 xl:w-[300px]">
-            <DropdownButton label="문서 발행" open={documentMenuOpen} onToggle={() => setDocumentMenuOpen((prev) => !prev)}>
-              <button type="button" onClick={handlePrintStatement} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
-                <FileText className="h-4 w-4" /> 거래명세표 출력
-              </button>
-              <button type="button" onClick={handleIssueTaxInvoice} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
-                <ReceiptText className="h-4 w-4" /> 세금계산서 발행
-              </button>
-              <button type="button" onClick={() => handlePrototypeAction('견적서 출력은 준비 중입니다.')} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
-                <ClipboardList className="h-4 w-4" /> 견적서 출력
-              </button>
-            </DropdownButton>
-
-            <DropdownButton label="더보기" open={moreMenuOpen} onToggle={() => setMoreMenuOpen((prev) => !prev)}>
-              <button type="button" onClick={() => handlePrototypeAction('주문 복제 기능은 준비 중입니다.')} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
-                <Package className="h-4 w-4" /> 주문 복제
-              </button>
-              <button type="button" onClick={() => window.print()} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-[13px] font-bold text-slate-700 transition hover:bg-slate-50">
-                <MoreHorizontal className="h-4 w-4" /> 인쇄하기
-              </button>
-            </DropdownButton>
+          <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-[360px]">
+            <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
+              <FileText className="h-4 w-4" /> 거래명세표 출력
+            </button>
+            <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <ReceiptText className="h-4 w-4" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
+            </button>
+            <button type="button" onClick={() => handlePrototypeAction('견적서 출력은 준비 중입니다.')} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
+              <ClipboardList className="h-4 w-4" /> 견적서 출력
+            </button>
+            <button type="button" onClick={() => window.print()} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
+              <MoreHorizontal className="h-4 w-4" /> 인쇄하기
+            </button>
             <button
               type="button"
               onClick={() => setDeleteModalOpen(true)}
-              className="h-12 rounded-xl border border-red-200 bg-[#FFF7F7] px-4 text-[14px] font-extrabold text-red-500 transition hover:bg-red-50"
+              className="h-12 rounded-xl border border-red-200 bg-[#FFF7F7] px-4 text-[13px] font-extrabold text-red-500 transition hover:bg-red-50 sm:col-span-2"
             >
               주문 삭제
             </button>
@@ -809,7 +678,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                     <th className="px-4 py-3 text-right">단가</th>
                     <th className="px-4 py-3 text-right">공급가</th>
                     <th className="px-4 py-3 text-right">부가세</th>
-                    <th className="px-4 py-3 text-right">공급가 합계</th>
+                    <th className="px-4 py-3 text-right">합계</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -862,6 +731,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">단가</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.unitPrice)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">공급가</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.supplyPrice)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">부가세</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.vat)}</div></div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">합계</span><div className="mt-1 font-bold text-slate-900">{formatCurrency(product.total)}</div></div>
                   </div>
                 </div>
               ))}
@@ -873,7 +743,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 <div className="grid gap-2 rounded-2xl border border-[#E6EAF2] bg-[#F8FAFC] p-5">
                   <div className="flex items-center justify-between gap-4 text-[13px]">
                     <span className="font-medium text-slate-500">상품 공급가 합계</span>
-                    <span className="font-black text-slate-900">{formatCurrency(detail.products.reduce((sum, item) => sum + item.total, 0))}</span>
+                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.productSupplyPrice)}</span>
                   </div>
                   <div className="flex items-center justify-between gap-4 text-[13px]">
                     <span className="font-medium text-slate-500">배송비</span>
@@ -973,56 +843,20 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                   <input
                     type="text"
                     value={trackingNumber}
-                    onChange={(event) => {
-                      setTrackingNumber(event.target.value)
-                      setIsEditingTracking(true)
-                    }}
+                    onChange={(event) => setTrackingNumber(event.target.value)}
                     placeholder="숫자와 하이픈만 입력해주세요"
                     className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 outline-none transition focus:border-blue-400"
                   />
                 </div>
               </div>
 
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => handleSaveTracking(false)}
-                  disabled={loadingAction === 'save-tracking' || !isEditingTracking}
-                  className="h-[46px] rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-bold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {loadingAction === 'save-tracking' ? '송장 저장 중...' : '송장 저장'}
-                </button>
-                <button
-                  type="button"
-                  onClick={currentStatus === 'DEPOSIT_COMPLETED' || adminDepositConfirmedAt ? () => handleSaveTracking(true) : handleConfirmDeposit}
-                  disabled={loadingAction === 'ship' || loadingAction === 'deposit'}
-                  className="h-[46px] rounded-xl bg-blue-600 px-4 text-[13px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
-                >
-                  {loadingAction === 'ship'
-                    ? '처리 중...'
-                    : loadingAction === 'deposit'
-                      ? '입금확인 중...'
-                      : currentStatus === 'DEPOSIT_COMPLETED' || adminDepositConfirmedAt
-                        ? '배송준비 처리'
-                        : '관리자 입금확인'}
-                </button>
-              </div>
-            </div>
-          </DetailCard>
-
-          <DetailCard title="바로가기" icon={<FileText className="h-4 w-4" />}>
-            <div className="grid grid-cols-2 gap-3">
-              <button type="button" onClick={handlePrintStatement} className="flex h-[92px] flex-col items-center justify-center gap-2 rounded-[14px] border border-[#E6EAF2] bg-white px-3 py-4 text-[12px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-[#F8FAFC] disabled:opacity-50">
-                <FileText className="h-5 w-5" /> 거래명세표
-              </button>
-              <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="flex h-[92px] flex-col items-center justify-center gap-2 rounded-[14px] border border-[#E6EAF2] bg-white px-3 py-4 text-[12px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-[#F8FAFC] disabled:cursor-not-allowed disabled:opacity-50">
-                <ReceiptText className="h-5 w-5" /> {taxInvoiceIssued ? '세금계산서 완료' : '세금계산서'}
-              </button>
-              <button type="button" onClick={() => handlePrototypeAction('견적서 출력은 준비 중입니다.')} className="flex h-[92px] flex-col items-center justify-center gap-2 rounded-[14px] border border-[#E6EAF2] bg-white px-3 py-4 text-[12px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-[#F8FAFC]">
-                <ClipboardList className="h-5 w-5" /> 견적서
-              </button>
-              <button type="button" onClick={() => handlePrototypeAction('문자 발송 연동은 준비 중입니다.')} className="flex h-[92px] flex-col items-center justify-center gap-2 rounded-[14px] border border-[#E6EAF2] bg-white px-3 py-4 text-[12px] font-bold text-slate-700 transition hover:border-slate-300 hover:bg-[#F8FAFC]">
-                <MessageSquare className="h-5 w-5" /> 문자 발송
+              <button
+                type="button"
+                onClick={handleSaveTracking}
+                disabled={loadingAction === 'ship'}
+                className="h-[46px] w-full rounded-xl bg-blue-600 px-4 text-[13px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loadingAction === 'ship' ? '처리 중...' : '배송 처리'}
               </button>
             </div>
           </DetailCard>
