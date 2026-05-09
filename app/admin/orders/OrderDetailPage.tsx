@@ -597,45 +597,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     alert(message)
   }
 
-  const handleSendPickupSms = async () => {
-    if (!fromNumber) {
-      alert('발신번호를 찾지 못했습니다. 문자발송서비스에서 발신번호를 먼저 확인해 주세요.')
-      return
-    }
-    if (!parsedShipmentCount) {
-      alert('출고 건수를 1 이상으로 입력해 주세요.')
-      return
-    }
-
-    const now = new Date()
-    const contents = [
-      '소장님, 엑스트래커입니다.',
-      `${now.getMonth() + 1}/${now.getDate()} 출고 ${parsedShipmentCount}건 집하 부탁드립니다.`,
-      '감사합니다.',
-    ].join('\n')
-
-    try {
-      setSendingPickupSms(true)
-      const response = await fetch('/api/admin/sms', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fromNumber,
-          toName: '소장님',
-          toNumber: '01027104466',
-          contents,
-        }),
-      })
-      const result: { error?: string } = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(result.error || '문자 발송에 실패했습니다.')
-      setToastMessage(`집하요청 문자 발송 완료 (${parsedShipmentCount}건)`)
-    } catch (error) {
-      alert(error instanceof Error ? error.message : '문자 발송에 실패했습니다.')
-    } finally {
-      setSendingPickupSms(false)
-    }
-  }
-
   return (
     <div
       className="bg-[#F5F7FB] px-4 pb-12 pt-7 md:px-8"
@@ -715,26 +676,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         <div className="flex items-center gap-2">
           <button type="button" className="flex h-[46px] w-[46px] items-center justify-center rounded-full border border-[#D8DEE9] bg-white text-[#334155] transition hover:bg-slate-50">
             <Bell className="h-4 w-4" />
-          </button>
-          <div className="inline-flex h-[46px] items-center rounded-full border border-[#D8DEE9] bg-white px-2 text-[14px] font-extrabold text-[#111827]">
-            <input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              value={shipmentCount}
-              onChange={(event) => setShipmentCount(event.target.value)}
-              className="h-full w-12 border-none bg-transparent text-center text-[16px] font-black outline-none"
-              aria-label="출고 건수"
-            />
-            <span className="pr-2 text-[13px] font-bold text-slate-700">건 출고</span>
-          </div>
-          <button
-            type="button"
-            onClick={handleSendPickupSms}
-            disabled={sendingPickupSms || loadingFromNumber}
-            className="inline-flex h-[46px] items-center rounded-full bg-gradient-to-b from-[#2F80ED] to-[#1769D9] px-5 text-[14px] font-extrabold text-white shadow-[0_10px_24px_rgba(47,128,237,0.35)] disabled:opacity-40"
-          >
-            {sendingPickupSms ? '요청중...' : '집하요청'}
           </button>
           <button
             type="button"
