@@ -1714,6 +1714,7 @@ export default function WormOrderPage() {
     const [paymentNotificationCopied, setPaymentNotificationCopied] = useState(false)
     const [activeWormOrder, setActiveWormOrder] = useState<WormOrderSnapshot | null>(null)
     const [wormOrderList, setWormOrderList] = useState<WormOrderListItem[]>([])
+    const [selectedWormOrderYearMonth, setSelectedWormOrderYearMonth] = useState('')
     const [wormOrderListLoading, setWormOrderListLoading] = useState(false)
     const [wormOrderListError, setWormOrderListError] = useState('')
     const [deletingWormOrderId, setDeletingWormOrderId] = useState<string | null>(null)
@@ -2384,7 +2385,7 @@ export default function WormOrderPage() {
         setWormOrderListError('')
 
         try {
-            const response = await fetch('/api/admin/worm-order/orders?limit=40', {
+            const response = await fetch('/api/admin/worm-order/orders?limit=500', {
                 method: 'GET',
                 cache: 'no-store',
             })
@@ -3245,6 +3246,39 @@ export default function WormOrderPage() {
         })
         return grouped
     }, [wormOrderList])
+    const wormOrderMonthGroups = useMemo(() => {
+        const groups = new Map<string, { year: string; month: string; count: number }>()
+        wormOrderList.forEach((order) => {
+            const ymd = toKstDateInputString(order.receiveDate)
+            const ym = ymd.slice(0, 7)
+            if (!/^\d{4}-\d{2}$/.test(ym)) return
+            const prev = groups.get(ym)
+            if (prev) {
+                prev.count += 1
+                return
+            }
+            const [year, month] = ym.split('-')
+            groups.set(ym, { year, month, count: 1 })
+        })
+        return Array.from(groups.entries())
+            .map(([value, group]) => ({ value, ...group }))
+            .sort((a, b) => b.value.localeCompare(a.value))
+    }, [wormOrderList])
+    const selectedWormOrderMonth = useMemo(() => {
+        if (selectedWormOrderYearMonth && wormOrderMonthGroups.some((group) => group.value === selectedWormOrderYearMonth)) {
+            return selectedWormOrderYearMonth
+        }
+        return wormOrderMonthGroups[0]?.value || ''
+    }, [selectedWormOrderYearMonth, wormOrderMonthGroups])
+    const filteredWormOrderList = useMemo(() => {
+        if (!selectedWormOrderMonth) return wormOrderList
+        return wormOrderList.filter((order) => toKstDateInputString(order.receiveDate).startsWith(selectedWormOrderMonth))
+    }, [selectedWormOrderMonth, wormOrderList])
+    const selectedWormOrderMonthLabel = useMemo(() => {
+        if (!selectedWormOrderMonth) return '전체'
+        const [year, month] = selectedWormOrderMonth.split('-')
+        return `${year}년 ${Number(month)}월`
+    }, [selectedWormOrderMonth])
     const calendarRange = useMemo(() => {
         if (calendarDays.length === 0) {
             return { startDate: today, endDate: today }
@@ -4444,45 +4478,73 @@ export default function WormOrderPage() {
                     {workflowFlowPanel}
                 </div>
                 <div className="min-w-0 flex flex-col gap-6 xl:col-start-1 xl:row-start-1">
-            <section className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] shadow-sm dark:shadow-none p-4 md:p-5">
-                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-7">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
-                        <h2 className="text-lg font-black text-slate-900 dark:text-white">발주 리스트</h2>
-                        <p className="text-xs text-slate-500 dark:text-gray-400 mt-1">새 발주 생성 시 DB에 저장되며, 아래에서 바로 선택할 수 있습니다.</p>
+                        <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">발주 리스트</h2>
+                        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-gray-400">새 발주 생성 시 DB에 저장되며, 아래에서 바로 선택할 수 있습니다.</p>
                     </div>
                     <button
                         type="button"
                         onClick={() => { void fetchWormOrders() }}
                         disabled={wormOrderListLoading}
-                        className="h-9 px-3 rounded-lg border border-slate-300 bg-white dark:bg-[#1e1e1e] text-slate-700 text-xs font-bold hover:bg-slate-50 dark:hover:bg-[#252525] disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                        {wormOrderListLoading && <Loader2 size={14} className="animate-spin" />}
+                        {wormOrderListLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={18} />}
                         리스트 새로고침
                     </button>
                 </div>
+
+                {wormOrderMonthGroups.length > 0 && (
+                    <div className="mt-5 flex flex-wrap items-center gap-2">
+                        {wormOrderMonthGroups.map((group) => {
+                            const selected = selectedWormOrderMonth === group.value
+                            return (
+                                <button
+                                    key={group.value}
+                                    type="button"
+                                    onClick={() => setSelectedWormOrderYearMonth(group.value)}
+                                    className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-black transition ${
+                                        selected
+                                            ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
+                                    }`}
+                                >
+                                    <span>{group.year}년 {Number(group.month)}월</span>
+                                    <span className={selected ? 'text-blue-100' : 'text-slate-400'}>{group.count}</span>
+                                </button>
+                            )
+                        })}
+                    </div>
+                )}
 
                 {wormOrderListError && (
                     <p className="mt-3 whitespace-pre-wrap text-xs font-semibold text-red-600">{wormOrderListError}</p>
                 )}
 
-                <div className="mt-3 overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                        <thead>
-                            <tr className="bg-slate-50 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400">
-                                <th className="text-left px-3 py-2 font-bold">발주번호</th>
-                                <th className="text-left px-3 py-2 font-bold">상태</th>
-                                <th className="text-left px-3 py-2 font-bold">총 송금액</th>
-                                <th className="text-left px-3 py-2 font-bold">총 송금 한화(수수료 포함)</th>
-                                <th className="text-left px-3 py-2 font-bold">총 수수료</th>
-                                <th className="text-left px-3 py-2 font-bold">환율정보</th>
-                                <th className="text-right px-3 py-2 font-bold">관리</th>
+                <div className="mt-7 overflow-hidden rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
+                    <div className="overflow-x-auto">
+                    <table className="min-w-[1120px] w-full text-sm">
+                        <thead className="bg-slate-50/80 text-slate-700 dark:bg-[#1a1a1a] dark:text-gray-300">
+                            <tr>
+                                <th className="w-12 px-4 py-5" />
+                                <th className="px-4 py-5 text-left font-black">발주일</th>
+                                <th className="px-4 py-5 text-left font-black">상태</th>
+                                <th className="px-4 py-5 text-right font-black">총 송금액 (USD)</th>
+                                <th className="px-4 py-5 text-right font-black">총 송금 한화<br />(수수료 포함)</th>
+                                <th className="px-4 py-5 text-right font-black">총 수수료 (원)</th>
+                                <th className="px-4 py-5 text-right font-black">환율 정보</th>
+                                <th className="px-4 py-5 text-right font-black">관리</th>
                             </tr>
                         </thead>
                         <tbody>
-                            {wormOrderList.map((order) => {
+                            {filteredWormOrderList.map((order) => {
                                 const isActiveOrder = activeWormOrder?.id === order.id
                                 const orderDateText = toKstDateInputString(order.receiveDate)
                                 const orderNumberDisplay = orderDateText ? formatYmdWithKoreanWeekday(orderDateText, '/') : order.orderNumber
+                                const orderDateParts = orderNumberDisplay.match(/^(.+?)\s+\((.+)\)$/)
+                                const orderDateMainText = orderDateParts?.[1] || orderNumberDisplay
+                                const orderWeekdayText = orderDateParts?.[2] || ''
                                 const sendAmountUsd = resolveRemittanceSendUsd(order)
                                 const originKrw = resolveRemittanceOriginKrw(order)
                                 const totalFeeKrw = resolveRemittanceFeeKrw(order)
@@ -4496,46 +4558,54 @@ export default function WormOrderPage() {
                                     <tr
                                         key={order.id}
                                         onClick={() => handleSelectWormOrder(order)}
-                                        className={`border-t border-slate-100 dark:border-[#2a2a2a] cursor-pointer transition-colors ${
-                                            isActiveOrder ? 'bg-[#fff3ef] dark:bg-[#252525]' : 'hover:bg-slate-50 dark:hover:bg-[#252525]'
+                                        className={`cursor-pointer border-t border-slate-200 transition-colors dark:border-[#2a2a2a] ${
+                                            isActiveOrder ? 'bg-blue-50/60 dark:bg-[#252525]' : 'bg-white hover:bg-slate-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
                                         }`}
                                     >
-                                        <td className="px-3 py-2.5 font-bold text-slate-900 dark:text-white">{orderNumberDisplay}</td>
-                                        <td className="px-3 py-2.5">
-                                            <div className="flex flex-col gap-1">
-                                                <span className={`inline-flex h-6 w-fit items-center rounded-md border px-2 text-xs font-bold ${getWormOrderStatusClass(order.status)}`}>
+                                        <td className="px-4 py-6 text-center text-slate-500 dark:text-gray-400">
+                                            {isActiveOrder ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                        </td>
+                                        <td className="px-4 py-6 align-middle">
+                                            <div className="text-base font-black leading-6 text-slate-950 dark:text-white">{orderDateMainText}</div>
+                                            {orderWeekdayText && <div className="text-base font-black leading-6 text-slate-950 dark:text-white">({orderWeekdayText})</div>}
+                                        </td>
+                                        <td className="px-4 py-6 align-middle">
+                                            <div className="flex flex-col gap-2">
+                                                <span className={`inline-flex h-7 w-fit items-center rounded-lg border px-2.5 text-xs font-black ${getWormOrderStatusClass(order.status)}`}>
                                                     {getWormOrderStatusLabel(order.status)}
                                                 </span>
                                                 {order.remittanceAppliedAt && (
-                                                    <span className="text-[11px] font-semibold text-emerald-700">
-                                                        신청시각 {new Date(order.remittanceAppliedAt).toLocaleString()}
-                                                        {originKrw !== null ? ` / 원금 ${formatKrwAmount(originKrw)}` : ''}
-                                                        {totalFeeKrw !== null ? ` / 수수료 ${formatKrwAmount(totalFeeKrw)}` : ''}
-                                                        {totalPaidKrw !== null ? ` / 합계 ${formatKrwAmount(totalPaidKrw)}` : ''}
-                                                        {parsedExchangeRate ? ` / ${exchangeRateText}` : ''}
+                                                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400">
+                                                        신청 {new Date(order.remittanceAppliedAt).toLocaleString('ko-KR', {
+                                                            year: 'numeric',
+                                                            month: '2-digit',
+                                                            day: '2-digit',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        })}
                                                     </span>
                                                 )}
-                                                {order.remittanceAppliedAt && !remittanceSummaryComplete && (
-                                                    <span className="text-[11px] font-bold text-rose-600">
-                                                        송금 정보 일부 누락 · 자동 가져오기 또는 직접 입력 필요
+                                                {(originKrw !== null || totalFeeKrw !== null) && (
+                                                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400">
+                                                        원금 {formatKrwAmount(originKrw)} <span className="mx-1 text-slate-300">|</span> 수수료 {formatKrwAmount(totalFeeKrw)}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
                                             {formatUsdAmount(sendAmountUsd)}
                                         </td>
-                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
                                             {formatKrwAmount(totalPaidKrw)}
                                         </td>
-                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
                                             {formatKrwAmount(totalFeeKrw)}
                                         </td>
-                                        <td className="px-3 py-2.5 text-sm font-semibold text-slate-700 whitespace-nowrap">
+                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
                                             {exchangeRateText}
                                         </td>
-                                        <td className="px-3 py-2.5 text-right">
-                                            <div className="flex items-center justify-end gap-1.5">
+                                        <td className="px-4 py-6 text-right">
+                                            <div className="flex items-center justify-end gap-2">
                                                 {!remittanceSummaryComplete && (
                                                     <>
                                                         <button
@@ -4545,7 +4615,7 @@ export default function WormOrderPage() {
                                                                 void handleImportRemittanceHistory(order)
                                                             }}
                                                             disabled={importingWormOrderId === order.id}
-                                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-sky-200 bg-sky-50 px-2.5 text-xs font-bold text-sky-700 hover:bg-sky-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                                                             aria-label={`${order.orderNumber} 송금정보 가져오기`}
                                                             title="모인 비즈플러스 거래내역에서 자동으로 가져옵니다"
                                                         >
@@ -4562,7 +4632,7 @@ export default function WormOrderPage() {
                                                                 event.stopPropagation()
                                                                 openManualRemittanceModal(order)
                                                             }}
-                                                            className="inline-flex h-8 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                                            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-50"
                                                             aria-label={`${order.orderNumber} 송금정보 직접 입력`}
                                                             title="송금 금액·수수료·환율을 직접 입력해 저장합니다"
                                                         >
@@ -4577,7 +4647,7 @@ export default function WormOrderPage() {
                                                         void handleDeleteWormOrder(order)
                                                     }}
                                                     disabled={deletingWormOrderId === order.id}
-                                                    className="inline-flex h-8 items-center gap-1.5 rounded-md border border-rose-200 bg-rose-50 px-2.5 text-xs font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 disabled:cursor-not-allowed"
+                                                    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-xs font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                     aria-label={`${order.orderNumber} 삭제`}
                                                 >
                                                     {deletingWormOrderId === order.id ? (
@@ -4592,15 +4662,21 @@ export default function WormOrderPage() {
                                     </tr>
                                 )
                             })}
-                            {!wormOrderListLoading && wormOrderList.length === 0 && (
+                            {!wormOrderListLoading && filteredWormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-3 py-6 text-center text-sm text-slate-500 dark:text-gray-400">
-                                        저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.
+                                    <td colSpan={8} className="px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:text-gray-400">
+                                        {wormOrderList.length === 0
+                                            ? '저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.'
+                                            : `${selectedWormOrderMonthLabel} 발주가 없습니다.`}
                                     </td>
                                 </tr>
                             )}
                         </tbody>
                     </table>
+                    </div>
+                </div>
+                <div className="mt-5 rounded-xl bg-slate-50 px-4 py-4 text-xs font-medium text-slate-500 dark:bg-[#1a1a1a] dark:text-gray-400">
+                    모든 금액은 실시간 환율을 기준으로 계산되며, 실제 송금 시점의 환율에 따라 변동될 수 있습니다.
                 </div>
             </section>
 

@@ -29,7 +29,7 @@ function resolveListLimit(input: string | null) {
   if (!input) return 30
   const parsed = Number(input)
   if (!Number.isFinite(parsed) || parsed <= 0) return 30
-  return Math.min(Math.floor(parsed), 100)
+  return Math.min(Math.floor(parsed), 500)
 }
 
 export async function GET(request: NextRequest) {
