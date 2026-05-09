@@ -152,7 +152,7 @@ public class MainActivity extends Activity {
             return;
         }
         requestPermissions(
-                new String[]{Manifest.permission.RECEIVE_SMS, Manifest.permission.READ_SMS},
+                new String[]{Manifest.permission.RECEIVE_SMS},
                 SMS_PERMISSION_REQUEST
         );
     }
