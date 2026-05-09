@@ -8,8 +8,24 @@ import AdminOrderCard from './AdminOrderCard'
 
 export default function OrdersClient({
   orders,
+  depositSmsSummary,
+  depositSmsActionItems = [],
 }: {
   orders: any[]
+  depositSmsSummary?: {
+    unmatched: number
+    ambiguous: number
+  }
+  depositSmsActionItems?: Array<{
+    id: string
+    sender: string
+    body: string
+    receivedAt: string | Date
+    amount: number | null
+    depositorName?: string | null
+    bankName?: string | null
+    matchStatus: string
+  }>
 }) {
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
@@ -45,6 +61,7 @@ export default function OrdersClient({
       return matchesMonth && matchesType
     })
   }, [orders, type, selectedYear, selectedMonth])
+  const hasDepositSmsActionItems = depositSmsActionItems.length > 0
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -102,11 +119,53 @@ export default function OrdersClient({
                   필터 적용: {type}
                 </span>
               ) : null}
+              <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[12px] font-black text-rose-700">
+                입금문자 미매칭 {depositSmsSummary?.unmatched || 0}건
+              </span>
+              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[12px] font-black text-amber-700">
+                복수매칭 {depositSmsSummary?.ambiguous || 0}건
+              </span>
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-bold text-slate-600">
                 총 {filteredOrders.length}건
               </span>
             </div>
           </div>
+          {hasDepositSmsActionItems ? (
+            <div className="mt-5 rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="text-[14px] font-black text-rose-800">입금문자 수동확인 필요</h2>
+                  <p className="mt-1 text-[12px] font-medium text-rose-600">
+                    금액이 주문과 맞지 않거나 같은 금액 주문이 여러 건인 문자입니다.
+                  </p>
+                </div>
+                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-black text-rose-700">
+                  {depositSmsActionItems.length}건 표시
+                </span>
+              </div>
+              <div className="mt-3 grid gap-2 lg:grid-cols-2">
+                {depositSmsActionItems.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-white bg-white px-4 py-3 shadow-sm">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
+                        item.matchStatus === 'AMBIGUOUS' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'
+                      }`}>
+                        {item.matchStatus === 'AMBIGUOUS' ? '복수매칭' : '미매칭'}
+                      </span>
+                      <span className="text-[13px] font-black text-slate-900">
+                        {item.amount ? `${Math.round(item.amount).toLocaleString('ko-KR')}원` : '금액 없음'}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-[12px] font-bold text-slate-500">
+                      {formatCompactDateTime(item.receivedAt)} · {item.bankName || item.sender}
+                      {item.depositorName ? ` · ${item.depositorName}` : ''}
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-600">{item.body}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
         </div>
 
         {filteredOrders.length === 0 ? (
@@ -125,4 +184,10 @@ export default function OrdersClient({
       </div>
     </div>
   )
+}
+
+function formatCompactDateTime(value: string | Date) {
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }

@@ -87,6 +87,7 @@ model Order {
   adminDepositConfirmedAt DateTime?
   user                    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   items                   OrderItem[]
+  depositSmsMessages      DepositSms[]
 }
 
 model OrderItem {
@@ -295,6 +296,31 @@ model SmsSendLog {
   @@index([createdAt])
   @@index([toName])
   @@index([toNumber])
+}
+
+model DepositSms {
+  id              String    @id @default(uuid())
+  messageHash     String    @unique
+  sender          String
+  body            String
+  receivedAt      DateTime
+  amount          Int?
+  depositorName   String?
+  bankName        String?
+  sourceDevice    String?
+  matchStatus     String    @default("RECEIVED")
+  matchedOrderId  String?
+  matchedAt       DateTime?
+  candidateOrderIds Json?
+  errorMessage    String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  matchedOrder    Order?    @relation(fields: [matchedOrderId], references: [id], onDelete: SetNull)
+
+  @@index([receivedAt])
+  @@index([amount])
+  @@index([matchStatus])
+  @@index([matchedOrderId])
 }
 
 model CoupangSyncHistory {

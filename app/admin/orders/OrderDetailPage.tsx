@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { signOut } from 'next-auth/react'
+import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import {
   AlertTriangle,
   Bell,
@@ -41,6 +42,20 @@ interface OrderProductRecord {
   }
 }
 
+interface DepositSmsRecord {
+  id: string
+  messageHash?: string
+  sender: string
+  body: string
+  receivedAt: string | Date
+  amount: number | null
+  depositorName?: string | null
+  bankName?: string | null
+  sourceDevice?: string | null
+  matchStatus: string
+  matchedAt?: string | Date | null
+}
+
 interface OrderRecord {
   id: string
   orderNumber?: string | null
@@ -65,6 +80,7 @@ interface OrderRecord {
     } | null
   }
   items: OrderProductRecord[]
+  depositSmsMessages?: DepositSmsRecord[]
 }
 
 interface ProductLineItem {
@@ -122,6 +138,7 @@ interface NormalizedOrderDetail {
   products: ProductLineItem[]
   depositConfirmedAt: string | null
   adminDepositConfirmedAt: string | null
+  depositSmsMessages: DepositSmsRecord[]
   rawStatus: string
 }
 
@@ -177,6 +194,7 @@ const sampleOrderData: NormalizedOrderDetail = {
   ],
   depositConfirmedAt: '2026-05-04 10:31',
   adminDepositConfirmedAt: '2026-05-04 11:15',
+  depositSmsMessages: [],
   rawStatus: 'DEPOSIT_COMPLETED',
 }
 
@@ -219,6 +237,23 @@ function mapStatusMeta(status: string, hasTracking: boolean, taxInvoiceIssued: b
   return { label: '주문접수', tone: 'gray' }
 }
 
+function formatDepositSmsStatus(status: string) {
+  switch (status) {
+    case 'AUTO_CONFIRMED':
+      return { label: '자동 입금확인', tone: 'green' as Tone }
+    case 'UNMATCHED':
+      return { label: '미매칭', tone: 'red' as Tone }
+    case 'AMBIGUOUS':
+      return { label: '복수매칭', tone: 'orange' as Tone }
+    case 'NOT_DEPOSIT':
+      return { label: '입금문자 아님', tone: 'gray' as Tone }
+    case 'DUPLICATE_OR_ALREADY_CONFIRMED':
+      return { label: '중복/이미확인', tone: 'gray' as Tone }
+    default:
+      return { label: status || '확인 필요', tone: 'gray' as Tone }
+  }
+}
+
 function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail {
   if (!order) return sampleOrderData
 
@@ -243,11 +278,7 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
     }
   })
 
-  const totalQuantity = products.reduce((sum, item) => sum + item.quantity, 0)
-  const productSupplyPrice = products.reduce((sum, item) => sum + item.supplyPrice, 0)
-  const shippingFee = totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0
-  const vat = Math.round((productSupplyPrice + shippingFee) * 0.1)
-  const finalAmount = productSupplyPrice + shippingFee + vat
+  const payment = calculateOrderFinalAmount(order.items || [])
   const statusMeta = mapStatusMeta(order.status, trackingNumbers.length > 0, Boolean(order.taxInvoiceIssued))
 
   return {
@@ -278,15 +309,16 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
       trackingNumber: trackingNumbers[0] || '',
     },
     payment: {
-      totalQuantity,
-      productSupplyPrice,
-      shippingFee,
-      vat,
-      finalAmount,
+      totalQuantity: payment.totalQuantity,
+      productSupplyPrice: payment.productSupplyPrice,
+      shippingFee: payment.shippingFee,
+      vat: payment.vat,
+      finalAmount: payment.finalAmount,
     },
     products: products.length > 0 ? products : sampleOrderData.products,
     depositConfirmedAt: order.depositConfirmedAt ? formatDateTime(order.depositConfirmedAt) : null,
     adminDepositConfirmedAt: order.adminDepositConfirmedAt ? formatDateTime(order.adminDepositConfirmedAt) : null,
+    depositSmsMessages: order.depositSmsMessages || [],
     rawStatus: order.status,
   }
 }
@@ -437,6 +469,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
     [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
   )
+  const latestDepositSms = detail.depositSmsMessages[0]
+  const latestDepositSmsMeta = latestDepositSms ? formatDepositSmsStatus(latestDepositSms.matchStatus) : null
 
   const canIssueDocuments = currentStatus !== 'CANCELED'
   const showCopyToast = (fieldKey: string, value: string) => {
@@ -735,6 +769,16 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                   세금계산서 발행 완료
                 </span>
               ) : null}
+              {latestDepositSms?.matchStatus === 'AUTO_CONFIRMED' ? (
+                <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-black text-emerald-700">
+                  문자 자동입금 확인
+                </span>
+              ) : null}
+              {latestDepositSms && latestDepositSms.matchStatus !== 'AUTO_CONFIRMED' ? (
+                <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-black ${toneClasses(latestDepositSmsMeta?.tone || 'gray')}`}>
+                  입금문자 {latestDepositSmsMeta?.label}
+                </span>
+              ) : null}
             </div>
             <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-[14px] text-[#64748B]">
               <span>주문일시 {detail.createdAtText}</span>
@@ -910,6 +954,54 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
 
         <aside className="space-y-5 xl:sticky xl:top-[104px]">
+          {latestDepositSms ? (
+            <DetailCard title="문자 자동입금 확인" icon={<MessageSquare className="h-4 w-4" />}>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div>
+                    <div className="text-[11px] font-bold text-slate-500">매칭 상태</div>
+                    <div className="mt-1 text-[15px] font-black text-slate-900">{latestDepositSmsMeta?.label}</div>
+                  </div>
+                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${toneClasses(latestDepositSmsMeta?.tone || 'gray')}`}>
+                    {latestDepositSmsMeta?.label}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-[12px]">
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <span className="font-bold text-slate-500">문자 금액</span>
+                    <div className="mt-1 text-[14px] font-black text-slate-900">
+                      {latestDepositSms.amount ? formatCurrency(latestDepositSms.amount) : '-'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <span className="font-bold text-slate-500">수신시각</span>
+                    <div className="mt-1 text-[13px] font-black text-slate-900">
+                      {formatDateTime(latestDepositSms.receivedAt)}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <span className="font-bold text-slate-500">은행</span>
+                    <div className="mt-1 text-[13px] font-black text-slate-900">
+                      {latestDepositSms.bankName || '-'}
+                    </div>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 px-3 py-2">
+                    <span className="font-bold text-slate-500">입금자</span>
+                    <div className="mt-1 text-[13px] font-black text-slate-900">
+                      {latestDepositSms.depositorName || '-'}
+                    </div>
+                  </div>
+                </div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[11px] font-bold text-slate-500">문자 원문</div>
+                  <p className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-5 text-slate-700">
+                    {latestDepositSms.body}
+                  </p>
+                </div>
+              </div>
+            </DetailCard>
+          ) : null}
+
           <DetailCard title="배송 처리" icon={<Truck className="h-4 w-4" />}>
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
