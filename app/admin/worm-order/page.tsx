@@ -4331,7 +4331,7 @@ export default function WormOrderPage() {
     const cargoCustomsMailToolOrderBase = getAnchorOrderBase([9], 9)
     const shippingToolOrderBase = getAnchorOrderBase([13], 13)
     const workflowFlowPanel = (
-        <aside className="rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none overflow-hidden">
+        <aside className="flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
             <div className="border-b border-slate-100 px-4 py-3 dark:border-[#2a2a2a]">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -4373,7 +4373,7 @@ export default function WormOrderPage() {
                 </div>
             </div>
 
-            <div className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
+            <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-[#2a2a2a]">
                 {filteredPipelineSteps.map((step) => {
                     const runtimeStatus = pipelineStatusMap[step.id]
                     const isCurrent = step.id === activeStepId
@@ -4474,7 +4474,7 @@ export default function WormOrderPage() {
             </div>
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-                <div className="xl:col-start-2 xl:row-start-1">
+                <div className="xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:self-start">
                     {workflowFlowPanel}
                 </div>
                 <div className="min-w-0 flex flex-col gap-6 xl:col-start-1 xl:row-start-1">
