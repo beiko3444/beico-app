@@ -409,10 +409,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const [moreMenuOpen, setMoreMenuOpen] = useState(false)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
-  const [shipmentCount, setShipmentCount] = useState('1')
-  const [fromNumber, setFromNumber] = useState('')
-  const [loadingFromNumber, setLoadingFromNumber] = useState(true)
-  const [sendingPickupSms, setSendingPickupSms] = useState(false)
 
   useEffect(() => {
     setCurrentStatus(detail.rawStatus)
@@ -422,35 +418,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     setIsEditingTracking(!detail.shipping.trackingNumber)
     setAdminDepositConfirmedAt(detail.adminDepositConfirmedAt)
   }, [detail])
-
-  useEffect(() => {
-    let mounted = true
-    async function loadFromNumber() {
-      setLoadingFromNumber(true)
-      try {
-        const response = await fetch('/api/admin/sms?mode=sender')
-        const result: {
-          defaultFromNumber?: string
-          fromNumbers?: Array<{ number?: string }>
-          error?: string
-        } = await response.json()
-        if (!mounted) return
-        if (!response.ok) throw new Error(result.error || '발신번호를 불러오지 못했습니다.')
-        const defaultFrom = typeof result.defaultFromNumber === 'string' ? result.defaultFromNumber : ''
-        const firstFrom = Array.isArray(result.fromNumbers) ? (result.fromNumbers[0]?.number || '') : ''
-        setFromNumber(defaultFrom || firstFrom)
-      } catch (error) {
-        if (!mounted) return
-        alert(error instanceof Error ? error.message : '발신번호를 불러오지 못했습니다.')
-      } finally {
-        if (mounted) setLoadingFromNumber(false)
-      }
-    }
-    loadFromNumber()
-    return () => {
-      mounted = false
-    }
-  }, [])
 
   useEffect(() => {
     if (!toastMessage) return
@@ -472,11 +439,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   )
 
   const canIssueDocuments = currentStatus !== 'CANCELED'
-  const parsedShipmentCount = useMemo(() => {
-    const value = Number.parseInt(shipmentCount, 10)
-    return Number.isFinite(value) && value > 0 ? value : 0
-  }, [shipmentCount])
-
   const showCopyToast = (fieldKey: string, value: string) => {
     if (!value || value === '-') return
     navigator.clipboard.writeText(value)
