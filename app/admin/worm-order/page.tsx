@@ -4523,18 +4523,16 @@ export default function WormOrderPage() {
                 )}
 
                 <div className="mt-7 overflow-hidden rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
-                    <div className="overflow-x-auto">
-                    <table className="min-w-[1120px] w-full text-sm">
+                    <table className="w-full table-fixed text-sm">
                         <thead className="bg-slate-50/80 text-slate-700 dark:bg-[#1a1a1a] dark:text-gray-300">
                             <tr>
-                                <th className="w-12 px-4 py-5" />
-                                <th className="px-4 py-5 text-left font-black">발주일</th>
-                                <th className="px-4 py-5 text-left font-black">상태</th>
-                                <th className="px-4 py-5 text-right font-black">총 송금액 (USD)</th>
-                                <th className="px-4 py-5 text-right font-black">총 송금 한화<br />(수수료 포함)</th>
-                                <th className="px-4 py-5 text-right font-black">총 수수료 (원)</th>
-                                <th className="px-4 py-5 text-right font-black">환율 정보</th>
-                                <th className="px-4 py-5 text-right font-black">관리</th>
+                                <th className="w-9 px-2 py-5" />
+                                <th className="w-[15%] px-2 py-5 text-left font-black">발주일</th>
+                                <th className="w-[26%] px-2 py-5 text-left font-black">상태</th>
+                                <th className="w-[14%] px-2 py-5 text-right font-black">송금액</th>
+                                <th className="w-[18%] px-2 py-5 text-right font-black">송금 한화</th>
+                                <th className="w-[14%] px-2 py-5 text-right font-black">환율</th>
+                                <th className="w-[8%] px-2 py-5 text-right font-black">관리</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -4562,20 +4560,20 @@ export default function WormOrderPage() {
                                             isActiveOrder ? 'bg-blue-50/60 dark:bg-[#252525]' : 'bg-white hover:bg-slate-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
                                         }`}
                                     >
-                                        <td className="px-4 py-6 text-center text-slate-500 dark:text-gray-400">
-                                            {isActiveOrder ? <ChevronDown size={18} /> : <ChevronRight size={18} />}
+                                        <td className="px-2 py-6 text-center text-slate-500 dark:text-gray-400">
+                                            {isActiveOrder ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
                                         </td>
-                                        <td className="px-4 py-6 align-middle">
-                                            <div className="text-base font-black leading-6 text-slate-950 dark:text-white">{orderDateMainText}</div>
-                                            {orderWeekdayText && <div className="text-base font-black leading-6 text-slate-950 dark:text-white">({orderWeekdayText})</div>}
+                                        <td className="px-2 py-6 align-middle">
+                                            <div className="break-keep text-sm font-black leading-6 text-slate-950 dark:text-white">{orderDateMainText}</div>
+                                            {orderWeekdayText && <div className="text-sm font-black leading-6 text-slate-950 dark:text-white">({orderWeekdayText})</div>}
                                         </td>
-                                        <td className="px-4 py-6 align-middle">
+                                        <td className="px-2 py-6 align-middle">
                                             <div className="flex flex-col gap-2">
                                                 <span className={`inline-flex h-7 w-fit items-center rounded-lg border px-2.5 text-xs font-black ${getWormOrderStatusClass(order.status)}`}>
                                                     {getWormOrderStatusLabel(order.status)}
                                                 </span>
                                                 {order.remittanceAppliedAt && (
-                                                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400">
+                                                    <span className="text-[11px] font-semibold text-slate-500 dark:text-gray-400">
                                                         신청 {new Date(order.remittanceAppliedAt).toLocaleString('ko-KR', {
                                                             year: 'numeric',
                                                             month: '2-digit',
@@ -4586,26 +4584,24 @@ export default function WormOrderPage() {
                                                     </span>
                                                 )}
                                                 {(originKrw !== null || totalFeeKrw !== null) && (
-                                                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400">
+                                                    <span className="truncate text-[11px] font-semibold text-slate-500 dark:text-gray-400">
                                                         원금 {formatKrwAmount(originKrw)} <span className="mx-1 text-slate-300">|</span> 수수료 {formatKrwAmount(totalFeeKrw)}
                                                     </span>
                                                 )}
                                             </div>
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
+                                        <td className="whitespace-nowrap px-2 py-6 text-right text-sm font-black text-slate-950 dark:text-white">
                                             {formatUsdAmount(sendAmountUsd)}
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
-                                            {formatKrwAmount(totalPaidKrw)}
+                                        <td className="px-2 py-6 text-right">
+                                            <div className="whitespace-nowrap text-sm font-black text-slate-950 dark:text-white">{formatKrwAmount(totalPaidKrw)}</div>
+                                            <div className="mt-1 whitespace-nowrap text-[11px] font-semibold text-slate-500 dark:text-gray-400">수수료 {formatKrwAmount(totalFeeKrw)}</div>
                                         </td>
-                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
-                                            {formatKrwAmount(totalFeeKrw)}
-                                        </td>
-                                        <td className="whitespace-nowrap px-4 py-6 text-right text-base font-black text-slate-950 dark:text-white">
+                                        <td className="whitespace-nowrap px-2 py-6 text-right text-sm font-black text-slate-950 dark:text-white">
                                             {exchangeRateText}
                                         </td>
-                                        <td className="px-4 py-6 text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                        <td className="px-2 py-6 text-right">
+                                            <div className="flex flex-col items-end gap-1.5">
                                                 {!remittanceSummaryComplete && (
                                                     <>
                                                         <button
@@ -4615,7 +4611,7 @@ export default function WormOrderPage() {
                                                                 void handleImportRemittanceHistory(order)
                                                             }}
                                                             disabled={importingWormOrderId === order.id}
-                                                            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-sky-200 bg-sky-50 px-3 text-xs font-black text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 text-[10px] font-black text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
                                                             aria-label={`${order.orderNumber} 송금정보 가져오기`}
                                                             title="모인 비즈플러스 거래내역에서 자동으로 가져옵니다"
                                                         >
@@ -4624,7 +4620,6 @@ export default function WormOrderPage() {
                                                             ) : (
                                                                 <ScanSearch size={13} />
                                                             )}
-                                                            자동
                                                         </button>
                                                         <button
                                                             type="button"
@@ -4632,7 +4627,7 @@ export default function WormOrderPage() {
                                                                 event.stopPropagation()
                                                                 openManualRemittanceModal(order)
                                                             }}
-                                                            className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 hover:bg-slate-50"
+                                                            className="inline-flex h-7 items-center rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-700 hover:bg-slate-50"
                                                             aria-label={`${order.orderNumber} 송금정보 직접 입력`}
                                                             title="송금 금액·수수료·환율을 직접 입력해 저장합니다"
                                                         >
@@ -4647,7 +4642,7 @@ export default function WormOrderPage() {
                                                         void handleDeleteWormOrder(order)
                                                     }}
                                                     disabled={deletingWormOrderId === order.id}
-                                                    className="inline-flex h-10 items-center gap-1.5 rounded-xl border border-rose-200 bg-white px-3 text-xs font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 text-[11px] font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
                                                     aria-label={`${order.orderNumber} 삭제`}
                                                 >
                                                     {deletingWormOrderId === order.id ? (
@@ -4664,7 +4659,7 @@ export default function WormOrderPage() {
                             })}
                             {!wormOrderListLoading && filteredWormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={8} className="px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:text-gray-400">
+                                    <td colSpan={7} className="px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:text-gray-400">
                                         {wormOrderList.length === 0
                                             ? '저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.'
                                             : `${selectedWormOrderMonthLabel} 발주가 없습니다.`}
@@ -4673,7 +4668,6 @@ export default function WormOrderPage() {
                             )}
                         </tbody>
                     </table>
-                    </div>
                 </div>
                 <div className="mt-5 rounded-xl bg-slate-50 px-4 py-4 text-xs font-medium text-slate-500 dark:bg-[#1a1a1a] dark:text-gray-400">
                     모든 금액은 실시간 환율을 기준으로 계산되며, 실제 송금 시점의 환율에 따라 변동될 수 있습니다.
