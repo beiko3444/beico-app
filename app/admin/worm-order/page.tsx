@@ -102,6 +102,13 @@ type PipelineStepDefinition = {
     warning?: string
 }
 
+type PipelinePhaseDefinition = {
+    id: string
+    label: string
+    stepIds: number[]
+    tone: 'red' | 'amber' | 'sky' | 'emerald' | 'slate'
+}
+
 function EmailBodyPreview({ loading, text }: { loading: boolean; text: string }) {
     const displayText = useMemo(() => emailBodyToDisplayText(text), [text])
 
@@ -488,6 +495,14 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     },
 ]
 
+const PIPELINE_PHASES: PipelinePhaseDefinition[] = [
+    { id: 'order', label: '발주', stepIds: [1, 2], tone: 'red' },
+    { id: 'remittance', label: '송금', stepIds: [3, 4, 5], tone: 'amber' },
+    { id: 'document', label: '선적서류', stepIds: [6], tone: 'sky' },
+    { id: 'customs', label: '통관', stepIds: [7, 8, 9], tone: 'emerald' },
+    { id: 'release', label: '출고', stepIds: [10, 11, 12, 13], tone: 'slate' },
+]
+
 const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
     { percent: 6, label: '브라우저 런타임을 준비하는 중...' },
     { percent: 14, label: '모인 로그인 페이지에 접속하는 중...' },
@@ -550,6 +565,14 @@ function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
     if (status === 'done') return '완료'
     if (status === 'active') return '진행중'
     return '대기'
+}
+
+function getPipelinePhaseClass(tone: PipelinePhaseDefinition['tone']) {
+    if (tone === 'red') return 'border-[#ffd7cc] bg-[#fff7f3] text-[#d9361b]'
+    if (tone === 'amber') return 'border-amber-200 bg-amber-50 text-amber-800'
+    if (tone === 'sky') return 'border-sky-200 bg-sky-50 text-sky-800'
+    if (tone === 'emerald') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
+    return 'border-slate-200 bg-slate-50 text-slate-700'
 }
 
 function getWormOrderStatusLabel(status: string) {
@@ -3224,6 +3247,12 @@ export default function WormOrderPage() {
     const totalBoxes = useMemo(() => {
         return selectedOrders.reduce((sum, item) => sum + item.boxes, 0)
     }, [selectedOrders])
+    const wormTypeTotals = useMemo(() => {
+        return WORM_TYPES.map((wormType) => ({
+            ...wormType,
+            total: WORM_SIZES.reduce((sum, size) => sum + (quantitiesByType[wormType.id]?.[size.id] || 0), 0),
+        }))
+    }, [quantitiesByType])
 
     const todayDate = useMemo(() => {
         const parsed = parseYmdToLocalDate(today)
@@ -4119,6 +4148,29 @@ export default function WormOrderPage() {
         () => PIPELINE_STEP_DEFINITIONS.find((step) => step.id === activeStepId) || null,
         [activeStepId],
     )
+    const activeOrderDateText = activeWormOrderRecord?.receiveDate
+        ? formatYmdWithKoreanWeekday(toKstDateInputString(activeWormOrderRecord.receiveDate), '/')
+        : activeWormOrder?.receiveDate
+            ? formatYmdWithKoreanWeekday(activeWormOrder.receiveDate, '/')
+            : receiveDate
+                ? formatYmdWithKoreanWeekday(receiveDate, '/')
+                : '-'
+    const activeOrderNumberText = activeWormOrderRecord?.orderNumber || activeWormOrder?.orderNumber || '발주 미선택'
+    const activeOrderStatusText = activeWormOrderRecord
+        ? getWormOrderStatusLabel(activeWormOrderRecord.status)
+        : activeWormOrder
+            ? '작성중'
+            : '새 발주 대기'
+    const nextActionText = activeStepDefinition
+        ? `${activeStepDefinition.id}. ${activeStepDefinition.title}`
+        : '모든 단계 확인'
+    const phaseProgressSummaries = useMemo(() => {
+        return PIPELINE_PHASES.map((phase) => {
+            const done = phase.stepIds.filter((stepId) => pipelineStatusMap[stepId] === 'done').length
+            const active = phase.stepIds.some((stepId) => pipelineStatusMap[stepId] === 'active')
+            return { ...phase, done, total: phase.stepIds.length, active }
+        })
+    }, [pipelineStatusMap])
     const pipelineFilterOptions = useMemo<Array<{ value: PipelineFilter; label: string; count: number }>>(
         () => [
             { value: 'all', label: '전체', count: PIPELINE_STEP_DEFINITIONS.length },
@@ -4331,12 +4383,13 @@ export default function WormOrderPage() {
     const cargoCustomsMailToolOrderBase = getAnchorOrderBase([9], 9)
     const shippingToolOrderBase = getAnchorOrderBase([13], 13)
     const workflowFlowPanel = (
-        <aside className="flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
-            <div className="border-b border-slate-100 px-4 py-3 dark:border-[#2a2a2a]">
-                <div className="flex items-center justify-between gap-3">
+        <aside className="flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+            <div className="border-b border-slate-100 px-4 py-4">
+                <div className="flex items-start justify-between gap-3">
                     <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">Flow</p>
-                        <p className="mt-1 text-xs font-bold text-slate-500 dark:text-gray-400">
+                        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#e34219]">Process</p>
+                        <h2 className="mt-1 text-base font-black text-slate-950">프로세스 리스트</h2>
+                        <p className="mt-1 text-xs font-bold text-slate-500">
                             {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                         </p>
                     </div>
@@ -4344,26 +4397,36 @@ export default function WormOrderPage() {
                         <button
                             type="button"
                             onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#fff3ef] px-2.5 text-xs font-black text-[#d9361b] hover:bg-[#ffeadd]"
+                            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#e34219] px-3 text-xs font-black text-white shadow-sm hover:bg-[#cd3b17]"
                         >
-                            <span className="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-[#e34219] text-[10px] text-white">
-                                {activeStepDefinition.id}
-                            </span>
-                            현재 단계
+                            {activeStepDefinition.id}
+                            이동
                         </button>
                     )}
                 </div>
 
-                <div className="mt-3 flex flex-wrap gap-1.5">
+                <div className="mt-4 grid grid-cols-5 gap-1.5">
+                    {phaseProgressSummaries.map((phase) => (
+                        <div
+                            key={phase.id}
+                            className={`rounded-xl border px-2 py-2 text-center ${getPipelinePhaseClass(phase.tone)} ${phase.active ? 'ring-2 ring-[#e34219]/20' : ''}`}
+                        >
+                            <p className="truncate text-[10px] font-black">{phase.label}</p>
+                            <p className="mt-1 text-[10px] font-bold opacity-75">{phase.done}/{phase.total}</p>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="mt-4 flex flex-wrap gap-1.5">
                     {pipelineFilterOptions.map((option) => (
                         <button
                             key={option.value}
                             type="button"
                             onClick={() => setPipelineFilter(option.value)}
-                            className={`inline-flex h-7 items-center gap-1 rounded-md border px-2 text-[10px] font-bold transition-colors ${
+                            className={`inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${
                                 pipelineFilter === option.value
                                     ? 'border-[#e34219] bg-[#fff3ef] text-[#d9361b]'
-                                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525]'
+                                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
                             }`}
                         >
                             {option.label}
@@ -4373,7 +4436,7 @@ export default function WormOrderPage() {
                 </div>
             </div>
 
-            <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto dark:divide-[#2a2a2a]">
+            <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
                 {filteredPipelineSteps.map((step) => {
                     const runtimeStatus = pipelineStatusMap[step.id]
                     const isCurrent = step.id === activeStepId
@@ -4382,40 +4445,45 @@ export default function WormOrderPage() {
                             key={`flow-table-${step.id}`}
                             type="button"
                             onClick={() => handlePipelineStepAction(step)}
-                            className={`grid w-full grid-cols-[28px_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2.5 text-left transition-colors ${
+                            className={`grid w-full grid-cols-[34px_minmax(0,1fr)] items-start gap-3 px-4 py-3 text-left transition-colors ${
                                 isCurrent
                                     ? 'bg-[#fff3ef]'
                                     : runtimeStatus === 'done'
                                         ? 'bg-emerald-50/50 hover:bg-emerald-50'
-                                        : 'hover:bg-slate-50 dark:hover:bg-[#252525]'
+                                        : 'hover:bg-slate-50'
                             }`}
                             title={step.summary}
                         >
-                            <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full text-xs font-black ${
+                            <span className={`mt-0.5 inline-flex h-8 min-w-8 items-center justify-center rounded-full text-sm font-black ${
                                 runtimeStatus === 'done'
                                     ? 'bg-emerald-500 text-white'
                                     : isCurrent
                                         ? 'bg-[#e34219] text-white'
-                                        : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
+                                        : 'bg-slate-200 text-slate-600'
                             }`}>
                                 {step.id}
                             </span>
                             <span className="min-w-0">
-                                <span className={`block truncate text-xs font-black ${
+                                <span className={`block text-sm font-black leading-tight ${
                                     isCurrent
                                         ? 'text-[#d9361b]'
                                         : runtimeStatus === 'done'
                                             ? 'text-emerald-700'
-                                            : 'text-slate-600 dark:text-gray-300'
+                                            : 'text-slate-800'
                                 }`}>
                                     {step.title}
                                 </span>
-                                <span className="mt-0.5 block truncate text-[10px] font-medium text-slate-400">
-                                    {getPipelineModeLabel(step.mode)}
+                                <span className="mt-1 block text-[11px] font-medium leading-snug text-slate-500">
+                                    {step.summary}
                                 </span>
-                            </span>
-                            <span className={`inline-flex h-6 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                {getPipelineRuntimeLabel(runtimeStatus)}
+                                <span className="mt-2 flex flex-wrap items-center gap-1.5">
+                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                        {getPipelineModeLabel(step.mode)}
+                                    </span>
+                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                        {getPipelineRuntimeLabel(runtimeStatus)}
+                                    </span>
+                                </span>
                             </span>
                         </button>
                     )
@@ -4425,18 +4493,19 @@ export default function WormOrderPage() {
     )
 
     return (
-        <div className="max-w-[1600px] mx-auto pb-10 flex flex-col gap-6 xl:px-4">
-            <div className="rounded-3xl border border-[#f3ddd8] bg-gradient-to-br from-white via-[#fff8f6] to-[#fff3ef] dark:from-[#1e1e1e] dark:via-[#1e1e1e] dark:to-[#1e1e1e] dark:border-[#2a2a2a] p-5 md:p-7 shadow-[0_14px_34px_rgba(15,23,42,0.08)] text-slate-900 dark:text-white">
+        <div className="mx-auto flex max-w-[1840px] flex-col gap-6 px-3 pb-10 md:px-5 xl:px-7">
+            <div className="rounded-3xl border border-[#f3ddd8] bg-gradient-to-br from-white via-[#fff8f6] to-[#fff3ef] p-5 text-slate-900 shadow-[0_14px_34px_rgba(15,23,42,0.08)] md:p-7">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="space-y-1">
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900 dark:text-white">지렁이 수입 자동화 파이프라인</h1>
-                        <p className="text-sm text-slate-600 dark:text-gray-400 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
+                        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#e34219]">Worm Import Pipeline</p>
+                        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">지렁이 수입 자동화 파이프라인</h1>
+                        <p className="text-sm text-slate-600 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
                     </div>
                     <button
                         type="button"
                         onClick={handleStartNewOrder}
                         disabled={creatingOrder}
-                        className="h-10 px-4 rounded-xl border border-[#e34219] bg-white dark:bg-[#1e1e1e] hover:bg-[#fff3ef] dark:hover:bg-[#252525] text-sm font-bold text-[#e34219] inline-flex items-center gap-2 w-full md:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#e34219] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
                     >
                         {creatingOrder ? (
                             <>
@@ -4461,23 +4530,54 @@ export default function WormOrderPage() {
                 )}
 
                 <div className="mt-4 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 rounded-full bg-slate-200 dark:bg-[#2a2a2a] overflow-hidden">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#f5d5cc]">
                         <div
                             className="h-full bg-[#e34219] rounded-full transition-all duration-500"
                             style={{ width: `${Math.round((doneStepCount / PIPELINE_STEP_DEFINITIONS.length) * 100)}%` }}
                         />
                     </div>
-                    <span className="text-xs font-semibold text-slate-500 dark:text-gray-400 shrink-0">
+                    <span className="shrink-0 text-xs font-bold text-slate-600">
                         {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                     </span>
                 </div>
             </div>
 
-            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_320px] xl:items-start">
-                <div className="xl:sticky xl:top-4 xl:col-start-2 xl:row-start-1 xl:self-start">
+            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+                    <div className="rounded-2xl border border-[#ffd7cc] bg-[#fff7f3] px-4 py-3">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#e34219]">Active Order</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">{activeOrderNumberText}</p>
+                        <p className="text-xs font-semibold text-slate-500">{activeOrderDateText}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">현재 상태</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">{activeOrderStatusText}</p>
+                        <p className="text-xs font-semibold text-slate-500">발주 {filteredWormOrderList.length}건 표시중</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">다음 액션</p>
+                        <p className="mt-1 line-clamp-1 text-lg font-black text-[#d9361b]">{nextActionText}</p>
+                        <p className="text-xs font-semibold text-slate-500">{activeStepDefinition?.summary || '완료 상태를 확인하세요.'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">발주 수량</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')} boxes</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                            {wormTypeTotals.map((wormType) => (
+                                <span key={wormType.id} className={`inline-flex h-6 items-center rounded-full px-2 text-[10px] font-black ${wormType.cardTagClass}`}>
+                                    {wormType.label} {wormType.total}
+                                </span>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)] xl:items-start">
+                <div className="xl:sticky xl:top-4 xl:col-start-1 xl:row-start-1 xl:self-start">
                     {workflowFlowPanel}
                 </div>
-                <div className="min-w-0 flex flex-col gap-6 xl:col-start-1 xl:row-start-1">
+                <div className="min-w-0 flex flex-col gap-6 xl:col-start-2 xl:row-start-1">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-7">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -4488,7 +4588,7 @@ export default function WormOrderPage() {
                         type="button"
                         onClick={() => { void fetchWormOrders() }}
                         disabled={wormOrderListLoading}
-                        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 text-sm font-black text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#e34219] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60"
                     >
                         {wormOrderListLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={18} />}
                         리스트 새로고침
@@ -4506,12 +4606,12 @@ export default function WormOrderPage() {
                                     onClick={() => setSelectedWormOrderYearMonth(group.value)}
                                     className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-black transition ${
                                         selected
-                                            ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
+                                            ? 'border-[#e34219] bg-[#e34219] text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-[#ffd7cc] hover:bg-[#fff7f3] hover:text-[#d9361b] dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
                                     }`}
                                 >
                                     <span>{group.year}년 {Number(group.month)}월</span>
-                                    <span className={selected ? 'text-blue-100' : 'text-slate-400'}>{group.count}</span>
+                                    <span className={selected ? 'text-red-100' : 'text-slate-400'}>{group.count}</span>
                                 </button>
                             )
                         })}
@@ -4675,106 +4775,29 @@ export default function WormOrderPage() {
             </section>
 
             <div className="flex flex-col gap-4">
-                <section
-                    style={{ order: 0 }}
-                    className="contents"
-                >
-                    <div className="hidden">
-                        <div>
-                            <h2 className="text-base font-black text-slate-900 dark:text-white">작업 흐름</h2>
-                            <p className="mt-1 text-xs font-medium text-slate-500 dark:text-gray-400">
-                                단계 설명은 이곳에서만 확인하고, 아래에는 실제 실행 패널만 표시합니다.
-                            </p>
-                        </div>
-                        <div className="flex flex-wrap gap-1.5">
-                            {pipelineFilterOptions.map((option) => (
-                                <button
-                                    key={option.value}
-                                    type="button"
-                                    onClick={() => setPipelineFilter(option.value)}
-                                    className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${
-                                        pipelineFilter === option.value
-                                            ? 'border-[#e34219] bg-[#fff3ef] text-[#d9361b]'
-                                            : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-400 dark:hover:bg-[#252525]'
-                                    }`}
-                                >
-                                    {option.label}
-                                    <span className="text-[10px] opacity-70">{option.count}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-
-                    {activeStepDefinition && (
-                        <div className="mt-4 flex items-center justify-between rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-3 py-2 xl:hidden">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-[#e34219] text-xs font-black text-white">
-                                    {activeStepDefinition.id}
-                                </span>
-                                <div className="min-w-0">
-                                    <p className="truncate text-xs font-black text-slate-900">{activeStepDefinition.title}</p>
-                                    <p className="text-[10px] font-bold text-[#d9361b]">{getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}</p>
-                                </div>
+                {activeStepDefinition && (
+                    <div className="flex items-center justify-between rounded-2xl border border-[#f5c4b8] bg-[#fff7f3] px-4 py-3 xl:hidden">
+                        <div className="flex min-w-0 items-center gap-2">
+                            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[#e34219] text-xs font-black text-white">
+                                {activeStepDefinition.id}
+                            </span>
+                            <div className="min-w-0">
+                                <p className="truncate text-sm font-black text-slate-900">{activeStepDefinition.title}</p>
+                                <p className="text-[11px] font-bold text-[#d9361b]">{getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}</p>
                             </div>
-                            {activeStepDefinition.target !== 'none' && (
-                                <button
-                                    type="button"
-                                    onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                                    className="inline-flex h-7 items-center justify-center gap-1 rounded-lg bg-[#e34219] px-2.5 text-[11px] font-bold text-white"
-                                >
-                                    이동
-                                    <ArrowRight size={11} />
-                                </button>
-                            )}
                         </div>
-                    )}
-
-                    <div className="contents">
-                        <div className="hidden">
-                            {filteredPipelineSteps.map((step) => {
-                                const runtimeStatus = pipelineStatusMap[step.id]
-                                const isCurrent = step.id === activeStepId
-                                return (
-                                    <button
-                                        key={step.id}
-                                        type="button"
-                                        onClick={() => handlePipelineStepAction(step)}
-                                        className={`group flex min-h-[84px] items-start gap-3 rounded-xl border px-3 py-3 text-left transition-colors ${
-                                            runtimeStatus === 'done'
-                                                ? 'border-emerald-200 bg-emerald-50/60 hover:bg-emerald-50'
-                                                : isCurrent
-                                                    ? 'border-[#e34219] bg-[#fff3ef] hover:bg-[#ffeadd]'
-                                                    : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
-                                        }`}
-                                    >
-                                        <span className={`mt-0.5 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1.5 text-xs font-black ${
-                                            runtimeStatus === 'done'
-                                                ? 'bg-emerald-500 text-white'
-                                                : isCurrent
-                                                    ? 'bg-[#e34219] text-white'
-                                                    : 'bg-slate-200 text-slate-600 dark:bg-[#2a2a2a] dark:text-gray-400'
-                                        }`}>
-                                            {step.id}
-                                        </span>
-                                        <span className="min-w-0 flex-1">
-                                            <span className="block text-[13px] font-black leading-snug text-slate-900 dark:text-white">{step.title}</span>
-                                            <span className="mt-1 block line-clamp-2 text-[11px] font-medium leading-snug text-slate-500 dark:text-gray-400">{step.summary}</span>
-                                            <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                                                <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
-                                                    {getPipelineModeLabel(step.mode)}
-                                                </span>
-                                                <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                                    {getPipelineRuntimeLabel(runtimeStatus)}
-                                                </span>
-                                            </span>
-                                        </span>
-                                    </button>
-                                )
-                            })}
-                        </div>
-
+                        {activeStepDefinition.target !== 'none' && (
+                            <button
+                                type="button"
+                                onClick={() => handlePipelineStepAction(activeStepDefinition)}
+                                className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-[#e34219] px-3 text-[11px] font-bold text-white"
+                            >
+                                이동
+                                <ArrowRight size={11} />
+                            </button>
+                        )}
                     </div>
-                </section>
+                )}
             {showOrderTools && (
                 <div
                     ref={orderSectionRef}
@@ -5034,17 +5057,52 @@ export default function WormOrderPage() {
                         </section>
 
                         <div className="space-y-5">
-                            <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+                            <div className="grid gap-3 md:grid-cols-3">
+                                <div className="rounded-2xl border border-[#ffd7cc] bg-[#fff7f3] px-4 py-3">
+                                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#e34219]">총 발주</p>
+                                    <p className="mt-1 text-2xl font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')}</p>
+                                    <p className="text-xs font-semibold text-slate-500">boxes</p>
+                                </div>
+                                {wormTypeTotals.map((wormType) => (
+                                    <div
+                                        key={`worm-total-${wormType.id}`}
+                                        className={`rounded-2xl border px-4 py-3 ${
+                                            wormType.id === 'blue'
+                                                ? 'border-emerald-200 bg-emerald-50'
+                                                : 'border-red-200 bg-red-50'
+                                        }`}
+                                    >
+                                        <p className={`text-[11px] font-black uppercase tracking-[0.18em] ${
+                                            wormType.id === 'blue' ? 'text-emerald-700' : 'text-red-700'
+                                        }`}>
+                                            {wormType.label}
+                                        </p>
+                                        <p className="mt-1 text-2xl font-black text-slate-950">{wormType.total.toLocaleString('ko-KR')}</p>
+                                        <p className="text-xs font-semibold text-slate-500">boxes</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-5">
                                 {WORM_TYPES.map((wormType) => (
-                                    <section key={wormType.id} className="space-y-3">
-                                        <div className="flex items-center gap-2">
+                                    <section
+                                        key={wormType.id}
+                                        className={`space-y-3 rounded-2xl border p-4 ${
+                                            wormType.id === 'blue'
+                                                ? 'border-emerald-200 bg-emerald-50/40'
+                                                : 'border-red-200 bg-red-50/40'
+                                        }`}
+                                    >
+                                        <div className="flex items-center justify-between gap-2">
                                             <span className={`inline-flex h-7 items-center rounded-full px-3 text-sm font-black ${wormType.cardTagClass}`}>
                                                 {wormType.label}
                                             </span>
-                                            <span className="text-xs text-gray-500 font-semibold">사이즈별 박스 수량 입력</span>
+                                            <span className="text-sm font-black text-slate-700">
+                                                {wormTypeTotals.find((item) => item.id === wormType.id)?.total.toLocaleString('ko-KR') || 0} boxes
+                                            </span>
                                         </div>
 
-                                        <div className="grid grid-cols-2 gap-3 md:gap-4">
+                                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-2">
                                             {WORM_SIZES.map((size) => {
                                                 const current = quantitiesByType[wormType.id]?.[size.id] || 0
                                                 const inputValue = current > 0 ? String(current) : ''
@@ -5056,7 +5114,7 @@ export default function WormOrderPage() {
                                                         className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
                                                             isSelected
                                                                 ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm dark:shadow-none`
-                                                                : 'border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] hover:border-gray-300'
+                                                                : 'border-gray-200 bg-white hover:border-gray-300'
                                                         }`}
                                                     >
                                                         <div className="flex flex-col items-start gap-0.5 px-0.5">
@@ -5064,11 +5122,11 @@ export default function WormOrderPage() {
                                                             <div className="text-[11px] tracking-tight text-gray-500 font-medium leading-none">{size.range}</div>
                                                         </div>
 
-                                                        <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 dark:border-[#2a2a2a] overflow-hidden w-full transition-colors bg-white dark:bg-[#1e1e1e]">
+                                                        <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
-                                                                className="h-[36px] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]"
+                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
                                                                 aria-label={`${wormType.label} ${size.id} decrease`}
                                                             >
                                                                 <Minus size={15} />
@@ -5091,7 +5149,7 @@ export default function WormOrderPage() {
                                                             <button
                                                                 type="button"
                                                                 onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
-                                                                className="h-[36px] flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-[#252525]"
+                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
                                                                 aria-label={`${wormType.label} ${size.id} increase`}
                                                             >
                                                                 <Plus size={15} />
