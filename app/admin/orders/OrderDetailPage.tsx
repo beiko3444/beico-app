@@ -607,16 +607,16 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               </div>
               <div className="col-span-2 border-t border-[#E6EAF2] px-5 py-4 text-center sm:col-span-1 sm:border-l sm:border-t-0">
                 <div className="text-[12px] font-bold text-slate-500">최종 결제금액</div>
-                <div className="mt-3 text-[24px] font-black tracking-tight text-slate-950">{formatCurrency(detail.payment.finalAmount)}</div>
+                <div className="mt-3 whitespace-nowrap text-[22px] font-black tracking-tight text-slate-950">{formatCurrency(detail.payment.finalAmount)}</div>
               </div>
           </div>
 
           <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-[344px]">
-            <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
-              <FileText className="h-4 w-4" /> 거래명세표 출력
+            <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
+              <FileText className="h-4 w-4 shrink-0" /> 거래명세표 출력
             </button>
-            <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-              <ReceiptText className="h-4 w-4" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
+            <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
+              <ReceiptText className="h-4 w-4 shrink-0" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
             </button>
             <button
               type="button"
@@ -629,9 +629,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_455px] xl:items-start">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_455px] xl:items-stretch">
         <div className="contents">
-          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} className="order-1">
+          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} className="order-1 h-full">
             <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-3">
               {[
                 { label: '거래처', value: detail.customer.company },
@@ -755,19 +755,18 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
         </div>
 
-        <aside className="order-2 space-y-5 xl:sticky xl:top-6">
-          <DetailCard title="배송 처리" icon={<Truck className="h-4 w-4" />}>
-            <div className="space-y-4">
-              <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-500">현재 상태</div>
-                    <div className="mt-1 text-[15px] font-black text-slate-900">{currentStatusMeta.label}</div>
-                  </div>
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-bold ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
-                </div>
-              </div>
-
+        <aside className="order-2 h-full space-y-5">
+          <DetailCard
+            title="배송 처리"
+            icon={<Truck className="h-4 w-4" />}
+            className="h-full"
+            actions={(
+              <span className={`inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[11px] font-bold ${toneClasses(currentStatusMeta.tone)}`}>
+                {currentStatusMeta.label}
+              </span>
+            )}
+          >
+            <div className="space-y-3">
               <div className="space-y-3">
                 <div>
                   <label className="mb-2 block text-[12px] font-bold text-slate-500">택배사</label>
