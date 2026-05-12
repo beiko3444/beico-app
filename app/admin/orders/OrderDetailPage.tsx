@@ -2,16 +2,12 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signOut } from 'next-auth/react'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import {
   AlertTriangle,
-  Bell,
   Check,
-  ChevronRight,
   Copy,
   FileText,
-  MessageSquare,
   Package,
   ReceiptText,
   Store,
@@ -225,23 +221,6 @@ function mapStatusMeta(status: string, hasTracking: boolean, taxInvoiceIssued: b
   return { label: '주문접수', tone: 'gray' }
 }
 
-function formatDepositSmsStatus(status: string) {
-  switch (status) {
-    case 'AUTO_CONFIRMED':
-      return { label: '자동 입금확인', tone: 'green' as Tone }
-    case 'UNMATCHED':
-      return { label: '미매칭', tone: 'red' as Tone }
-    case 'AMBIGUOUS':
-      return { label: '복수매칭', tone: 'orange' as Tone }
-    case 'NOT_DEPOSIT':
-      return { label: '입금문자 아님', tone: 'gray' as Tone }
-    case 'DUPLICATE_OR_ALREADY_CONFIRMED':
-      return { label: '중복/이미확인', tone: 'gray' as Tone }
-    default:
-      return { label: status || '확인 필요', tone: 'gray' as Tone }
-  }
-}
-
 function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail {
   if (!order) return sampleOrderData
 
@@ -330,23 +309,25 @@ function DetailCard({
   title,
   icon,
   actions,
+  className = '',
   children,
 }: {
   title: string
   icon?: React.ReactNode
   actions?: React.ReactNode
+  className?: string
   children: React.ReactNode
 }) {
   return (
-    <section className="overflow-hidden rounded-[18px] border border-[#E6EAF2] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.06)]">
-      <div className="flex items-center justify-between gap-3 border-b border-[#E6EAF2] px-7 py-5">
+    <section className={`overflow-hidden rounded-2xl border border-[#E6EAF2] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)] ${className}`}>
+      <div className="flex items-center justify-between gap-3 border-b border-[#E6EAF2] px-6 py-5">
         <div className="flex items-center gap-2">
-          {icon ? <span className="text-slate-400">{icon}</span> : null}
+          {icon ? <span className="text-[#64748B]">{icon}</span> : null}
           <h3 className="text-[17px] font-extrabold tracking-tight text-[#0F172A]">{title}</h3>
         </div>
         {actions}
       </div>
-      <div className="p-7">{children}</div>
+      <div className="p-6">{children}</div>
     </section>
   )
 }
@@ -418,9 +399,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
     [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
   )
-  const latestDepositSms = detail.depositSmsMessages[0]
-  const latestDepositSmsMeta = latestDepositSms ? formatDepositSmsStatus(latestDepositSms.matchStatus) : null
-
   const canIssueDocuments = currentStatus !== 'CANCELED'
   const showCopyToast = (fieldKey: string, value: string) => {
     if (!value || value === '-') return
@@ -593,71 +571,47 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
       ) : null}
 
-      <section className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2 text-[13px] text-[#64748B]">
-          <span>관리자 홈</span>
-          <ChevronRight className="h-3.5 w-3.5 text-[#94A3B8]" />
-          <span>주문 관리</span>
-          <ChevronRight className="h-3.5 w-3.5 text-[#94A3B8]" />
-          <span className="font-semibold text-[#0F172A]">주문 상세</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <button type="button" className="flex h-[46px] w-[46px] items-center justify-center rounded-full border border-[#D8DEE9] bg-white text-[#334155] transition hover:bg-slate-50">
-            <Bell className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={() => signOut({ callbackUrl: '/login' })}
-            className="inline-flex h-[46px] items-center rounded-full border border-[#D8DEE9] bg-white px-4 text-[14px] font-bold text-[#334155] transition hover:bg-slate-50"
-          >
-            로그아웃
-          </button>
-        </div>
-      </section>
-
-      <div className="rounded-[22px] border border-[#BDEFD8] bg-[linear-gradient(135deg,#F0FFF8_0%,#FFFFFF_58%,#F8FAFF_100%)] p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:p-8">
-        <div className="grid items-center gap-6 xl:grid-cols-[minmax(0,1fr)_360px_360px]">
+      <div className="rounded-2xl border border-[#E6EAF2] bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.07)] lg:p-6">
+        <div className="grid items-center gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(520px,640px)_344px]">
           <div>
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#E9FFF4] text-[#12B981]">
-                <Package className="h-8 w-8" />
+              <div className="flex h-[52px] w-[52px] items-center justify-center rounded-xl bg-[#DCFCEB] text-[#10B981]">
+                <Package className="h-7 w-7" />
               </div>
-              <h2 className="text-[24px] font-black tracking-[-0.04em] text-[#0F172A] md:text-[32px]">{detail.customer.company}</h2>
-              <span className="hidden h-7 w-px bg-[#CBD5E1] md:block" />
-              <div className="text-[22px] font-black tracking-[-0.04em] text-[#1769D9] md:text-[28px]">주문 #{detail.orderNumber}</div>
+              <h2 className="text-[24px] font-black tracking-tight text-[#0F172A] md:text-[28px]">{detail.customer.company}</h2>
+              <span className="hidden h-8 w-px bg-[#CBD5E1] md:block" />
+              <div className="text-[21px] font-black tracking-tight text-[#0B63E5] md:text-[24px]">주문 #{detail.orderNumber}</div>
             </div>
-            <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
-              <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
+            <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
+              <span className={`inline-flex h-9 items-center rounded-xl border px-4 text-[14px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
               <span className="text-[14px] font-semibold text-[#64748B]">주문일시 {detail.createdAtText}</span>
             </div>
           </div>
 
-          <div className="grid gap-2 rounded-2xl border border-[#DCE5F0] bg-white/85 p-4 shadow-sm">
-            <div className="grid grid-cols-2 gap-2 text-[12px]">
-              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
-                <div className="font-bold text-slate-500">상품 공급가</div>
-                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{formatCurrency(detail.payment.productSupplyPrice)}</div>
+          <div className="grid grid-cols-2 gap-0 overflow-hidden rounded-2xl border border-[#DCE5F0] bg-white shadow-[0_10px_28px_rgba(15,23,42,0.04)] sm:grid-cols-5">
+              <div className="px-5 py-4 text-center">
+                <div className="text-[12px] font-bold text-slate-500">상품 공급가</div>
+                <div className="mt-3 text-[17px] font-black text-slate-950">{formatCurrency(detail.payment.productSupplyPrice)}</div>
               </div>
-              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
-                <div className="font-bold text-slate-500">배송비</div>
-                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{formatCurrency(detail.payment.shippingFee)}</div>
+              <div className="border-l border-[#E6EAF2] px-5 py-4 text-center">
+                <div className="text-[12px] font-bold text-slate-500">배송비</div>
+                <div className="mt-3 text-[17px] font-black text-slate-950">{formatCurrency(detail.payment.shippingFee)}</div>
               </div>
-              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
-                <div className="font-bold text-slate-500">부가세</div>
-                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{formatCurrency(detail.payment.vat)}</div>
+              <div className="border-l border-[#E6EAF2] px-5 py-4 text-center">
+                <div className="text-[12px] font-bold text-slate-500">부가세</div>
+                <div className="mt-3 text-[17px] font-black text-slate-950">{formatCurrency(detail.payment.vat)}</div>
               </div>
-              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
-                <div className="font-bold text-slate-500">수량</div>
-                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</div>
+              <div className="border-l border-[#E6EAF2] px-5 py-4 text-center">
+                <div className="text-[12px] font-bold text-slate-500">수량</div>
+                <div className="mt-3 text-[17px] font-black text-slate-950">{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</div>
               </div>
-            </div>
-            <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-[#E6EAF2]">
-              <span className="text-[13px] font-black text-slate-600">최종 결제금액</span>
-              <span className="text-[24px] font-black tracking-[-0.04em] text-slate-950">{formatCurrency(detail.payment.finalAmount)}</span>
-            </div>
+              <div className="col-span-2 border-t border-[#E6EAF2] px-5 py-4 text-center sm:col-span-1 sm:border-l sm:border-t-0">
+                <div className="text-[12px] font-bold text-slate-500">최종 결제금액</div>
+                <div className="mt-3 text-[24px] font-black tracking-tight text-slate-950">{formatCurrency(detail.payment.finalAmount)}</div>
+              </div>
           </div>
 
-          <div className="grid w-full gap-2 sm:grid-cols-2 xl:w-[360px]">
+          <div className="grid w-full gap-3 sm:grid-cols-2 xl:w-[344px]">
             <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
               <FileText className="h-4 w-4" /> 거래명세표 출력
             </button>
@@ -675,9 +629,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <div className="space-y-6">
-          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />}>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_455px] xl:items-start">
+        <div className="contents">
+          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} className="order-1">
             <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-3">
               {[
                 { label: '거래처', value: detail.customer.company },
@@ -686,7 +640,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 { label: '이메일', value: detail.customer.email, copyKey: 'email' },
                 { label: '배송지 주소', value: detail.shipping.address, copyKey: 'address' },
               ].map((field) => (
-                <div key={field.label} className="min-h-[112px] rounded-[14px] border border-[#E6EAF2] bg-[#F8FAFC] px-[18px] py-[18px]">
+                <div key={field.label} className={`min-h-[88px] rounded-xl border border-[#E6EAF2] bg-[#F8FAFC] px-4 py-4 ${field.label === '배송지 주소' ? 'xl:col-span-2' : ''}`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-[11px] font-bold text-slate-500">{field.label}</div>
                     {field.copyKey ? <CopyButton copied={copiedField === field.copyKey} onClick={() => showCopyToast(field.copyKey, field.value)} /> : null}
@@ -698,6 +652,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </DetailCard>
 
           <DetailCard
+            className="order-3 xl:col-span-2"
             title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개${detail.payment.shippingFee > 0 ? ', 배송비 포함' : ''})`}
             icon={<Package className="h-4 w-4" />}
           >
@@ -773,59 +728,34 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               ))}
             </div>
 
+            <div className="mt-4 grid gap-4 rounded-xl border border-[#E6EAF2] bg-[#F8FAFC] px-5 py-4 text-[14px] font-black text-slate-900 md:grid-cols-[1fr_auto_auto_auto_auto] md:items-center">
+              <div className="flex items-center gap-5">
+                <span className="text-slate-500">총 수량</span>
+                <span>{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 md:justify-start">
+                <span className="text-slate-500">공급가</span>
+                <span>{formatCurrency(detail.payment.productSupplyPrice)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 md:justify-start">
+                <span className="text-slate-500">부가세</span>
+                <span>{formatCurrency(detail.payment.vat)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 md:justify-start">
+                <span className="text-slate-500">배송비</span>
+                <span>{formatCurrency(detail.payment.shippingFee)}</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 md:justify-start">
+                <span className="text-slate-500">최종 결제금액</span>
+                <span className="text-[22px] text-[#0B63E5]">{formatCurrency(detail.payment.finalAmount)}</span>
+              </div>
+            </div>
+
           </DetailCard>
 
         </div>
 
-        <aside className="space-y-5 xl:sticky xl:top-[104px]">
-          {latestDepositSms ? (
-            <DetailCard title="문자 자동입금 확인" icon={<MessageSquare className="h-4 w-4" />}>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div>
-                    <div className="text-[11px] font-bold text-slate-500">매칭 상태</div>
-                    <div className="mt-1 text-[15px] font-black text-slate-900">{latestDepositSmsMeta?.label}</div>
-                  </div>
-                  <span className={`inline-flex rounded-full border px-3 py-1 text-[11px] font-black ${toneClasses(latestDepositSmsMeta?.tone || 'gray')}`}>
-                    {latestDepositSmsMeta?.label}
-                  </span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-[12px]">
-                  <div className="rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="font-bold text-slate-500">문자 금액</span>
-                    <div className="mt-1 text-[14px] font-black text-slate-900">
-                      {latestDepositSms.amount ? formatCurrency(latestDepositSms.amount) : '-'}
-                    </div>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="font-bold text-slate-500">수신시각</span>
-                    <div className="mt-1 text-[13px] font-black text-slate-900">
-                      {formatDateTime(latestDepositSms.receivedAt)}
-                    </div>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="font-bold text-slate-500">은행</span>
-                    <div className="mt-1 text-[13px] font-black text-slate-900">
-                      {latestDepositSms.bankName || '-'}
-                    </div>
-                  </div>
-                  <div className="rounded-xl bg-slate-50 px-3 py-2">
-                    <span className="font-bold text-slate-500">입금자</span>
-                    <div className="mt-1 text-[13px] font-black text-slate-900">
-                      {latestDepositSms.depositorName || '-'}
-                    </div>
-                  </div>
-                </div>
-                <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[11px] font-bold text-slate-500">문자 원문</div>
-                  <p className="mt-2 whitespace-pre-wrap break-words text-[12px] leading-5 text-slate-700">
-                    {latestDepositSms.body}
-                  </p>
-                </div>
-              </div>
-            </DetailCard>
-          ) : null}
-
+        <aside className="order-2 space-y-5 xl:sticky xl:top-6">
           <DetailCard title="배송 처리" icon={<Truck className="h-4 w-4" />}>
             <div className="space-y-4">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">

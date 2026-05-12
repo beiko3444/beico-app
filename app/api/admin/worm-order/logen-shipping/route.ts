@@ -49,7 +49,8 @@ export async function POST(request: Request) {
     try {
         const body = await request.json()
 
-        const { recipientPhone, recipientName, recipientAddress, recipientDetailAddress } = body as {
+        const { orderId, recipientPhone, recipientName, recipientAddress, recipientDetailAddress } = body as {
+            orderId?: string
             recipientPhone?: string
             recipientName?: string
             recipientAddress?: string
@@ -63,10 +64,17 @@ export async function POST(request: Request) {
             )
         }
 
-        const loginId = (process.env.LOGEN_LOGIN_ID || '54751300').trim()
-        const loginPassword = process.env.LOGEN_LOGIN_PASSWORD || 'dprtmxmfozj1!'
-        const senderPhone = '010-8119-3313'
-        const senderName = '엑스트래커'
+        const loginId = process.env.LOGEN_LOGIN_ID?.trim() || ''
+        const loginPassword = process.env.LOGEN_LOGIN_PASSWORD || ''
+        const senderPhone = (process.env.LOGEN_SENDER_PHONE || '010-8119-3313').trim()
+        const senderName = (process.env.LOGEN_SENDER_NAME || '엑스트래커').trim()
+
+        if (!loginId || !loginPassword) {
+            return NextResponse.json(
+                { error: 'LOGEN_LOGIN_ID와 LOGEN_LOGIN_PASSWORD 환경변수를 설정해야 합니다.' },
+                { status: 500 }
+            )
+        }
 
         if (globalLogenGuard.logenShippingInFlight) {
             return NextResponse.json(
@@ -98,25 +106,29 @@ export async function POST(request: Request) {
                     const result = await submitLogenShipping({
                         loginId,
                         loginPassword,
+                        orderId: orderId?.trim() || undefined,
                         recipientPhone: recipientPhone.trim(),
                         recipientName: recipientName.trim(),
                         recipientAddress: recipientAddress.trim(),
                         recipientDetailAddress: (recipientDetailAddress || '').trim(),
                         senderPhone,
                         senderName,
-                        headless: process.env.LOGEN_HEADLESS !== 'false',
+                        headless: process.env.LOGEN_HEADLESS ? process.env.LOGEN_HEADLESS !== 'false' : false,
                         signal: abortController.signal,
                         onStep: (step) => {
                             steps.push(step)
                             console.log(`[LogenShipping API] Step: ${step}`)
-                            send('step', { step })
+                            send('progress', { step })
                         },
                     })
 
-                    send('done', {
+                    send('success', {
                         ok: true,
                         message: '로젠 운송장 발행이 완료되었습니다.',
                         trackingNumber: result.trackingNumber,
+                        printedAt: result.printedAt,
+                        recipientName: result.recipientName,
+                        orderId: orderId || null,
                         steps,
                     })
                 } catch (error) {
@@ -152,6 +164,7 @@ export async function POST(request: Request) {
                 'Content-Type': 'text/event-stream',
                 'Cache-Control': 'no-cache',
                 'Connection': 'keep-alive',
+                'X-Accel-Buffering': 'no',
             },
         })
     } catch (error) {

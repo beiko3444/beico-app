@@ -1,7 +1,11 @@
 import { chromium } from 'playwright-core';
 
-const LOGIN_ID = process.env.LOGEN_LOGIN_ID || '54751300';
-const LOGIN_PASSWORD = process.env.LOGEN_LOGIN_PASSWORD || 'dprtmxmfozj1!';
+const LOGIN_ID = process.env.LOGEN_LOGIN_ID;
+const LOGIN_PASSWORD = process.env.LOGEN_LOGIN_PASSWORD;
+
+if (!LOGIN_ID || !LOGIN_PASSWORD) {
+  throw new Error('Set LOGEN_LOGIN_ID and LOGEN_LOGIN_PASSWORD before running this live Logen script.');
+}
 const WAIT_MS = 1000;
 
 const MENU_RESERVATION = '\uC608\uC57D\uAD00\uB9AC';

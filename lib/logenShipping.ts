@@ -1,6 +1,15 @@
-﻿const LOGEN_LOGIN_URL = 'https://logis.ilogen.com/'
+import { existsSync } from 'fs'
+
 const DEFAULT_TIMEOUT_MS = 30000
 const LONG_TIMEOUT_MS = 60000
+const LOGEN_ORIGIN = 'https://logis.ilogen.com'
+const LOGEN_LOGIN_API_URL = `${LOGEN_ORIGIN}/lsy07b-checkpoint/login`
+const LOGEN_MAIN_URL = `${LOGEN_ORIGIN}/common/html/main.html`
+const LOGEN_SINGLE_ORDER_URL = `${LOGEN_ORIGIN}/lrm01f-reserve/lrm01f0050.html`
+const LOGEN_TOKEN_STORAGE_KEY = 'com.logen.logistics.token'
+const LOGEN_COMPANY_CODE = '51'
+const LOGEN_AES_KEY = 'A9f$2kLm!zQx7@1B'
+const LOGEN_AES_IV = 'V#8d*P0w$eR6!nTq'
 
 type BrowserLike = {
     newContext: (options?: Record<string, unknown>) => Promise<BrowserContextLike>
@@ -9,6 +18,7 @@ type BrowserLike = {
 
 type BrowserContextLike = {
     newPage: () => Promise<PageLike>
+    addInitScript: (script: string | ((...args: unknown[]) => unknown), arg?: unknown) => Promise<void>
 }
 
 type FrameLike = {
@@ -55,6 +65,7 @@ type LocatorLike = {
 export type LogenShippingInput = {
     loginId: string
     loginPassword: string
+    orderId?: string
     recipientPhone: string
     recipientName: string
     recipientAddress: string
@@ -68,6 +79,8 @@ export type LogenShippingInput = {
 
 export type LogenShippingResult = {
     trackingNumber: string
+    printedAt: string
+    recipientName: string
 }
 
 export class LogenAutomationError extends Error {
@@ -105,10 +118,120 @@ const formatPhone = (raw: string) => {
     return String(raw ?? '').trim()
 }
 
+type LogenLoginSession = {
+    token: string
+    userInfo: Record<string, unknown>
+}
+
+const normalizeLogenToken = (raw: string | null) => {
+    const token = String(raw ?? '').trim()
+    if (!token) return ''
+    return token.toLowerCase().startsWith('bearer ') ? token : `Bearer ${token}`
+}
+
+const encryptLogenPassword = async (password: string) => {
+    const { createCipheriv } = await import('crypto')
+    const cipher = createCipheriv(
+        'aes-128-cbc',
+        Buffer.from(LOGEN_AES_KEY, 'utf8'),
+        Buffer.from(LOGEN_AES_IV, 'utf8'),
+    )
+    return Buffer.concat([
+        cipher.update(String(password ?? ''), 'utf8'),
+        cipher.final(),
+    ]).toString('base64')
+}
+
+const loginToLogen = async (loginId: string, loginPassword: string, signal?: AbortSignal): Promise<LogenLoginSession> => {
+    const encryptedPassword = await encryptLogenPassword(loginPassword)
+    const response = await fetch(LOGEN_LOGIN_API_URL, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json;charset=UTF-8',
+            Accept: 'application/json, text/plain, */*',
+        },
+        body: JSON.stringify({
+            username: loginId,
+            password: encryptedPassword,
+            companyCode: LOGEN_COMPANY_CODE,
+        }),
+        signal,
+    })
+
+    const responseText = await response.text().catch(() => '')
+    let userInfo: Record<string, unknown> = {}
+    if (responseText) {
+        try {
+            userInfo = JSON.parse(responseText) as Record<string, unknown>
+        } catch {
+            userInfo = {}
+        }
+    }
+
+    if (!response.ok) {
+        const message = typeof userInfo.message === 'string' && userInfo.message
+            ? userInfo.message
+            : `Logen login returned HTTP ${response.status}`
+        throw new LogenAutomationError('Login', message)
+    }
+
+    const token = normalizeLogenToken(response.headers.get('authorization'))
+    if (!token) {
+        throw new LogenAutomationError('Login', 'Logen login succeeded but did not return an Authorization token.')
+    }
+
+    return { token, userInfo }
+}
+
+const resolveLocalChromiumExecutable = () => {
+    const candidates = [
+        process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+        process.env.CHROMIUM_EXECUTABLE_PATH,
+        process.env.CHROME_EXECUTABLE_PATH,
+        process.env.MSEDGE_EXECUTABLE_PATH,
+        process.env.ProgramFiles ? `${process.env.ProgramFiles}\\Google\\Chrome\\Application\\chrome.exe` : '',
+        process.env['ProgramFiles(x86)'] ? `${process.env['ProgramFiles(x86)']}\\Google\\Chrome\\Application\\chrome.exe` : '',
+        process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe` : '',
+        process.env.ProgramFiles ? `${process.env.ProgramFiles}\\Microsoft\\Edge\\Application\\msedge.exe` : '',
+        process.env['ProgramFiles(x86)'] ? `${process.env['ProgramFiles(x86)']}\\Microsoft\\Edge\\Application\\msedge.exe` : '',
+        process.env.LOCALAPPDATA ? `${process.env.LOCALAPPDATA}\\Microsoft\\Edge\\Application\\msedge.exe` : '',
+    ].filter((value): value is string => Boolean(value))
+
+    for (const candidate of candidates) {
+        try {
+            if (existsSync(candidate)) return candidate
+        } catch {
+            // Try next candidate.
+        }
+    }
+    return ''
+}
+
 const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string }> => {
     const runtimeErrors: string[] = []
 
-    // Attempt 1: @sparticuz/chromium (for Vercel/AWS Lambda)
+    try {
+        const executablePath = resolveLocalChromiumExecutable()
+        if (!executablePath) {
+            throw new Error('No local Chrome/Edge executable was found. Set CHROME_EXECUTABLE_PATH if needed.')
+        }
+
+        const { chromium: playwrightCoreChromium } = await import('playwright-core')
+        const browser = await playwrightCoreChromium.launch({
+            headless,
+            executablePath,
+            args: [
+                '--disable-popup-blocking',
+                '--disable-features=IsolateOrigins,site-per-process',
+            ],
+        })
+
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-local-chromium' }
+    } catch (error) {
+        runtimeErrors.push(`playwright-core-local-chromium: ${getErrorMessage(error)}`)
+    }
+
+    // Fallback for hosted smoke tests. It is not suitable for actual OZ/printer output.
     try {
         const { chromium: playwrightCoreChromium } = await import('playwright-core')
         const chromium = (await import('@sparticuz/chromium')).default
@@ -126,29 +249,9 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
         runtimeErrors.push(`playwright-core+sparticuz: ${getErrorMessage(error)}`)
     }
 
-    // Attempt 2: Custom path fallback for self-hosted environments
-    try {
-        const customExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || process.env.CHROMIUM_EXECUTABLE_PATH
-        if (!customExecutablePath) {
-            throw new Error('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH is not set')
-        }
-
-        const { chromium: playwrightCoreChromium } = await import('playwright-core')
-
-        const browser = await playwrightCoreChromium.launch({
-            headless,
-            executablePath: customExecutablePath,
-            args: ['--no-sandbox', '--disable-setuid-sandbox'],
-        })
-
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path' }
-    } catch (error) {
-        runtimeErrors.push(`playwright-core-custom-path: ${getErrorMessage(error)}`)
-    }
-
     throw new LogenAutomationError(
         'Launch Browser',
-        `No server browser runtime available. Ensure playwright-core and @sparticuz/chromium are installed and redeployed. Details: ${runtimeErrors.join(' | ')}`
+        `No browser runtime available for Logen automation. Run this on a Windows worker with Chrome/Edge installed or set CHROME_EXECUTABLE_PATH. Details: ${runtimeErrors.join(' | ')}`
     )
 }
 
@@ -708,6 +811,179 @@ const waitForNoPrintRowsByApi = async (page: PageLike, timeoutMs = 14000): Promi
     return { rowCount: 0, checkedCount: 0 }
 }
 
+const readTrackingNumberFromSheets = async (page: PageLike): Promise<string> => {
+    for (const ctx of getAllContexts(page)) {
+        const trackingNumber = await ctx.evaluate(() => {
+            const win = window as unknown as Record<string, unknown>
+            const sheets = [
+                win.lrm01f0050Sheet1,
+                win.lrm01f0050RtnSheet1,
+                win.lrm01f0050Sheet2,
+                win.lrm01f0050RtnSheet2,
+            ].filter(Boolean) as Array<Record<string, unknown>>
+
+            const normalize = (value: unknown) => String(value ?? '').replace(/\D/g, '')
+            const looksLikeTracking = (value: string) => /^\d{10,15}$/.test(value)
+            const slipKeys = ['slipNo', 'SlipNo', 'SLIP_NO', 'barSlipNo', 'orgnSlipNo']
+
+            for (const sheet of sheets) {
+                if (typeof sheet.getRowsByChecked === 'function') {
+                    const checkedRows = (sheet.getRowsByChecked as (col: string) => unknown[])('CheckData') || []
+                    if (Array.isArray(checkedRows)) {
+                        for (const row of checkedRows) {
+                            const record = row as Record<string, unknown>
+                            for (const key of slipKeys) {
+                                const candidate = normalize(record[key])
+                                if (looksLikeTracking(candidate)) return candidate
+                            }
+                            for (const value of Object.values(record)) {
+                                const candidate = normalize(value)
+                                if (looksLikeTracking(candidate)) return candidate
+                            }
+                        }
+                    }
+                }
+
+                if (typeof sheet.getDataRows === 'function') {
+                    const rows = (sheet.getDataRows as () => unknown[])() || []
+                    if (Array.isArray(rows)) {
+                        for (const row of rows) {
+                            const record = row as Record<string, unknown>
+                            for (const key of slipKeys) {
+                                const candidate = normalize(record[key])
+                                if (looksLikeTracking(candidate)) return candidate
+                            }
+                        }
+                    }
+                }
+            }
+
+            return ''
+        }).catch(() => '') as string
+
+        if (trackingNumber) return trackingNumber
+    }
+    return ''
+}
+
+const selectMatchingNoPrintRowByApi = async (
+    page: PageLike,
+    recipientName: string,
+    recipientPhone: string,
+): Promise<{ ok: boolean; rowCount: number; matchedCount: number; checkedCount: number; trackingNumber: string; reason: string }> => {
+    const targetName = String(recipientName ?? '').replace(/\s+/g, '')
+    const targetPhone = String(recipientPhone ?? '').replace(/\D/g, '')
+
+    for (const ctx of getAllContexts(page)) {
+        const state = await ctx.evaluate((args: unknown) => {
+            const [name, phone] = args as [string, string]
+            const win = window as unknown as Record<string, unknown>
+            const sheets = [
+                win.lrm01f0050Sheet1,
+                win.lrm01f0050RtnSheet1,
+            ].filter(Boolean) as Array<Record<string, unknown>>
+
+            const normalizeText = (value: unknown) => String(value ?? '').replace(/\s+/g, '')
+            const normalizePhone = (value: unknown) => String(value ?? '').replace(/\D/g, '')
+            const looksLikeTracking = (value: string) => /^\d{10,15}$/.test(value)
+            const slipKeys = ['slipNo', 'SlipNo', 'SLIP_NO', 'barSlipNo', 'orgnSlipNo']
+
+            for (const sheet of sheets) {
+                if (typeof sheet.getDataRows !== 'function') continue
+                const rows = (sheet.getDataRows as () => unknown[])() || []
+                if (!Array.isArray(rows) || rows.length === 0) continue
+
+                let matchReason = 'matched'
+                let matches = rows.filter((row) => {
+                    const record = row as Record<string, unknown>
+                    const values = Object.values(record)
+                    const hasName = !name || values.some((value) => normalizeText(value).includes(name))
+                    const hasPhone = !phone || values.some((value) => normalizePhone(value).includes(phone))
+                    return hasName && hasPhone
+                })
+                if (matches.length === 0 && name) {
+                    const nameOnlyMatches = rows.filter((row) => {
+                        const values = Object.values(row as Record<string, unknown>)
+                        return values.some((value) => normalizeText(value).includes(name))
+                    })
+                    if (nameOnlyMatches.length === 1) {
+                        matches = nameOnlyMatches
+                        matchReason = 'unique-name-match'
+                    }
+                }
+                if (matches.length === 0 && phone) {
+                    const phoneOnlyMatches = rows.filter((row) => {
+                        const values = Object.values(row as Record<string, unknown>)
+                        return values.some((value) => normalizePhone(value).includes(phone))
+                    })
+                    if (phoneOnlyMatches.length === 1) {
+                        matches = phoneOnlyMatches
+                        matchReason = 'unique-phone-match'
+                    }
+                }
+
+                if (typeof sheet.setValue === 'function') {
+                    for (const row of rows) {
+                        try {
+                            ;(sheet.setValue as (opts: Record<string, unknown>) => void)({ row, col: 'CheckData', val: 0, render: 1 })
+                        } catch {
+                            // ignore row clear failures
+                        }
+                    }
+                    for (const row of matches) {
+                        try {
+                            ;(sheet.setValue as (opts: Record<string, unknown>) => void)({ row, col: 'CheckData', val: 1, render: 1 })
+                        } catch {
+                            // ignore row set failures
+                        }
+                    }
+                }
+
+                let checkedCount = matches.length
+                if (typeof sheet.getRowsByChecked === 'function') {
+                    const checkedRows = (sheet.getRowsByChecked as (col: string) => unknown[])('CheckData') || []
+                    checkedCount = Array.isArray(checkedRows) ? checkedRows.length : checkedCount
+                }
+
+                let trackingNumber = ''
+                for (const row of matches) {
+                    const record = row as Record<string, unknown>
+                    for (const key of slipKeys) {
+                        const candidate = normalizePhone(record[key])
+                        if (looksLikeTracking(candidate)) {
+                            trackingNumber = candidate
+                            break
+                        }
+                    }
+                    if (trackingNumber) break
+                }
+
+                return {
+                    ok: matches.length > 0 && checkedCount > 0,
+                    rowCount: rows.length,
+                    matchedCount: matches.length,
+                    checkedCount,
+                    trackingNumber,
+                    reason: matches.length > 0 ? matchReason : 'no-recipient-match',
+                }
+            }
+
+            return { ok: false, rowCount: 0, matchedCount: 0, checkedCount: 0, trackingNumber: '', reason: 'no-sheet' }
+        }, [targetName, targetPhone]).catch(() => null) as {
+            ok: boolean
+            rowCount: number
+            matchedCount: number
+            checkedCount: number
+            trackingNumber: string
+            reason: string
+        } | null
+
+        if (state && (state.ok || state.rowCount > 0)) return state
+    }
+
+    return { ok: false, rowCount: 0, matchedCount: 0, checkedCount: 0, trackingNumber: '', reason: 'no-context' }
+}
+
 const selectNoPrintRowsByApi = async (page: PageLike): Promise<{ ok: boolean; rowCount: number; checkedCount: number; reason: string }> => {
     for (const ctx of getAllContexts(page)) {
         try {
@@ -969,7 +1245,12 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
     let browser: BrowserLike | null = null
 
     try {
-        // Step 1: Launch browser and navigate
+        // Step 1: Login through Logen's same endpoint used by the visible login form.
+        reportStep('로젠 로그인 토큰 발급')
+        throwIfAbortRequested(signal, 'Login')
+        const logenSession = await loginToLogen(loginId.trim(), loginPassword, signal)
+
+        // Step 2: Launch browser and inject the authenticated session.
         reportStep('브라우저 시작')
         throwIfAbortRequested(signal, 'Launch Browser')
 
@@ -981,6 +1262,23 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             viewport: { width: 1280, height: 900 },
             locale: 'ko-KR',
         })
+        await context.addInitScript((init: unknown) => {
+            const { token, storageKey } = init as { token: string; storageKey: string }
+            if (window.location.hostname !== 'logis.ilogen.com') return
+            window.sessionStorage.setItem(String(storageKey), String(token))
+            window.sessionStorage.setItem('portal-logout-target', 'true')
+
+            const applyToken = () => {
+                const win = window as unknown as { AUTH_UTIL?: { BASE_PC_ACCESS_TOKEN?: string } }
+                if (win.AUTH_UTIL) {
+                    win.AUTH_UTIL.BASE_PC_ACCESS_TOKEN = String(token)
+                }
+            }
+
+            applyToken()
+            window.addEventListener('DOMContentLoaded', applyToken, { once: true })
+        }, { token: logenSession.token, storageKey: LOGEN_TOKEN_STORAGE_KEY })
+
         const page = await context.newPage()
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
@@ -994,133 +1292,31 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
             }
         })
 
-        reportStep('로젠 사이트 접속')
-        await page.goto(LOGEN_LOGIN_URL, { waitUntil: 'domcontentloaded' })
-        await page.waitForTimeout(2000)
-
-        // Step 2: Login
-        throwIfAbortRequested(signal, 'Login')
-        reportStep('로그인')
-
-        // LOGEN uses id="user.id" and id="user.pw" (dots in IDs)
-        await fillFirstVisible(
-            page,
-            [
-                '[id="user.id"]',
-                'input#user\\.id',
-                'input.fText[placeholder="사용자 ID"]',
-            ],
-            loginId,
-            'Login - Username'
-        )
-
-        await fillFirstVisible(
-            page,
-            [
-                '[id="user.pw"]',
-                'input#user\\.pw',
-                'input.fText[placeholder="Password"]',
-                'input[type="password"]',
-            ],
-            loginPassword,
-            'Login - Password'
-        )
-
-        await clickFirstVisible(
-            page,
-            [
-                'a[onclick="basicLogin()"]',
-                'a:has-text("로그인")',
-                'button:has-text("로그인")',
-            ],
-            'Login - Submit'
-        )
-
+        reportStep('로젠 세션 확인')
+        await page.goto(LOGEN_MAIN_URL, { waitUntil: 'domcontentloaded' })
         await page.waitForTimeout(1200)
         await safeWaitForLoad(page)
 
-        // Step 3: Close any popup/modal that might appear after login (유통판매채널 등)
-        throwIfAbortRequested(signal, 'Close Popup')
-        reportStep('팝업 닫기')
-
-        for (let attempt = 0; attempt < 8; attempt++) {
-            const closeSelectors = [
-                '#btn-popupModal1',
-                '#popupModal1 button.btn.base.close',
-                '#popupModal1 button.btn.outline.close',
-                '[onclick^="fn_popClose"]',
-                'button:has-text("닫기")',
-                'input[type="button"][value="닫기"]',
-                'a:has-text("닫기")',
-                '.popup-close',
-                'button.close',
-                '.btn-close',
-            ]
-            for (const selector of closeSelectors) {
-                try {
-                    const btn = page.locator(selector).first()
-                    const visible = await btn.isVisible().catch(() => false)
-                    if (visible) {
-                        await btn.click({ timeout: 1500, force: true })
-                        await page.waitForTimeout(120)
-                    }
-                } catch {
-                    // Popup button not found, continue
-                }
-            }
-            // Also check inside frames for popups
-            for (const frame of page.frames()) {
-                for (const selector of closeSelectors) {
-                    try {
-                        const btn = frame.locator(selector).first()
-                        const visible = await btn.isVisible().catch(() => false)
-                        if (visible) {
-                            await btn.click({ timeout: 1500, force: true })
-                            await page.waitForTimeout(120)
-                        }
-                    } catch {
-                        // continue
-                    }
-                }
-            }
-            await page.evaluate(() => {
-                const win = window as unknown as Record<string, unknown>
-                const fn = win.fn_popClose as ((mode?: string) => void) | undefined
-                if (typeof fn === 'function') {
-                    fn('N')
-                }
-            }).catch(() => undefined)
-            await page.waitForTimeout(120)
+        const mainContent = await page.content().catch(() => '')
+        if (mainContent.includes('인증 토큰이 존재하지 않습니다') || mainContent.includes('재 로그인')) {
+            throw new LogenAutomationError('Session Bootstrap', 'Injected Logen token was rejected by the main page.')
         }
 
-        // Step 4: Navigate to 예약관리 > 주문등록/출력(단건)
-        throwIfAbortRequested(signal, 'Navigate Menu')
-        reportStep('메뉴 이동: 예약관리 > 주문등록/출력(단건)')
+        // Step 3: Open the verified single-order screen directly. This avoids fragile sidebar clicks.
+        throwIfAbortRequested(signal, 'Navigate Order Form')
+        reportStep('주문등록/출력(단건) 화면 이동')
 
-        // LOGEN sidebar uses dynamic menu - click parent first to expand, then submenu
-        await clickFirstVisible(
-            page,
-            [
-                'a:has-text("예약관리")',
-                'span:has-text("예약관리")',
-                'li:has-text("예약관리") > a',
-            ],
-            'Navigate - 예약관리 Menu'
-        )
-
-        await page.waitForTimeout(2000)
-
-        await clickFirstVisible(
-            page,
-            [
-                'a:has-text("주문등록/출력(단건)")',
-                'span:has-text("주문등록/출력(단건)")',
-                'li a:has-text("주문등록")',
-            ],
-            'Navigate - 주문등록/출력(단건) Submenu'
-        )
-
-        await page.waitForTimeout(5000)
+        await page.goto(LOGEN_SINGLE_ORDER_URL, { waitUntil: 'domcontentloaded' })
+        await page.evaluate((init: unknown) => {
+            const { token, storageKey } = init as { token: string; storageKey: string }
+            window.sessionStorage.setItem(String(storageKey), String(token))
+            const win = window as unknown as { AUTH_UTIL?: { BASE_PC_ACCESS_TOKEN?: string } }
+            if (win.AUTH_UTIL) {
+                win.AUTH_UTIL.BASE_PC_ACCESS_TOKEN = String(token)
+            }
+        }, { token: logenSession.token, storageKey: LOGEN_TOKEN_STORAGE_KEY }).catch(() => undefined)
+        await page.waitForTimeout(2500)
+        await safeWaitForLoad(page)
 
         // Log available frames for debugging
         const frameUrls = page.frames().map(f => f.url())
@@ -1134,12 +1330,44 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         reportStep(`폼 분석 완료 (${frameCount}개 프레임)`)
 
         const orderFrame =
-            page.frames().find(f => f.url().includes('/lrm01f-reserve/lrm01f0050.html'))
-            ?? page.frames().find(f => f.url().includes('/lrm01f0050.html'))
+            getAllContexts(page).find(f => f.url().includes('/lrm01f-reserve/lrm01f0050.html'))
+            ?? getAllContexts(page).find(f => f.url().includes('/lrm01f0050.html'))
 
         if (!orderFrame) {
             throw new LogenAutomationError('Navigate - Order Form', 'Order frame (lrm01f0050) not found')
         }
+
+        await orderFrame.locator('#strRcvCustTelNo').first().waitFor({ state: 'visible', timeout: LONG_TIMEOUT_MS })
+
+        throwIfAbortRequested(signal, 'New Order Form')
+        reportStep('신규 주문 폼 초기화')
+        try {
+            await clickFirstVisible(
+                page,
+                [
+                    'button[onclick*="fn_initRegist"]',
+                    'button:has-text("신규")',
+                    'a:has-text("신규")',
+                    'input[type="button"][value*="신규"]',
+                ],
+                'New Order Form',
+                8000
+            )
+        } catch {
+            const initializedByFn = await orderFrame.evaluate(() => {
+                const win = window as unknown as Record<string, unknown>
+                const fn = win.fn_initRegist as ((mode?: string) => void) | undefined
+                if (typeof fn === 'function') {
+                    fn('ALL')
+                    return true
+                }
+                return false
+            }).catch(() => false)
+            if (!initializedByFn) {
+                throw new LogenAutomationError('New Order Form', 'Could not click or invoke the Logen 신규(F3) action.')
+            }
+        }
+        await orderFrame.waitForTimeout(700)
 
         // Block auto multi-customer popup while filling recipient fields.
         // LOGEN can trigger this popup from name/phone change handlers (SelectCustInfo chain).
@@ -1201,6 +1429,20 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
                 'Could not set recipient phone/name fields directly (#strRcvCustTelNo, #strRcvCustNm)'
             )
         }
+
+        await orderFrame.evaluate((args: unknown) => {
+            const [phone, name] = args as [string, string]
+            const setIfEmpty = (selector: string, value: string) => {
+                const input = document.querySelector(selector) as HTMLInputElement | null
+                if (!input || input.value.trim()) return
+                input.value = value
+                input.dispatchEvent(new Event('input', { bubbles: true }))
+                input.dispatchEvent(new Event('change', { bubbles: true }))
+            }
+
+            setIfEmpty('#strSndCustTelNo', phone)
+            setIfEmpty('#strSndCustNm', name)
+        }, [formatPhone(senderPhone), senderName]).catch(() => undefined)
 
         // Step 6: Address flow
         // User-required sequence:
@@ -1935,28 +2177,38 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         const gridReadyState = await getUnprintedGridState(page)
         console.log(`[LogenShipping] Print prep: grid rows=${gridReadyState.rowCount}, cbs=${gridReadyState.checkboxCount}`)
 
-        // Do not touch utility checkbox near 관내우선; it can switch sheet context.
+        // Select only the row that matches the current recipient. Header-checking the whole grid can print stale rows.
+        let selectedTrackingNumber = ''
+        const matchedRowState = await selectMatchingNoPrintRowByApi(page, recipientNameFinal, recipientPhoneFormatted)
+        console.log(
+            `[LogenShipping] Print prep(match): rows=${matchedRowState.rowCount}, matched=${matchedRowState.matchedCount}, checked=${matchedRowState.checkedCount}, reason=${matchedRowState.reason}`
+        )
+        selectedTrackingNumber = matchedRowState.trackingNumber
 
-        // DOM 헤더 체크박스 클릭 (API 강제 체크 사용 안 함 - 삭제된 주문 포함 오류 방지)
-        let checkedRows = 0
-        let checkedRowsByApi = 0
-        for (let attempt = 0; attempt < 3; attempt++) {
-            try {
-                await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
-            } catch {
-                // retry after short wait
+        if (!matchedRowState.ok) {
+            if (Math.max(apiReadyState.rowCount, gridReadyState.rowCount) <= 1) {
+                let checkedRows = 0
+                for (let attempt = 0; attempt < 2; attempt++) {
+                    try {
+                        await checkOrderCheckboxInIBSheet(page, 'Select Order Checkbox')
+                    } catch {
+                        // retry after short wait
+                    }
+                    await page.waitForTimeout(500)
+                    const state = await getUnprintedGridState(page)
+                    const apiAfterDom = await waitForNoPrintRowsByApi(page, 2500)
+                    checkedRows = Math.max(state.checkedCount, apiAfterDom.checkedCount)
+                    if (checkedRows > 0) break
+                }
+                if (checkedRows === 0) {
+                    throw new LogenAutomationError('Select Order Checkbox', '미출력 체크가 적용되지 않아 운송장출력을 진행할 수 없습니다.')
+                }
+            } else {
+                throw new LogenAutomationError(
+                    'Select Order Checkbox',
+                    `미출력 목록에서 현재 수하인(${recipientNameFinal}, ${recipientPhoneFormatted}) 행만 찾지 못했습니다. 전체 ${matchedRowState.rowCount}건을 일괄 출력하지 않도록 중단했습니다.`
+                )
             }
-            await page.waitForTimeout(500)
-            const state = await getUnprintedGridState(page)
-            const apiAfterDom = await waitForNoPrintRowsByApi(page, 2500)
-            checkedRowsByApi = Math.max(checkedRowsByApi, apiAfterDom.checkedCount)
-            checkedRows = Math.max(state.checkedCount, checkedRowsByApi)
-            console.log(`[LogenShipping] Print prep: DOM check attempt#${attempt + 1} dom=${state.checkedCount} api=${checkedRowsByApi}`)
-            if (checkedRows > 0) break
-            await waitForUnprintedGridReady(page, 2500)
-        }
-        if (checkedRows === 0) {
-            throw new LogenAutomationError('Select Order Checkbox', '미출력 체크가 적용되지 않아 운송장출력을 진행할 수 없습니다.')
         }
         await page.waitForTimeout(1800)
 
@@ -2007,29 +2259,31 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         throwIfAbortRequested(signal, 'Extract Tracking Number')
         reportStep('송장번호 추출')
 
-        let trackingNumber = ''
+        let trackingNumber = selectedTrackingNumber || await readTrackingNumberFromSheets(page)
 
-        // Try to extract tracking number from ALL frames' content
         const allPages = [page as FrameLike, ...page.frames()]
-        for (const ctx of allPages) {
-            try {
-                const content = await ctx.content()
-                const trackingPatterns = [
-                    /송장번호[:\s]*(\d{3}-\d{4}-\d{4})/,
-                    /송장번호[:\s]*(\d{10,12})/,
-                    /운송장[번호]*[:\s]*(\d{3}-\d{4}-\d{4})/,
-                    /운송장[번호]*[:\s]*(\d{10,12})/,
-                    /(\d{3}-\d{4}-\d{4})/,
-                ]
-                for (const pattern of trackingPatterns) {
-                    const match = content.match(pattern)
-                    if (match && match[1]) {
-                        trackingNumber = match[1]
-                        break
+        if (!trackingNumber) {
+            // Try to extract tracking number from ALL frames' content
+            for (const ctx of allPages) {
+                try {
+                    const content = await ctx.content()
+                    const trackingPatterns = [
+                        /송장번호[:\s]*(\d{3}-\d{4}-\d{4})/,
+                        /송장번호[:\s]*(\d{10,12})/,
+                        /운송장[번호]*[:\s]*(\d{3}-\d{4}-\d{4})/,
+                        /운송장[번호]*[:\s]*(\d{10,12})/,
+                        /(\d{3}-\d{4}-\d{4})/,
+                    ]
+                    for (const pattern of trackingPatterns) {
+                        const match = content.match(pattern)
+                        if (match && match[1]) {
+                            trackingNumber = match[1]
+                            break
+                        }
                     }
-                }
-                if (trackingNumber) break
-            } catch { /* next frame */ }
+                    if (trackingNumber) break
+                } catch { /* next frame */ }
+            }
         }
 
         // Also try reading from specific elements across all frames
@@ -2071,7 +2325,11 @@ export async function submitLogenShipping(params: LogenShippingInput): Promise<L
         reportStep(`완료 - 송장번호: ${trackingNumber}`)
         console.log(`[LogenShipping] Tracking number extracted: ${trackingNumber}`)
 
-        return { trackingNumber }
+        return {
+            trackingNumber,
+            printedAt: new Date().toISOString(),
+            recipientName: recipientNameFinal,
+        }
     } catch (error) {
         if (error instanceof LogenAutomationError) {
             throw error
