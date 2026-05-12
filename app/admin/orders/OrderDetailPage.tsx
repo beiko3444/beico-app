@@ -616,7 +616,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       </section>
 
       <div className="rounded-[22px] border border-[#BDEFD8] bg-[linear-gradient(135deg,#F0FFF8_0%,#FFFFFF_58%,#F8FAFF_100%)] p-6 shadow-[0_16px_40px_rgba(15,23,42,0.06)] lg:p-8">
-        <div className="grid items-center gap-7 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="grid items-center gap-6 xl:grid-cols-[minmax(0,1fr)_360px_360px]">
           <div>
             <div className="flex flex-wrap items-center gap-4">
               <div className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-[#E9FFF4] text-[#12B981]">
@@ -629,6 +629,31 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2">
               <span className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-[12px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
               <span className="text-[14px] font-semibold text-[#64748B]">주문일시 {detail.createdAtText}</span>
+            </div>
+          </div>
+
+          <div className="grid gap-2 rounded-2xl border border-[#DCE5F0] bg-white/85 p-4 shadow-sm">
+            <div className="grid grid-cols-2 gap-2 text-[12px]">
+              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
+                <div className="font-bold text-slate-500">상품 공급가</div>
+                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{formatCurrency(detail.payment.productSupplyPrice)}</div>
+              </div>
+              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
+                <div className="font-bold text-slate-500">배송비</div>
+                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{formatCurrency(detail.payment.shippingFee)}</div>
+              </div>
+              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
+                <div className="font-bold text-slate-500">부가세</div>
+                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{formatCurrency(detail.payment.vat)}</div>
+              </div>
+              <div className="rounded-xl bg-[#F8FAFC] px-3 py-2">
+                <div className="font-bold text-slate-500">수량</div>
+                <div className="mt-1 text-right text-[15px] font-black text-slate-950">{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</div>
+              </div>
+            </div>
+            <div className="flex items-center justify-between gap-3 rounded-2xl bg-white px-4 py-3 ring-1 ring-[#E6EAF2]">
+              <span className="text-[13px] font-black text-slate-600">최종 결제금액</span>
+              <span className="text-[24px] font-black tracking-[-0.04em] text-slate-950">{formatCurrency(detail.payment.finalAmount)}</span>
             </div>
           </div>
 
@@ -748,29 +773,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               ))}
             </div>
 
-            <div className="mt-6 border-t border-[#E6EAF2] px-6 py-6">
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_420px]">
-                <div />
-                <div className="grid gap-2 rounded-2xl border border-[#E6EAF2] bg-[#F8FAFC] p-5">
-                  <div className="flex items-center justify-between gap-4 text-[13px]">
-                    <span className="font-medium text-slate-500">상품 공급가 합계</span>
-                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.productSupplyPrice)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 text-[13px]">
-                    <span className="font-medium text-slate-500">배송비</span>
-                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.shippingFee)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 text-[13px]">
-                    <span className="font-medium text-slate-500">부가세</span>
-                    <span className="font-black text-slate-900">{formatCurrency(detail.payment.vat)}</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-4 rounded-xl bg-white px-3 py-2 text-[14px]">
-                    <span className="font-bold text-slate-600">최종 결제금액</span>
-                    <span className="text-[20px] font-black text-slate-950">{formatCurrency(detail.payment.finalAmount)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
           </DetailCard>
 
         </div>
