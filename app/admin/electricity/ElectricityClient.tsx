@@ -1778,6 +1778,18 @@ export default function ElectricityClient() {
                                     background: white !important;
                                     overflow: hidden !important; 
                                 }
+
+                                .apple-admin-shell,
+                                .apple-admin-shell > main {
+                                    margin: 0 !important;
+                                    padding: 0 !important;
+                                    background: white !important;
+                                }
+
+                                .apple-admin-shell > aside {
+                                    display: none !important;
+                                    visibility: hidden !important;
+                                }
                                 
                                 /* Completely remove background layout elements from print flow */
                                 #electricity-main > div:not(#print-modal) {

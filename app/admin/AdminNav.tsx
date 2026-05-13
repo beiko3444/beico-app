@@ -117,7 +117,7 @@ export default function AdminNav({
   }
 
   return (
-    <aside className="fixed bottom-0 left-0 top-0 z-[1000] box-border flex h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.06)]">
+    <aside className="fixed bottom-0 left-0 top-0 z-[1000] box-border flex h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.06)] print:hidden">
       <div className="shrink-0">
         <div className="text-[30px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
         <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#7D8491]">WHOLESALE PORTAL</div>
