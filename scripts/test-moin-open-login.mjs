@@ -58,6 +58,10 @@ test('MOIN login page opening checks attached data-testid input after commit bef
   assert.equal(waitUntil, 'commit')
   assert.deepEqual(page.gotoWaits, ['commit'])
   assert.deepEqual(page.loginInput.waitChecks.map((options) => options.state), ['attached'])
+  assert.ok(
+    page.loginInput.waitChecks.every((options) => options.timeout >= 30000),
+    `expected login input wait to allow slow server-side page startup, received ${JSON.stringify(page.loginInput.waitChecks)}`,
+  )
 })
 
 test('MOIN login page opening still checks data-testid input after a navigation timeout', async () => {

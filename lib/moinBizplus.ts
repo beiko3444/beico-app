@@ -22,6 +22,7 @@ const TARGET_COMPANY_NAME_VARIANTS = [
 const TARGET_COMPANY_NAME_REGEX = /Shanghai\s*Oikki\s*Trading\s*Co\.?\s*,?\s*Ltd/i
 const DEFAULT_TIMEOUT_MS = 8000
 const LONG_TIMEOUT_MS = 18000
+const LOGIN_INPUT_TIMEOUT_MS = 30000
 const FAST_ELEMENT_TIMEOUT_MS = 1200
 const COMPLETION_FAST_TIMEOUT_MS = 2200
 const DESKTOP_VIEWPORT = { width: 1440, height: 1024 }
@@ -2201,13 +2202,13 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
                 timeout: timeoutMs,
             })
 
-            await waitForMoinLoginInput(page, Math.min(timeoutMs, 12000))
+            await waitForMoinLoginInput(page, Math.max(timeoutMs, LOGIN_INPUT_TIMEOUT_MS))
             return waitUntil
         } catch (error) {
             const reason = error instanceof Error ? error.message : String(error)
             navigationErrors.push(`${waitUntil}: ${reason}`)
             try {
-                await waitForMoinLoginInput(page, 3000)
+                await waitForMoinLoginInput(page, LOGIN_INPUT_TIMEOUT_MS)
                 return waitUntil
             } catch {
                 // Continue with the next navigation strategy.
