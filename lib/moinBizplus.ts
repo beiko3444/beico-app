@@ -1,4 +1,6 @@
 import { existsSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 const MOIN_BIZPLUS_LOGIN_URL = 'https://www.moinbizplus.com/login'
 const MOIN_BIZPLUS_RECIPIENT_URL = 'https://www.moinbizplus.com/transfer/recipient'
@@ -22,6 +24,7 @@ const TARGET_COMPANY_NAME_VARIANTS = [
     'michael-lee12580',
 ]
 const TARGET_COMPANY_NAME_REGEX = /Shanghai\s*Oikki\s*Trading\s*Co\.?\s*,?\s*Ltd/i
+const TARGET_COMPANY_RECIPIENT_ID_FALLBACK = '17122'
 const DEFAULT_TIMEOUT_MS = 8000
 const LONG_TIMEOUT_MS = 18000
 const LOGIN_INPUT_TIMEOUT_MS = 30000
@@ -167,6 +170,12 @@ type ResponseLike = {
     text: () => Promise<string>
 }
 
+type ApiResponseLike = {
+    status: () => number
+    json: () => Promise<unknown>
+    text: () => Promise<string>
+}
+
 type PageLike = {
     goto: (url: string, options?: Record<string, unknown>) => Promise<void>
     url: () => string
@@ -181,6 +190,14 @@ type PageLike = {
     evaluate: (fn: string | ((...args: unknown[]) => unknown), ...args: unknown[]) => Promise<unknown>
     on: (event: 'response', handler: (response: ResponseLike) => void) => void
     off?: (event: 'response', handler: (response: ResponseLike) => void) => void
+    screenshot?: (options?: Record<string, unknown>) => Promise<Buffer>
+    request?: {
+        post: (url: string, options?: Record<string, unknown>) => Promise<ApiResponseLike>
+    }
+    keyboard?: {
+        press: (key: string, options?: Record<string, unknown>) => Promise<void>
+        type: (text: string, options?: Record<string, unknown>) => Promise<void>
+    }
 }
 
 type LocatorLike = {
@@ -235,6 +252,7 @@ export type MoinRemittancePricingSummary = {
 export class MoinAutomationError extends Error {
     step: string
     diagnostic?: unknown
+    steps?: string[]
 
     constructor(step: string, message: string, diagnostic?: unknown) {
         super(message)
@@ -276,6 +294,16 @@ const getErrorMessage = (error: unknown) => {
     return String(error)
 }
 
+const getErrorName = (error: unknown) => {
+    if (error instanceof Error && error.name) return error.name
+    return typeof error
+}
+
+const getStackFirstLine = (error: unknown) => {
+    if (!(error instanceof Error) || !error.stack) return null
+    return error.stack.split('\n').map((line) => line.trim()).filter(Boolean)[0] || null
+}
+
 const isTargetClosedAutomationError = (error: unknown) =>
     /target page, context or browser has been closed|browser has been closed|context has been closed|target closed/i.test(getErrorMessage(error))
 
@@ -286,10 +314,17 @@ const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) =>
 }
 
 const resolveMoinProxyFromEnv = (env: EnvLike = process.env): { proxy: ProxyConfig; source: string } | null => {
+    const disabled = env.MOIN_BIZPLUS_DISABLE_PROXY === 'true'
+    if (disabled) return null
+
     const candidates: Array<[string, string | undefined]> = [
         ['MOIN_BIZPLUS_PROXY_URL', env.MOIN_BIZPLUS_PROXY_URL],
-        ['FIXIE_URL', env.FIXIE_URL],
-        ['QUOTAGUARDSTATIC_URL', env.QUOTAGUARDSTATIC_URL],
+        ...(env.MOIN_BIZPLUS_USE_FIXIE === 'true'
+            ? [
+                ['FIXIE_URL', env.FIXIE_URL],
+                ['QUOTAGUARDSTATIC_URL', env.QUOTAGUARDSTATIC_URL],
+            ] as Array<[string, string | undefined]>
+            : []),
         ['HTTPS_PROXY', env.HTTPS_PROXY],
         ['HTTP_PROXY', env.HTTP_PROXY],
     ]
@@ -734,10 +769,12 @@ const typeFirstVisible = async (
             const target = page.locator(selector).first()
             await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, DEFAULT_TIMEOUT_MS) })
             await target.click({ timeout: 5000 })
-            // Clear any existing value first
-            await target.fill('')
-            // MOIN's login form intermittently ignores zero-delay synthetic typing.
-            await target.pressSequentially(value, { delay: LOGIN_TYPING_DELAY_MS })
+            if (page.keyboard) {
+                await page.keyboard.type(value, { delay: LOGIN_TYPING_DELAY_MS })
+            } else {
+                await target.fill('')
+                await target.pressSequentially(value, { delay: LOGIN_TYPING_DELAY_MS })
+            }
             return
         } catch (error) {
             errors.push(`${selector}: ${getErrorMessage(error).slice(0, 180)}`)
@@ -839,9 +876,6 @@ const uploadFirstFileInput = async (
 }
 
 const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
-    const domClicked = await clickVisibleTextAction(page, [KO_NEXT_STEP, KO_NEXT_STEP_SPACED, KO_NEXT])
-    if (domClicked) return
-
     await clickFirstVisible(
         page,
         [
@@ -856,53 +890,95 @@ const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => 
 }
 
 const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
-    const domClicked = await clickVisibleTextAction(
-        page,
-        [
-            KO_REMIT_REQUEST,
-            KO_REMIT_REQUEST_COMPACT,
-            KO_REMIT,
-            KO_NEXT_STEP,
-            KO_NEXT_STEP_SPACED,
-            KO_APPLY,
-            KO_SUBMIT,
-        ],
-        true
-    )
-    if (domClicked) return domClicked
+    const domClicked = await page.evaluate(`
+        (() => {
+            const labels = [
+                ${JSON.stringify(KO_REMIT_REQUEST)},
+                ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)},
+                ${JSON.stringify(KO_APPLY)},
+                ${JSON.stringify(KO_SUBMIT)},
+                '신청하기',
+                '확인',
+            ].filter(Boolean);
+            const contextLabels = [
+                ${JSON.stringify(KO_AGREEMENT)},
+                ${JSON.stringify(KO_AGREEMENT_DESCRIPTION)},
+                ${JSON.stringify(KO_FINAL_RECEIVE_AMOUNT)},
+                ${JSON.stringify(KO_SEND_AMOUNT)},
+                ${JSON.stringify(KO_TOTAL_FEE)},
+                ${JSON.stringify(KO_EXCHANGE_RATE)},
+                'USD',
+                'KRW',
+            ];
+            const excludedLabels = [
+                ${JSON.stringify(KO_NEXT_STEP)},
+                ${JSON.stringify(KO_NEXT_STEP_SPACED)},
+                ${JSON.stringify(KO_NEXT)},
+                ${JSON.stringify(KO_REMIT)},
+                '로그아웃',
+                '메뉴',
+                '닫기',
+            ];
+            const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const textOf = (el) => norm([
+                el.textContent || '',
+                el.value || '',
+                el.getAttribute && el.getAttribute('aria-label') || '',
+                el.getAttribute && el.getAttribute('title') || '',
+            ].join(' '));
+            const hasConfirmationContext = (el) => {
+                let current = el;
+                for (let depth = 0; current && depth < 8; depth += 1) {
+                    const text = norm(current.innerText || current.textContent || '');
+                    if (
+                        contextLabels.some((label) => label && text.includes(label)) &&
+                        !/로그아웃|메뉴|홈|고객센터/.test(text)
+                    ) {
+                        return true;
+                    }
+                    current = current.parentElement;
+                }
+                return false;
+            };
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]'))
+                .filter((el) => isVisible(el) && !isDisabled(el))
+                .map((el) => ({ el, text: textOf(el), rect: el.getBoundingClientRect() }))
+                .filter((row) => row.text && labels.some((label) => row.text.includes(label)))
+                .filter((row) => !excludedLabels.some((label) => label && row.text === label))
+                .filter((row) => hasConfirmationContext(row.el))
+                .filter((row) => row.rect.top > 80);
+            const target = candidates[candidates.length - 1];
+            if (!target) {
+                return null;
+            }
+            try { target.el.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' }); } catch {}
+            const eventInit = { bubbles: true, cancelable: true, view: window };
+            try { target.el.dispatchEvent(new MouseEvent('pointerdown', eventInit)); } catch {}
+            try { target.el.dispatchEvent(new MouseEvent('mousedown', eventInit)); } catch {}
+            try { target.el.dispatchEvent(new MouseEvent('mouseup', eventInit)); } catch {}
+            try { target.el.dispatchEvent(new MouseEvent('click', eventInit)); } catch {}
+            if (typeof target.el.click === 'function') target.el.click();
+            return 'dom-scoped:' + target.text.slice(0, 80);
+        })()
+    `).catch(() => null)
+    if (typeof domClicked === 'string' && domClicked) return domClicked
 
     const finalSubmitSelectors = [
         `button:has-text("${KO_REMIT_REQUEST}")`,
         `[role="button"]:has-text("${KO_REMIT_REQUEST}")`,
-        `a:has-text("${KO_REMIT_REQUEST}")`,
         `input[type="button"][value*="${KO_REMIT_REQUEST}"]`,
         `input[type="submit"][value*="${KO_REMIT_REQUEST}"]`,
         `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
         `[role="button"]:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
-        `a:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
         `input[type="button"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
         `input[type="submit"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
-        `button:has-text("${KO_REMIT}")`,
-        `[role="button"]:has-text("${KO_REMIT}")`,
-        `a:has-text("${KO_REMIT}")`,
-        `input[type="button"][value*="${KO_REMIT}"]`,
-        `input[type="submit"][value*="${KO_REMIT}"]`,
-        `button:has-text("${KO_NEXT_STEP}")`,
-        `[role="button"]:has-text("${KO_NEXT_STEP}")`,
-        `a:has-text("${KO_NEXT_STEP}")`,
-        `button:has-text("${KO_NEXT_STEP_SPACED}")`,
-        `[role="button"]:has-text("${KO_NEXT_STEP_SPACED}")`,
-        `a:has-text("${KO_NEXT_STEP_SPACED}")`,
-        `button:has-text("${KO_APPLY}")`,
-        `[role="button"]:has-text("${KO_APPLY}")`,
-        `a:has-text("${KO_APPLY}")`,
-        `input[type="button"][value*="${KO_APPLY}"]`,
-        `input[type="submit"][value*="${KO_APPLY}"]`,
-        `button:has-text("${KO_SUBMIT}")`,
-        `[role="button"]:has-text("${KO_SUBMIT}")`,
-        `a:has-text("${KO_SUBMIT}")`,
-        `input[type="button"][value*="${KO_SUBMIT}"]`,
-        `input[type="submit"][value*="${KO_SUBMIT}"]`,
     ]
 
     return clickLastVisible(page, finalSubmitSelectors, 'Submit remittance', timeoutMs)
@@ -1164,11 +1240,11 @@ const clickMoinLoginSubmit = async (
             const enableDeadline = Date.now() + 5000
             while (Date.now() < enableDeadline) {
                 throwIfAbortRequested(abortSignal, 'Submit login')
-                await refreshMoinLoginInputEvents(page)
 
                 const count = typeof matches.count === 'function'
                     ? await matches.count().catch(() => 0)
                     : 1
+                let shouldRefreshInputEvents = false
                 for (let index = 0; index < count; index += 1) {
                     const btn = typeof matches.nth === 'function'
                         ? matches.nth(index)
@@ -1184,6 +1260,11 @@ const clickMoinLoginSubmit = async (
                         return count === 1 ? selector : `${selector}#${index}`
                     }
                     sawVisibleDisabledSubmit = true
+                    shouldRefreshInputEvents = true
+                }
+
+                if (shouldRefreshInputEvents) {
+                    await refreshMoinLoginInputEvents(page)
                 }
 
                 await page.waitForTimeout(120)
@@ -1355,6 +1436,70 @@ const clickCompanyRowCandidate = async (page: PageLike, companyNames: string[]) 
     return String(result || 'row-select-unknown')
 }
 
+const findTargetRecipientId = async (page: PageLike, companyNames: string[]) => {
+    const recipientId = await page.evaluate(`
+        (() => {
+            const companies = ${JSON.stringify(companyNames)};
+            const normalize = (value) => String(value || '').toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+            const normalizedCompanies = companies.map(normalize).filter(Boolean);
+            const requiredTokens = ['shanghai', 'oikki', 'trading'];
+            const textOf = (el) => String((el && el.textContent) || '').replace(/\\s+/g, ' ').trim();
+            const matchesCompany = (el) => {
+                const normalized = normalize(textOf(el));
+                if (!normalized) return false;
+                if (normalizedCompanies.some((company) => normalized.includes(company))) return true;
+                return requiredTokens.every((token) => normalized.includes(token));
+            };
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const candidates = Array.from(document.querySelectorAll('li, tr, article, section, label, [role="row"], [role="option"], [role="button"], div'))
+                .filter((el) => isVisible(el) && matchesCompany(el))
+                .map((el) => {
+                    const rect = el.getBoundingClientRect();
+                    const text = textOf(el);
+                    const hrefs = Array.from(el.querySelectorAll('a[href]'))
+                        .map((anchor) => String(anchor.getAttribute('href') || anchor.href || ''));
+                    return {
+                        el,
+                        text,
+                        hrefs,
+                        area: rect.width * rect.height,
+                        hasTargetAccount: /439064148553|BKCHCNBJ300/i.test(text),
+                    };
+                })
+                .filter((row) => row.text.length >= 8 && row.text.length <= 900)
+                .sort((a, b) => {
+                    const accountScore = Number(b.hasTargetAccount) - Number(a.hasTargetAccount);
+                    if (accountScore !== 0) return accountScore;
+                    return a.area - b.area;
+                });
+
+            for (const candidate of candidates) {
+                for (const href of candidate.hrefs) {
+                    const match = href.match(/\\/recipient\\/(\\d+)\\/correct\\b/);
+                    if (match && match[1]) return match[1];
+                }
+            }
+
+            return '';
+        })()
+    `).catch(() => '')
+
+    return typeof recipientId === 'string' && /^\d+$/.test(recipientId)
+        ? recipientId
+        : ''
+}
+
+const openMoinAmountPage = async (page: PageLike, recipientId: string) => {
+    const amountUrl = `https://www.moinbizplus.com/transfer/amount?recipientId=${encodeURIComponent(recipientId)}&origin=%2Ftransfer%2Frecipient`
+    await page.goto(amountUrl, { waitUntil: 'domcontentloaded', timeout: LONG_TIMEOUT_MS })
+    await page.waitForTimeout(1800)
+}
+
 const clickFirstRecipientSearchResult = async (page: PageLike, keyword: string) => {
     const result = await page.evaluate(`
         (() => {
@@ -1480,8 +1625,7 @@ const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
             };
             const visibleInputs = Array.from(document.querySelectorAll('input'))
                 .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
-            const input = visibleInputs.find((el) => isRecipientSearch(el))
-                || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
+            const input = visibleInputs.find((el) => isRecipientSearch(el));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -1526,8 +1670,7 @@ const clearRecipientSearchKeyword = async (page: PageLike) => {
             };
             const visibleInputs = Array.from(document.querySelectorAll('input'))
                 .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
-            const input = visibleInputs.find((el) => isRecipientSearch(el))
-                || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
+            const input = visibleInputs.find((el) => isRecipientSearch(el));
             if (!input) return 'recipient-search-not-found';
 
             const nativeSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
@@ -1600,12 +1743,19 @@ const inspectTransferInputs = async (page: PageLike) => {
     return result
 }
 
-const collectMoinFailureDiagnostic = async (page: PageLike | null, steps: string[]) => {
+const collectMoinFailureDiagnostic = async (page: PageLike | null, steps: string[], error?: unknown) => {
+    const errorSnapshot = {
+        errorName: error === undefined ? null : getErrorName(error),
+        errorMessage: error === undefined ? null : getErrorMessage(error),
+        stackFirstLine: error === undefined ? null : getStackFirstLine(error),
+    }
+
     if (!page) {
         return {
             url: 'no-page',
             lastSteps: steps.slice(-12),
             pageAvailable: false,
+            ...errorSnapshot,
         }
     }
 
@@ -1643,11 +1793,25 @@ const collectMoinFailureDiagnostic = async (page: PageLike | null, steps: string
                 return { url: location.href, buttons, inputs, bodyPreview };
             })()
         `)
+        let screenshotPath: string | null = null
+        let screenshotError: string | null = null
+        if (typeof page.screenshot === 'function') {
+            try {
+                const nextPath = join(tmpdir(), `moin-debug-${Date.now()}.png`)
+                await page.screenshot({ path: nextPath, fullPage: true })
+                screenshotPath = nextPath
+            } catch (screenshotFailure) {
+                screenshotError = getErrorMessage(screenshotFailure)
+            }
+        }
 
         return {
             ...(pageSnapshot as Record<string, unknown>),
             lastSteps: steps.slice(-12),
             pageAvailable: true,
+            screenshotPath,
+            screenshotError,
+            ...errorSnapshot,
         }
     } catch (error) {
         return {
@@ -1655,6 +1819,7 @@ const collectMoinFailureDiagnostic = async (page: PageLike | null, steps: string
             lastSteps: steps.slice(-12),
             pageAvailable: false,
             diagnosticError: getErrorMessage(error),
+            ...errorSnapshot,
         }
     }
 }
@@ -1679,39 +1844,59 @@ const inspectAmountFieldValue = async (page: PageLike, expectedAmount: string) =
             };
 
             const expectedNumeric = parseNumeric(expectedAmountText);
-            const blockedTokens = [String(recipientPlaceholder || '').toLowerCase(), 'recipient', 'alias', 'company', 'name'];
+            const blockedTokens = [
+                String(recipientPlaceholder || '').toLowerCase(),
+                'recipient',
+                'alias',
+                'company',
+                'name',
+                'source_amount',
+                'source amount',
+                'send',
+                'sending',
+                'krw',
+                'code',
+                'coupon',
+                'discount',
+                '보내는 금액',
+                '할인',
+            ];
             const candidates = Array.from(document.querySelectorAll('input'))
                 .filter((inp) => isVisible(inp))
                 .filter((inp) => ['text', 'number', 'tel', ''].includes((inp.type || '').toLowerCase()))
                 .map((inp) => {
-                    const hint = [inp.name || '', inp.id || '', inp.placeholder || '', inp.getAttribute('aria-label') || '']
+                    const hint = [inp.name || '', inp.id || '', inp.placeholder || '', inp.getAttribute('aria-label') || '', inp.closest('label, div, section, article')?.textContent || '']
                         .join(' ')
                         .toLowerCase();
                     const value = inp.value || '';
                     const numeric = parseNumeric(value);
                     const blocked = blockedTokens.some((token) => token && hint.includes(token));
+                    const target = /target_amount|target amount|receive|receiving|beneficiary|usd|받는 금액/.test(hint);
                     return {
                         hint: hint.slice(0, 120),
                         value: value.slice(0, 50),
                         numeric,
                         blocked,
+                        target,
                         readOnly: Boolean(inp.readOnly),
                         disabled: Boolean(inp.disabled),
                     };
                 });
 
             const usableCandidates = candidates.filter((row) => !row.blocked && !row.disabled);
-            const matched = usableCandidates.some((row) => {
+            const targetCandidates = usableCandidates.filter((row) => row.target);
+            const compareCandidates = targetCandidates.length > 0 ? targetCandidates : usableCandidates;
+            const matched = compareCandidates.some((row) => {
                 if (row.numeric === null || expectedNumeric === null) return false;
                 return Math.abs(row.numeric - expectedNumeric) < 0.000001;
             });
-            const bestCandidate = usableCandidates.find((row) => row.numeric !== null) || usableCandidates[0] || null;
+            const bestCandidate = compareCandidates.find((row) => row.numeric !== null) || compareCandidates[0] || null;
             return JSON.stringify({
                 matched,
                 expectedNumeric,
                 bestValue: bestCandidate ? bestCandidate.value : '',
                 bestNumeric: bestCandidate ? bestCandidate.numeric : null,
-                candidates: usableCandidates.slice(0, 6),
+                candidates: compareCandidates.slice(0, 6),
             });
         })()
     `) as string
@@ -1749,16 +1934,26 @@ const fillMoinUsdAmountByDom = async (page: PageLike, amount: string): Promise<s
             const visibleInputs = Array.from(document.querySelectorAll('input'))
                 .filter((inp) => isVisible(inp) && !inp.disabled && !inp.readOnly)
                 .filter((inp) => ['text', 'number', 'tel', ''].includes(String(inp.type || '').toLowerCase()));
+            const inputHint = (inp) => norm([
+                inp.name || '',
+                inp.id || '',
+                inp.placeholder || '',
+                inp.getAttribute('aria-label') || '',
+            ].join(' ')).toLowerCase();
+
+            const explicitTarget = visibleInputs
+                .map((inp, index) => ({ inp, index }))
+                .find(({ inp }) => /target_amount|target amount|receiv|beneficiary|usd/i.test(inputHint(inp))
+                    && !/source_amount|source amount|code|coupon|discount|할인/i.test(inputHint(inp)));
+            if (!explicitTarget) return 'target-usd-input-not-found';
 
             const scoreInput = (inp, index) => {
                 let score = 0;
-                const hint = norm([
-                    inp.name || '',
-                    inp.id || '',
-                    inp.placeholder || '',
-                    inp.getAttribute('aria-label') || '',
-                ].join(' ')).toLowerCase();
+                const hint = inputHint(inp);
                 if (/recipient|alias|company|name|수취인|회사명|별칭|받는 분/.test(hint)) score -= 10000;
+                if (/target_amount|target amount/.test(hint)) score += 5000;
+                if (/source_amount|source amount/.test(hint)) score -= 5000;
+                if (/code|coupon|discount|할인/.test(hint)) score -= 10000;
                 if (/usd|receive|receiving|beneficiary|받는 금액/.test(hint)) score += 500;
                 if (/krw|send|sending|보내는 금액/.test(hint)) score -= 500;
 
@@ -1783,7 +1978,10 @@ const fillMoinUsdAmountByDom = async (page: PageLike, amount: string): Promise<s
             const ranked = visibleInputs
                 .map((inp, index) => ({ inp, index, score: scoreInput(inp, index) }))
                 .sort((a, b) => b.score - a.score);
-            const target = ranked[0]?.inp || null;
+            const targetRow = explicitTarget
+                ? { ...explicitTarget, score: 9999 }
+                : ranked[0] || null;
+            const target = targetRow?.inp || null;
             if (!target) return 'no-usd-input';
 
             try { target.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' }); } catch {}
@@ -1798,7 +1996,7 @@ const fillMoinUsdAmountByDom = async (page: PageLike, amount: string): Promise<s
             target.dispatchEvent(new Event('change', { bubbles: true }));
             target.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true }));
             target.dispatchEvent(new Event('blur', { bubbles: true }));
-            return 'dom-usd-filled:index=' + ranked[0].index + ':score=' + ranked[0].score;
+            return 'dom-usd-filled:index=' + targetRow.index + ':score=' + targetRow.score + ':name=' + (target.getAttribute('name') || '');
         })()
     `).catch((error) => `dom-usd-error:${getErrorMessage(error)}`)
 
@@ -1981,7 +2179,8 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                 return amountExpr ? clean(amountExpr[0]) : '';
             };
 
-            const lines = clean((document.body && document.body.innerText) || '')
+            const bodyText = clean((document.body && document.body.innerText) || '');
+            const lines = bodyText
                 .split(/\\n+/)
                 .map((line) => clean(line))
                 .filter(Boolean);
@@ -2049,7 +2248,43 @@ const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemi
                 exchangeRate: '',
             };
 
+            const exactLabelMap = {
+                finalReceiveAmount: [${JSON.stringify(KO_FINAL_RECEIVE_AMOUNT)}, '최종 수취 금액', ${JSON.stringify(KO_RECEIVE_AMOUNT)}],
+                sendAmount: [${JSON.stringify(KO_SEND_AMOUNT)}, '보내는 돈', '보내는돈'],
+                totalFee: [${JSON.stringify(KO_TOTAL_FEE)}, '총 수수료', '총수수료'],
+                exchangeRate: [${JSON.stringify(KO_EXCHANGE_RATE)}, '적용 환율', '적용환율'],
+            };
+            const exactOrder = ['finalReceiveAmount', 'sendAmount', 'totalFee', 'exchangeRate'];
+            const allExactLabels = exactOrder.flatMap((key) => exactLabelMap[key]);
+            const findLabelPosition = (key) => {
+                const labels = exactLabelMap[key] || [];
+                let best = { index: -1, label: '' };
+                for (const label of labels) {
+                    const index = bodyText.indexOf(label);
+                    if (index >= 0 && (best.index < 0 || index < best.index)) best = { index, label };
+                }
+                return best;
+            };
+            const findByExactBodyLabel = (key) => {
+                const { index: start, label } = findLabelPosition(key);
+                if (start < 0) return '';
+                let end = bodyText.length;
+                for (const otherLabel of allExactLabels) {
+                    if (otherLabel === label) continue;
+                    const next = bodyText.indexOf(otherLabel, start + label.length);
+                    if (next >= 0 && next < end) end = next;
+                }
+                const segment = clean(bodyText.slice(start + label.length, end));
+                return moneySnippet(segment, key);
+            };
+
+            for (const key of exactOrder) {
+                const exactValue = findByExactBodyLabel(key);
+                if (exactValue) result[key] = exactValue;
+            }
+
             for (const key of Object.keys(result)) {
+                if (result[key]) continue;
                 const words = labels[key] || [];
                 const domValue = findByDom(key, words);
                 if (domValue) {
@@ -2350,9 +2585,93 @@ const waitForMoinLoginInput = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT
     throw new Error(`Login input fields were not attached after navigation. ${errors.slice(0, 4).join(' | ')}`)
 }
 
+const readJsonObject = async (response: ApiResponseLike) => {
+    const json = await response.json().catch(() => null)
+    return json && typeof json === 'object' ? json as Record<string, unknown> : {}
+}
+
+const getNestedString = (value: Record<string, unknown>, path: string[]) => {
+    let current: unknown = value
+    for (const key of path) {
+        if (!current || typeof current !== 'object') return ''
+        current = (current as Record<string, unknown>)[key]
+    }
+    return typeof current === 'string' ? current : ''
+}
+
+const authenticateMoinSessionWithApi = async (
+    page: PageLike,
+    loginId: string,
+    loginPassword: string,
+    steps: string[],
+): Promise<boolean> => {
+    if (!page.request) return false
+
+    steps.push('api-login:start')
+    const loginResponse = await page.request.post('https://mbp-web-api.cspprd.moinbizplus.com/api/v1/auth/login', {
+        data: { email: loginId, password: loginPassword },
+    })
+    const loginJson = await readJsonObject(loginResponse)
+    const firstRefreshToken = getNestedString(loginJson, ['data', 'refresh_token'])
+    if (loginResponse.status() >= 400 || !firstRefreshToken) {
+        const body = await loginResponse.text().catch(() => '')
+        throw new MoinAutomationError(
+            'API login',
+            `MOIN API login failed. status=${loginResponse.status()} body=${body.replace(/\s+/g, ' ').slice(0, 260)}`
+        )
+    }
+
+    steps.push('api-login:refresh-issued')
+    const renewResponse = await page.request.post('https://mbp-web-api.cspprd.moinbizplus.com/api/v1/auth/renew-access-token', {
+        data: { refresh_token: firstRefreshToken },
+    })
+    const renewJson = await readJsonObject(renewResponse)
+    const accessToken = getNestedString(renewJson, ['data', 'access_token'])
+    const nextRefreshToken = getNestedString(renewJson, ['data', 'refresh_token']) || firstRefreshToken
+    if (renewResponse.status() >= 400 || !accessToken) {
+        const body = await renewResponse.text().catch(() => '')
+        throw new MoinAutomationError(
+            'API login',
+            `MOIN API access-token renewal failed. status=${renewResponse.status()} body=${body.replace(/\s+/g, ' ').slice(0, 260)}`
+        )
+    }
+
+    steps.push('api-login:access-issued')
+    const storeResult = await page.evaluate(async (payload) => {
+        const { accessToken, refreshToken } = payload as { accessToken: string; refreshToken: string };
+        const refreshResponse = await fetch('/api/auth/token?type=refreshToken', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ token: refreshToken }),
+        });
+        const accessResponse = await fetch('/api/auth/token?type=accessToken', {
+            method: 'POST',
+            headers: {
+                'content-type': 'application/json',
+                authorization: `Bearer ${accessToken}`,
+            },
+            body: JSON.stringify({ token: accessToken }),
+        });
+        return {
+            refreshStatus: refreshResponse.status,
+            accessStatus: accessResponse.status,
+        };
+    }, { accessToken, refreshToken: nextRefreshToken }) as { refreshStatus?: number; accessStatus?: number }
+
+    if (storeResult.refreshStatus !== 200 || storeResult.accessStatus !== 200) {
+        throw new MoinAutomationError(
+            'API login',
+            `MOIN token storage failed. refreshStatus=${storeResult.refreshStatus} accessStatus=${storeResult.accessStatus}`
+        )
+    }
+
+    steps.push('api-login:tokens-stored')
+    return true
+}
+
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
-    const waitStrategies: Array<'commit' | 'domcontentloaded' | 'load'> = ['commit', 'domcontentloaded', 'load']
+    const waitStrategies: Array<'domcontentloaded' | 'load' | 'commit'> = ['domcontentloaded', 'load', 'commit']
 
     for (const waitUntil of waitStrategies) {
         try {
@@ -2488,6 +2807,24 @@ const performMoinLogin = async (
         steps.push(`dismiss-overlays:${overlayDismissed}`)
     }
 
+    if (process.env.MOIN_BIZPLUS_USE_UI_LOGIN !== 'true') {
+        const apiAuthenticated = await authenticateMoinSessionWithApi(page, loginId, loginPassword, steps)
+        if (apiAuthenticated) {
+            await page.goto(MOIN_BIZPLUS_RECIPIENT_URL, {
+                waitUntil: 'domcontentloaded',
+                timeout: 10000,
+            })
+            steps.push('post-login-direct-recipient-check')
+            const postApiLoginUrl = page.url()
+            if (postApiLoginUrl.includes('/login')) {
+                const bodyText = (await page.locator('body').textContent().catch(() => '')) || ''
+                throw createMoinLoginFailureError(postApiLoginUrl, bodyText)
+            }
+            steps.push(`post-login-url:${postApiLoginUrl}`)
+            return
+        }
+    }
+
     throwIfAbortRequested(abortSignal, 'Fill login ID')
     await typeFirstVisible(
         page,
@@ -2519,9 +2856,7 @@ const performMoinLogin = async (
     try {
         throwIfAbortRequested(abortSignal, 'Verify login')
         await Promise.race([
-            waitForUrlChange(page, loginUrlBefore, 10000).then((url) => {
-                if (url.includes('/login')) loginFailed = true
-            }),
+            waitForUrlChange(page, loginUrlBefore, 10000),
             page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
             page.getByText(KO_LOGIN_ATTEMPT_REMAINING).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
             page.getByText(KO_ACCOUNT_PROTECTED_LIMIT).first().waitFor({ state: 'visible', timeout: 10000 }).then(() => { loginFailed = true }),
@@ -3584,9 +3919,14 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
     const pushTiming = (label: string) => {
         steps.push(`timing:${label}:${Date.now() - startedAtMs}ms`)
     }
+    const attachSteps = <T extends MoinAutomationError>(error: T) => {
+        error.steps = steps.slice()
+        return error
+    }
 
     try {
         throwIfAbortRequested(abortSignal, 'Launch browser')
+        steps.push('launch-browser:start')
         const launched = await launchBrowser(input.headless ?? true)
         browser = launched.browser
         steps.push(`runtime:${launched.runtime}`)
@@ -3607,99 +3947,15 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
 
         throwIfAbortRequested(abortSignal, 'Create browser context')
+        steps.push('create-browser-context:start')
         const context = await browser.newContext({ locale: 'ko-KR', viewport: DESKTOP_VIEWPORT })
         page = await context.newPage()
+        steps.push('create-browser-context:page-created')
         page.setDefaultTimeout(DEFAULT_TIMEOUT_MS)
         page.setDefaultNavigationTimeout(LONG_TIMEOUT_MS)
 
-        // ???? Step 1: Go directly to login page ??????????????????????????????????????????????????????????
-        throwIfAbortRequested(abortSignal, 'Open login page')
-        steps.push('open-login-page:start')
-        const loginWaitUntil = await openMoinLoginPage(page, LONG_TIMEOUT_MS)
-        steps.push(`open-login-page:${loginWaitUntil}`)
-        pushTiming('login-page-opened')
-        const overlayDismissed = await dismissMoinUiOverlays(page)
-        if (overlayDismissed > 0) {
-            steps.push(`dismiss-overlays:${overlayDismissed}`)
-        }
+        await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
 
-        // ???? Step 2: Fill login credentials (type char-by-char for React) ????
-        throwIfAbortRequested(abortSignal, 'Fill login ID')
-        await typeFirstVisible(
-            page,
-            MOIN_LOGIN_ID_SELECTORS,
-            input.loginId,
-            'Fill login ID',
-            DEFAULT_TIMEOUT_MS
-        )
-        steps.push('fill-login-id')
-
-        throwIfAbortRequested(abortSignal, 'Fill login password')
-        await typeFirstVisible(
-            page,
-            MOIN_LOGIN_PASSWORD_SELECTORS,
-            input.loginPassword,
-            'Fill login password',
-            DEFAULT_TIMEOUT_MS
-        )
-        steps.push('fill-login-password')
-
-        throwIfAbortRequested(abortSignal, 'Submit login')
-
-        // ???? Step 3: Submit login ??????????????????????????????????????????????????????????????????????????????????????
-        const loginUrlBefore = page.url()
-
-        await clickMoinLoginSubmit(page, abortSignal)
-        steps.push('submit-login')
-
-        // ???? Step 3.5: Check for explicit login errors ??????????????????????????????????????????????
-        // MOIN bizplus shows a red banner for invalid password or locked accounts.
-        // Check login state quickly. Later navigation to the transfer page is the real success signal.
-        let loginFailed = false
-        let loginFailureBodyText = ''
-        try {
-            throwIfAbortRequested(abortSignal, 'Verify login')
-            await Promise.race([
-                waitForUrlChange(page, loginUrlBefore, 5000).then((url) => {
-                    if (url.includes('/login')) loginFailed = true
-                }),
-                page.getByText(KO_PASSWORD_MISMATCH).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true }),
-                page.getByText(KO_LOGIN_ATTEMPT_REMAINING).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true }),
-                page.getByText(KO_ACCOUNT_PROTECTED_LIMIT).first().waitFor({ state: 'visible', timeout: 5000 }).then(() => { loginFailed = true })
-            ])
-        } catch {
-            // Ignore timeouts from race
-        }
-        if (page.url().includes('/login')) {
-            loginFailureBodyText = (await page.locator('body').textContent().catch(() => '')) || ''
-            if (classifyMoinLoginFailure(loginFailureBodyText)) {
-                throw createMoinLoginFailureError(page.url(), loginFailureBodyText)
-            }
-        }
-        if (!loginFailed && page.url().includes('/login')) {
-            try {
-                await page.goto(MOIN_BIZPLUS_RECIPIENT_URL, {
-                    waitUntil: 'domcontentloaded',
-                    timeout: 8000,
-                })
-                steps.push('post-login-direct-recipient-check')
-            } catch (error) {
-                steps.push(`post-login-direct-recipient-check-error:${getErrorMessage(error).slice(0, 100)}`)
-            }
-        }
-
-        const loginCheckUrl = page.url()
-        if (loginFailed && !loginCheckUrl.includes('/login')) {
-            steps.push(`login-warning-nonblocking:url:${loginCheckUrl}`)
-        }
-
-        if (loginCheckUrl.includes('/login')) {
-            const bodyText = loginFailureBodyText || ((await page.locator('body').textContent().catch(() => '')) || '')
-            throw createMoinLoginFailureError(loginCheckUrl, bodyText)
-        }
-
-        const postLoginUrl = page.url()
-        steps.push(`post-login-url:${postLoginUrl}`)
         pushTiming('login-complete')
 
         // ???? Step 4: Navigate to recipient page ??????????????????????????????????????????????????????????
@@ -3767,45 +4023,68 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         await assertMoinRemittanceOpen(page, 'MOIN operating hours')
         pushTiming('recipient-page-ready')
 
-        // New flow: the recipient list can be behind the "구매대행송금" tab.
-        try {
-            const purchaseTabClicked = await clickVisibleTextAction(page, [KO_PURCHASE_REMIT])
-            if (purchaseTabClicked) {
-                steps.push(`open-purchase-remit-tab:${purchaseTabClicked}`)
-                await assertMoinRemittanceOpen(page, 'MOIN operating hours')
-            } else {
-                steps.push('purchase-remit-tab-not-found')
-            }
-        } catch (error) {
-            if (error instanceof MoinAutomationError) throw error
-            steps.push('purchase-remit-tab-not-found')
-        }
+        // Do not click the header "구매대행송금" link here. The transfer
+        // recipient page already contains the purchase remittance flow, while
+        // the header link navigates outside the form and breaks automation.
+        steps.push('purchase-remit-header-link-skipped')
 
         // The current MOIN recipient screen can virtualize or filter recipient cards.
         // Search first, then scan for the company text in the narrowed list.
         let recipientSearchPrefilled = false
         let lastRecipientSearchKeyword = TARGET_COMPANY_SEARCH_KEYWORD
-        let companyTextEl: LocatorLike | null = null
-        for (const keyword of TARGET_COMPANY_SEARCH_KEYWORDS) {
-            throwIfAbortRequested(abortSignal, 'Search recipient')
-            lastRecipientSearchKeyword = keyword
-            try {
-                if (recipientSearchPrefilled) {
-                    const clearResult = await clearRecipientSearchKeyword(page)
-                    steps.push(`recipient-search-clear:${clearResult}`)
-                }
+        let recipientSessionRecoveryAttempts = 0
+        let companyTextEl: LocatorLike | null = await findVisibleCompanyTextLocator(page, 3000)
+        if (companyTextEl) {
+            steps.push('company-text-visible-before-search')
+        } else {
+            for (const keyword of TARGET_COMPANY_SEARCH_KEYWORDS) {
+                throwIfAbortRequested(abortSignal, 'Search recipient')
+                lastRecipientSearchKeyword = keyword
+                try {
+                    if (page.url().includes('/login')) {
+                        if (recipientSessionRecoveryAttempts >= 1) {
+                            throw new MoinAutomationError(
+                                'Search recipient',
+                                `MOIN redirected back to login while searching recipient. (url: ${page.url()})`
+                            )
+                        }
+                        recipientSessionRecoveryAttempts += 1
+                        steps.push('recipient-session-login-redirect')
+                        await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
+                        steps.push('recipient-session-relogin')
+                        await assertMoinRemittanceOpen(page, 'MOIN operating hours')
+                    }
 
-                const searchResult = await fillRecipientSearchKeyword(page, keyword)
-                steps.push(`recipient-search-prefill:${keyword}:${searchResult}`)
-                recipientSearchPrefilled = searchResult === 'recipient-search-filled'
+                    if (recipientSearchPrefilled) {
+                        const clearResult = await clearRecipientSearchKeyword(page)
+                        steps.push(`recipient-search-clear:${clearResult}`)
+                        if (clearResult === 'recipient-search-not-found' && page.url().includes('/login')) {
+                            throw new MoinAutomationError(
+                                'Search recipient',
+                                `MOIN redirected back to login before clearing recipient search. (url: ${page.url()})`
+                            )
+                        }
+                    }
 
-                companyTextEl = await findVisibleCompanyTextLocator(page, 2200)
-                if (companyTextEl) {
-                    steps.push(`company-text-visible-after-search:${keyword}`)
-                    break
+                    const searchResult = await fillRecipientSearchKeyword(page, keyword)
+                    steps.push(`recipient-search-prefill:${keyword}:${searchResult}`)
+                    recipientSearchPrefilled = searchResult === 'recipient-search-filled'
+                    if (searchResult === 'recipient-search-not-found' && page.url().includes('/login')) {
+                        throw new MoinAutomationError(
+                            'Search recipient',
+                            `MOIN redirected back to login before recipient search. (url: ${page.url()})`
+                        )
+                    }
+
+                    companyTextEl = await findVisibleCompanyTextLocator(page, 2200)
+                    if (companyTextEl) {
+                        steps.push(`company-text-visible-after-search:${keyword}`)
+                        break
+                    }
+                } catch (error) {
+                    if (error instanceof MoinAutomationError) throw error
+                    steps.push(`recipient-search-prefill-error:${keyword}`)
                 }
-            } catch {
-                steps.push(`recipient-search-prefill-error:${keyword}`)
             }
         }
         pushTiming('recipient-search-complete')
@@ -3816,7 +4095,6 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // The modal shows recipient details and has "??瑜곸젧???얄뵛" / "??酉????얄뵛" buttons.
 
         // First, check if company name is visible (may need to scroll)
-        let recipientSelectedFromSearchResult = false
         if (!companyTextEl) {
             companyTextEl = await findVisibleCompanyTextLocator(page, 3000)
         }
@@ -3827,32 +4105,20 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             steps.push(scrolled ? 'company-scroll-hit' : 'company-scroll-miss')
             companyTextEl = await findVisibleCompanyTextLocator(page, 4000)
             if (!companyTextEl) {
-                if (recipientSearchPrefilled) {
-                    const searchResultClick = await clickFirstRecipientSearchResult(page, lastRecipientSearchKeyword)
-                    steps.push(`recipient-search-result-click:${searchResultClick}`)
-                    if (searchResultClick.startsWith('clicked-')) {
-                        recipientSelectedFromSearchResult = true
+                let pageInfo = `url: ${page.url()}`
+                try {
+                    const html = await page.content()
+                    const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
+                    if (bodyMatch) {
+                        const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+                        pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
                     }
-                }
+                } catch { /* ignore */ }
 
-                if (recipientSelectedFromSearchResult) {
-                    steps.push('company-text-hidden-selected-search-result')
-                } else {
-                    let pageInfo = `url: ${page.url()}`
-                    try {
-                        const html = await page.content()
-                        const bodyMatch = html.match(/<body[^>]*>([\s\S]*)<\/body>/i)
-                        if (bodyMatch) {
-                            const textContent = bodyMatch[1].replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-                            pageInfo += ` | page-text(first 800): ${textContent.slice(0, 800)}`
-                        }
-                    } catch { /* ignore */ }
-
-                    throw new MoinAutomationError(
-                        'Select company',
-                        `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
-                    )
-                }
+                throw new MoinAutomationError(
+                    'Select company',
+                    `Could not find target company text (${TARGET_COMPANY_NAME}). ${pageInfo}`
+                )
             }
             if (companyTextEl) {
                 steps.push('company-text-visible-after-scroll')
@@ -3863,6 +4129,32 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // The card area containing the company name is clickable (cursor:pointer)
         let remitClicked = false
         let remitClickReason = 'not-attempted'
+
+        try {
+            const recipientId = await findTargetRecipientId(page, TARGET_COMPANY_NAME_VARIANTS)
+                || TARGET_COMPANY_RECIPIENT_ID_FALLBACK
+            steps.push(`recipient-id-resolved:${recipientId}`)
+            await openMoinAmountPage(page, recipientId)
+            steps.push(`recipient-direct-amount-page:${page.url()}`)
+            const directAmountInspection = await inspectTransferInputs(page)
+            if (directAmountInspection.amountKeywordVisible || !directAmountInspection.aliasSearchVisible) {
+                remitClicked = true
+                remitClickReason = `direct-amount-page:${recipientId}`
+                steps.push(`recipient-direct-amount-loaded:${JSON.stringify({
+                    aliasSearchVisible: directAmountInspection.aliasSearchVisible,
+                    amountKeywordVisible: directAmountInspection.amountKeywordVisible,
+                    inputCount: directAmountInspection.visibleInputs.length,
+                })}`)
+            } else {
+                steps.push(`recipient-direct-amount-not-ready:${JSON.stringify({
+                    aliasSearchVisible: directAmountInspection.aliasSearchVisible,
+                    amountKeywordVisible: directAmountInspection.amountKeywordVisible,
+                    buttons: directAmountInspection.nextButtons.slice(0, 8),
+                })}`)
+            }
+        } catch (err) {
+            steps.push(`recipient-direct-amount-error:${err instanceof Error ? err.message.slice(0, 140) : 'unknown'}`)
+        }
 
         for (let attempt = 0; attempt < 2 && !remitClicked; attempt++) {
             throwIfAbortRequested(abortSignal, 'Open remit modal')
@@ -4064,6 +4356,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // Strategy 1: Specific selectors for the receiving amount
         const usdSelectors = [
+            'input[name="target_amount"]',
+            'input[id="target_amount"]',
             // Near "?꾩룇猷???ル?녽뇡? / "USD" text
             `xpath=//*[contains(normalize-space(),"${KO_RECEIVE_AMOUNT}")]/following::input[1]`,
             'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
@@ -4074,8 +4368,8 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             'input[placeholder*="USD"]',
             'input[aria-label*="USD"]',
             'input[name*="receive" i]',
-            'input[name*="amount" i]',
-            'input[id*="amount" i]',
+            'input[name*="target" i]',
+            'input[id*="target" i]',
             'div.sc-1e23ebf0-0.gEjWbH:nth-of-type(3) div.sc-1e23ebf0-4.lnBVuY:nth-of-type(1) input.pxv49w0.dor4d38',
             // By label/text proximity
             'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
@@ -4133,7 +4427,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                 if (candidateInputs.length > 0) {
                     const targetInfo = candidateInputs.find((visibleInput) => {
                         const hint = `${visibleInput.name} ${visibleInput.id} ${visibleInput.placeholder}`.toLowerCase()
-                        return hint.includes('usd') || hint.includes('amount') || hint.includes('receive')
+                        return hint.includes('target_amount') || hint.includes('target') || hint.includes('usd') || hint.includes('receive')
                     }) || candidateInputs[Math.min(1, candidateInputs.length - 1)]
                     
                     let selector = ''
@@ -4381,40 +4675,42 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         }
     } catch (error) {
         if (error instanceof MoinAutomationCanceledError) {
+            attachSteps(error)
             error.message = `${error.message} [steps: ${steps.join(' -> ')}]`
             throw error
         }
 
         if (abortSignal?.aborted) {
-            throw new MoinAutomationCanceledError(
+            throw attachSteps(new MoinAutomationCanceledError(
                 'Automation',
                 `Remittance automation was canceled by user. [steps: ${steps.join(' -> ')}]`
-            )
+            ))
         }
 
         if (error instanceof MoinAutomationError) {
             // Append accumulated steps to help debugging
             if (error.diagnostic === undefined) {
-                error.diagnostic = await collectMoinFailureDiagnostic(page, steps)
+                error.diagnostic = await collectMoinFailureDiagnostic(page, steps, error)
             }
+            attachSteps(error)
             error.message = `${error.message} [steps: ${steps.join(' -> ')}]`
             throw error
         }
 
-        const diagnostic = await collectMoinFailureDiagnostic(page, steps)
+        const diagnostic = await collectMoinFailureDiagnostic(page, steps, error)
         if (isTargetClosedAutomationError(error)) {
-            throw new MoinAutomationError(
+            throw attachSteps(new MoinAutomationError(
                 'Browser closed unexpectedly',
                 `MOIN automation browser closed before completion. This usually means Chromium crashed or the MOIN page closed during the current step. [lastSteps: ${steps.slice(-8).join(' -> ')}] [steps: ${steps.join(' -> ')}]`,
                 diagnostic,
-            )
+            ))
         }
 
-        throw new MoinAutomationError(
+        throw attachSteps(new MoinAutomationError(
             'Automation',
             `${error instanceof Error ? error.message : 'Unknown automation error.'} [steps: ${steps.join(' -> ')}] [url: ${browser ? 'see-steps' : 'no-browser'}]`,
             diagnostic,
-        )
+        ))
     } finally {
         if (abortListenerCleanup) {
             abortListenerCleanup()

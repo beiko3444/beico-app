@@ -73,6 +73,29 @@ const withTimeout = async <T,>(work: Promise<T>, timeoutMs: number, message: str
     }
 }
 
+const extractStepsFromMessage = (message: string) => {
+    const stepsMatch = message.match(/\[steps:\s*([^\]]+)\]/i)
+    if (!stepsMatch?.[1]) return []
+    return stepsMatch[1]
+        .split(/\s*(?:->|→)\s*/)
+        .map((step) => step.trim())
+        .filter(Boolean)
+}
+
+const serializeRemittanceError = (error: unknown) => {
+    const errorObject = error instanceof Error ? error : null
+    const message = errorObject?.message || String(error)
+    const automationError = error instanceof MoinAutomationError ? error : null
+    return {
+        name: errorObject?.name || typeof error,
+        message,
+        step: automationError?.step || null,
+        steps: automationError?.steps?.length ? automationError.steps : extractStepsFromMessage(message),
+        diagnostic: automationError?.diagnostic ?? null,
+        stackFirstLine: errorObject?.stack?.split('\n').map((line) => line.trim()).filter(Boolean)[0] || null,
+    }
+}
+
 const resolveInvoicePdfFromEmail = async (
     invoiceEmailUid: string,
     invoiceAttachmentIndexRaw: string,
@@ -744,11 +767,14 @@ export async function POST(request: Request) {
             }
 
             if (error instanceof MoinAutomationError) {
+                const serializedError = serializeRemittanceError(error)
                 console.warn('MOIN remittance automation failed:', {
                     step: error.step,
                     message: error.message,
                     authRelated: isAuthRelatedAutomationError(error),
                     diagnostic: error.diagnostic ?? null,
+                    steps: serializedError.steps,
+                    stackFirstLine: serializedError.stackFirstLine,
                 })
                 if (isAuthRelatedAutomationError(error)) {
                     const failure = registerAuthFailure(guardState, credentialKey, Date.now())
@@ -763,6 +789,7 @@ export async function POST(request: Request) {
                             locked: lockActive,
                             lockedUntil: lockActive ? new Date(failure.lockedUntil!).toISOString() : null,
                             diagnostic: error.diagnostic ?? null,
+                            debug: serializedError,
                         },
                         { status: lockActive ? 429 : 401 }
                     )
@@ -772,6 +799,7 @@ export async function POST(request: Request) {
                     {
                         error: `${error.step}: ${error.message}`,
                         diagnostic: error.diagnostic ?? null,
+                        debug: serializedError,
                     },
                     { status: 502 }
                 )
@@ -779,9 +807,11 @@ export async function POST(request: Request) {
 
             console.error('Failed to apply MOIN remittance:', error)
             const detail = error instanceof Error ? error.message : 'Unknown error'
+            const serializedError = serializeRemittanceError(error)
             return NextResponse.json(
                 {
                     error: `Failed to complete remittance automation: ${detail}`,
+                    debug: serializedError,
                 },
                 { status: 500 }
             )
@@ -793,9 +823,11 @@ export async function POST(request: Request) {
     } catch (error) {
         console.error('Failed to apply MOIN remittance:', error)
         const detail = error instanceof Error ? error.message : 'Unknown error'
+        const serializedError = serializeRemittanceError(error)
         return NextResponse.json(
             {
                 error: `Failed to complete remittance automation: ${detail}`,
+                debug: serializedError,
             },
             { status: 500 }
         )

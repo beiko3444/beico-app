@@ -24,7 +24,7 @@ test('MOIN runtime health masks env values and reports missing credentials', asy
     env: {
       MOIN_BIZPLUS_LOGIN_ID: 'admin@example.com',
       MOIN_BIZPLUS_LOGIN_PASSWORD: '',
-      FIXIE_URL: 'http://user:secret@example.com:8080',
+      MOIN_BIZPLUS_PROXY_URL: 'http://user:secret@example.com:8080',
       CHROME_EXECUTABLE_PATH: '/missing/chrome',
     },
     launch: false,
@@ -39,4 +39,23 @@ test('MOIN runtime health masks env values and reports missing credentials', asy
   assert.ok(result.missingComponents.includes('MOIN_BIZPLUS_LOGIN_PASSWORD'))
   assert.equal(JSON.stringify(result).includes('secret'), false)
   assert.equal(JSON.stringify(result).includes('admin@example.com'), false)
+})
+
+test('MOIN runtime ignores shared FIXIE_URL unless explicitly enabled', async () => {
+  const check = moin.checkMoinRuntimeAvailability
+  assert.ok(check, 'MOIN runtime health check is unavailable')
+
+  const result = await check({
+    env: {
+      MOIN_BIZPLUS_LOGIN_ID: 'admin@example.com',
+      MOIN_BIZPLUS_LOGIN_PASSWORD: 'password',
+      FIXIE_URL: 'http://user:secret@example.com:8080',
+      CHROME_EXECUTABLE_PATH: '/missing/chrome',
+    },
+    launch: false,
+    exists: () => false,
+  })
+
+  assert.equal(result.proxyConfigured, false)
+  assert.equal(result.proxySource, null)
 })

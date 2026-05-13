@@ -595,6 +595,8 @@ const formatRemittanceAutomationError = (message: string) => {
     const withoutPageDump = normalized
         .replace(/\s*\|\s*page-text\(first 800\):.*$/i, '')
         .replace(/\s*\[steps:.*$/i, '')
+        .replace(/\s*\[diagnostic:.*$/i, '')
+        .replace(/\s*\[debug:.*$/i, '')
         .trim()
 
     return withoutPageDump.length > 420
@@ -3962,10 +3964,22 @@ export default function WormOrderPage() {
                 const diagnostic = result?.diagnostic && typeof result.diagnostic === 'object'
                     ? result.diagnostic as { lastSteps?: unknown; url?: unknown; diagnosticError?: unknown }
                     : null
+                const debug = result?.debug && typeof result.debug === 'object'
+                    ? result.debug as { step?: unknown; steps?: unknown; stackFirstLine?: unknown; diagnostic?: unknown }
+                    : null
+                const debugSteps = Array.isArray(debug?.steps)
+                    ? debug.steps.filter((step): step is string => typeof step === 'string').slice(-8)
+                    : []
+                const debugDiagnostic = debug?.diagnostic && typeof debug.diagnostic === 'object'
+                    ? debug.diagnostic as { url?: unknown; screenshotPath?: unknown; errorName?: unknown }
+                    : null
                 const diagnosticSuffix = diagnostic
                     ? ` [diagnostic: url=${typeof diagnostic.url === 'string' ? diagnostic.url : 'unknown'} lastSteps=${Array.isArray(diagnostic.lastSteps) ? diagnostic.lastSteps.slice(-6).join(' -> ') : 'none'}${typeof diagnostic.diagnosticError === 'string' ? ` diagnosticError=${diagnostic.diagnosticError}` : ''}]`
                     : ''
-                throw new Error(`${typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.'}${diagnosticSuffix}`)
+                const debugSuffix = debug
+                    ? ` [debug: step=${typeof debug.step === 'string' ? debug.step : 'unknown'} lastSteps=${debugSteps.length > 0 ? debugSteps.join(' -> ') : 'none'}${typeof debug.stackFirstLine === 'string' ? ` stack=${debug.stackFirstLine}` : ''}${typeof debugDiagnostic?.url === 'string' ? ` url=${debugDiagnostic.url}` : ''}${typeof debugDiagnostic?.screenshotPath === 'string' ? ` screenshot=${debugDiagnostic.screenshotPath}` : ''}]`
+                    : ''
+                throw new Error(`${typeof result?.error === 'string' ? result.error : 'Failed to submit remittance.'}${diagnosticSuffix}${debugSuffix}`)
             }
 
             const automationSteps = Array.isArray(result?.result?.steps) ? result.result.steps as string[] : []
