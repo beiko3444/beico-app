@@ -59,6 +59,13 @@ const KO_RECIPIENT_SEARCH_PLACEHOLDER = '\uBC1B\uB294 \uBD84 \uC774\uB984, \uD68
 const KO_REMIT_RESTRICTED_NOTICE = '\uC1A1\uAE08 \uC2E0\uCCAD \uC81C\uD55C \uC548\uB0B4'
 const KO_REMIT_AVAILABLE_TIME = '\uC1A1\uAE08 \uC2E0\uCCAD \uAC00\uB2A5\uC2DC\uAC04 \uC548\uB0B4'
 const KO_REMIT_RESTRICTED = '\uC1A1\uAE08 \uC2E0\uCCAD \uC81C\uD55C'
+const MOIN_RECIPIENT_SEARCH_SELECTOR = `input[placeholder="${KO_RECIPIENT_SEARCH_PLACEHOLDER}"]`
+const MOIN_TARGET_COMPANY_BUTTON_SELECTOR = `button:has-text("${TARGET_COMPANY_NAME}")`
+const MOIN_MODAL_REMIT_LINK_SELECTOR = `a[href^="/transfer/amount?recipientId="]:has-text("${KO_REMIT}")`
+const MOIN_USD_TARGET_AMOUNT_SELECTOR = 'input[name="target_amount"]'
+const MOIN_KRW_SOURCE_AMOUNT_SELECTOR = 'input[name="source_amount"]'
+const MOIN_UPLOAD_NEXT_SELECTOR = `button[name="next_button"]:has-text("${KO_NEXT_STEP_SPACED}")`
+const MOIN_FINAL_SUBMIT_SELECTOR = `button[name="transfer_submit"]:has-text("${KO_REMIT_REQUEST}")`
 const KO_SUCCESS_PATTERN =
     /\uC2E0\uCCAD \uC644\uB8CC|\uC811\uC218 \uC644\uB8CC|\uC644\uB8CC\uB418\uC5C8\uC2B5\uB2C8\uB2E4|\uC1A1\uAE08 \uC644\uB8CC|\uC2E0\uCCAD\uC774 \uC644\uB8CC|\uC811\uC218\uB418\uC5C8/
 const KO_SUCCESS_KEYWORDS = [
@@ -108,6 +115,77 @@ const MOIN_LOGIN_PASSWORD_SELECTORS = [
     'main form input:nth-of-type(2)',
     'label.sc-3e129e50-2:nth-of-type(2) input.sc-4f2c4f04-2',
 ]
+
+const isSafeMoinActionHref = (href: string | null | undefined): boolean => {
+    const value = String(href || '').trim()
+    if (!value || value.startsWith('/') || value.startsWith('#')) return true
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(value)) return true
+
+    try {
+        const url = new URL(value)
+        return url.hostname === 'moinbizplus.com' || url.hostname.endsWith('.moinbizplus.com')
+    } catch {
+        return false
+    }
+}
+
+const getMoinUsdAmountSelectors = () => [
+    MOIN_USD_TARGET_AMOUNT_SELECTOR,
+    'input[name*="usd" i]',
+    'input[id*="usd" i]',
+    'input[placeholder*="USD"]',
+    'input[aria-label*="USD"]',
+    'input[name*="receive" i]',
+    'input[name*="target" i]',
+    'input[name*="amount" i]',
+    'input[id*="amount" i]',
+    `xpath=//*[contains(normalize-space(),"${KO_RECEIVE_AMOUNT}")]/following::input[1]`,
+    'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
+    'xpath=//*[contains(normalize-space(),"USD")]/following::input[1]',
+    'div.sc-1e23ebf0-0.gEjWbH:nth-of-type(3) div.sc-1e23ebf0-4.lnBVuY:nth-of-type(1) input.pxv49w0.dor4d38',
+    'xpath=//label[contains(normalize-space(),"USD")]/following::input[1]',
+    `xpath=//*[contains(normalize-space(),"${KO_AMOUNT}")]/following::input[1]`,
+]
+
+const getMoinNextStepSelectors = () => [
+    MOIN_UPLOAD_NEXT_SELECTOR,
+    `button:has-text("${KO_NEXT_STEP}")`,
+    `button:has-text("${KO_NEXT_STEP_SPACED}")`,
+    `[role="button"]:has-text("${KO_NEXT_STEP}")`,
+    `[role="button"]:has-text("${KO_NEXT_STEP_SPACED}")`,
+    `button:has-text("${KO_NEXT}")`,
+]
+
+const getMoinFinalSubmitSelectors = () => [
+    MOIN_FINAL_SUBMIT_SELECTOR,
+    `button:has-text("${KO_REMIT_REQUEST}")`,
+    `[role="button"]:has-text("${KO_REMIT_REQUEST}")`,
+    `input[type="button"][value*="${KO_REMIT_REQUEST}"]`,
+    `input[type="submit"][value*="${KO_REMIT_REQUEST}"]`,
+    `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
+    `[role="button"]:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
+    `input[type="button"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
+    `input[type="submit"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
+    `button:has-text("${KO_REMIT}")`,
+    `[role="button"]:has-text("${KO_REMIT}")`,
+    `input[type="button"][value*="${KO_REMIT}"]`,
+    `input[type="submit"][value*="${KO_REMIT}"]`,
+    `button:has-text("${KO_APPLY}")`,
+    `[role="button"]:has-text("${KO_APPLY}")`,
+    `input[type="button"][value*="${KO_APPLY}"]`,
+    `input[type="submit"][value*="${KO_APPLY}"]`,
+    `button:has-text("${KO_SUBMIT}")`,
+    `[role="button"]:has-text("${KO_SUBMIT}")`,
+    `input[type="button"][value*="${KO_SUBMIT}"]`,
+    `input[type="submit"][value*="${KO_SUBMIT}"]`,
+]
+
+const assertStillOnMoinBizplus = (page: PageLike, step: string) => {
+    const currentUrl = page.url()
+    if (!isSafeMoinActionHref(currentUrl)) {
+        throw new MoinAutomationError(step, `MOIN automation navigated to an external URL: ${currentUrl}`)
+    }
+}
 
 const classifyMoinLoginFailure = (bodyText: string): 'locked' | 'password' | null => {
     if (!bodyText) return null
@@ -402,8 +480,21 @@ const clickVisibleTextAction = async (
                 (el && el.getAttribute && el.getAttribute('aria-label')) || '',
                 (el && el.getAttribute && el.getAttribute('title')) || '',
             ].join(' '));
+            const isSafeHref = (el) => {
+                if (!el || (el.tagName || '').toLowerCase() !== 'a') return true;
+                const href = String(el.getAttribute('href') || '').trim();
+                if (!href || href.startsWith('/') || href.startsWith('#')) return true;
+                if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) return true;
+                try {
+                    const url = new URL(href, window.location.href);
+                    return url.hostname === 'moinbizplus.com' || url.hostname.endsWith('.moinbizplus.com');
+                } catch {
+                    return false;
+                }
+            };
             const candidates = Array.from(document.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]'))
                 .filter((el) => isVisible(el) && !isDisabled(el))
+                .filter((el) => isSafeHref(el))
                 .filter((el) => labels.some((label) => label && textOf(el).includes(label)));
             const target = preferLast ? candidates[candidates.length - 1] : candidates[0];
             if (!target) return null;
@@ -684,18 +775,19 @@ const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => 
 
     await clickFirstVisible(
         page,
-        [
-            `button:has-text("${KO_NEXT_STEP}")`,
-            `button:has-text("${KO_NEXT_STEP_SPACED}")`,
-            `[role="button"]:has-text("${KO_NEXT_STEP}")`,
-            `button:has-text("${KO_NEXT}")`,
-        ],
+        getMoinNextStepSelectors(),
         'Click next step',
         timeoutMs
     )
 }
 
 const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
+    try {
+        return await clickLastVisible(page, getMoinFinalSubmitSelectors(), 'Submit remittance', Math.min(timeoutMs, TRANSFER_ACTION_TIMEOUT_MS))
+    } catch {
+        // Fall back to DOM text matching for older layouts.
+    }
+
     const domClicked = await clickVisibleTextAction(
         page,
         [
@@ -711,41 +803,7 @@ const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TI
     )
     if (domClicked) return domClicked
 
-    const finalSubmitSelectors = [
-        `button:has-text("${KO_REMIT_REQUEST}")`,
-        `[role="button"]:has-text("${KO_REMIT_REQUEST}")`,
-        `a:has-text("${KO_REMIT_REQUEST}")`,
-        `input[type="button"][value*="${KO_REMIT_REQUEST}"]`,
-        `input[type="submit"][value*="${KO_REMIT_REQUEST}"]`,
-        `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
-        `[role="button"]:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
-        `a:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
-        `input[type="button"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
-        `input[type="submit"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
-        `button:has-text("${KO_REMIT}")`,
-        `[role="button"]:has-text("${KO_REMIT}")`,
-        `a:has-text("${KO_REMIT}")`,
-        `input[type="button"][value*="${KO_REMIT}"]`,
-        `input[type="submit"][value*="${KO_REMIT}"]`,
-        `button:has-text("${KO_NEXT_STEP}")`,
-        `[role="button"]:has-text("${KO_NEXT_STEP}")`,
-        `a:has-text("${KO_NEXT_STEP}")`,
-        `button:has-text("${KO_NEXT_STEP_SPACED}")`,
-        `[role="button"]:has-text("${KO_NEXT_STEP_SPACED}")`,
-        `a:has-text("${KO_NEXT_STEP_SPACED}")`,
-        `button:has-text("${KO_APPLY}")`,
-        `[role="button"]:has-text("${KO_APPLY}")`,
-        `a:has-text("${KO_APPLY}")`,
-        `input[type="button"][value*="${KO_APPLY}"]`,
-        `input[type="submit"][value*="${KO_APPLY}"]`,
-        `button:has-text("${KO_SUBMIT}")`,
-        `[role="button"]:has-text("${KO_SUBMIT}")`,
-        `a:has-text("${KO_SUBMIT}")`,
-        `input[type="button"][value*="${KO_SUBMIT}"]`,
-        `input[type="submit"][value*="${KO_SUBMIT}"]`,
-    ]
-
-    return clickLastVisible(page, finalSubmitSelectors, 'Submit remittance', timeoutMs)
+    return clickLastVisible(page, getMoinFinalSubmitSelectors(), 'Submit remittance', timeoutMs)
 }
 
 const checkAgreement = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
@@ -765,8 +823,21 @@ const checkAgreement = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) =>
                 if (typeof el.click === 'function') el.click();
                 return true;
             };
+            const checkHiddenInput = (input) => {
+                if (!input || input.checked || input.disabled) return false;
+                const checkedSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'checked')?.set;
+                try { input.focus(); } catch {}
+                if (checkedSetter) checkedSetter.call(input, true);
+                else input.checked = true;
+                input.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window }));
+                input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: null }));
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+                return input.checked === true;
+            };
             const checkbox = Array.from(document.querySelectorAll('input[type="checkbox"]')).find((el) => isVisible(el) && !el.checked);
             if (checkbox && clickTarget(checkbox)) return true;
+            const hiddenCheckbox = Array.from(document.querySelectorAll('input[type="checkbox"]')).find((el) => !el.checked && !el.disabled);
+            if (hiddenCheckbox && checkHiddenInput(hiddenCheckbox)) return true;
             const target = Array.from(document.querySelectorAll('label, button, [role="button"], div, span'))
                 .find((el) => isVisible(el) && labels.some((label) => norm(el.textContent || '').includes(label)));
             return clickTarget(target);
@@ -1320,7 +1391,9 @@ const fillRecipientSearchKeyword = async (page: PageLike, keyword: string) => {
             };
             const visibleInputs = Array.from(document.querySelectorAll('input'))
                 .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
-            const input = visibleInputs.find((el) => isRecipientSearch(el))
+            const exactInput = document.querySelector(${JSON.stringify(MOIN_RECIPIENT_SEARCH_SELECTOR)});
+            const input = visibleInputs.find((el) => el === exactInput)
+                || visibleInputs.find((el) => isRecipientSearch(el))
                 || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
             if (!input) return 'recipient-search-not-found';
 
@@ -1366,7 +1439,9 @@ const clearRecipientSearchKeyword = async (page: PageLike) => {
             };
             const visibleInputs = Array.from(document.querySelectorAll('input'))
                 .filter((el) => isVisible(el) && !el.disabled && !el.readOnly);
-            const input = visibleInputs.find((el) => isRecipientSearch(el))
+            const exactInput = document.querySelector(${JSON.stringify(MOIN_RECIPIENT_SEARCH_SELECTOR)});
+            const input = visibleInputs.find((el) => el === exactInput)
+                || visibleInputs.find((el) => isRecipientSearch(el))
                 || visibleInputs.find((el) => ['search', 'text', ''].includes(String(el.type || '').toLowerCase()));
             if (!input) return 'recipient-search-not-found';
 
@@ -1942,6 +2017,25 @@ const clickCompanyScopedRemit = async (
     companyNames: string[],
     remitText: string
 ): Promise<string> => {
+    const preferredRemitSelectors = [
+        MOIN_MODAL_REMIT_LINK_SELECTOR,
+        `a[href*="/transfer/amount"]:has-text("${remitText}")`,
+        `a[href*="/transfer/amount"]:has-text("${KO_REMIT_SHORT}")`,
+    ]
+    for (const selector of preferredRemitSelectors) {
+        try {
+            const target = page.locator(selector).first()
+            await target.waitFor({ state: 'visible', timeout: FAST_ELEMENT_TIMEOUT_MS })
+            const disabled = await target.isDisabled().catch(() => false)
+            const enabled = await target.isEnabled().catch(() => !disabled)
+            if (disabled || !enabled) continue
+            await target.click({ timeout: 5000 })
+            return `clicked-preferred-remit:${selector}`
+        } catch {
+            // Try DOM-scoped fallbacks below.
+        }
+    }
+
     const result = await page.evaluate(`
         (() => {
             const companies = ${JSON.stringify(companyNames)};
@@ -1966,6 +2060,18 @@ const clickCompanyScopedRemit = async (
             ].join(' '));
             const hasText = (el, text) => textOf(el).includes(norm(text));
             const hasActionText = (el) => actionLabels.some((label) => label && hasText(el, label));
+            const isSafeHref = (el) => {
+                if (!el || (el.tagName || '').toLowerCase() !== 'a') return true;
+                const href = String(el.getAttribute('href') || '').trim();
+                if (!href || href.startsWith('/') || href.startsWith('#')) return true;
+                if (!/^[a-z][a-z0-9+.-]*:/i.test(href)) return true;
+                try {
+                    const url = new URL(href, window.location.href);
+                    return url.hostname === 'moinbizplus.com' || url.hostname.endsWith('.moinbizplus.com');
+                } catch {
+                    return false;
+                }
+            };
             const describe = (el) => {
                 if (!el) return 'none';
                 const tag = (el.tagName || '').toLowerCase();
@@ -2020,6 +2126,7 @@ const clickCompanyScopedRemit = async (
             const clickWithMouseEvents = (raw) => {
                 const target = toClickable(raw) || raw;
                 if (!target || !isVisible(target)) return false;
+                if (!isSafeHref(target)) return false;
                 const ariaDisabled = String(target.getAttribute('aria-disabled') || '').toLowerCase();
                 if (target.disabled || ariaDisabled === 'true') return false;
                 try {
@@ -2063,11 +2170,13 @@ const clickCompanyScopedRemit = async (
                 const clickableRemit = Array.from(scope.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick]'))
                     .filter((el) => isVisible(el) && hasActionText(el))
                     .map((el) => toClickable(el))
-                    .filter(Boolean);
+                    .filter(Boolean)
+                    .filter((el) => isSafeHref(el));
                 const textNodes = Array.from(scope.querySelectorAll('div, span, p, strong, b'))
                     .filter((el) => isVisible(el) && hasActionText(el))
                     .map((el) => toClickable(el))
-                    .filter(Boolean);
+                    .filter(Boolean)
+                    .filter((el) => isSafeHref(el));
                 const merged = clickableRemit.concat(textNodes);
                 return merged.filter((el, index, arr) => arr.indexOf(el) === index);
             };
@@ -2158,9 +2267,7 @@ const clickCompanyScopedRemit = async (
                         const text = textOf(el);
                         if (href.includes('/login')) return false;
                         if (href.includes('/transfer/recipient') && text.includes(${JSON.stringify(KO_REMIT)})) return false;
-                        if (href.includes('notion.site')) return false;
-                        if (/^https?:\\/\\//i.test(href) && !href.includes('moinbizplus.com') && !href.includes('themoin.com')) return false;
-                        return true;
+                        return isSafeHref(el);
                     })
                     .sort((a, b) => scoreRemitCandidate(a, basePoint) - scoreRemitCandidate(b, basePoint));
 
@@ -3612,6 +3719,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             const purchaseTabClicked = await clickVisibleTextAction(page, [KO_PURCHASE_REMIT])
             if (purchaseTabClicked) {
                 steps.push(`open-purchase-remit-tab:${purchaseTabClicked}`)
+                assertStillOnMoinBizplus(page, 'Open purchase remit tab')
                 await assertMoinRemittanceOpen(page, 'MOIN operating hours')
             } else {
                 steps.push('purchase-remit-tab-not-found')
@@ -3706,6 +3814,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         for (let attempt = 0; attempt < 2 && !remitClicked; attempt++) {
             throwIfAbortRequested(abortSignal, 'Open remit modal')
+            try {
+                await clickFirstVisible(page, [MOIN_TARGET_COMPANY_BUTTON_SELECTOR], 'Select target company row', 2500)
+                steps.push(`clicked-preferred-company-row:attempt${attempt}`)
+            } catch {
+                steps.push(`preferred-company-row-not-clicked:attempt${attempt}`)
+            }
+
             try {
                 const visibleCompanyEl = await findVisibleCompanyTextLocator(page, 2000)
                 if (!visibleCompanyEl) {
@@ -3904,6 +4019,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // Strategy 1: Specific selectors for the receiving amount
         const usdSelectors = [
+            MOIN_USD_TARGET_AMOUNT_SELECTOR,
             // Near "?꾩룇猷???ル?녽뇡? / "USD" text
             `xpath=//*[contains(normalize-space(),"${KO_RECEIVE_AMOUNT}")]/following::input[1]`,
             'xpath=//*[contains(normalize-space(),"USD")]/ancestor::*[contains(@class,"amount") or contains(@class,"input")][1]//input',
@@ -3914,6 +4030,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
             'input[placeholder*="USD"]',
             'input[aria-label*="USD"]',
             'input[name*="receive" i]',
+            'input[name*="target" i]',
             'input[name*="amount" i]',
             'input[id*="amount" i]',
             'div.sc-1e23ebf0-0.gEjWbH:nth-of-type(3) div.sc-1e23ebf0-4.lnBVuY:nth-of-type(1) input.pxv49w0.dor4d38',
@@ -4277,4 +4394,7 @@ export const __moinBizplusTestHooks = {
     fillMissingHistoryRecipients,
     classifyMoinLoginFailure,
     createMoinLoginFailureError,
+    isSafeMoinActionHref,
+    getMoinUsdAmountSelectors,
+    getMoinFinalSubmitSelectors,
 }
