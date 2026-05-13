@@ -4,12 +4,14 @@ import { authOptions } from '@/lib/auth'
 import { MoinAutomationCanceledError, MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
 import { prisma } from '@/lib/prisma'
 import { getRemittanceRunningJobElapsedMs, isRemittanceRunningJobStale } from '@/lib/remittanceRunningJob'
+import { getWormEmailAttachment, getWormEmailDetail } from '@/lib/wormOrderMail'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
 
 const MAX_PDF_SIZE_BYTES = 10 * 1024 * 1024
+const EMAIL_ATTACHMENT_TIMEOUT_MS = 45 * 1000
 const AUTH_FAILURE_THRESHOLD = 2
 const AUTH_LOCK_MINUTES = 15
 const AUTH_LOCK_MS = AUTH_LOCK_MINUTES * 60 * 1000
@@ -42,6 +44,76 @@ const globalRemittanceGuard = globalThis as typeof globalThis & {
 const readString = (value: FormDataEntryValue | null) => {
     if (typeof value === 'string') return value.trim()
     return ''
+}
+
+const isPdfAttachment = (attachment: { filename?: string | null; contentType?: string | null }) => {
+    const filename = (attachment.filename || '').toLowerCase()
+    const contentType = (attachment.contentType || '').toLowerCase()
+    return filename.endsWith('.pdf') || contentType.includes('pdf')
+}
+
+const toBuffer = (value: unknown) => {
+    if (Buffer.isBuffer(value)) return value
+    if (value instanceof Uint8Array) return Buffer.from(value)
+    if (typeof value === 'string') return Buffer.from(value)
+    return Buffer.from([])
+}
+
+const withTimeout = async <T,>(work: Promise<T>, timeoutMs: number, message: string): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+    try {
+        return await Promise.race([
+            work,
+            new Promise<never>((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs)
+            }),
+        ])
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId)
+    }
+}
+
+const resolveInvoicePdfFromEmail = async (
+    invoiceEmailUid: string,
+    invoiceAttachmentIndexRaw: string,
+) => {
+    const detail = await withTimeout(
+        getWormEmailDetail(invoiceEmailUid),
+        EMAIL_ATTACHMENT_TIMEOUT_MS,
+        '인보이스 메일 상세 조회 시간이 초과되었습니다. 잠시 후 다시 시도하거나 수동 입력으로 PDF를 업로드해 주세요.',
+    )
+
+    const requestedIndex = invoiceAttachmentIndexRaw ? Number(invoiceAttachmentIndexRaw) : null
+    const attachments = detail.attachments || []
+    const selectedAttachment =
+        Number.isInteger(requestedIndex)
+            ? attachments.find((attachment) => attachment.index === requestedIndex)
+            : attachments.find((attachment) => isPdfAttachment(attachment))
+
+    if (!selectedAttachment) {
+        throw new Error('매칭된 인보이스 메일에서 PDF 첨부파일을 찾지 못했습니다. 인보이스 메일을 다시 매칭하거나 수동 입력으로 PDF를 업로드해 주세요.')
+    }
+
+    if (!isPdfAttachment(selectedAttachment)) {
+        throw new Error('선택된 인보이스 첨부파일이 PDF가 아닙니다. PDF 첨부를 선택하거나 수동 입력으로 업로드해 주세요.')
+    }
+
+    const attachment = await withTimeout(
+        getWormEmailAttachment(invoiceEmailUid, selectedAttachment.index),
+        EMAIL_ATTACHMENT_TIMEOUT_MS,
+        '인보이스 PDF 첨부 다운로드 시간이 초과되었습니다. 잠시 후 다시 시도하거나 수동 입력으로 PDF를 업로드해 주세요.',
+    )
+    const invoiceBuffer = toBuffer(attachment.content)
+
+    if (invoiceBuffer.byteLength === 0) {
+        throw new Error('인보이스 PDF 첨부파일이 비어 있습니다. 인보이스 메일을 다시 확인하거나 수동 입력으로 PDF를 업로드해 주세요.')
+    }
+
+    return {
+        invoiceBuffer,
+        invoiceFileName: attachment.filename || selectedAttachment.filename || `invoice-${selectedAttachment.index}.pdf`,
+        invoiceMimeType: attachment.contentType || selectedAttachment.contentType || 'application/pdf',
+    }
 }
 
 const normalizeSummaryText = (value: string) => {
@@ -185,6 +257,11 @@ const isRetryableBrowserClosure = (error: MoinAutomationError) => (
     !wasMoinSubmitted(error)
 )
 
+const isInvoicePreparationError = (error: unknown) => (
+    error instanceof Error &&
+    /(인보이스|첨부|PDF|메일|다운로드|조회 시간이 초과)/i.test(error.message)
+)
+
 const registerAuthFailure = (state: RemittanceAuthGuardState, credentialKey: string, now: number) => {
     const prev = state.failures.get(credentialKey)
     const shouldReset = !prev || now - prev.lastFailedAt > AUTH_FAILURE_RESET_MS
@@ -288,10 +365,12 @@ export async function POST(request: Request) {
         const amountRaw = readString(formData.get('amountUsd'))
         const orderIdRaw = readString(formData.get('orderId'))
         const invoicePdf = formData.get('invoicePdf')
+        const invoiceEmailUid = readString(formData.get('invoiceEmailUid'))
+        const invoiceAttachmentIndexRaw = readString(formData.get('invoiceAttachmentIndex'))
 
         if (!moinLoginId || !moinPassword) {
             return NextResponse.json(
-                { error: 'Server is not configured: set MOIN_BIZPLUS_LOGIN_ID and MOIN_BIZPLUS_LOGIN_PASSWORD.' },
+                { error: '모인 계정 환경변수가 설정되지 않았습니다. MOIN_BIZPLUS_LOGIN_ID와 MOIN_BIZPLUS_LOGIN_PASSWORD를 등록해 주세요.' },
                 { status: 500 }
             )
         }
@@ -305,27 +384,33 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Valid USD amount is required.' }, { status: 400 })
         }
 
-        if (!(invoicePdf instanceof File)) {
-            return NextResponse.json({ error: 'Invoice PDF file is required.' }, { status: 400 })
-        }
-
-        const isPdf = invoicePdf.type === 'application/pdf' || invoicePdf.name.toLowerCase().endsWith('.pdf')
-        if (!isPdf) {
-            return NextResponse.json({ error: 'Only PDF file is supported for invoice.' }, { status: 400 })
-        }
-
-        if (invoicePdf.size > MAX_PDF_SIZE_BYTES) {
-            return NextResponse.json(
-                { error: 'Invoice PDF is too large. Maximum size is 10MB.' },
-                { status: 400 }
-            )
-        }
-
         if (!orderIdRaw || !isUuid(orderIdRaw)) {
             return NextResponse.json(
                 { error: '발주리스트에서 유효한 발주를 선택한 뒤 다시 시도해 주세요.' },
                 { status: 400 }
             )
+        }
+
+        const hasUploadedInvoicePdf = invoicePdf instanceof File && invoicePdf.size > 0
+        if (!hasUploadedInvoicePdf && !invoiceEmailUid) {
+            return NextResponse.json(
+                { error: '인보이스 PDF 파일 또는 매칭된 인보이스 메일 정보가 필요합니다.' },
+                { status: 400 }
+            )
+        }
+
+        if (hasUploadedInvoicePdf) {
+            const isPdf = invoicePdf.type === 'application/pdf' || invoicePdf.name.toLowerCase().endsWith('.pdf')
+            if (!isPdf) {
+                return NextResponse.json({ error: 'Only PDF file is supported for invoice.' }, { status: 400 })
+            }
+
+            if (invoicePdf.size > MAX_PDF_SIZE_BYTES) {
+                return NextResponse.json(
+                    { error: 'Invoice PDF is too large. Maximum size is 10MB.' },
+                    { status: 400 }
+                )
+            }
         }
 
         let targetOrder:
@@ -435,15 +520,29 @@ export async function POST(request: Request) {
         guardState.runningJobsByCredential.set(credentialKey, runningJob)
         guardState.runningJobsByOrderId.set(targetOrder.id, runningJob)
 
-        const invoiceBuffer = Buffer.from(await invoicePdf.arrayBuffer())
         try {
+            const invoiceInput = hasUploadedInvoicePdf
+                ? {
+                    invoiceBuffer: Buffer.from(await invoicePdf.arrayBuffer()),
+                    invoiceFileName: invoicePdf.name || 'invoice.pdf',
+                    invoiceMimeType: invoicePdf.type || 'application/pdf',
+                }
+                : await resolveInvoicePdfFromEmail(invoiceEmailUid, invoiceAttachmentIndexRaw)
+
+            if (invoiceInput.invoiceBuffer.byteLength > MAX_PDF_SIZE_BYTES) {
+                return NextResponse.json(
+                    { error: 'Invoice PDF is too large. Maximum size is 10MB.' },
+                    { status: 400 }
+                )
+            }
+
             const runMoinRemittance = () => submitMoinRemittance({
                 loginId: moinLoginId,
                 loginPassword: moinPassword,
                 amountUsd: parsedAmount.toFixed(2),
-                invoiceFileName: invoicePdf.name || 'invoice.pdf',
-                invoiceMimeType: invoicePdf.type || 'application/pdf',
-                invoiceBuffer,
+                invoiceFileName: invoiceInput.invoiceFileName,
+                invoiceMimeType: invoiceInput.invoiceMimeType,
+                invoiceBuffer: invoiceInput.invoiceBuffer,
                 headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
                 abortSignal: runningJob.abortController.signal,
                 prepareOnly: false,
@@ -594,6 +693,13 @@ export async function POST(request: Request) {
                 saveWarning,
             })
         } catch (error) {
+            if (isInvoicePreparationError(error)) {
+                return NextResponse.json(
+                    { error: error instanceof Error ? error.message : '인보이스 PDF를 준비하지 못했습니다.' },
+                    { status: 400 }
+                )
+            }
+
             if (error instanceof MoinAutomationCanceledError) {
                 return NextResponse.json(
                     {

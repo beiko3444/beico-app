@@ -570,6 +570,10 @@ const formatRemittanceAutomationError = (message: string) => {
     const normalized = message.replace(/\s+/g, ' ').trim()
     if (!normalized) return '송금 자동화 중 오류가 발생했습니다.'
 
+    if (/MOIN_BIZPLUS_LOGIN_ID|MOIN_BIZPLUS_LOGIN_PASSWORD|Server is not configured/i.test(normalized)) {
+        return '모인 계정 환경변수가 설정되지 않았습니다. 서버 환경변수에 MOIN_BIZPLUS_LOGIN_ID와 MOIN_BIZPLUS_LOGIN_PASSWORD를 등록한 뒤 다시 실행해 주세요.'
+    }
+
     if (/Select company: Could not find target company text/i.test(normalized)) {
         return '모인 수취인 목록에서 Shanghai Oikki Trading 거래처를 찾지 못했습니다. 수취인 검색/목록 화면이 바뀌었거나 해당 거래처가 숨김 처리되었을 수 있습니다.'
     }
@@ -3829,6 +3833,8 @@ export default function WormOrderPage() {
             remittanceRequestAbortControllerRef.current = requestAbortController
 
             let invoicePdfFile: File | null = null
+            let invoiceEmailUidForServer = ''
+            let invoiceAttachmentIndexForServer: number | null = null
             if (usingManualInput) {
                 const isPdf =
                     invoicePdf instanceof File &&
@@ -3853,36 +3859,18 @@ export default function WormOrderPage() {
                     }
                     return
                 }
-                // 매칭된 인보이스 메일에서 PDF 첨부파일 자동 다운로드
-                setRemittanceProgressLabel('인보이스 PDF 다운로드 중...')
-                const matchedDetail = emailDetails[linkedInvoiceEmail.uid] || await fetchEmailDetail(linkedInvoiceEmail.uid)
-                const pdfAtt = matchedDetail?.attachments?.find(att => {
+                setRemittanceProgressLabel('서버에 송금 신청 정보를 전송하는 중...')
+                invoiceEmailUidForServer = linkedInvoiceEmail.uid
+                const cachedInvoiceDetail = emailDetails[linkedInvoiceEmail.uid]
+                const cachedPdfAttachment = cachedInvoiceDetail?.attachments?.find(att => {
                     const name = att.filename.toLowerCase()
                     const type = att.contentType.toLowerCase()
                     return name.endsWith('.pdf') || type.includes('pdf')
                 })
-                if (!pdfAtt) {
-                    setRemittanceError('매칭된 인보이스 메일에 PDF 첨부파일이 없습니다.')
-                    if (remittanceProgressTimerRef.current) {
-                        window.clearInterval(remittanceProgressTimerRef.current)
-                        remittanceProgressTimerRef.current = null
-                    }
-                    return
-                }
-                const pdfRes = await fetch(`/api/admin/worm-order/emails/attachment?uid=${linkedInvoiceEmail.uid}&index=${pdfAtt.index}&raw=1`)
-                if (!pdfRes.ok) {
-                    setRemittanceError('인보이스 PDF 다운로드에 실패했습니다.')
-                    if (remittanceProgressTimerRef.current) {
-                        window.clearInterval(remittanceProgressTimerRef.current)
-                        remittanceProgressTimerRef.current = null
-                    }
-                    return
-                }
-                const pdfBlob = await pdfRes.blob()
-                invoicePdfFile = new File([pdfBlob], pdfAtt.filename, { type: 'application/pdf' })
+                invoiceAttachmentIndexForServer = cachedPdfAttachment?.index ?? null
             }
 
-            if (!invoicePdfFile) {
+            if (usingManualInput && !invoicePdfFile) {
                 setRemittanceError('인보이스 PDF를 준비하지 못했습니다.')
                 if (remittanceProgressTimerRef.current) {
                     window.clearInterval(remittanceProgressTimerRef.current)
@@ -3893,7 +3881,14 @@ export default function WormOrderPage() {
 
             const submitData = new FormData()
             submitData.append('amountUsd', parsedAmount.toFixed(2))
-            submitData.append('invoicePdf', invoicePdfFile)
+            if (usingManualInput && invoicePdfFile) {
+                submitData.append('invoicePdf', invoicePdfFile)
+            } else {
+                submitData.append('invoiceEmailUid', invoiceEmailUidForServer)
+                if (invoiceAttachmentIndexForServer !== null) {
+                    submitData.append('invoiceAttachmentIndex', String(invoiceAttachmentIndexForServer))
+                }
+            }
             if (activeWormOrder?.id) {
                 submitData.append('orderId', activeWormOrder.id)
             }
