@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { MoinAutomationCanceledError, MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
+import { checkMoinRuntimeAvailability, MoinAutomationCanceledError, MoinAutomationError, submitMoinRemittance } from '@/lib/moinBizplus'
 import { prisma } from '@/lib/prisma'
 import { getRemittanceRunningJobElapsedMs, isRemittanceRunningJobStale } from '@/lib/remittanceRunningJob'
 import { getWormEmailAttachment, getWormEmailDetail } from '@/lib/wormOrderMail'
@@ -311,6 +311,25 @@ const buildRunningJobResponse = (runningJob: RemittanceRunningJob, now: number, 
     }
 }
 
+export async function GET() {
+    const session = await getServerSession(authOptions)
+    if (!session || session.user.role !== 'ADMIN') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const health = await checkMoinRuntimeAvailability({
+        headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
+    })
+    const ok = health.runtimeAvailable &&
+        health.credentials.loginIdConfigured &&
+        health.credentials.passwordConfigured
+
+    return NextResponse.json({
+        ok,
+        ...health,
+    }, { status: ok ? 200 : 503 })
+}
+
 export async function DELETE(request: Request) {
     const session = await getServerSession(authOptions)
     if (!session || session.user.role !== 'ADMIN') {
@@ -506,6 +525,20 @@ export async function POST(request: Request) {
                     `해당 발주는 이미 송금 신청이 진행 중입니다. (${targetOrder.orderNumber})`,
                 ),
                 { status: 409 }
+            )
+        }
+
+        const runtimeHealth = await checkMoinRuntimeAvailability({
+            headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
+        })
+        if (!runtimeHealth.runtimeAvailable) {
+            return NextResponse.json(
+                {
+                    error: '브라우저 자동화 런타임이 준비되지 않았습니다. 서버의 Chrome/Edge 실행 경로 또는 Chromium 런타임 설정을 확인해 주세요.',
+                    runtimeUnavailable: true,
+                    health: runtimeHealth,
+                },
+                { status: 503 }
             )
         }
 

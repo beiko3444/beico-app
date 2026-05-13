@@ -73,6 +73,16 @@ type WormEmailOfflineCache = {
     selectedEmailUid: string | null
 }
 
+type RemittanceRuntimeHealth = {
+    ok?: boolean
+    runtimeAvailable?: boolean
+    runtimeUnavailable?: boolean
+    runtime?: string | null
+    resolvedExecutablePath?: string | null
+    missingComponents?: string[]
+    error?: string
+}
+
 type CustomsProgressResult = {
     blNo: string
     query: {
@@ -572,6 +582,10 @@ const formatRemittanceAutomationError = (message: string) => {
 
     if (/MOIN_BIZPLUS_LOGIN_ID|MOIN_BIZPLUS_LOGIN_PASSWORD|Server is not configured/i.test(normalized)) {
         return '모인 계정 환경변수가 설정되지 않았습니다. 서버 환경변수에 MOIN_BIZPLUS_LOGIN_ID와 MOIN_BIZPLUS_LOGIN_PASSWORD를 등록한 뒤 다시 실행해 주세요.'
+    }
+
+    if (/브라우저 자동화 런타임|No server browser runtime available|BROWSER_RUNTIME|runtimeUnavailable/i.test(normalized)) {
+        return '브라우저 자동화 런타임이 준비되지 않았습니다. 서버의 Chrome/Edge 실행 경로 또는 Chromium 런타임 설정을 확인해 주세요.'
     }
 
     if (/Select company: Could not find target company text/i.test(normalized)) {
@@ -3879,6 +3893,22 @@ export default function WormOrderPage() {
                 return
             }
 
+            setRemittanceProgress((prev) => Math.max(prev, 6))
+            setRemittanceProgressLabel('서버 브라우저 자동화 런타임을 확인하는 중...')
+            const runtimeResponse = await fetch('/api/admin/worm-order/remittance', {
+                method: 'GET',
+                signal: requestAbortController.signal,
+            })
+            const runtimeHealth = await runtimeResponse.json().catch(() => null) as RemittanceRuntimeHealth | null
+            if (!runtimeResponse.ok || runtimeHealth?.runtimeAvailable !== true) {
+                const missing = Array.isArray(runtimeHealth?.missingComponents) && runtimeHealth.missingComponents.length > 0
+                    ? ` (누락: ${runtimeHealth.missingComponents.join(', ')})`
+                    : ''
+                throw new Error(
+                    `${runtimeHealth?.error || '브라우저 자동화 런타임이 준비되지 않았습니다.'}${missing} runtimeUnavailable`
+                )
+            }
+
             const submitData = new FormData()
             submitData.append('amountUsd', parsedAmount.toFixed(2))
             if (usingManualInput && invoicePdfFile) {
@@ -3896,6 +3926,8 @@ export default function WormOrderPage() {
                 submitData.append('receiveDate', receiveDate)
             }
 
+            setRemittanceProgress((prev) => Math.max(prev, 8))
+            setRemittanceProgressLabel('서버 자동화가 실행 중입니다. 모인 BizPlus 응답을 기다리는 중...')
             const response = await fetch('/api/admin/worm-order/remittance', {
                 method: 'POST',
                 body: submitData,

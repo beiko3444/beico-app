@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs'
+
 const MOIN_BIZPLUS_LOGIN_URL = 'https://www.moinbizplus.com/login'
 const MOIN_BIZPLUS_RECIPIENT_URL = 'https://www.moinbizplus.com/transfer/recipient'
 const TARGET_COMPANY_NAME = 'Shanghai Oikki Trading Co.,Ltd'
@@ -149,6 +151,9 @@ type ProxyConfig = {
     password?: string
 }
 
+type EnvLike = Record<string, string | undefined>
+type ExistsLike = (path: string) => boolean
+
 type BrowserContextLike = {
     newPage: () => Promise<PageLike>
 }
@@ -280,13 +285,13 @@ const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) =>
     }
 }
 
-const resolveMoinProxyFromEnv = (): { proxy: ProxyConfig; source: string } | null => {
+const resolveMoinProxyFromEnv = (env: EnvLike = process.env): { proxy: ProxyConfig; source: string } | null => {
     const candidates: Array<[string, string | undefined]> = [
-        ['MOIN_BIZPLUS_PROXY_URL', process.env.MOIN_BIZPLUS_PROXY_URL],
-        ['FIXIE_URL', process.env.FIXIE_URL],
-        ['QUOTAGUARDSTATIC_URL', process.env.QUOTAGUARDSTATIC_URL],
-        ['HTTPS_PROXY', process.env.HTTPS_PROXY],
-        ['HTTP_PROXY', process.env.HTTP_PROXY],
+        ['MOIN_BIZPLUS_PROXY_URL', env.MOIN_BIZPLUS_PROXY_URL],
+        ['FIXIE_URL', env.FIXIE_URL],
+        ['QUOTAGUARDSTATIC_URL', env.QUOTAGUARDSTATIC_URL],
+        ['HTTPS_PROXY', env.HTTPS_PROXY],
+        ['HTTP_PROXY', env.HTTP_PROXY],
     ]
 
     for (const [source, raw] of candidates) {
@@ -305,13 +310,94 @@ const resolveMoinProxyFromEnv = (): { proxy: ProxyConfig; source: string } | nul
     return null
 }
 
-const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike; runtime: string; proxySource: string | null }> => {
+const resolveLocalChromiumExecutable = (
+    env: EnvLike = process.env,
+    exists: ExistsLike = existsSync,
+) => {
+    const candidates = [
+        env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH,
+        env.CHROMIUM_EXECUTABLE_PATH,
+        env.CHROME_EXECUTABLE_PATH,
+        env.MSEDGE_EXECUTABLE_PATH,
+        '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+        '/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge',
+        env.ProgramFiles ? `${env.ProgramFiles}\\Google\\Chrome\\Application\\chrome.exe` : '',
+        env['ProgramFiles(x86)'] ? `${env['ProgramFiles(x86)']}\\Google\\Chrome\\Application\\chrome.exe` : '',
+        env.LOCALAPPDATA ? `${env.LOCALAPPDATA}\\Google\\Chrome\\Application\\chrome.exe` : '',
+        env.ProgramFiles ? `${env.ProgramFiles}\\Microsoft\\Edge\\Application\\msedge.exe` : '',
+        env['ProgramFiles(x86)'] ? `${env['ProgramFiles(x86)']}\\Microsoft\\Edge\\Application\\msedge.exe` : '',
+        env.LOCALAPPDATA ? `${env.LOCALAPPDATA}\\Microsoft\\Edge\\Application\\msedge.exe` : '',
+        '/usr/bin/google-chrome',
+        '/usr/bin/google-chrome-stable',
+        '/usr/bin/chromium',
+        '/usr/bin/chromium-browser',
+    ].filter((value): value is string => Boolean(value))
+
+    for (const candidate of candidates) {
+        try {
+            if (exists(candidate)) return candidate
+        } catch {
+            // Try next candidate.
+        }
+    }
+    return ''
+}
+
+const maskExecutablePath = (value: string | null) => {
+    if (!value) return null
+    const home = process.env.HOME
+    if (home && value.startsWith(home)) return `~${value.slice(home.length)}`
+    return value
+}
+
+export type MoinRuntimeAvailability = {
+    runtimeAvailable: boolean
+    runtime: string | null
+    proxyConfigured: boolean
+    proxySource: string | null
+    resolvedExecutablePath: string | null
+    missingComponents: string[]
+    credentials: {
+        loginIdConfigured: boolean
+        passwordConfigured: boolean
+    }
+    runtimeErrors: string[]
+}
+
+const launchBrowser = async (
+    headless: boolean,
+    options: { env?: EnvLike; exists?: ExistsLike } = {},
+): Promise<{ browser: BrowserLike; runtime: string; proxySource: string | null; executablePath: string | null }> => {
     const runtimeErrors: string[] = []
-    const proxyEntry = resolveMoinProxyFromEnv()
+    const env = options.env ?? process.env
+    const exists = options.exists ?? existsSync
+    const proxyEntry = resolveMoinProxyFromEnv(env)
     const proxy = proxyEntry?.proxy
     const proxySource = proxyEntry?.source ?? null
 
-    // Attempt 1: @sparticuz/chromium (for Vercel/AWS Lambda)
+    // Attempt 1: local/self-hosted Chrome or Edge. This is required on macOS and
+    // other regular Node hosts where @sparticuz/chromium is not executable.
+    try {
+        const executablePath = resolveLocalChromiumExecutable(env, exists)
+        if (!executablePath) {
+            throw new Error('No local Chrome/Edge executable was found')
+        }
+
+        const { chromium: playwrightCoreChromium } = await import('playwright-core')
+
+        const browser = await playwrightCoreChromium.launch({
+            headless,
+            executablePath,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            ...(proxy ? { proxy } : {}),
+        })
+
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-local-chromium', proxySource, executablePath }
+    } catch (error) {
+        runtimeErrors.push(`playwright-core-local-chromium: ${getErrorMessage(error)}`)
+    }
+
+    // Attempt 2: @sparticuz/chromium (for Vercel/AWS Lambda)
     try {
         const { chromium: playwrightCoreChromium } = await import('playwright-core')
         const chromium = (await import('@sparticuz/chromium')).default
@@ -325,14 +411,14 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
             ...(proxy ? { proxy } : {}),
         })
 
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core+sparticuz', proxySource }
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core+sparticuz', proxySource, executablePath }
     } catch (error) {
         runtimeErrors.push(`playwright-core+sparticuz: ${getErrorMessage(error)}`)
     }
 
-    // Attempt 2: Custom path fallback for self-hosted environments
+    // Attempt 3: Custom path fallback kept for compatibility with old env names.
     try {
-        const customExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || process.env.CHROMIUM_EXECUTABLE_PATH
+        const customExecutablePath = env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH || env.CHROMIUM_EXECUTABLE_PATH
         if (!customExecutablePath) {
             throw new Error('PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH is not set')
         }
@@ -346,7 +432,7 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
             ...(proxy ? { proxy } : {}),
         })
 
-        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path', proxySource }
+        return { browser: browser as unknown as BrowserLike, runtime: 'playwright-core-custom-path', proxySource, executablePath: customExecutablePath }
     } catch (error) {
         runtimeErrors.push(`playwright-core-custom-path: ${getErrorMessage(error)}`)
     }
@@ -355,6 +441,79 @@ const launchBrowser = async (headless: boolean): Promise<{ browser: BrowserLike;
         'Launch Browser',
         `No server browser runtime available. Ensure playwright-core and @sparticuz/chromium are installed and redeployed. Details: ${runtimeErrors.join(' | ')}`
     )
+}
+
+export const checkMoinRuntimeAvailability = async (
+    options: { env?: EnvLike; headless?: boolean; launch?: boolean; exists?: ExistsLike } = {},
+): Promise<MoinRuntimeAvailability> => {
+    const env = options.env ?? process.env
+    const shouldLaunch = options.launch !== false
+    const missingComponents: string[] = []
+    const runtimeErrors: string[] = []
+    const loginIdConfigured = Boolean((env.MOIN_BIZPLUS_LOGIN_ID || '').trim())
+    const passwordConfigured = Boolean((env.MOIN_BIZPLUS_LOGIN_PASSWORD || '').trim())
+    const proxyEntry = resolveMoinProxyFromEnv(env)
+    const localExecutablePath = resolveLocalChromiumExecutable(env, options.exists ?? existsSync)
+
+    if (!loginIdConfigured) missingComponents.push('MOIN_BIZPLUS_LOGIN_ID')
+    if (!passwordConfigured) missingComponents.push('MOIN_BIZPLUS_LOGIN_PASSWORD')
+
+    if (!shouldLaunch) {
+        if (!localExecutablePath) missingComponents.push('BROWSER_RUNTIME')
+        return {
+            runtimeAvailable: Boolean(localExecutablePath),
+            runtime: localExecutablePath ? 'playwright-core-local-chromium' : null,
+            proxyConfigured: Boolean(proxyEntry),
+            proxySource: proxyEntry?.source ?? null,
+            resolvedExecutablePath: maskExecutablePath(localExecutablePath || null),
+            missingComponents,
+            credentials: {
+                loginIdConfigured,
+                passwordConfigured,
+            },
+            runtimeErrors,
+        }
+    }
+
+    let launched: Awaited<ReturnType<typeof launchBrowser>> | null = null
+    try {
+        launched = await launchBrowser(options.headless ?? true, {
+            env,
+            exists: options.exists,
+        })
+        return {
+            runtimeAvailable: true,
+            runtime: launched.runtime,
+            proxyConfigured: Boolean(proxyEntry),
+            proxySource: proxyEntry?.source ?? null,
+            resolvedExecutablePath: maskExecutablePath(launched.executablePath),
+            missingComponents,
+            credentials: {
+                loginIdConfigured,
+                passwordConfigured,
+            },
+            runtimeErrors,
+        }
+    } catch (error) {
+        const message = getErrorMessage(error)
+        runtimeErrors.push(message)
+        missingComponents.push('BROWSER_RUNTIME')
+        return {
+            runtimeAvailable: false,
+            runtime: null,
+            proxyConfigured: Boolean(proxyEntry),
+            proxySource: proxyEntry?.source ?? null,
+            resolvedExecutablePath: maskExecutablePath(localExecutablePath || null),
+            missingComponents,
+            credentials: {
+                loginIdConfigured,
+                passwordConfigured,
+            },
+            runtimeErrors,
+        }
+    } finally {
+        if (launched) await launched.browser.close().catch(() => undefined)
+    }
 }
 
 const clickFirstVisible = async (
@@ -4278,4 +4437,5 @@ export const __moinBizplusTestHooks = {
     fillMissingHistoryRecipients,
     classifyMoinLoginFailure,
     createMoinLoginFailureError,
+    resolveLocalChromiumExecutable,
 }
