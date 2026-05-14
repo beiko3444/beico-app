@@ -32,7 +32,10 @@ type WormEmailAttachment = {
     contentType: string
     size: number
     index: number
+    isPdf?: boolean
 }
+
+type WormEmailMatchType = 'INVOICE' | 'AWB_DOCUMENT'
 
 type WormEmailListItem = {
     uid: string
@@ -40,6 +43,7 @@ type WormEmailListItem = {
     date: string
     hasAttachments: boolean
     awbNumber: string | null
+    matchType: WormEmailMatchType | null
     matchedOrderId: string | null
     matchedOrderNumber: string | null
     matchedAt: string | null
@@ -71,6 +75,13 @@ type WormEmailOfflineCache = {
     emails: WormEmailListItem[]
     emailDetails: Record<string, WormEmailDetail>
     selectedEmailUid: string | null
+}
+
+type MatchedWormEmailPayload = {
+    invoiceEmails: WormEmailListItem[]
+    invoiceEmailDetails: Record<string, WormEmailDetail>
+    awbDocumentEmails: WormEmailListItem[]
+    awbDocumentEmailDetails: Record<string, WormEmailDetail>
 }
 
 type RemittanceRuntimeHealth = {
@@ -1179,6 +1190,19 @@ const PHONE_LIKE_PREFIX_REGEX = /^(010|011|016|017|018|019|070|080)/
 const WORM_EMAIL_CACHE_STORAGE_KEY = 'beico-worm-order-email-cache-v1'
 const WORM_EMAIL_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
 
+function normalizeWormEmailMatchType(value: unknown): WormEmailMatchType | null {
+    if (value === 'INVOICE' || value === 'AWB_DOCUMENT') return value
+    return null
+}
+
+function isPdfEmailAttachment(attachment: WormEmailAttachment) {
+    return (
+        attachment.isPdf === true ||
+        attachment.filename.toLowerCase().endsWith('.pdf') ||
+        attachment.contentType.toLowerCase().includes('pdf')
+    )
+}
+
 function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
     if (!value || typeof value !== 'object') return null
 
@@ -1198,6 +1222,7 @@ function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
         date: candidate.date,
         hasAttachments: candidate.hasAttachments,
         awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
+        matchType: normalizeWormEmailMatchType(candidate.matchType),
         matchedOrderId: typeof candidate.matchedOrderId === 'string' ? candidate.matchedOrderId : null,
         matchedOrderNumber: typeof candidate.matchedOrderNumber === 'string' ? candidate.matchedOrderNumber : null,
         matchedAt: typeof candidate.matchedAt === 'string' ? candidate.matchedAt : null,
@@ -1385,6 +1410,7 @@ function sanitizeWormEmailAttachment(value: unknown): WormEmailAttachment | null
         contentType: candidate.contentType,
         size: candidate.size,
         index: candidate.index,
+        isPdf: candidate.isPdf === true,
     }
 }
 
@@ -1418,6 +1444,42 @@ function sanitizeWormEmailDetail(value: unknown): WormEmailDetail | null {
         skmIndices,
         attachments,
         awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
+    }
+}
+
+function sanitizeWormEmailDetailsMap(value: unknown, emails: WormEmailListItem[]) {
+    if (!value || typeof value !== 'object') return {}
+    const emailUidSet = new Set(emails.map((email) => email.uid))
+    return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>)
+            .map(([uid, detail]) => {
+                if (!emailUidSet.has(uid)) return null
+                const sanitized = sanitizeWormEmailDetail(detail)
+                if (!sanitized || sanitized.uid !== uid) return null
+                return [uid, sanitized] as const
+            })
+            .filter((entry): entry is readonly [string, WormEmailDetail] => entry !== null),
+    ) as Record<string, WormEmailDetail>
+}
+
+function sanitizeMatchedWormEmailPayload(value: unknown): MatchedWormEmailPayload {
+    const source = value && typeof value === 'object' ? value as Record<string, unknown> : {}
+    const invoiceEmails = Array.isArray(source.invoiceEmails)
+        ? source.invoiceEmails
+            .map((email) => sanitizeWormEmailListItem(email))
+            .filter((email): email is WormEmailListItem => email !== null)
+        : []
+    const awbDocumentEmails = Array.isArray(source.awbDocumentEmails)
+        ? source.awbDocumentEmails
+            .map((email) => sanitizeWormEmailListItem(email))
+            .filter((email): email is WormEmailListItem => email !== null)
+        : []
+
+    return {
+        invoiceEmails,
+        invoiceEmailDetails: sanitizeWormEmailDetailsMap(source.invoiceEmailDetails, invoiceEmails),
+        awbDocumentEmails,
+        awbDocumentEmailDetails: sanitizeWormEmailDetailsMap(source.awbDocumentEmailDetails, awbDocumentEmails),
     }
 }
 
@@ -1841,6 +1903,7 @@ export default function WormOrderPage() {
     const activeWormOrderIdRef = useRef<string | null>(null)
     const lastResetWormOrderIdRef = useRef<string | null | undefined>(undefined)
     const emailFetchRequestIdRef = useRef(0)
+    const matchedEmailRestoreRequestIdRef = useRef(0)
     const emailDetailRequestIdRef = useRef(0)
     const docEmailFetchRequestIdRef = useRef(0)
     const docEmailDetailRequestIdRef = useRef(0)
@@ -2614,6 +2677,7 @@ export default function WormOrderPage() {
 
     const resetOrderScopedUiState = useCallback(() => {
         emailFetchRequestIdRef.current += 1
+        matchedEmailRestoreRequestIdRef.current += 1
         emailDetailRequestIdRef.current += 1
         docEmailFetchRequestIdRef.current += 1
         docEmailDetailRequestIdRef.current += 1
@@ -2726,6 +2790,50 @@ export default function WormOrderPage() {
         setShippingProgressEvents([])
     }, [replaceInvoicePreviewUrl])
 
+    const restoreMatchedEmailsForOrder = useCallback(async (order: WormOrderSnapshot) => {
+        const requestId = ++matchedEmailRestoreRequestIdRef.current
+        const orderId = order.id
+
+        try {
+            const response = await fetch(`/api/admin/worm-order/emails/matched?orderId=${encodeURIComponent(orderId)}`, {
+                cache: 'no-store',
+            })
+            const result = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '매칭된 메일을 불러오지 못했습니다.')
+            }
+            if (requestId !== matchedEmailRestoreRequestIdRef.current || activeWormOrderIdRef.current !== orderId) return
+
+            const payload = sanitizeMatchedWormEmailPayload(result)
+
+            setEmails(payload.invoiceEmails)
+            setEmailDetails(payload.invoiceEmailDetails)
+            setSelectedEmailUid(payload.invoiceEmails[0]?.uid || null)
+            setHasFetched(payload.invoiceEmails.length > 0)
+            setUsingOfflineEmailCache(false)
+            setEmailCacheSavedAt(null)
+
+            setDocEmails(payload.awbDocumentEmails)
+            setDocEmailDetails(payload.awbDocumentEmailDetails)
+            setSelectedDocEmailUid(payload.awbDocumentEmails[0]?.uid || null)
+            setDocHasFetched(payload.awbDocumentEmails.length > 0)
+
+            const firstAwbEmail = payload.awbDocumentEmails.find((email) => email.awbNumber)
+            const firstAwbUid = firstAwbEmail?.uid || payload.awbDocumentEmails[0]?.uid || null
+            const restoredAwb = firstAwbEmail?.awbNumber
+                || (firstAwbUid ? payload.awbDocumentEmailDetails[firstAwbUid]?.awbNumber : null)
+                || null
+            if (restoredAwb) {
+                setAwbNumber(restoredAwb)
+            }
+        } catch (error) {
+            if (requestId !== matchedEmailRestoreRequestIdRef.current || activeWormOrderIdRef.current !== orderId) return
+            const message = error instanceof Error ? error.message : '매칭된 메일을 불러오지 못했습니다.'
+            setEmailError(message)
+            setDocEmailError(message)
+        }
+    }, [])
+
     useEffect(() => {
         const nextOrderId = activeWormOrder?.id ?? null
         if (lastResetWormOrderIdRef.current === nextOrderId) return
@@ -2733,6 +2841,11 @@ export default function WormOrderPage() {
         lastResetWormOrderIdRef.current = nextOrderId
         resetOrderScopedUiState()
     }, [activeWormOrder?.id, resetOrderScopedUiState])
+
+    useEffect(() => {
+        if (!activeWormOrder?.id) return
+        void restoreMatchedEmailsForOrder(activeWormOrder)
+    }, [activeWormOrder?.id, restoreMatchedEmailsForOrder])
 
     const handleSelectWormOrder = useCallback((order: WormOrderListItem) => {
         const receiveDateText = toKstDateInputString(order.receiveDate)
@@ -3015,8 +3128,14 @@ export default function WormOrderPage() {
 
     const applyMatchResultToEmailState = useCallback((uid: string, fallbackOrder: WormOrderSnapshot, rawMatch: unknown) => {
         const matched = rawMatch as {
+            matchType?: unknown
+            subject?: unknown
+            date?: unknown
             orderNumber?: unknown
             matchedAt?: unknown
+            awbNumber?: unknown
+            emailBodyText?: unknown
+            attachmentsJson?: unknown
             invoiceUnitPriceUsd?: unknown
             invoiceTotalAmountUsd?: unknown
             usdKrwRate?: unknown
@@ -3036,12 +3155,16 @@ export default function WormOrderPage() {
                 : fallbackOrder.orderNumber
         const matchedAt =
             typeof matched?.matchedAt === 'string' ? matched.matchedAt : new Date().toISOString()
+        const matchedMatchType = normalizeWormEmailMatchType(matched?.matchType) || 'INVOICE'
+        const matchedAwbNumber = typeof matched?.awbNumber === 'string' ? matched.awbNumber : null
 
         setEmails((prev) =>
             prev.map((item) =>
                 item.uid === uid
                     ? {
                         ...item,
+                        matchType: matchedMatchType,
+                        awbNumber: matchedAwbNumber || item.awbNumber,
                         matchedOrderId: fallbackOrder.id,
                         matchedOrderNumber,
                         matchedAt,
@@ -3057,6 +3180,33 @@ export default function WormOrderPage() {
                     : item,
             ),
         )
+        const attachments = Array.isArray(matched?.attachmentsJson)
+            ? matched.attachmentsJson
+                .map((attachment) => sanitizeWormEmailAttachment(attachment))
+                .filter((attachment): attachment is WormEmailAttachment => attachment !== null)
+            : []
+        setEmailDetails((prev) => {
+            const current = prev[uid]
+            return {
+                ...prev,
+                [uid]: {
+                    uid,
+                    subject: typeof matched?.subject === 'string' && matched.subject
+                        ? matched.subject
+                        : current?.subject || '',
+                    date: typeof matched?.date === 'string' && matched.date
+                        ? matched.date
+                        : current?.date || new Date().toISOString(),
+                    text: typeof matched?.emailBodyText === 'string'
+                        ? matched.emailBodyText
+                        : current?.text || '',
+                    hasAttachments: attachments.length > 0 || current?.hasAttachments || false,
+                    skmIndices: attachments.filter(isPdfEmailAttachment).map((attachment) => attachment.index),
+                    attachments: attachments.length > 0 ? attachments : current?.attachments || [],
+                    awbNumber: matchedAwbNumber || current?.awbNumber || null,
+                },
+            }
+        })
         setEmailCacheSavedAt(new Date().toISOString())
         return {
             matchedOrderNumber,
@@ -3064,15 +3214,21 @@ export default function WormOrderPage() {
         }
     }, [])
 
-    const requestEmailMatchAndInvoiceOcr = useCallback(async (email: WormEmailListItem, targetOrder: WormOrderSnapshot) => {
+    const requestEmailMatchAndInvoiceOcr = useCallback(async (
+        email: WormEmailListItem,
+        targetOrder: WormOrderSnapshot,
+        matchType: WormEmailMatchType = 'INVOICE',
+    ) => {
         const response = await fetch('/api/admin/worm-order/emails/match', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 uid: email.uid,
                 orderId: targetOrder.id,
+                matchType,
                 subject: email.subject,
                 date: email.date,
+                awbNumber: email.awbNumber,
             }),
         })
         const raw = await response.text()
@@ -3174,6 +3330,7 @@ export default function WormOrderPage() {
                     item.uid === email.uid
                         ? {
                             ...item,
+                            matchType: null,
                             matchedOrderId: null,
                             matchedOrderNumber: null,
                             matchedAt: null,
@@ -3312,24 +3469,62 @@ export default function WormOrderPage() {
         setDocEmailError('')
         setDocEmailMatchMessage('')
         try {
-            const res = await fetch('/api/admin/worm-order/emails/match', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    uid: email.uid,
-                    orderId: activeWormOrder.id,
-                    subject: email.subject,
-                    date: email.date,
-                }),
-            })
-            const result = await res.json().catch(() => null)
-            if (!res.ok) throw new Error(result?.error || '매칭에 실패했습니다.')
+            const result = await requestEmailMatchAndInvoiceOcr(email, activeWormOrder, 'AWB_DOCUMENT')
+            const match = result?.match as {
+                subject?: unknown
+                date?: unknown
+                orderNumber?: unknown
+                matchedAt?: unknown
+                awbNumber?: unknown
+                emailBodyText?: unknown
+                attachmentsJson?: unknown
+            } | null
+            const matchedAt = typeof match?.matchedAt === 'string' ? match.matchedAt : new Date().toISOString()
+            const matchedOrderNumber = typeof match?.orderNumber === 'string' && match.orderNumber
+                ? match.orderNumber
+                : activeWormOrder.orderNumber
+            const matchedAwbNumber = typeof match?.awbNumber === 'string' ? match.awbNumber : email.awbNumber
+            const attachments = Array.isArray(match?.attachmentsJson)
+                ? match.attachmentsJson
+                    .map((attachment) => sanitizeWormEmailAttachment(attachment))
+                    .filter((attachment): attachment is WormEmailAttachment => attachment !== null)
+                : []
             setDocEmails(prev => prev.map(item =>
                 item.uid === email.uid
-                    ? { ...item, matchedOrderId: activeWormOrder.id, matchedOrderNumber: activeWormOrder.orderNumber, matchedAt: new Date().toISOString() }
+                    ? {
+                        ...item,
+                        matchType: 'AWB_DOCUMENT',
+                        awbNumber: matchedAwbNumber || item.awbNumber,
+                        matchedOrderId: activeWormOrder.id,
+                        matchedOrderNumber,
+                        matchedAt,
+                    }
                     : item
             ))
-            setDocEmailMatchMessage(`매칭 완료: ${activeWormOrder.orderNumber}`)
+            setDocEmailDetails((prev) => {
+                const current = prev[email.uid]
+                return {
+                    ...prev,
+                    [email.uid]: {
+                        uid: email.uid,
+                        subject: typeof match?.subject === 'string' && match.subject
+                            ? match.subject
+                            : current?.subject || email.subject,
+                        date: typeof match?.date === 'string' && match.date
+                            ? match.date
+                            : current?.date || email.date,
+                        text: typeof match?.emailBodyText === 'string'
+                            ? match.emailBodyText
+                            : current?.text || '',
+                        hasAttachments: attachments.length > 0 || current?.hasAttachments || email.hasAttachments,
+                        skmIndices: attachments.filter(isPdfEmailAttachment).map((attachment) => attachment.index),
+                        attachments: attachments.length > 0 ? attachments : current?.attachments || [],
+                        awbNumber: matchedAwbNumber || current?.awbNumber || null,
+                    },
+                }
+            })
+            if (matchedAwbNumber) setAwbNumber(matchedAwbNumber)
+            setDocEmailMatchMessage(`매칭 완료: ${matchedOrderNumber}`)
         } catch (error) {
             setDocEmailError(error instanceof Error ? error.message : '매칭 중 오류가 발생했습니다.')
         } finally {
@@ -3354,7 +3549,7 @@ export default function WormOrderPage() {
             }
             setDocEmails(prev => prev.map(item =>
                 item.uid === email.uid
-                    ? { ...item, matchedOrderId: null, matchedOrderNumber: null, matchedAt: null }
+                    ? { ...item, matchType: null, matchedOrderId: null, matchedOrderNumber: null, matchedAt: null }
                     : item
             ))
             setDocEmailMatchMessage(`매칭 해제 완료: ${email.matchedOrderNumber || email.uid}`)

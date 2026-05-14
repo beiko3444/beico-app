@@ -42,6 +42,7 @@ export type WormEmailListItem = {
   date: string
   hasAttachments: boolean
   awbNumber: string | null
+  matchType?: WormEmailMatchType | null
   matchedOrderId: string | null
   matchedOrderNumber: string | null
   matchedAt: string | null
@@ -62,6 +63,12 @@ export type WormEmailAttachment = {
   index: number
 }
 
+export type WormEmailMatchType = 'INVOICE' | 'AWB_DOCUMENT'
+
+export type WormEmailAttachmentSnapshot = WormEmailAttachment & {
+  isPdf: boolean
+}
+
 export type WormEmailDetail = {
   uid: string
   subject: string
@@ -74,6 +81,7 @@ export type WormEmailDetail = {
 }
 
 type WormOrderEmailMatchHydrated = {
+  matchType: WormEmailMatchType
   orderId: string
   orderNumber: string
   matchedAt: string | null
@@ -90,8 +98,14 @@ type WormOrderEmailMatchHydrated = {
 
 type WormOrderEmailMatchUpsertResult = {
   uid: string
+  matchType: string
+  subject: string | null
+  emailDate: Date | null
   orderId: string
   matchedAt: Date
+  awbNumber: string | null
+  emailBodyText: string | null
+  attachmentsJson: unknown
   invoiceUnitPriceUsd: number | null
   invoiceTotalAmountUsd: number | null
   usdKrwRate: number | null
@@ -103,6 +117,13 @@ type WormOrderEmailMatchUpsertResult = {
   order: {
     orderNumber: string
   }
+}
+
+export type WormMatchedEmailRestorePayload = {
+  invoiceEmails: WormEmailListItem[]
+  invoiceEmailDetails: Record<string, WormEmailDetail>
+  awbDocumentEmails: WormEmailListItem[]
+  awbDocumentEmailDetails: Record<string, WormEmailDetail>
 }
 
 function getDaumImapCredentials() {
@@ -185,6 +206,73 @@ function normalizeAwbNumber(value: string) {
   return value.replace(/\s+/g, '').trim()
 }
 
+function normalizeWormEmailMatchType(value: unknown): WormEmailMatchType {
+  return value === 'AWB_DOCUMENT' ? 'AWB_DOCUMENT' : 'INVOICE'
+}
+
+function inferWormEmailMatchType(input: {
+  matchType?: unknown
+  subject?: string | null
+  awbNumber?: string | null
+  invoiceUnitPriceUsd?: number | null
+  invoiceTotalAmountUsd?: number | null
+  invoiceUnitPriceKrw?: number | null
+  invoiceTotalAmountKrw?: number | null
+}) {
+  const storedType = normalizeWormEmailMatchType(input.matchType)
+  if (storedType === 'AWB_DOCUMENT') return storedType
+
+  const subject = (input.subject || '').toLowerCase()
+  const hasInvoiceAmount =
+    input.invoiceUnitPriceUsd !== null ||
+    input.invoiceTotalAmountUsd !== null ||
+    input.invoiceUnitPriceKrw !== null ||
+    input.invoiceTotalAmountKrw !== null
+  if (!hasInvoiceAmount && input.awbNumber && /(document|documets|documents|awb|skm|waybill)/i.test(subject)) {
+    return 'AWB_DOCUMENT'
+  }
+
+  return storedType
+}
+
+function isPdfAttachmentMeta(attachment: { filename?: string | null; contentType?: string | null }) {
+  const fileName = (attachment.filename || '').toLowerCase()
+  const contentType = (attachment.contentType || '').toLowerCase()
+  return fileName.endsWith('.pdf') || contentType.includes('pdf')
+}
+
+function toAttachmentSnapshots(attachments: WormEmailAttachment[]): WormEmailAttachmentSnapshot[] {
+  return attachments.map((attachment) => ({
+    ...attachment,
+    isPdf: isPdfAttachmentMeta(attachment),
+  }))
+}
+
+function sanitizeAttachmentSnapshots(value: unknown): WormEmailAttachmentSnapshot[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null
+      const candidate = item as Partial<WormEmailAttachmentSnapshot>
+      if (
+        typeof candidate.filename !== 'string' ||
+        typeof candidate.contentType !== 'string' ||
+        typeof candidate.size !== 'number' ||
+        typeof candidate.index !== 'number'
+      ) {
+        return null
+      }
+      return {
+        filename: candidate.filename,
+        contentType: candidate.contentType,
+        size: candidate.size,
+        index: candidate.index,
+        isPdf: candidate.isPdf === true || isPdfAttachmentMeta(candidate),
+      }
+    })
+    .filter((item): item is WormEmailAttachmentSnapshot => item !== null)
+}
+
 async function getWormEmailAwbCacheMap(uids: string[]) {
   const normalizedUids = Array.from(new Set(uids.map((uid) => uid.trim()).filter(Boolean)))
   if (normalizedUids.length === 0) return new Map<string, string>()
@@ -213,6 +301,8 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
       where: { uid: { in: normalizedUids } },
       select: {
         uid: true,
+        matchType: true,
+        subject: true,
         orderId: true,
         matchedAt: true,
         awbNumber: true,
@@ -236,6 +326,7 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
       rows.map((row) => [
         row.uid,
         <WormOrderEmailMatchHydrated>{
+          matchType: inferWormEmailMatchType(row),
           orderId: row.orderId,
           orderNumber: row.order?.orderNumber || '',
           matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
@@ -274,6 +365,7 @@ async function getWormOrderEmailMatchMap(uids: string[]) {
         legacyRows.map((row) => [
           row.uid,
           <WormOrderEmailMatchHydrated>{
+            matchType: 'INVOICE',
             orderId: row.orderId,
             orderNumber: row.order?.orderNumber || '',
             matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
@@ -302,6 +394,7 @@ async function hydrateEmailsWithAwbCache(emails: WormEmailListItem[]) {
   return emails.map((email) => ({
     ...email,
     awbNumber: awbMap.get(email.uid) || matchMap.get(email.uid)?.awbNumber || email.awbNumber || null,
+    matchType: matchMap.get(email.uid)?.matchType || email.matchType || null,
     matchedOrderId: matchMap.get(email.uid)?.orderId || null,
     matchedOrderNumber: matchMap.get(email.uid)?.orderNumber || null,
     matchedAt: matchMap.get(email.uid)?.matchedAt || null,
@@ -385,9 +478,12 @@ export async function upsertWormEmailAwbCache(input: {
 export async function upsertWormOrderEmailMatch(input: {
   uid: string
   orderId: string
+  matchType?: WormEmailMatchType
   subject?: string | null
   date?: string | null
   awbNumber?: string | null
+  emailBodyText?: string | null
+  attachmentsJson?: WormEmailAttachmentSnapshot[] | null
   invoiceUnitPriceUsd?: number | null
   invoiceTotalAmountUsd?: number | null
   usdKrwRate?: number | null
@@ -413,16 +509,21 @@ export async function upsertWormOrderEmailMatch(input: {
     const awbCache = await getWormEmailAwbCacheByUid(uid)
     awbNumber = awbCache?.awbNumber || null
   }
+  const matchType = normalizeWormEmailMatchType(input.matchType)
+  const attachmentsJson = input.attachmentsJson ? toAttachmentSnapshots(input.attachmentsJson) : []
 
   try {
     return await prisma.wormOrderEmailMatch.upsert({
       where: { uid },
       update: {
+        matchType,
         orderId,
         subject: input.subject?.trim() || null,
         emailDate: toOptionalDate(input.date),
         matchedAt: new Date(),
         awbNumber,
+        emailBodyText: input.emailBodyText ?? null,
+        attachmentsJson,
         invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
         invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
         usdKrwRate: input.usdKrwRate ?? null,
@@ -434,11 +535,14 @@ export async function upsertWormOrderEmailMatch(input: {
       },
       create: {
         uid,
+        matchType,
         orderId,
         subject: input.subject?.trim() || null,
         emailDate: toOptionalDate(input.date),
         matchedAt: new Date(),
         awbNumber,
+        emailBodyText: input.emailBodyText ?? null,
+        attachmentsJson,
         invoiceUnitPriceUsd: input.invoiceUnitPriceUsd ?? null,
         invoiceTotalAmountUsd: input.invoiceTotalAmountUsd ?? null,
         usdKrwRate: input.usdKrwRate ?? null,
@@ -450,8 +554,14 @@ export async function upsertWormOrderEmailMatch(input: {
       },
       select: {
         uid: true,
+        matchType: true,
+        subject: true,
+        emailDate: true,
         orderId: true,
         matchedAt: true,
+        awbNumber: true,
+        emailBodyText: true,
+        attachmentsJson: true,
         invoiceUnitPriceUsd: true,
         invoiceTotalAmountUsd: true,
         usdKrwRate: true,
@@ -500,6 +610,12 @@ export async function upsertWormOrderEmailMatch(input: {
 
     return {
       ...legacy,
+      matchType,
+      subject: input.subject?.trim() || null,
+      emailDate: toOptionalDate(input.date),
+      awbNumber,
+      emailBodyText: input.emailBodyText ?? null,
+      attachmentsJson,
       invoiceUnitPriceUsd: null,
       invoiceTotalAmountUsd: null,
       usdKrwRate: null,
@@ -596,6 +712,7 @@ export async function loadWormEmailList(options?: {
         date: new Date(dateObj).toISOString(),
         hasAttachments,
         awbNumber: null,
+        matchType: null,
         matchedOrderId: null,
         matchedOrderNumber: null,
         matchedAt: null,
@@ -712,6 +829,107 @@ export async function getWormEmailDetail(uid: string): Promise<WormEmailDetail> 
     attachments,
     awbNumber: awbCache?.awbNumber || null,
   }
+}
+
+export async function getWormEmailSnapshotForMatch(uid: string) {
+  const detail = await getWormEmailDetail(uid)
+  return {
+    detail,
+    emailBodyText: detail.text,
+    attachmentsJson: toAttachmentSnapshots(detail.attachments),
+  }
+}
+
+export async function loadMatchedWormOrderEmails(orderId: string): Promise<WormMatchedEmailRestorePayload> {
+  const normalizedOrderId = orderId.trim()
+  if (!normalizedOrderId) {
+    return {
+      invoiceEmails: [],
+      invoiceEmailDetails: {},
+      awbDocumentEmails: [],
+      awbDocumentEmailDetails: {},
+    }
+  }
+
+  const rows = await prisma.wormOrderEmailMatch.findMany({
+    where: { orderId: normalizedOrderId },
+    orderBy: { matchedAt: 'desc' },
+    select: {
+      uid: true,
+      matchType: true,
+      subject: true,
+      emailDate: true,
+      matchedAt: true,
+      awbNumber: true,
+      emailBodyText: true,
+      attachmentsJson: true,
+      invoiceUnitPriceUsd: true,
+      invoiceTotalAmountUsd: true,
+      usdKrwRate: true,
+      invoiceUnitPriceKrw: true,
+      invoiceTotalAmountKrw: true,
+      invoiceExtractedAt: true,
+      invoiceSourceFile: true,
+      invoiceOcrError: true,
+      orderId: true,
+      order: {
+        select: { orderNumber: true },
+      },
+    },
+  })
+
+  const payload: WormMatchedEmailRestorePayload = {
+    invoiceEmails: [],
+    invoiceEmailDetails: {},
+    awbDocumentEmails: [],
+    awbDocumentEmailDetails: {},
+  }
+
+  for (const row of rows) {
+    const matchType = inferWormEmailMatchType(row)
+    const attachments = sanitizeAttachmentSnapshots(row.attachmentsJson)
+    const date = (row.emailDate || row.matchedAt || new Date()).toISOString()
+    const subject = row.subject || '(제목 없음)'
+    const listItem: WormEmailListItem = {
+      uid: row.uid,
+      subject,
+      date,
+      hasAttachments: attachments.length > 0,
+      awbNumber: row.awbNumber || null,
+      matchType,
+      matchedOrderId: row.orderId,
+      matchedOrderNumber: row.order?.orderNumber || '',
+      matchedAt: row.matchedAt ? row.matchedAt.toISOString() : null,
+      invoiceUnitPriceUsd: row.invoiceUnitPriceUsd,
+      invoiceTotalAmountUsd: row.invoiceTotalAmountUsd,
+      usdKrwRate: row.usdKrwRate,
+      invoiceUnitPriceKrw: row.invoiceUnitPriceKrw,
+      invoiceTotalAmountKrw: row.invoiceTotalAmountKrw,
+      invoiceExtractedAt: row.invoiceExtractedAt ? row.invoiceExtractedAt.toISOString() : null,
+      invoiceSourceFile: row.invoiceSourceFile || null,
+      invoiceOcrError: row.invoiceOcrError || null,
+    }
+    const detail: WormEmailDetail = {
+      uid: row.uid,
+      subject,
+      date,
+      text: row.emailBodyText || '',
+      hasAttachments: attachments.length > 0,
+      skmIndices: attachments.filter((attachment) => attachment.isPdf).map((attachment) => attachment.index),
+      attachments: attachments.map(({ isPdf: _isPdf, ...attachment }) => attachment),
+      awbNumber: row.awbNumber || null,
+    }
+
+    if (matchType === 'AWB_DOCUMENT') {
+      payload.awbDocumentEmails.push(listItem)
+      payload.awbDocumentEmailDetails[row.uid] = detail
+    } else {
+      payload.invoiceEmails.push(listItem)
+      payload.invoiceEmailDetails[row.uid] = detail
+    }
+  }
+
+  return payload
 }
 
 export async function getWormEmailAttachment(uid: string, index: number) {

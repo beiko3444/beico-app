@@ -2,7 +2,12 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { getParsedMailByUid, upsertWormOrderEmailMatch } from '@/lib/wormOrderMail'
+import {
+  getParsedMailByUid,
+  getWormEmailSnapshotForMatch,
+  type WormEmailMatchType,
+  upsertWormOrderEmailMatch,
+} from '@/lib/wormOrderMail'
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -328,6 +333,8 @@ export async function POST(request: Request) {
     const orderId = typeof body?.orderId === 'string' ? body.orderId.trim() : ''
     const subject = typeof body?.subject === 'string' ? body.subject : ''
     const date = typeof body?.date === 'string' ? body.date : ''
+    const matchType: WormEmailMatchType = body?.matchType === 'AWB_DOCUMENT' ? 'AWB_DOCUMENT' : 'INVOICE'
+    const bodyAwbNumber = typeof body?.awbNumber === 'string' ? body.awbNumber.replace(/\s+/g, '').trim() : ''
 
     if (!uid) {
       return NextResponse.json({ error: 'uid is required.' }, { status: 400 })
@@ -344,29 +351,46 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: '매칭할 발주를 찾을 수 없습니다.' }, { status: 404 })
     }
 
-    let invoiceOcr: InvoiceOcrResult
-    try {
-      invoiceOcr = await runInvoicePdfOcr(uid)
-    } catch (ocrError) {
-      const message = ocrError instanceof Error ? ocrError.message : 'unknown OCR error'
-      console.error('Invoice OCR failed during email match:', ocrError)
-      invoiceOcr = {
-        invoiceUnitPriceUsd: null,
-        invoiceTotalAmountUsd: null,
-        usdKrwRate: null,
-        invoiceUnitPriceKrw: null,
-        invoiceTotalAmountKrw: null,
-        invoiceExtractedAt: null,
-        invoiceSourceFile: null,
-        invoiceOcrError: `인보이스 OCR 실행 실패: ${message}`,
+    const snapshot = await getWormEmailSnapshotForMatch(uid)
+
+    let invoiceOcr: InvoiceOcrResult = {
+      invoiceUnitPriceUsd: null,
+      invoiceTotalAmountUsd: null,
+      usdKrwRate: null,
+      invoiceUnitPriceKrw: null,
+      invoiceTotalAmountKrw: null,
+      invoiceExtractedAt: null,
+      invoiceSourceFile: null,
+      invoiceOcrError: null,
+    }
+    if (matchType === 'INVOICE') {
+      try {
+        invoiceOcr = await runInvoicePdfOcr(uid)
+      } catch (ocrError) {
+        const message = ocrError instanceof Error ? ocrError.message : 'unknown OCR error'
+        console.error('Invoice OCR failed during email match:', ocrError)
+        invoiceOcr = {
+          invoiceUnitPriceUsd: null,
+          invoiceTotalAmountUsd: null,
+          usdKrwRate: null,
+          invoiceUnitPriceKrw: null,
+          invoiceTotalAmountKrw: null,
+          invoiceExtractedAt: null,
+          invoiceSourceFile: null,
+          invoiceOcrError: `인보이스 OCR 실행 실패: ${message}`,
+        }
       }
     }
 
     const saved = await upsertWormOrderEmailMatch({
       uid,
       orderId,
-      subject,
-      date,
+      matchType,
+      subject: snapshot.detail.subject || subject,
+      date: snapshot.detail.date || date,
+      awbNumber: bodyAwbNumber || snapshot.detail.awbNumber,
+      emailBodyText: snapshot.emailBodyText,
+      attachmentsJson: snapshot.attachmentsJson,
       invoiceUnitPriceUsd: invoiceOcr.invoiceUnitPriceUsd,
       invoiceTotalAmountUsd: invoiceOcr.invoiceTotalAmountUsd,
       usdKrwRate: invoiceOcr.usdKrwRate,
@@ -381,9 +405,15 @@ export async function POST(request: Request) {
       ok: true,
       match: {
         uid: saved.uid,
+        matchType: saved.matchType,
+        subject: saved.subject,
+        date: saved.emailDate ? saved.emailDate.toISOString() : null,
         orderId: saved.orderId,
         orderNumber: saved.order.orderNumber,
         matchedAt: saved.matchedAt.toISOString(),
+        awbNumber: saved.awbNumber,
+        emailBodyText: saved.emailBodyText,
+        attachmentsJson: saved.attachmentsJson,
         invoiceUnitPriceUsd: saved.invoiceUnitPriceUsd,
         invoiceTotalAmountUsd: saved.invoiceTotalAmountUsd,
         usdKrwRate: saved.usdKrwRate,

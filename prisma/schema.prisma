@@ -231,11 +231,14 @@ model WormOrder {
 model WormOrderEmailMatch {
   id                    String    @id @default(uuid())
   uid                   String    @unique
+  matchType             String    @default("INVOICE")
   subject               String?
   emailDate             DateTime?
   orderId               String
   matchedAt             DateTime  @default(now())
   awbNumber             String?
+  emailBodyText         String?
+  attachmentsJson       Json?     @default("[]")
   invoiceUnitPriceUsd   Float?
   invoiceTotalAmountUsd Float?
   usdKrwRate            Float?
@@ -248,6 +251,7 @@ model WormOrderEmailMatch {
   order                 WormOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
   @@index([orderId])
+  @@index([orderId, matchType])
   @@index([updatedAt])
 }
 
