@@ -2771,7 +2771,7 @@ export default function WormOrderPage() {
                 body: JSON.stringify({
                     orderId: order.id,
                     targetDate: order.receiveDate
-                        ? new Date(order.receiveDate).toISOString().slice(0, 10)
+                        ? toKstDateInputString(order.receiveDate)
                         : null,
                 }),
             })
