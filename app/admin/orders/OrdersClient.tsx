@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronRight, ArrowLeft } from 'lucide-react'
 import AdminOrderCard from './AdminOrderCard'
+import type { OrderRecord } from './OrderDetailPage'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 
 export default function OrdersClient({
@@ -12,7 +13,7 @@ export default function OrdersClient({
   depositSmsSummary,
   depositSmsActionItems = [],
 }: {
-  orders: any[]
+  orders: OrderRecord[]
   depositSmsSummary?: {
     unmatched: number
     ambiguous: number
@@ -203,12 +204,11 @@ export default function OrdersClient({
             <p className="mt-2 text-[13px] text-slate-400">현재 조건에 맞는 주문 상세를 찾지 못했습니다.</p>
           </div>
         ) : (
-          filteredOrders.map((order, index) => (
-            <div key={order.id} className="space-y-6">
-              {index > 0 ? <div className="h-px bg-slate-200" /> : null}
-              <AdminOrderCard order={order} />
-            </div>
-          ))
+          <div className="space-y-8">
+            {filteredOrders.map((order) => (
+              <AdminOrderCard key={order.id} order={order} />
+            ))}
+          </div>
         )}
       </div>
     </div>
