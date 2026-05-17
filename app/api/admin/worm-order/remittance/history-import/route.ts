@@ -94,6 +94,15 @@ export async function POST(request: Request) {
                 status: true,
                 receiveDate: true,
                 createdAt: true,
+                emailMatches: {
+                    orderBy: { matchedAt: 'desc' },
+                    take: 1,
+                    select: {
+                        invoiceTotalAmountUsd: true,
+                        emailDate: true,
+                        matchedAt: true,
+                    },
+                },
             },
         })
 
@@ -102,11 +111,25 @@ export async function POST(request: Request) {
         }
 
         const targetDate = targetDateInput || formatKstYmd(order.receiveDate || order.createdAt)
+        const latestInvoiceMatch = order.emailMatches[0] ?? null
+        const invoiceDate = latestInvoiceMatch?.emailDate
+            ? formatKstYmd(latestInvoiceMatch.emailDate)
+            : latestInvoiceMatch?.matchedAt
+                ? formatKstYmd(latestInvoiceMatch.matchedAt)
+                : null
+        const targetAmountUsd =
+            typeof latestInvoiceMatch?.invoiceTotalAmountUsd === 'number' &&
+                Number.isFinite(latestInvoiceMatch.invoiceTotalAmountUsd)
+                ? latestInvoiceMatch.invoiceTotalAmountUsd
+                : null
 
         const result = await fetchMoinRemittanceHistory({
             loginId: moinLoginId,
             loginPassword: moinPassword,
             targetDate,
+            fallbackDate: formatKstYmd(order.createdAt),
+            invoiceDate,
+            targetAmountUsd,
             recipientHint: TARGET_RECIPIENT_HINT,
             targetTransactionId: transactionIdInput || null,
             headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',

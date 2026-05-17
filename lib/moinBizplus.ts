@@ -2920,10 +2920,21 @@ export type MoinHistoryFetchInput = {
     loginId: string
     loginPassword: string
     targetDate?: string | null
+    fallbackDate?: string | null
+    invoiceDate?: string | null
+    targetAmountUsd?: number | null
     recipientHint?: string | null
     targetTransactionId?: string | null
     headless?: boolean
     abortSignal?: AbortSignal
+}
+
+type MoinHistoryMatchCriteria = {
+    targetDate?: string | null
+    fallbackDate?: string | null
+    invoiceDate?: string | null
+    targetAmountUsd?: number | null
+    recipientHint?: string | null
 }
 
 export type MoinHistoryFetchResult = {
@@ -3110,41 +3121,79 @@ const inspectHistoryDetailAppliedAt = async (page: PageLike): Promise<string | n
     return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString()
 }
 
+const parseCurrencyNumber = (value: string | null | undefined): number | null => {
+    const raw = (value || '').trim()
+    if (!raw) return null
+    const match = raw.match(/-?\d[\d,]*(?:\.\d+)?/)
+    if (!match) return null
+    const numeric = Number(match[0].replace(/,/g, ''))
+    return Number.isFinite(numeric) ? numeric : null
+}
+
+const parseKstYmdTime = (value: string | null | undefined): number | null => {
+    const raw = (value || '').trim()
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null
+    const time = new Date(`${raw}T00:00:00+09:00`).getTime()
+    return Number.isFinite(time) ? time : null
+}
+
+const amountsAreClose = (left: number, right: number) =>
+    Math.abs(left - right) <= 0.01 || Math.abs(Math.round(left) - Math.round(right)) <= 0
+
 const matchHistoryItem = (
     items: MoinHistoryItem[],
-    targetDate: string | null,
-    recipientHint: string | null,
+    criteria: MoinHistoryMatchCriteria,
 ): MoinHistoryItem | null => {
     if (items.length === 0) return null
 
-    const recipientNorm = recipientHint
-        ? recipientHint.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const recipientNorm = criteria.recipientHint
+        ? criteria.recipientHint.toLowerCase().replace(/[^a-z0-9]/g, '')
         : ''
 
-    const targetTime = targetDate ? new Date(`${targetDate}T00:00:00+09:00`).getTime() : null
-    const autoMatchEndTime = targetTime !== null ? targetTime + 2 * 24 * 60 * 60 * 1000 : null
+    const targetAmountUsd =
+        typeof criteria.targetAmountUsd === 'number' && Number.isFinite(criteria.targetAmountUsd)
+            ? criteria.targetAmountUsd
+            : null
+    const anchorTimes = [criteria.targetDate, criteria.invoiceDate, criteria.fallbackDate]
+        .map((value) => parseKstYmdTime(value || null))
+        .filter((value): value is number => value !== null)
+    const dayMs = 24 * 60 * 60 * 1000
 
     const scored = items
         .map((item) => {
             let score = 0
-            if (targetTime !== null) {
-                if (!item.dateText) return { item, score: Number.NEGATIVE_INFINITY }
-                const itemTime = new Date(`${item.dateText}T00:00:00+09:00`).getTime()
-                if (
-                    !Number.isFinite(itemTime) ||
-                    itemTime < targetTime ||
-                    (autoMatchEndTime !== null && itemTime >= autoMatchEndTime)
-                ) {
-                    return { item, score: Number.NEGATIVE_INFINITY }
-                }
 
-                const distanceDays = Math.floor((itemTime - targetTime) / (24 * 60 * 60 * 1000))
-                score += Math.max(0, 500 - distanceDays * 120)
+            if (targetAmountUsd !== null) {
+                const itemAmountUsd = parseCurrencyNumber(item.amountUsdText)
+                if (itemAmountUsd !== null) {
+                    if (amountsAreClose(itemAmountUsd, targetAmountUsd)) {
+                        score += 2500
+                    } else {
+                        score -= 500
+                    }
+                }
+            }
+
+            if (anchorTimes.length > 0) {
+                const itemTime = parseKstYmdTime(item.dateText)
+                if (itemTime !== null) {
+                    const minDistanceDays = Math.min(
+                        ...anchorTimes.map((anchorTime) => Math.abs(itemTime - anchorTime) / dayMs),
+                    )
+                    score += Math.max(0, 700 - minDistanceDays * 90)
+                }
             }
             if (recipientNorm) {
                 const itemRecipientNorm = (item.recipient || '').toLowerCase().replace(/[^a-z0-9]/g, '')
                 const itemRowNorm = (item.rowText || '').toLowerCase().replace(/[^a-z0-9]/g, '')
-                if (itemRecipientNorm.includes(recipientNorm) || itemRowNorm.includes(recipientNorm)) score += 1000
+                const itemRawNorm = JSON.stringify(item.rawTransaction || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+                if (
+                    itemRecipientNorm.includes(recipientNorm) ||
+                    itemRowNorm.includes(recipientNorm) ||
+                    itemRawNorm.includes(recipientNorm)
+                ) {
+                    score += 1000
+                }
             }
             if (item.statusText && /(송금완료|입금완료|완료)/.test(item.statusText)) score += 200
             return { item, score }
@@ -3335,6 +3384,52 @@ const extractDetailObjectFromCapturedResponses = (
     }
     if (!best) return null
     return { obj: best.obj, sourceUrl: best.sourceUrl, sourcePath: best.sourcePath }
+}
+
+const waitForMoinHistoryData = async (
+    page: PageLike,
+    capturedResponses: CapturedJsonResponse[],
+    settleCapturedResponses: () => Promise<void>,
+    steps: string[],
+    targetTransactionId: string | null,
+    maxWaitMs = 10000,
+): Promise<{ domItems: MoinHistoryItem[] }> => {
+    const startedAt = Date.now()
+    let latestDomItems: MoinHistoryItem[] = []
+    let nextDomCheckAt = 0
+
+    while (Date.now() - startedAt < maxWaitMs) {
+        await settleCapturedResponses()
+
+        const transactionExtraction = extractTransactionsFromCapturedResponses(capturedResponses)
+        if (transactionExtraction && transactionExtraction.array.length > 0) {
+            steps.push(`history-data-ready:api-list:${transactionExtraction.array.length}`)
+            return { domItems: latestDomItems }
+        }
+
+        if (targetTransactionId) {
+            const detailExtraction = extractDetailObjectFromCapturedResponses(capturedResponses, targetTransactionId)
+            if (detailExtraction) {
+                steps.push(`history-data-ready:api-detail:${detailExtraction.sourcePath}`)
+                return { domItems: latestDomItems }
+            }
+        }
+
+        if (Date.now() >= nextDomCheckAt) {
+            latestDomItems = await inspectHistoryListItems(page).catch(() => [])
+            if (latestDomItems.length > 0) {
+                steps.push(`history-data-ready:dom:${latestDomItems.length}`)
+                return { domItems: latestDomItems }
+            }
+            nextDomCheckAt = Date.now() + 1000
+        }
+
+        await page.waitForTimeout(300).catch(() => undefined)
+    }
+
+    await settleCapturedResponses()
+    steps.push(`history-data-wait-timeout:responses:${capturedResponses.length}:dom:${latestDomItems.length}`)
+    return { domItems: latestDomItems }
 }
 
 const isGenericMoinHistoryListUrl = (value: string | null | undefined) =>
@@ -3563,6 +3658,12 @@ export const fetchMoinRemittanceHistory = async (
     let abortListenerCleanup: (() => void) | null = null
 
     const capturedResponses: CapturedJsonResponse[] = []
+    const capturedResponsePromises: Promise<void>[] = []
+    const settleCapturedResponses = async () => {
+        const pending = capturedResponsePromises.splice(0)
+        if (pending.length === 0) return
+        await Promise.allSettled(pending)
+    }
     let responseHandler: ((response: ResponseLike) => void) | null = null
 
     try {
@@ -3598,9 +3699,10 @@ export const fetchMoinRemittanceHistory = async (
                 const headers = response.headers()
                 const contentType = headers['content-type'] || headers['Content-Type'] || ''
                 if (!contentType.toLowerCase().includes('json')) return
-                void response.json().then((json) => {
+                const jsonPromise = response.json().then((json) => {
                     capturedResponses.push({ url, json })
                 }).catch(() => undefined)
+                capturedResponsePromises.push(jsonPromise)
             } catch {
                 // Ignore listener errors — must not block navigation.
             }
@@ -3610,6 +3712,13 @@ export const fetchMoinRemittanceHistory = async (
         await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
 
         const targetTransactionId = input.targetTransactionId?.trim() || null
+        const matchCriteria: MoinHistoryMatchCriteria = {
+            targetDate: input.targetDate || null,
+            fallbackDate: input.fallbackDate || null,
+            invoiceDate: input.invoiceDate || null,
+            targetAmountUsd: input.targetAmountUsd ?? null,
+            recipientHint: input.recipientHint || null,
+        }
 
         throwIfAbortRequested(abortSignal, 'Open history page')
         const initialHistoryUrl = targetTransactionId
@@ -3635,8 +3744,13 @@ export const fetchMoinRemittanceHistory = async (
                 steps.push(`history-final-goto-interrupted:${getErrorMessage(error).slice(0, 120)}`)
             })
         }
-        await Promise.resolve()
-        await Promise.resolve()
+        const initialHistoryData = await waitForMoinHistoryData(
+            page,
+            capturedResponses,
+            settleCapturedResponses,
+            steps,
+            targetTransactionId,
+        )
         steps.push(`history-page-url:${page.url()}`)
         steps.push(`captured-responses-count:${capturedResponses.length}`)
 
@@ -3673,7 +3787,7 @@ export const fetchMoinRemittanceHistory = async (
             matchStrategy = 'api'
             steps.push('targeted-transaction-id-mode')
         } else if (enrichedApiItems.length > 0) {
-            matched = matchHistoryItem(enrichedApiItems, input.targetDate || null, input.recipientHint || null)
+            matched = matchHistoryItem(enrichedApiItems, matchCriteria)
             if (matched) {
                 matchStrategy = 'api'
                 steps.push(`api-matched:${matched.transactionId || matched.detailUrl}`)
@@ -3710,12 +3824,18 @@ export const fetchMoinRemittanceHistory = async (
                         waitUntil: 'domcontentloaded',
                         timeout: LONG_TIMEOUT_MS,
                     }).catch(() => undefined)
-                    await Promise.resolve()
-                    await Promise.resolve()
+                    await waitForMoinHistoryData(
+                        page,
+                        capturedResponses,
+                        settleCapturedResponses,
+                        steps,
+                        matched.transactionId,
+                        5000,
+                    )
                     steps.push(`history-detail-url:${page.url()}`)
                 } else {
                     steps.push('detail-url-already-loaded')
-                    await Promise.resolve()
+                    await settleCapturedResponses()
                 }
                 const detailResponses = capturedResponses.slice(beforeCount)
                 steps.push(`detail-responses-count:${detailResponses.length}`)
@@ -3819,10 +3939,12 @@ export const fetchMoinRemittanceHistory = async (
 
         // ---------- DOM fallback path ----------
         steps.push('falling-back-to-dom')
-        const domItems = await inspectHistoryListItems(page)
+        const domItems = initialHistoryData.domItems.length > 0
+            ? initialHistoryData.domItems
+            : await inspectHistoryListItems(page)
         steps.push(`dom-items-count:${domItems.length}`)
         const combinedItems = enrichedApiItems.length > 0 ? enrichedApiItems : domItems
-        const domMatched = matchHistoryItem(domItems, input.targetDate || null, input.recipientHint || null)
+        const domMatched = matchHistoryItem(domItems, matchCriteria)
 
         if (domMatched) {
             matchStrategy = 'dom'
@@ -4730,6 +4852,7 @@ export const __moinBizplusTestHooks = {
     clickLastVisible,
     getMoinRemittanceWindowState,
     normalizeMoinTransaction,
+    matchHistoryItem,
     fillMissingHistoryRecipients,
     classifyMoinLoginFailure,
     createMoinLoginFailureError,

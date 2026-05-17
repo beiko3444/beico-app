@@ -45,7 +45,7 @@ interface DepositSmsRecord {
   matchedAt?: string | Date | null
 }
 
-interface OrderRecord {
+export interface OrderRecord {
   id: string
   orderNumber?: string | null
   createdAt: string | Date
@@ -305,22 +305,45 @@ function toneClasses(tone: Tone) {
   }
 }
 
+function toneAccentClasses(tone: Tone) {
+  switch (tone) {
+    case 'blue':
+      return 'bg-blue-500'
+    case 'green':
+      return 'bg-emerald-500'
+    case 'orange':
+      return 'bg-orange-500'
+    case 'red':
+      return 'bg-red-500'
+    default:
+      return 'bg-slate-400'
+  }
+}
+
 function DetailCard({
   title,
   icon,
   actions,
   className = '',
+  muted = false,
   children,
 }: {
   title: string
   icon?: React.ReactNode
   actions?: React.ReactNode
   className?: string
+  muted?: boolean
   children: React.ReactNode
 }) {
   return (
-    <section className={`overflow-hidden rounded-2xl border border-[#E6EAF2] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)] ${className}`}>
-      <div className="flex items-center justify-between gap-3 border-b border-[#E6EAF2] px-6 py-5">
+    <section className={`overflow-hidden rounded-2xl border ${
+      muted
+        ? 'border-slate-300 bg-slate-50 shadow-[0_8px_22px_rgba(15,23,42,0.04)]'
+        : 'border-[#E6EAF2] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)]'
+    } ${className}`}>
+      <div className={`flex items-center justify-between gap-3 border-b px-6 py-5 ${
+        muted ? 'border-slate-300 bg-slate-100/70' : 'border-[#E6EAF2]'
+      }`}>
         <div className="flex items-center gap-2">
           {icon ? <span className="text-[#64748B]">{icon}</span> : null}
           <h3 className="text-[17px] font-extrabold tracking-tight text-[#0F172A]">{title}</h3>
@@ -399,6 +422,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
     [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
   )
+  const orderAccentClass = isCompletedOrder ? 'bg-slate-500' : toneAccentClasses(currentStatusMeta.tone)
+  const orderShellClass = isCompletedOrder
+    ? 'relative overflow-hidden rounded-[30px] border border-slate-300 bg-slate-200/80 px-4 pb-12 pt-7 shadow-[0_12px_30px_rgba(15,23,42,0.08)] md:px-8'
+    : 'relative overflow-hidden rounded-[30px] border border-blue-100 bg-white px-4 pb-12 pt-7 shadow-[0_18px_42px_rgba(15,23,42,0.10)] ring-1 ring-blue-50 md:px-8'
+  const summaryCardClass = isCompletedOrder
+    ? 'rounded-2xl border border-slate-300 bg-slate-100/95 p-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)] lg:p-6'
+    : 'rounded-2xl border border-[#E6EAF2] bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.07)] lg:p-6'
   const canIssueDocuments = currentStatus !== 'CANCELED'
   const showCopyToast = (fieldKey: string, value: string) => {
     if (!value || value === '-') return
@@ -505,7 +535,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
   return (
     <div
-      className="bg-[#F5F7FB] px-4 pb-12 pt-7 md:px-8"
+      className={orderShellClass}
       style={{
         ['--page-bg' as string]: '#F5F7FB',
         ['--card-bg' as string]: '#FFFFFF',
@@ -519,6 +549,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         ['--danger' as string]: '#EF4444',
       }}
     >
+      <div className={`absolute inset-y-0 left-0 w-2 ${orderAccentClass}`} aria-hidden="true" />
       <div className="mx-auto max-w-[1440px] space-y-6">
       {toastMessage ? (
         <div className="fixed right-6 top-24 z-50 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-bold text-white shadow-2xl">
@@ -571,16 +602,22 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </div>
       ) : null}
 
-      <div className="rounded-2xl border border-[#E6EAF2] bg-white p-5 shadow-[0_14px_36px_rgba(15,23,42,0.07)] lg:p-6">
+      <div className={summaryCardClass}>
         <div className="grid items-center gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(520px,640px)_344px]">
           <div>
             <div className="flex flex-wrap items-center gap-4">
-              <div className="flex h-[52px] w-[52px] items-center justify-center rounded-xl bg-[#DCFCEB] text-[#10B981]">
+              <div className={`flex h-[52px] w-[52px] items-center justify-center rounded-xl ${
+                isCompletedOrder ? 'bg-slate-200 text-slate-500' : 'bg-[#DCFCEB] text-[#10B981]'
+              }`}>
                 <Package className="h-7 w-7" />
               </div>
-              <h2 className="text-[24px] font-black tracking-tight text-[#0F172A] md:text-[28px]">{detail.customer.company}</h2>
+              <h2 className={`text-[24px] font-black tracking-tight md:text-[28px] ${
+                isCompletedOrder ? 'text-slate-700' : 'text-[#0F172A]'
+              }`}>{detail.customer.company}</h2>
               <span className="hidden h-8 w-px bg-[#CBD5E1] md:block" />
-              <div className="text-[21px] font-black tracking-tight text-[#0B63E5] md:text-[24px]">주문 #{detail.orderNumber}</div>
+              <div className={`text-[21px] font-black tracking-tight md:text-[24px] ${
+                isCompletedOrder ? 'text-slate-600' : 'text-[#0B63E5]'
+              }`}>주문 #{detail.orderNumber}</div>
             </div>
             <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2">
               <span className={`inline-flex h-9 items-center rounded-xl border px-4 text-[14px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
@@ -631,7 +668,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_455px] xl:items-stretch">
         <div className="contents">
-          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} className="order-1 h-full">
+          <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} className="order-1 h-full" muted={isCompletedOrder}>
             <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-3">
               {[
                 { label: '거래처', value: detail.customer.company },
@@ -655,6 +692,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             className="order-3 xl:col-span-2"
             title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개${detail.payment.shippingFee > 0 ? ', 배송비 포함' : ''})`}
             icon={<Package className="h-4 w-4" />}
+            muted={isCompletedOrder}
           >
             <div className="hidden overflow-hidden rounded-2xl border border-[#E6EAF2] lg:block">
               <table className="w-full table-fixed border-collapse">
@@ -760,6 +798,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             title="배송 처리"
             icon={<Truck className="h-4 w-4" />}
             className="h-full"
+            muted={isCompletedOrder}
             actions={(
               <span className={`inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[11px] font-bold ${toneClasses(currentStatusMeta.tone)}`}>
                 {currentStatusMeta.label}

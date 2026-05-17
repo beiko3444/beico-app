@@ -5,13 +5,15 @@ import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ChevronRight, ArrowLeft } from 'lucide-react'
 import AdminOrderCard from './AdminOrderCard'
+import type { OrderRecord } from './OrderDetailPage'
+import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 
 export default function OrdersClient({
   orders,
   depositSmsSummary,
   depositSmsActionItems = [],
 }: {
-  orders: any[]
+  orders: OrderRecord[]
   depositSmsSummary?: {
     unmatched: number
     ambiguous: number
@@ -46,11 +48,28 @@ export default function OrdersClient({
     return Array.from(years).sort((a, b) => b - a)
   }, [orders, latestOrderDate])
 
-  const filteredOrders = useMemo(() => {
+  const monthlyOrders = useMemo(() => {
     return (orders || []).filter((order) => {
       const createdAt = new Date(order.createdAt)
       if (Number.isNaN(createdAt.getTime())) return false
-      const matchesMonth = createdAt.getFullYear() === selectedYear && createdAt.getMonth() + 1 === selectedMonth
+      return createdAt.getFullYear() === selectedYear && createdAt.getMonth() + 1 === selectedMonth
+    })
+  }, [orders, selectedYear, selectedMonth])
+
+  const monthlySalesSummary = useMemo(() => {
+    const revenueOrders = monthlyOrders.filter((order) => order.status !== 'CANCELED')
+    const total = revenueOrders.reduce((sum, order) => {
+      return sum + calculateOrderFinalAmount(order.items || []).finalAmount
+    }, 0)
+
+    return {
+      orderCount: revenueOrders.length,
+      total,
+    }
+  }, [monthlyOrders])
+
+  const filteredOrders = useMemo(() => {
+    return monthlyOrders.filter((order) => {
       const matchesType = (() => {
         if (type === 'invoice') return !order.taxInvoiceIssued
         if (type === 'tracking') return !order.trackingNumber && order.status === 'APPROVED'
@@ -58,9 +77,9 @@ export default function OrdersClient({
         if (type === 'completed') return order.trackingNumber && order.taxInvoiceIssued
         return true
       })()
-      return matchesMonth && matchesType
+      return matchesType
     })
-  }, [orders, type, selectedYear, selectedMonth])
+  }, [monthlyOrders, type])
   const hasDepositSmsActionItems = depositSmsActionItems.length > 0
 
   return (
@@ -130,6 +149,17 @@ export default function OrdersClient({
               </span>
             </div>
           </div>
+          <div className="mt-5 border-t border-slate-100 pt-4">
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-end sm:gap-4">
+              <div className="text-[12px] font-bold text-slate-500">
+                {selectedYear}년 {selectedMonth}월 총매출
+                <span className="ml-2 text-slate-400">취소 제외 {monthlySalesSummary.orderCount}건</span>
+              </div>
+              <div className="text-[24px] font-black tracking-tight text-blue-600">
+                {formatCurrency(monthlySalesSummary.total)}
+              </div>
+            </div>
+          </div>
           {hasDepositSmsActionItems ? (
             <div className="mt-5 rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
@@ -174,12 +204,11 @@ export default function OrdersClient({
             <p className="mt-2 text-[13px] text-slate-400">현재 조건에 맞는 주문 상세를 찾지 못했습니다.</p>
           </div>
         ) : (
-          filteredOrders.map((order, index) => (
-            <div key={order.id} className="space-y-6">
-              {index > 0 ? <div className="h-px bg-slate-200" /> : null}
-              <AdminOrderCard order={order} />
-            </div>
-          ))
+          <div className="space-y-8">
+            {filteredOrders.map((order) => (
+              <AdminOrderCard key={order.id} order={order} />
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -190,4 +219,8 @@ function formatCompactDateTime(value: string | Date) {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
   return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
+}
+
+function formatCurrency(value: number) {
+  return `${Math.round(value).toLocaleString('ko-KR')}원`
 }
