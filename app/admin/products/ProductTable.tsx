@@ -31,12 +31,14 @@ interface ProductRowProps {
     onToggleCheck: (id: string) => void
     modifiedMoq: string | undefined
     onMoqChange: (id: string, val: string) => void
+    modifiedOrderUnit: string | undefined
+    onOrderUnitChange: (id: string, val: string) => void
     modifiedStock: string | undefined
     onStockChange: (id: string, val: string) => void
     onToggleWholesale: (id: string) => void
 }
 
-function SortableProductRow({ product, index, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedMoq, onMoqChange, modifiedStock, onStockChange, onToggleWholesale }: ProductRowProps) {
+function SortableProductRow({ product, index, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, modifiedStock, onStockChange, onToggleWholesale }: ProductRowProps) {
     const {
         attributes,
         listeners,
@@ -156,6 +158,15 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete, check
                     className="w-12 text-center border border-gray-200 rounded py-0.5 text-[11px] focus:border-[var(--color-brand-blue)] outline-none font-bold bg-white transition-colors"
                 />
             </td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-800 font-bold whitespace-nowrap">
+                <input
+                    type="number"
+                    min="1"
+                    value={modifiedOrderUnit !== undefined ? modifiedOrderUnit : (product.orderUnit || 1)}
+                    onChange={(e) => onOrderUnitChange(product.id, e.target.value)}
+                    className="w-12 text-center border border-gray-200 rounded py-0.5 text-[11px] focus:border-[var(--color-brand-blue)] outline-none font-bold bg-white transition-colors"
+                />
+            </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums text-gray-500 whitespace-nowrap">{(product.buyPrice || 0).toLocaleString()}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-[var(--color-brand-blue)] whitespace-nowrap">{(product.sellPrice || 0).toLocaleString()}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-gray-700 whitespace-nowrap">{(product.onlinePrice || 0).toLocaleString()}</td>
@@ -222,6 +233,7 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete, check
 export default function ProductTable({ initialProducts }: { initialProducts: any[] }) {
     const [products, setProducts] = useState(initialProducts)
     const [modifiedMoqs, setModifiedMoqs] = useState<Record<string, string>>({})
+    const [modifiedOrderUnits, setModifiedOrderUnits] = useState<Record<string, string>>({})
     const [modifiedStocks, setModifiedStocks] = useState<Record<string, string>>({})
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
     const [isSaving, setIsSaving] = useState(false)
@@ -321,6 +333,15 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
         }
     }
 
+    const handleOrderUnitChange = (id: string, val: string) => {
+        setModifiedOrderUnits(prev => ({ ...prev, [id]: val }))
+        if (!checkedIds.has(id)) {
+            const next = new Set(checkedIds)
+            next.add(id)
+            setCheckedIds(next)
+        }
+    }
+
     const handleStockChange = (id: string, val: string) => {
         setModifiedStocks(prev => ({ ...prev, [id]: val }))
         if (!checkedIds.has(id)) {
@@ -357,6 +378,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
         setIsSaving(true)
         try {
             const hasMoqChanges = Array.from(checkedIds).some(id => modifiedMoqs[id] !== undefined)
+            const hasOrderUnitChanges = Array.from(checkedIds).some(id => modifiedOrderUnits[id] !== undefined)
             const hasStockChanges = Array.from(checkedIds).some(id => modifiedStocks[id] !== undefined)
 
             if (hasMoqChanges) {
@@ -371,6 +393,22 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ updates: moqUpdates })
                 })
+            }
+
+            if (hasOrderUnitChanges) {
+                const orderUnitUpdates = Array.from(checkedIds)
+                    .filter(id => modifiedOrderUnits[id] !== undefined)
+                    .map(id => {
+                        const num = parseInt(modifiedOrderUnits[id])
+                        return { id, orderUnit: isNaN(num) || num < 1 ? 1 : num }
+                    })
+                if (orderUnitUpdates.length > 0) {
+                    await fetch('/api/products/bulk/order-unit', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ updates: orderUnitUpdates })
+                    })
+                }
             }
 
             if (hasStockChanges) {
@@ -392,6 +430,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
             alert('저장되었습니다.')
             setCheckedIds(new Set())
             setModifiedMoqs({})
+            setModifiedOrderUnits({})
             setModifiedStocks({})
             router.refresh()
         } catch (e) {
@@ -433,6 +472,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">KR 최소수량</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">주문단위</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">매입가</th>
                             <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매가</th>
                             <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">판매가</th>
@@ -450,7 +490,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                         >
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={15} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={16} className="px-6 py-12 text-center text-gray-500">
                                         등록된 상품이 없습니다.
                                     </td>
                                 </tr>
@@ -466,6 +506,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                                         onToggleCheck={handleToggleCheck}
                                         modifiedMoq={modifiedMoqs[product.id]}
                                         onMoqChange={handleMoqChange}
+                                        modifiedOrderUnit={modifiedOrderUnits[product.id]}
+                                        onOrderUnitChange={handleOrderUnitChange}
                                         modifiedStock={modifiedStocks[product.id]}
                                         onStockChange={handleStockChange}
                                         onToggleWholesale={handleToggleWholesale}

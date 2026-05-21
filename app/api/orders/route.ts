@@ -30,6 +30,14 @@ export async function POST(request: Request) {
                 if (product.stock < item.quantity) {
                     throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.stock}`)
                 }
+                const minimumQuantity = product.minOrderQuantity || 1
+                if (item.quantity < minimumQuantity) {
+                    throw new Error(`${product.name} minimum order quantity is ${minimumQuantity}`)
+                }
+                const orderUnit = product.orderUnit || 1
+                if (item.quantity % orderUnit !== 0) {
+                    throw new Error(`${product.name} must be ordered in units of ${orderUnit}`)
+                }
             }
 
             // 2. Deduct stock

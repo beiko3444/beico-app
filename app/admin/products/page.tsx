@@ -30,6 +30,7 @@ const getCachedProducts = unstable_cache(
             imageUrl: true,
             sortOrder: true,
             minOrderQuantity: true,
+            orderUnit: true,
             jpBuyPrice: true,
             jpSellPrice: true,
             krBuyPrice: true,

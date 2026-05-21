@@ -31,6 +31,7 @@ type Product = {
     imageUrl?: string | null
     regionalPrices?: any
     minOrderQuantity: number
+    orderUnit?: number
 }
 
 interface ProductFormProps {
@@ -70,6 +71,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [priceD, setPriceD] = useState('')
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
+    const [orderUnit, setOrderUnit] = useState('1')
     const [hasImageChanged, setHasImageChanged] = useState(false)
     const [loading, setLoading] = useState(false)
     const [exchangeRates, setExchangeRates] = useState<{ USD: number, JPY: number, CNY: number } | null>(null);
@@ -149,6 +151,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setImageUrl(initialData.imageUrl || null)
             setHasImageChanged(false)
             setMinOrderQuantity(formatNumber(initialData.minOrderQuantity || 1))
+            setOrderUnit(formatNumber(initialData.orderUnit || 1))
 
             if (initialData.regionalPrices && Object.keys(initialData.regionalPrices).length > 0) {
                 // Formatting values when loading from existing JSON
@@ -202,6 +205,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setImageUrl(null)
             setHasImageChanged(false)
             setMinOrderQuantity('1')
+            setOrderUnit('1')
             setRegionalPrices({
                 A: defaultGradePricing(),
                 B: defaultGradePricing(),
@@ -265,6 +269,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 stock: parseInt(parseNumber(stock)) || 0,
                 safetyStock: parseInt(parseNumber(safetyStock)) || 0,
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
+                orderUnit: parseInt(parseNumber(orderUnit)) || 1,
                 regionalPrices: regionalPrices,
             }
 
@@ -489,7 +494,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     {/* Inventory Group */}
                     <fieldset className="border border-gray-400 p-4 pt-2">
                         <legend className="px-2 text-xs font-bold text-gray-700">재고 및 주문 (Inventory)</legend>
-                        <div className="grid grid-cols-3 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                             <div className="space-y-1">
                                 <label className="text-[11px] font-bold text-gray-600">현재고 수량</label>
                                 <input
@@ -519,6 +524,17 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     value={minOrderQuantity}
                                     onChange={e => setMinOrderQuantity(formatNumber(e.target.value))}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-blue-700"
+                                    required
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">주문 단위</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={orderUnit}
+                                    onChange={e => setOrderUnit(formatNumber(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-emerald-700"
                                     required
                                 />
                             </div>

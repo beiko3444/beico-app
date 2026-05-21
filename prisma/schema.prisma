@@ -60,6 +60,7 @@ model Product {
   imageUrl         String?
   sortOrder        Int         @default(0)
   minOrderQuantity Int         @default(1)
+  orderUnit        Int         @default(1)
   nameEN           String?
   jpBuyPrice       Float?      @default(0)
   jpSellPrice      Float?      @default(0)

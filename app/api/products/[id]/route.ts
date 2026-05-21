@@ -22,6 +22,7 @@ const productResponseSelect = {
     coupangSku: true,
     sortOrder: true,
     minOrderQuantity: true,
+    orderUnit: true,
     jpBuyPrice: true,
     jpSellPrice: true,
     krBuyPrice: true,
@@ -69,6 +70,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
             priceD: (body.priceD !== null && body.priceD !== undefined && body.priceD !== "") ? Number(body.priceD) : null,
             minOrderQuantity: body.minOrderQuantity !== undefined ? Math.max(1, Math.round(Number(body.minOrderQuantity))) : 1,
+            orderUnit: body.orderUnit !== undefined ? Math.max(1, Math.round(Number(body.orderUnit))) : 1,
             sortOrder: body.sortOrder !== undefined ? Math.round(Number(body.sortOrder)) : undefined,
             regionalPrices: body.regionalPrices !== undefined ? body.regionalPrices : undefined,
         }

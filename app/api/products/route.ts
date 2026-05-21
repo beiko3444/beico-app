@@ -22,6 +22,7 @@ const productListSelect = {
     coupangSku: true,
     sortOrder: true,
     minOrderQuantity: true,
+    orderUnit: true,
     jpBuyPrice: true,
     jpSellPrice: true,
     krBuyPrice: true,
@@ -49,7 +50,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity, coupangSku } = body
+        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity, orderUnit, coupangSku } = body
         const normalizedProductCode = productCode ? String(productCode).trim().toUpperCase() : null
         let imageUrl: string | null = null
 
@@ -91,6 +92,7 @@ export async function POST(request: Request) {
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
             priceD: (body.priceD !== null && body.priceD !== undefined && body.priceD !== "") ? Number(body.priceD) : null,
             minOrderQuantity: minOrderQuantity !== undefined ? Math.max(1, Math.round(Number(minOrderQuantity))) : 1,
+            orderUnit: orderUnit !== undefined ? Math.max(1, Math.round(Number(orderUnit))) : 1,
             regionalPrices: body.regionalPrices !== undefined ? body.regionalPrices : undefined,
         }
 

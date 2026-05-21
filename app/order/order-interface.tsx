@@ -16,6 +16,7 @@ type Product = {
     nameJP?: string | null
     nameEN?: string | null
     minOrderQuantity: number
+    orderUnit?: number
     appliedGrade?: string
     onlinePrice: number
     jpBuyPrice: number
@@ -60,15 +61,28 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     }
 
     const handleOrderNow = () => {
-        const violations = products
+        const minimumViolations = products
             .filter(p => {
                 const qty = quantities[p.id] || 0;
                 return qty > 0 && qty < (p.minOrderQuantity || 1);
             })
             .map(p => `- ${p.name}: 주문 ${quantities[p.id]}개 / 최소 ${p.minOrderQuantity}개`);
 
-        if (violations.length > 0) {
-            alert(`최소 주문 수량이 미달된 상품이 있습니다:\n\n${violations.join('\n')}\n\n최소 주문 수량 이상으로 주문해 주세요.`);
+        if (minimumViolations.length > 0) {
+            alert(`최소 주문 수량이 미달된 상품이 있습니다:\n\n${minimumViolations.join('\n')}\n\n최소 주문 수량 이상으로 주문해 주세요.`);
+            return;
+        }
+
+        const unitViolations = products
+            .filter(p => {
+                const qty = quantities[p.id] || 0;
+                const orderUnit = p.orderUnit || 1;
+                return qty > 0 && qty % orderUnit !== 0;
+            })
+            .map(p => `- ${p.name}: 주문 ${quantities[p.id]}개 / 주문 단위 ${p.orderUnit || 1}개`);
+
+        if (unitViolations.length > 0) {
+            alert(`주문 단위에 맞지 않는 상품이 있습니다:\n\n${unitViolations.join('\n')}\n\n설정된 주문 단위의 배수로 주문해 주세요.`);
             return;
         }
         setShowSummary(true);
@@ -99,6 +113,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {products.map((product, index) => {
                     const qty = quantities[product.id] || 0
+                    const orderUnit = product.orderUnit || 1
                     const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice;
                     const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice;
                     const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : 0;
@@ -262,6 +277,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                 <div className="flex flex-col">
                                     <span className="text-[11px] font-black text-[#e34219] uppercase tracking-widest leading-tight">最小注文数量</span>
                                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Min Order: {product.minOrderQuantity}ea</span>
+                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Order Unit: {orderUnit}ea</span>
                                 </div>
 
                                 {product.stock > 0 ? (
@@ -273,7 +289,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 : 'bg-[#fff7f3] dark:bg-[#2a1a1a] border-[#e34219]'
                                             }`}>
                                             <button
-                                                onClick={() => handleQuantityChange(product.id, Math.max(0, qty - 1))}
+                                                onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))}
                                                 className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
                                                     ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
                                                     : qty < product.minOrderQuantity
@@ -300,7 +316,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     }`}
                                             />
                                             <button
-                                                onClick={() => handleQuantityChange(product.id, qty + 1)}
+                                                onClick={() => handleQuantityChange(product.id, qty + orderUnit)}
                                                 className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
                                                     ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
                                                     : qty < product.minOrderQuantity
