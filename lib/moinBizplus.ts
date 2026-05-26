@@ -557,21 +557,34 @@ const clickFirstVisible = async (
     step: string,
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
-    for (const selector of selectors) {
-        try {
-            const target = page.locator(selector).first()
-            await target.waitFor({ state: 'visible', timeout: Math.min(timeoutMs, FAST_ELEMENT_TIMEOUT_MS) })
-            const disabled = await target.isDisabled().catch(() => false)
-            const enabled = await target.isEnabled().catch(() => !disabled)
-            if (disabled || !enabled) continue
-            await target.click({ timeout: 5000 })
-            return
-        } catch {
-            // Try next selector.
+    const deadline = Date.now() + timeoutMs
+    const errors: string[] = []
+
+    while (Date.now() < deadline) {
+        for (const selector of selectors) {
+            try {
+                const target = page.locator(selector).first()
+                await target.waitFor({ state: 'visible', timeout: Math.min(FAST_ELEMENT_TIMEOUT_MS, Math.max(250, deadline - Date.now())) })
+                const disabled = await target.isDisabled().catch(() => false)
+                const enabled = await target.isEnabled().catch(() => !disabled)
+                if (disabled || !enabled) {
+                    errors.push(`${selector}:disabled`)
+                    continue
+                }
+                await target.click({ timeout: 5000 })
+                return
+            } catch (error) {
+                errors.push(`${selector}:${getErrorMessage(error).slice(0, 120)}`)
+            }
         }
+
+        await page.waitForTimeout(Math.min(250, Math.max(0, deadline - Date.now()))).catch(() => undefined)
     }
 
-    throw new MoinAutomationError(step, `Could not find a clickable element for step: ${step} (url: ${page.url()})`)
+    throw new MoinAutomationError(
+        step,
+        `Could not find a clickable element for step: ${step} (url: ${page.url()}) errors=${errors.slice(-8).join(' | ')}`
+    )
 }
 
 const clickVisibleTextAction = async (
@@ -797,13 +810,54 @@ const uploadFirstFileInput = async (
     file: { name: string; mimeType: string; buffer: Buffer },
     timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<void> => {
+    const isUploadAccepted = async () => {
+        const result = await page.evaluate(`
+            (() => {
+                const fileName = ${JSON.stringify(file.name)};
+                const nextStep = ${JSON.stringify(KO_NEXT_STEP)};
+                const nextStepSpaced = ${JSON.stringify(KO_NEXT_STEP_SPACED)};
+                const next = ${JSON.stringify(KO_NEXT)};
+                const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+                const isVisible = (el) => {
+                    if (!el) return false;
+                    const rect = el.getBoundingClientRect();
+                    const style = window.getComputedStyle(el);
+                    return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+                };
+                const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+                const bodyText = norm((document.body && document.body.innerText) || '');
+                const hasFileName = Boolean(fileName && bodyText.includes(fileName));
+                const enabledNext = Array.from(document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]'))
+                    .filter((el) => isVisible(el))
+                    .some((el) => {
+                        const text = norm(el.textContent || el.value || el.getAttribute('aria-label') || '');
+                        return !isDisabled(el) && (text.includes(nextStep) || text.includes(nextStepSpaced) || text === next);
+                    });
+                const fileInputHasFile = Array.from(document.querySelectorAll('input[type="file"]'))
+                    .some((el) => el.files && el.files.length > 0);
+                return { hasFileName, enabledNext, fileInputHasFile };
+            })()
+        `).catch(() => null) as { hasFileName?: boolean; enabledNext?: boolean; fileInputHasFile?: boolean } | null
+
+        return Boolean(result?.enabledNext || result?.hasFileName)
+    }
+
     const trySetFiles = async () => {
         for (const selector of selectors) {
             try {
-                const target = page.locator(selector).first()
-                await target.waitFor({ state: 'attached', timeout: Math.min(timeoutMs, FAST_ELEMENT_TIMEOUT_MS) })
-                await target.setInputFiles(file)
-                return true
+                const targets = page.locator(selector)
+                const count = await targets.count().catch(() => 0)
+                for (let index = 0; index < Math.max(1, count); index += 1) {
+                    const target = count > 0 ? targets.nth(index) : targets.first()
+                    try {
+                        await target.waitFor({ state: 'attached', timeout: Math.min(timeoutMs, FAST_ELEMENT_TIMEOUT_MS) })
+                        await target.setInputFiles(file)
+                        const accepted = await waitForFastCondition(page, isUploadAccepted, 2500)
+                        if (accepted) return true
+                    } catch {
+                        // Try next matching file input.
+                    }
+                }
             } catch {
                 // Try next selector.
             }
@@ -1054,7 +1108,7 @@ const waitForUrlChange = async (page: PageLike, startUrl: string, timeoutMs: num
         if (currentUrl !== startUrl && !currentUrl.includes('/login')) {
             return currentUrl
         }
-        await Promise.resolve()
+        await page.waitForTimeout(100).catch(() => undefined)
     }
     return page.url()
 }
@@ -1068,7 +1122,7 @@ const waitForFastCondition = async (
     const deadline = Date.now() + timeoutMs
     while (Date.now() < deadline) {
         if (await check().catch(() => false)) return true
-        await Promise.resolve()
+        await page.waitForTimeout(100).catch(() => undefined)
     }
     return false
 }
@@ -4174,6 +4228,13 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
                         steps.push('recipient-session-login-redirect')
                         await performMoinLogin(page, input.loginId, input.loginPassword, steps, abortSignal)
                         steps.push('recipient-session-relogin')
+                        const reloginPage = page
+                        const recipientReadyAfterRelogin = await waitForFastCondition(
+                            reloginPage,
+                            async () => !reloginPage.url().includes('/login') && (await inspectTransferInputs(reloginPage)).aliasSearchVisible,
+                            8000
+                        )
+                        steps.push(`recipient-session-ready-after-relogin:${recipientReadyAfterRelogin}`)
                         await assertMoinRemittanceOpen(page, 'MOIN operating hours')
                     }
 
@@ -4685,7 +4746,7 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
         // ???? Step 9: Next step after upload ??????????????????????????????????????????????????????????????????
         throwIfAbortRequested(abortSignal, 'Next after upload')
         const uploadUrl = page.url()
-        await clickNextStep(page, TRANSFER_ACTION_TIMEOUT_MS)
+        await clickNextStep(page, LONG_TIMEOUT_MS)
         const confirmationPage = page
         await waitForFastCondition(confirmationPage, async () => {
             const currentUrl = confirmationPage.url()
