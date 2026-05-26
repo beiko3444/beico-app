@@ -2807,7 +2807,7 @@ const performMoinLogin = async (
         steps.push(`dismiss-overlays:${overlayDismissed}`)
     }
 
-    if (process.env.MOIN_BIZPLUS_USE_UI_LOGIN !== 'true') {
+    if (process.env.MOIN_BIZPLUS_USE_API_LOGIN === 'true' && process.env.MOIN_BIZPLUS_USE_UI_LOGIN !== 'true') {
         const apiAuthenticated = await authenticateMoinSessionWithApi(page, loginId, loginPassword, steps)
         if (apiAuthenticated) {
             await page.goto(MOIN_BIZPLUS_RECIPIENT_URL, {
