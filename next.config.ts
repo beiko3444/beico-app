@@ -1,7 +1,22 @@
 import type { NextConfig } from "next";
 
+const fallbackNextAuthUrl = "https://www.beiko.co.kr";
+const configuredNextAuthUrl = process.env.NEXTAUTH_URL?.trim();
+const configuredVercelUrl = process.env.VERCEL_URL?.trim();
+
+process.env.NEXTAUTH_URL =
+  configuredNextAuthUrl ||
+  (configuredVercelUrl
+    ? configuredVercelUrl.startsWith("http")
+      ? configuredVercelUrl
+      : `https://${configuredVercelUrl}`
+    : fallbackNextAuthUrl);
+
 const nextConfig: NextConfig = {
   output: 'standalone',
+  env: {
+    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
+  },
   serverExternalPackages: ['playwright-core', '@sparticuz/chromium', '@napi-rs/canvas', 'pdf-parse', 'pdfjs-dist'],
   outputFileTracingIncludes: {
     '/api/admin/worm-order/remittance': ['./node_modules/@sparticuz/chromium/**/*'],
