@@ -9,6 +9,15 @@ export function formatBlYear(year: number) {
     return String(year)
 }
 
+export function getKoreaCurrentYear(date = new Date()) {
+    const year = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+    }).format(date)
+
+    return Number.parseInt(year, 10)
+}
+
 export function normalizeBlNo(input: string) {
     return input
         .replace(/\s+/g, '')
@@ -29,8 +38,14 @@ export function resolveUnipassQueryAttempts(rawBlNo: string, currentYear: number
         attempts.push({ kind: 'cargMtNo', blYy: null })
     }
 
+    const years: number[] = []
     for (let delta = 0; delta < lookbackYears; delta += 1) {
-        const blYy = formatBlYear(currentYear - delta)
+        years.push(currentYear - delta)
+    }
+    years.push(currentYear + 1)
+
+    for (const year of Array.from(new Set(years))) {
+        const blYy = formatBlYear(year)
         attempts.push({ kind: 'mblNo', blYy })
         attempts.push({ kind: 'hblNo', blYy })
     }

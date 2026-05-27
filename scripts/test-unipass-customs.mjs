@@ -7,6 +7,10 @@ test('UNIPASS BL year is sent as four digits', () => {
   assert.equal(customs.formatBlYear(2026), '2026')
 })
 
+test('UNIPASS current year follows Korea date', () => {
+  assert.equal(customs.getKoreaCurrentYear(new Date('2025-12-31T15:05:00.000Z')), 2026)
+})
+
 test('UNIPASS query attempts include cargo management number lookup for cargo numbers', () => {
   const attempts = customs.resolveUnipassQueryAttempts('123-4567-8901-2345', 2026, 2)
 
@@ -16,6 +20,15 @@ test('UNIPASS query attempts include cargo management number lookup for cargo nu
     { kind: 'hblNo', blYy: '2026' },
     { kind: 'mblNo', blYy: '2025' },
     { kind: 'hblNo', blYy: '2025' },
+  ])
+})
+
+test('UNIPASS query attempts include next BL year after lookback years', () => {
+  const attempts = customs.resolveUnipassQueryAttempts('11206305924', 2025, 3)
+
+  assert.deepEqual(attempts.slice(-2), [
+    { kind: 'mblNo', blYy: '2026' },
+    { kind: 'hblNo', blYy: '2026' },
   ])
 })
 

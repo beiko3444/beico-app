@@ -4388,7 +4388,7 @@ export default function WormOrderPage() {
         const requestId = ++customsProgressRequestIdRef.current
         setCustomsProgressLoading(true)
         try {
-            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(normalizedBlNo)}`, { method: 'GET' })
+            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(normalizedBlNo)}&force=1`, { method: 'GET' })
             const result = await response.json()
 
             if (!response.ok) {
@@ -6567,7 +6567,7 @@ export default function WormOrderPage() {
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">유니패스 수입 통관 조회</h3>
                         <p className="text-xs text-gray-500 mt-1">
-                            B/L 번호만 입력하면 MBL/HBL + 최근 3개년을 자동으로 시도해 조회합니다. (하이픈/공백은 자동 제거)
+                            B/L 번호만 입력하면 MBL/HBL + 현재/최근/다음 연도를 자동으로 시도해 조회합니다. (하이픈/공백은 자동 제거)
                         </p>
                     </div>
                     <Search size={18} className="text-[#e34219] mt-1" />

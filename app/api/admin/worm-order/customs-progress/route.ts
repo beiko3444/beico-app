@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/requireAdmin'
 import {
     buildUnipassSearchParams,
+    getKoreaCurrentYear,
     normalizeBlNo,
     resolveUnipassQueryAttempts,
     type UnipassQueryKind,
@@ -127,7 +128,7 @@ export async function GET(request: NextRequest) {
         }
     }
 
-    const currentYear = new Date().getFullYear()
+    const currentYear = getKoreaCurrentYear()
     const attempts: Array<{ kind: UnipassQueryKind; blYy: string | null; tCnt: number; ntceInfo: string }> = []
 
     for (const attempt of resolveUnipassQueryAttempts(blNo, currentYear, LOOKBACK_YEARS)) {
@@ -165,18 +166,21 @@ export async function GET(request: NextRequest) {
         }
     }
 
+    const hasOnlyRequestFailures = attempts.length > 0 && attempts.every((attempt) => attempt.tCnt === -1 && attempt.ntceInfo)
     const notFoundPayload = {
-        error: '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
+        error: hasOnlyRequestFailures
+            ? '유니패스 서버 요청이 실패했습니다. 잠시 후 다시 조회해주세요.'
+            : '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
         blNo,
         attempts,
     }
     customsProgressCache.set(cacheKey, {
         expiresAt: Date.now() + CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS,
-        status: 404,
+        status: hasOnlyRequestFailures ? 502 : 404,
         payload: notFoundPayload,
     })
     return NextResponse.json(notFoundPayload, {
-        status: 404,
+        status: hasOnlyRequestFailures ? 502 : 404,
         headers: {
             'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
         },
