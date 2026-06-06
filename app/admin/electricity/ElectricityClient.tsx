@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import { buildElectricitySavePayload, hasSavedLandlordReading } from '@/lib/electricityUsageClient'
 
 type BillData = {
     year: number
@@ -217,8 +218,7 @@ export default function ElectricityClient() {
                             meterPrevious: data.meterPrevious || ''
                         })
 
-                        const hasCurrentBillEntry = hasBillEntry(data)
-                        const hasLandlordReading = hasCurrentBillEntry && data.landlordMeterCurr !== null
+                        const hasLandlordReading = hasSavedLandlordReading(data)
 
                         if (hasLandlordReading || data.meterPhotoUrl) {
                             setLandlordData({
@@ -426,33 +426,16 @@ export default function ElectricityClient() {
     const saveData = async (bData: BillData | null, lData: LandlordData | null, currentRawText?: string, currentHistory?: any[]) => {
         setLoading(true)
         try {
-            const billDataProvided = bData !== null
-            const hasLandlordReading = Boolean(lData?.hasReading)
-            const shares = calculateCurrentShares(bData, lData)
-
-            const payload = {
-                year: bData ? bData.year : selectedYear,
-                month: bData ? bData.month : selectedMonth,
-                readingDate: bData ? bData.readingDate : null,
-                usagePeriod: bData ? bData.usagePeriod : null,
-                meterCurrent: bData ? bData.meterCurrent : null,
-                meterPrevious: bData ? bData.meterPrevious : null,
-                totalUsage: bData ? bData.currentUsage : null,
-                totalAmount: bData ? bData.totalAmount : null,
-                rawBillData: bData ? JSON.stringify({
-                    ...bData.parsedDetails,
-                    beicoTotal: shares.beicoTotal,
-                    landlordTotal: shares.landlordTotal
-                }) : null,
-                landlordMeterPrev: hasLandlordReading ? lData!.prevMeter : null,
-                landlordMeterCurr: hasLandlordReading ? lData!.currMeter : null,
-                landlordUsage: hasLandlordReading ? (lData!.currMeter - lData!.prevMeter + lData!.waterHeaterKw + lData!.outdoorLightKw) : null,
-                waterHeaterKw: hasLandlordReading ? lData!.waterHeaterKw : null,
-                outdoorLightKw: hasLandlordReading ? lData!.outdoorLightKw : null,
-                meterPhotoUrl: lData ? lData.photo : null,
-                rawText: billDataProvided ? (currentRawText !== undefined ? currentRawText : rawText) : null,
-                extractionHistory: billDataProvided ? JSON.stringify(currentHistory !== undefined ? currentHistory : extractionHistory) : null
-            }
+            const payload = buildElectricitySavePayload({
+                selectedYear,
+                selectedMonth,
+                billData: bData,
+                landlordData: lData,
+                rawText,
+                extractionHistory,
+                currentRawText,
+                currentHistory
+            })
 
             const res = await fetch('/api/admin/electricity', {
                 method: 'POST',
@@ -471,7 +454,7 @@ export default function ElectricityClient() {
                 }))
                 setMonthlyMeterReadings(prev => ({
                     ...prev,
-                    [payload.month]: hasBillEntry(savedData) && savedData.landlordMeterCurr !== null
+                    [payload.month]: hasSavedLandlordReading(savedData)
                         ? Number(savedData.landlordMeterCurr)
                         : null
                 }))
@@ -863,7 +846,7 @@ export default function ElectricityClient() {
     return (
         <div id="electricity-main" className="space-y-8 font-sans pb-20 print:pb-0 print:space-y-0">
             {/* Header */}
-            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all">
+            <div className="sticky top-14 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all lg:top-0">
                 <div className="flex flex-col gap-4 py-4">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">

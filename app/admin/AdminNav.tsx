@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useEffect, useState } from 'react'
+import { Menu, X } from 'lucide-react'
 
 export default function AdminNav({
   counts,
@@ -16,6 +17,7 @@ export default function AdminNav({
   const [fromNumber, setFromNumber] = useState('')
   const [loadingFromNumber, setLoadingFromNumber] = useState(true)
   const [sendingSms, setSendingSms] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const navItems = [
     { name: '주문관리', path: '/admin/orders' },
@@ -38,6 +40,29 @@ export default function AdminNav({
   }
 
   const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
+
+  const activeItem = navItems.find((item) => isActive(item.path))
+
+  useEffect(() => {
+    setIsMobileMenuOpen(false)
+  }, [pathname])
+
+  useEffect(() => {
+    if (!isMobileMenuOpen) return
+
+    const previousOverflow = document.body.style.overflow
+    document.body.style.overflow = 'hidden'
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsMobileMenuOpen(false)
+    }
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [isMobileMenuOpen])
 
   useEffect(() => {
     let mounted = true
@@ -116,20 +141,21 @@ export default function AdminNav({
     }
   }
 
-  return (
-    <aside className="fixed bottom-0 left-0 top-0 z-[1000] box-border flex h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.06)] print:hidden">
+  const sidebarContent = (
+    <>
       <div className="shrink-0">
         <div className="text-[30px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
         <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#7D8491]">WHOLESALE PORTAL</div>
       </div>
       <div className="mb-4 mt-5 h-px shrink-0 bg-[#E5E7EB]" />
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-hidden pb-3">
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-3">
         {navItems.map((item) => (
           <Link
             key={item.path}
             href={item.path}
             prefetch={false}
+            onClick={() => setIsMobileMenuOpen(false)}
             className={`flex h-[38px] min-h-[38px] items-center justify-between rounded-[12px] border px-4 text-[14px] font-extrabold tracking-[-0.025em] no-underline transition-all duration-150 ${
               isActive(item.path)
                 ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_20px_rgba(239,59,29,0.22)]'
@@ -194,6 +220,58 @@ export default function AdminNav({
           로그아웃
         </button>
       </div>
-    </aside>
+    </>
+  )
+
+  return (
+    <>
+      <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E7EB] bg-white/95 px-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur print:hidden lg:hidden">
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen(true)}
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] transition hover:bg-[#F4F5F7]"
+          aria-label="관리자 메뉴 열기"
+          aria-expanded={isMobileMenuOpen}
+          aria-controls="admin-mobile-sidebar"
+        >
+          <Menu size={20} />
+        </button>
+        <div className="min-w-0 text-center">
+          <div className="text-[18px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
+          <div className="mt-1 truncate text-[11px] font-extrabold tracking-[-0.02em] text-[#111827]">
+            {activeItem?.name || '관리자'}
+          </div>
+        </div>
+        <div className="h-10 w-10" aria-hidden="true" />
+      </header>
+
+      {isMobileMenuOpen ? (
+        <button
+          type="button"
+          className="fixed inset-0 z-[1001] bg-black/45 backdrop-blur-[2px] print:hidden lg:hidden"
+          onClick={() => setIsMobileMenuOpen(false)}
+          aria-label="관리자 메뉴 닫기"
+        />
+      ) : null}
+
+      <aside
+        id="admin-mobile-sidebar"
+        className={`fixed bottom-0 left-0 top-0 z-[1002] box-border flex h-screen w-[260px] max-w-[82vw] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.16)] transition-transform duration-200 print:hidden lg:z-[1000] lg:max-w-none lg:translate-x-0 lg:shadow-[12px_0_34px_rgba(15,23,42,0.06)] ${
+          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="mb-2 flex items-start justify-between gap-3 lg:hidden">
+          <button
+            type="button"
+            onClick={() => setIsMobileMenuOpen(false)}
+            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] transition hover:bg-[#F4F5F7] lg:hidden"
+            aria-label="관리자 메뉴 닫기"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {sidebarContent}
+      </aside>
+    </>
   )
 }

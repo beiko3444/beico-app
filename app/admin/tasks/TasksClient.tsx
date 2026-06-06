@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, UserRound } from 'lucide-react'
 import { createEmployee, deleteEmployee, toggleAttendanceDate, updateEmployee } from './actions'
+import { getKoreanHolidayName } from '@/lib/koreanHolidays'
 
 type AttendanceRecord = {
     id: string
@@ -256,20 +257,53 @@ export default function TasksClient({ initialEmployees }: { initialEmployees: At
 
                             const key = dateKey(date)
                             const checked = selectedWorkDates.has(key)
+                            const holidayName = getKoreanHolidayName(key)
+                            const isSunday = date.getDay() === 0
+                            const isSaturday = date.getDay() === 6
+                            const isWeekend = isSunday || isSaturday
+                            const dayTextClass = holidayName || isSunday
+                                ? 'text-red-600'
+                                : isSaturday
+                                    ? 'text-blue-500'
+                                    : checked
+                                        ? 'text-[#d9361b]'
+                                        : 'text-gray-700'
+
                             return (
                                 <button
                                     key={key}
                                     type="button"
                                     onClick={() => handleToggleDate(date)}
                                     disabled={!selectedEmployee || isPending}
-                                    className={`min-h-[112px] border-r border-b border-gray-100 p-3 text-left transition-all disabled:cursor-not-allowed ${checked ? 'bg-red-50 hover:bg-red-100' : 'bg-white hover:bg-gray-50'}`}
+                                    className={`min-h-[112px] border-r border-b p-3 text-left transition-all disabled:cursor-not-allowed ${
+                                        checked
+                                            ? 'border-red-100 bg-red-50 hover:bg-red-100'
+                                            : holidayName
+                                                ? 'border-red-100 bg-red-50/50 hover:bg-red-50'
+                                                : isWeekend
+                                                    ? 'border-gray-100 bg-gray-50/70 hover:bg-gray-100'
+                                                    : 'border-gray-100 bg-white hover:bg-gray-50'
+                                    }`}
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <span className={`text-sm font-black ${checked ? 'text-[#d9361b]' : 'text-gray-700'}`}>{date.getDate()}</span>
+                                        <span className={`text-sm font-black ${dayTextClass}`}>{date.getDate()}</span>
                                         <span className={`h-5 w-5 rounded-full border flex items-center justify-center ${checked ? 'border-[#d9361b] bg-[#d9361b]' : 'border-gray-200 bg-white'}`}>
                                             {checked && <span className="h-2 w-2 rounded-full bg-white" />}
                                         </span>
                                     </div>
+                                    {(holidayName || isWeekend) && (
+                                        <div
+                                            className={`mt-2 inline-flex max-w-full rounded-md px-2 py-1 text-[10px] font-black leading-none ${
+                                                holidayName
+                                                    ? 'bg-red-100 text-red-700'
+                                                    : isSunday
+                                                        ? 'bg-red-50 text-red-500'
+                                                        : 'bg-blue-50 text-blue-500'
+                                            }`}
+                                        >
+                                            <span className="truncate">{holidayName || (isSunday ? '일요일' : '토요일')}</span>
+                                        </div>
+                                    )}
                                     {checked && selectedEmployee && (
                                         <div className="mt-5 rounded-lg bg-white/80 px-2 py-1.5 text-[11px] font-bold text-red-600">
                                             {selectedEmployee.dailyHours}h · {formatMoney(selectedEmployee.hourlyWage * selectedEmployee.dailyHours)}
