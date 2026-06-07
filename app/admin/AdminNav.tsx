@@ -141,7 +141,7 @@ export default function AdminNav({
     }
   }
 
-  const sidebarContent = (
+  const desktopSidebarContent = (
     <>
       <div className="shrink-0">
         <div className="text-[30px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
@@ -223,18 +223,102 @@ export default function AdminNav({
     </>
   )
 
+  const mobileMenuContent = (
+    <>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="text-[14px] font-black leading-none text-[#EF3B1D]">관리자 메뉴</div>
+          <div className="mt-1 truncate text-[12px] font-extrabold text-[#111827]">
+            {activeItem?.name || '관리자'}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setIsMobileMenuOpen(false)}
+          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] transition hover:bg-[#F4F5F7]"
+          aria-label="관리자 메뉴 닫기"
+        >
+          <X size={18} />
+        </button>
+      </div>
+
+      <nav className="mt-4 grid max-h-[calc(100vh-260px)] grid-cols-2 gap-2 overflow-y-auto pr-1">
+        {navItems.map((item) => (
+          <Link
+            key={item.path}
+            href={item.path}
+            prefetch={false}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`flex h-11 min-w-0 items-center justify-between gap-2 rounded-xl border px-3 text-[13px] font-extrabold no-underline transition-all duration-150 ${
+              isActive(item.path)
+                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_8px_18px_rgba(239,59,29,0.18)]'
+                : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#1F2937] hover:bg-white'
+            }`}
+            style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
+          >
+            <span className="truncate text-inherit">{item.name}</span>
+            {alertCountByPath[item.path] > 0 ? (
+              <span
+                className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
+                  isActive(item.path) ? 'bg-white/25 text-white' : 'bg-[#EF3B1D] text-white'
+                }`}
+                aria-label={`${alertCountByPath[item.path]}건 알림`}
+              >
+                {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
+              </span>
+            ) : null}
+          </Link>
+        ))}
+      </nav>
+
+      <div className="mt-4 border-t border-[#E5E7EB] pt-3">
+        <div className="flex items-center justify-between gap-2">
+          <div className="shrink-0 text-[13px] font-extrabold leading-none text-[#111827]">집하 문자</div>
+          <div className="flex min-w-0 items-center justify-end gap-1.5 text-[12px] font-bold leading-none text-[#EF3B1D]">
+            <input
+              type="number"
+              min={1}
+              inputMode="numeric"
+              value={shipmentCount}
+              onChange={(event) => setShipmentCount(event.target.value)}
+              className="h-8 w-11 rounded-lg border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold text-[#EF3B1D] outline-none"
+              aria-label="발송 건수"
+            />
+            <span className="shrink-0">건</span>
+            <button
+              type="button"
+              onClick={handleSendPickupSms}
+              disabled={sendingSms || loadingFromNumber}
+              className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[12px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {sendingSms ? '요청중' : '발송'}
+            </button>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => signOut({ callbackUrl: '/login' })}
+          className="mt-3 flex h-10 w-full items-center justify-center rounded-full border-none bg-[#0B1220] px-[18px] text-[14px] font-extrabold text-white shadow-[0_8px_18px_rgba(11,18,32,0.14)] transition-all duration-150 hover:bg-[#111827]"
+        >
+          로그아웃
+        </button>
+      </div>
+    </>
+  )
+
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E7EB] bg-white/95 px-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur print:hidden lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen(true)}
-          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] transition hover:bg-[#F4F5F7]"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-3 text-[#111827] transition hover:bg-[#F4F5F7]"
           aria-label="관리자 메뉴 열기"
           aria-expanded={isMobileMenuOpen}
-          aria-controls="admin-mobile-sidebar"
+          aria-controls="admin-mobile-menu"
         >
-          <Menu size={20} />
+          <Menu size={18} />
+          <span className="text-[13px] font-extrabold">메뉴</span>
         </button>
         <div className="min-w-0 text-center">
           <div className="text-[18px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
@@ -246,31 +330,30 @@ export default function AdminNav({
       </header>
 
       {isMobileMenuOpen ? (
-        <button
-          type="button"
-          className="fixed inset-0 z-[1001] bg-black/45 backdrop-blur-[2px] print:hidden lg:hidden"
-          onClick={() => setIsMobileMenuOpen(false)}
-          aria-label="관리자 메뉴 닫기"
-        />
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-[1001] bg-black/30 backdrop-blur-[1px] print:hidden lg:hidden"
+            onClick={() => setIsMobileMenuOpen(false)}
+            aria-label="관리자 메뉴 닫기"
+          />
+          <aside
+            id="admin-mobile-menu"
+            role="dialog"
+            aria-modal="true"
+            aria-label="관리자 메뉴"
+            className="fixed left-3 top-16 z-[1002] box-border max-h-[calc(100vh-76px)] w-[calc(100vw-24px)] max-w-[420px] overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-[0_18px_46px_rgba(15,23,42,0.22)] print:hidden lg:hidden"
+          >
+            {mobileMenuContent}
+          </aside>
+        </>
       ) : null}
 
       <aside
-        id="admin-mobile-sidebar"
-        className={`fixed bottom-0 left-0 top-0 z-[1002] box-border flex h-screen w-[260px] max-w-[82vw] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.16)] transition-transform duration-200 print:hidden lg:z-[1000] lg:max-w-none lg:translate-x-0 lg:shadow-[12px_0_34px_rgba(15,23,42,0.06)] ${
-          isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        id="admin-desktop-sidebar"
+        className="fixed bottom-0 left-0 top-0 z-[1000] box-border hidden h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.06)] print:hidden lg:flex"
       >
-        <div className="mb-2 flex items-start justify-between gap-3 lg:hidden">
-          <button
-            type="button"
-            onClick={() => setIsMobileMenuOpen(false)}
-            className="ml-auto inline-flex h-9 w-9 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] transition hover:bg-[#F4F5F7] lg:hidden"
-            aria-label="관리자 메뉴 닫기"
-          >
-            <X size={18} />
-          </button>
-        </div>
-        {sidebarContent}
+        {desktopSidebarContent}
       </aside>
     </>
   )
