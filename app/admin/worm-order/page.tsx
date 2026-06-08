@@ -772,6 +772,8 @@ function toCalendarWeatherTextByCode(code: number | null) {
 }
 
 function formatKstDateDot(date: Date) {
+    if (!Number.isFinite(date.getTime())) return '-'
+
     const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Seoul',
         year: 'numeric',
@@ -782,6 +784,32 @@ function formatKstDateDot(date: Date) {
     const month = parts.find((part) => part.type === 'month')?.value ?? '00'
     const day = parts.find((part) => part.type === 'day')?.value ?? '00'
     return `${year}.${month}.${day}`
+}
+
+function toValidDate(value: unknown): Date | null {
+    if (value === null || value === undefined || value === '') return null
+
+    const date = value instanceof Date ? value : new Date(String(value))
+    return Number.isFinite(date.getTime()) ? date : null
+}
+
+function formatSafeDateTime(
+    value: unknown,
+    options?: Intl.DateTimeFormatOptions,
+    fallback = '-',
+) {
+    const date = toValidDate(value)
+    if (!date) return fallback
+
+    try {
+        return new Intl.DateTimeFormat('ko-KR', options).format(date)
+    } catch {
+        return fallback
+    }
+}
+
+function formatSafeDate(value: unknown, fallback = '-') {
+    return formatSafeDateTime(value, undefined, fallback)
 }
 
 function getCalendarMonthlyPriceInfo(month: number) {
@@ -3817,7 +3845,7 @@ export default function WormOrderPage() {
         (activeWormOrderRecord.status === 'REMITTANCE_APPLIED' || activeWormOrderRecord.remittanceAppliedAt),
     )
     const activeOrderRemittanceAppliedAtText = activeWormOrderRecord?.remittanceAppliedAt
-        ? new Date(activeWormOrderRecord.remittanceAppliedAt).toLocaleString()
+        ? formatSafeDateTime(activeWormOrderRecord.remittanceAppliedAt)
         : ''
     const persistedRemittancePricingSummary = useMemo(
         () => buildRemittancePricingSummaryFromOrder(activeWormOrderRecord),
@@ -5055,7 +5083,7 @@ export default function WormOrderPage() {
                                                 </span>
                                                 {order.remittanceAppliedAt && (
                                                     <span className="text-[11px] font-semibold text-slate-500 dark:text-gray-400">
-                                                        신청 {new Date(order.remittanceAppliedAt).toLocaleString('ko-KR', {
+                                                        신청 {formatSafeDateTime(order.remittanceAppliedAt, {
                                                             year: 'numeric',
                                                             month: '2-digit',
                                                             day: '2-digit',
@@ -5605,7 +5633,7 @@ export default function WormOrderPage() {
                         </p>
                         {emailCacheSavedAt && (
                             <p className={`mt-1 text-[11px] font-medium ${usingOfflineEmailCache ? 'text-amber-600' : 'text-slate-400'}`}>
-                                {usingOfflineEmailCache ? '오프라인 캐시 사용 중' : '캐시 저장'} · {new Date(emailCacheSavedAt).toLocaleString()}
+                                {usingOfflineEmailCache ? '오프라인 캐시 사용 중' : '캐시 저장'} · {formatSafeDateTime(emailCacheSavedAt)}
                             </p>
                         )}
                     </div>
@@ -5667,7 +5695,7 @@ export default function WormOrderPage() {
                                             >
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
-                                                        {new Date(email.date).toLocaleDateString()}
+                                                        {formatSafeDate(email.date)}
                                                     </span>
                                                     {email.hasAttachments && <span className="text-[11px]">📎</span>}
                                                 </div>
@@ -5823,7 +5851,7 @@ export default function WormOrderPage() {
                                             </p>
                                         )}
                                         <div className="flex items-center gap-3 text-[12px] text-gray-500 font-medium tracking-tight">
-                                            <span>수신일시: {new Date(selectedEmail.date).toLocaleString()}</span>
+                                            <span>수신일시: {formatSafeDateTime(selectedEmail.date)}</span>
                                         </div>
 
                                         {(matchingEmailUid === selectedEmail.uid || invoiceOcrRunningUid === selectedEmail.uid) && (
@@ -5943,7 +5971,7 @@ export default function WormOrderPage() {
                                             >
                                                 <div className="flex justify-between items-start mb-2">
                                                     <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
-                                                        {new Date(email.date).toLocaleDateString()}
+                                                        {formatSafeDate(email.date)}
                                                     </span>
                                                     {email.hasAttachments && <span className="text-[11px]">📎</span>}
                                                 </div>
@@ -6056,7 +6084,7 @@ export default function WormOrderPage() {
                                             </p>
                                         )}
                                         <div className="flex items-center gap-3 text-[12px] text-gray-500 font-medium tracking-tight">
-                                            <span>수신일시: {new Date(selectedDoc.date).toLocaleString()}</span>
+                                            <span>수신일시: {formatSafeDateTime(selectedDoc.date)}</span>
                                         </div>
 
                                         <div className="mt-4 flex items-center gap-2">
@@ -6495,7 +6523,7 @@ export default function WormOrderPage() {
                         </div>
                         {remittanceSaveInfo && (
                             <p className="text-xs font-semibold text-emerald-700">
-                                발주 DB 저장 완료: {remittanceSaveInfo.orderNumber} / {new Date(remittanceSaveInfo.savedAt).toLocaleString()}
+                                발주 DB 저장 완료: {remittanceSaveInfo.orderNumber} / {formatSafeDateTime(remittanceSaveInfo.savedAt)}
                             </p>
                         )}
                     </div>
@@ -6806,7 +6834,7 @@ export default function WormOrderPage() {
                                     {forwardLogs.map((log) => (
                                         <div key={log.id} className="rounded-lg border border-slate-200 bg-slate-50/60 px-3 py-2">
                                             <p className="text-[12px] font-semibold text-slate-700">
-                                                {new Date(log.createdAt).toLocaleString()} · {log.toEmail}
+                                                {formatSafeDateTime(log.createdAt)} · {log.toEmail}
                                             </p>
                                             <p className="text-[11px] text-slate-500">
                                                 발신계정 {log.fromEmail} · 첨부 {log.attachmentCount}개{log.sentByUserName ? ` · 처리자 ${log.sentByUserName}` : ''}
@@ -6902,7 +6930,7 @@ export default function WormOrderPage() {
                                 </span>
                                 {shippingPrintedAt && (
                                     <span className="text-[11px] font-semibold text-slate-500">
-                                        {new Date(shippingPrintedAt).toLocaleString()}
+                                        {formatSafeDateTime(shippingPrintedAt)}
                                     </span>
                                 )}
                             </div>
