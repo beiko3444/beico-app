@@ -99,6 +99,8 @@ type CustomsProgressResult = {
     query: {
         kind: 'cargMtNo' | 'mblNo' | 'hblNo'
         blYy: string | null
+        value?: string
+        label?: string
     }
     tCnt: number
     ntceInfo: string
@@ -4994,11 +4996,7 @@ export default function WormOrderPage() {
                 </div>
             </section>
 
-            <div className="grid gap-6 xl:grid-cols-[340px_minmax(0,1fr)] xl:items-start">
-                <div className="xl:sticky xl:top-4 xl:col-start-1 xl:row-start-1 xl:self-start">
-                    {workflowFlowPanel}
-                </div>
-                <div className="min-w-0 flex flex-col gap-6 xl:col-start-2 xl:row-start-1">
+            <div className="min-w-0 flex flex-col gap-6">
             <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-7">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
@@ -7028,7 +7026,6 @@ export default function WormOrderPage() {
                 </div>
             )}
 
-                </div>
             </div>
 
             {remittanceCandidates && remittanceCandidatesOrder && (

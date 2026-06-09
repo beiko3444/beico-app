@@ -3,6 +3,7 @@ import { requireAdminSession } from '@/lib/requireAdmin'
 import {
     buildUnipassSearchParams,
     getKoreaCurrentYear,
+    looksLikeMasterAirWaybill,
     normalizeBlNo,
     resolveUnipassQueryAttempts,
     type UnipassQueryKind,
@@ -84,7 +85,7 @@ function parseApi001Xml(xml: string): Api001ParseResult {
     return { tCnt, ntceInfo, summaryRecords, detailRecords }
 }
 
-async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null }) {
+async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null; value: string; label: string }) {
     const params = buildUnipassSearchParams(apiKey, blNo, attempt)
 
     const response = await fetch(`${UNIPASS_API_URL}?${params.toString()}`, {
@@ -134,7 +135,7 @@ export async function GET(request: NextRequest) {
     }
 
     const currentYear = getKoreaCurrentYear()
-    const attempts: Array<{ kind: UnipassQueryKind; blYy: string | null; tCnt: number; ntceInfo: string }> = []
+    const attempts: Array<{ kind: UnipassQueryKind; blYy: string | null; value: string; label: string; tCnt: number; ntceInfo: string }> = []
 
     for (const apiKey of apiKeys) {
         for (const attempt of resolveUnipassQueryAttempts(blNo, currentYear, LOOKBACK_YEARS)) {
@@ -174,12 +175,18 @@ export async function GET(request: NextRequest) {
     }
 
     const hasOnlyRequestFailures = attempts.length > 0 && attempts.every((attempt) => attempt.tCnt === -1 && attempt.ntceInfo)
+    const notFoundMessage = looksLikeMasterAirWaybill(blNo)
+        ? `유니패스 통관 DB에 아직 조회 결과가 없습니다. ${blNo.slice(0, 3)}-${blNo.slice(3)} AWB가 실제 운송장이어도, 한국 도착 전이거나 항공사/포워더가 적하목록을 전송하기 전이면 유니패스에 안 뜹니다. House B/L이 따로 있으면 H B/L 번호로 조회하세요.`
+        : '조회 결과가 없습니다. H B/L 또는 M B/L 번호와 입항연도를 확인해주세요.'
     const notFoundPayload = {
         error: hasOnlyRequestFailures
             ? '유니패스 서버 요청이 실패했습니다. 잠시 후 다시 조회해주세요.'
             : '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
         blNo,
         attempts,
+    }
+    if (!hasOnlyRequestFailures) {
+        notFoundPayload.error = notFoundMessage
     }
     customsProgressCache.set(cacheKey, {
         expiresAt: Date.now() + CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS,
