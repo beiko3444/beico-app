@@ -3402,7 +3402,19 @@ export default function WormOrderPage() {
 
         try {
             const params = new URLSearchParams()
-            params.set('subjectKeyword', 'documents,documets')
+            params.set('subjectKeyword', [
+                'documents',
+                'documets',
+                'document',
+                'shipping documents',
+                'shipment arrival',
+                'shipment',
+                'awb',
+                'air waybill',
+                'waybill',
+                'payment invoice',
+            ].join(','))
+            params.set('forceRefresh', '1')
             if (requestOrderId) {
                 params.set('orderId', requestOrderId)
             }

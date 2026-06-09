@@ -37,7 +37,22 @@ export async function GET(request: Request) {
             .map((token) => token.trim())
             .filter(Boolean)
         const isInvoiceInboxRequest = keywordTokens.includes('invoice') || keywordTokens.includes('payment')
-        const subjectKeyword = isInvoiceInboxRequest ? 'invoice,payment' : requestedSubjectKeyword
+        const awbDocumentTokens = new Set([
+            'documents',
+            'documets',
+            'document',
+            'shipping document',
+            'shipping documents',
+            'shipment arrival',
+            'shipment',
+            'awb',
+            'air waybill',
+            'waybill',
+            'payment invoice',
+        ])
+        const isAwbDocumentInboxRequest = keywordTokens.some((token) => awbDocumentTokens.has(token))
+        const isInvoiceOnlyInboxRequest = isInvoiceInboxRequest && !isAwbDocumentInboxRequest
+        const subjectKeyword = isInvoiceOnlyInboxRequest ? 'invoice,payment' : requestedSubjectKeyword
 
         const emails = await withTimeout(
             loadWormEmailList({
@@ -45,8 +60,8 @@ export async function GET(request: Request) {
                 scanLimit: 40,
                 listLimit: 20,
                 orderId,
-                senderEmail: isInvoiceInboxRequest ? 'michael@oikki.com' : null,
-                keywordMatchInSource: isInvoiceInboxRequest,
+                senderEmail: isInvoiceOnlyInboxRequest ? 'michael@oikki.com' : null,
+                keywordMatchInSource: isInvoiceOnlyInboxRequest,
                 forceRefresh,
             }),
             EMAIL_SCAN_TIMEOUT_MS,

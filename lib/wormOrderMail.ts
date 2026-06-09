@@ -228,7 +228,7 @@ function inferWormEmailMatchType(input: {
     input.invoiceTotalAmountUsd !== null ||
     input.invoiceUnitPriceKrw !== null ||
     input.invoiceTotalAmountKrw !== null
-  if (!hasInvoiceAmount && input.awbNumber && /(document|documets|documents|awb|skm|waybill)/i.test(subject)) {
+  if (!hasInvoiceAmount && input.awbNumber && /(document|documets|documents|awb|skm|waybill|shipment\s+arrival|payment\s+invoice)/i.test(subject)) {
     return 'AWB_DOCUMENT'
   }
 
