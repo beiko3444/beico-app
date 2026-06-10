@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { request as httpsRequest } from 'node:https'
 import { requireAdminSession } from '@/lib/requireAdmin'
 import {
     buildUnipassSearchParams,
@@ -16,6 +17,8 @@ const CUSTOMS_PROGRESS_CACHE_TTL_MS = 10 * 60 * 1000
 const CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS = 60 * 1000
 const UNIPASS_REQUEST_TIMEOUT_MS = 15 * 1000
 const UNIPASS_REQUEST_RETRY_COUNT = 2
+
+export const runtime = 'nodejs'
 
 function resolveUnipassApiKeys() {
     const configuredKey = process.env.UNIPASS_API_KEY?.trim()
@@ -107,12 +110,50 @@ function formatRequestError(error: unknown) {
     return error.message
 }
 
-async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null; value: string; label: string }) {
-    const params = buildUnipassSearchParams(apiKey, blNo, attempt)
-    const url = `${UNIPASS_API_URL}?${params.toString()}`
-    let lastError: unknown = null
+function requestXmlWithNodeHttps(url: string) {
+    return new Promise<string>((resolve, reject) => {
+        const request = httpsRequest(
+            url,
+            {
+                method: 'GET',
+                family: 4,
+                headers: {
+                    Accept: 'application/xml,text/xml,*/*',
+                    'User-Agent': 'beiko-admin/1.0',
+                },
+                timeout: UNIPASS_REQUEST_TIMEOUT_MS,
+            },
+            (response) => {
+                const chunks: Buffer[] = []
 
-    for (let requestIndex = 0; requestIndex <= UNIPASS_REQUEST_RETRY_COUNT; requestIndex += 1) {
+                response.on('data', (chunk) => {
+                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
+                })
+
+                response.on('end', () => {
+                    const rawXml = Buffer.concat(chunks).toString('utf8')
+                    const statusCode = response.statusCode || 0
+
+                    if (statusCode < 200 || statusCode >= 300) {
+                        reject(new Error(`UNI-PASS node HTTPS request failed (${statusCode})`))
+                        return
+                    }
+
+                    resolve(rawXml)
+                })
+            },
+        )
+
+        request.on('timeout', () => {
+            request.destroy(new Error('UNI-PASS node HTTPS request timed out'))
+        })
+        request.on('error', reject)
+        request.end()
+    })
+}
+
+async function requestXml(url: string) {
+    try {
         const controller = new AbortController()
         const timeout = setTimeout(() => controller.abort(), UNIPASS_REQUEST_TIMEOUT_MS)
 
@@ -129,17 +170,38 @@ async function requestApi001(apiKey: string, blNo: string, attempt: { kind: Unip
 
             const rawXml = await response.text()
             if (!response.ok) {
-                throw new Error(`UNI-PASS request failed (${response.status})`)
+                throw new Error(`UNI-PASS fetch request failed (${response.status})`)
             }
 
+            return rawXml
+        } finally {
+            clearTimeout(timeout)
+        }
+    } catch (fetchError) {
+        try {
+            return await requestXmlWithNodeHttps(url)
+        } catch (nodeHttpsError) {
+            throw new Error(
+                `fetch: ${formatRequestError(fetchError)}; node:https: ${formatRequestError(nodeHttpsError)}`,
+            )
+        }
+    }
+}
+
+async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null; value: string; label: string }) {
+    const params = buildUnipassSearchParams(apiKey, blNo, attempt)
+    const url = `${UNIPASS_API_URL}?${params.toString()}`
+    let lastError: unknown = null
+
+    for (let requestIndex = 0; requestIndex <= UNIPASS_REQUEST_RETRY_COUNT; requestIndex += 1) {
+        try {
+            const rawXml = await requestXml(url)
             return parseApi001Xml(rawXml)
         } catch (error) {
             lastError = error
             if (requestIndex < UNIPASS_REQUEST_RETRY_COUNT) {
                 await sleep(300 * (requestIndex + 1))
             }
-        } finally {
-            clearTimeout(timeout)
         }
     }
 
