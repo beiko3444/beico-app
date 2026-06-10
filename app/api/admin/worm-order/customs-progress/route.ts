@@ -14,6 +14,8 @@ const UNIPASS_API_URL = 'https://unipass.customs.go.kr:38010/ext/rest/cargCsclPr
 const LOOKBACK_YEARS = 3
 const CUSTOMS_PROGRESS_CACHE_TTL_MS = 10 * 60 * 1000
 const CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS = 60 * 1000
+const UNIPASS_REQUEST_TIMEOUT_MS = 15 * 1000
+const UNIPASS_REQUEST_RETRY_COUNT = 2
 
 function resolveUnipassApiKeys() {
     const configuredKey = process.env.UNIPASS_API_KEY?.trim()
@@ -85,23 +87,63 @@ function parseApi001Xml(xml: string): Api001ParseResult {
     return { tCnt, ntceInfo, summaryRecords, detailRecords }
 }
 
-async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null; value: string; label: string }) {
-    const params = buildUnipassSearchParams(apiKey, blNo, attempt)
+function sleep(ms: number) {
+    return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
-    const response = await fetch(`${UNIPASS_API_URL}?${params.toString()}`, {
-        method: 'GET',
-        headers: {
-            Accept: 'application/xml,text/xml,*/*',
-        },
-        cache: 'no-store',
-    })
+function formatRequestError(error: unknown) {
+    if (!(error instanceof Error)) return String(error)
 
-    const rawXml = await response.text()
-    if (!response.ok) {
-        throw new Error(`UNI-PASS 요청 실패 (${response.status})`)
+    const cause = (error as Error & { cause?: unknown }).cause
+    if (cause instanceof Error && cause.message && cause.message !== error.message) {
+        return `${error.message}: ${cause.message}`
     }
 
-    return parseApi001Xml(rawXml)
+    if (cause && typeof cause === 'object' && 'code' in cause) {
+        const code = (cause as { code?: string }).code
+        return code ? `${error.message}: ${code}` : error.message
+    }
+
+    return error.message
+}
+
+async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null; value: string; label: string }) {
+    const params = buildUnipassSearchParams(apiKey, blNo, attempt)
+    const url = `${UNIPASS_API_URL}?${params.toString()}`
+    let lastError: unknown = null
+
+    for (let requestIndex = 0; requestIndex <= UNIPASS_REQUEST_RETRY_COUNT; requestIndex += 1) {
+        const controller = new AbortController()
+        const timeout = setTimeout(() => controller.abort(), UNIPASS_REQUEST_TIMEOUT_MS)
+
+        try {
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    Accept: 'application/xml,text/xml,*/*',
+                    'User-Agent': 'beiko-admin/1.0',
+                },
+                cache: 'no-store',
+                signal: controller.signal,
+            })
+
+            const rawXml = await response.text()
+            if (!response.ok) {
+                throw new Error(`UNI-PASS request failed (${response.status})`)
+            }
+
+            return parseApi001Xml(rawXml)
+        } catch (error) {
+            lastError = error
+            if (requestIndex < UNIPASS_REQUEST_RETRY_COUNT) {
+                await sleep(300 * (requestIndex + 1))
+            }
+        } finally {
+            clearTimeout(timeout)
+        }
+    }
+
+    throw new Error(`UNI-PASS request failed: ${formatRequestError(lastError)}`)
 }
 
 export async function GET(request: NextRequest) {
@@ -175,26 +217,29 @@ export async function GET(request: NextRequest) {
     }
 
     const hasOnlyRequestFailures = attempts.length > 0 && attempts.every((attempt) => attempt.tCnt === -1 && attempt.ntceInfo)
+    const hasCurrentYearRequestFailure = attempts.some((attempt) => attempt.blYy === String(currentYear) && attempt.tCnt === -1)
+    const hasOnlyZeroResultsAfterFailure = attempts.some((attempt) => attempt.tCnt >= 0) && attempts.every((attempt) => attempt.tCnt <= 0)
+    const shouldReportRequestFailure = hasOnlyRequestFailures || (hasCurrentYearRequestFailure && hasOnlyZeroResultsAfterFailure)
     const notFoundMessage = looksLikeMasterAirWaybill(blNo)
         ? `유니패스 통관 DB에 아직 조회 결과가 없습니다. ${blNo.slice(0, 3)}-${blNo.slice(3)} AWB가 실제 운송장이어도, 한국 도착 전이거나 항공사/포워더가 적하목록을 전송하기 전이면 유니패스에 안 뜹니다. House B/L이 따로 있으면 H B/L 번호로 조회하세요.`
         : '조회 결과가 없습니다. H B/L 또는 M B/L 번호와 입항연도를 확인해주세요.'
     const notFoundPayload = {
-        error: hasOnlyRequestFailures
+        error: shouldReportRequestFailure
             ? '유니패스 서버 요청이 실패했습니다. 잠시 후 다시 조회해주세요.'
             : '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
         blNo,
         attempts,
     }
-    if (!hasOnlyRequestFailures) {
+    if (!shouldReportRequestFailure) {
         notFoundPayload.error = notFoundMessage
     }
     customsProgressCache.set(cacheKey, {
         expiresAt: Date.now() + CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS,
-        status: hasOnlyRequestFailures ? 502 : 404,
+        status: shouldReportRequestFailure ? 502 : 404,
         payload: notFoundPayload,
     })
     return NextResponse.json(notFoundPayload, {
-        status: hasOnlyRequestFailures ? 502 : 404,
+        status: shouldReportRequestFailure ? 502 : 404,
         headers: {
             'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
         },
