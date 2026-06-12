@@ -112,6 +112,7 @@ type MonitorBase = {
 
 const CHANNELS: SmartInventoryChannel[] = ['naver', 'coupang']
 const TUNNEL_DOWN_STATUS = new Set([502, 503, 504, 530])
+const DEFAULT_MONITOR_URL_GIST = 'https://gist.githubusercontent.com/beiko3444/5a69e99d96fa2ae34ba4af96c117d5e0/raw/monitor.json'
 
 function cleanString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -191,12 +192,13 @@ async function resolveMonitorUrlFromGist(gistRawUrl: string, timeoutMs: number):
 async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promise<MonitorBase | null> {
   const warnings: string[] = []
   const envUrl = normalizeBaseUrl(process.env.SMARTINVENTORY_MONITOR_URL)
-  const gistRawUrl = cleanString(process.env.SMARTINVENTORY_MONITOR_URL_GIST)
+  const configuredGistRawUrl = cleanString(process.env.SMARTINVENTORY_MONITOR_URL_GIST)
+  const gistRawUrl = configuredGistRawUrl || (envUrl ? '' : DEFAULT_MONITOR_URL_GIST)
 
   if (gistRawUrl) {
     const gistUrl = await resolveMonitorUrlFromGist(gistRawUrl, Math.min(timeoutMs, 5000))
     if (gistUrl) return { url: gistUrl, source: 'gist', warnings }
-    warnings.push('Gist에서 라즈베리 터널 URL을 가져오지 못해 SMARTINVENTORY_MONITOR_URL로 시도합니다.')
+    warnings.push('라즈베리 터널 Gist에서 현재 URL을 가져오지 못해 SMARTINVENTORY_MONITOR_URL로 시도합니다.')
   }
 
   if (envUrl) return { url: envUrl, source: 'env', warnings }
@@ -555,7 +557,7 @@ export async function fetchSmartInventoryDashboard(): Promise<SmartInventoryDash
       unlinkedRows: { naver: [], coupang: [] },
       stockInbounds: { items: [], summaries: [] },
       syncedAt,
-      warnings: ['SMARTINVENTORY_MONITOR_URL 또는 SMARTINVENTORY_MONITOR_URL_GIST 환경변수가 필요합니다.'],
+      warnings: ['라즈베리 모니터 서버 주소를 확인하지 못했습니다. SMARTINVENTORY_MONITOR_URL 또는 SMARTINVENTORY_MONITOR_URL_GIST를 확인해 주세요.'],
       summary: {
         masterCount: 0,
         linkedCount: 0,

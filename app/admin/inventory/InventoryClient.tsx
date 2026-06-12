@@ -425,7 +425,7 @@ export default function InventoryClient() {
       {data?.configured === false ? (
         <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-bold text-amber-800">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
-          <span>라즈베리 모니터 서버 주소가 설정되지 않았습니다. `.env.local`에 `SMARTINVENTORY_MONITOR_URL` 또는 `SMARTINVENTORY_MONITOR_URL_GIST`를 넣으면 바로 조회됩니다.</span>
+          <span>라즈베리 모니터 서버 주소를 확인하지 못했습니다. Gist 터널 또는 `SMARTINVENTORY_MONITOR_URL` 설정을 확인해 주세요.</span>
         </div>
       ) : null}
 
