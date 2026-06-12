@@ -2189,10 +2189,16 @@ export default function CardUsageClient() {
                   const isCatSelectOpen = catSelectItemId === item.id
                   const isReviewed = Boolean(item.reviewedAt)
                   const isSelected = selectedItemId === item.id
+                  const hasMemo = Boolean(displayMemo.trim())
                   const usedMonthDay = formatMonthDay(item.usedAt)
                   const usedTime = formatAmPmTime(item.usedAt) || '-'
                   const defaultRowBg = reviewMode ? (isReviewed ? T.reviewDoneBg : T.reviewPendingBg) : T.surface
                   const defaultRowBorder = reviewMode ? (isReviewed ? T.reviewDoneBorder : T.reviewPendingBorder) : T.borderLight
+                  const memoRowBg = theme === 'dark' ? '#123524' : '#ECFDF3'
+                  const memoSelectedBg = theme === 'dark' ? '#16452D' : '#DCFCE7'
+                  const memoRowBorder = theme === 'dark' ? '#166534' : '#86EFAC'
+                  const rowBg = hasMemo ? (isSelected ? memoSelectedBg : memoRowBg) : (isSelected ? T.selectedBg : defaultRowBg)
+                  const rowBorder = hasMemo ? memoRowBorder : (isSelected ? T.selectedBorder : defaultRowBorder)
 
                   return (
                     <div
@@ -2204,11 +2210,11 @@ export default function CardUsageClient() {
                         gridTemplateColumns: '72px 1fr auto',
                         gap: 12,
                         alignItems: 'center',
-                        background: isSelected ? T.selectedBg : defaultRowBg,
-                        border: `1px solid ${isSelected ? T.selectedBorder : defaultRowBorder}`,
+                        background: rowBg,
+                        border: `1px solid ${rowBorder}`,
                         borderRadius: 10,
                         padding: '12px 14px',
-                        transition: 'border-color .15s',
+                        transition: 'background .15s, border-color .15s',
                         position: 'relative',
                         cursor: 'pointer',
                       }}
