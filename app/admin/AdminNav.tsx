@@ -122,8 +122,12 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
                 <div className="truncate text-[11px] font-black text-slate-900" title={row.name}>
                   {row.name}
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-extrabold text-slate-500">
-                  <span className="truncate">N {formatSidebarStock(row.naverStock)} / C {formatSidebarStock(row.coupangStock)}</span>
+                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-extrabold">
+                  <span className="truncate">
+                    <span className="text-emerald-600">N {formatSidebarStock(row.naverStock)}</span>
+                    <span className="mx-1 text-slate-300">/</span>
+                    <span className="text-red-600">C {formatSidebarStock(row.coupangStock)}</span>
+                  </span>
                   <span className={`shrink-0 tabular-nums ${row.totalStock !== null && row.totalStock <= 5 ? 'text-red-600' : 'text-[#EF3B1D]'}`}>
                     {formatSidebarStock(row.totalStock)}
                   </span>

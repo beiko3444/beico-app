@@ -120,7 +120,7 @@ function StatCard({
   icon: ReactNode
   label: string
   value: string
-  sub: string
+  sub: ReactNode
   tone?: 'navy' | 'blue' | 'orange' | 'red' | 'green'
 }) {
   const iconClass =
@@ -147,6 +147,22 @@ function StatCard({
       </div>
       <div className="mt-3 truncate text-[12px] font-bold text-slate-500">{sub}</div>
     </div>
+  )
+}
+
+function InventoryStockSub({
+  naver,
+  coupang,
+}: {
+  naver: number | null | undefined
+  coupang: number | null | undefined
+}) {
+  return (
+    <span>
+      <span className="text-emerald-600">네이버 {formatNumber(naver)}</span>
+      <span className="mx-1 text-slate-300">/</span>
+      <span className="text-red-600">쿠팡 {formatNumber(coupang)}</span>
+    </span>
   )
 }
 
@@ -267,8 +283,8 @@ function SortableMasterRow({
         </div>
       </td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
-      <td className={`px-3 py-2 text-right text-[13px] font-black tabular-nums ${stockTone(row.naverStock)}`}>{formatNumber(row.naverStock)}</td>
-      <td className={`px-3 py-2 text-right text-[13px] font-black tabular-nums ${stockTone(row.coupangStock)}`}>{formatNumber(row.coupangStock)}</td>
+      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-emerald-600">{formatNumber(row.naverStock)}</td>
+      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-red-600">{formatNumber(row.coupangStock)}</td>
       <td className={`px-3 py-2 text-right text-[14px] font-black tabular-nums ${stockTone(row.totalStock)}`}>{formatNumber(row.totalStock)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600">{formatNumber(row.totalInboundPending)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(row.stockCost)}</td>
@@ -314,14 +330,14 @@ function MasterTable({
   return (
     <div className="overflow-x-auto rounded-xl border border-[#E5EAF2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
       <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-        <table className="w-[1360px] table-fixed border-collapse text-left text-[13px] xl:w-full">
+        <table className="w-[1360px] table-fixed border-collapse text-left text-[13px]">
           <thead className="border-b border-[#E5EAF2] bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
             <tr>
               <th className="w-[86px] px-3 py-3">순번</th>
               <th className="w-[330px] px-3 py-3">상품</th>
               <th className="w-[105px] px-3 py-3 text-right">판매가</th>
-              <th className="w-[84px] px-3 py-3 text-right">네이버</th>
-              <th className="w-[84px] px-3 py-3 text-right">쿠팡</th>
+              <th className="w-[84px] px-3 py-3 text-right text-emerald-600">네이버</th>
+              <th className="w-[84px] px-3 py-3 text-right text-red-600">쿠팡</th>
               <th className="w-[90px] px-3 py-3 text-right">총재고</th>
               <th className="w-[90px] px-3 py-3 text-right">입고대기</th>
               <th className="w-[130px] px-3 py-3 text-right">재고가치</th>
@@ -614,7 +630,13 @@ export default function InventoryClient() {
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(data?.summary.masterCount || 0)} sub="등록된 전체 상품 수" />
-        <StatCard icon={<Database size={20} />} label="총 재고" value={formatNumber(data?.summary.totalStock || 0)} sub={`네이버 ${formatNumber(data?.summary.naverStock || 0)} / 쿠팡 ${formatNumber(data?.summary.coupangStock || 0)}`} tone="blue" />
+        <StatCard
+          icon={<Database size={20} />}
+          label="총 재고"
+          value={formatNumber(data?.summary.totalStock || 0)}
+          sub={<InventoryStockSub naver={data?.summary.naverStock || 0} coupang={data?.summary.coupangStock || 0} />}
+          tone="blue"
+        />
         <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="입고 예정 상품 수" tone="orange" />
         <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub="연결되지 않은 상품 수" tone="red" />
         <StatCard icon={<WalletCards size={20} />} label="재고가치" value={formatMoney(data?.summary.stockCost || 0)} sub="총 재고 기준 금액" tone="green" />
