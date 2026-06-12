@@ -22,6 +22,7 @@ export default function AdminNav({
   const navItems = [
     { name: '주문관리', path: '/admin/orders' },
     { name: '상품관리', path: '/admin/products' },
+    { name: '재고관리', path: '/admin/inventory' },
     { name: '파트너관리', path: '/admin/partners' },
     { name: '생산관리', path: '/admin/production' },
     { name: '근태관리', path: '/admin/tasks' },
