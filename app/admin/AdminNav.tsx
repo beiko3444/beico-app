@@ -4,17 +4,37 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
-import { Menu, Star, X } from 'lucide-react'
+import { Boxes, Menu, Star, X } from 'lucide-react'
 import {
   INVENTORY_FAVORITES_EVENT,
-  INVENTORY_FAVORITES_KEY,
-  readStoredNumberArray,
+  type InventoryPreferencesPayload,
+  uniqueInventoryIds,
 } from '@/lib/smartInventoryPrefs'
 import type { SmartInventoryDashboardPayload, SmartInventoryMasterRow } from '@/lib/smartInventoryClient'
 
 function formatSidebarStock(value: number | null | undefined) {
   if (value === null || value === undefined) return '-'
   return value.toLocaleString('ko-KR')
+}
+
+function SidebarProductImage({ src, alt }: { src: string | null; alt: string }) {
+  const [failed, setFailed] = useState(false)
+  if (!src || failed) {
+    return (
+      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#FFE1B0] bg-white/80 text-slate-300">
+        <Boxes size={15} />
+      </div>
+    )
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="h-10 w-10 shrink-0 rounded-lg border border-[#FFE1B0] bg-white object-cover"
+      onError={() => setFailed(true)}
+    />
+  )
 }
 
 function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
@@ -27,14 +47,18 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   }, [])
 
   const loadFavorites = useCallback(async () => {
-    const ids = readStoredNumberArray(INVENTORY_FAVORITES_KEY)
-    if (!ids.length) {
-      setFavoriteRows([])
-      return
-    }
-
     setLoading(true)
     try {
+      const preferencesResponse = await fetch('/api/admin/inventory/preferences', { cache: 'no-store' })
+      const preferences: InventoryPreferencesPayload | null = await preferencesResponse.json().catch(() => null)
+      if (!preferencesResponse.ok) throw new Error('failed')
+
+      const ids = uniqueInventoryIds(preferences?.favoriteMasterIds)
+      if (!ids.length) {
+        setFavoriteRows([])
+        return
+      }
+
       const response = await fetch('/api/admin/inventory', { cache: 'no-store' })
       const payload: SmartInventoryDashboardPayload = await response.json()
       if (!response.ok || !Array.isArray(payload.rows)) throw new Error('failed')
@@ -50,26 +74,22 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   useEffect(() => {
     loadFavorites()
 
-    const handleStorage = (event: StorageEvent) => {
-      if (event.key === INVENTORY_FAVORITES_KEY) loadFavorites()
-    }
-
     const handleFavoriteEvent = (event: Event) => {
-      const ids = readStoredNumberArray(INVENTORY_FAVORITES_KEY)
-      const rows = (event as CustomEvent<{ rows?: SmartInventoryMasterRow[] }>).detail?.rows
-      if (ids.length && Array.isArray(rows)) {
-        applyRows(ids, rows)
+      const detail = (event as CustomEvent<{ favoriteMasterIds?: number[]; rows?: SmartInventoryMasterRow[] }>).detail
+      const ids = uniqueInventoryIds(detail?.favoriteMasterIds)
+      if (ids.length && Array.isArray(detail?.rows)) {
+        applyRows(ids, detail.rows)
+        return
+      }
+      if (!ids.length && Array.isArray(detail?.rows)) {
+        setFavoriteRows([])
         return
       }
       loadFavorites()
     }
 
     window.addEventListener(INVENTORY_FAVORITES_EVENT, handleFavoriteEvent)
-    window.addEventListener('storage', handleStorage)
-    return () => {
-      window.removeEventListener(INVENTORY_FAVORITES_EVENT, handleFavoriteEvent)
-      window.removeEventListener('storage', handleStorage)
-    }
+    return () => window.removeEventListener(INVENTORY_FAVORITES_EVENT, handleFavoriteEvent)
   }, [applyRows, loadFavorites])
 
   if (!favoriteRows.length && !loading) return null
@@ -81,12 +101,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
           <Star size={14} className="text-amber-500" fill="currentColor" />
           즐겨찾기 재고
         </div>
-        <Link
-          href="/admin/inventory"
-          prefetch={false}
-          onClick={onNavigate}
-          className="text-[10px] font-black text-[#EF3B1D] no-underline"
-        >
+        <Link href="/admin/inventory" prefetch={false} onClick={onNavigate} className="text-[10px] font-black text-[#EF3B1D] no-underline">
           열기
         </Link>
       </div>
@@ -100,16 +115,19 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
               href="/admin/inventory"
               prefetch={false}
               onClick={onNavigate}
-              className="block rounded-lg border border-[#FFE1B0] bg-white px-2.5 py-2 text-inherit no-underline transition hover:bg-[#FFF3D9]"
+              className="flex items-center gap-2 rounded-lg border border-[#FFE1B0] bg-white px-2.5 py-2 text-inherit no-underline transition hover:bg-[#FFF3D9]"
             >
-              <div className="truncate text-[11px] font-black text-slate-900" title={row.name}>
-                {row.name}
-              </div>
-              <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-extrabold text-slate-500">
-                <span>N {formatSidebarStock(row.naverStock)} / C {formatSidebarStock(row.coupangStock)}</span>
-                <span className={`tabular-nums ${row.totalStock !== null && row.totalStock <= 5 ? 'text-red-600' : 'text-[#EF3B1D]'}`}>
-                  {formatSidebarStock(row.totalStock)}
-                </span>
+              <SidebarProductImage src={row.imageUrl} alt={row.name} />
+              <div className="min-w-0 flex-1">
+                <div className="truncate text-[11px] font-black text-slate-900" title={row.name}>
+                  {row.name}
+                </div>
+                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-extrabold text-slate-500">
+                  <span className="truncate">N {formatSidebarStock(row.naverStock)} / C {formatSidebarStock(row.coupangStock)}</span>
+                  <span className={`shrink-0 tabular-nums ${row.totalStock !== null && row.totalStock <= 5 ? 'text-red-600' : 'text-[#EF3B1D]'}`}>
+                    {formatSidebarStock(row.totalStock)}
+                  </span>
+                </div>
               </div>
             </Link>
           ))
@@ -154,7 +172,6 @@ export default function AdminNav({
   }
 
   const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
-
   const activeItem = navItems.find((item) => isActive(item.path))
 
   useEffect(() => {
@@ -163,15 +180,12 @@ export default function AdminNav({
 
   useEffect(() => {
     if (!isMobileMenuOpen) return
-
     const previousOverflow = document.body.style.overflow
     document.body.style.overflow = 'hidden'
-
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') setIsMobileMenuOpen(false)
     }
     window.addEventListener('keydown', handleKeyDown)
-
     return () => {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
@@ -221,14 +235,11 @@ export default function AdminNav({
       alert('발송 건수를 1 이상으로 입력해 주세요.')
       return
     }
-    const shouldSend = confirm(`집하요청 문자 ${pickupCount}건을 발송하시겠습니까?`)
-    if (!shouldSend) {
-      return
-    }
+    if (!confirm(`집하요청 문자 ${pickupCount}건을 발송하시겠습니까?`)) return
 
     const now = new Date()
     const contents = [
-      '소장님, 엑스트래커입니다.',
+      '도매장님, 익스트래커입니다.',
       `${now.getMonth() + 1}/${now.getDate()} 출고 ${pickupCount}건 집하 부탁드립니다.`,
       '감사합니다.',
     ].join('\n')
@@ -240,7 +251,7 @@ export default function AdminNav({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fromNumber,
-          toName: '소장님',
+          toName: '도매장',
           toNumber: '01027104466',
           contents,
         }),
@@ -255,6 +266,44 @@ export default function AdminNav({
     }
   }
 
+  const renderNavItems = (mobile = false) => (
+    <>
+      {navItems.map((item) => (
+        <Link
+          key={item.path}
+          href={item.path}
+          prefetch={false}
+          onClick={() => setIsMobileMenuOpen(false)}
+          className={`flex ${mobile ? 'h-11' : 'h-[38px] min-h-[38px]'} min-w-0 items-center justify-between rounded-[12px] border px-4 text-[14px] font-extrabold tracking-[-0.025em] no-underline transition-all duration-150 ${
+            isActive(item.path)
+              ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_20px_rgba(239,59,29,0.22)]'
+              : 'border-transparent bg-transparent text-[#1F2937] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
+          }`}
+          style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
+        >
+          <span className="truncate text-inherit">{item.name}</span>
+          <span className="inline-flex items-center gap-1.5">
+            {alertCountByPath[item.path] > 0 ? (
+              <span
+                className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
+                  isActive(item.path) ? 'bg-white/25 text-white' : 'bg-[#EF3B1D] text-white'
+                }`}
+                aria-label={`${alertCountByPath[item.path]}건 알림`}
+              >
+                {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
+              </span>
+            ) : null}
+            {isActive(item.path) && !mobile ? (
+              <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-1 text-[9px] font-black tracking-[0.08em] text-white">
+                ACTIVE
+              </span>
+            ) : null}
+          </span>
+        </Link>
+      ))}
+    </>
+  )
+
   const desktopSidebarContent = (
     <>
       <div className="shrink-0">
@@ -263,41 +312,7 @@ export default function AdminNav({
       </div>
       <div className="mb-4 mt-5 h-px shrink-0 bg-[#E5E7EB]" />
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-3">
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            prefetch={false}
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`flex h-[38px] min-h-[38px] items-center justify-between rounded-[12px] border px-4 text-[14px] font-extrabold tracking-[-0.025em] no-underline transition-all duration-150 ${
-              isActive(item.path)
-                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_20px_rgba(239,59,29,0.22)]'
-                : 'border-transparent bg-transparent text-[#1F2937] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
-            }`}
-            style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
-          >
-            <span className="text-inherit">{item.name}</span>
-            <span className="inline-flex items-center gap-1.5">
-              {alertCountByPath[item.path] > 0 ? (
-                <span
-                  className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
-                    isActive(item.path) ? 'bg-white/25 text-white' : 'bg-[#EF3B1D] text-white'
-                  }`}
-                  aria-label={`${alertCountByPath[item.path]}건 알림`}
-                >
-                  {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
-                </span>
-              ) : null}
-              {isActive(item.path) ? (
-                <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-1 text-[9px] font-black tracking-[0.08em] text-white">
-                  ACTIVE
-                </span>
-              ) : null}
-            </span>
-          </Link>
-        ))}
-      </nav>
+      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-3">{renderNavItems()}</nav>
 
       <FavoriteInventoryPanel />
 
@@ -344,9 +359,7 @@ export default function AdminNav({
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="text-[14px] font-black leading-none text-[#EF3B1D]">관리자 메뉴</div>
-          <div className="mt-1 truncate text-[12px] font-extrabold text-[#111827]">
-            {activeItem?.name || '관리자'}
-          </div>
+          <div className="mt-1 truncate text-[12px] font-extrabold text-[#111827]">{activeItem?.name || '관리자'}</div>
         </div>
         <button
           type="button"
@@ -358,34 +371,7 @@ export default function AdminNav({
         </button>
       </div>
 
-      <nav className="mt-4 grid max-h-[calc(100vh-260px)] grid-cols-2 gap-2 overflow-y-auto pr-1">
-        {navItems.map((item) => (
-          <Link
-            key={item.path}
-            href={item.path}
-            prefetch={false}
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`flex h-11 min-w-0 items-center justify-between gap-2 rounded-xl border px-3 text-[13px] font-extrabold no-underline transition-all duration-150 ${
-              isActive(item.path)
-                ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_8px_18px_rgba(239,59,29,0.18)]'
-                : 'border-[#E5E7EB] bg-[#F9FAFB] text-[#1F2937] hover:bg-white'
-            }`}
-            style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
-          >
-            <span className="truncate text-inherit">{item.name}</span>
-            {alertCountByPath[item.path] > 0 ? (
-              <span
-                className={`inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
-                  isActive(item.path) ? 'bg-white/25 text-white' : 'bg-[#EF3B1D] text-white'
-                }`}
-                aria-label={`${alertCountByPath[item.path]}건 알림`}
-              >
-                {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
-              </span>
-            ) : null}
-          </Link>
-        ))}
-      </nav>
+      <nav className="mt-4 grid max-h-[calc(100vh-260px)] grid-cols-2 gap-2 overflow-y-auto pr-1">{renderNavItems(true)}</nav>
 
       <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
 
@@ -440,9 +426,7 @@ export default function AdminNav({
         </button>
         <div className="min-w-0 text-center">
           <div className="text-[18px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
-          <div className="mt-1 truncate text-[11px] font-extrabold tracking-[-0.02em] text-[#111827]">
-            {activeItem?.name || '관리자'}
-          </div>
+          <div className="mt-1 truncate text-[11px] font-extrabold tracking-[-0.02em] text-[#111827]">{activeItem?.name || '관리자'}</div>
         </div>
         <div className="h-10 w-10" aria-hidden="true" />
       </header>

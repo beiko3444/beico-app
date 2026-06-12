@@ -5,12 +5,13 @@ import { fetchSmartInventoryDashboard, syncSmartInventory } from '@/lib/smartInv
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: Request) {
   const { unauthorized } = await requireAdminSession()
   if (unauthorized) return unauthorized
 
   try {
-    const dashboard = await fetchSmartInventoryDashboard()
+    const url = new URL(request.url)
+    const dashboard = await fetchSmartInventoryDashboard({ refresh: url.searchParams.get('refresh') === '1' })
     return NextResponse.json(dashboard, {
       headers: {
         'Cache-Control': 'private, no-store',

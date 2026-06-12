@@ -22,6 +22,17 @@ model User {
   orders         Order[]
   proformaInvoices ProformaInvoice[]
   partnerProfile PartnerProfile?
+  inventoryPreference InventoryPreference?
+}
+
+model InventoryPreference {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  favoriteMasterIds Json     @default("[]")
+  masterOrder       Json     @default("[]")
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model PartnerProfile {

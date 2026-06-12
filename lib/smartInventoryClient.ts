@@ -79,6 +79,11 @@ export type SmartInventoryDashboardPayload = {
     summaries: Array<Record<string, unknown>>
   }
   syncedAt: string
+  cache: {
+    hit: boolean
+    cachedAt: string | null
+    refreshing: boolean
+  }
   warnings: string[]
   summary: {
     masterCount: number
@@ -110,9 +115,27 @@ type MonitorBase = {
   warnings: string[]
 }
 
+type DashboardCacheEntry = {
+  payload: SmartInventoryDashboardPayload
+  cachedAt: string
+}
+
 const CHANNELS: SmartInventoryChannel[] = ['naver', 'coupang']
 const TUNNEL_DOWN_STATUS = new Set([502, 503, 504, 530])
 const DEFAULT_MONITOR_URL_GIST = 'https://gist.githubusercontent.com/beiko3444/5a69e99d96fa2ae34ba4af96c117d5e0/raw/monitor.json'
+let dashboardCache: DashboardCacheEntry | null = null
+let dashboardRefreshPromise: Promise<SmartInventoryDashboardPayload> | null = null
+
+function withCacheMeta(
+  payload: SmartInventoryDashboardPayload,
+  cache: SmartInventoryDashboardPayload['cache'],
+): SmartInventoryDashboardPayload {
+  return {
+    ...payload,
+    warnings: [...payload.warnings],
+    cache,
+  }
+}
 
 function cleanString(value: unknown): string {
   return typeof value === 'string' ? value.trim() : ''
@@ -524,6 +547,7 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
       summaries: inboundSummaries,
     },
     syncedAt,
+    cache: { hit: false, cachedAt: null, refreshing: false },
     warnings,
     summary: {
       masterCount: sortedRows.length,
@@ -542,7 +566,7 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
   }
 }
 
-export async function fetchSmartInventoryDashboard(): Promise<SmartInventoryDashboardPayload> {
+async function fetchSmartInventoryDashboardLive(): Promise<SmartInventoryDashboardPayload> {
   const base = await resolveMonitorBase()
   if (!base) {
     const syncedAt = new Date().toISOString()
@@ -557,6 +581,7 @@ export async function fetchSmartInventoryDashboard(): Promise<SmartInventoryDash
       unlinkedRows: { naver: [], coupang: [] },
       stockInbounds: { items: [], summaries: [] },
       syncedAt,
+      cache: { hit: false, cachedAt: null, refreshing: false },
       warnings: ['라즈베리 모니터 서버 주소를 확인하지 못했습니다. SMARTINVENTORY_MONITOR_URL 또는 SMARTINVENTORY_MONITOR_URL_GIST를 확인해 주세요.'],
       summary: {
         masterCount: 0,
@@ -578,6 +603,49 @@ export async function fetchSmartInventoryDashboard(): Promise<SmartInventoryDash
   return buildDashboard(base)
 }
 
+async function refreshDashboardCache(): Promise<SmartInventoryDashboardPayload> {
+  const payload = await fetchSmartInventoryDashboardLive()
+  const cachedAt = new Date().toISOString()
+  dashboardCache = { payload, cachedAt }
+  return withCacheMeta(payload, { hit: false, cachedAt, refreshing: false })
+}
+
+export async function fetchSmartInventoryDashboard(options: { refresh?: boolean } = {}): Promise<SmartInventoryDashboardPayload> {
+  if (!options.refresh && dashboardCache) {
+    if (!dashboardRefreshPromise) {
+      dashboardRefreshPromise = refreshDashboardCache().catch((error) => {
+        console.error('[smart-inventory] background cache refresh failed', error)
+        if (dashboardCache) return dashboardCache.payload
+        throw error
+      }).finally(() => {
+        dashboardRefreshPromise = null
+      })
+    }
+
+    return withCacheMeta(dashboardCache.payload, {
+      hit: true,
+      cachedAt: dashboardCache.cachedAt,
+      refreshing: true,
+    })
+  }
+
+  try {
+    return await refreshDashboardCache()
+  } catch (error) {
+    if (!dashboardCache) throw error
+    return withCacheMeta(
+      {
+        ...dashboardCache.payload,
+        warnings: [
+          ...dashboardCache.payload.warnings,
+          `새 재고 정보를 가져오지 못해 캐시 데이터를 표시합니다. ${error instanceof Error ? error.message : String(error)}`,
+        ],
+      },
+      { hit: true, cachedAt: dashboardCache.cachedAt, refreshing: false },
+    )
+  }
+}
+
 export async function syncSmartInventory(): Promise<{ result: Record<string, unknown>; dashboard: SmartInventoryDashboardPayload }> {
   const base = await resolveMonitorBase(requestTimeoutMs(120000))
   if (!base) {
@@ -590,6 +658,6 @@ export async function syncSmartInventory(): Promise<{ result: Record<string, unk
     { method: 'POST' },
     requestTimeoutMs(120000),
   )
-  const dashboard = await buildDashboard(base)
+  const dashboard = await refreshDashboardCache()
   return { result, dashboard }
 }
