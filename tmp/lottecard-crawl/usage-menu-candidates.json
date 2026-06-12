@@ -1,0 +1,1337 @@
+[
+  {
+    "idx": 37,
+    "tag": "DIV",
+    "text": "MY 한눈에 보기 이용한도 이용한도 조회 이용한도 상향 이용한도 하향 업종별 특별한도 가족카드 이용한도 변경 이용내역 이용내역(매출전표) 이용대금명세서 결제예정금액 소득공제내역 세금 신고용 이용내역 교통ㆍ하이패스 이용내역 이용금액결제 즉시결제 분할납부 일부결제금액이월약정(리볼빙) 포인트연계할부(세이브) 가상계좌 신청ㆍ조회 이용금액 입금내역 포인트플러스 GR",
+    "href": "",
+    "id": "",
+    "cls": "gnbCont",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbCont"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 38,
+    "tag": "DIV",
+    "text": "MY 한눈에 보기 이용한도 이용한도 조회 이용한도 상향 이용한도 하향 업종별 특별한도 가족카드 이용한도 변경 이용내역 이용내역(매출전표) 이용대금명세서 결제예정금액 소득공제내역 세금 신고용 이용내역 교통ㆍ하이패스 이용내역 이용금액결제 즉시결제 분할납부 일부결제금액이월약정(리볼빙) 포인트연계할부(세이브) 가상계좌 신청ㆍ조회 이용금액 입금내역 포인트플러스 GR",
+    "href": "",
+    "id": "",
+    "cls": "gnbInner",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbInner",
+      "style": "overflow: hidden; padding: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 39,
+    "tag": "DIV",
+    "text": "MY 한눈에 보기 이용한도 이용한도 조회 이용한도 상향 이용한도 하향 업종별 특별한도 가족카드 이용한도 변경 이용내역 이용내역(매출전표) 이용대금명세서 결제예정금액 소득공제내역 세금 신고용 이용내역 교통ㆍ하이패스 이용내역 이용금액결제 즉시결제 분할납부 일부결제금액이월약정(리볼빙) 포인트연계할부(세이브) 가상계좌 신청ㆍ조회 이용금액 입금내역 포인트플러스 GR",
+    "href": "",
+    "id": "",
+    "cls": "jspContainer",
+    "onclick": "",
+    "attrs": {
+      "class": "jspContainer",
+      "style": "height: 282px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 40,
+    "tag": "DIV",
+    "text": "MY 한눈에 보기 이용한도 이용한도 조회 이용한도 상향 이용한도 하향 업종별 특별한도 가족카드 이용한도 변경 이용내역 이용내역(매출전표) 이용대금명세서 결제예정금액 소득공제내역 세금 신고용 이용내역 교통ㆍ하이패스 이용내역 이용금액결제 즉시결제 분할납부 일부결제금액이월약정(리볼빙) 포인트연계할부(세이브) 가상계좌 신청ㆍ조회 이용금액 입금내역 포인트플러스 GR",
+    "href": "",
+    "id": "",
+    "cls": "jspPane",
+    "onclick": "",
+    "attrs": {
+      "class": "jspPane",
+      "style": "padding: 0px; top: 0px; left: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 55,
+    "tag": "DIV",
+    "text": "이용내역 이용내역(매출전표) 이용대금명세서 결제예정금액 소득공제내역 세금 신고용 이용내역 교통ㆍ하이패스 이용내역",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 56,
+    "tag": "LI",
+    "text": "이용내역 이용내역(매출전표) 이용대금명세서 결제예정금액 소득공제내역 세금 신고용 이용내역 교통ㆍ하이패스 이용내역",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 57,
+    "tag": "LI",
+    "text": "이용내역(매출전표)",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 58,
+    "tag": "A",
+    "text": "이용내역(매출전표)",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDAA_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDAA_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 59,
+    "tag": "LI",
+    "text": "이용대금명세서",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 60,
+    "tag": "A",
+    "text": "이용대금명세서",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDBA_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDBA_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 65,
+    "tag": "LI",
+    "text": "세금 신고용 이용내역",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 66,
+    "tag": "A",
+    "text": "세금 신고용 이용내역",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDBE_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDBE_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 67,
+    "tag": "LI",
+    "text": "교통ㆍ하이패스 이용내역",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 68,
+    "tag": "A",
+    "text": "교통ㆍ하이패스 이용내역",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDAB_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDAB_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 85,
+    "tag": "DIV",
+    "text": "카드정보관리 보유카드조회 카드비밀번호 등록ㆍ변경 명세서수령방법 변경 결제일 변경 결제계좌 변경 카드해지신청",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 86,
+    "tag": "LI",
+    "text": "카드정보관리 보유카드조회 카드비밀번호 등록ㆍ변경 명세서수령방법 변경 결제일 변경 결제계좌 변경 카드해지신청",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 91,
+    "tag": "LI",
+    "text": "명세서수령방법 변경",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 92,
+    "tag": "A",
+    "text": "명세서수령방법 변경",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDFB_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDFB_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 111,
+    "tag": "DIV",
+    "text": "가족카드조회 이용내역(매출전표) 교통ㆍ하이패스 이용내역 가족카드 이용한도 단기카드대출 신청",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 112,
+    "tag": "LI",
+    "text": "가족카드조회 이용내역(매출전표) 교통ㆍ하이패스 이용내역 가족카드 이용한도 단기카드대출 신청",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 113,
+    "tag": "LI",
+    "text": "이용내역(매출전표)",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 114,
+    "tag": "A",
+    "text": "이용내역(매출전표)",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDIA_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDIA_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 115,
+    "tag": "LI",
+    "text": "교통ㆍ하이패스 이용내역",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 116,
+    "tag": "A",
+    "text": "교통ㆍ하이패스 이용내역",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDIB_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDIB_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 124,
+    "tag": "DIV",
+    "text": "카드 혜택 TOUCH 친구에게 카드추천(이벤트) 이벤트 진행 이벤트 지난 이벤트 이벤트 당첨확인 포인트·마일리지 포인트 안내 포인트 조회 포인트 전환 포인트 사용 포인트 기부 포인트 이용안내 롯데카드 혜택 연간서비스이용내역 정부지원 혜택 고유가 피해지원금 국가바우처 교육급여 바우처(25년) 교육급여 바우처(26년) 경차유류세환급 소상공인 경영안정 바우처 닫",
+    "href": "",
+    "id": "",
+    "cls": "gnbCont",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbCont"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 125,
+    "tag": "DIV",
+    "text": "카드 혜택 TOUCH 친구에게 카드추천(이벤트) 이벤트 진행 이벤트 지난 이벤트 이벤트 당첨확인 포인트·마일리지 포인트 안내 포인트 조회 포인트 전환 포인트 사용 포인트 기부 포인트 이용안내 롯데카드 혜택 연간서비스이용내역 정부지원 혜택 고유가 피해지원금 국가바우처 교육급여 바우처(25년) 교육급여 바우처(26년) 경차유류세환급 소상공인 경영안정 바우처",
+    "href": "",
+    "id": "",
+    "cls": "gnbInner",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbInner",
+      "style": "overflow: hidden; padding: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 126,
+    "tag": "DIV",
+    "text": "카드 혜택 TOUCH 친구에게 카드추천(이벤트) 이벤트 진행 이벤트 지난 이벤트 이벤트 당첨확인 포인트·마일리지 포인트 안내 포인트 조회 포인트 전환 포인트 사용 포인트 기부 포인트 이용안내 롯데카드 혜택 연간서비스이용내역 정부지원 혜택 고유가 피해지원금 국가바우처 교육급여 바우처(25년) 교육급여 바우처(26년) 경차유류세환급 소상공인 경영안정 바우처",
+    "href": "",
+    "id": "",
+    "cls": "jspContainer",
+    "onclick": "",
+    "attrs": {
+      "class": "jspContainer",
+      "style": "height: 213px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 127,
+    "tag": "DIV",
+    "text": "카드 혜택 TOUCH 친구에게 카드추천(이벤트) 이벤트 진행 이벤트 지난 이벤트 이벤트 당첨확인 포인트·마일리지 포인트 안내 포인트 조회 포인트 전환 포인트 사용 포인트 기부 포인트 이용안내 롯데카드 혜택 연간서비스이용내역 정부지원 혜택 고유가 피해지원금 국가바우처 교육급여 바우처(25년) 교육급여 바우처(26년) 경차유류세환급 소상공인 경영안정 바우처",
+    "href": "",
+    "id": "",
+    "cls": "jspPane",
+    "onclick": "",
+    "attrs": {
+      "class": "jspPane",
+      "style": "padding: 0px; top: 0px; left: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 158,
+    "tag": "DIV",
+    "text": "롯데카드 혜택 연간서비스이용내역",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 159,
+    "tag": "LI",
+    "text": "롯데카드 혜택 연간서비스이용내역",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 160,
+    "tag": "LI",
+    "text": "연간서비스이용내역",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 161,
+    "tag": "A",
+    "text": "연간서비스이용내역",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPBNFJA_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPBNFJA_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 179,
+    "tag": "DIV",
+    "text": "브랜드카드 디지로카 City Edition 디지로카 발견 Edition LOCA LOCA LIKIT I'm 롯데백화점 AVENUEL카드 Flex카드 카드신청 디지로카 카드픽 프리미엄 카드 신용카드 제휴카드 체크카드 가족카드 내 카드 한도 미리보기 상품권·기프트카드 이용안내 카드신청 신청내역ㆍ배송 조회 잔액ㆍ이용내역 조회 환불ㆍ포인트전환ㆍ기부 인터넷사용ㆍ소득",
+    "href": "",
+    "id": "",
+    "cls": "gnbCont",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbCont"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 180,
+    "tag": "DIV",
+    "text": "브랜드카드 디지로카 City Edition 디지로카 발견 Edition LOCA LOCA LIKIT I'm 롯데백화점 AVENUEL카드 Flex카드 카드신청 디지로카 카드픽 프리미엄 카드 신용카드 제휴카드 체크카드 가족카드 내 카드 한도 미리보기 상품권·기프트카드 이용안내 카드신청 신청내역ㆍ배송 조회 잔액ㆍ이용내역 조회 환불ㆍ포인트전환ㆍ기부 인터넷사용ㆍ소득",
+    "href": "",
+    "id": "",
+    "cls": "gnbInner",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbInner",
+      "style": "overflow: hidden; padding: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 181,
+    "tag": "DIV",
+    "text": "브랜드카드 디지로카 City Edition 디지로카 발견 Edition LOCA LOCA LIKIT I'm 롯데백화점 AVENUEL카드 Flex카드 카드신청 디지로카 카드픽 프리미엄 카드 신용카드 제휴카드 체크카드 가족카드 내 카드 한도 미리보기 상품권·기프트카드 이용안내 카드신청 신청내역ㆍ배송 조회 잔액ㆍ이용내역 조회 환불ㆍ포인트전환ㆍ기부 인터넷사용ㆍ소득",
+    "href": "",
+    "id": "",
+    "cls": "jspContainer",
+    "onclick": "",
+    "attrs": {
+      "class": "jspContainer",
+      "style": "height: 262px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 182,
+    "tag": "DIV",
+    "text": "브랜드카드 디지로카 City Edition 디지로카 발견 Edition LOCA LOCA LIKIT I'm 롯데백화점 AVENUEL카드 Flex카드 카드신청 디지로카 카드픽 프리미엄 카드 신용카드 제휴카드 체크카드 가족카드 내 카드 한도 미리보기 상품권·기프트카드 이용안내 카드신청 신청내역ㆍ배송 조회 잔액ㆍ이용내역 조회 환불ㆍ포인트전환ㆍ기부 인터넷사용ㆍ소득",
+    "href": "",
+    "id": "",
+    "cls": "jspPane",
+    "onclick": "",
+    "attrs": {
+      "class": "jspPane",
+      "style": "padding: 0px; top: 0px; left: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 215,
+    "tag": "DIV",
+    "text": "상품권·기프트카드 이용안내 카드신청 신청내역ㆍ배송 조회 잔액ㆍ이용내역 조회 환불ㆍ포인트전환ㆍ기부 인터넷사용ㆍ소득공제 등록 티니패스 카드(용돈카드)",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 216,
+    "tag": "LI",
+    "text": "상품권·기프트카드 이용안내 카드신청 신청내역ㆍ배송 조회 잔액ㆍ이용내역 조회 환불ㆍ포인트전환ㆍ기부 인터넷사용ㆍ소득공제 등록 티니패스 카드(용돈카드)",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 223,
+    "tag": "LI",
+    "text": "잔액ㆍ이용내역 조회",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 224,
+    "tag": "A",
+    "text": "잔액ㆍ이용내역 조회",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPCDAJA_V110.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPCDAJA_V110.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 296,
+    "tag": "DIV",
+    "text": "생활문화 서비스 쇼핑(띵샵) 여행 보험 요금납부 서비스 자동납부 프리미엄 서비스 모빌리티팩 컬쳐DC 휴대폰케어 안심쇼핑 올마이카 편의 서비스 채무면제ㆍ유예상품 해외이용 서비스 해외이용 안심설정 해외 원화승인 차단 해외이용 사전할부예약 모바일해외안심카드 닫기",
+    "href": "",
+    "id": "",
+    "cls": "gnbCont",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbCont"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 297,
+    "tag": "DIV",
+    "text": "생활문화 서비스 쇼핑(띵샵) 여행 보험 요금납부 서비스 자동납부 프리미엄 서비스 모빌리티팩 컬쳐DC 휴대폰케어 안심쇼핑 올마이카 편의 서비스 채무면제ㆍ유예상품 해외이용 서비스 해외이용 안심설정 해외 원화승인 차단 해외이용 사전할부예약 모바일해외안심카드",
+    "href": "",
+    "id": "",
+    "cls": "gnbInner",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbInner",
+      "style": "overflow: hidden; padding: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 298,
+    "tag": "DIV",
+    "text": "생활문화 서비스 쇼핑(띵샵) 여행 보험 요금납부 서비스 자동납부 프리미엄 서비스 모빌리티팩 컬쳐DC 휴대폰케어 안심쇼핑 올마이카 편의 서비스 채무면제ㆍ유예상품 해외이용 서비스 해외이용 안심설정 해외 원화승인 차단 해외이용 사전할부예약 모바일해외안심카드",
+    "href": "",
+    "id": "",
+    "cls": "jspContainer",
+    "onclick": "",
+    "attrs": {
+      "class": "jspContainer",
+      "style": "height: 184px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 299,
+    "tag": "DIV",
+    "text": "생활문화 서비스 쇼핑(띵샵) 여행 보험 요금납부 서비스 자동납부 프리미엄 서비스 모빌리티팩 컬쳐DC 휴대폰케어 안심쇼핑 올마이카 편의 서비스 채무면제ㆍ유예상품 해외이용 서비스 해외이용 안심설정 해외 원화승인 차단 해외이용 사전할부예약 모바일해외안심카드",
+    "href": "",
+    "id": "",
+    "cls": "jspPane",
+    "onclick": "",
+    "attrs": {
+      "class": "jspPane",
+      "style": "padding: 0px; top: 0px; left: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 328,
+    "tag": "DIV",
+    "text": "해외이용 서비스 해외이용 안심설정 해외 원화승인 차단 해외이용 사전할부예약 모바일해외안심카드",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 329,
+    "tag": "LI",
+    "text": "해외이용 서비스 해외이용 안심설정 해외 원화승인 차단 해외이용 사전할부예약 모바일해외안심카드",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 332,
+    "tag": "LI",
+    "text": "해외 원화승인 차단",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 333,
+    "tag": "A",
+    "text": "해외 원화승인 차단",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDEE_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPMCDEE_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 357,
+    "tag": "DIV",
+    "text": "온라인 고객상담 자주 하는 질문(FAQ) 이메일상담 상담내역조회 장애인 회원 상담 안내 분실신고ㆍ재발급 분실신고 분실신고 해제 타사카드 분실신고 조회 카드 재발급 이용안내 웹사이트 보안프로그램 카드센터 안내 ARS번호 이용안내 교통카드 이용약관 로카페이 로카페이 이용안내 결제 서비스 간편결제 일반결제 개인신용정보관리보호 금융소비자보호포털 결제승인 이의제기 ",
+    "href": "",
+    "id": "",
+    "cls": "gnbCont",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbCont"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 358,
+    "tag": "DIV",
+    "text": "온라인 고객상담 자주 하는 질문(FAQ) 이메일상담 상담내역조회 장애인 회원 상담 안내 분실신고ㆍ재발급 분실신고 분실신고 해제 타사카드 분실신고 조회 카드 재발급 이용안내 웹사이트 보안프로그램 카드센터 안내 ARS번호 이용안내 교통카드 이용약관 로카페이 로카페이 이용안내 결제 서비스 간편결제 일반결제 개인신용정보관리보호 금융소비자보호포털 결제승인 이의제기 ",
+    "href": "",
+    "id": "",
+    "cls": "gnbInner",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbInner",
+      "style": "overflow: hidden; padding: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 359,
+    "tag": "DIV",
+    "text": "온라인 고객상담 자주 하는 질문(FAQ) 이메일상담 상담내역조회 장애인 회원 상담 안내 분실신고ㆍ재발급 분실신고 분실신고 해제 타사카드 분실신고 조회 카드 재발급 이용안내 웹사이트 보안프로그램 카드센터 안내 ARS번호 이용안내 교통카드 이용약관 로카페이 로카페이 이용안내 결제 서비스 간편결제 일반결제 개인신용정보관리보호 금융소비자보호포털 결제승인 이의제기 ",
+    "href": "",
+    "id": "",
+    "cls": "jspContainer",
+    "onclick": "",
+    "attrs": {
+      "class": "jspContainer",
+      "style": "height: 215px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 360,
+    "tag": "DIV",
+    "text": "온라인 고객상담 자주 하는 질문(FAQ) 이메일상담 상담내역조회 장애인 회원 상담 안내 분실신고ㆍ재발급 분실신고 분실신고 해제 타사카드 분실신고 조회 카드 재발급 이용안내 웹사이트 보안프로그램 카드센터 안내 ARS번호 이용안내 교통카드 이용약관 로카페이 로카페이 이용안내 결제 서비스 간편결제 일반결제 개인신용정보관리보호 금융소비자보호포털 결제승인 이의제기 ",
+    "href": "",
+    "id": "",
+    "cls": "jspPane",
+    "onclick": "",
+    "attrs": {
+      "class": "jspPane",
+      "style": "padding: 0px; top: 0px; left: 0px;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 381,
+    "tag": "DIV",
+    "text": "이용안내 웹사이트 보안프로그램 카드센터 안내 ARS번호 이용안내 교통카드 이용약관",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 382,
+    "tag": "LI",
+    "text": "이용안내 웹사이트 보안프로그램 카드센터 안내 ARS번호 이용안내 교통카드 이용약관",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 389,
+    "tag": "LI",
+    "text": "교통카드",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 390,
+    "tag": "A",
+    "text": "교통카드",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "",
+    "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPLIFDE_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(3,this); svcf_Link('/app/LPLIFDE_V100.lc');return false;"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 402,
+    "tag": "DIV",
+    "text": "개인신용정보관리보호 금융소비자보호포털 결제승인 이의제기",
+    "href": "",
+    "id": "",
+    "cls": "gnbWrap",
+    "onclick": "",
+    "attrs": {
+      "class": "gnbWrap"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 407,
+    "tag": "LI",
+    "text": "결제승인 이의제기",
+    "href": "",
+    "id": "",
+    "cls": "",
+    "onclick": "",
+    "attrs": {},
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 408,
+    "tag": "A",
+    "text": "결제승인 이의제기",
+    "href": "javascript:void(0);",
+    "id": "",
+    "cls": "tit",
+    "onclick": "GA_PCMenuEvent(2,this); svcf_Link('/app/LPCSTAL_V100.lc');return false;",
+    "attrs": {
+      "href": "javascript:void(0);",
+      "onclick": "GA_PCMenuEvent(2,this); svcf_Link('/app/LPCSTAL_V100.lc');return false;",
+      "class": "tit"
+    },
+    "x": 0,
+    "y": 0,
+    "w": 0,
+    "h": 0,
+    "visible": false
+  },
+  {
+    "idx": 477,
+    "tag": "DIV",
+    "text": "롯데카드 메인 이전 메뉴로 화면 이동 메뉴목록 다음 메뉴로 화면 이동 MY 이*빈님 안녕하세요. LOCA LIKIT 1.2 결제일 변경 결제계좌 변경 나의정보 조회/변경 6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙) 포인트 포인",
+    "href": "",
+    "id": "container",
+    "cls": "container main-bg main-login-after",
+    "onclick": "",
+    "attrs": {
+      "id": "container",
+      "class": "container main-bg main-login-after"
+    },
+    "x": 0,
+    "y": 110,
+    "w": 1390,
+    "h": 3208,
+    "visible": true
+  },
+  {
+    "idx": 699,
+    "tag": "DIV",
+    "text": "이*빈님 안녕하세요. LOCA LIKIT 1.2 결제일 변경 결제계좌 변경 나의정보 조회/변경 6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙) 포인트 포인트 선택 L.POINT 8P 포인트안내 포인트사용 혜택을 터치하면 알아서 챙",
+    "href": "",
+    "id": "",
+    "cls": "main-sec-1",
+    "onclick": "",
+    "attrs": {
+      "class": "main-sec-1"
+    },
+    "x": 95,
+    "y": 110,
+    "w": 1200,
+    "h": 730,
+    "visible": true
+  },
+  {
+    "idx": 700,
+    "tag": "DIV",
+    "text": "이*빈님 안녕하세요. LOCA LIKIT 1.2 결제일 변경 결제계좌 변경 나의정보 조회/변경 6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙) 포인트 포인트 선택 L.POINT 8P 포인트안내 포인트사용 혜택을 터치하면 알아서 챙",
+    "href": "",
+    "id": "",
+    "cls": "main-cont",
+    "onclick": "",
+    "attrs": {
+      "class": "main-cont"
+    },
+    "x": 91,
+    "y": 140,
+    "w": 1208,
+    "h": 700,
+    "visible": true
+  },
+  {
+    "idx": 701,
+    "tag": "DIV",
+    "text": "이*빈님 안녕하세요. LOCA LIKIT 1.2 결제일 변경 결제계좌 변경 나의정보 조회/변경 6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙) 포인트 포인트 선택 L.POINT 8P 포인트안내 포인트사용 혜택을 터치하면 알아서 챙",
+    "href": "",
+    "id": "",
+    "cls": "f-1",
+    "onclick": "",
+    "attrs": {
+      "class": "f-1"
+    },
+    "x": 95,
+    "y": 140,
+    "w": 898,
+    "h": 700,
+    "visible": true
+  },
+  {
+    "idx": 702,
+    "tag": "DIV",
+    "text": "이*빈님 안녕하세요. LOCA LIKIT 1.2 결제일 변경 결제계좌 변경 나의정보 조회/변경 6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙) 포인트 포인트 선택 L.POINT 8P 포인트안내 포인트사용 혜택을 터치하면 알아서 챙",
+    "href": "",
+    "id": "",
+    "cls": "cont-t main-row-2 main-bg-row",
+    "onclick": "",
+    "attrs": {
+      "class": "cont-t main-row-2 main-bg-row"
+    },
+    "x": 91,
+    "y": 140,
+    "w": 906,
+    "h": 396,
+    "visible": true
+  },
+  {
+    "idx": 703,
+    "tag": "DIV",
+    "text": "이*빈님 안녕하세요. LOCA LIKIT 1.2 결제일 변경 결제계좌 변경 나의정보 조회/변경 6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙)",
+    "href": "",
+    "id": "",
+    "cls": "f-1 main-large main-myInfo",
+    "onclick": "",
+    "attrs": {
+      "class": "f-1 main-large main-myInfo"
+    },
+    "x": 95,
+    "y": 140,
+    "w": 596,
+    "h": 395,
+    "visible": true
+  },
+  {
+    "idx": 715,
+    "tag": "DIV",
+    "text": "6월 결제예정금액 (오늘기준) 7,471,677원 즉시결제 분할납부신청 6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙)",
+    "href": "",
+    "id": "",
+    "cls": "mypay",
+    "onclick": "",
+    "attrs": {
+      "class": "mypay"
+    },
+    "x": 297,
+    "y": 190,
+    "w": 366,
+    "h": 345,
+    "visible": true
+  },
+  {
+    "idx": 723,
+    "tag": "DIV",
+    "text": "6월 이용대금명세서 7,471,677원 이메일명세서 다시받기 소비패턴 리포트 일부결제금액이월약정(리볼빙)",
+    "href": "",
+    "id": "bllFd",
+    "cls": "useCont",
+    "onclick": "",
+    "attrs": {
+      "class": "useCont",
+      "id": "bllFd"
+    },
+    "x": 322,
+    "y": 343,
+    "w": 341,
+    "h": 100,
+    "visible": true
+  },
+  {
+    "idx": 724,
+    "tag": "A",
+    "text": "6월 이용대금명세서",
+    "href": "https://www.lottecard.co.kr/app/LPMCDBA_V100.lc",
+    "id": "lpmaiaav100_my_lnkStatementUsage",
+    "cls": "tit",
+    "onclick": "GA_MainBtnEvent('MY_이용대금명세서','이용대금명세서');",
+    "attrs": {
+      "href": "/app/LPMCDBA_V100.lc",
+      "class": "tit",
+      "id": "lpmaiaav100_my_lnkStatementUsage",
+      "onclick": "GA_MainBtnEvent('MY_이용대금명세서','이용대금명세서');"
+    },
+    "x": 322,
+    "y": 343,
+    "w": 154,
+    "h": 24,
+    "visible": true
+  },
+  {
+    "idx": 726,
+    "tag": "LI",
+    "text": "이메일명세서 다시받기",
+    "href": "",
+    "id": "sendEmail",
+    "cls": "",
+    "onclick": "",
+    "attrs": {
+      "id": "sendEmail"
+    },
+    "x": 322,
+    "y": 412,
+    "w": 170,
+    "h": 31,
+    "visible": true
+  },
+  {
+    "idx": 727,
+    "tag": "A",
+    "text": "이메일명세서 다시받기",
+    "href": "https://www.lottecard.co.kr/app/LPMAIFA_V100.lc#",
+    "id": "lpmaiaav100_my_btnSendEmail",
+    "cls": "ico4",
+    "onclick": "GA_MainBtnEvent('MY_이용대금명세서',this); popupEmailSend(); return false;",
+    "attrs": {
+      "href": "#",
+      "class": "ico4",
+      "title": "새창",
+      "onclick": "GA_MainBtnEvent('MY_이용대금명세서',this); popupEmailSend(); return false;",
+      "id": "lpmaiaav100_my_btnSendEmail"
+    },
+    "x": 322,
+    "y": 412,
+    "w": 170,
+    "h": 31,
+    "visible": true
+  },
+  {
+    "idx": 729,
+    "tag": "A",
+    "text": "소비패턴 리포트",
+    "href": "https://www.lottecard.co.kr/app/LPMAIFA_V100.lc#",
+    "id": "lpmaiaav100_my_btnPatternReport",
+    "cls": "ico5",
+    "onclick": "GA_MainBtnEvent('MY_이용대금명세서',this); window.open('/app/LPMAIFB_P100.lc','', 'scrollbars=yes,resizable=yes, width=930,height=750'); return false;",
+    "attrs": {
+      "href": "#",
+      "class": "ico5",
+      "title": "새창",
+      "onclick": "GA_MainBtnEvent('MY_이용대금명세서',this); window.open('/app/LPMAIFB_P100.lc','', 'scrollbars=yes,resizable=yes, width=930,height=750'); return false;",
+      "id": "lpmaiaav100_my_btnPatternReport"
+    },
+    "x": 496,
+    "y": 412,
+    "w": 133,
+    "h": 31,
+    "visible": true
+  },
+  {
+    "idx": 763,
+    "tag": "DIV",
+    "text": "최근 이용내역 지자체세입금(네이버페이) 26.06.12 10:04 일시불 253,000 원 쿠팡 26.06.11 23:34 일시불 205,940 원 Adobe 26.06.11 01:37 일시불 19,000 원 aliexpress Singapo 26.06.10 22:57 일시불 47,746 원 나의 이용한도 이용한도 20,000,000원 이용금액 11,684",
+    "href": "",
+    "id": "",
+    "cls": "cont-b main-bg-row main-row-3",
+    "onclick": "",
+    "attrs": {
+      "class": "cont-b main-bg-row main-row-3"
+    },
+    "x": 91,
+    "y": 544,
+    "w": 906,
+    "h": 296,
+    "visible": true
+  },
+  {
+    "idx": 764,
+    "tag": "DIV",
+    "text": "최근 이용내역 지자체세입금(네이버페이) 26.06.12 10:04 일시불 253,000 원 쿠팡 26.06.11 23:34 일시불 205,940 원 Adobe 26.06.11 01:37 일시불 19,000 원 aliexpress Singapo 26.06.10 22:57 일시불 47,746 원",
+    "href": "",
+    "id": "useCardList",
+    "cls": "f-1 main-recentused",
+    "onclick": "",
+    "attrs": {
+      "class": "f-1 main-recentused",
+      "id": "useCardList"
+    },
+    "x": 95,
+    "y": 544,
+    "w": 294,
+    "h": 296,
+    "visible": true
+  },
+  {
+    "idx": 765,
+    "tag": "A",
+    "text": "최근 이용내역",
+    "href": "https://www.lottecard.co.kr/app/LPMAIFA_V100.lc#",
+    "id": "lpmaiaav100_my_lblUseHistoryLatest",
+    "cls": "",
+    "onclick": "GA_MainBtnEvent('MY_최근 이용내역','자세히 보기'); svcf_Link('/app/LPMCDAA_V100.lc');return false;",
+    "attrs": {
+      "href": "#",
+      "onclick": "GA_MainBtnEvent('MY_최근 이용내역','자세히 보기'); svcf_Link('/app/LPMCDAA_V100.lc');return false;",
+      "id": "lpmaiaav100_my_lblUseHistoryLatest"
+    },
+    "x": 188,
+    "y": 561,
+    "w": 107,
+    "h": 20,
+    "visible": true
+  },
+  {
+    "idx": 806,
+    "tag": "DIV",
+    "text": "MY MENU 유료상품이용내역 카드분실 신고 내 보유카드 EVENT LOCA 365 월 최대 36,500원 할인에 최대 57만원 상당 혜택까지 바로가기 > 123456789정지",
+    "href": "",
+    "id": "",
+    "cls": "f-2 main-login main-bg-self",
+    "onclick": "",
+    "attrs": {
+      "class": "f-2 main-login main-bg-self"
+    },
+    "x": 1001,
+    "y": 140,
+    "w": 294,
+    "h": 700,
+    "visible": true
+  },
+  {
+    "idx": 807,
+    "tag": "DIV",
+    "text": "MY MENU 유료상품이용내역 카드분실 신고 내 보유카드",
+    "href": "",
+    "id": "",
+    "cls": "mainLogin",
+    "onclick": "",
+    "attrs": {
+      "class": "mainLogin"
+    },
+    "x": 1026,
+    "y": 161,
+    "w": 245,
+    "h": 67,
+    "visible": true
+  },
+  {
+    "idx": 808,
+    "tag": "A",
+    "text": "유료상품이용내역",
+    "href": "https://www.lottecard.co.kr/app/LPMAIFA_V100.lc#",
+    "id": "lpmaiaav100_my_lnkPaidProductUse",
+    "cls": "",
+    "onclick": "GA_MainBtnEvent('마이메뉴',this); window.open('/app/LPMAIFA_A140.lc','', 'scrollbars=yes,resizable=yes, width=540,height=480'); return false;",
+    "attrs": {
+      "href": "#",
+      "onclick": "GA_MainBtnEvent('마이메뉴',this); window.open('/app/LPMAIFA_A140.lc','', 'scrollbars=yes,resizable=yes, width=540,height=480'); return false;",
+      "id": "lpmaiaav100_my_lnkPaidProductUse",
+      "title": "새창열림"
+    },
+    "x": 1163,
+    "y": 161,
+    "w": 108,
+    "h": 21,
+    "visible": true
+  },
+  {
+    "idx": 1138,
+    "tag": "DIV",
+    "text": "이용약관 개인정보처리방침 위치기반서비스 이용약관 고객권리안내 윤리경영 회사소개 ENGLISH 이메일상담 소비자보호포털 FAQ 전자민원접수 패밀리사이트 상담전용 1588-8100분실/한도승인 1588-8300 현금서비스/대출상담 : 1588-8200/1577-8200 해외에서 이용 시 : 82-2-2280-2400 English Consulting : 189",
+    "href": "",
+    "id": "",
+    "cls": "footer-cont",
+    "onclick": "",
+    "attrs": {
+      "class": "footer-cont"
+    },
+    "x": 0,
+    "y": 3213,
+    "w": 1390,
+    "h": 275,
+    "visible": true
+  }
+]

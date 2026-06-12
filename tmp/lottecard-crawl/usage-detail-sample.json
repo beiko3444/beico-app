@@ -1,0 +1,29 @@
+{
+  "net": [
+    {
+      "method": "Network.requestWillBeSent",
+      "url": "https://www.lottecard.co.kr/app/LPMCDAA_P103.lc",
+      "type": "XHR",
+      "methodReq": "POST",
+      "postData": "aprDeAm=253000&aprDeKeyV=48311554&aprDtti=20260612100424511&encCdno=sTJ4ZzpH6gHT%2BTQEuMup0A%3D%3D&deDt=20260612&gramFlwSeq=104278&auPartId=80&aprno=48311554&aprTrc=00&byRc=+&byCanRc=+&mcNm=%EC%A7%80%EC%9E%90%EC%B2%B4%EC%84%B8%EC%9E%85%EA%B8%88(%EB%84%A4%EC%9D%B4%EB%B2%84%ED%8E%98%EC%9D%B4)&lono=&type=&mildolYn=&aprRsc=12"
+    },
+    {
+      "method": "Network.responseReceived",
+      "url": "https://www.lottecard.co.kr/app/LPMCDAA_P103.lc",
+      "status": 200,
+      "type": "XHR"
+    },
+    {
+      "method": "Network.requestWillBeSent",
+      "url": "https://image.lottecard.co.kr/webapp/pc/images/common/bg_line02.png",
+      "type": "Image",
+      "methodReq": "GET"
+    },
+    {
+      "method": "Network.responseReceived",
+      "url": "https://image.lottecard.co.kr/webapp/pc/images/common/bg_line02.png",
+      "status": 200,
+      "type": "Image"
+    }
+  ]
+}
