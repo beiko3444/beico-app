@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
 import { unstable_cache } from "next/cache"
 import AdminNav from "./AdminNav"
+import PushNotificationRegistrar from "@/components/PushNotificationRegistrar"
 
 type LowStockCountRow = {
     count: number | bigint
@@ -94,6 +95,7 @@ export default async function AdminLayout({
     return (
         <div className="apple-admin-shell relative min-h-screen bg-[#F7F7F8] print:bg-white">
             <AdminNav counts={counts} userName={userName} />
+            <PushNotificationRegistrar />
             <main className="min-h-screen bg-[#F7F7F8] p-4 pb-12 pt-20 sm:p-6 sm:pt-20 lg:ml-[260px] lg:p-8 lg:pb-12 print:ml-0 print:bg-white print:p-0">
                 {children}
             </main>

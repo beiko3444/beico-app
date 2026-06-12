@@ -1,3 +1,9 @@
 {
-  "buildCommand": "npx prisma db push --accept-data-loss && next build --webpack"
+  "buildCommand": "npx prisma db push --accept-data-loss && next build --webpack",
+  "crons": [
+    {
+      "path": "/api/admin/inventory/favorite-push",
+      "schedule": "50 14 * * *"
+    }
+  ]
 }
