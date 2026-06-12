@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from '@/components/ThemeProvider'
-import { Calendar, CheckCircle2, ChevronDown, Circle, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { Calendar, CheckCircle2, ChevronDown, Circle, CreditCard, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 import type { CategoryMeta } from '@/lib/cardCategory'
 
@@ -433,6 +433,7 @@ export default function CardUsageClient() {
   const [data, setData] = useState<CardUsageResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [lotteSyncing, setLotteSyncing] = useState(false)
   const [refreshBeforeFetch, setRefreshBeforeFetch] = useState(false)
   const [error, setError] = useState('')
   const [syncMessage, setSyncMessage] = useState('')
@@ -622,6 +623,23 @@ export default function CardUsageClient() {
       await load(1)
     } catch (err: unknown) { setError(errorMessage(err)) }
     finally { setSyncing(false) }
+  }
+
+  const handleLotteSync = async () => {
+    setLotteSyncing(true); setError(''); setSyncMessage(''); setSyncCompletedAt(null)
+    try {
+      const res = await fetch('/api/admin/card-usage/lotte-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ startDate, endDate, cardNum: cardNum.trim() || undefined }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'LotteCard direct sync failed')
+      setSyncMessage(`\uB86F\uB370\uCE74\uB4DC \uC9C1\uC811 \uB3D9\uAE30\uD654 \uC644\uB8CC \u00B7 \uC870\uD68C ${json.fetchedCount?.toLocaleString?.() ?? 0}\uAC74 / \uC800\uC7A5 ${json.storedCount?.toLocaleString?.() ?? 0}\uAC74 / \uAE08\uC561\uD655\uC778 ${json.amountResolvedCount?.toLocaleString?.() ?? 0}\uAC74 / \uAE08\uC561\uC5C6\uC74C ${json.amountMissingCount?.toLocaleString?.() ?? 0}\uAC74`)
+      setSyncCompletedAt(typeof json.syncedAt === 'string' ? json.syncedAt : new Date().toISOString())
+      await load(1)
+    } catch (err: unknown) { setError(errorMessage(err)) }
+    finally { setLotteSyncing(false) }
   }
 
   const handleCoupangSync = async () => {
@@ -1255,6 +1273,22 @@ export default function CardUsageClient() {
           >
             {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             바로빌 동기화
+          </button>
+          <button
+            type="button"
+            onClick={handleLotteSync}
+            disabled={lotteSyncing}
+            style={{
+              height: 40, padding: '0 14px', borderRadius: 10,
+              background: '#0F766E', color: '#fff', fontSize: 13, fontWeight: 600,
+              border: 'none', cursor: lotteSyncing ? 'wait' : 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 7,
+              opacity: lotteSyncing ? 0.7 : 1, transition: 'opacity .2s',
+            }}
+            title="\uC774\uBBF8 \uB85C\uADF8\uC778\uB41C \uB86F\uB370\uCE74\uB4DC \uB514\uBC84\uADF8 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uC774\uC6A9\uB0B4\uC5ED\uC744 \uC9C1\uC811 \uC218\uC9D1"
+          >
+            {lotteSyncing ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
+            {'\uB86F\uB370 \uC9C1\uC811'}
           </button>
           <button
             type="button"
