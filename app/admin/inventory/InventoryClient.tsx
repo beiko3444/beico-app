@@ -2,16 +2,41 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
+  DndContext,
+  PointerSensor,
+  closestCenter,
+  type DragEndEvent,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core'
+import {
+  SortableContext,
+  arrayMove,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+import {
   AlertTriangle,
   Boxes,
   Database,
   ExternalLink,
+  GripVertical,
   Link2,
   Loader2,
   PackageCheck,
   RefreshCw,
   Search,
+  Star,
 } from 'lucide-react'
+import {
+  INVENTORY_FAVORITES_EVENT,
+  INVENTORY_FAVORITES_KEY,
+  INVENTORY_ORDER_EVENT,
+  INVENTORY_ORDER_KEY,
+  readStoredNumberArray,
+  writeStoredNumberArray,
+} from '@/lib/smartInventoryPrefs'
 import type {
   SmartInventoryChannel,
   SmartInventoryChannelRow,
@@ -68,6 +93,18 @@ function stockTone(value: number | null) {
   return 'text-slate-900'
 }
 
+function orderRows(rows: SmartInventoryMasterRow[], order: number[]) {
+  const orderMap = new Map(order.map((id, index) => [id, index]))
+  return [...rows].sort((a, b) => {
+    const aOrder = orderMap.get(a.id)
+    const bOrder = orderMap.get(b.id)
+    if (aOrder !== undefined && bOrder !== undefined) return aOrder - bOrder
+    if (aOrder !== undefined) return -1
+    if (bOrder !== undefined) return 1
+    return a.name.localeCompare(b.name, 'ko') || a.id - b.id
+  })
+}
+
 function StatTile({
   icon,
   label,
@@ -91,15 +128,15 @@ function StatTile({
           : 'bg-white text-slate-700 border-slate-200'
 
   return (
-    <div className={`min-h-[96px] rounded-lg border p-4 shadow-sm ${toneClass}`}>
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-[12px] font-black text-slate-500">{label}</span>
-        <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-white/80 text-current shadow-sm">
+    <div className={`min-h-[78px] rounded-lg border p-3 shadow-sm ${toneClass}`}>
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-[11px] font-black text-slate-500">{label}</span>
+        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white/80 text-current shadow-sm">
           {icon}
         </span>
       </div>
-      <div className="mt-3 text-[24px] font-black leading-none tracking-tight text-slate-950">{value}</div>
-      {sub ? <div className="mt-2 text-[11px] font-bold text-slate-500">{sub}</div> : null}
+      <div className="mt-2 text-[20px] font-black leading-none tracking-tight text-slate-950">{value}</div>
+      {sub ? <div className="mt-1.5 truncate text-[10px] font-bold text-slate-500">{sub}</div> : null}
     </div>
   )
 }
@@ -108,8 +145,8 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
   const [failed, setFailed] = useState(false)
   if (!src || failed) {
     return (
-      <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-300">
-        <Boxes size={18} />
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-300">
+        <Boxes size={15} />
       </div>
     )
   }
@@ -118,24 +155,24 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
     <img
       src={src}
       alt={alt}
-      className="h-12 w-12 rounded-lg border border-slate-200 bg-white object-cover"
+      className="h-9 w-9 shrink-0 rounded-lg border border-slate-200 bg-white object-cover"
       onError={() => setFailed(true)}
     />
   )
 }
 
 function LinkedProducts({ links }: { links: SmartInventoryMasterRow['linked'] }) {
-  if (!links.length) return <span className="text-[12px] font-bold text-slate-400">연결 없음</span>
+  if (!links.length) return <span className="text-[11px] font-bold text-slate-400">연결 없음</span>
 
   return (
-    <div className="flex max-w-[320px] flex-wrap gap-1.5">
-      {links.slice(0, 4).map((link) => (
+    <div className="flex max-w-[250px] flex-wrap gap-1">
+      {links.slice(0, 3).map((link) => (
         <a
           key={`${link.channel}:${link.productKey}`}
           href={link.productUrl || '#'}
           target="_blank"
           rel="noreferrer"
-          className={`inline-flex max-w-[150px] items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-black no-underline ${
+          className={`inline-flex max-w-[118px] items-center gap-1 rounded-md border px-1.5 py-0.5 text-[10px] font-black no-underline ${
             link.channel === 'naver'
               ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
               : 'border-sky-100 bg-sky-50 text-sky-700'
@@ -144,88 +181,195 @@ function LinkedProducts({ links }: { links: SmartInventoryMasterRow['linked'] })
         >
           <span className="shrink-0">{channelLabel[link.channel]}</span>
           <span className="truncate">{link.multiplier > 1 ? `x${link.multiplier}` : link.name}</span>
-          {link.productUrl ? <ExternalLink size={11} className="shrink-0" /> : null}
+          {link.productUrl ? <ExternalLink size={10} className="shrink-0" /> : null}
         </a>
       ))}
-      {links.length > 4 ? (
-        <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
-          +{links.length - 4}
+      {links.length > 3 ? (
+        <span className="inline-flex items-center rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-500">
+          +{links.length - 3}
         </span>
       ) : null}
     </div>
   )
 }
 
-function MasterTable({ rows }: { rows: SmartInventoryMasterRow[] }) {
+function SortableMasterRow({
+  row,
+  rank,
+  favorite,
+  onToggleFavorite,
+}: {
+  row: SmartInventoryMasterRow
+  rank: number
+  favorite: boolean
+  onToggleFavorite: (id: number) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: row.id })
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        opacity: isDragging ? 0.6 : 1,
+        zIndex: isDragging ? 50 : 'auto',
+      }}
+      className="bg-white hover:bg-slate-50"
+    >
+      <td className="px-2 py-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            className="inline-flex h-7 w-7 cursor-grab items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-400 active:cursor-grabbing"
+            title="드래그해서 순위 변경"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={15} />
+          </button>
+          <span className="min-w-6 text-right text-[12px] font-black tabular-nums text-slate-500">{rank}</span>
+        </div>
+      </td>
+      <td className="px-2 py-2">
+        <div className="flex min-w-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleFavorite(row.id)}
+            className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md border transition ${
+              favorite
+                ? 'border-amber-200 bg-amber-50 text-amber-500'
+                : 'border-slate-200 bg-white text-slate-300 hover:text-amber-500'
+            }`}
+            title={favorite ? '즐겨찾기 해제' : '즐겨찾기'}
+          >
+            <Star size={15} fill={favorite ? 'currentColor' : 'none'} />
+          </button>
+          <ProductImage src={row.imageUrl} alt={row.name} />
+          <div className="min-w-0">
+            <div className="truncate text-[13px] font-black text-slate-950" title={row.name}>
+              {row.name || `마스터 #${row.id}`}
+            </div>
+            <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[10px] font-bold text-slate-500">
+              <span className="shrink-0">단가 {formatMoney(row.unitCost)}</span>
+              {row.memo ? <span className="truncate text-emerald-700">메모 {row.memo}</span> : null}
+            </div>
+          </div>
+        </div>
+      </td>
+      <td className={`px-2 py-2 text-right font-black tabular-nums ${stockTone(row.naverStock)}`}>
+        {formatNumber(row.naverStock)}
+      </td>
+      <td className={`px-2 py-2 text-right font-black tabular-nums ${stockTone(row.coupangStock)}`}>
+        {formatNumber(row.coupangStock)}
+      </td>
+      <td className={`px-2 py-2 text-right text-[13px] font-black tabular-nums ${stockTone(row.totalStock)}`}>
+        {formatNumber(row.totalStock)}
+      </td>
+      <td className="px-2 py-2 text-right font-black tabular-nums text-orange-700">
+        {formatNumber(row.totalInboundPending)}
+      </td>
+      <td className="px-2 py-2 text-right font-black tabular-nums text-slate-800">
+        {formatNumber(row.totalTodaySales)}
+      </td>
+      <td className="px-2 py-2 text-right font-black tabular-nums text-slate-800">
+        {formatMoney(row.stockCost)}
+      </td>
+      <td className="px-2 py-2">
+        <LinkedProducts links={row.linked} />
+      </td>
+      <td className="px-2 py-2 text-[11px] font-bold text-slate-500">
+        {formatDateTime(row.updatedAt || row.linked[0]?.syncedAt)}
+      </td>
+    </tr>
+  )
+}
+
+function MasterTable({
+  rows,
+  allRows,
+  favoriteIds,
+  onToggleFavorite,
+  onReorder,
+}: {
+  rows: SmartInventoryMasterRow[]
+  allRows: SmartInventoryMasterRow[]
+  favoriteIds: number[]
+  onToggleFavorite: (id: number) => void
+  onReorder: (nextOrder: number[]) => void
+}) {
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 6 },
+    }),
+  )
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+
+    const activeId = Number(active.id)
+    const overId = Number(over.id)
+    const visibleIds = rows.map((row) => row.id)
+    const oldIndex = visibleIds.indexOf(activeId)
+    const newIndex = visibleIds.indexOf(overId)
+    if (oldIndex < 0 || newIndex < 0) return
+
+    const movedVisibleIds = arrayMove(visibleIds, oldIndex, newIndex)
+    const visibleSet = new Set(visibleIds)
+    let cursor = 0
+    const nextOrder = allRows.map((row) => (visibleSet.has(row.id) ? movedVisibleIds[cursor++] : row.id))
+    onReorder(nextOrder)
+  }
+
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[1180px] table-fixed border-collapse text-left text-[13px]">
-        <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
-          <tr>
-            <th className="w-[330px] px-4 py-3">상품</th>
-            <th className="w-[90px] px-3 py-3 text-right">네이버</th>
-            <th className="w-[90px] px-3 py-3 text-right">쿠팡</th>
-            <th className="w-[90px] px-3 py-3 text-right">총재고</th>
-            <th className="w-[90px] px-3 py-3 text-right">입고대기</th>
-            <th className="w-[90px] px-3 py-3 text-right">오늘판매</th>
-            <th className="w-[110px] px-3 py-3 text-right">재고원가</th>
-            <th className="w-[340px] px-3 py-3">연결상품</th>
-            <th className="w-[110px] px-3 py-3">갱신</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {rows.length ? (
-            rows.map((row) => (
-              <tr key={row.id} className="bg-white hover:bg-slate-50">
-                <td className="px-4 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <ProductImage src={row.imageUrl} alt={row.name} />
-                    <div className="min-w-0">
-                      <div className="truncate text-[14px] font-black text-slate-950" title={row.name}>
-                        {row.name || `마스터 #${row.id}`}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] font-bold text-slate-500">
-                        <span>단가 {formatMoney(row.unitCost)}</span>
-                        {row.memo ? <span className="truncate text-emerald-700">메모 {row.memo}</span> : null}
-                      </div>
-                    </div>
-                  </div>
-                </td>
-                <td className={`px-3 py-3 text-right font-black tabular-nums ${stockTone(row.naverStock)}`}>
-                  {formatNumber(row.naverStock)}
-                </td>
-                <td className={`px-3 py-3 text-right font-black tabular-nums ${stockTone(row.coupangStock)}`}>
-                  {formatNumber(row.coupangStock)}
-                </td>
-                <td className={`px-3 py-3 text-right text-[15px] font-black tabular-nums ${stockTone(row.totalStock)}`}>
-                  {formatNumber(row.totalStock)}
-                </td>
-                <td className="px-3 py-3 text-right font-black tabular-nums text-orange-700">
-                  {formatNumber(row.totalInboundPending)}
-                </td>
-                <td className="px-3 py-3 text-right font-black tabular-nums text-slate-800">
-                  {formatNumber(row.totalTodaySales)}
-                </td>
-                <td className="px-3 py-3 text-right font-black tabular-nums text-slate-800">
-                  {formatMoney(row.stockCost)}
-                </td>
-                <td className="px-3 py-3">
-                  <LinkedProducts links={row.linked} />
-                </td>
-                <td className="px-3 py-3 text-[12px] font-bold text-slate-500">
-                  {formatDateTime(row.updatedAt || row.linked[0]?.syncedAt)}
+      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+        <table className="w-[1240px] table-fixed border-collapse text-left text-[12px]">
+          <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
+            <tr>
+              <th className="w-[74px] px-2 py-2">순번</th>
+              <th className="w-[286px] px-2 py-2">상품</th>
+              <th className="w-[72px] px-2 py-2 text-right">네이버</th>
+              <th className="w-[72px] px-2 py-2 text-right">쿠팡</th>
+              <th className="w-[78px] px-2 py-2 text-right">총재고</th>
+              <th className="w-[78px] px-2 py-2 text-right">입고대기</th>
+              <th className="w-[78px] px-2 py-2 text-right">오늘판매</th>
+              <th className="w-[102px] px-2 py-2 text-right">재고원가</th>
+              <th className="w-[270px] px-2 py-2">연결상품</th>
+              <th className="w-[110px] px-2 py-2">갱신</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {rows.length ? (
+              <SortableContext items={rows.map((row) => row.id)} strategy={verticalListSortingStrategy}>
+                {rows.map((row, index) => (
+                  <SortableMasterRow
+                    key={row.id}
+                    row={row}
+                    rank={index + 1}
+                    favorite={favoriteIds.includes(row.id)}
+                    onToggleFavorite={onToggleFavorite}
+                  />
+                ))}
+              </SortableContext>
+            ) : (
+              <tr>
+                <td colSpan={10} className="h-44 px-4 py-8 text-center text-[13px] font-bold text-slate-400">
+                  표시할 마스터 재고가 없습니다.
                 </td>
               </tr>
-            ))
-          ) : (
-            <tr>
-              <td colSpan={9} className="h-44 px-4 py-8 text-center text-[13px] font-bold text-slate-400">
-                표시할 마스터 재고가 없습니다.
-              </td>
-            </tr>
-          )}
-        </tbody>
-      </table>
+            )}
+          </tbody>
+        </table>
+      </DndContext>
     </div>
   )
 }
@@ -233,24 +377,28 @@ function MasterTable({ rows }: { rows: SmartInventoryMasterRow[] }) {
 function UnlinkedTable({ rows }: { rows: SmartInventoryChannelRow[] }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white shadow-sm">
-      <table className="w-full min-w-[900px] table-fixed border-collapse text-left text-[13px]">
-        <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
+      <table className="w-[880px] table-fixed border-collapse text-left text-[12px]">
+        <thead className="border-b border-slate-200 bg-slate-50 text-[10px] font-black uppercase tracking-wide text-slate-500">
           <tr>
-            <th className="w-[110px] px-4 py-3">채널</th>
-            <th className="w-[420px] px-3 py-3">상품</th>
-            <th className="w-[110px] px-3 py-3 text-right">재고</th>
-            <th className="w-[110px] px-3 py-3 text-right">오늘판매</th>
-            <th className="w-[130px] px-3 py-3 text-right">판매가</th>
-            <th className="w-[130px] px-3 py-3">수집</th>
+            <th className="w-[64px] px-2 py-2 text-right">순번</th>
+            <th className="w-[90px] px-2 py-2">채널</th>
+            <th className="w-[350px] px-2 py-2">상품</th>
+            <th className="w-[86px] px-2 py-2 text-right">재고</th>
+            <th className="w-[86px] px-2 py-2 text-right">오늘판매</th>
+            <th className="w-[104px] px-2 py-2 text-right">판매가</th>
+            <th className="w-[100px] px-2 py-2">수집</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.length ? (
-            rows.map((row) => (
+            rows.map((row, index) => (
               <tr key={`${row.channel}:${row.identityKey}`} className="bg-white hover:bg-slate-50">
-                <td className="px-4 py-3">
+                <td className="px-2 py-2 text-right text-[12px] font-black tabular-nums text-slate-500">
+                  {index + 1}
+                </td>
+                <td className="px-2 py-2">
                   <span
-                    className={`inline-flex rounded-md border px-2 py-1 text-[11px] font-black ${
+                    className={`inline-flex rounded-md border px-1.5 py-0.5 text-[10px] font-black ${
                       row.channel === 'naver'
                         ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
                         : 'border-sky-100 bg-sky-50 text-sky-700'
@@ -259,34 +407,34 @@ function UnlinkedTable({ rows }: { rows: SmartInventoryChannelRow[] }) {
                     {channelLabel[row.channel]}
                   </span>
                 </td>
-                <td className="px-3 py-3">
-                  <div className="flex min-w-0 items-center gap-3">
+                <td className="px-2 py-2">
+                  <div className="flex min-w-0 items-center gap-2">
                     <ProductImage src={row.imageUrl} alt={row.name} />
                     <div className="min-w-0">
                       <a
                         href={row.productUrl || '#'}
                         target="_blank"
                         rel="noreferrer"
-                        className={`block truncate text-[14px] font-black text-slate-950 no-underline ${
+                        className={`block truncate text-[13px] font-black text-slate-950 no-underline ${
                           row.productUrl ? 'hover:text-[#d9361b]' : 'pointer-events-none'
                         }`}
                         title={row.name}
                       >
                         {row.name || row.productKey}
                       </a>
-                      <div className="mt-1 truncate text-[11px] font-bold text-slate-500">{row.identityKey}</div>
+                      <div className="mt-0.5 truncate text-[10px] font-bold text-slate-500">{row.identityKey}</div>
                     </div>
                   </div>
                 </td>
-                <td className={`px-3 py-3 text-right font-black tabular-nums ${stockTone(row.stock)}`}>{formatNumber(row.stock)}</td>
-                <td className="px-3 py-3 text-right font-black tabular-nums text-slate-800">{formatNumber(row.todaySales)}</td>
-                <td className="px-3 py-3 text-right font-black tabular-nums text-slate-800">{formatMoney(row.price)}</td>
-                <td className="px-3 py-3 text-[12px] font-bold text-slate-500">{formatDateTime(row.syncedAt)}</td>
+                <td className={`px-2 py-2 text-right font-black tabular-nums ${stockTone(row.stock)}`}>{formatNumber(row.stock)}</td>
+                <td className="px-2 py-2 text-right font-black tabular-nums text-slate-800">{formatNumber(row.todaySales)}</td>
+                <td className="px-2 py-2 text-right font-black tabular-nums text-slate-800">{formatMoney(row.price)}</td>
+                <td className="px-2 py-2 text-[11px] font-bold text-slate-500">{formatDateTime(row.syncedAt)}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={6} className="h-44 px-4 py-8 text-center text-[13px] font-bold text-slate-400">
+              <td colSpan={7} className="h-44 px-4 py-8 text-center text-[13px] font-bold text-slate-400">
                 미연결 상품이 없습니다.
               </td>
             </tr>
@@ -305,6 +453,13 @@ export default function InventoryClient() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<FilterMode>('all')
   const [tableMode, setTableMode] = useState<TableMode>('masters')
+  const [masterOrder, setMasterOrder] = useState<number[]>([])
+  const [favoriteIds, setFavoriteIds] = useState<number[]>([])
+
+  useEffect(() => {
+    setMasterOrder(readStoredNumberArray(INVENTORY_ORDER_KEY))
+    setFavoriteIds(readStoredNumberArray(INVENTORY_FAVORITES_KEY))
+  }, [])
 
   const loadDashboard = useCallback(async () => {
     setLoading(true)
@@ -344,11 +499,26 @@ export default function InventoryClient() {
     }
   }
 
+  const handleReorder = (nextOrder: number[]) => {
+    setMasterOrder(nextOrder)
+    writeStoredNumberArray(INVENTORY_ORDER_KEY, nextOrder)
+    window.dispatchEvent(new CustomEvent(INVENTORY_ORDER_EVENT))
+  }
+
+  const handleToggleFavorite = (id: number) => {
+    setFavoriteIds((current) => {
+      const next = current.includes(id) ? current.filter((item) => item !== id) : [...current, id]
+      writeStoredNumberArray(INVENTORY_FAVORITES_KEY, next)
+      window.dispatchEvent(new CustomEvent(INVENTORY_FAVORITES_EVENT, { detail: { rows: data?.rows || [] } }))
+      return next
+    })
+  }
+
   const normalizedQuery = query.trim().toLowerCase()
+  const orderedMasters = useMemo(() => orderRows(data?.rows || [], masterOrder), [data?.rows, masterOrder])
 
   const filteredMasters = useMemo(() => {
-    const rows = data?.rows || []
-    return rows.filter((row) => {
+    return orderedMasters.filter((row) => {
       if (
         normalizedQuery &&
         !includesQuery(row.name, normalizedQuery) &&
@@ -362,7 +532,7 @@ export default function InventoryClient() {
       if (filter === 'unlinked') return row.linkCount === 0
       return true
     })
-  }, [data?.rows, filter, normalizedQuery])
+  }, [filter, normalizedQuery, orderedMasters])
 
   const filteredUnlinkedRows = useMemo(() => {
     const rows = [...(data?.unlinkedRows.naver || []), ...(data?.unlinkedRows.coupang || [])]
@@ -380,16 +550,16 @@ export default function InventoryClient() {
   const monitorLabel = data?.monitorSource === 'gist' ? 'Gist 터널' : data?.monitorSource === 'env' ? '고정 URL' : '미설정'
 
   return (
-    <div className="space-y-5">
-      <div className="sticky top-0 z-40 -mx-4 border-b border-slate-200 bg-[#F7F7F8]/95 px-4 py-3 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+    <div className="space-y-4">
+      <div className="sticky top-0 z-40 -mx-4 border-b border-slate-200 bg-[#F7F7F8]/95 px-4 py-2 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+        <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <div className="text-[12px] font-black uppercase tracking-[0.18em] text-[#d9361b]">Smart Inventory</div>
-            <h1 className="mt-1 text-[22px] font-black tracking-tight text-slate-950">재고관리</h1>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#d9361b]">Smart Inventory</div>
+            <h1 className="mt-0.5 text-[21px] font-black tracking-tight text-slate-950">재고관리</h1>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600">
-              <Database size={16} />
+            <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600">
+              <Database size={15} />
               <span>{monitorLabel}</span>
               {healthStatus ? <span className="text-emerald-700">{healthStatus}</span> : null}
             </div>
@@ -397,18 +567,18 @@ export default function InventoryClient() {
               type="button"
               onClick={loadDashboard}
               disabled={loading || syncing}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-[13px] font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
               새로고침
             </button>
             <button
               type="button"
               onClick={handleSync}
               disabled={loading || syncing || data?.configured === false}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#d9361b] bg-[#d9361b] px-4 text-[13px] font-black text-white shadow-sm transition hover:bg-[#c52f16] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#d9361b] bg-[#d9361b] px-3 text-[12px] font-black text-white shadow-sm transition hover:bg-[#c52f16] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {syncing ? <Loader2 size={16} className="animate-spin" /> : <PackageCheck size={16} />}
+              {syncing ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
               라즈베리 동기화
             </button>
           </div>
@@ -437,23 +607,23 @@ export default function InventoryClient() {
         </div>
       ) : null}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <StatTile icon={<Boxes size={17} />} label="마스터 상품" value={formatNumber(data?.summary.masterCount || 0)} sub={`연결 ${formatNumber(data?.summary.linkedCount || 0)}건`} />
-        <StatTile icon={<PackageCheck size={17} />} label="총재고" value={formatNumber(data?.summary.totalStock || 0)} sub={`N ${formatNumber(data?.summary.naverStock || 0)} / C ${formatNumber(data?.summary.coupangStock || 0)}`} tone="blue" />
-        <StatTile icon={<Database size={17} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="채널별 대기 합산" tone="orange" />
-        <StatTile icon={<Link2 size={17} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub={`N ${formatNumber(data?.unlinked.naver || 0)} / C ${formatNumber(data?.unlinked.coupang || 0)}`} />
-        <StatTile icon={<PackageCheck size={17} />} label="오늘판매" value={formatNumber(data?.summary.todaySales || 0)} sub={formatMoney(data?.summary.todayRevenue || 0)} tone="green" />
-        <StatTile icon={<Database size={17} />} label="재고원가" value={formatMoney(data?.summary.stockCost || 0)} sub={`조회 ${formatDateTime(data?.syncedAt)}`} />
+      <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-6">
+        <StatTile icon={<Boxes size={16} />} label="마스터 상품" value={formatNumber(data?.summary.masterCount || 0)} sub={`연결 ${formatNumber(data?.summary.linkedCount || 0)}건`} />
+        <StatTile icon={<PackageCheck size={16} />} label="총재고" value={formatNumber(data?.summary.totalStock || 0)} sub={`N ${formatNumber(data?.summary.naverStock || 0)} / C ${formatNumber(data?.summary.coupangStock || 0)}`} tone="blue" />
+        <StatTile icon={<Database size={16} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="채널별 대기 합산" tone="orange" />
+        <StatTile icon={<Link2 size={16} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub={`N ${formatNumber(data?.unlinked.naver || 0)} / C ${formatNumber(data?.unlinked.coupang || 0)}`} />
+        <StatTile icon={<PackageCheck size={16} />} label="오늘판매" value={formatNumber(data?.summary.todaySales || 0)} sub={formatMoney(data?.summary.todayRevenue || 0)} tone="green" />
+        <StatTile icon={<Database size={16} />} label="재고원가" value={formatMoney(data?.summary.stockCost || 0)} sub={`조회 ${formatDateTime(data?.syncedAt)}`} />
       </div>
 
-      <div className="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+      <div className="flex flex-col gap-2 rounded-lg border border-slate-200 bg-white p-2 shadow-sm xl:flex-row xl:items-center xl:justify-between">
         <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3">
-          <Search size={16} className="shrink-0 text-slate-400" />
+          <Search size={15} className="shrink-0 text-slate-400" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="상품명, 링크상품, 키 검색"
-            className="h-10 min-w-0 flex-1 bg-transparent text-[13px] font-bold text-slate-900 outline-none placeholder:text-slate-400"
+            className="h-9 min-w-0 flex-1 bg-transparent text-[12px] font-bold text-slate-900 outline-none placeholder:text-slate-400"
           />
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -467,7 +637,7 @@ export default function InventoryClient() {
                   if (option.value !== 'unlinked') setTableMode('masters')
                   if (option.value === 'unlinked') setTableMode('unlinked')
                 }}
-                className={`h-8 rounded-md px-3 text-[12px] font-black transition ${
+                className={`h-7 rounded-md px-2.5 text-[11px] font-black transition ${
                   filter === option.value ? 'bg-slate-950 text-white shadow-sm' : 'text-slate-600 hover:bg-white'
                 }`}
               >
@@ -479,7 +649,7 @@ export default function InventoryClient() {
             <button
               type="button"
               onClick={() => setTableMode('masters')}
-              className={`h-8 rounded-md px-3 text-[12px] font-black transition ${
+              className={`h-7 rounded-md px-2.5 text-[11px] font-black transition ${
                 tableMode === 'masters' ? 'bg-[#d9361b] text-white shadow-sm' : 'text-slate-600 hover:bg-white'
               }`}
             >
@@ -488,14 +658,14 @@ export default function InventoryClient() {
             <button
               type="button"
               onClick={() => setTableMode('unlinked')}
-              className={`h-8 rounded-md px-3 text-[12px] font-black transition ${
+              className={`h-7 rounded-md px-2.5 text-[11px] font-black transition ${
                 tableMode === 'unlinked' ? 'bg-[#d9361b] text-white shadow-sm' : 'text-slate-600 hover:bg-white'
               }`}
             >
               미연결
             </button>
           </div>
-          <div className="text-[12px] font-black text-slate-500">{loading ? '불러오는 중' : `${formatNumber(activeRowsCount)}건`}</div>
+          <div className="text-[11px] font-black text-slate-500">{loading ? '불러오는 중' : `${formatNumber(activeRowsCount)}건`}</div>
         </div>
       </div>
 
@@ -505,7 +675,13 @@ export default function InventoryClient() {
           라즈베리 재고를 불러오는 중입니다.
         </div>
       ) : tableMode === 'masters' ? (
-        <MasterTable rows={filteredMasters} />
+        <MasterTable
+          rows={filteredMasters}
+          allRows={orderedMasters}
+          favoriteIds={favoriteIds}
+          onToggleFavorite={handleToggleFavorite}
+          onReorder={handleReorder}
+        />
       ) : (
         <UnlinkedTable rows={filteredUnlinkedRows} />
       )}

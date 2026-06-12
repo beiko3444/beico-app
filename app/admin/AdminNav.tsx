@@ -3,8 +3,121 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
-import { useEffect, useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Menu, Star, X } from 'lucide-react'
+import {
+  INVENTORY_FAVORITES_EVENT,
+  INVENTORY_FAVORITES_KEY,
+  readStoredNumberArray,
+} from '@/lib/smartInventoryPrefs'
+import type { SmartInventoryDashboardPayload, SmartInventoryMasterRow } from '@/lib/smartInventoryClient'
+
+function formatSidebarStock(value: number | null | undefined) {
+  if (value === null || value === undefined) return '-'
+  return value.toLocaleString('ko-KR')
+}
+
+function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
+  const [favoriteRows, setFavoriteRows] = useState<SmartInventoryMasterRow[]>([])
+  const [loading, setLoading] = useState(false)
+
+  const applyRows = useCallback((ids: number[], rows: SmartInventoryMasterRow[]) => {
+    const byId = new Map(rows.map((row) => [row.id, row]))
+    setFavoriteRows(ids.map((id) => byId.get(id)).filter((row): row is SmartInventoryMasterRow => Boolean(row)))
+  }, [])
+
+  const loadFavorites = useCallback(async () => {
+    const ids = readStoredNumberArray(INVENTORY_FAVORITES_KEY)
+    if (!ids.length) {
+      setFavoriteRows([])
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await fetch('/api/admin/inventory', { cache: 'no-store' })
+      const payload: SmartInventoryDashboardPayload = await response.json()
+      if (!response.ok || !Array.isArray(payload.rows)) throw new Error('failed')
+
+      applyRows(ids, payload.rows)
+    } catch {
+      setFavoriteRows([])
+    } finally {
+      setLoading(false)
+    }
+  }, [applyRows])
+
+  useEffect(() => {
+    loadFavorites()
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === INVENTORY_FAVORITES_KEY) loadFavorites()
+    }
+
+    const handleFavoriteEvent = (event: Event) => {
+      const ids = readStoredNumberArray(INVENTORY_FAVORITES_KEY)
+      const rows = (event as CustomEvent<{ rows?: SmartInventoryMasterRow[] }>).detail?.rows
+      if (ids.length && Array.isArray(rows)) {
+        applyRows(ids, rows)
+        return
+      }
+      loadFavorites()
+    }
+
+    window.addEventListener(INVENTORY_FAVORITES_EVENT, handleFavoriteEvent)
+    window.addEventListener('storage', handleStorage)
+    return () => {
+      window.removeEventListener(INVENTORY_FAVORITES_EVENT, handleFavoriteEvent)
+      window.removeEventListener('storage', handleStorage)
+    }
+  }, [applyRows, loadFavorites])
+
+  if (!favoriteRows.length && !loading) return null
+
+  return (
+    <div className="mt-2 shrink-0 rounded-2xl border border-[#FFE1B0] bg-[#FFF9ED] px-3 py-3">
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5 text-[12px] font-black text-[#111827]">
+          <Star size={14} className="text-amber-500" fill="currentColor" />
+          즐겨찾기 재고
+        </div>
+        <Link
+          href="/admin/inventory"
+          prefetch={false}
+          onClick={onNavigate}
+          className="text-[10px] font-black text-[#EF3B1D] no-underline"
+        >
+          열기
+        </Link>
+      </div>
+      <div className="mt-2 space-y-1.5">
+        {loading ? (
+          <div className="rounded-lg bg-white/70 px-2 py-2 text-[11px] font-bold text-slate-500">불러오는 중</div>
+        ) : (
+          favoriteRows.slice(0, 5).map((row) => (
+            <Link
+              key={row.id}
+              href="/admin/inventory"
+              prefetch={false}
+              onClick={onNavigate}
+              className="block rounded-lg border border-[#FFE1B0] bg-white px-2.5 py-2 text-inherit no-underline transition hover:bg-[#FFF3D9]"
+            >
+              <div className="truncate text-[11px] font-black text-slate-900" title={row.name}>
+                {row.name}
+              </div>
+              <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-extrabold text-slate-500">
+                <span>N {formatSidebarStock(row.naverStock)} / C {formatSidebarStock(row.coupangStock)}</span>
+                <span className={`tabular-nums ${row.totalStock !== null && row.totalStock <= 5 ? 'text-red-600' : 'text-[#EF3B1D]'}`}>
+                  {formatSidebarStock(row.totalStock)}
+                </span>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
 
 export default function AdminNav({
   counts,
@@ -186,6 +299,8 @@ export default function AdminNav({
         ))}
       </nav>
 
+      <FavoriteInventoryPanel />
+
       <div className="mt-1 flex h-16 shrink-0 items-center justify-between gap-2.5 rounded-2xl border border-[#FFD4C8] bg-[#FFF6F3] px-[14px] py-3 transition-colors hover:bg-[#FFF1EC]">
         <div className="min-w-0">
           <div className="text-[13px] font-extrabold leading-none tracking-[-0.01em] text-[#111827]">집하 문자</div>
@@ -271,6 +386,8 @@ export default function AdminNav({
           </Link>
         ))}
       </nav>
+
+      <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
 
       <div className="mt-4 border-t border-[#E5E7EB] pt-3">
         <div className="flex items-center justify-between gap-2">
