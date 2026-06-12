@@ -21,8 +21,8 @@ function SidebarProductImage({ src, alt }: { src: string | null; alt: string }) 
   const [failed, setFailed] = useState(false)
   if (!src || failed) {
     return (
-      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-[#FFE1B0] bg-white/80 text-slate-300">
-        <Boxes size={15} />
+      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300">
+        <Boxes size={14} />
       </div>
     )
   }
@@ -31,7 +31,7 @@ function SidebarProductImage({ src, alt }: { src: string | null; alt: string }) 
     <img
       src={src}
       alt={alt}
-      className="h-10 w-10 shrink-0 rounded-lg border border-[#FFE1B0] bg-white object-cover"
+      className="h-9 w-9 shrink-0 rounded-md border border-slate-200 bg-white object-cover"
       onError={() => setFailed(true)}
     />
   )
@@ -95,7 +95,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   if (!favoriteRows.length && !loading) return null
 
   return (
-    <div className="mt-2 shrink-0 rounded-2xl border border-[#FFE1B0] bg-[#FFF9ED] px-3 py-3">
+    <div className="mt-2 shrink-0 border-t border-[#E5E7EB] pt-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5 text-[12px] font-black text-[#111827]">
           <Star size={14} className="text-amber-500" fill="currentColor" />
@@ -105,9 +105,9 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
           열기
         </Link>
       </div>
-      <div className="mt-2 space-y-1.5">
+      <div className="mt-2 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200 bg-white">
         {loading ? (
-          <div className="rounded-lg bg-white/70 px-2 py-2 text-[11px] font-bold text-slate-500">불러오는 중</div>
+          <div className="px-2 py-2 text-[11px] font-bold text-slate-500">불러오는 중</div>
         ) : (
           favoriteRows.slice(0, 5).map((row) => (
             <Link
@@ -115,22 +115,17 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
               href="/admin/inventory"
               prefetch={false}
               onClick={onNavigate}
-              className="flex items-center gap-2 rounded-lg border border-[#FFE1B0] bg-white px-2.5 py-2 text-inherit no-underline transition hover:bg-[#FFF3D9]"
+              className="flex items-center gap-2 px-2 py-1.5 text-inherit no-underline transition hover:bg-slate-50"
             >
               <SidebarProductImage src={row.imageUrl} alt={row.name} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-black text-slate-900" title={row.name}>
+                <div className="truncate text-[11px] font-black leading-tight text-slate-900" title={row.name}>
                   {row.name}
                 </div>
-                <div className="mt-1 flex items-center justify-between gap-2 text-[10px] font-extrabold">
-                  <span className="truncate">
-                    <span className="text-emerald-600">N {formatSidebarStock(row.naverStock)}</span>
-                    <span className="mx-1 text-slate-300">/</span>
-                    <span className="text-red-600">C {formatSidebarStock(row.coupangStock)}</span>
-                  </span>
-                  <span className="shrink-0 tabular-nums text-slate-950">
-                    {formatSidebarStock(row.totalStock)}
-                  </span>
+                <div className="mt-1 grid grid-cols-[1fr_1fr_auto] items-center gap-1 text-[10px] font-extrabold tabular-nums">
+                  <span className="truncate text-emerald-600">N {formatSidebarStock(row.naverStock)}</span>
+                  <span className="truncate text-red-600">C {formatSidebarStock(row.coupangStock)}</span>
+                  <span className="text-right text-slate-950">{formatSidebarStock(row.totalStock)}</span>
                 </div>
               </div>
             </Link>
