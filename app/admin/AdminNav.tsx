@@ -128,7 +128,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
                     <span className="mx-1 text-slate-300">/</span>
                     <span className="text-red-600">C {formatSidebarStock(row.coupangStock)}</span>
                   </span>
-                  <span className={`shrink-0 tabular-nums ${row.totalStock !== null && row.totalStock <= 5 ? 'text-red-600' : 'text-[#EF3B1D]'}`}>
+                  <span className="shrink-0 tabular-nums text-slate-950">
                     {formatSidebarStock(row.totalStock)}
                   </span>
                 </div>

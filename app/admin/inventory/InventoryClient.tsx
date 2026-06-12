@@ -285,7 +285,7 @@ function SortableMasterRow({
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-emerald-600">{formatNumber(row.naverStock)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-red-600">{formatNumber(row.coupangStock)}</td>
-      <td className={`px-3 py-2 text-right text-[14px] font-black tabular-nums ${stockTone(row.totalStock)}`}>{formatNumber(row.totalStock)}</td>
+      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-slate-950">{formatNumber(row.totalStock)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600">{formatNumber(row.totalInboundPending)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(row.stockCost)}</td>
       <td className="px-3 py-2"><LinkedProducts links={row.linked} /></td>
