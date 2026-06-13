@@ -355,6 +355,48 @@ model DepositSms {
   @@index([matchedOrderId])
 }
 
+model NaverSalesDaily {
+  id                   String   @id @default(uuid())
+  saleDate             DateTime
+  channelProductNo     String
+  sellerManagementCode String?
+  productName          String?
+  dbProductId          String?
+  dbProductName        String?
+  orders               Int      @default(0)
+  quantity             Int      @default(0)
+  payAmount            Int      @default(0)
+  refundAmount         Int      @default(0)
+  netAmount            Int      @default(0)
+  raw                  Json?
+  syncedAt             DateTime @default(now())
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  @@unique([saleDate, channelProductNo])
+  @@index([saleDate])
+  @@index([channelProductNo])
+  @@index([sellerManagementCode])
+  @@index([dbProductId])
+}
+
+model NaverSalesSyncLog {
+  id                 String    @id @default(uuid())
+  sourceDevice       String?
+  status             String    @default("SUCCESS")
+  requestedStartDate DateTime?
+  requestedEndDate   DateTime?
+  fetchedAt          DateTime?
+  rowsReceived       Int       @default(0)
+  rowsUpserted       Int       @default(0)
+  errorMessage       String?
+  raw                Json?
+  createdAt          DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([status])
+}
+
 model CoupangSyncHistory {
   id           String   @id @default(uuid())
   createdAt    DateTime @default(now())

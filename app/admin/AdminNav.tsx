@@ -158,6 +158,7 @@ export default function AdminNav({
     { name: '근태관리', path: '/admin/tasks' },
     { name: '카드사용내역', path: '/admin/card-usage' },
     { name: '문자발송서비스', path: '/admin/sms' },
+    { name: '통계', path: '/admin/statistics' },
     { name: '지렁이 발주', path: '/admin/worm-order' },
     { name: 'PI발급', path: '/admin/proforma' },
     { name: '전력관리', path: '/admin/electricity' },
@@ -315,27 +316,25 @@ export default function AdminNav({
 
       <FavoriteInventoryPanel />
 
-      <div className="mt-1 flex h-16 shrink-0 items-center justify-between gap-2.5 rounded-2xl border border-[#FFD4C8] bg-[#FFF6F3] px-[14px] py-3 transition-colors hover:bg-[#FFF1EC]">
-        <div className="min-w-0">
-          <div className="text-[13px] font-extrabold leading-none tracking-[-0.01em] text-[#111827]">집하 문자</div>
-          <div className="mt-1 flex items-center gap-1 text-[12px] font-bold leading-none text-[#EF3B1D]">
-            <input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              value={shipmentCount}
-              onChange={(event) => setShipmentCount(event.target.value)}
-              className="h-[18px] w-[30px] rounded border border-[#FFD4C8] bg-white px-1 text-center text-[11px] font-extrabold text-[#EF3B1D] outline-none"
-              aria-label="발송 건수"
-            />
-            <span>건 대기</span>
-          </div>
+      <div className="mt-1 flex h-10 shrink-0 items-center justify-between gap-2 rounded-xl border border-[#FFD4C8] bg-[#FFF6F3] px-3 transition-colors hover:bg-[#FFF1EC]">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="shrink-0 text-[12px] font-extrabold leading-none tracking-[-0.01em] text-[#111827]">집하 문자</div>
+          <input
+            type="number"
+            min={1}
+            inputMode="numeric"
+            value={shipmentCount}
+            onChange={(event) => setShipmentCount(event.target.value)}
+            className="h-6 w-9 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold leading-none text-[#EF3B1D] outline-none"
+            aria-label="발송 건수"
+          />
+          <span className="shrink-0 text-[11px] font-bold leading-none text-[#EF3B1D]">건</span>
         </div>
         <button
           type="button"
           onClick={handleSendPickupSms}
           disabled={sendingSms || loadingFromNumber}
-          className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[13px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[12px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {sendingSms ? '요청중' : '발송'}
         </button>
@@ -376,15 +375,15 @@ export default function AdminNav({
 
       <div className="mt-4 border-t border-[#E5E7EB] pt-3">
         <div className="flex items-center justify-between gap-2">
-          <div className="shrink-0 text-[13px] font-extrabold leading-none text-[#111827]">집하 문자</div>
-          <div className="flex min-w-0 items-center justify-end gap-1.5 text-[12px] font-bold leading-none text-[#EF3B1D]">
+          <div className="shrink-0 text-[12px] font-extrabold leading-none text-[#111827]">집하 문자</div>
+          <div className="flex min-w-0 items-center justify-end gap-1 text-[12px] font-bold leading-none text-[#EF3B1D]">
             <input
               type="number"
               min={1}
               inputMode="numeric"
               value={shipmentCount}
               onChange={(event) => setShipmentCount(event.target.value)}
-              className="h-8 w-11 rounded-lg border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold text-[#EF3B1D] outline-none"
+              className="h-7 w-10 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold text-[#EF3B1D] outline-none"
               aria-label="발송 건수"
             />
             <span className="shrink-0">건</span>
@@ -392,7 +391,7 @@ export default function AdminNav({
               type="button"
               onClick={handleSendPickupSms}
               disabled={sendingSms || loadingFromNumber}
-              className="inline-flex h-8 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[12px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[12px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sendingSms ? '요청중' : '발송'}
             </button>
