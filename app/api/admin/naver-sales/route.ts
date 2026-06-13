@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/requireAdmin'
 import { defaultDateRange, normalizeYmdDate, toYmd, ymdToUtcDate } from '@/lib/naverSales'
+import { buildNaverSalesDashboard, summarizeInsightRows } from '@/lib/naverSalesAnalytics.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: '조회 기간이 올바르지 않습니다.' }, { status: 400 })
   }
 
-  const [rows, latestLog] = await Promise.all([
+  const [rows, insightRows, realtimeSnapshot, latestLog] = await Promise.all([
     prisma.naverSalesDaily.findMany({
       where: {
         saleDate: {
@@ -34,41 +35,54 @@ export async function GET(request: Request) {
       ],
       take: 1000,
     }),
+    prisma.naverSalesInsightDaily.findMany({
+      where: {
+        saleDate: {
+          gte: start,
+          lte: end,
+        },
+      },
+      orderBy: [
+        { payAmount: 'desc' },
+        { orders: 'desc' },
+        { label: 'asc' },
+      ],
+      take: 1000,
+    }),
+    prisma.naverSalesRealtimeSnapshot.findFirst({
+      where: {
+        snapshotDate: {
+          gte: start,
+          lte: end,
+        },
+      },
+      orderBy: { collectedAt: 'desc' },
+    }),
     prisma.naverSalesSyncLog.findFirst({
       orderBy: { createdAt: 'desc' },
     }),
   ])
 
-  const totals = rows.reduce(
-    (acc, row) => {
-      acc.orders += row.orders
-      acc.quantity += row.quantity
-      acc.payAmount += row.payAmount
-      acc.refundAmount += row.refundAmount
-      acc.netAmount += row.netAmount
-      return acc
-    },
-    { orders: 0, quantity: 0, payAmount: 0, refundAmount: 0, netAmount: 0 },
-  )
-
-  const byDate = Array.from(
-    rows.reduce((map, row) => {
-      const key = toYmd(row.saleDate)
-      const current = map.get(key) || { saleDate: key, orders: 0, quantity: 0, netAmount: 0 }
-      current.orders += row.orders
-      current.quantity += row.quantity
-      current.netAmount += row.netAmount
-      map.set(key, current)
-      return map
-    }, new Map<string, { saleDate: string; orders: number; quantity: number; netAmount: number }>()),
-  )
-    .map(([, value]) => value)
-    .sort((a, b) => a.saleDate.localeCompare(b.saleDate))
+  const dashboard = buildNaverSalesDashboard(rows)
+  const keywords = summarizeInsightRows(insightRows.filter((row) => row.category === 'KEYWORD' || row.category === 'PRODUCT_KEYWORD'), 15)
+  const channels = summarizeInsightRows(insightRows.filter((row) => row.category === 'CHANNEL' || row.category === 'PRODUCT_MARKETING'), 15)
 
   return NextResponse.json({
     range: { start: startText, end: endText },
-    totals,
-    byDate,
+    totals: dashboard.totals,
+    products: dashboard.products,
+    byDate: dashboard.byDate,
+    keywords,
+    channels,
+    realtimeSnapshot: realtimeSnapshot ? {
+      snapshotDate: toYmd(realtimeSnapshot.snapshotDate),
+      orders: realtimeSnapshot.orders,
+      quantity: realtimeSnapshot.quantity,
+      payAmount: realtimeSnapshot.payAmount,
+      refundAmount: realtimeSnapshot.refundAmount,
+      netAmount: realtimeSnapshot.netAmount,
+      collectedAt: realtimeSnapshot.collectedAt,
+    } : null,
     rows: rows.map((row) => ({
       id: row.id,
       saleDate: toYmd(row.saleDate),

@@ -16,7 +16,16 @@ const env = {
   days: clampInt(process.env.NAVER_SALES_DAYS, 1, 30, 2),
   requestDelayMs: clampInt(process.env.NAVER_SALES_REQUEST_DELAY_MS, 0, 60_000, 1_000),
   retryCount: clampInt(process.env.NAVER_SALES_RETRY_COUNT, 0, 5, 3),
+  includeInsights: process.env.NAVER_SALES_INCLUDE_INSIGHTS !== '0',
+  includeRealtime: process.env.NAVER_SALES_INCLUDE_REALTIME !== '0',
 }
+
+const INSIGHT_ENDPOINTS = [
+  { category: 'KEYWORD', path: 'marketing/search/keyword', label: '검색어' },
+  { category: 'PRODUCT_KEYWORD', path: 'sales/product-search/keyword-by-product', label: '상품별 검색어' },
+  { category: 'CHANNEL', path: 'marketing/all/detail', label: '마케팅 채널' },
+  { category: 'PRODUCT_MARKETING', path: 'sales/product-marketing/detail', label: '상품 마케팅' },
+]
 
 async function main() {
   validateEnv()
@@ -30,6 +39,8 @@ async function main() {
   for (const saleDate of dates) {
     const apiRows = await fetchProductSalesRowsWithRetry(accessToken, channelNo, saleDate)
     const normalized = normalizeNaverSalesRows(saleDate, apiRows)
+    const insightRows = env.includeInsights ? await fetchInsightPayloads(accessToken, channelNo, saleDate) : []
+    const realtime = env.includeRealtime && saleDate === dates[dates.length - 1] ? await fetchRealtimeSnapshot(accessToken, channelNo, saleDate) : null
     console.log(`[naver-sales] ${saleDate}: fetched ${apiRows.length}, normalized ${normalized.length}`)
     const result = await uploadToBeiko({
       sourceDevice: env.sourceDevice,
@@ -38,8 +49,10 @@ async function main() {
       saleDate,
       fetchedAt: new Date().toISOString(),
       rows: normalized,
+      insightRows,
+      realtime,
     })
-    totalReceived += result.rowsReceived || normalized.length
+    totalReceived += result.rowsReceived || normalized.length + insightRows.reduce((sum, row) => sum + row.rows.length, 0) + (realtime ? 1 : 0)
     totalUpserted += result.rowsUpserted || 0
     console.log(`[naver-sales] ${saleDate}: uploaded ${result.rowsUpserted || 0}/${result.rowsReceived || normalized.length} rows`)
     await sleep(env.requestDelayMs)
@@ -124,6 +137,84 @@ async function fetchProductSalesRows(accessToken, channelNo, saleDate) {
   }
 
   throw new Error(`네이버 판매량 조회 실패\n${errors.join('\n')}`)
+}
+
+async function fetchInsightPayloads(accessToken, channelNo, saleDate) {
+  const payloads = []
+  for (const endpoint of INSIGHT_ENDPOINTS) {
+    try {
+      const rows = await fetchBizdataRowsWithRetry(accessToken, channelNo, endpoint.path, saleDate, endpoint.label)
+      payloads.push({ category: endpoint.category, saleDate, rows })
+      console.log(`[naver-sales] ${saleDate}: ${endpoint.label} ${rows.length} rows`)
+    } catch (error) {
+      console.warn(`[naver-sales] ${saleDate}: ${endpoint.label} skipped - ${error instanceof Error ? error.message.split('\n')[0] : error}`)
+    }
+    await sleep(env.requestDelayMs)
+  }
+  return payloads
+}
+
+async function fetchBizdataRows(accessToken, channelNo, path, saleDate, label) {
+  const endpoint = `${NAVER_BASE_URL}/v1/bizdata-stats/channels/${channelNo}/${path}`
+  const formats = [saleDate, saleDate.replaceAll('-', '')]
+  const errors = []
+
+  for (const value of formats) {
+    const url = new URL(endpoint)
+    url.searchParams.set('startDate', value)
+    url.searchParams.set('endDate', value)
+    const response = await fetch(url, { headers: authHeaders(accessToken) })
+    if (!response.ok) {
+      errors.push(`${url.toString()} -> ${await readError(response)}`)
+      continue
+    }
+    const body = await response.json()
+    return extractRows(body)
+  }
+
+  throw new Error(`네이버 ${label} 조회 실패\n${errors.join('\n')}`)
+}
+
+async function fetchBizdataRowsWithRetry(accessToken, channelNo, path, saleDate, label) {
+  let lastError
+  for (let attempt = 0; attempt <= env.retryCount; attempt += 1) {
+    try {
+      return await fetchBizdataRows(accessToken, channelNo, path, saleDate, label)
+    } catch (error) {
+      lastError = error
+      if (attempt >= env.retryCount) break
+      const delayMs = env.requestDelayMs * 2 ** attempt
+      console.warn(`[naver-sales] ${saleDate}: ${label} retry ${attempt + 1}/${env.retryCount} after ${delayMs}ms`)
+      await sleep(delayMs)
+    }
+  }
+  throw lastError
+}
+
+async function fetchRealtimeSnapshot(accessToken, channelNo, saleDate) {
+  try {
+    const response = await fetch(`${NAVER_BASE_URL}/v1/bizdata-stats/channels/${channelNo}/realtime/daily`, {
+      headers: authHeaders(accessToken),
+    })
+    if (!response.ok) {
+      throw new Error(await readError(response))
+    }
+    const body = await response.json()
+    const rows = extractRows(body)
+    const metric = rows[0] || (body && typeof body === 'object' ? body : {})
+    return {
+      snapshotDate: saleDate,
+      orders: metric.numPurchases ?? metric.orders ?? metric.orderCount,
+      quantity: metric.productQuantity ?? metric.quantity,
+      payAmount: metric.payAmount ?? metric.totalPayAmount ?? metric.salesAmount,
+      refundAmount: metric.refundPayAmount ?? metric.refundAmount,
+      netAmount: metric.netAmount,
+      raw: body,
+    }
+  } catch (error) {
+    console.warn(`[naver-sales] realtime skipped - ${error instanceof Error ? error.message : error}`)
+    return null
+  }
 }
 
 async function fetchProductSalesRowsWithRetry(accessToken, channelNo, saleDate) {

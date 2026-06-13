@@ -380,6 +380,46 @@ model NaverSalesDaily {
   @@index([dbProductId])
 }
 
+model NaverSalesInsightDaily {
+  id           String   @id @default(uuid())
+  saleDate     DateTime
+  category     String
+  label        String
+  detail       String   @default("")
+  interactions Int      @default(0)
+  inflow       Int      @default(0)
+  orders       Int      @default(0)
+  quantity     Int      @default(0)
+  payAmount    Int      @default(0)
+  refundAmount Int      @default(0)
+  netAmount    Int      @default(0)
+  raw          Json?
+  syncedAt     DateTime @default(now())
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([saleDate, category, label, detail])
+  @@index([saleDate])
+  @@index([category])
+}
+
+model NaverSalesRealtimeSnapshot {
+  id           String   @id @default(uuid())
+  snapshotDate DateTime
+  sourceDevice String?
+  orders       Int      @default(0)
+  quantity     Int      @default(0)
+  payAmount    Int      @default(0)
+  refundAmount Int      @default(0)
+  netAmount    Int      @default(0)
+  raw          Json?
+  collectedAt  DateTime @default(now())
+  createdAt    DateTime @default(now())
+
+  @@index([snapshotDate])
+  @@index([createdAt])
+}
+
 model NaverSalesSyncLog {
   id                 String    @id @default(uuid())
   sourceDevice       String?

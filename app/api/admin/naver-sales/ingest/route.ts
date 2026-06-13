@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
+import type { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import {
   normalizeNaverSalesRows,
   normalizeYmdDate,
   ymdToUtcDate,
 } from '@/lib/naverSales'
+import { normalizeNaverInsightRows } from '@/lib/naverSalesAnalytics.mjs'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -16,6 +18,23 @@ type IngestBody = {
   endDate?: unknown
   fetchedAt?: unknown
   rows?: unknown
+  insightRows?: unknown
+  realtime?: unknown
+}
+
+type NaverInsightRow = {
+  saleDate: string
+  category: string
+  label: string
+  detail: string
+  interactions: number
+  inflow: number
+  orders: number
+  quantity: number
+  payAmount: number
+  refundAmount: number
+  netAmount: number
+  raw: unknown
 }
 
 export async function POST(request: Request) {
@@ -40,21 +59,9 @@ export async function POST(request: Request) {
   }
 
   const rows = normalizeNaverSalesRows(defaultSaleDate, body.rows)
-  if (rows.length === 0) {
-    await prisma.naverSalesSyncLog.create({
-      data: {
-        sourceDevice: toNonEmptyString(body.sourceDevice),
-        status: 'EMPTY',
-        requestedStartDate: ymdToUtcDate(normalizeYmdDate(body.startDate)) || ymdToUtcDate(defaultSaleDate),
-        requestedEndDate: ymdToUtcDate(normalizeYmdDate(body.endDate)) || ymdToUtcDate(defaultSaleDate),
-        fetchedAt: toDate(body.fetchedAt),
-        rowsReceived: Array.isArray(body.rows) ? body.rows.length : 0,
-        rowsUpserted: 0,
-        raw: { reason: 'no valid rows' },
-      },
-    })
-    return NextResponse.json({ success: true, rowsReceived: Array.isArray(body.rows) ? body.rows.length : 0, rowsUpserted: 0 })
-  }
+  const insightRows = normalizeInsightPayload(defaultSaleDate, body.insightRows)
+  const realtime = normalizeRealtimePayload(defaultSaleDate, body.realtime)
+  const rowsReceived = rows.length + insightRows.length + (realtime ? 1 : 0)
 
   const sellerCodes = Array.from(new Set(rows.map((row) => row.sellerManagementCode).filter(Boolean)))
   const productMap = await loadProductMap(sellerCodes)
@@ -85,7 +92,7 @@ export async function POST(request: Request) {
             payAmount: row.payAmount,
             refundAmount: row.refundAmount,
             netAmount: row.netAmount,
-            raw: row.raw,
+            raw: normalizeJson(row.raw),
             syncedAt: toDate(body.fetchedAt) || new Date(),
           },
           update: {
@@ -98,8 +105,67 @@ export async function POST(request: Request) {
             payAmount: row.payAmount,
             refundAmount: row.refundAmount,
             netAmount: row.netAmount,
-            raw: row.raw,
+            raw: normalizeJson(row.raw),
             syncedAt: toDate(body.fetchedAt) || new Date(),
+          },
+        })
+        upserted += 1
+      }
+
+      for (const row of insightRows) {
+        const saleDate = ymdToUtcDate(row.saleDate)
+        if (!saleDate) continue
+        await tx.naverSalesInsightDaily.upsert({
+          where: {
+            saleDate_category_label_detail: {
+              saleDate,
+              category: row.category,
+              label: row.label,
+              detail: row.detail || '',
+            },
+          },
+          create: {
+            saleDate,
+            category: row.category,
+            label: row.label,
+            detail: row.detail || '',
+            interactions: row.interactions,
+            inflow: row.inflow,
+            orders: row.orders,
+            quantity: row.quantity,
+            payAmount: row.payAmount,
+            refundAmount: row.refundAmount,
+            netAmount: row.netAmount,
+            raw: normalizeJson(row.raw),
+            syncedAt: toDate(body.fetchedAt) || new Date(),
+          },
+          update: {
+            interactions: row.interactions,
+            inflow: row.inflow,
+            orders: row.orders,
+            quantity: row.quantity,
+            payAmount: row.payAmount,
+            refundAmount: row.refundAmount,
+            netAmount: row.netAmount,
+            raw: normalizeJson(row.raw),
+            syncedAt: toDate(body.fetchedAt) || new Date(),
+          },
+        })
+        upserted += 1
+      }
+
+      if (realtime) {
+        await tx.naverSalesRealtimeSnapshot.create({
+          data: {
+            snapshotDate: ymdToUtcDate(realtime.snapshotDate) || ymdToUtcDate(defaultSaleDate)!,
+            sourceDevice: toNonEmptyString(body.sourceDevice),
+            orders: realtime.orders,
+            quantity: realtime.quantity,
+            payAmount: realtime.payAmount,
+            refundAmount: realtime.refundAmount,
+            netAmount: realtime.netAmount,
+            raw: realtime.raw,
+            collectedAt: toDate(body.fetchedAt) || new Date(),
           },
         })
         upserted += 1
@@ -108,12 +174,13 @@ export async function POST(request: Request) {
       await tx.naverSalesSyncLog.create({
         data: {
           sourceDevice: toNonEmptyString(body.sourceDevice),
-          status: 'SUCCESS',
-          requestedStartDate: ymdToUtcDate(normalizeYmdDate(body.startDate)) || ymdToUtcDate(rows[0].saleDate),
-          requestedEndDate: ymdToUtcDate(normalizeYmdDate(body.endDate)) || ymdToUtcDate(rows[rows.length - 1].saleDate),
+          status: upserted > 0 ? 'SUCCESS' : 'EMPTY',
+          requestedStartDate: ymdToUtcDate(normalizeYmdDate(body.startDate)) || ymdToUtcDate(defaultSaleDate),
+          requestedEndDate: ymdToUtcDate(normalizeYmdDate(body.endDate)) || ymdToUtcDate(defaultSaleDate),
           fetchedAt: toDate(body.fetchedAt),
-          rowsReceived: rows.length,
+          rowsReceived,
           rowsUpserted: upserted,
+          raw: upserted > 0 ? undefined : { reason: 'no valid rows' },
         },
       })
     })
@@ -125,7 +192,7 @@ export async function POST(request: Request) {
         requestedStartDate: ymdToUtcDate(normalizeYmdDate(body.startDate)) || ymdToUtcDate(defaultSaleDate),
         requestedEndDate: ymdToUtcDate(normalizeYmdDate(body.endDate)) || ymdToUtcDate(defaultSaleDate),
         fetchedAt: toDate(body.fetchedAt),
-        rowsReceived: rows.length,
+        rowsReceived,
         rowsUpserted: upserted,
         errorMessage: error instanceof Error ? error.message : '네이버 판매량 저장 실패',
       },
@@ -136,9 +203,38 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     success: true,
-    rowsReceived: rows.length,
+    rowsReceived,
     rowsUpserted: upserted,
   })
+}
+
+function normalizeInsightPayload(defaultSaleDate: string, value: unknown): NaverInsightRow[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return []
+    const record = entry as Record<string, unknown>
+    const category = toStringValue(record.category)
+    const saleDate = normalizeYmdDate(record.saleDate) || defaultSaleDate
+    const rows = Array.isArray(record.rows) ? record.rows : [record]
+    return normalizeNaverInsightRows(saleDate, category, rows) as NaverInsightRow[]
+  })
+}
+
+function normalizeRealtimePayload(defaultSaleDate: string, value: unknown) {
+  if (!value || typeof value !== 'object') return null
+  const record = value as Record<string, unknown>
+  const snapshotDate = normalizeYmdDate(record.snapshotDate) || normalizeYmdDate(record.saleDate) || defaultSaleDate
+  const payAmount = toInt(record.payAmount ?? record.totalPayAmount ?? record.salesAmount)
+  const refundAmount = toInt(record.refundAmount ?? record.refundPayAmount)
+  return {
+    snapshotDate,
+    orders: toInt(record.orders ?? record.numPurchases ?? record.orderCount),
+    quantity: toInt(record.quantity ?? record.productQuantity),
+    payAmount,
+    refundAmount,
+    netAmount: toInt(record.netAmount) || payAmount - refundAmount,
+    raw: normalizeJson(record.raw ?? record),
+  }
 }
 
 async function loadProductMap(sellerCodes: string[]) {
@@ -178,6 +274,24 @@ function isAuthorized(request: Request, secret: string) {
 
 function toNonEmptyString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null
+}
+
+function toStringValue(value: unknown) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function toInt(value: unknown) {
+  if (value === null || value === undefined || value === '') return 0
+  const parsed = Number(String(value).replace(/,/g, ''))
+  return Number.isFinite(parsed) ? Math.round(parsed) : 0
+}
+
+function normalizeJson(value: unknown): Prisma.InputJsonValue {
+  try {
+    return JSON.parse(JSON.stringify(value ?? {})) as Prisma.InputJsonValue
+  } catch {
+    return {}
+  }
 }
 
 function toDate(value: unknown) {
