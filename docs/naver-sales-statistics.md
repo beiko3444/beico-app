@@ -18,7 +18,12 @@ export NAVER_SALES_INGEST_SECRET=Vercel과_같은_토큰
 export BEIKO_NAVER_SALES_API_URL=https://www.beiko.co.kr/api/admin/naver-sales/ingest
 export NAVER_SALES_DAYS=2
 export NAVER_SALES_SOURCE_DEVICE=raspberry-pi-naver-sales
+export NAVER_SALES_REQUEST_DELAY_MS=1000
+export NAVER_SALES_RETRY_COUNT=3
 ```
+
+- `NAVER_SALES_REQUEST_DELAY_MS`: 날짜 하나 저장한 뒤 기다리는 시간이다. 네이버가 너무 많은 요청이라고 막으면 값을 늘린다.
+- `NAVER_SALES_RETRY_COUNT`: 네이버 요청이 실패했을 때 다시 시도할 횟수다.
 
 ## 수동 실행
 

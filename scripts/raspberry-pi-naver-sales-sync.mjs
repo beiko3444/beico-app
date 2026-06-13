@@ -14,6 +14,8 @@ const env = {
   ingestSecret: process.env.NAVER_SALES_INGEST_SECRET || '',
   sourceDevice: process.env.NAVER_SALES_SOURCE_DEVICE || 'raspberry-pi-naver-sales',
   days: clampInt(process.env.NAVER_SALES_DAYS, 1, 30, 2),
+  requestDelayMs: clampInt(process.env.NAVER_SALES_REQUEST_DELAY_MS, 0, 60_000, 1_000),
+  retryCount: clampInt(process.env.NAVER_SALES_RETRY_COUNT, 0, 5, 3),
 }
 
 async function main() {
@@ -22,25 +24,28 @@ async function main() {
   const accessToken = await issueAccessToken()
   const channelNo = await fetchPrimaryChannelNo(accessToken)
   const dates = recentDates(env.days)
-  const allRows = []
+  let totalReceived = 0
+  let totalUpserted = 0
 
   for (const saleDate of dates) {
-    const apiRows = await fetchProductSalesRows(accessToken, channelNo, saleDate)
+    const apiRows = await fetchProductSalesRowsWithRetry(accessToken, channelNo, saleDate)
     const normalized = normalizeNaverSalesRows(saleDate, apiRows)
-    allRows.push(...normalized)
     console.log(`[naver-sales] ${saleDate}: fetched ${apiRows.length}, normalized ${normalized.length}`)
+    const result = await uploadToBeiko({
+      sourceDevice: env.sourceDevice,
+      startDate: saleDate,
+      endDate: saleDate,
+      saleDate,
+      fetchedAt: new Date().toISOString(),
+      rows: normalized,
+    })
+    totalReceived += result.rowsReceived || normalized.length
+    totalUpserted += result.rowsUpserted || 0
+    console.log(`[naver-sales] ${saleDate}: uploaded ${result.rowsUpserted || 0}/${result.rowsReceived || normalized.length} rows`)
+    await sleep(env.requestDelayMs)
   }
 
-  const payload = {
-    sourceDevice: env.sourceDevice,
-    startDate: dates[0],
-    endDate: dates[dates.length - 1],
-    saleDate: dates[dates.length - 1],
-    fetchedAt: new Date().toISOString(),
-    rows: allRows,
-  }
-  const result = await uploadToBeiko(payload)
-  console.log(`[naver-sales] uploaded ${result.rowsUpserted || 0}/${result.rowsReceived || allRows.length} rows`)
+  console.log(`[naver-sales] complete: uploaded ${totalUpserted}/${totalReceived} rows`)
 }
 
 function validateEnv() {
@@ -121,6 +126,22 @@ async function fetchProductSalesRows(accessToken, channelNo, saleDate) {
   throw new Error(`네이버 판매량 조회 실패\n${errors.join('\n')}`)
 }
 
+async function fetchProductSalesRowsWithRetry(accessToken, channelNo, saleDate) {
+  let lastError
+  for (let attempt = 0; attempt <= env.retryCount; attempt += 1) {
+    try {
+      return await fetchProductSalesRows(accessToken, channelNo, saleDate)
+    } catch (error) {
+      lastError = error
+      if (attempt >= env.retryCount) break
+      const delayMs = env.requestDelayMs * 2 ** attempt
+      console.warn(`[naver-sales] ${saleDate}: retry ${attempt + 1}/${env.retryCount} after ${delayMs}ms - ${error instanceof Error ? error.message.split('\n')[0] : error}`)
+      await sleep(delayMs)
+    }
+  }
+  throw lastError
+}
+
 async function uploadToBeiko(payload) {
   const response = await fetch(env.beikoApiUrl, {
     method: 'POST',
@@ -177,6 +198,11 @@ function clampInt(value, min, max, fallback) {
   const parsed = Number.parseInt(String(value || ''), 10)
   if (!Number.isFinite(parsed)) return fallback
   return Math.min(max, Math.max(min, parsed))
+}
+
+function sleep(ms) {
+  if (!ms) return Promise.resolve()
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
 async function readError(response) {

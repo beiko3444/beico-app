@@ -13,8 +13,17 @@ const ADMIN_ONLY_API_PREFIXES = [
     '/api/mindboard',
 ]
 
+const PUBLIC_API_PATHS = [
+    '/api/admin/deposit-sms/ingest',
+    '/api/admin/naver-sales/ingest',
+]
+
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
+
+    if (PUBLIC_API_PATHS.includes(pathname)) {
+        return NextResponse.next()
+    }
 
     if (pathname.startsWith('/admin')) {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
