@@ -109,7 +109,7 @@ type RawMasterLink = {
   multiplier: number
 }
 
-type MonitorBase = {
+export type MonitorBase = {
   url: string
   source: 'env' | 'gist'
   warnings: string[]
@@ -181,7 +181,7 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
   }
 }
 
-function requestTimeoutMs(override?: number): number {
+export function requestTimeoutMs(override?: number): number {
   const raw = numberOrNull(process.env.SMARTINVENTORY_MONITOR_TIMEOUT_MS)
   return override ?? Math.max(3000, raw ?? 15000)
 }
@@ -212,7 +212,7 @@ async function resolveMonitorUrlFromGist(gistRawUrl: string, timeoutMs: number):
   }
 }
 
-async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promise<MonitorBase | null> {
+export async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promise<MonitorBase | null> {
   const warnings: string[] = []
   const envUrl = normalizeBaseUrl(process.env.SMARTINVENTORY_MONITOR_URL)
   const configuredGistRawUrl = cleanString(process.env.SMARTINVENTORY_MONITOR_URL_GIST)
@@ -228,7 +228,7 @@ async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promise<Monit
   return null
 }
 
-async function monitorRequest<T>(
+export async function monitorRequest<T>(
   base: MonitorBase,
   path: string,
   init: RequestInit = {},

@@ -1,53 +1,60 @@
-# 네이버 판매통계 수집
+# 네이버 판매통계
 
-베이코앱은 네이버 통계 API를 Vercel에서 직접 호출하지 않는다. 라즈베리파이가 네이버 API를 호출하고, 집계 결과만 베이코앱 API로 업로드한다.
+베이코앱은 네이버 통계 값을 DB에 저장하지 않는다.
 
-## Vercel 환경변수
+흐름은 이렇게 간다.
 
-```bash
-NAVER_SALES_INGEST_SECRET=긴_랜덤_토큰
-```
+1. 관리자가 `/admin/statistics` 화면을 연다.
+2. 베이코앱이 라즈베리 모니터 API에 묻는다.
+3. 라즈베리가 네이버 API에서 값을 받아온다.
+4. 베이코앱은 받은 값을 화면에만 보여준다.
 
-## 라즈베리 환경변수
+## 베이코앱 설정
 
-```bash
-export NAVER_COMMERCE_CLIENT_ID=...
-export NAVER_COMMERCE_CLIENT_SECRET=...
-export NAVER_COMMERCE_TOKEN_TYPE=SELF
-export NAVER_SALES_INGEST_SECRET=Vercel과_같은_토큰
-export BEIKO_NAVER_SALES_API_URL=https://www.beiko.co.kr/api/admin/naver-sales/ingest
-export NAVER_SALES_DAYS=2
-export NAVER_SALES_SOURCE_DEVICE=raspberry-pi-naver-sales
-export NAVER_SALES_REQUEST_DELAY_MS=1000
-export NAVER_SALES_RETRY_COUNT=3
-export NAVER_SALES_INCLUDE_INSIGHTS=1
-export NAVER_SALES_INCLUDE_REALTIME=1
-```
-
-- `NAVER_SALES_REQUEST_DELAY_MS`: 날짜 하나 저장한 뒤 기다리는 시간이다. 네이버가 너무 많은 요청이라고 막으면 값을 늘린다.
-- `NAVER_SALES_RETRY_COUNT`: 네이버 요청이 실패했을 때 다시 시도할 횟수다.
-- `NAVER_SALES_INCLUDE_INSIGHTS`: `1`이면 검색어/채널 통계도 같이 수집한다.
-- `NAVER_SALES_INCLUDE_REALTIME`: `1`이면 오늘 통계 스냅샷도 같이 저장한다.
-
-## 수동 실행
+Vercel에는 라즈베리 주소만 필요하다.
 
 ```bash
-node scripts/raspberry-pi-naver-sales-sync.mjs
+SMARTINVENTORY_MONITOR_URL=https://라즈베리_주소
 ```
 
-## cron 예시
+고정 주소를 쓰지 않는다면 Gist 주소를 쓸 수 있다.
 
-라즈베리에서 하루 2회 실행한다.
-
-```cron
-15 9,21 * * * cd /home/pi/beico-app && /usr/bin/node scripts/raspberry-pi-naver-sales-sync.mjs >> /home/pi/naver-sales-sync.log 2>&1
+```bash
+SMARTINVENTORY_MONITOR_URL_GIST=https://gist.githubusercontent.com/.../raw/...
 ```
 
-## 저장 구조
+화면을 열 때마다 라즈베리가 네이버 API를 새로 부르게 하려면:
 
-- `NaverSalesDaily`: 일자와 네이버 상품 번호별 판매 집계
-- `NaverSalesInsightDaily`: 검색어/마케팅 채널별 집계
-- `NaverSalesRealtimeSnapshot`: 오늘 통계 스냅샷
-- `NaverSalesSyncLog`: 업로드 성공/실패 로그
+```bash
+NAVER_SALES_REMOTE_REFRESH=1
+```
 
-관리자 화면은 `/admin/statistics`에서 DB에 저장된 집계만 조회한다.
+라즈베리에 이미 저장된 최근 값만 빠르게 보고 싶으면:
+
+```bash
+NAVER_SALES_REMOTE_REFRESH=0
+```
+
+## 라즈베리 API
+
+베이코앱은 아래 주소를 읽는다.
+
+```text
+GET /revenue?period_days=30&refresh=1
+GET /keywords?period_days=30&refresh=1
+```
+
+- `/revenue`: 상품별 매출
+- `/keywords`: 검색어별 매출
+- `period_days`: 며칠치를 볼지
+- `refresh=1`: 네이버 API를 새로 호출
+
+## 쓰지 않는 방식
+
+예전 방식인 라즈베리에서 베이코앱으로 통계를 업로드하는 방식은 더 이상 쓰지 않는다.
+
+```text
+POST /api/admin/naver-sales/ingest
+```
+
+이 주소는 DB에 저장하지 않고 막힌 응답을 돌려준다.

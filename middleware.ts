@@ -15,7 +15,6 @@ const ADMIN_ONLY_API_PREFIXES = [
 
 const PUBLIC_API_PATHS = [
     '/api/admin/deposit-sms/ingest',
-    '/api/admin/naver-sales/ingest',
 ]
 
 export async function middleware(request: NextRequest) {

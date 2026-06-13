@@ -3,9 +3,8 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { Activity, BarChart3, Package, RefreshCw, Search, TrendingUp } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
-import { defaultDateRange, normalizeYmdDate, toYmd, ymdToUtcDate } from '@/lib/naverSales'
-import { buildNaverSalesDashboard, summarizeInsightRows } from '@/lib/naverSalesAnalytics.mjs'
+import { defaultDateRange, normalizeYmdDate } from '@/lib/naverSales'
+import { fetchNaverSalesRemoteDashboard } from '@/lib/naverSalesRemote'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,37 +22,12 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
   const fallback = defaultDateRange(30)
   const startText = normalizeYmdDate(readParam(params.start)) || fallback.start
   const endText = normalizeYmdDate(readParam(params.end)) || fallback.end
-  const start = ymdToUtcDate(startText) || ymdToUtcDate(fallback.start)!
-  const end = ymdToUtcDate(endText) || ymdToUtcDate(fallback.end)!
-
-  const [salesRows, insightRows, realtimeSnapshot, latestLog, logs] = await Promise.all([
-    prisma.naverSalesDaily.findMany({
-      where: { saleDate: { gte: start, lte: end } },
-      orderBy: [{ saleDate: 'desc' }, { netAmount: 'desc' }],
-      take: 5000,
-    }),
-    prisma.naverSalesInsightDaily.findMany({
-      where: { saleDate: { gte: start, lte: end } },
-      orderBy: [{ payAmount: 'desc' }, { orders: 'desc' }, { label: 'asc' }],
-      take: 5000,
-    }),
-    prisma.naverSalesRealtimeSnapshot.findFirst({
-      where: { snapshotDate: { gte: start, lte: end } },
-      orderBy: { collectedAt: 'desc' },
-    }),
-    prisma.naverSalesSyncLog.findFirst({ orderBy: { createdAt: 'desc' } }),
-    prisma.naverSalesSyncLog.findMany({ orderBy: { createdAt: 'desc' }, take: 5 }),
-  ])
-
-  const dashboard = buildNaverSalesDashboard(salesRows)
-  const keywordRows = summarizeInsightRows(
-    insightRows.filter((row) => row.category === 'KEYWORD' || row.category === 'PRODUCT_KEYWORD'),
-    12,
-  )
-  const channelRows = summarizeInsightRows(
-    insightRows.filter((row) => row.category === 'CHANNEL' || row.category === 'PRODUCT_MARKETING'),
-    12,
-  )
+  const dashboard = await fetchNaverSalesRemoteDashboard(startText, endText)
+  const keywordRows = dashboard.keywords.slice(0, 12)
+  const channelRows = dashboard.channels.slice(0, 12)
+  const realtimeSnapshot = dashboard.realtimeSnapshot
+  const latestLog = dashboard.latestLog
+  const logs = dashboard.logs
   const maxDailyNet = Math.max(...dashboard.byDate.map((row) => row.netAmount), 1)
 
   return (
@@ -68,8 +42,13 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
               </div>
               <h1 className="mt-2 text-[28px] font-black tracking-tight text-slate-950">상품별 매출 대시보드</h1>
               <p className="mt-1 text-[13px] font-medium text-slate-500">
-                선택한 기간의 상품 매출, 검색어, 마케팅 채널, 오늘 수집값을 한 화면에서 봅니다.
+                라즈베리파이가 네이버 API에서 받아온 상품 매출과 검색어 매출을 보여줍니다. 베이코 DB에는 저장하지 않습니다.
               </p>
+              {dashboard.warnings.length > 0 ? (
+                <p className="mt-2 max-w-[820px] rounded-lg bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-700">
+                  {dashboard.warnings.join(' / ')}
+                </p>
+              ) : null}
             </div>
 
             <form className="flex flex-wrap items-end gap-2">
@@ -136,7 +115,7 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
                   {dashboard.products.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="px-3 py-12 text-center text-[13px] font-bold text-slate-400">
-                        선택한 기간에 저장된 네이버 판매 통계가 없습니다.
+                        라즈베리에서 받아온 네이버 판매 통계가 없습니다.
                       </td>
                     </tr>
                   ) : (
@@ -177,16 +156,16 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
                   <MetricLine label="수집" value={formatDateTime(realtimeSnapshot.collectedAt)} />
                 </div>
               ) : (
-                <EmptyText text="오늘 통계 스냅샷이 없습니다." />
+                <EmptyText text="라즈베리 실시간 통계 값이 없습니다." />
               )}
             </InfoPanel>
 
-            <InfoPanel title="최근 수집" icon={<RefreshCw className="h-4 w-4 text-blue-600" />}>
+            <InfoPanel title="라즈베리 응답" icon={<RefreshCw className="h-4 w-4 text-blue-600" />}>
               <div className="space-y-2 text-[12px] font-bold text-slate-500">
                 <div>상태: <span className="text-slate-900">{latestLog?.status || '-'}</span></div>
-                <div>수집기: <span className="text-slate-900">{latestLog?.sourceDevice || '-'}</span></div>
-                <div>업로드: <span className="text-slate-900">{latestLog ? formatDateTime(latestLog.createdAt) : '-'}</span></div>
-                <div>저장: <span className="text-slate-900">{latestLog?.rowsUpserted?.toLocaleString('ko-KR') || 0}건</span></div>
+                <div>요청처: <span className="text-slate-900">{dashboard.monitorSource || '-'}</span></div>
+                <div>조회: <span className="text-slate-900">{latestLog ? formatDateTime(latestLog.createdAt) : '-'}</span></div>
+                <div>표시: <span className="text-slate-900">{latestLog?.rowsUpserted?.toLocaleString('ko-KR') || 0}건</span></div>
               </div>
             </InfoPanel>
 
@@ -218,7 +197,7 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
         </section>
 
         <section className="border border-slate-200 bg-white p-4 shadow-sm">
-          <h2 className="text-[14px] font-black text-slate-900">최근 업로드 로그</h2>
+          <h2 className="text-[14px] font-black text-slate-900">라즈베리 조회 상태</h2>
           <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             {logs.map((log) => (
               <div key={log.id} className="border border-slate-100 px-3 py-2 text-[12px] font-bold leading-5 text-slate-500">
@@ -291,7 +270,7 @@ function InsightTable({ title, icon, rows }: { title: string; icon: ReactNode; r
             {rows.length === 0 ? (
               <tr>
                 <td colSpan={5} className="px-3 py-10 text-center text-[13px] font-bold text-slate-400">
-                  저장된 데이터가 없습니다.
+                  라즈베리에서 받아온 데이터가 없습니다.
                 </td>
               </tr>
             ) : (
@@ -333,11 +312,11 @@ function formatWon(value: number) {
   return `${Math.round(value).toLocaleString('ko-KR')}원`
 }
 
-function formatDateTime(value: Date) {
+function formatDateTime(value: Date | string) {
   return new Intl.DateTimeFormat('ko-KR', {
     month: '2-digit',
     day: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
-  }).format(value)
+  }).format(new Date(value))
 }
