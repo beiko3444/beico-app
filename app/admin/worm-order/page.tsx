@@ -4430,7 +4430,7 @@ export default function WormOrderPage() {
         const requestId = ++customsProgressRequestIdRef.current
         setCustomsProgressLoading(true)
         try {
-            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(normalizedBlNo)}&force=1`, { method: 'GET' })
+            const response = await fetch(`/api/admin/worm-order/customs-progress?blNo=${encodeURIComponent(normalizedBlNo)}`, { method: 'GET' })
             const result = await response.json()
 
             if (!response.ok) {
@@ -6600,11 +6600,11 @@ export default function WormOrderPage() {
             })()}
 
             {showCustomsTools && (
-                <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
+                <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
                 <div className="flex items-start justify-between gap-3">
                     <div>
-                        <h3 className="text-lg font-black text-[#111827]">유니패스 수입 통관 조회</h3>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <h3 className="text-base font-black text-[#111827] md:text-lg">유니패스 수입 통관 조회</h3>
+                        <p className="mt-1 text-[11px] leading-snug text-gray-500 md:text-xs">
                             B/L 번호만 입력하면 MBL/HBL + 현재/최근/다음 연도를 자동으로 시도해 조회합니다. (하이픈/공백은 자동 제거)
                         </p>
                     </div>
@@ -6642,7 +6642,7 @@ export default function WormOrderPage() {
                         type="button"
                         onClick={() => handleCustomsProgressSearch()}
                         disabled={customsProgressLoading}
-                        className="h-11 px-6 bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#e34219] px-6 text-sm font-bold tracking-wide text-white hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
                     >
                         {customsProgressLoading ? (
                             <>

@@ -36,6 +36,10 @@ export function looksLikeMasterAirWaybill(blNo: string) {
     return /^\d{11}$/.test(normalizeBlNo(blNo))
 }
 
+function looksLikeMasterBlNumber(blNo: string) {
+    return /^[0-9A-Z]{8,14}$/.test(normalizeBlNo(blNo))
+}
+
 export function resolveUnipassQueryAttempts(rawBlNo: string, currentYear: number, lookbackYears: number) {
     const blNo = normalizeBlNo(rawBlNo)
     const attempts: UnipassQueryAttempt[] = []
@@ -48,20 +52,32 @@ export function resolveUnipassQueryAttempts(rawBlNo: string, currentYear: number
     for (let delta = 0; delta < lookbackYears; delta += 1) {
         years.push(currentYear - delta)
     }
-    years.push(currentYear + 1)
+    years.splice(1, 0, currentYear + 1)
 
-    const kinds: UnipassQueryKind[] = looksLikeMasterAirWaybill(blNo)
-        ? ['mblNo', 'hblNo']
-        : ['hblNo', 'mblNo']
+    const uniqueYears = Array.from(new Set(years))
 
-    for (const year of Array.from(new Set(years))) {
+    if (looksLikeMasterBlNumber(blNo)) {
+        const label = looksLikeMasterAirWaybill(blNo) ? 'master-air-waybill' : 'master-bl'
+        for (const year of uniqueYears) {
+            attempts.push({ kind: 'mblNo', blYy: formatBlYear(year), value: blNo, label })
+        }
+
+        for (const year of uniqueYears) {
+            attempts.push({ kind: 'hblNo', blYy: formatBlYear(year), value: blNo, label })
+        }
+
+        return attempts
+    }
+
+    const kinds: UnipassQueryKind[] = ['hblNo', 'mblNo']
+    for (const year of uniqueYears) {
         const blYy = formatBlYear(year)
         for (const kind of kinds) {
             attempts.push({
                 kind,
                 blYy,
                 value: blNo,
-                label: looksLikeMasterAirWaybill(blNo) ? 'master-air-waybill' : 'normalized',
+                label: 'normalized',
             })
         }
     }

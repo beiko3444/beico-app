@@ -5,6 +5,10 @@ import { Activity, BarChart3, Package, RefreshCw, Search, TrendingUp } from 'luc
 import { authOptions } from '@/lib/auth'
 import { defaultDateRange, normalizeYmdDate } from '@/lib/naverSales'
 import { fetchNaverSalesRemoteDashboard } from '@/lib/naverSalesRemote'
+import { prisma } from '@/lib/prisma'
+import { getProductImageUrl } from '@/lib/product-image-url'
+import ProductSalesTrend, { type ProductSalesTrendPoint, type ProductSalesTrendRow } from './ProductSalesTrend'
+import StatisticsDateRangePicker from './StatisticsDateRangePicker'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,6 +33,8 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
   const latestLog = dashboard.latestLog
   const logs = dashboard.logs
   const maxDailyNet = Math.max(...dashboard.byDate.map((row) => row.netAmount), 1)
+  const trendMonths = buildRecentMonthBuckets(endText, 12)
+  const productSalesTrend = await buildProductSalesTrend(trendMonths)
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -51,32 +57,7 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
               ) : null}
             </div>
 
-            <form className="flex flex-wrap items-end gap-2">
-              <label className="grid gap-1 text-[11px] font-black text-slate-500">
-                시작일
-                <input
-                  type="date"
-                  name="start"
-                  defaultValue={startText}
-                  className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-blue-500"
-                />
-              </label>
-              <label className="grid gap-1 text-[11px] font-black text-slate-500">
-                종료일
-                <input
-                  type="date"
-                  name="end"
-                  defaultValue={endText}
-                  className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-800 outline-none focus:border-blue-500"
-                />
-              </label>
-              <button
-                type="submit"
-                className="inline-flex h-9 items-center justify-center rounded-lg border border-blue-600 bg-blue-600 px-4 text-[13px] font-black text-white transition hover:bg-blue-700"
-              >
-                조회
-              </button>
-            </form>
+            <StatisticsDateRangePicker key={`${startText}:${endText}`} startText={startText} endText={endText} />
           </div>
         </section>
 
@@ -88,6 +69,8 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
           <SummaryTile label="환불금액" value={formatWon(dashboard.totals.refundAmount)} tone="red" />
           <SummaryTile label="평균 주문" value={formatWon(dashboard.totals.averageOrderAmount)} />
         </section>
+
+        <ProductSalesTrend products={productSalesTrend.products} allPoints={productSalesTrend.allPoints} />
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -306,6 +289,129 @@ function EmptyText({ text }: { text: string }) {
 
 function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
+}
+
+function buildRecentMonthBuckets(endText: string, count: number) {
+  const end = new Date(`${endText.slice(0, 7)}-01T00:00:00.000Z`)
+  if (Number.isNaN(end.getTime())) return buildRecentMonthBuckets(new Date().toISOString().slice(0, 10), count)
+
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - (count - 1 - index), 1))
+    const monthKey = date.toISOString().slice(0, 7)
+    return {
+      monthKey,
+      label: `${date.getUTCFullYear().toString().slice(2)}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
+      start: date,
+      end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)),
+    }
+  })
+}
+
+async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonthBuckets>): Promise<{
+  products: ProductSalesTrendRow[]
+  allPoints: ProductSalesTrendPoint[]
+}> {
+  const firstMonth = months[0]
+  const lastMonth = months[months.length - 1]
+  if (!firstMonth || !lastMonth) return { products: [], allPoints: [] }
+
+  const orders = await prisma.order.findMany({
+    where: {
+      createdAt: {
+        gte: firstMonth.start,
+        lt: lastMonth.end,
+      },
+      status: {
+        notIn: ['CANCELED', 'CANCELLED'],
+      },
+    },
+    select: {
+      id: true,
+      createdAt: true,
+      items: {
+        select: {
+          productId: true,
+          quantity: true,
+          price: true,
+          product: {
+            select: {
+              id: true,
+              name: true,
+              nameJP: true,
+              productCode: true,
+              imageUrl: true,
+              updatedAt: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  const monthIndex = new Map(months.map((month, index) => [month.monthKey, index]))
+  const makePoints = (): ProductSalesTrendPoint[] => months.map((month) => ({
+    monthKey: month.monthKey,
+    label: month.label,
+    quantity: 0,
+    total: 0,
+    orders: 0,
+  }))
+  const allPoints = makePoints()
+  const products = new Map<string, ProductSalesTrendRow>()
+  const allOrderHits = new Map<number, Set<string>>()
+  const productOrderHits = new Map<string, Map<number, Set<string>>>()
+
+  for (const order of orders) {
+    const key = order.createdAt.toISOString().slice(0, 7)
+    const index = monthIndex.get(key)
+    if (index === undefined) continue
+
+    for (const item of order.items) {
+      const amount = Math.round(Number(item.price || 0) * Number(item.quantity || 0))
+      const quantity = Number(item.quantity || 0)
+      allPoints[index].quantity += quantity
+      allPoints[index].total += amount
+      if (!allOrderHits.has(index)) allOrderHits.set(index, new Set())
+      allOrderHits.get(index)?.add(order.id)
+
+      const productId = item.productId
+      const product = products.get(productId) || {
+        productId,
+        productName: item.product?.nameJP || item.product?.name || '상품명 없음',
+        productCode: item.product?.productCode || null,
+        imageUrl: item.product?.imageUrl && item.product?.id ? getProductImageUrl(item.product.id, item.product.updatedAt) : null,
+        quantity: 0,
+        total: 0,
+        points: makePoints(),
+      }
+
+      product.quantity += quantity
+      product.total += amount
+      product.points[index].quantity += quantity
+      product.points[index].total += amount
+      products.set(productId, product)
+
+      if (!productOrderHits.has(productId)) productOrderHits.set(productId, new Map())
+      const hitsByMonth = productOrderHits.get(productId)
+      if (!hitsByMonth?.has(index)) hitsByMonth?.set(index, new Set())
+      hitsByMonth?.get(index)?.add(order.id)
+    }
+  }
+
+  allPoints.forEach((point, index) => {
+    point.orders = allOrderHits.get(index)?.size || 0
+  })
+  for (const product of products.values()) {
+    const hitsByMonth = productOrderHits.get(product.productId)
+    product.points.forEach((point, index) => {
+      point.orders = hitsByMonth?.get(index)?.size || 0
+    })
+  }
+
+  return {
+    products: Array.from(products.values()).sort((a, b) => b.total - a.total || b.quantity - a.quantity || a.productName.localeCompare(b.productName, 'ko')),
+    allPoints,
+  }
 }
 
 function formatWon(value: number) {

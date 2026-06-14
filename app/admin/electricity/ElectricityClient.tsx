@@ -32,8 +32,58 @@ type PaymentChecklistStatus = {
     electricityPaidAt: string | null
 }
 
+type MonthlyCalendarSummary = {
+    label: string
+    value: number | null
+}
+
 const PAYMENT_STORAGE_KEY = 'beico-payment-checklist-v1'
 const PAYMENT_START_YEAR = 2025
+
+const toFiniteNumber = (value: unknown) => {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : null
+}
+
+const hasBillEntry = (data: unknown) => {
+    const record = data as Record<string, unknown> | null
+    if (!record || !record.year) return false
+    if (typeof record.rawText === 'string' && record.rawText.trim().length > 0) return true
+    if ((Number(record.totalUsage) || 0) > 0 || (Number(record.totalAmount) || 0) > 0) return true
+
+    if (typeof record.rawBillData !== 'string') return false
+    try {
+        const parsed = JSON.parse(record.rawBillData)
+        return Object.entries(parsed).some(([key, value]) => {
+            if (key === 'beicoTotal' || key === 'landlordTotal') return false
+            return typeof value === 'number' && value !== 0
+        })
+    } catch {
+        return false
+    }
+}
+
+const buildMonthlyCalendarSummary = (data: unknown): MonthlyCalendarSummary | null => {
+    if (!hasBillEntry(data)) return null
+    const record = data as Record<string, unknown>
+
+    const landlordMeter = toFiniteNumber(record.landlordMeterCurr)
+    if (landlordMeter !== null) {
+        return { label: '지침', value: landlordMeter }
+    }
+
+    const totalAmount = toFiniteNumber(record.totalAmount)
+    if (totalAmount !== null) {
+        return { label: '요금', value: totalAmount }
+    }
+
+    const currentUsage = toFiniteNumber(record.currentUsage)
+    if (currentUsage !== null) {
+        return { label: '사용량', value: currentUsage }
+    }
+
+    return { label: '저장됨', value: null }
+}
 
 export default function ElectricityClient() {
     const today = new Date()
@@ -62,7 +112,7 @@ export default function ElectricityClient() {
     const [paymentChecklist, setPaymentChecklist] = useState<Record<string, PaymentChecklistStatus>>({})
     const [monthlyLandlordTotals, setMonthlyLandlordTotals] = useState<Record<number, number | null>>({})
     const [monthlyBillStatuses, setMonthlyBillStatuses] = useState<Record<number, boolean>>({})
-    const [monthlyMeterReadings, setMonthlyMeterReadings] = useState<Record<number, number | null>>({})
+    const [monthlyCalendarSummaries, setMonthlyCalendarSummaries] = useState<Record<number, MonthlyCalendarSummary | null>>({})
     const [rentPaidDates, setRentPaidDates] = useState<Record<number, string | null>>({})
     const [savingRentMonth, setSavingRentMonth] = useState<number | null>(null)
     const monthlyLandlordTotalsCache = useRef<Record<number, Record<number, number | null>>>({})
@@ -133,23 +183,6 @@ export default function ElectricityClient() {
 
     const getPaymentStatus = (year: number, month: number) => {
         return paymentChecklist[monthKey(year, month)] || defaultPaymentStatus
-    }
-
-    const hasBillEntry = (data: any) => {
-        if (!data || !data.year) return false
-        if (typeof data.rawText === 'string' && data.rawText.trim().length > 0) return true
-        if ((Number(data.totalUsage) || 0) > 0 || (Number(data.totalAmount) || 0) > 0) return true
-
-        if (typeof data.rawBillData !== 'string') return false
-        try {
-            const parsed = JSON.parse(data.rawBillData)
-            return Object.entries(parsed).some(([key, value]) => {
-                if (key === 'beicoTotal' || key === 'landlordTotal') return false
-                return typeof value === 'number' && value !== 0
-            })
-        } catch {
-            return false
-        }
     }
 
     const updatePaymentStatus = (
@@ -362,13 +395,12 @@ export default function ElectricityClient() {
 
                         const data = await res.json()
                         const hasBill = hasBillEntry(data)
-                        const reading = hasBill && data.landlordMeterCurr !== null ? Number(data.landlordMeterCurr) : null
-                        return [month, hasBill, Number.isFinite(reading) ? reading : null] as const
+                        return [month, hasBill, buildMonthlyCalendarSummary(data)] as const
                     })
                 )
 
                 setMonthlyBillStatuses(Object.fromEntries(monthEntries.map(([month, hasBill]) => [month, hasBill])))
-                setMonthlyMeterReadings(Object.fromEntries(monthEntries.map(([month, , reading]) => [month, reading])))
+                setMonthlyCalendarSummaries(Object.fromEntries(monthEntries.map(([month, , summary]) => [month, summary])))
             } catch (error) {
                 console.error('Failed to fetch monthly bill statuses', error)
             }
@@ -452,11 +484,9 @@ export default function ElectricityClient() {
                     ...prev,
                     [payload.month]: hasBillEntry(savedData)
                 }))
-                setMonthlyMeterReadings(prev => ({
+                setMonthlyCalendarSummaries(prev => ({
                     ...prev,
-                    [payload.month]: hasSavedLandlordReading(savedData)
-                        ? Number(savedData.landlordMeterCurr)
-                        : null
+                    [payload.month]: buildMonthlyCalendarSummary(savedData)
                 }))
                 delete monthlyLandlordTotalsCache.current[payload.year]
             }
@@ -893,38 +923,76 @@ export default function ElectricityClient() {
             </div>
 
             {/* Month Selection */}
-            <div className="bg-white dark:bg-[#1e1e1e] p-4 rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] space-y-4">
-                <div className="flex gap-4 items-center overflow-x-auto pb-2">
-                    <select
-                        value={selectedYear}
-                        onChange={(e) => setSelectedYear(Number(e.target.value))}
-                        className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-900 dark:text-white text-sm rounded-xl focus:ring-[#d9361b] focus:border-[#d9361b] block p-2 font-bold min-w-[100px]"
-                    >
-                        {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
-                    </select>
-                    <div className="flex gap-2 min-w-max">
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
-                            const hasBill = monthlyBillStatuses[month]
-                            const isSelected = selectedMonth === month
-                            const meterReading = monthlyMeterReadings[month]
-
-                            return (
-                                <button
-                                    key={month}
-                                    onClick={() => setSelectedMonth(month)}
-                                    className={`min-w-[72px] px-3 py-2 rounded-xl text-sm font-bold transition-all border ${hasBill
-                                        ? 'bg-[#d9361b] text-white border-[#d9361b] hover:bg-red-600'
-                                        : 'bg-white dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 border-gray-100 dark:border-[#2a2a2a] hover:bg-gray-50 dark:hover:bg-[#252525]'
-                                        } ${isSelected ? 'shadow-md transform scale-105 ring-2 ring-[#d9361b]/25' : ''}`}
-                                >
-                                    <span className="block leading-tight">{month}월</span>
-                                    <span className={`mt-0.5 block text-[10px] leading-tight ${hasBill ? 'text-white/80' : 'text-gray-400 dark:text-gray-500'}`}>
-                                        {meterReading !== null && meterReading !== undefined ? meterReading.toLocaleString() : '-'}
-                                    </span>
-                                </button>
-                            )
-                        })}
+            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#d9361b]">Monthly Ledger</p>
+                        <h2 className="mt-1 text-lg font-black text-gray-950 dark:text-white">{selectedYear}년 전력 데이터</h2>
                     </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => setSelectedYear(selectedYear - 1)}
+                            className="h-10 w-10 rounded-xl border border-gray-200 bg-gray-50 text-sm font-black text-gray-600 transition hover:bg-gray-100 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-300"
+                            aria-label="이전 연도"
+                        >
+                            ‹
+                        </button>
+                        <select
+                            value={selectedYear}
+                            onChange={(e) => setSelectedYear(Number(e.target.value))}
+                            className="h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-black text-gray-900 outline-none focus:border-[#d9361b] dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
+                        >
+                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
+                        </select>
+                        <button
+                            type="button"
+                            onClick={() => setSelectedYear(selectedYear + 1)}
+                            className="h-10 w-10 rounded-xl border border-gray-200 bg-gray-50 text-sm font-black text-gray-600 transition hover:bg-gray-100 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-300"
+                            aria-label="다음 연도"
+                        >
+                            ›
+                        </button>
+                    </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                    {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
+                        const hasBill = monthlyBillStatuses[month]
+                        const isSelected = selectedMonth === month
+                        const calendarSummary = monthlyCalendarSummaries[month]
+                        const displayValue = calendarSummary?.value !== null && calendarSummary?.value !== undefined
+                            ? calendarSummary.value.toLocaleString()
+                            : hasBill
+                                ? calendarSummary?.label || '저장됨'
+                                : '미입력'
+
+                        return (
+                            <button
+                                key={month}
+                                type="button"
+                                onClick={() => setSelectedMonth(month)}
+                                className={`min-h-[92px] rounded-2xl border p-3 text-left transition-all ${
+                                    isSelected
+                                        ? 'border-[#d9361b] bg-[#fff3ef] shadow-[0_10px_22px_rgba(217,54,27,0.14)] ring-2 ring-[#d9361b]/15 dark:bg-[#2a1712]'
+                                        : hasBill
+                                            ? 'border-[#ffd1c7] bg-white hover:border-[#d9361b]/50 hover:bg-[#fff8f6] dark:border-[#3a2a25] dark:bg-[#1a1a1a]'
+                                            : 'border-gray-100 bg-gray-50/70 hover:bg-white dark:border-[#2a2a2a] dark:bg-[#171717]'
+                                }`}
+                            >
+                                <span className="flex items-center justify-between gap-2">
+                                    <span className={`text-lg font-black ${isSelected ? 'text-[#d9361b]' : 'text-gray-900 dark:text-white'}`}>{month}월</span>
+                                    <span className={`h-2.5 w-2.5 rounded-full ${hasBill ? 'bg-[#d9361b]' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                </span>
+                                <span className={`mt-3 block text-base font-black leading-tight ${hasBill ? 'text-gray-950 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                                    {displayValue}
+                                </span>
+                                <span className={`mt-1 block text-[11px] font-bold ${hasBill ? 'text-[#d9361b]' : 'text-gray-400 dark:text-gray-500'}`}>
+                                    {hasBill ? calendarSummary?.label || '데이터 저장됨' : '데이터 없음'}
+                                </span>
+                            </button>
+                        )
+                    })}
                 </div>
 
                 {activeTab === 'analysis' && billData && (
