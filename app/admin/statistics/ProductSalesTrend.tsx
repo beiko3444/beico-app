@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 
 export type ProductSalesTrendPoint = {
-  monthKey: string
+  periodKey: string
   label: string
   quantity: number
   total: number
@@ -27,7 +27,7 @@ export default function ProductSalesTrend({
   products: ProductSalesTrendRow[]
   allPoints: ProductSalesTrendPoint[]
 }) {
-  const [selectedProductId, setSelectedProductId] = useState(products[0]?.productId || 'all')
+  const [selectedProductId, setSelectedProductId] = useState('all')
   const selectedProduct = products.find((product) => product.productId === selectedProductId) || null
   const points = selectedProduct ? selectedProduct.points : allPoints
   const selectedName = selectedProduct?.productName || '전체 상품'
@@ -122,7 +122,7 @@ export default function ProductSalesTrend({
                 const x = 24 + index * (552 / Math.max(points.length, 1))
                 const height = Math.max(point.total > 0 ? 6 : 0, (point.total / maxSales) * 124)
                 return (
-                  <g key={point.monthKey}>
+                  <g key={point.periodKey}>
                     <rect x={x} y={166 - height} width="30" height={height} rx="7" fill="#CBD5E1" />
                     <title>{`${point.label} 매출 ${formatWon(point.total)} / ${point.quantity.toLocaleString('ko-KR')}개`}</title>
                   </g>
@@ -132,12 +132,12 @@ export default function ProductSalesTrend({
               {points.map((point, index) => {
                 const x = 36 + index * (528 / Math.max(points.length - 1, 1))
                 const y = 166 - (point.quantity / maxQuantity) * 124
-                return <circle key={point.monthKey} cx={x} cy={y} r={point.quantity > 0 ? 5 : 3} fill="#E34219" stroke="#fff" strokeWidth="2" />
+                return <circle key={point.periodKey} cx={x} cy={y} r={point.quantity > 0 ? 5 : 3} fill="#E34219" stroke="#fff" strokeWidth="2" />
               })}
             </svg>
             <div className="grid grid-cols-12 gap-1">
               {points.map((point) => (
-                <div key={point.monthKey} className="min-h-[54px] rounded-xl bg-white px-1 py-2 text-center">
+                <div key={point.periodKey} className="min-h-[54px] rounded-xl bg-white px-1 py-2 text-center">
                   <div className="text-[11px] font-black text-slate-700">{point.label}</div>
                   <div className="mt-0.5 text-[10px] font-bold text-slate-500">{point.quantity.toLocaleString('ko-KR')}개</div>
                 </div>

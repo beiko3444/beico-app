@@ -4,9 +4,10 @@ import type { ReactNode } from 'react'
 import { Activity, BarChart3, Package, RefreshCw, Search, TrendingUp } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
 import { defaultDateRange, normalizeYmdDate } from '@/lib/naverSales'
-import { fetchNaverSalesRemoteDashboard } from '@/lib/naverSalesRemote'
+import { fetchNaverSalesRemoteDashboard, type NaverSalesRemoteDashboard } from '@/lib/naverSalesRemote'
 import { prisma } from '@/lib/prisma'
 import { getProductImageUrl } from '@/lib/product-image-url'
+import MonthlyInflowSalesChart, { type MonthlyInflowSalesPoint } from './MonthlyInflowSalesChart'
 import ProductSalesTrend, { type ProductSalesTrendPoint, type ProductSalesTrendRow } from './ProductSalesTrend'
 import StatisticsDateRangePicker from './StatisticsDateRangePicker'
 
@@ -33,8 +34,9 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
   const latestLog = dashboard.latestLog
   const logs = dashboard.logs
   const maxDailyNet = Math.max(...dashboard.byDate.map((row) => row.netAmount), 1)
-  const trendMonths = buildRecentMonthBuckets(endText, 12)
-  const productSalesTrend = await buildProductSalesTrend(trendMonths)
+  const trendBuckets = buildRangeBuckets(startText, endText)
+  const productSalesTrend = await buildProductSalesTrend(trendBuckets, dashboard.products)
+  const monthlyInflowSales = await buildMonthlyInflowSales(startText, endText)
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
@@ -69,6 +71,8 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
           <SummaryTile label="환불금액" value={formatWon(dashboard.totals.refundAmount)} tone="red" />
           <SummaryTile label="평균 주문" value={formatWon(dashboard.totals.averageOrderAmount)} />
         </section>
+
+        <MonthlyInflowSalesChart points={monthlyInflowSales} />
 
         <ProductSalesTrend products={productSalesTrend.products} allPoints={productSalesTrend.allPoints} />
 
@@ -307,105 +311,250 @@ function buildRecentMonthBuckets(endText: string, count: number) {
   })
 }
 
-async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonthBuckets>): Promise<{
+function buildRangeMonthBuckets(startText: string, endText: string) {
+  const start = new Date(`${startText.slice(0, 7)}-01T00:00:00.000Z`)
+  const end = new Date(`${endText.slice(0, 7)}-01T00:00:00.000Z`)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    return buildRecentMonthBuckets(endText, 12)
+  }
+
+  const months: ReturnType<typeof buildRecentMonthBuckets> = []
+  const cursor = new Date(start)
+  while (cursor <= end && months.length < 24) {
+    const date = new Date(cursor)
+    months.push({
+      monthKey: date.toISOString().slice(0, 7),
+      label: `${date.getUTCFullYear().toString().slice(2)}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
+      start: date,
+      end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)),
+    })
+    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
+  }
+
+  return months
+}
+
+async function buildMonthlyInflowSales(startText: string, endText: string): Promise<MonthlyInflowSalesPoint[]> {
+  const months = buildRangeMonthBuckets(startText, endText)
+  const firstMonth = months[0]
+  const lastMonth = months[months.length - 1]
+  if (!firstMonth || !lastMonth) return []
+
+  const [salesRows, insightRows] = await Promise.all([
+    prisma.naverSalesDaily.findMany({
+      where: {
+        saleDate: {
+          gte: firstMonth.start,
+          lt: lastMonth.end,
+        },
+      },
+      select: {
+        saleDate: true,
+        orders: true,
+        netAmount: true,
+      },
+    }),
+    prisma.naverSalesInsightDaily.findMany({
+      where: {
+        saleDate: {
+          gte: firstMonth.start,
+          lt: lastMonth.end,
+        },
+      },
+      select: {
+        saleDate: true,
+        interactions: true,
+        inflow: true,
+      },
+    }),
+  ])
+
+  const monthIndex = new Map(months.map((month, index) => [month.monthKey, index]))
+  const points: MonthlyInflowSalesPoint[] = months.map((month) => ({
+    monthKey: month.monthKey,
+    label: month.label,
+    inflow: 0,
+    interactions: 0,
+    sales: 0,
+    orders: 0,
+  }))
+
+  for (const row of salesRows) {
+    const index = monthIndex.get(row.saleDate.toISOString().slice(0, 7))
+    if (index === undefined) continue
+    points[index].sales += row.netAmount
+    points[index].orders += row.orders
+  }
+
+  for (const row of insightRows) {
+    const index = monthIndex.get(row.saleDate.toISOString().slice(0, 7))
+    if (index === undefined) continue
+    points[index].inflow += row.inflow || row.interactions
+    points[index].interactions += row.interactions
+  }
+
+  return points
+}
+
+function buildRangeBuckets(startText: string, endText: string) {
+  const start = parseYmdDate(startText)
+  const end = parseYmdDate(endText)
+  if (!start || !end || start > end) return buildRecentMonthBuckets(endText, 12).map((month) => ({
+    periodKey: month.monthKey,
+    label: month.label,
+    start: month.start,
+    end: month.end,
+  }))
+
+  const diffDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
+  if (diffDays <= 62) {
+    return Array.from({ length: diffDays }, (_, index) => {
+      const date = new Date(start)
+      date.setUTCDate(start.getUTCDate() + index)
+      const periodKey = date.toISOString().slice(0, 10)
+      return {
+        periodKey,
+        label: `${String(date.getUTCMonth() + 1).padStart(2, '0')}.${String(date.getUTCDate()).padStart(2, '0')}`,
+        start: date,
+        end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1)),
+      }
+    })
+  }
+
+  return buildRangeMonthBuckets(startText, endText).map((month) => ({
+    periodKey: month.monthKey,
+    label: month.label,
+    start: month.start,
+    end: month.end,
+  }))
+}
+
+function parseYmdDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const date = new Date(`${value}T00:00:00.000Z`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+async function buildProductSalesTrend(
+  buckets: ReturnType<typeof buildRangeBuckets>,
+  fallbackProducts: NaverSalesRemoteDashboard['products'],
+): Promise<{
   products: ProductSalesTrendRow[]
   allPoints: ProductSalesTrendPoint[]
 }> {
-  const firstMonth = months[0]
-  const lastMonth = months[months.length - 1]
-  if (!firstMonth || !lastMonth) return { products: [], allPoints: [] }
+  const firstBucket = buckets[0]
+  const lastBucket = buckets[buckets.length - 1]
+  if (!firstBucket || !lastBucket) return { products: [], allPoints: [] }
 
-  const orders = await prisma.order.findMany({
+  const salesRows = await prisma.naverSalesDaily.findMany({
     where: {
-      createdAt: {
-        gte: firstMonth.start,
-        lt: lastMonth.end,
-      },
-      status: {
-        notIn: ['CANCELED', 'CANCELLED'],
+      saleDate: {
+        gte: firstBucket.start,
+        lt: lastBucket.end,
       },
     },
     select: {
-      id: true,
-      createdAt: true,
-      items: {
-        select: {
-          productId: true,
-          quantity: true,
-          price: true,
-          product: {
-            select: {
-              id: true,
-              name: true,
-              nameJP: true,
-              productCode: true,
-              imageUrl: true,
-              updatedAt: true,
-            },
-          },
-        },
-      },
+      saleDate: true,
+      channelProductNo: true,
+      sellerManagementCode: true,
+      productName: true,
+      dbProductId: true,
+      dbProductName: true,
+      orders: true,
+      quantity: true,
+      netAmount: true,
     },
   })
 
-  const monthIndex = new Map(months.map((month, index) => [month.monthKey, index]))
-  const makePoints = (): ProductSalesTrendPoint[] => months.map((month) => ({
-    monthKey: month.monthKey,
-    label: month.label,
+  const dbProductIds = Array.from(new Set(salesRows.map((row) => row.dbProductId).filter((id): id is string => Boolean(id))))
+  const dbProducts = dbProductIds.length
+    ? await prisma.product.findMany({
+      where: { id: { in: dbProductIds } },
+      select: { id: true, imageUrl: true, updatedAt: true, name: true, nameJP: true, productCode: true },
+    })
+    : []
+  const dbProductMap = new Map(dbProducts.map((product) => [product.id, product]))
+
+  const bucketIndex = new Map<string, number>()
+  buckets.forEach((bucket, index) => {
+    if (bucket.periodKey.length === 10) {
+      bucketIndex.set(bucket.periodKey, index)
+    } else {
+      bucketIndex.set(bucket.periodKey, index)
+    }
+  })
+  const makePoints = (): ProductSalesTrendPoint[] => buckets.map((bucket) => ({
+    periodKey: bucket.periodKey,
+    label: bucket.label,
     quantity: 0,
     total: 0,
     orders: 0,
   }))
   const allPoints = makePoints()
   const products = new Map<string, ProductSalesTrendRow>()
-  const allOrderHits = new Map<number, Set<string>>()
-  const productOrderHits = new Map<string, Map<number, Set<string>>>()
 
-  for (const order of orders) {
-    const key = order.createdAt.toISOString().slice(0, 7)
-    const index = monthIndex.get(key)
-    if (index === undefined) continue
+  if (salesRows.length === 0 && fallbackProducts.length > 0) {
+    const fallbackIndex = Math.max(0, allPoints.length - 1)
+    for (const row of fallbackProducts) {
+      const amount = Number(row.netAmount || 0)
+      const quantity = Number(row.quantity || 0)
+      const orders = Number(row.orders || 0)
+      allPoints[fallbackIndex].quantity += quantity
+      allPoints[fallbackIndex].total += amount
+      allPoints[fallbackIndex].orders += orders
 
-    for (const item of order.items) {
-      const amount = Math.round(Number(item.price || 0) * Number(item.quantity || 0))
-      const quantity = Number(item.quantity || 0)
-      allPoints[index].quantity += quantity
-      allPoints[index].total += amount
-      if (!allOrderHits.has(index)) allOrderHits.set(index, new Set())
-      allOrderHits.get(index)?.add(order.id)
-
-      const productId = item.productId
-      const product = products.get(productId) || {
+      const productId = `naver:${row.channelProductNo}`
+      const product = {
         productId,
-        productName: item.product?.nameJP || item.product?.name || '상품명 없음',
-        productCode: item.product?.productCode || null,
-        imageUrl: item.product?.imageUrl && item.product?.id ? getProductImageUrl(item.product.id, item.product.updatedAt) : null,
-        quantity: 0,
-        total: 0,
+        productName: row.productName || row.naverProductName || '상품명 없음',
+        productCode: row.sellerManagementCode || row.channelProductNo,
+        imageUrl: null,
+        quantity,
+        total: amount,
         points: makePoints(),
       }
-
-      product.quantity += quantity
-      product.total += amount
-      product.points[index].quantity += quantity
-      product.points[index].total += amount
+      product.points[fallbackIndex].quantity = quantity
+      product.points[fallbackIndex].total = amount
+      product.points[fallbackIndex].orders = orders
       products.set(productId, product)
+    }
 
-      if (!productOrderHits.has(productId)) productOrderHits.set(productId, new Map())
-      const hitsByMonth = productOrderHits.get(productId)
-      if (!hitsByMonth?.has(index)) hitsByMonth?.set(index, new Set())
-      hitsByMonth?.get(index)?.add(order.id)
+    return {
+      products: Array.from(products.values()).sort((a, b) => b.total - a.total || b.quantity - a.quantity || a.productName.localeCompare(b.productName, 'ko')),
+      allPoints,
     }
   }
 
-  allPoints.forEach((point, index) => {
-    point.orders = allOrderHits.get(index)?.size || 0
-  })
-  for (const product of products.values()) {
-    const hitsByMonth = productOrderHits.get(product.productId)
-    product.points.forEach((point, index) => {
-      point.orders = hitsByMonth?.get(index)?.size || 0
-    })
+  for (const row of salesRows) {
+    const saleYmd = row.saleDate.toISOString().slice(0, 10)
+    const saleMonth = row.saleDate.toISOString().slice(0, 7)
+    const index = bucketIndex.get(buckets[0]?.periodKey.length === 10 ? saleYmd : saleMonth)
+    if (index === undefined) continue
+
+    const amount = Number(row.netAmount || 0)
+    const quantity = Number(row.quantity || 0)
+    allPoints[index].quantity += quantity
+    allPoints[index].total += amount
+    allPoints[index].orders += row.orders
+
+    const productId = row.dbProductId || `naver:${row.channelProductNo}`
+    const dbProduct = row.dbProductId ? dbProductMap.get(row.dbProductId) : null
+    const product = products.get(productId) || {
+      productId,
+      productName: dbProduct?.nameJP || dbProduct?.name || row.dbProductName || row.productName || '상품명 없음',
+      productCode: dbProduct?.productCode || row.sellerManagementCode || row.channelProductNo,
+      imageUrl: dbProduct?.imageUrl ? getProductImageUrl(dbProduct.id, dbProduct.updatedAt) : null,
+      quantity: 0,
+      total: 0,
+      points: makePoints(),
+    }
+
+    product.quantity += quantity
+    product.total += amount
+    product.points[index].quantity += quantity
+    product.points[index].total += amount
+    product.points[index].orders += row.orders
+    products.set(productId, product)
   }
 
   return {

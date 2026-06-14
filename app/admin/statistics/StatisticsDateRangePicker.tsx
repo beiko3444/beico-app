@@ -99,7 +99,9 @@ export default function StatisticsDateRangePicker({
 
   const applyMonthRange = (year: number, monthIndex: number) => {
     const firstDay = new Date(year, monthIndex, 1)
-    const lastDay = new Date(year, monthIndex + 1, 0)
+    const today = new Date()
+    const monthEnd = new Date(year, monthIndex + 1, 0)
+    const lastDay = year === today.getFullYear() && monthIndex === today.getMonth() ? today : monthEnd
     const nextStart = formatYmd(firstDay)
     const nextEnd = formatYmd(lastDay)
     setStart(nextStart)
