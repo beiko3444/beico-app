@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { Activity, BarChart3, Package, RefreshCw, Search, TrendingUp } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
-import { defaultDateRange, normalizeYmdDate } from '@/lib/naverSales'
+import { defaultDateRange, normalizeYmdDate, toYmd } from '@/lib/naverSales'
 import { fetchNaverSalesRemoteDashboard, type NaverSalesRemoteDashboard } from '@/lib/naverSalesRemote'
 import { prisma } from '@/lib/prisma'
 import { getProductImageUrl } from '@/lib/product-image-url'
@@ -27,41 +27,45 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
   const fallback = defaultDateRange(30)
   const startText = normalizeYmdDate(readParam(params.start)) || fallback.start
   const endText = normalizeYmdDate(readParam(params.end)) || fallback.end
-  const dashboard = await fetchNaverSalesRemoteDashboard(startText, endText)
+  const forceLiveRefresh = readParam(params.refresh) === '1'
+  const trendBuckets = buildTrendBuckets(startText, endText)
+  const dashboard = await fetchNaverSalesRemoteDashboard(startText, endText, {
+    refresh: forceLiveRefresh,
+    timeoutMs: forceLiveRefresh ? 45000 : 12000,
+  })
+  const [productSalesTrend, monthlyInflowSales] = await Promise.all([
+    buildProductSalesTrend(trendBuckets.buckets, dashboard.products),
+    buildMonthlyInflowSales(startText, endText),
+  ])
   const keywordRows = dashboard.keywords.slice(0, 12)
   const channelRows = dashboard.channels.slice(0, 12)
   const realtimeSnapshot = dashboard.realtimeSnapshot
   const latestLog = dashboard.latestLog
   const logs = dashboard.logs
   const maxDailyNet = Math.max(...dashboard.byDate.map((row) => row.netAmount), 1)
-  const trendBuckets = buildRangeBuckets(startText, endText)
-  const productSalesTrend = await buildProductSalesTrend(trendBuckets, dashboard.products)
-  const monthlyInflowSales = await buildMonthlyInflowSales(startText, endText)
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="border border-slate-200 bg-white px-5 py-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
-              <div className="flex items-center gap-2 text-[13px] font-black text-blue-600">
-                <BarChart3 className="h-4 w-4" />
-                네이버 전체 통계
-              </div>
-              <h1 className="mt-2 text-[28px] font-black tracking-tight text-slate-950">상품별 매출 대시보드</h1>
-              <p className="mt-1 text-[13px] font-medium text-slate-500">
-                라즈베리파이가 네이버 API에서 받아온 상품 매출과 검색어 매출을 보여줍니다. 베이코 DB에는 저장하지 않습니다.
-              </p>
-              {dashboard.warnings.length > 0 ? (
-                <p className="mt-2 max-w-[820px] rounded-lg bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-700">
-                  {dashboard.warnings.join(' / ')}
-                </p>
-              ) : null}
+        <section className="border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:p-5">
+          <div className="max-w-[860px]">
+            <div className="flex items-center gap-2 text-[13px] font-black text-blue-600">
+              <BarChart3 className="h-4 w-4" />
+              네이버 전체 통계
             </div>
-
-            <StatisticsDateRangePicker key={`${startText}:${endText}`} startText={startText} endText={endText} />
+            <h1 className="mt-2 text-[28px] font-black tracking-tight text-slate-950">상품별 매출 대시보드</h1>
+            <p className="mt-1 text-[13px] font-medium text-slate-500">
+              라즈베리파이가 네이버 API에서 받아온 상품 매출과 검색어 매출을 보여줍니다. 베이코 DB에는 저장하지 않습니다.
+            </p>
+            {dashboard.warnings.length > 0 ? (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-700">
+                {dashboard.warnings.join(' / ')}
+              </p>
+            ) : null}
           </div>
         </section>
+
+        <StatisticsDateRangePicker key={`${startText}:${endText}`} startText={startText} endText={endText} />
 
         <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <SummaryTile label="총 매출" value={formatWon(dashboard.totals.payAmount)} icon={<TrendingUp className="h-4 w-4" />} tone="blue" />
@@ -74,7 +78,12 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
 
         <MonthlyInflowSalesChart points={monthlyInflowSales} />
 
-        <ProductSalesTrend products={productSalesTrend.products} allPoints={productSalesTrend.allPoints} />
+        <ProductSalesTrend
+          products={productSalesTrend.products}
+          allPoints={productSalesTrend.allPoints}
+          rangeText={`${startText} ~ ${endText}`}
+          bucketLabel={trendBuckets.bucketLabel}
+        />
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -295,32 +304,136 @@ function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-function buildRecentMonthBuckets(endText: string, count: number) {
-  const end = new Date(`${endText.slice(0, 7)}-01T00:00:00.000Z`)
-  if (Number.isNaN(end.getTime())) return buildRecentMonthBuckets(new Date().toISOString().slice(0, 10), count)
-
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - (count - 1 - index), 1))
-    const monthKey = date.toISOString().slice(0, 7)
-    return {
-      monthKey,
-      label: `${date.getUTCFullYear().toString().slice(2)}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
-      start: date,
-      end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)),
-    }
-  })
+type TrendBucket = {
+  periodKey: string
+  label: string
+  start: Date
+  end: Date
 }
 
-function buildRangeMonthBuckets(startText: string, endText: string) {
-  const start = new Date(`${startText.slice(0, 7)}-01T00:00:00.000Z`)
-  const end = new Date(`${endText.slice(0, 7)}-01T00:00:00.000Z`)
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
-    return buildRecentMonthBuckets(endText, 12)
+function buildTrendBuckets(startText: string, endText: string): {
+  buckets: TrendBucket[]
+  bucketLabel: '일별' | '주별' | '월별'
+} {
+  const fallback = defaultDateRange(30)
+  let start = parseYmdUtc(startText) || parseYmdUtc(fallback.start)!
+  let end = parseYmdUtc(endText) || parseYmdUtc(fallback.end)!
+  if (start.getTime() > end.getTime()) {
+    const previousStart = start
+    start = end
+    end = previousStart
   }
 
-  const months: ReturnType<typeof buildRecentMonthBuckets> = []
-  const cursor = new Date(start)
-  while (cursor <= end && months.length < 24) {
+  const endExclusive = addUtcDays(end, 1)
+  const periodDays = Math.max(1, Math.round((endExclusive.getTime() - start.getTime()) / 86_400_000))
+
+  if (periodDays <= 45) {
+    return {
+      bucketLabel: '일별',
+      buckets: buildFixedDayBuckets(start, endExclusive, 1, (date) => formatMonthDay(date)),
+    }
+  }
+
+  if (periodDays <= 180) {
+    return {
+      bucketLabel: '주별',
+      buckets: buildFixedDayBuckets(start, endExclusive, 7, (date, bucketEnd) => {
+        const lastDay = addUtcDays(bucketEnd, -1)
+        return `${formatMonthDay(date)}~${formatMonthDay(lastDay)}`
+      }),
+    }
+  }
+
+  return {
+    bucketLabel: '월별',
+    buckets: buildMonthlyBuckets(start, endExclusive),
+  }
+}
+
+function buildFixedDayBuckets(
+  start: Date,
+  endExclusive: Date,
+  stepDays: number,
+  labelFor: (date: Date, bucketEnd: Date) => string,
+): TrendBucket[] {
+  const buckets: TrendBucket[] = []
+  for (let cursor = new Date(start); cursor.getTime() < endExclusive.getTime(); cursor = addUtcDays(cursor, stepDays)) {
+    const bucketStart = new Date(cursor)
+    const bucketEnd = minDate(addUtcDays(bucketStart, stepDays), endExclusive)
+    buckets.push({
+      periodKey: toYmd(bucketStart),
+      label: labelFor(bucketStart, bucketEnd),
+      start: bucketStart,
+      end: bucketEnd,
+    })
+  }
+  return buckets
+}
+
+function buildMonthlyBuckets(start: Date, endExclusive: Date): TrendBucket[] {
+  const buckets: TrendBucket[] = []
+  let cursor = new Date(start)
+  while (cursor.getTime() < endExclusive.getTime()) {
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))
+    const bucketStart = new Date(cursor)
+    const bucketEnd = minDate(monthEnd, endExclusive)
+    buckets.push({
+      periodKey: toYmd(bucketStart),
+      label: `${bucketStart.getUTCFullYear().toString().slice(2)}.${String(bucketStart.getUTCMonth() + 1).padStart(2, '0')}`,
+      start: bucketStart,
+      end: bucketEnd,
+    })
+    cursor = bucketEnd
+  }
+  return buckets
+}
+
+function parseYmdUtc(value: string) {
+  const normalized = normalizeYmdDate(value)
+  if (!normalized) return null
+  const date = new Date(`${normalized}T00:00:00.000Z`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setUTCDate(next.getUTCDate() + days)
+  return next
+}
+
+function minDate(a: Date, b: Date) {
+  return a.getTime() <= b.getTime() ? a : b
+}
+
+function formatMonthDay(date: Date) {
+  return `${String(date.getUTCMonth() + 1).padStart(2, '0')}.${String(date.getUTCDate()).padStart(2, '0')}`
+}
+
+type MonthBucket = {
+  monthKey: string
+  label: string
+  start: Date
+  end: Date
+}
+
+function buildRangeMonthBuckets(startText: string, endText: string): MonthBucket[] {
+  let start = parseYmdUtc(startText)
+  let end = parseYmdUtc(endText)
+  if (!start || !end) {
+    const fallback = defaultDateRange(365)
+    start = parseYmdUtc(fallback.start)!
+    end = parseYmdUtc(fallback.end)!
+  }
+  if (start.getTime() > end.getTime()) {
+    const previousStart = start
+    start = end
+    end = previousStart
+  }
+
+  const firstMonth = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth(), 1))
+  const lastMonth = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth(), 1))
+  const months: MonthBucket[] = []
+  for (let cursor = new Date(firstMonth); cursor.getTime() <= lastMonth.getTime() && months.length < 36; cursor.setUTCMonth(cursor.getUTCMonth() + 1)) {
     const date = new Date(cursor)
     months.push({
       monthKey: date.toISOString().slice(0, 7),
@@ -328,7 +441,6 @@ function buildRangeMonthBuckets(startText: string, endText: string) {
       start: date,
       end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)),
     })
-    cursor.setUTCMonth(cursor.getUTCMonth() + 1)
   }
 
   return months
@@ -396,47 +508,8 @@ async function buildMonthlyInflowSales(startText: string, endText: string): Prom
   return points
 }
 
-function buildRangeBuckets(startText: string, endText: string) {
-  const start = parseYmdDate(startText)
-  const end = parseYmdDate(endText)
-  if (!start || !end || start > end) return buildRecentMonthBuckets(endText, 12).map((month) => ({
-    periodKey: month.monthKey,
-    label: month.label,
-    start: month.start,
-    end: month.end,
-  }))
-
-  const diffDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1
-  if (diffDays <= 62) {
-    return Array.from({ length: diffDays }, (_, index) => {
-      const date = new Date(start)
-      date.setUTCDate(start.getUTCDate() + index)
-      const periodKey = date.toISOString().slice(0, 10)
-      return {
-        periodKey,
-        label: `${String(date.getUTCMonth() + 1).padStart(2, '0')}.${String(date.getUTCDate()).padStart(2, '0')}`,
-        start: date,
-        end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() + 1)),
-      }
-    })
-  }
-
-  return buildRangeMonthBuckets(startText, endText).map((month) => ({
-    periodKey: month.monthKey,
-    label: month.label,
-    start: month.start,
-    end: month.end,
-  }))
-}
-
-function parseYmdDate(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
-  const date = new Date(`${value}T00:00:00.000Z`)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
 async function buildProductSalesTrend(
-  buckets: ReturnType<typeof buildRangeBuckets>,
+  buckets: TrendBucket[],
   fallbackProducts: NaverSalesRemoteDashboard['products'],
 ): Promise<{
   products: ProductSalesTrendRow[]
@@ -475,14 +548,6 @@ async function buildProductSalesTrend(
     : []
   const dbProductMap = new Map(dbProducts.map((product) => [product.id, product]))
 
-  const bucketIndex = new Map<string, number>()
-  buckets.forEach((bucket, index) => {
-    if (bucket.periodKey.length === 10) {
-      bucketIndex.set(bucket.periodKey, index)
-    } else {
-      bucketIndex.set(bucket.periodKey, index)
-    }
-  })
   const makePoints = (): ProductSalesTrendPoint[] => buckets.map((bucket) => ({
     periodKey: bucket.periodKey,
     label: bucket.label,
@@ -526,10 +591,8 @@ async function buildProductSalesTrend(
   }
 
   for (const row of salesRows) {
-    const saleYmd = row.saleDate.toISOString().slice(0, 10)
-    const saleMonth = row.saleDate.toISOString().slice(0, 7)
-    const index = bucketIndex.get(buckets[0]?.periodKey.length === 10 ? saleYmd : saleMonth)
-    if (index === undefined) continue
+    const index = findBucketIndex(row.saleDate, buckets)
+    if (index < 0) continue
 
     const amount = Number(row.netAmount || 0)
     const quantity = Number(row.quantity || 0)
@@ -561,6 +624,10 @@ async function buildProductSalesTrend(
     products: Array.from(products.values()).sort((a, b) => b.total - a.total || b.quantity - a.quantity || a.productName.localeCompare(b.productName, 'ko')),
     allPoints,
   }
+}
+
+function findBucketIndex(date: Date, buckets: TrendBucket[]) {
+  return buckets.findIndex((bucket) => date.getTime() >= bucket.start.getTime() && date.getTime() < bucket.end.getTime())
 }
 
 function formatWon(value: number) {
