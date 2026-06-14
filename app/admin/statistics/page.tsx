@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { Activity, BarChart3, Package, RefreshCw, Search, TrendingUp } from 'lucide-react'
 import { authOptions } from '@/lib/auth'
-import { defaultDateRange, normalizeYmdDate } from '@/lib/naverSales'
+import { defaultDateRange, normalizeYmdDate, toYmd } from '@/lib/naverSales'
 import { fetchNaverSalesRemoteDashboard } from '@/lib/naverSalesRemote'
 import { prisma } from '@/lib/prisma'
 import { getProductImageUrl } from '@/lib/product-image-url'
@@ -27,13 +27,13 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
   const startText = normalizeYmdDate(readParam(params.start)) || fallback.start
   const endText = normalizeYmdDate(readParam(params.end)) || fallback.end
   const forceLiveRefresh = readParam(params.refresh) === '1'
-  const trendMonths = buildRecentMonthBuckets(endText, 12)
+  const trendBuckets = buildTrendBuckets(startText, endText)
   const [dashboard, productSalesTrend] = await Promise.all([
     fetchNaverSalesRemoteDashboard(startText, endText, {
       refresh: forceLiveRefresh,
       timeoutMs: forceLiveRefresh ? 45000 : 12000,
     }),
-    buildProductSalesTrend(trendMonths),
+    buildProductSalesTrend(trendBuckets.buckets),
   ])
   const keywordRows = dashboard.keywords.slice(0, 12)
   const channelRows = dashboard.channels.slice(0, 12)
@@ -74,7 +74,12 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
           <SummaryTile label="평균 주문" value={formatWon(dashboard.totals.averageOrderAmount)} />
         </section>
 
-        <ProductSalesTrend products={productSalesTrend.products} allPoints={productSalesTrend.allPoints} />
+        <ProductSalesTrend
+          products={productSalesTrend.products}
+          allPoints={productSalesTrend.allPoints}
+          rangeText={`${startText} ~ ${endText}`}
+          bucketLabel={trendBuckets.bucketLabel}
+        />
 
         <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="overflow-hidden border border-slate-200 bg-white shadow-sm">
@@ -295,20 +300,109 @@ function readParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value
 }
 
-function buildRecentMonthBuckets(endText: string, count: number) {
-  const end = new Date(`${endText.slice(0, 7)}-01T00:00:00.000Z`)
-  if (Number.isNaN(end.getTime())) return buildRecentMonthBuckets(new Date().toISOString().slice(0, 10), count)
+type TrendBucket = {
+  periodKey: string
+  label: string
+  start: Date
+  end: Date
+}
 
-  return Array.from({ length: count }, (_, index) => {
-    const date = new Date(Date.UTC(end.getUTCFullYear(), end.getUTCMonth() - (count - 1 - index), 1))
-    const monthKey = date.toISOString().slice(0, 7)
+function buildTrendBuckets(startText: string, endText: string): {
+  buckets: TrendBucket[]
+  bucketLabel: '일별' | '주별' | '월별'
+} {
+  const fallback = defaultDateRange(30)
+  let start = parseYmdUtc(startText) || parseYmdUtc(fallback.start)!
+  let end = parseYmdUtc(endText) || parseYmdUtc(fallback.end)!
+  if (start.getTime() > end.getTime()) {
+    const previousStart = start
+    start = end
+    end = previousStart
+  }
+
+  const endExclusive = addUtcDays(end, 1)
+  const periodDays = Math.max(1, Math.round((endExclusive.getTime() - start.getTime()) / 86_400_000))
+
+  if (periodDays <= 45) {
     return {
-      monthKey,
-      label: `${date.getUTCFullYear().toString().slice(2)}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`,
-      start: date,
-      end: new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 1)),
+      bucketLabel: '일별',
+      buckets: buildFixedDayBuckets(start, endExclusive, 1, (date) => formatMonthDay(date)),
     }
-  })
+  }
+
+  if (periodDays <= 180) {
+    return {
+      bucketLabel: '주별',
+      buckets: buildFixedDayBuckets(start, endExclusive, 7, (date, bucketEnd) => {
+        const lastDay = addUtcDays(bucketEnd, -1)
+        return `${formatMonthDay(date)}~${formatMonthDay(lastDay)}`
+      }),
+    }
+  }
+
+  return {
+    bucketLabel: '월별',
+    buckets: buildMonthlyBuckets(start, endExclusive),
+  }
+}
+
+function buildFixedDayBuckets(
+  start: Date,
+  endExclusive: Date,
+  stepDays: number,
+  labelFor: (date: Date, bucketEnd: Date) => string,
+): TrendBucket[] {
+  const buckets: TrendBucket[] = []
+  for (let cursor = new Date(start); cursor.getTime() < endExclusive.getTime(); cursor = addUtcDays(cursor, stepDays)) {
+    const bucketStart = new Date(cursor)
+    const bucketEnd = minDate(addUtcDays(bucketStart, stepDays), endExclusive)
+    buckets.push({
+      periodKey: toYmd(bucketStart),
+      label: labelFor(bucketStart, bucketEnd),
+      start: bucketStart,
+      end: bucketEnd,
+    })
+  }
+  return buckets
+}
+
+function buildMonthlyBuckets(start: Date, endExclusive: Date): TrendBucket[] {
+  const buckets: TrendBucket[] = []
+  let cursor = new Date(start)
+  while (cursor.getTime() < endExclusive.getTime()) {
+    const monthEnd = new Date(Date.UTC(cursor.getUTCFullYear(), cursor.getUTCMonth() + 1, 1))
+    const bucketStart = new Date(cursor)
+    const bucketEnd = minDate(monthEnd, endExclusive)
+    buckets.push({
+      periodKey: toYmd(bucketStart),
+      label: `${bucketStart.getUTCFullYear().toString().slice(2)}.${String(bucketStart.getUTCMonth() + 1).padStart(2, '0')}`,
+      start: bucketStart,
+      end: bucketEnd,
+    })
+    cursor = bucketEnd
+  }
+  return buckets
+}
+
+function parseYmdUtc(value: string) {
+  const normalized = normalizeYmdDate(value)
+  if (!normalized) return null
+  const date = new Date(`${normalized}T00:00:00.000Z`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
+function addUtcDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setUTCDate(next.getUTCDate() + days)
+  return next
+}
+
+function minDate(a: Date, b: Date) {
+  return a.getTime() <= b.getTime() ? a : b
+}
+
+function formatMonthDay(date: Date) {
+  return `${String(date.getUTCMonth() + 1).padStart(2, '0')}.${String(date.getUTCDate()).padStart(2, '0')}`
 }
 
 type ProductTrendAggregateRow = {
@@ -318,31 +412,31 @@ type ProductTrendAggregateRow = {
   productCode: string | null
   imageUrl: string | null
   updatedAt: Date | null
-  monthKey: string
+  saleDate: string
   quantity: number | bigint | null
   total: number | bigint | null
   orders: number | bigint | null
 }
 
-type MonthlyTrendAggregateRow = {
-  monthKey: string
+type DailyTrendAggregateRow = {
+  saleDate: string
   quantity: number | bigint | null
   total: number | bigint | null
   orders: number | bigint | null
 }
 
-async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonthBuckets>): Promise<{
+async function buildProductSalesTrend(buckets: TrendBucket[]): Promise<{
   products: ProductSalesTrendRow[]
   allPoints: ProductSalesTrendPoint[]
 }> {
-  const firstMonth = months[0]
-  const lastMonth = months[months.length - 1]
-  if (!firstMonth || !lastMonth) return { products: [], allPoints: [] }
+  const firstBucket = buckets[0]
+  const lastBucket = buckets[buckets.length - 1]
+  if (!firstBucket || !lastBucket) return { products: [], allPoints: [] }
 
-  const monthIndex = new Map(months.map((month, index) => [month.monthKey, index]))
-  const makePoints = (): ProductSalesTrendPoint[] => months.map((month) => ({
-    monthKey: month.monthKey,
-    label: month.label,
+  const bucketIndexByDay = buildBucketIndexByDay(buckets)
+  const makePoints = (): ProductSalesTrendPoint[] => buckets.map((bucket) => ({
+    monthKey: bucket.periodKey,
+    label: bucket.label,
     quantity: 0,
     total: 0,
     orders: 0,
@@ -350,7 +444,7 @@ async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonth
   const allPoints = makePoints()
   const products = new Map<string, ProductSalesTrendRow>()
 
-  const [rows, monthlyRows] = await Promise.all([
+  const [rows, dailyRows] = await Promise.all([
     prisma.$queryRaw<ProductTrendAggregateRow[]>`
       SELECT
         oi."productId" AS "productId",
@@ -359,15 +453,15 @@ async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonth
         p."productCode" AS "productCode",
         p."imageUrl" AS "imageUrl",
         p."updatedAt" AS "updatedAt",
-        to_char(date_trunc('month', o."createdAt"), 'YYYY-MM') AS "monthKey",
+        to_char(o."createdAt", 'YYYY-MM-DD') AS "saleDate",
         COALESCE(SUM(oi."quantity"), 0)::int AS "quantity",
         COALESCE(SUM(oi."price" * oi."quantity"), 0)::double precision AS "total",
         COUNT(DISTINCT o."id")::int AS "orders"
       FROM "OrderItem" oi
       INNER JOIN "Order" o ON o."id" = oi."orderId"
       LEFT JOIN "Product" p ON p."id" = oi."productId"
-      WHERE o."createdAt" >= ${firstMonth.start}
-        AND o."createdAt" < ${lastMonth.end}
+      WHERE o."createdAt" >= ${firstBucket.start}
+        AND o."createdAt" < ${lastBucket.end}
         AND o."status" NOT IN ('CANCELED', 'CANCELLED')
       GROUP BY
         oi."productId",
@@ -376,35 +470,35 @@ async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonth
         p."productCode",
         p."imageUrl",
         p."updatedAt",
-        date_trunc('month', o."createdAt")
-      ORDER BY "monthKey" ASC
+        to_char(o."createdAt", 'YYYY-MM-DD')
+      ORDER BY "saleDate" ASC
     `,
-    prisma.$queryRaw<MonthlyTrendAggregateRow[]>`
+    prisma.$queryRaw<DailyTrendAggregateRow[]>`
       SELECT
-        to_char(date_trunc('month', o."createdAt"), 'YYYY-MM') AS "monthKey",
+        to_char(o."createdAt", 'YYYY-MM-DD') AS "saleDate",
         COALESCE(SUM(oi."quantity"), 0)::int AS "quantity",
         COALESCE(SUM(oi."price" * oi."quantity"), 0)::double precision AS "total",
         COUNT(DISTINCT o."id")::int AS "orders"
       FROM "OrderItem" oi
       INNER JOIN "Order" o ON o."id" = oi."orderId"
-      WHERE o."createdAt" >= ${firstMonth.start}
-        AND o."createdAt" < ${lastMonth.end}
+      WHERE o."createdAt" >= ${firstBucket.start}
+        AND o."createdAt" < ${lastBucket.end}
         AND o."status" NOT IN ('CANCELED', 'CANCELLED')
-      GROUP BY date_trunc('month', o."createdAt")
-      ORDER BY "monthKey" ASC
+      GROUP BY to_char(o."createdAt", 'YYYY-MM-DD')
+      ORDER BY "saleDate" ASC
     `,
   ])
 
-  for (const row of monthlyRows) {
-    const index = monthIndex.get(row.monthKey)
+  for (const row of dailyRows) {
+    const index = bucketIndexByDay.get(row.saleDate)
     if (index === undefined) continue
-    allPoints[index].quantity = numberValue(row.quantity)
-    allPoints[index].total = Math.round(numberValue(row.total))
-    allPoints[index].orders = numberValue(row.orders)
+    allPoints[index].quantity += numberValue(row.quantity)
+    allPoints[index].total += Math.round(numberValue(row.total))
+    allPoints[index].orders += numberValue(row.orders)
   }
 
   for (const row of rows) {
-    const index = monthIndex.get(row.monthKey)
+    const index = bucketIndexByDay.get(row.saleDate)
     if (index === undefined) continue
 
     const productId = row.productId
@@ -434,6 +528,16 @@ async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonth
     products: Array.from(products.values()).sort((a, b) => b.total - a.total || b.quantity - a.quantity || a.productName.localeCompare(b.productName, 'ko')),
     allPoints,
   }
+}
+
+function buildBucketIndexByDay(buckets: TrendBucket[]) {
+  const indexByDay = new Map<string, number>()
+  buckets.forEach((bucket, index) => {
+    for (let cursor = new Date(bucket.start); cursor.getTime() < bucket.end.getTime(); cursor = addUtcDays(cursor, 1)) {
+      indexByDay.set(toYmd(cursor), index)
+    }
+  })
+  return indexByDay
 }
 
 function numberValue(value: number | bigint | null | undefined) {
