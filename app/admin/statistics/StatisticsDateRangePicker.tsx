@@ -29,6 +29,7 @@ export default function StatisticsDateRangePicker({
   const [quickYear, setQuickYear] = useState(() => monthStart(endText || startText).getFullYear())
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
+  const [monthPanelOpen, setMonthPanelOpen] = useState(false)
   const [calendarOpen, setCalendarOpen] = useState(false)
   const progressTimerRef = useRef<number | null>(null)
 
@@ -70,6 +71,7 @@ export default function StatisticsDateRangePicker({
       setEnd('')
       setProgress(0)
       setStatus('')
+      setMonthPanelOpen(false)
       setCalendarOpen(true)
       return
     }
@@ -100,6 +102,7 @@ export default function StatisticsDateRangePicker({
     setViewMonth(monthStart(nextEnd))
     setProgress(0)
     setStatus('')
+    setMonthPanelOpen(false)
     setCalendarOpen(false)
   }
 
@@ -113,6 +116,7 @@ export default function StatisticsDateRangePicker({
     setViewMonth(new Date(year, monthIndex, 1))
     setProgress(0)
     setStatus('')
+    setMonthPanelOpen(false)
     setCalendarOpen(false)
   }
 
@@ -153,92 +157,112 @@ export default function StatisticsDateRangePicker({
   }
 
   return (
-    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3">
-      <div className="flex items-center justify-between gap-2">
-        <div>
+    <section className="border border-slate-200 bg-white p-3 shadow-sm">
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-[220px]">
           <div className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">조회 기간</div>
           <div className="mt-1 text-[13px] font-black text-slate-950">{selectedDaysText}</div>
         </div>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={!rangeValid || isPending}
-          className="inline-flex h-10 min-w-[88px] items-center justify-center rounded-xl bg-blue-600 px-4 text-[13px] font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
-        >
-          조회
-        </button>
-      </div>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
-        {[7, 30, 90].map((daysBack) => (
+        <div className="flex flex-1 flex-wrap items-center gap-2">
+          {[7, 30, 90].map((daysBack) => (
+            <button
+              key={daysBack}
+              type="button"
+              onClick={() => applyQuickRange(daysBack)}
+              className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[12px] font-black text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
+            >
+              최근 {daysBack}일
+            </button>
+          ))}
           <button
-            key={daysBack}
             type="button"
-            onClick={() => applyQuickRange(daysBack)}
-            className="h-7 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-black text-slate-600 transition hover:border-blue-200 hover:text-blue-700"
+            onClick={() => {
+              setMonthPanelOpen((open) => !open)
+              setCalendarOpen(false)
+            }}
+            aria-expanded={monthPanelOpen}
+            className={`h-8 rounded-lg border px-3 text-[12px] font-black transition ${
+              monthPanelOpen
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:text-blue-700'
+            }`}
           >
-            최근 {daysBack}일
+            월별 선택
           </button>
-        ))}
-        <button
-          type="button"
-          onClick={() => setCalendarOpen((open) => !open)}
-          aria-expanded={calendarOpen}
-          className={`inline-flex h-7 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-black transition ${
-            calendarOpen
-              ? 'border-blue-600 bg-blue-600 text-white'
-              : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
-          }`}
-        >
-          <CalendarDays className="h-3.5 w-3.5" />
-          직접 선택
-        </button>
+          <button
+            type="button"
+            onClick={() => {
+              setCalendarOpen((open) => !open)
+              setMonthPanelOpen(false)
+            }}
+            aria-expanded={calendarOpen}
+            className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-3 text-[12px] font-black transition ${
+              calendarOpen
+                ? 'border-blue-600 bg-blue-600 text-white'
+                : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:text-blue-700'
+            }`}
+          >
+            <CalendarDays className="h-3.5 w-3.5" />
+            날짜 선택
+          </button>
+          <button
+            type="button"
+            onClick={submit}
+            disabled={!rangeValid || isPending}
+            className="ml-auto inline-flex h-9 min-w-[88px] items-center justify-center rounded-xl bg-blue-600 px-4 text-[13px] font-black text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-45"
+          >
+            조회
+          </button>
+        </div>
       </div>
 
-      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">월별 바로조회</div>
-          <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            {yearOptions.map((year) => (
-              <button
-                key={year}
-                type="button"
-                onClick={() => {
-                  setQuickYear(year)
-                  setViewMonth(new Date(year, viewMonth.getMonth(), 1))
-                }}
-                className={`h-7 rounded-md px-2 text-[11px] font-black transition ${
-                  quickYear === year ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-white hover:text-slate-900'
-                }`}
-              >
-                {year}
-              </button>
-            ))}
+      {monthPanelOpen ? (
+        <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <div className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">월별 바로조회</div>
+            <div className="flex rounded-lg border border-slate-200 bg-white p-0.5">
+              {yearOptions.map((year) => (
+                <button
+                  key={year}
+                  type="button"
+                  onClick={() => {
+                    setQuickYear(year)
+                    setViewMonth(new Date(year, viewMonth.getMonth(), 1))
+                  }}
+                  className={`h-7 rounded-md px-2 text-[11px] font-black transition ${
+                    quickYear === year ? 'bg-blue-600 text-white' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+                  }`}
+                >
+                  {year}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-6 xl:grid-cols-12">
+            {Array.from({ length: 12 }, (_, index) => {
+              const selectedMonth = start === formatYmd(new Date(quickYear, index, 1)) && end === formatYmd(new Date(quickYear, index + 1, 0))
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => applyMonthRange(quickYear, index)}
+                  className={`h-9 rounded-lg border text-[12px] font-black transition ${
+                    selectedMonth
+                      ? 'border-blue-600 bg-blue-600 text-white'
+                      : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
+                  }`}
+                >
+                  {index + 1}월
+                </button>
+              )
+            })}
           </div>
         </div>
-        <div className="grid grid-cols-4 gap-1.5">
-          {Array.from({ length: 12 }, (_, index) => {
-            const selectedMonth = start === formatYmd(new Date(quickYear, index, 1)) && end === formatYmd(new Date(quickYear, index + 1, 0))
-            return (
-              <button
-                key={index}
-                type="button"
-                onClick={() => applyMonthRange(quickYear, index)}
-                className={`h-9 rounded-lg border text-[12px] font-black transition ${
-                  selectedMonth
-                    ? 'border-blue-600 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-slate-50 text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-              >
-                {index + 1}월
-              </button>
-            )
-          })}
-        </div>
-      </div>
+      ) : null}
 
       {calendarOpen ? (
-        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+        <div className="mt-3 max-w-[460px] rounded-xl border border-slate-200 bg-slate-50 p-3">
           <div className="mb-2 flex items-center justify-between">
             <button
               type="button"
@@ -305,7 +329,7 @@ export default function StatisticsDateRangePicker({
           </div>
         </div>
       )}
-    </div>
+    </section>
   )
 }
 

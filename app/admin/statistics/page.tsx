@@ -46,26 +46,24 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-5">
         <section className="border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:p-5">
-          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
-            <div className="min-w-0 pt-1">
-              <div className="flex items-center gap-2 text-[13px] font-black text-blue-600">
-                <BarChart3 className="h-4 w-4" />
-                네이버 전체 통계
-              </div>
-              <h1 className="mt-2 text-[28px] font-black tracking-tight text-slate-950">상품별 매출 대시보드</h1>
-              <p className="mt-1 text-[13px] font-medium text-slate-500">
-                라즈베리파이가 네이버 API에서 받아온 상품 매출과 검색어 매출을 보여줍니다. 베이코 DB에는 저장하지 않습니다.
-              </p>
-              {dashboard.warnings.length > 0 ? (
-                <p className="mt-2 max-w-[820px] rounded-lg bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-700">
-                  {dashboard.warnings.join(' / ')}
-                </p>
-              ) : null}
+          <div className="max-w-[860px]">
+            <div className="flex items-center gap-2 text-[13px] font-black text-blue-600">
+              <BarChart3 className="h-4 w-4" />
+              네이버 전체 통계
             </div>
-
-            <StatisticsDateRangePicker key={`${startText}:${endText}`} startText={startText} endText={endText} />
+            <h1 className="mt-2 text-[28px] font-black tracking-tight text-slate-950">상품별 매출 대시보드</h1>
+            <p className="mt-1 text-[13px] font-medium text-slate-500">
+              라즈베리파이가 네이버 API에서 받아온 상품 매출과 검색어 매출을 보여줍니다. 베이코 DB에는 저장하지 않습니다.
+            </p>
+            {dashboard.warnings.length > 0 ? (
+              <p className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-[12px] font-bold leading-5 text-amber-700">
+                {dashboard.warnings.join(' / ')}
+              </p>
+            ) : null}
           </div>
         </section>
+
+        <StatisticsDateRangePicker key={`${startText}:${endText}`} startText={startText} endText={endText} />
 
         <section className="grid gap-3 md:grid-cols-3 xl:grid-cols-6">
           <SummaryTile label="총 매출" value={formatWon(dashboard.totals.payAmount)} icon={<TrendingUp className="h-4 w-4" />} tone="blue" />
