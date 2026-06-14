@@ -3,6 +3,10 @@ import { defaultDateRange, normalizeYmdDate } from '@/lib/naverSales'
 import { buildNaverSalesDashboard, summarizeInsightRows } from '@/lib/naverSalesAnalytics.mjs'
 
 type RawRecord = Record<string, unknown>
+type NaverSalesRemoteDashboardOptions = {
+  refresh?: boolean
+  timeoutMs?: number
+}
 
 export type NaverSalesRemoteDashboard = {
   configured: boolean
@@ -36,31 +40,55 @@ export type NaverSalesRemoteDashboard = {
   warnings: string[]
 }
 
-export async function fetchNaverSalesRemoteDashboard(startText: string, endText: string): Promise<NaverSalesRemoteDashboard> {
+type DashboardCacheEntry = {
+  payload: NaverSalesRemoteDashboard
+  cachedAt: string
+}
+
+const dashboardCache = new Map<string, DashboardCacheEntry>()
+const DASHBOARD_CACHE_LIMIT = 8
+
+export async function fetchNaverSalesRemoteDashboard(
+  startText: string,
+  endText: string,
+  options: NaverSalesRemoteDashboardOptions = {},
+): Promise<NaverSalesRemoteDashboard> {
   const range = normalizeRange(startText, endText)
-  const base = await resolveMonitorBase(requestTimeoutMs(90000))
+  const cacheKey = `${range.start}:${range.end}`
+  const cached = dashboardCache.get(cacheKey)
+  if (cached && options.refresh !== true) {
+    return fromCache(cached)
+  }
+
+  const timeoutMs = options.timeoutMs ?? requestTimeoutMs()
+  const base = await resolveMonitorBase(timeoutMs)
   const now = new Date().toISOString()
 
   if (!base) {
     return emptyDashboard(range, now, ['라즈베리 주소를 찾지 못했습니다. SMARTINVENTORY_MONITOR_URL 또는 SMARTINVENTORY_MONITOR_URL_GIST를 확인해 주세요.'])
   }
 
-  const refresh = process.env.NAVER_SALES_REMOTE_REFRESH === '0' ? '0' : '1'
+  const shouldRefresh = options.refresh ?? process.env.NAVER_SALES_REMOTE_REFRESH === '1'
+  const refresh = shouldRefresh ? '1' : '0'
   const query = `period_days=${range.periodDays}&refresh=${refresh}`
   const warnings = [...base.warnings]
 
   const [revenueResult, keywordResult] = await Promise.allSettled([
-    monitorRequest<RawRecord>(base, `/revenue?${query}`, {}, requestTimeoutMs(90000)),
-    monitorRequest<RawRecord>(base, `/keywords?${query}`, {}, requestTimeoutMs(90000)),
+    monitorRequest<RawRecord>(base, `/revenue?${query}`, {}, timeoutMs),
+    monitorRequest<RawRecord>(base, `/keywords?${query}`, {}, timeoutMs),
   ])
 
   const revenuePayload = settledValue(revenueResult, '매출 통계', warnings)
   const keywordPayload = settledValue(keywordResult, '검색어 통계', warnings)
+  if (!revenuePayload && !keywordPayload && cached) {
+    return fromCache(cached, warnings)
+  }
+
   const dashboard = buildNaverSalesDashboard(extractRevenueProducts(revenuePayload, range.end))
   const keywords = summarizeInsightRows(extractKeywordRows(keywordPayload, range.end), 15)
   const generatedAt = readGeneratedAt(revenuePayload) || readGeneratedAt(keywordPayload) || now
 
-  return {
+  const payload = {
     configured: true,
     monitorUrl: base.url,
     monitorSource: base.source,
@@ -88,6 +116,44 @@ export async function fetchNaverSalesRemoteDashboard(startText: string, endText:
     ],
     warnings,
   }
+  cacheDashboard(cacheKey, payload)
+  return payload
+}
+
+function cacheDashboard(key: string, payload: NaverSalesRemoteDashboard) {
+  dashboardCache.set(key, { payload, cachedAt: new Date().toISOString() })
+  while (dashboardCache.size > DASHBOARD_CACHE_LIMIT) {
+    const oldestKey = dashboardCache.keys().next().value
+    if (!oldestKey) break
+    dashboardCache.delete(oldestKey)
+  }
+}
+
+function fromCache(entry: DashboardCacheEntry, warnings: string[] = []): NaverSalesRemoteDashboard {
+  const cacheMessage = `캐시된 통계를 표시합니다. 저장 시각: ${formatCacheTime(entry.cachedAt)}`
+  const nextWarnings = warnings.length
+    ? [...warnings, ...entry.payload.warnings, cacheMessage]
+    : [...entry.payload.warnings]
+  return {
+    ...entry.payload,
+    latestLog: entry.payload.latestLog
+      ? {
+          ...entry.payload.latestLog,
+          status: warnings.length ? 'CACHE_WARNING' : 'CACHE',
+        }
+      : entry.payload.latestLog,
+    logs: entry.payload.logs.map((log) => ({ ...log })),
+    warnings: nextWarnings,
+  }
+}
+
+function formatCacheTime(value: string) {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(value))
 }
 
 function normalizeRange(startText: string, endText: string) {

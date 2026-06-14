@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const QUERY_PROGRESS_KEY = 'beiko-statistics-query-progress'
 const DAY_LABELS = ['일', '월', '화', '수', '목', '금', '토']
@@ -28,6 +29,7 @@ export default function StatisticsDateRangePicker({
   const [quickYear, setQuickYear] = useState(() => monthStart(endText || startText).getFullYear())
   const [progress, setProgress] = useState(0)
   const [status, setStatus] = useState('')
+  const [calendarOpen, setCalendarOpen] = useState(false)
   const progressTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
@@ -68,16 +70,19 @@ export default function StatisticsDateRangePicker({
       setEnd('')
       setProgress(0)
       setStatus('')
+      setCalendarOpen(true)
       return
     }
 
     if (ymd < start) {
       setEnd(start)
       setStart(ymd)
+      setCalendarOpen(false)
       return
     }
 
     setEnd(ymd)
+    setCalendarOpen(false)
   }
 
   const moveMonth = (delta: number) => {
@@ -95,6 +100,7 @@ export default function StatisticsDateRangePicker({
     setViewMonth(monthStart(nextEnd))
     setProgress(0)
     setStatus('')
+    setCalendarOpen(false)
   }
 
   const applyMonthRange = (year: number, monthIndex: number) => {
@@ -107,6 +113,7 @@ export default function StatisticsDateRangePicker({
     setViewMonth(new Date(year, monthIndex, 1))
     setProgress(0)
     setStatus('')
+    setCalendarOpen(false)
   }
 
   const submit = () => {
@@ -120,7 +127,13 @@ export default function StatisticsDateRangePicker({
     }, 140)
     window.sessionStorage.setItem(QUERY_PROGRESS_KEY, '1')
 
-    const nextUrl = `/admin/statistics?start=${encodeURIComponent(start)}&end=${encodeURIComponent(end)}`
+    const nextQuery = new URLSearchParams({
+      start,
+      end,
+      refresh: '1',
+      t: String(Date.now()),
+    })
+    const nextUrl = `/admin/statistics?${nextQuery.toString()}`
     const currentUrl = `${window.location.pathname}${window.location.search}`
 
     startTransition(() => {
@@ -140,7 +153,7 @@ export default function StatisticsDateRangePicker({
   }
 
   return (
-    <div className="w-full max-w-[430px] rounded-2xl border border-slate-200 bg-slate-50 p-3">
+    <div className="w-full rounded-xl border border-slate-200 bg-slate-50 p-3">
       <div className="flex items-center justify-between gap-2">
         <div>
           <div className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-400">조회 기간</div>
@@ -167,6 +180,19 @@ export default function StatisticsDateRangePicker({
             최근 {daysBack}일
           </button>
         ))}
+        <button
+          type="button"
+          onClick={() => setCalendarOpen((open) => !open)}
+          aria-expanded={calendarOpen}
+          className={`inline-flex h-7 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-black transition ${
+            calendarOpen
+              ? 'border-blue-600 bg-blue-600 text-white'
+              : 'border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:text-blue-700'
+          }`}
+        >
+          <CalendarDays className="h-3.5 w-3.5" />
+          직접 선택
+        </button>
       </div>
 
       <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
@@ -211,50 +237,62 @@ export default function StatisticsDateRangePicker({
         </div>
       </div>
 
-      <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
-        <div className="mb-2 flex items-center justify-between">
-          <button type="button" onClick={() => moveMonth(-1)} className="h-8 w-8 rounded-lg text-[16px] font-black text-slate-500 hover:bg-slate-50" aria-label="이전 달">
-            {'<'}
-          </button>
-          <div className="text-[14px] font-black text-slate-950">
-            {viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월
-          </div>
-          <button type="button" onClick={() => moveMonth(1)} className="h-8 w-8 rounded-lg text-[16px] font-black text-slate-500 hover:bg-slate-50" aria-label="다음 달">
-            {'>'}
-          </button>
-        </div>
-
-        <div className="grid grid-cols-7 gap-1 text-center">
-          {DAY_LABELS.map((label) => (
-            <div key={label} className="py-1 text-[10px] font-black text-slate-400">
-              {label}
+      {calendarOpen ? (
+        <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+          <div className="mb-2 flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => moveMonth(-1)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50"
+              aria-label="이전 달"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            <div className="text-[14px] font-black text-slate-950">
+              {viewMonth.getFullYear()}년 {viewMonth.getMonth() + 1}월
             </div>
-          ))}
-          {days.map((day) => {
-            const selectedStart = day.ymd === start
-            const selectedEnd = day.ymd === end
-            const inRange = start && end && day.ymd > start && day.ymd < end
-            return (
-              <button
-                key={day.ymd}
-                type="button"
-                onClick={() => handleDateClick(day.ymd)}
-                className={`h-9 rounded-lg text-[12px] font-black transition ${
-                  selectedStart || selectedEnd
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : inRange
-                      ? 'bg-blue-50 text-blue-700'
-                      : day.inMonth
-                        ? 'text-slate-700 hover:bg-slate-50'
-                        : 'text-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                {day.day}
-              </button>
-            )
-          })}
+            <button
+              type="button"
+              onClick={() => moveMonth(1)}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50"
+              aria-label="다음 달"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-7 gap-1 text-center">
+            {DAY_LABELS.map((label) => (
+              <div key={label} className="py-1 text-[10px] font-black text-slate-400">
+                {label}
+              </div>
+            ))}
+            {days.map((day) => {
+              const selectedStart = day.ymd === start
+              const selectedEnd = day.ymd === end
+              const inRange = start && end && day.ymd > start && day.ymd < end
+              return (
+                <button
+                  key={day.ymd}
+                  type="button"
+                  onClick={() => handleDateClick(day.ymd)}
+                  className={`h-9 rounded-lg text-[12px] font-black transition ${
+                    selectedStart || selectedEnd
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : inRange
+                        ? 'bg-blue-50 text-blue-700'
+                        : day.inMonth
+                          ? 'text-slate-700 hover:bg-slate-50'
+                          : 'text-slate-300 hover:bg-slate-50'
+                  }`}
+                >
+                  {day.day}
+                </button>
+              )
+            })}
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {(progress > 0 || status) && (
         <div className="mt-3">

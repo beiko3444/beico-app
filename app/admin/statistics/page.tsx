@@ -26,22 +26,28 @@ export default async function StatisticsPage({ searchParams }: PageProps) {
   const fallback = defaultDateRange(30)
   const startText = normalizeYmdDate(readParam(params.start)) || fallback.start
   const endText = normalizeYmdDate(readParam(params.end)) || fallback.end
-  const dashboard = await fetchNaverSalesRemoteDashboard(startText, endText)
+  const forceLiveRefresh = readParam(params.refresh) === '1'
+  const trendMonths = buildRecentMonthBuckets(endText, 12)
+  const [dashboard, productSalesTrend] = await Promise.all([
+    fetchNaverSalesRemoteDashboard(startText, endText, {
+      refresh: forceLiveRefresh,
+      timeoutMs: forceLiveRefresh ? 45000 : 12000,
+    }),
+    buildProductSalesTrend(trendMonths),
+  ])
   const keywordRows = dashboard.keywords.slice(0, 12)
   const channelRows = dashboard.channels.slice(0, 12)
   const realtimeSnapshot = dashboard.realtimeSnapshot
   const latestLog = dashboard.latestLog
   const logs = dashboard.logs
   const maxDailyNet = Math.max(...dashboard.byDate.map((row) => row.netAmount), 1)
-  const trendMonths = buildRecentMonthBuckets(endText, 12)
-  const productSalesTrend = await buildProductSalesTrend(trendMonths)
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
       <div className="mx-auto max-w-[1500px] space-y-5">
-        <section className="border border-slate-200 bg-white px-5 py-5 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-            <div>
+        <section className="border border-slate-200 bg-white p-4 shadow-[0_10px_35px_rgba(15,23,42,0.05)] sm:p-5">
+          <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px] xl:items-start">
+            <div className="min-w-0 pt-1">
               <div className="flex items-center gap-2 text-[13px] font-black text-blue-600">
                 <BarChart3 className="h-4 w-4" />
                 네이버 전체 통계
@@ -307,6 +313,26 @@ function buildRecentMonthBuckets(endText: string, count: number) {
   })
 }
 
+type ProductTrendAggregateRow = {
+  productId: string
+  productName: string | null
+  productNameJP: string | null
+  productCode: string | null
+  imageUrl: string | null
+  updatedAt: Date | null
+  monthKey: string
+  quantity: number | bigint | null
+  total: number | bigint | null
+  orders: number | bigint | null
+}
+
+type MonthlyTrendAggregateRow = {
+  monthKey: string
+  quantity: number | bigint | null
+  total: number | bigint | null
+  orders: number | bigint | null
+}
+
 async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonthBuckets>): Promise<{
   products: ProductSalesTrendRow[]
   allPoints: ProductSalesTrendPoint[]
@@ -314,39 +340,6 @@ async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonth
   const firstMonth = months[0]
   const lastMonth = months[months.length - 1]
   if (!firstMonth || !lastMonth) return { products: [], allPoints: [] }
-
-  const orders = await prisma.order.findMany({
-    where: {
-      createdAt: {
-        gte: firstMonth.start,
-        lt: lastMonth.end,
-      },
-      status: {
-        notIn: ['CANCELED', 'CANCELLED'],
-      },
-    },
-    select: {
-      id: true,
-      createdAt: true,
-      items: {
-        select: {
-          productId: true,
-          quantity: true,
-          price: true,
-          product: {
-            select: {
-              id: true,
-              name: true,
-              nameJP: true,
-              productCode: true,
-              imageUrl: true,
-              updatedAt: true,
-            },
-          },
-        },
-      },
-    },
-  })
 
   const monthIndex = new Map(months.map((month, index) => [month.monthKey, index]))
   const makePoints = (): ProductSalesTrendPoint[] => months.map((month) => ({
@@ -358,60 +351,96 @@ async function buildProductSalesTrend(months: ReturnType<typeof buildRecentMonth
   }))
   const allPoints = makePoints()
   const products = new Map<string, ProductSalesTrendRow>()
-  const allOrderHits = new Map<number, Set<string>>()
-  const productOrderHits = new Map<string, Map<number, Set<string>>>()
 
-  for (const order of orders) {
-    const key = order.createdAt.toISOString().slice(0, 7)
-    const index = monthIndex.get(key)
+  const [rows, monthlyRows] = await Promise.all([
+    prisma.$queryRaw<ProductTrendAggregateRow[]>`
+      SELECT
+        oi."productId" AS "productId",
+        p."name" AS "productName",
+        p."nameJP" AS "productNameJP",
+        p."productCode" AS "productCode",
+        p."imageUrl" AS "imageUrl",
+        p."updatedAt" AS "updatedAt",
+        to_char(date_trunc('month', o."createdAt"), 'YYYY-MM') AS "monthKey",
+        COALESCE(SUM(oi."quantity"), 0)::int AS "quantity",
+        COALESCE(SUM(oi."price" * oi."quantity"), 0)::double precision AS "total",
+        COUNT(DISTINCT o."id")::int AS "orders"
+      FROM "OrderItem" oi
+      INNER JOIN "Order" o ON o."id" = oi."orderId"
+      LEFT JOIN "Product" p ON p."id" = oi."productId"
+      WHERE o."createdAt" >= ${firstMonth.start}
+        AND o."createdAt" < ${lastMonth.end}
+        AND o."status" NOT IN ('CANCELED', 'CANCELLED')
+      GROUP BY
+        oi."productId",
+        p."name",
+        p."nameJP",
+        p."productCode",
+        p."imageUrl",
+        p."updatedAt",
+        date_trunc('month', o."createdAt")
+      ORDER BY "monthKey" ASC
+    `,
+    prisma.$queryRaw<MonthlyTrendAggregateRow[]>`
+      SELECT
+        to_char(date_trunc('month', o."createdAt"), 'YYYY-MM') AS "monthKey",
+        COALESCE(SUM(oi."quantity"), 0)::int AS "quantity",
+        COALESCE(SUM(oi."price" * oi."quantity"), 0)::double precision AS "total",
+        COUNT(DISTINCT o."id")::int AS "orders"
+      FROM "OrderItem" oi
+      INNER JOIN "Order" o ON o."id" = oi."orderId"
+      WHERE o."createdAt" >= ${firstMonth.start}
+        AND o."createdAt" < ${lastMonth.end}
+        AND o."status" NOT IN ('CANCELED', 'CANCELLED')
+      GROUP BY date_trunc('month', o."createdAt")
+      ORDER BY "monthKey" ASC
+    `,
+  ])
+
+  for (const row of monthlyRows) {
+    const index = monthIndex.get(row.monthKey)
     if (index === undefined) continue
-
-    for (const item of order.items) {
-      const amount = Math.round(Number(item.price || 0) * Number(item.quantity || 0))
-      const quantity = Number(item.quantity || 0)
-      allPoints[index].quantity += quantity
-      allPoints[index].total += amount
-      if (!allOrderHits.has(index)) allOrderHits.set(index, new Set())
-      allOrderHits.get(index)?.add(order.id)
-
-      const productId = item.productId
-      const product = products.get(productId) || {
-        productId,
-        productName: item.product?.nameJP || item.product?.name || '상품명 없음',
-        productCode: item.product?.productCode || null,
-        imageUrl: item.product?.imageUrl && item.product?.id ? getProductImageUrl(item.product.id, item.product.updatedAt) : null,
-        quantity: 0,
-        total: 0,
-        points: makePoints(),
-      }
-
-      product.quantity += quantity
-      product.total += amount
-      product.points[index].quantity += quantity
-      product.points[index].total += amount
-      products.set(productId, product)
-
-      if (!productOrderHits.has(productId)) productOrderHits.set(productId, new Map())
-      const hitsByMonth = productOrderHits.get(productId)
-      if (!hitsByMonth?.has(index)) hitsByMonth?.set(index, new Set())
-      hitsByMonth?.get(index)?.add(order.id)
-    }
+    allPoints[index].quantity = numberValue(row.quantity)
+    allPoints[index].total = Math.round(numberValue(row.total))
+    allPoints[index].orders = numberValue(row.orders)
   }
 
-  allPoints.forEach((point, index) => {
-    point.orders = allOrderHits.get(index)?.size || 0
-  })
-  for (const product of products.values()) {
-    const hitsByMonth = productOrderHits.get(product.productId)
-    product.points.forEach((point, index) => {
-      point.orders = hitsByMonth?.get(index)?.size || 0
-    })
+  for (const row of rows) {
+    const index = monthIndex.get(row.monthKey)
+    if (index === undefined) continue
+
+    const productId = row.productId
+    const quantity = numberValue(row.quantity)
+    const total = Math.round(numberValue(row.total))
+    const orders = numberValue(row.orders)
+
+    const product = products.get(productId) || {
+      productId,
+      productName: row.productNameJP || row.productName || '상품명 없음',
+      productCode: row.productCode || null,
+      imageUrl: row.imageUrl ? getProductImageUrl(productId, row.updatedAt || new Date()) : null,
+      quantity: 0,
+      total: 0,
+      points: makePoints(),
+    }
+
+    product.quantity += quantity
+    product.total += total
+    product.points[index].quantity += quantity
+    product.points[index].total += total
+    product.points[index].orders += orders
+    products.set(productId, product)
   }
 
   return {
     products: Array.from(products.values()).sort((a, b) => b.total - a.total || b.quantity - a.quantity || a.productName.localeCompare(b.productName, 'ko')),
     allPoints,
   }
+}
+
+function numberValue(value: number | bigint | null | undefined) {
+  if (typeof value === 'bigint') return Number(value)
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
 }
 
 function formatWon(value: number) {
