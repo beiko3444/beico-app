@@ -94,6 +94,14 @@ function stockTone(value: number | null) {
   return 'text-slate-950'
 }
 
+function externalProductHref(value: string | null | undefined) {
+  const trimmed = String(value || '').trim()
+  if (!trimmed) return null
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (/^\/\//.test(trimmed)) return `https:${trimmed}`
+  return `https://${trimmed}`
+}
+
 function orderRows(rows: SmartInventoryMasterRow[], order: number[]) {
   const orderMap = new Map(order.map((id, index) => [id, index]))
   return [...rows].sort((a, b) => {
@@ -191,24 +199,33 @@ function LinkedProducts({ links }: { links: SmartInventoryMasterRow['linked'] })
 
   return (
     <div className="flex max-w-[280px] flex-wrap gap-1.5">
-      {links.slice(0, 3).map((link) => (
-        <a
-          key={`${link.channel}:${link.productKey}`}
-          href={link.productUrl || '#'}
-          target="_blank"
-          rel="noreferrer"
-          className={`inline-flex max-w-[132px] items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-black no-underline ${
-            link.channel === 'naver'
-              ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-              : 'border-sky-100 bg-sky-50 text-sky-700'
-          } ${link.productUrl ? 'hover:brightness-95' : 'pointer-events-none'}`}
-          title={link.name}
-        >
-          <span className="shrink-0">{channelLabel[link.channel]}</span>
-          <span className="truncate">{link.name}</span>
-          {link.productUrl ? <ExternalLink size={11} className="shrink-0" /> : null}
-        </a>
-      ))}
+      {links.slice(0, 3).map((link) => {
+        const href = externalProductHref(link.productUrl)
+
+        return (
+          <a
+            key={`${link.channel}:${link.productKey}`}
+            href={href || '#'}
+            target="_blank"
+            rel="noreferrer"
+            onClick={(event) => {
+              event.stopPropagation()
+              if (!href) event.preventDefault()
+            }}
+            onPointerDown={(event) => event.stopPropagation()}
+            className={`inline-flex max-w-[132px] items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-black no-underline ${
+              link.channel === 'naver'
+                ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
+                : 'border-sky-100 bg-sky-50 text-sky-700'
+            } ${href ? 'hover:brightness-95' : 'pointer-events-none'}`}
+            title={link.name}
+          >
+            <span className="shrink-0">{channelLabel[link.channel]}</span>
+            <span className="truncate">{link.name}</span>
+            {href ? <ExternalLink size={11} className="shrink-0" /> : null}
+          </a>
+        )
+      })}
       {links.length > 3 ? (
         <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-500">
           +{links.length - 3}
@@ -405,17 +422,23 @@ function UnlinkedTable({ rows }: { rows: SmartInventoryChannelRow[] }) {
                   <div className="flex min-w-0 items-center gap-3">
                     <ProductImage src={row.imageUrl} alt={row.name} />
                     <div className="min-w-0">
-                      <a
-                        href={row.productUrl || '#'}
-                        target="_blank"
-                        rel="noreferrer"
-                        className={`block truncate text-[14px] font-black text-slate-950 no-underline ${
-                          row.productUrl ? 'hover:text-[#EF3B2D]' : 'pointer-events-none'
-                        }`}
-                        title={row.name}
-                      >
-                        {row.name || row.productKey}
-                      </a>
+                      {(() => {
+                        const href = externalProductHref(row.productUrl)
+
+                        return (
+                          <a
+                            href={href || '#'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className={`block truncate text-[14px] font-black text-slate-950 no-underline ${
+                              href ? 'hover:text-[#EF3B2D]' : 'pointer-events-none'
+                            }`}
+                            title={row.name}
+                          >
+                            {row.name || row.productKey}
+                          </a>
+                        )
+                      })()}
                       <div className="mt-1 truncate text-[12px] font-bold text-slate-500">{row.identityKey}</div>
                     </div>
                   </div>
