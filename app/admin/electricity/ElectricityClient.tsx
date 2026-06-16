@@ -1314,7 +1314,7 @@ export default function ElectricityClient() {
                                 <table className="w-full min-w-[920px] table-fixed text-xs">
                                     <thead className="bg-white dark:bg-[#1e1e1e] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-[#2a2a2a]">
                                         <tr>
-                                            <th className="w-[80px] whitespace-nowrap px-3 py-2 text-left">월</th>
+                                            <th className="w-[96px] whitespace-nowrap px-3 py-2 text-left">월</th>
                                             <th className="w-[155px] whitespace-nowrap px-3 py-2 text-center">월세 입금일자</th>
                                             <th className="w-[120px] whitespace-nowrap px-3 py-2 text-right">입금액</th>
                                             <th className="whitespace-nowrap px-3 py-2 text-center">임대일자</th>
@@ -1334,8 +1334,20 @@ export default function ElectricityClient() {
 
                                                 return (
                                                     <tr key={m} className={`hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
-                                                        <td className="cursor-pointer whitespace-nowrap px-3 py-2.5 font-bold text-gray-900 dark:text-white" onClick={() => setSelectedMonth(m)}>
-                                                            {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
+                                                        <td className="whitespace-nowrap px-3 py-2.5">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => setSelectedMonth(m)}
+                                                                aria-pressed={isSelected}
+                                                                aria-label={`${m}월 선택`}
+                                                                className={`inline-flex min-w-[62px] items-center justify-center rounded-lg border px-2.5 py-1 text-xs font-black transition-all ${
+                                                                    isSelected
+                                                                        ? 'border-[#d9361b] bg-[#d9361b] text-white shadow-sm'
+                                                                        : 'border-gray-200 bg-white text-gray-900 hover:border-[#d9361b] hover:bg-[#fff3ef] hover:text-[#d9361b] dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white dark:hover:bg-[#2a1712]'
+                                                                }`}
+                                                            >
+                                                                {m}월
+                                                            </button>
                                                         </td>
                                                         <td className="whitespace-nowrap px-3 py-2.5 text-center">
                                                             <input
