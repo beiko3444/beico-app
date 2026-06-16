@@ -37,7 +37,6 @@ type MonthlyCalendarSummary = {
     value: number | null
 }
 
-const PAYMENT_STORAGE_KEY = 'beico-payment-checklist-v1'
 const PAYMENT_START_YEAR = 2025
 
 const toFiniteNumber = (value: unknown) => {
@@ -191,10 +190,10 @@ export default function ElectricityClient() {
         updater: (prev: PaymentChecklistStatus) => PaymentChecklistStatus
     ) => {
         const key = monthKey(year, month)
-        setPaymentChecklist(prev => {
-            const nextStatus = updater(prev[key] || defaultPaymentStatus)
-            return { ...prev, [key]: nextStatus }
-        })
+        const previousStatus = paymentChecklist[key] || defaultPaymentStatus
+        const nextStatus = updater(previousStatus)
+        setPaymentChecklist(prev => ({ ...prev, [key]: nextStatus }))
+        savePaymentChecklistStatus(year, month, nextStatus)
     }
 
     // Fetch data when Year/Month changes
@@ -331,25 +330,6 @@ export default function ElectricityClient() {
     }, [selectedYear, selectedMonth])
 
     useEffect(() => {
-        if (typeof window === 'undefined') return
-        try {
-            const raw = window.localStorage.getItem(PAYMENT_STORAGE_KEY)
-            if (!raw) return
-            const parsed = JSON.parse(raw)
-            if (parsed && typeof parsed === 'object') {
-                setPaymentChecklist(parsed)
-            }
-        } catch (error) {
-            console.error('Failed to restore payment checklist', error)
-        }
-    }, [])
-
-    useEffect(() => {
-        if (typeof window === 'undefined') return
-        window.localStorage.setItem(PAYMENT_STORAGE_KEY, JSON.stringify(paymentChecklist))
-    }, [paymentChecklist])
-
-    useEffect(() => {
         if (activeTab !== 'payment') return
         let cancelled = false
 
@@ -419,12 +399,19 @@ export default function ElectricityClient() {
                 const data = await res.json()
                 const payments = Array.isArray(data?.payments) ? data.payments : []
                 const next: Record<number, string | null> = {}
+                const nextChecklist: Record<string, PaymentChecklistStatus> = {}
                 for (const entry of payments) {
                     const month = Number(entry?.month)
                     if (!Number.isFinite(month)) continue
                     next[month] = entry?.paidDate ? String(entry.paidDate).slice(0, 10) : null
+                    nextChecklist[monthKey(selectedYear, month)] = {
+                        rentTaxInvoiceIssued: Boolean(entry?.rentTaxInvoiceIssued),
+                        electricityPaid: Boolean(entry?.electricityPaid),
+                        electricityPaidAt: entry?.electricityPaidAt ? String(entry.electricityPaidAt) : null,
+                    }
                 }
                 setRentPaidDates(next)
+                setPaymentChecklist(nextChecklist)
             } catch (error) {
                 console.error('Failed to fetch rent payments', error)
             }
@@ -432,6 +419,26 @@ export default function ElectricityClient() {
 
         fetchRentPayments()
     }, [activeTab, selectedYear])
+
+    const savePaymentChecklistStatus = async (year: number, month: number, status: PaymentChecklistStatus) => {
+        try {
+            const res = await fetch('/api/admin/electricity/rent-payment', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    year,
+                    month,
+                    rentTaxInvoiceIssued: status.rentTaxInvoiceIssued,
+                    electricityPaid: status.electricityPaid,
+                    electricityPaidAt: status.electricityPaidAt,
+                }),
+            })
+            if (!res.ok) throw new Error('save-failed')
+        } catch (error) {
+            console.error('Failed to save payment checklist:', error)
+            alert('납부 체크 상태 저장에 실패했습니다.')
+        }
+    }
 
     const saveRentPaidDate = async (month: number, paidDate: string | null) => {
         setSavingRentMonth(month)
@@ -874,10 +881,10 @@ export default function ElectricityClient() {
     const rentInfo = getRentPaymentInfo(selectedYear, selectedMonth);
 
     return (
-        <div id="electricity-main" className="space-y-8 font-sans pb-20 print:pb-0 print:space-y-0">
+        <div id="electricity-main" className="mx-auto w-full max-w-[1280px] space-y-5 font-sans pb-20 print:pb-0 print:space-y-0">
             {/* Header */}
-            <div className="sticky top-14 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all lg:top-0">
-                <div className="flex flex-col gap-4 py-4">
+            <div className="sticky top-14 z-40 rounded-2xl border border-gray-100 bg-white/90 px-4 shadow-sm backdrop-blur-xl transition-all dark:border-[#2a2a2a] dark:bg-[#1e1e1e]/90 dark:shadow-none lg:top-0">
+                <div className="flex flex-col gap-3 py-3">
                     <div className="flex justify-between items-center">
                         <div className="flex items-center gap-3">
                             <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-400 hover:text-[#d9361b] transition-all">
@@ -889,7 +896,7 @@ export default function ElectricityClient() {
                 </div>
             </div>
 
-            <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] p-1 flex gap-1">
+            <div className="flex gap-1 rounded-2xl border border-gray-100 bg-white p-1 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
                 <button
                     type="button"
                     onClick={() => setActiveTab('analysis')}
@@ -956,7 +963,7 @@ export default function ElectricityClient() {
                     </div>
                 </div>
 
-                <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
                     {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
                         const hasBill = monthlyBillStatuses[month]
                         const isSelected = selectedMonth === month
@@ -972,7 +979,7 @@ export default function ElectricityClient() {
                                 key={month}
                                 type="button"
                                 onClick={() => setSelectedMonth(month)}
-                                className={`min-h-[92px] rounded-2xl border p-3 text-left transition-all ${
+                                className={`min-h-[72px] rounded-xl border p-2 text-left transition-all ${
                                     isSelected
                                         ? 'border-[#d9361b] bg-[#fff3ef] shadow-[0_10px_22px_rgba(217,54,27,0.14)] ring-2 ring-[#d9361b]/15 dark:bg-[#2a1712]'
                                         : hasBill
@@ -981,10 +988,10 @@ export default function ElectricityClient() {
                                 }`}
                             >
                                 <span className="flex items-center justify-between gap-2">
-                                    <span className={`text-lg font-black ${isSelected ? 'text-[#d9361b]' : 'text-gray-900 dark:text-white'}`}>{month}월</span>
-                                    <span className={`h-2.5 w-2.5 rounded-full ${hasBill ? 'bg-[#d9361b]' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                    <span className={`text-sm font-black ${isSelected ? 'text-[#d9361b]' : 'text-gray-900 dark:text-white'}`}>{month}월</span>
+                                    <span className={`h-2 w-2 rounded-full ${hasBill ? 'bg-[#d9361b]' : 'bg-gray-300 dark:bg-gray-600'}`} />
                                 </span>
-                                <span className={`mt-3 block text-base font-black leading-tight ${hasBill ? 'text-gray-950 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
+                                <span className={`mt-2 block truncate text-sm font-black leading-tight ${hasBill ? 'text-gray-950 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
                                     {displayValue}
                                 </span>
                                 <span className={`mt-1 block text-[11px] font-bold ${hasBill ? 'text-[#d9361b]' : 'text-gray-400 dark:text-gray-500'}`}>
@@ -1227,8 +1234,8 @@ export default function ElectricityClient() {
 
             {
                 activeTab === 'payment' && (
-                    <div className="space-y-4">
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-3">
+                    <div className="mx-auto max-w-[1120px] space-y-4">
+                        <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
                                     <h2 className="text-lg font-black text-gray-900 dark:text-white">납부관리 체크리스트</h2>
@@ -1240,7 +1247,7 @@ export default function ElectricityClient() {
                                 </div>
                             </div>
 
-                            <div className="rounded-2xl border border-red-100 bg-red-50 px-4 py-3">
+                            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
                                 <div className="text-xs font-bold text-red-600">현재 일자 기준 임대인 미납 전기세</div>
                                 <div className="mt-1 text-lg font-black text-gray-900 dark:text-white">
                                     {unpaidLandlordElectricitySummary.total.toLocaleString()}원
@@ -1250,8 +1257,8 @@ export default function ElectricityClient() {
                                 </div>
                             </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <label className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] px-4 py-3 bg-blue-50/50 dark:bg-blue-950/20">
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-blue-50/50 px-4 py-3 dark:border-[#2a2a2a] dark:bg-blue-950/20">
                                     <div>
                                         <div className="text-sm font-bold text-gray-900 dark:text-white">월세 납부 세금계산서 발행</div>
                                         <div className="mt-1.5 space-y-0.5">
@@ -1277,7 +1284,7 @@ export default function ElectricityClient() {
                                     />
                                 </label>
 
-                                <label className="flex items-center justify-between rounded-xl border border-gray-200 dark:border-[#2a2a2a] px-4 py-3 bg-gray-50 dark:bg-[#1a1a1a]">
+                                <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
                                     <div>
                                         <div className="text-sm font-bold text-gray-900 dark:text-white">전기세 납부 완료</div>
                                         <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
@@ -1298,22 +1305,22 @@ export default function ElectricityClient() {
                             </div>
                         </div>
 
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
+                        <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
                             <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] flex items-center justify-between">
                                 <h3 className="text-sm font-bold text-gray-800 dark:text-white">{selectedYear}년 월별 납부 현황</h3>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">체크 결과는 현재 브라우저에 저장됩니다.</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">입금일자와 체크 결과는 DB에 저장됩니다.</div>
                             </div>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
+                                <table className="w-full min-w-[920px] table-fixed text-xs">
                                     <thead className="bg-white dark:bg-[#1e1e1e] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-[#2a2a2a]">
                                         <tr>
-                                            <th className="text-left px-4 py-3 whitespace-nowrap">월</th>
-                                            <th className="text-center px-4 py-3 whitespace-nowrap">월세 입금일자</th>
-                                            <th className="text-right px-4 py-3 whitespace-nowrap">입금액</th>
-                                            <th className="text-center px-4 py-3 whitespace-nowrap">임대일자</th>
-                                            <th className="text-center px-4 py-3 whitespace-nowrap">월세 세금계산서</th>
-                                            <th className="text-right px-4 py-3 whitespace-nowrap">임대인 전기세</th>
-                                            <th className="text-center px-4 py-3 whitespace-nowrap">전기세 납부</th>
+                                            <th className="w-[80px] whitespace-nowrap px-3 py-2 text-left">월</th>
+                                            <th className="w-[155px] whitespace-nowrap px-3 py-2 text-center">월세 입금일자</th>
+                                            <th className="w-[120px] whitespace-nowrap px-3 py-2 text-right">입금액</th>
+                                            <th className="whitespace-nowrap px-3 py-2 text-center">임대일자</th>
+                                            <th className="w-[120px] whitespace-nowrap px-3 py-2 text-center">세금계산서</th>
+                                            <th className="w-[130px] whitespace-nowrap px-3 py-2 text-right">임대인 전기세</th>
+                                            <th className="w-[110px] whitespace-nowrap px-3 py-2 text-center">전기세 납부</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
@@ -1327,33 +1334,33 @@ export default function ElectricityClient() {
 
                                                 return (
                                                     <tr key={m} className={`hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
-                                                        <td className="px-4 py-3 font-bold text-gray-900 dark:text-white cursor-pointer whitespace-nowrap" onClick={() => setSelectedMonth(m)}>
+                                                        <td className="cursor-pointer whitespace-nowrap px-3 py-2.5 font-bold text-gray-900 dark:text-white" onClick={() => setSelectedMonth(m)}>
                                                             {m}월 {isSelected && <span className="ml-1 text-[10px] bg-[#d9361b] text-white px-1.5 py-0.5 rounded-md">선택됨</span>}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center whitespace-nowrap">
+                                                        <td className="whitespace-nowrap px-3 py-2.5 text-center">
                                                             <input
                                                                 type="date"
                                                                 value={rentPaidDates[m] || ''}
                                                                 onChange={(e) => saveRentPaidDate(m, e.target.value || null)}
                                                                 disabled={savingRentMonth === m}
-                                                                className="bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] text-gray-900 dark:text-white text-xs rounded-md focus:ring-[#d9361b] focus:border-[#d9361b] px-2 py-1 font-medium disabled:opacity-60"
+                                                                className="w-[128px] rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-900 focus:border-[#d9361b] focus:ring-[#d9361b] disabled:opacity-60 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
                                                             />
                                                         </td>
-                                                        <td className="px-4 py-3 text-right font-bold text-gray-900 dark:text-white whitespace-nowrap">
+                                                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold text-gray-900 dark:text-white">
                                                             {rowRentInfo.amount}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">
+                                                        <td className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] text-gray-500 dark:text-gray-400">
                                                             {rowRentInfo.period}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
+                                                        <td className="px-3 py-2.5 text-center">
                                                             <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'}`}>
                                                                 {status.rentTaxInvoiceIssued ? '✓' : '-'}
                                                             </span>
                                                         </td>
-                                                        <td className="px-4 py-3 text-right text-gray-600 dark:text-gray-400 whitespace-nowrap">
+                                                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">
                                                             {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
                                                         </td>
-                                                        <td className="px-4 py-3 text-center">
+                                                        <td className="px-3 py-2.5 text-center">
                                                             <div className="flex flex-col items-center">
                                                                 <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'}`}>
                                                                     {status.electricityPaid ? '✓' : '-'}

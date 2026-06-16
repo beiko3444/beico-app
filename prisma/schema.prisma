@@ -177,12 +177,15 @@ model ElectricityUsage {
 }
 
 model RentPayment {
-  id        String    @id @default(uuid())
-  year      Int
-  month     Int
-  paidDate  DateTime?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                   String    @id @default(uuid())
+  year                 Int
+  month                Int
+  paidDate             DateTime?
+  rentTaxInvoiceIssued Boolean   @default(false)
+  electricityPaid      Boolean   @default(false)
+  electricityPaidAt    DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@unique([year, month])
 }

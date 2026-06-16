@@ -37,24 +37,37 @@ export async function POST(request: Request) {
         const year = Number(body?.year)
         const month = Number(body?.month)
         const paidDateRaw = body?.paidDate
+        const hasPaidDate = Object.prototype.hasOwnProperty.call(body || {}, 'paidDate')
+        const hasRentTaxInvoiceIssued = Object.prototype.hasOwnProperty.call(body || {}, 'rentTaxInvoiceIssued')
+        const hasElectricityPaid = Object.prototype.hasOwnProperty.call(body || {}, 'electricityPaid')
+        const hasElectricityPaidAt = Object.prototype.hasOwnProperty.call(body || {}, 'electricityPaidAt')
 
         if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) {
             return NextResponse.json({ error: "Invalid year or month" }, { status: 400 })
         }
 
-        let paidDate: Date | null = null
-        if (paidDateRaw) {
-            const parsed = new Date(paidDateRaw)
-            if (Number.isNaN(parsed.getTime())) {
-                return NextResponse.json({ error: "Invalid paidDate" }, { status: 400 })
-            }
-            paidDate = parsed
-        }
+        const paidDate = hasPaidDate ? parseOptionalDate(paidDateRaw, 'paidDate') : undefined
+        const electricityPaidAt = hasElectricityPaidAt ? parseOptionalDate(body?.electricityPaidAt, 'electricityPaidAt') : undefined
+        if (paidDate instanceof NextResponse) return paidDate
+        if (electricityPaidAt instanceof NextResponse) return electricityPaidAt
+
+        const update: Record<string, unknown> = {}
+        if (hasPaidDate) update.paidDate = paidDate
+        if (hasRentTaxInvoiceIssued) update.rentTaxInvoiceIssued = Boolean(body?.rentTaxInvoiceIssued)
+        if (hasElectricityPaid) update.electricityPaid = Boolean(body?.electricityPaid)
+        if (hasElectricityPaidAt) update.electricityPaidAt = electricityPaidAt
 
         const payment = await prisma.rentPayment.upsert({
             where: { year_month: { year, month } },
-            update: { paidDate },
-            create: { year, month, paidDate },
+            update,
+            create: {
+                year,
+                month,
+                paidDate: hasPaidDate ? paidDate : null,
+                rentTaxInvoiceIssued: hasRentTaxInvoiceIssued ? Boolean(body?.rentTaxInvoiceIssued) : false,
+                electricityPaid: hasElectricityPaid ? Boolean(body?.electricityPaid) : false,
+                electricityPaidAt: hasElectricityPaidAt ? electricityPaidAt : null,
+            },
         })
 
         return NextResponse.json({ payment })
@@ -62,4 +75,13 @@ export async function POST(request: Request) {
         console.error("Failed to save rent payment:", error)
         return NextResponse.json({ error: "Failed to save rent payment" }, { status: 500 })
     }
+}
+
+function parseOptionalDate(value: unknown, fieldName: string): Date | null | NextResponse {
+    if (!value) return null
+    const parsed = new Date(String(value))
+    if (Number.isNaN(parsed.getTime())) {
+        return NextResponse.json({ error: `Invalid ${fieldName}` }, { status: 400 })
+    }
+    return parsed
 }
