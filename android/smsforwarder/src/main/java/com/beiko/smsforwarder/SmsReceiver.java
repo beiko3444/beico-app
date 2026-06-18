@@ -9,6 +9,8 @@ import android.telephony.SmsMessage;
 public class SmsReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
+        if (!SmsForwarder.isEnabled(context)) return;
+
         if (!Telephony.Sms.Intents.SMS_RECEIVED_ACTION.equals(intent.getAction())) return;
 
         SmsMessage[] messages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
@@ -31,6 +33,15 @@ public class SmsReceiver extends BroadcastReceiver {
         }
 
         if (body.length() == 0) return;
-        SmsForwarder.forward(context.getApplicationContext(), sender, body.toString(), receivedAt);
+        MessageRecord record = SmsForwarder.buildMessage(
+                context.getApplicationContext(),
+                SmsForwarder.createFallbackMessageId("SMS", sender, body.toString(), receivedAt),
+                "SMS",
+                sender,
+                body.toString(),
+                receivedAt,
+                ""
+        );
+        SmsForwarder.enqueueAndRetry(context.getApplicationContext(), record);
     }
 }

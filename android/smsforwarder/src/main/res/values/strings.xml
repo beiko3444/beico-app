@@ -1,4 +1,4 @@
 <resources>
     <string name="app_name">Beiko SMS Forwarder</string>
-    <string name="default_endpoint">http://192.168.219.176:8088/sms/incoming</string>
+    <string name="default_endpoint">https://www.beiko.co.kr/api/mobile/messages/batch</string>
 </resources>

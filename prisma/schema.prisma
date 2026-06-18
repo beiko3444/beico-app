@@ -23,7 +23,9 @@ model User {
   proformaInvoices ProformaInvoice[]
   partnerProfile PartnerProfile?
   inventoryPreference InventoryPreference?
+  inventoryInbounds InventoryInbound[]
   pushTokens PushToken[]
+  mobileMessages MobileMessage[]
 }
 
 model InventoryPreference {
@@ -34,6 +36,23 @@ model InventoryPreference {
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
   user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model InventoryInbound {
+  id              String   @id @default(uuid())
+  inboundDate     DateTime
+  masterId        Int
+  productName     String
+  productImageUrl String?
+  quantity        Int
+  createdById     String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  createdBy       User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([inboundDate])
+  @@index([masterId])
+  @@index([createdById])
 }
 
 model PushToken {
@@ -356,6 +375,27 @@ model DepositSms {
   @@index([amount])
   @@index([matchStatus])
   @@index([matchedOrderId])
+}
+
+model MobileMessage {
+  id              String   @id @default(uuid())
+  userId          String
+  deviceMessageId String
+  messageType     String
+  direction       String   @default("INBOUND")
+  sender          String?
+  body            String
+  receivedAt      DateTime
+  threadId        String?
+  sourceDevice    String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, deviceMessageId])
+  @@index([userId, receivedAt])
+  @@index([messageType])
+  @@index([receivedAt])
 }
 
 model NaverSalesDaily {
