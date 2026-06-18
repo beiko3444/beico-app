@@ -36,6 +36,20 @@ type InboundPayload = {
   date: string
   items: InboundItem[]
   totalQuantity: number
+  quickProducts?: ProductCandidate[]
+}
+
+type ProductCandidate = {
+  id: number
+  sourceId?: string
+  name: string
+  nameJP?: string | null
+  imageUrl: string | null
+  naverStock?: number | null
+  coupangStock?: number | null
+  totalStock?: number | null
+  stock?: number | null
+  memo?: string | null
 }
 
 const REFRESH_MS = 5000
@@ -64,6 +78,18 @@ function formatTime(value: string) {
 function isQuickBait(row: SmartInventoryMasterRow) {
   const haystack = [row.name, row.memo || '', ...row.linked.map((link) => link.name)].join(' ').toLowerCase()
   return QUICK_BAIT_KEYWORDS.some((keyword) => haystack.includes(keyword))
+}
+
+function smartRowToCandidate(row: SmartInventoryMasterRow): ProductCandidate {
+  return {
+    id: row.id,
+    name: row.name,
+    imageUrl: row.imageUrl,
+    naverStock: row.naverStock,
+    coupangStock: row.coupangStock,
+    totalStock: row.totalStock,
+    memo: row.memo,
+  }
 }
 
 function stockTone(value: number | null | undefined) {
@@ -104,9 +130,9 @@ export default function InventoryStandaloneClient() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null)
-  const [selectedProduct, setSelectedProduct] = useState<SmartInventoryMasterRow | null>(null)
+  const [selectedProduct, setSelectedProduct] = useState<ProductCandidate | null>(null)
   const [keypadValue, setKeypadValue] = useState('')
-  const selectedRef = useRef<SmartInventoryMasterRow | null>(null)
+  const selectedRef = useRef<ProductCandidate | null>(null)
 
   useEffect(() => {
     selectedRef.current = selectedProduct
@@ -154,7 +180,11 @@ export default function InventoryStandaloneClient() {
 
   const rows = dashboard?.rows || []
   const quickRows = useMemo(() => rows.filter(isQuickBait), [rows])
-  const inboundRows = quickRows.length ? quickRows : rows
+  const inboundRows = useMemo(() => {
+    if (quickRows.length > 0) return quickRows.map(smartRowToCandidate)
+    if (inbounds.quickProducts?.length) return inbounds.quickProducts
+    return rows.map(smartRowToCandidate)
+  }, [inbounds.quickProducts, quickRows, rows])
 
   const filteredStockRows = useMemo(() => {
     const text = query.trim().toLowerCase()
@@ -175,11 +205,11 @@ export default function InventoryStandaloneClient() {
     const text = query.trim().toLowerCase()
     return inboundRows.filter((row) => {
       if (!text) return true
-      return [row.name, row.memo || '', row.linked.map((link) => link.name).join(' ')].join(' ').toLowerCase().includes(text)
+      return [row.name, row.nameJP || '', row.memo || ''].join(' ').toLowerCase().includes(text)
     })
   }, [inboundRows, query])
 
-  function openKeypad(row: SmartInventoryMasterRow) {
+  function openKeypad(row: ProductCandidate) {
     setSelectedProduct(row)
     setKeypadValue('')
   }
@@ -323,6 +353,7 @@ export default function InventoryStandaloneClient() {
           loading={loading}
           rows={filteredInboundRows}
           quickRowsAvailable={quickRows.length > 0}
+          productDbFallbackAvailable={Boolean(inbounds.quickProducts?.length)}
           inbounds={inbounds}
           saving={saving}
           onOpenKeypad={openKeypad}
@@ -413,17 +444,19 @@ function InboundTab({
   loading,
   rows,
   quickRowsAvailable,
+  productDbFallbackAvailable,
   inbounds,
   saving,
   onOpenKeypad,
   onDeleteInbound,
 }: {
   loading: boolean
-  rows: SmartInventoryMasterRow[]
+  rows: ProductCandidate[]
   quickRowsAvailable: boolean
+  productDbFallbackAvailable: boolean
   inbounds: InboundPayload
   saving: boolean
-  onOpenKeypad: (row: SmartInventoryMasterRow) => void
+  onOpenKeypad: (row: ProductCandidate) => void
   onDeleteInbound: (id: string) => void
 }) {
   return (
@@ -470,9 +503,9 @@ function InboundTab({
       </aside>
 
       <div className="min-w-0">
-        {!quickRowsAvailable ? (
+        {!quickRowsAvailable && !productDbFallbackAvailable ? (
           <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">
-            퀵베이트 이름을 찾지 못해 전체 마스터 상품을 표시합니다.
+            퀵베이트 상품을 찾지 못해 전체 마스터 상품을 표시합니다.
           </div>
         ) : null}
 
@@ -482,7 +515,7 @@ function InboundTab({
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {rows.map((row) => (
               <button
-                key={row.id}
+                key={`${row.sourceId || row.id}`}
                 type="button"
                 onClick={() => onOpenKeypad(row)}
                 className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99]"
@@ -493,7 +526,7 @@ function InboundTab({
                     <div className="line-clamp-2 min-h-[44px] text-base font-black leading-tight tracking-normal text-slate-950">{row.name}</div>
                     <div className="mt-2 grid grid-cols-2 gap-1 text-xs font-black">
                       <span className="rounded bg-emerald-50 px-2 py-1 text-right text-emerald-700">N {formatNumber(row.naverStock)}</span>
-                      <span className="rounded bg-sky-50 px-2 py-1 text-right text-sky-700">C {formatNumber(row.coupangStock)}</span>
+                      <span className="rounded bg-sky-50 px-2 py-1 text-right text-sky-700">C {formatNumber(row.coupangStock ?? row.stock)}</span>
                     </div>
                   </div>
                 </div>
@@ -515,7 +548,7 @@ function KeypadModal({
   onClose,
   onSubmit,
 }: {
-  product: SmartInventoryMasterRow
+  product: ProductCandidate
   value: string
   saving: boolean
   onPress: (value: string) => void

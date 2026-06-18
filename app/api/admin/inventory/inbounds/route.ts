@@ -1,9 +1,12 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/requireAdmin'
+import { getProductImageUrl } from '@/lib/product-image-url'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+const QUICK_BAIT_CATEGORIES = ['청갯지렁이', '홍갯지렁이', '혼무시', '멍게', '번데기']
 
 export async function GET(request: Request) {
   const { unauthorized } = await requireAdminSession()
@@ -14,30 +17,60 @@ export async function GET(request: Request) {
   const nextDate = new Date(inboundDate)
   nextDate.setDate(nextDate.getDate() + 1)
 
-  const items = await prisma.inventoryInbound.findMany({
-    where: {
-      inboundDate: {
-        gte: inboundDate,
-        lt: nextDate,
+  const [items, products] = await Promise.all([
+    prisma.inventoryInbound.findMany({
+      where: {
+        inboundDate: {
+          gte: inboundDate,
+          lt: nextDate,
+        },
       },
-    },
-    orderBy: { createdAt: 'desc' },
-    select: {
-      id: true,
-      inboundDate: true,
-      masterId: true,
-      productName: true,
-      productImageUrl: true,
-      quantity: true,
-      createdAt: true,
-      createdBy: { select: { name: true, username: true } },
-    },
-  })
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        inboundDate: true,
+        masterId: true,
+        productName: true,
+        productImageUrl: true,
+        quantity: true,
+        createdAt: true,
+        createdBy: { select: { name: true, username: true } },
+      },
+    }),
+    prisma.product.findMany({
+      where: {
+        OR: QUICK_BAIT_CATEGORIES.flatMap((category) => [
+          { name: { contains: category, mode: 'insensitive' as const } },
+          { nameJP: { contains: category, mode: 'insensitive' as const } },
+          { nameEN: { contains: category, mode: 'insensitive' as const } },
+        ]),
+      },
+      select: {
+        id: true,
+        name: true,
+        nameJP: true,
+        imageUrl: true,
+        stock: true,
+        updatedAt: true,
+      },
+      orderBy: { sortOrder: 'asc' },
+    }),
+  ])
+
+  const quickProducts = products.map((product) => ({
+    id: productIdToInt(product.id),
+    sourceId: product.id,
+    name: product.name,
+    nameJP: product.nameJP,
+    imageUrl: product.imageUrl ? getProductImageUrl(product.id, product.updatedAt) : null,
+    stock: product.stock,
+  }))
 
   return NextResponse.json({
     date: formatYmd(inboundDate),
     items,
     totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
+    quickProducts,
   }, {
     headers: { 'Cache-Control': 'private, no-store' },
   })
@@ -106,4 +139,12 @@ function formatYmd(date: Date) {
   const month = String(koreaDate.getMonth() + 1).padStart(2, '0')
   const day = String(koreaDate.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
+}
+
+function productIdToInt(id: string) {
+  let hash = 0
+  for (let index = 0; index < id.length; index++) {
+    hash = ((hash << 5) - hash + id.charCodeAt(index)) | 0
+  }
+  return Math.abs(hash) || 1
 }
