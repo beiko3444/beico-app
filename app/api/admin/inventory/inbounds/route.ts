@@ -9,31 +9,31 @@ const DEFAULT_WAREHOUSE_ITEMS = [
   {
     name: 'BEIKO 퀵베이트V3 청갯지렁이',
     productCode: 'quickbait-green',
-    imageUrl: '/inventory/quickbait-green.png',
+    imageUrl: '/inventory-assets/quickbait-green.png',
     sortOrder: 10,
   },
   {
     name: 'BEIKO 퀵베이트V3 홍갯지렁이',
     productCode: 'quickbait-red',
-    imageUrl: '/inventory/quickbait-red.png',
+    imageUrl: '/inventory-assets/quickbait-red.png',
     sortOrder: 20,
   },
   {
     name: 'BEIKO 퀵베이트V3 혼무시',
     productCode: 'quickbait-blue',
-    imageUrl: '/inventory/quickbait-blue.png',
+    imageUrl: '/inventory-assets/quickbait-blue.png',
     sortOrder: 30,
   },
   {
     name: 'BEIKO 퀵베이트V3 멍게',
     productCode: 'quickbait-orange',
-    imageUrl: '/inventory/quickbait-orange.png',
+    imageUrl: '/inventory-assets/quickbait-orange.png',
     sortOrder: 40,
   },
   {
     name: 'BEIKO 퀵베이트V3 번데기',
     productCode: 'quickbait-yellow',
-    imageUrl: '/inventory/quickbait-yellow.png',
+    imageUrl: '/inventory-assets/quickbait-yellow.png',
     sortOrder: 50,
   },
 ]
@@ -215,15 +215,22 @@ function formatYmd(date: Date) {
 }
 
 async function ensureWarehouseInventoryItems() {
-  const count = await prisma.warehouseInventoryItem.count()
-  if (count > 0) return
-
-  await prisma.warehouseInventoryItem.createMany({
-    data: DEFAULT_WAREHOUSE_ITEMS.map((item) => ({
-      ...item,
-      stock: 0,
-      active: true,
-    })),
-    skipDuplicates: true,
-  })
+  await Promise.all(
+    DEFAULT_WAREHOUSE_ITEMS.map((item) =>
+      prisma.warehouseInventoryItem.upsert({
+        where: { productCode: item.productCode },
+        create: {
+          ...item,
+          stock: 0,
+          active: true,
+        },
+        update: {
+          name: item.name,
+          imageUrl: item.imageUrl,
+          sortOrder: item.sortOrder,
+          active: true,
+        },
+      }),
+    ),
+  )
 }
