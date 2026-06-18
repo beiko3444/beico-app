@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from '@/components/ThemeProvider'
-import { Calendar, CheckCircle2, ChevronDown, Circle, CreditCard, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { Calendar, CheckCircle2, ChevronDown, Circle, CreditCard, GripVertical, HelpCircle, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 import type { CategoryMeta } from '@/lib/cardCategory'
 
@@ -498,6 +498,13 @@ export default function CardUsageClient() {
   }
   const handleResetCategories = () => {
     updateCategories(DEFAULT_CATEGORIES)
+  }
+  const moveCategory = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= categories.length || toIndex >= categories.length) return
+    const nextCats = [...categories]
+    const [item] = nextCats.splice(fromIndex, 1)
+    nextCats.splice(toIndex, 0, item)
+    updateCategories(nextCats)
   }
   const startCategoryLabelEdit = useCallback((category: CategoryMeta, source: CategoryEditSource, itemId?: string) => {
     setEditingCategoryTarget({ code: category.code, source, itemId })
@@ -1194,45 +1201,84 @@ export default function CardUsageClient() {
 
   return (
     <div className="cu-root" style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
-      {viewMode === 'list' && showShortcutDock && shortcutCategories.length > 0 && (
+      {(viewMode === 'list' || viewMode === 'table') && showShortcutDock && shortcutCategories.length > 0 && (
         <div
           style={{
             position: 'fixed',
-            left: 14,
+            left: 276,
             top: '50%',
             transform: 'translateY(-50%)',
-            width: 188,
+            width: 214,
             borderRadius: 12,
             border: `1px solid ${T.border}`,
-            background: 'var(--cu-surface, rgba(255,255,255,0.95))',
+            background: T.surface,
             boxShadow: '0 10px 24px rgba(0,0,0,0.08)',
-            padding: '10px 10px 8px',
+            padding: '10px',
             zIndex: 60,
             backdropFilter: 'blur(4px)',
           }}
         >
-          <p style={{ margin: 0, fontSize: 12, fontWeight: 700, color: T.text }}>
-            카테고리 단축키
-          </p>
-          <p style={{ margin: '3px 0 8px', fontSize: 11, color: T.textTertiary }}>
-            행 선택 후 숫자키
-          </p>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: 9,
+                background: T.surfaceSecondary,
+                border: `1px solid ${T.borderLight}`,
+                color: T.textSecondary,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexShrink: 0,
+              }}
+            >
+              <HelpCircle size={15} />
+            </span>
+            <div style={{ minWidth: 0 }}>
+              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: T.text }}>
+                단축키 팁
+              </p>
+              <p style={{ margin: '2px 0 0', fontSize: 10, color: T.textTertiary }}>
+                거래 선택 후 숫자키
+              </p>
+            </div>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 9 }}>
             {shortcutCategories.map((cat, idx) => (
               <div
                 key={cat.code}
+                draggable
+                onDragStart={(e) => {
+                  setDraggedCatIdx(idx)
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  e.dataTransfer.dropEffect = 'move'
+                }}
+                onDrop={(e) => {
+                  e.preventDefault()
+                  if (draggedCatIdx !== null) moveCategory(draggedCatIdx, idx)
+                  setDraggedCatIdx(null)
+                }}
+                onDragEnd={() => setDraggedCatIdx(null)}
+                title="드래그해서 단축키 순서 변경"
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: '20px 18px 1fr',
+                  gridTemplateColumns: '16px 24px 18px 1fr',
                   alignItems: 'center',
                   gap: 6,
                   background: cat.bgColor,
                   border: `1px solid ${T.borderLight}`,
                   borderRadius: 8,
-                  padding: '4px 6px',
+                  padding: '5px 7px',
+                  cursor: draggedCatIdx === idx ? 'grabbing' : 'grab',
+                  opacity: draggedCatIdx === idx ? 0.55 : 1,
                 }}
               >
-                <span style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary }}>{idx + 1}</span>
+                <GripVertical size={13} style={{ color: T.textTertiary }} />
+                <span style={{ fontSize: 11, fontWeight: 900, color: T.text, textAlign: 'center' }}>{idx + 1}번</span>
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
                 <span style={{ fontSize: 11, color: T.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                   {cat.label}
@@ -1240,8 +1286,11 @@ export default function CardUsageClient() {
               </div>
             ))}
           </div>
+          <p style={{ margin: '8px 0 0', fontSize: 10, color: T.textTertiary, lineHeight: 1.4 }}>
+            위아래로 드래그하면 1~6번 순서가 바뀝니다.
+          </p>
           <p style={{ margin: '8px 0 0', fontSize: 10, color: T.textTertiary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            선택됨: {selectedItem?.useStoreName || '-'}
+            선택: {selectedItem?.useStoreName || '-'}
           </p>
         </div>
       )}
@@ -1699,10 +1748,7 @@ export default function CardUsageClient() {
                 onDrop={e => {
                   e.preventDefault()
                   if (draggedCatIdx === null || draggedCatIdx === idx) return
-                  const nextCats = [...categories]
-                  const [item] = nextCats.splice(draggedCatIdx, 1)
-                  nextCats.splice(idx, 0, item)
-                  updateCategories(nextCats)
+                  moveCategory(draggedCatIdx, idx)
                   setDraggedCatIdx(null)
                 }}
                 onDragEnd={() => setDraggedCatIdx(null)}
