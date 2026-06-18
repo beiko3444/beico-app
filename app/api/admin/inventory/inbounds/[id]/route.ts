@@ -19,19 +19,19 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
     await prisma.$transaction(async (tx) => {
       const inbound = await tx.inventoryInbound.delete({
         where: { id },
-        select: { productId: true, quantity: true },
+        select: { warehouseItemId: true, quantity: true },
       })
 
-      if (inbound.productId) {
-        const product = await tx.product.findUnique({
-          where: { id: inbound.productId },
+      if (inbound.warehouseItemId) {
+        const warehouseItem = await tx.warehouseInventoryItem.findUnique({
+          where: { id: inbound.warehouseItemId },
           select: { stock: true },
         })
 
-        if (product) {
-          await tx.product.update({
-            where: { id: inbound.productId },
-            data: { stock: Math.max(0, product.stock - inbound.quantity) },
+        if (warehouseItem) {
+          await tx.warehouseInventoryItem.update({
+            where: { id: inbound.warehouseItemId },
+            data: { stock: Math.max(0, warehouseItem.stock - inbound.quantity) },
           })
         }
       }

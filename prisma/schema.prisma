@@ -41,8 +41,8 @@ model InventoryPreference {
 model InventoryInbound {
   id              String   @id @default(uuid())
   inboundDate     DateTime
-  masterId        Int
-  productId       String?
+  warehouseItemId String?
+  masterId        Int?
   productName     String
   productImageUrl String?
   quantity        Int
@@ -50,12 +50,29 @@ model InventoryInbound {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdBy       User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
-  product         Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  warehouseItem   WarehouseInventoryItem? @relation(fields: [warehouseItemId], references: [id], onDelete: SetNull)
 
   @@index([inboundDate])
+  @@index([warehouseItemId])
   @@index([masterId])
-  @@index([productId])
   @@index([createdById])
+}
+
+model WarehouseInventoryItem {
+  id          String   @id @default(uuid())
+  name        String
+  nameJP      String?
+  productCode String?  @unique
+  imageUrl    String?
+  stock       Int      @default(0)
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  inbounds    InventoryInbound[]
+
+  @@index([active])
+  @@index([sortOrder])
 }
 
 model PushToken {
@@ -121,7 +138,6 @@ model Product {
   wholesaleAvailable  Boolean     @default(true)
   orderItems       OrderItem[]
   proformaInvoiceItems ProformaInvoiceItem[]
-  inventoryInbounds InventoryInbound[]
 }
 
 model Order {

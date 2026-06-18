@@ -1,12 +1,42 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/requireAdmin'
-import { getProductImageUrl } from '@/lib/product-image-url'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-const QUICK_BAIT_CATEGORIES = ['청갯지렁이', '홍갯지렁이', '혼무시', '멍게', '번데기']
+const DEFAULT_WAREHOUSE_ITEMS = [
+  {
+    name: 'BEIKO 퀵베이트V3 청갯지렁이',
+    productCode: 'quickbait-green',
+    imageUrl: '/inventory/quickbait-green.png',
+    sortOrder: 10,
+  },
+  {
+    name: 'BEIKO 퀵베이트V3 홍갯지렁이',
+    productCode: 'quickbait-red',
+    imageUrl: '/inventory/quickbait-red.png',
+    sortOrder: 20,
+  },
+  {
+    name: 'BEIKO 퀵베이트V3 혼무시',
+    productCode: 'quickbait-blue',
+    imageUrl: '/inventory/quickbait-blue.png',
+    sortOrder: 30,
+  },
+  {
+    name: 'BEIKO 퀵베이트V3 멍게',
+    productCode: 'quickbait-orange',
+    imageUrl: '/inventory/quickbait-orange.png',
+    sortOrder: 40,
+  },
+  {
+    name: 'BEIKO 퀵베이트V3 번데기',
+    productCode: 'quickbait-yellow',
+    imageUrl: '/inventory/quickbait-yellow.png',
+    sortOrder: 50,
+  },
+]
 
 export async function GET(request: Request) {
   const { unauthorized } = await requireAdminSession()
@@ -21,7 +51,9 @@ export async function GET(request: Request) {
   const monthEnd = new Date(monthStart)
   monthEnd.setMonth(monthEnd.getMonth() + 1)
 
-  const [items, monthItems, products] = await Promise.all([
+  await ensureWarehouseInventoryItems()
+
+  const [items, monthItems, warehouseItems] = await Promise.all([
     prisma.inventoryInbound.findMany({
       where: {
         inboundDate: {
@@ -34,7 +66,7 @@ export async function GET(request: Request) {
         id: true,
         inboundDate: true,
         masterId: true,
-        productId: true,
+        warehouseItemId: true,
         productName: true,
         productImageUrl: true,
         quantity: true,
@@ -54,14 +86,8 @@ export async function GET(request: Request) {
         quantity: true,
       },
     }),
-    prisma.product.findMany({
-      where: {
-        OR: QUICK_BAIT_CATEGORIES.flatMap((category) => [
-          { name: { contains: category, mode: 'insensitive' as const } },
-          { nameJP: { contains: category, mode: 'insensitive' as const } },
-          { nameEN: { contains: category, mode: 'insensitive' as const } },
-        ]),
-      },
+    prisma.warehouseInventoryItem.findMany({
+      where: { active: true },
       select: {
         id: true,
         name: true,
@@ -69,7 +95,6 @@ export async function GET(request: Request) {
         productCode: true,
         imageUrl: true,
         stock: true,
-        updatedAt: true,
       },
       orderBy: { sortOrder: 'asc' },
     }),
@@ -86,14 +111,14 @@ export async function GET(request: Request) {
     }, new Map<string, { date: string; totalQuantity: number; count: number }>()).values(),
   ).sort((a, b) => a.date.localeCompare(b.date))
 
-  const quickProducts = products.map((product) => ({
-    id: productIdToInt(product.id),
-    sourceId: product.id,
-    name: product.name,
-    nameJP: product.nameJP,
-    productCode: product.productCode,
-    imageUrl: product.imageUrl ? getProductImageUrl(product.id, product.updatedAt) : null,
-    stock: product.stock,
+  const quickProducts = warehouseItems.map((item, index) => ({
+    id: index + 1,
+    sourceId: item.id,
+    name: item.name,
+    nameJP: item.nameJP,
+    productCode: item.productCode,
+    imageUrl: item.imageUrl,
+    stock: item.stock,
   }))
 
   return NextResponse.json({
@@ -113,13 +138,12 @@ export async function POST(request: Request) {
 
   const body = await request.json().catch(() => ({}))
   const inboundDate = parseInboundDate(body?.inboundDate) || todayStart()
-  const masterId = Number(body?.masterId)
-  const productId = typeof body?.productId === 'string' && body.productId.trim() ? body.productId.trim() : null
+  const warehouseItemId = typeof body?.warehouseItemId === 'string' && body.warehouseItemId.trim() ? body.warehouseItemId.trim() : null
   const productName = typeof body?.productName === 'string' ? body.productName.trim() : ''
   const productImageUrl = typeof body?.productImageUrl === 'string' && body.productImageUrl.trim() ? body.productImageUrl.trim() : null
   const quantity = Number(body?.quantity)
 
-  if (!Number.isFinite(masterId) || masterId <= 0) {
+  if (!warehouseItemId) {
     return NextResponse.json({ error: '상품 ID가 올바르지 않습니다.' }, { status: 400 })
   }
   if (!productName) {
@@ -130,37 +154,26 @@ export async function POST(request: Request) {
   }
 
   const item = await prisma.$transaction(async (tx) => {
-    let resolvedProductId = productId
-    let resolvedProductName = productName
-    let resolvedProductImageUrl = productImageUrl
+    const warehouseItem = await tx.warehouseInventoryItem.findUnique({
+      where: { id: warehouseItemId },
+      select: { id: true, name: true, imageUrl: true },
+    })
 
-    if (productId) {
-      const product = await tx.product.findUnique({
-        where: { id: productId },
-        select: { id: true, name: true, imageUrl: true, updatedAt: true },
-      })
-
-      if (!product) {
-        throw new Error('상품을 찾지 못했습니다.')
-      }
-
-      resolvedProductId = product.id
-      resolvedProductName = product.name
-      resolvedProductImageUrl = product.imageUrl ? getProductImageUrl(product.id, product.updatedAt) : null
-
-      await tx.product.update({
-        where: { id: product.id },
-        data: { stock: { increment: Math.trunc(quantity) } },
-      })
+    if (!warehouseItem) {
+      throw new Error('창고재고 상품을 찾지 못했습니다.')
     }
+
+    await tx.warehouseInventoryItem.update({
+      where: { id: warehouseItem.id },
+      data: { stock: { increment: Math.trunc(quantity) } },
+    })
 
     return tx.inventoryInbound.create({
       data: {
         inboundDate,
-        masterId: Math.trunc(masterId),
-        productId: resolvedProductId,
-        productName: resolvedProductName,
-        productImageUrl: resolvedProductImageUrl,
+        warehouseItemId: warehouseItem.id,
+        productName: warehouseItem.name || productName,
+        productImageUrl: warehouseItem.imageUrl || productImageUrl,
         quantity: Math.trunc(quantity),
         createdById: session.user.id,
       },
@@ -168,7 +181,7 @@ export async function POST(request: Request) {
         id: true,
         inboundDate: true,
         masterId: true,
-        productId: true,
+        warehouseItemId: true,
         productName: true,
         productImageUrl: true,
         quantity: true,
@@ -201,10 +214,16 @@ function formatYmd(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-function productIdToInt(id: string) {
-  let hash = 0
-  for (let index = 0; index < id.length; index++) {
-    hash = ((hash << 5) - hash + id.charCodeAt(index)) | 0
-  }
-  return Math.abs(hash) || 1
+async function ensureWarehouseInventoryItems() {
+  const count = await prisma.warehouseInventoryItem.count()
+  if (count > 0) return
+
+  await prisma.warehouseInventoryItem.createMany({
+    data: DEFAULT_WAREHOUSE_ITEMS.map((item) => ({
+      ...item,
+      stock: 0,
+      active: true,
+    })),
+    skipDuplicates: true,
+  })
 }

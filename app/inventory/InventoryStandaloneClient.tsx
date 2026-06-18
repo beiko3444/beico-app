@@ -19,8 +19,8 @@ type TabMode = 'stock' | 'inbound'
 type InboundItem = {
   id: string
   inboundDate: string
-  masterId: number
-  productId: string | null
+  masterId: number | null
+  warehouseItemId: string | null
   productName: string
   productImageUrl: string | null
   quantity: number
@@ -222,8 +222,7 @@ export default function InventoryStandaloneClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           inboundDate: selectedDate,
-          masterId: selectedProduct.id,
-          productId: selectedProduct.sourceId,
+          warehouseItemId: selectedProduct.sourceId,
           productName: selectedProduct.name,
           productImageUrl: selectedProduct.imageUrl,
           quantity,
