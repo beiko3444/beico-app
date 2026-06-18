@@ -16,8 +16,12 @@ export async function GET(request: Request) {
   const inboundDate = parseInboundDate(url.searchParams.get('date')) || todayStart()
   const nextDate = new Date(inboundDate)
   nextDate.setDate(nextDate.getDate() + 1)
+  const monthStart = new Date(inboundDate)
+  monthStart.setDate(1)
+  const monthEnd = new Date(monthStart)
+  monthEnd.setMonth(monthEnd.getMonth() + 1)
 
-  const [items, products] = await Promise.all([
+  const [items, monthItems, products] = await Promise.all([
     prisma.inventoryInbound.findMany({
       where: {
         inboundDate: {
@@ -35,6 +39,18 @@ export async function GET(request: Request) {
         quantity: true,
         createdAt: true,
         createdBy: { select: { name: true, username: true } },
+      },
+    }),
+    prisma.inventoryInbound.findMany({
+      where: {
+        inboundDate: {
+          gte: monthStart,
+          lt: monthEnd,
+        },
+      },
+      select: {
+        inboundDate: true,
+        quantity: true,
       },
     }),
     prisma.product.findMany({
@@ -57,6 +73,17 @@ export async function GET(request: Request) {
     }),
   ])
 
+  const calendar = Array.from(
+    monthItems.reduce((map, item) => {
+      const date = formatYmd(item.inboundDate)
+      const current = map.get(date) || { date, totalQuantity: 0, count: 0 }
+      current.totalQuantity += item.quantity
+      current.count += 1
+      map.set(date, current)
+      return map
+    }, new Map<string, { date: string; totalQuantity: number; count: number }>()).values(),
+  ).sort((a, b) => a.date.localeCompare(b.date))
+
   const quickProducts = products.map((product) => ({
     id: productIdToInt(product.id),
     sourceId: product.id,
@@ -70,6 +97,7 @@ export async function GET(request: Request) {
     date: formatYmd(inboundDate),
     items,
     totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
+    calendar,
     quickProducts,
   }, {
     headers: { 'Cache-Control': 'private, no-store' },

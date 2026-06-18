@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import Link from 'next/link'
 import {
   AlertTriangle,
   Boxes,
@@ -36,6 +35,11 @@ type InboundPayload = {
   date: string
   items: InboundItem[]
   totalQuantity: number
+  calendar?: Array<{
+    date: string
+    totalQuantity: number
+    count: number
+  }>
   quickProducts?: ProductCandidate[]
 }
 
@@ -73,6 +77,24 @@ function formatTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
   return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function addDays(date: Date, days: number) {
+  const next = new Date(date)
+  next.setDate(next.getDate() + days)
+  return next
+}
+
+function ymdToDate(value: string) {
+  const parsed = new Date(`${value}T00:00:00+09:00`)
+  return Number.isNaN(parsed.getTime()) ? new Date() : parsed
+}
+
+function formatYmd(date: Date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 function isQuickBait(row: SmartInventoryMasterRow) {
@@ -122,9 +144,10 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
 }
 
 export default function InventoryStandaloneClient() {
-  const [tab, setTab] = useState<TabMode>('stock')
+  const [tab, setTab] = useState<TabMode>('inbound')
   const [dashboard, setDashboard] = useState<SmartInventoryDashboardPayload | null>(null)
   const [inbounds, setInbounds] = useState<InboundPayload>({ date: todayYmd(), items: [], totalQuantity: 0 })
+  const [selectedDate, setSelectedDate] = useState(todayYmd())
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -154,9 +177,9 @@ export default function InventoryStandaloneClient() {
     }
   }
 
-  async function loadInbounds() {
+  async function loadInbounds(date = selectedDate) {
     try {
-      const response = await fetch(`/api/admin/inventory/inbounds?date=${todayYmd()}`, { cache: 'no-store' })
+      const response = await fetch(`/api/admin/inventory/inbounds?date=${date}`, { cache: 'no-store' })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error || '입고 목록을 불러오지 못했습니다.')
       setInbounds(payload)
@@ -168,15 +191,15 @@ export default function InventoryStandaloneClient() {
 
   useEffect(() => {
     void loadDashboard(true)
-    void loadInbounds()
+    void loadInbounds(selectedDate)
     const timer = window.setInterval(() => {
       if (!selectedRef.current) {
         void loadDashboard(false)
-        void loadInbounds()
+        void loadInbounds(selectedDate)
       }
     }, REFRESH_MS)
     return () => window.clearInterval(timer)
-  }, [])
+  }, [selectedDate])
 
   const rows = dashboard?.rows || []
   const quickRows = useMemo(() => rows.filter(isQuickBait), [rows])
@@ -243,7 +266,7 @@ export default function InventoryStandaloneClient() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          inboundDate: todayYmd(),
+          inboundDate: selectedDate,
           masterId: selectedProduct.id,
           productName: selectedProduct.name,
           productImageUrl: selectedProduct.imageUrl,
@@ -253,7 +276,7 @@ export default function InventoryStandaloneClient() {
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.error || '입고 저장에 실패했습니다.')
       closeKeypad()
-      await loadInbounds()
+      await loadInbounds(selectedDate)
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : '입고 저장에 실패했습니다.')
     } finally {
@@ -267,7 +290,7 @@ export default function InventoryStandaloneClient() {
       const response = await fetch(`/api/admin/inventory/inbounds/${id}`, { method: 'DELETE' })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.error || '입고 삭제에 실패했습니다.')
-      await loadInbounds()
+      await loadInbounds(selectedDate)
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : '입고 삭제에 실패했습니다.')
     } finally {
@@ -296,17 +319,11 @@ export default function InventoryStandaloneClient() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Link
-                href="/admin/inventory"
-                className="hidden h-11 items-center rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 shadow-sm sm:flex"
-              >
-                상세재고
-              </Link>
               <button
                 type="button"
                 onClick={() => {
                   void loadDashboard(true)
-                  void loadInbounds()
+                  void loadInbounds(selectedDate)
                 }}
                 className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm"
                 aria-label="새로고침"
@@ -355,7 +372,9 @@ export default function InventoryStandaloneClient() {
           quickRowsAvailable={quickRows.length > 0}
           productDbFallbackAvailable={Boolean(inbounds.quickProducts?.length)}
           inbounds={inbounds}
+          selectedDate={selectedDate}
           saving={saving}
+          onSelectDate={(date) => setSelectedDate(date)}
           onOpenKeypad={openKeypad}
           onDeleteInbound={(id) => void deleteInbound(id)}
         />
@@ -446,7 +465,9 @@ function InboundTab({
   quickRowsAvailable,
   productDbFallbackAvailable,
   inbounds,
+  selectedDate,
   saving,
+  onSelectDate,
   onOpenKeypad,
   onDeleteInbound,
 }: {
@@ -455,13 +476,17 @@ function InboundTab({
   quickRowsAvailable: boolean
   productDbFallbackAvailable: boolean
   inbounds: InboundPayload
+  selectedDate: string
   saving: boolean
+  onSelectDate: (date: string) => void
   onOpenKeypad: (row: ProductCandidate) => void
   onDeleteInbound: (id: string) => void
 }) {
   return (
-    <section className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[340px_minmax(0,1fr)]">
+    <section className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[380px_minmax(0,1fr)]">
       <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
+        <InboundCalendar selectedDate={selectedDate} calendar={inbounds.calendar || []} onSelectDate={onSelectDate} />
+
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <div className="flex items-center gap-2 text-sm font-black text-slate-950">
@@ -537,6 +562,92 @@ function InboundTab({
         {!loading && rows.length === 0 ? <EmptyBlock label="입고할 상품이 없습니다." /> : null}
       </div>
     </section>
+  )
+}
+
+function InboundCalendar({
+  selectedDate,
+  calendar,
+  onSelectDate,
+}: {
+  selectedDate: string
+  calendar: Array<{ date: string; totalQuantity: number; count: number }>
+  onSelectDate: (date: string) => void
+}) {
+  const selected = ymdToDate(selectedDate)
+  const firstDay = new Date(selected.getFullYear(), selected.getMonth(), 1)
+  const firstGridDay = addDays(firstDay, -firstDay.getDay())
+  const calendarMap = new Map(calendar.map((item) => [item.date, item]))
+  const days = Array.from({ length: 42 }, (_, index) => addDays(firstGridDay, index))
+  const monthLabel = selected.toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
+
+  function moveMonth(delta: number) {
+    const next = new Date(selected)
+    next.setMonth(next.getMonth() + delta)
+    next.setDate(1)
+    onSelectDate(formatYmd(next))
+  }
+
+  return (
+    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => moveMonth(-1)}
+          className="h-9 rounded-md bg-white px-3 text-sm font-black text-slate-600 shadow-sm"
+        >
+          이전
+        </button>
+        <div className="text-sm font-black text-slate-950">{monthLabel}</div>
+        <button
+          type="button"
+          onClick={() => moveMonth(1)}
+          className="h-9 rounded-md bg-white px-3 text-sm font-black text-slate-600 shadow-sm"
+        >
+          다음
+        </button>
+      </div>
+
+      <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
+        {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
+          <div key={day} className="py-1">{day}</div>
+        ))}
+      </div>
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {days.map((day) => {
+          const dateText = formatYmd(day)
+          const item = calendarMap.get(dateText)
+          const inCurrentMonth = day.getMonth() === selected.getMonth()
+          const active = dateText === selectedDate
+          const isToday = dateText === todayYmd()
+
+          return (
+            <button
+              key={dateText}
+              type="button"
+              onClick={() => onSelectDate(dateText)}
+              className={`min-h-[54px] rounded-md border p-1 text-left transition ${
+                active
+                  ? 'border-slate-950 bg-slate-950 text-white'
+                  : item
+                    ? 'border-emerald-200 bg-emerald-50 text-slate-950'
+                    : 'border-slate-200 bg-white text-slate-700'
+              } ${inCurrentMonth ? '' : 'opacity-40'}`}
+            >
+              <div className="flex items-center justify-between gap-1">
+                <span className="text-xs font-black">{day.getDate()}</span>
+                {isToday ? <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-blue-500'}`} /> : null}
+              </div>
+              {item ? (
+                <div className={`mt-1 text-[10px] font-black leading-tight ${active ? 'text-white' : 'text-emerald-700'}`}>
+                  {formatNumber(item.totalQuantity)}개
+                </div>
+              ) : null}
+            </button>
+          )
+        })}
+      </div>
+    </div>
   )
 }
 
