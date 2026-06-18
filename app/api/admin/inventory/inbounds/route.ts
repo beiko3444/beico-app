@@ -34,6 +34,7 @@ export async function GET(request: Request) {
         id: true,
         inboundDate: true,
         masterId: true,
+        productId: true,
         productName: true,
         productImageUrl: true,
         quantity: true,
@@ -65,6 +66,7 @@ export async function GET(request: Request) {
         id: true,
         name: true,
         nameJP: true,
+        productCode: true,
         imageUrl: true,
         stock: true,
         updatedAt: true,
@@ -89,6 +91,7 @@ export async function GET(request: Request) {
     sourceId: product.id,
     name: product.name,
     nameJP: product.nameJP,
+    productCode: product.productCode,
     imageUrl: product.imageUrl ? getProductImageUrl(product.id, product.updatedAt) : null,
     stock: product.stock,
   }))
@@ -111,6 +114,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
   const inboundDate = parseInboundDate(body?.inboundDate) || todayStart()
   const masterId = Number(body?.masterId)
+  const productId = typeof body?.productId === 'string' && body.productId.trim() ? body.productId.trim() : null
   const productName = typeof body?.productName === 'string' ? body.productName.trim() : ''
   const productImageUrl = typeof body?.productImageUrl === 'string' && body.productImageUrl.trim() ? body.productImageUrl.trim() : null
   const quantity = Number(body?.quantity)
@@ -125,25 +129,53 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '입고 수량은 1 이상이어야 합니다.' }, { status: 400 })
   }
 
-  const item = await prisma.inventoryInbound.create({
-    data: {
-      inboundDate,
-      masterId: Math.trunc(masterId),
-      productName,
-      productImageUrl,
-      quantity: Math.trunc(quantity),
-      createdById: session.user.id,
-    },
-    select: {
-      id: true,
-      inboundDate: true,
-      masterId: true,
-      productName: true,
-      productImageUrl: true,
-      quantity: true,
-      createdAt: true,
-      createdBy: { select: { name: true, username: true } },
-    },
+  const item = await prisma.$transaction(async (tx) => {
+    let resolvedProductId = productId
+    let resolvedProductName = productName
+    let resolvedProductImageUrl = productImageUrl
+
+    if (productId) {
+      const product = await tx.product.findUnique({
+        where: { id: productId },
+        select: { id: true, name: true, imageUrl: true, updatedAt: true },
+      })
+
+      if (!product) {
+        throw new Error('상품을 찾지 못했습니다.')
+      }
+
+      resolvedProductId = product.id
+      resolvedProductName = product.name
+      resolvedProductImageUrl = product.imageUrl ? getProductImageUrl(product.id, product.updatedAt) : null
+
+      await tx.product.update({
+        where: { id: product.id },
+        data: { stock: { increment: Math.trunc(quantity) } },
+      })
+    }
+
+    return tx.inventoryInbound.create({
+      data: {
+        inboundDate,
+        masterId: Math.trunc(masterId),
+        productId: resolvedProductId,
+        productName: resolvedProductName,
+        productImageUrl: resolvedProductImageUrl,
+        quantity: Math.trunc(quantity),
+        createdById: session.user.id,
+      },
+      select: {
+        id: true,
+        inboundDate: true,
+        masterId: true,
+        productId: true,
+        productName: true,
+        productImageUrl: true,
+        quantity: true,
+        createdAt: true,
+        createdBy: { select: { name: true, username: true } },
+      },
+    })
   })
 
   return NextResponse.json({ success: true, item }, {

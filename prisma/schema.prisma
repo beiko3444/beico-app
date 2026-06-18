@@ -42,6 +42,7 @@ model InventoryInbound {
   id              String   @id @default(uuid())
   inboundDate     DateTime
   masterId        Int
+  productId       String?
   productName     String
   productImageUrl String?
   quantity        Int
@@ -49,9 +50,11 @@ model InventoryInbound {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   createdBy       User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  product         Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
 
   @@index([inboundDate])
   @@index([masterId])
+  @@index([productId])
   @@index([createdById])
 }
 
@@ -118,6 +121,7 @@ model Product {
   wholesaleAvailable  Boolean     @default(true)
   orderItems       OrderItem[]
   proformaInvoiceItems ProformaInvoiceItem[]
+  inventoryInbounds InventoryInbound[]
 }
 
 model Order {

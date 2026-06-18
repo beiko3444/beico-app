@@ -16,8 +16,25 @@ export async function DELETE(_request: Request, context: { params: Promise<{ id:
   }
 
   try {
-    await prisma.inventoryInbound.delete({
-      where: { id },
+    await prisma.$transaction(async (tx) => {
+      const inbound = await tx.inventoryInbound.delete({
+        where: { id },
+        select: { productId: true, quantity: true },
+      })
+
+      if (inbound.productId) {
+        const product = await tx.product.findUnique({
+          where: { id: inbound.productId },
+          select: { stock: true },
+        })
+
+        if (product) {
+          await tx.product.update({
+            where: { id: inbound.productId },
+            data: { stock: Math.max(0, product.stock - inbound.quantity) },
+          })
+        }
+      }
     })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {

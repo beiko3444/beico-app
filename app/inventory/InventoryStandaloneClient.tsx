@@ -13,7 +13,6 @@ import {
   X,
   Delete,
 } from 'lucide-react'
-import type { SmartInventoryDashboardPayload, SmartInventoryMasterRow } from '@/lib/smartInventoryClient'
 
 type TabMode = 'stock' | 'inbound'
 
@@ -21,6 +20,7 @@ type InboundItem = {
   id: string
   inboundDate: string
   masterId: number
+  productId: string | null
   productName: string
   productImageUrl: string | null
   quantity: number
@@ -45,19 +45,15 @@ type InboundPayload = {
 
 type ProductCandidate = {
   id: number
-  sourceId?: string
+  sourceId: string
   name: string
   nameJP?: string | null
+  productCode?: string | null
   imageUrl: string | null
-  naverStock?: number | null
-  coupangStock?: number | null
-  totalStock?: number | null
   stock?: number | null
-  memo?: string | null
 }
 
 const REFRESH_MS = 5000
-const QUICK_BAIT_KEYWORDS = ['quickbait', 'quick bait', 'quick-bait', '퀵베이트', '퀵 베이트']
 
 function todayYmd() {
   const now = new Date()
@@ -97,23 +93,6 @@ function formatYmd(date: Date) {
   return `${year}-${month}-${day}`
 }
 
-function isQuickBait(row: SmartInventoryMasterRow) {
-  const haystack = [row.name, row.memo || '', ...row.linked.map((link) => link.name)].join(' ').toLowerCase()
-  return QUICK_BAIT_KEYWORDS.some((keyword) => haystack.includes(keyword))
-}
-
-function smartRowToCandidate(row: SmartInventoryMasterRow): ProductCandidate {
-  return {
-    id: row.id,
-    name: row.name,
-    imageUrl: row.imageUrl,
-    naverStock: row.naverStock,
-    coupangStock: row.coupangStock,
-    totalStock: row.totalStock,
-    memo: row.memo,
-  }
-}
-
 function stockTone(value: number | null | undefined) {
   if (value === null || value === undefined) return 'text-slate-400'
   if (value <= 0) return 'text-red-600'
@@ -145,7 +124,6 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
 
 export default function InventoryStandaloneClient() {
   const [tab, setTab] = useState<TabMode>('inbound')
-  const [dashboard, setDashboard] = useState<SmartInventoryDashboardPayload | null>(null)
   const [inbounds, setInbounds] = useState<InboundPayload>({ date: todayYmd(), items: [], totalQuantity: 0 })
   const [selectedDate, setSelectedDate] = useState(todayYmd())
   const [query, setQuery] = useState('')
@@ -161,63 +139,40 @@ export default function InventoryStandaloneClient() {
     selectedRef.current = selectedProduct
   }, [selectedProduct])
 
-  async function loadDashboard(showLoader = false) {
+  async function loadInbounds(date = selectedDate, showLoader = false) {
     if (showLoader) setLoading(true)
-    try {
-      const response = await fetch('/api/admin/inventory', { cache: 'no-store' })
-      const payload = await response.json()
-      if (!response.ok) throw new Error(payload?.error || '재고를 불러오지 못했습니다.')
-      setDashboard(payload)
-      setLastLoadedAt(new Date())
-      setError('')
-    } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : '재고를 불러오지 못했습니다.')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  async function loadInbounds(date = selectedDate) {
     try {
       const response = await fetch(`/api/admin/inventory/inbounds?date=${date}`, { cache: 'no-store' })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error || '입고 목록을 불러오지 못했습니다.')
       setInbounds(payload)
+      setLastLoadedAt(new Date())
       setError('')
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '입고 목록을 불러오지 못했습니다.')
+    } finally {
+      setLoading(false)
     }
   }
 
   useEffect(() => {
-    void loadDashboard(true)
-    void loadInbounds(selectedDate)
+    void loadInbounds(selectedDate, true)
     const timer = window.setInterval(() => {
       if (!selectedRef.current) {
-        void loadDashboard(false)
         void loadInbounds(selectedDate)
       }
     }, REFRESH_MS)
     return () => window.clearInterval(timer)
   }, [selectedDate])
 
-  const rows = dashboard?.rows || []
-  const quickRows = useMemo(() => rows.filter(isQuickBait), [rows])
-  const inboundRows = useMemo(() => {
-    if (quickRows.length > 0) return quickRows.map(smartRowToCandidate)
-    if (inbounds.quickProducts?.length) return inbounds.quickProducts
-    return rows.map(smartRowToCandidate)
-  }, [inbounds.quickProducts, quickRows, rows])
+  const rows = useMemo(() => inbounds.quickProducts || [], [inbounds.quickProducts])
+  const warehouseStockTotal = useMemo(() => rows.reduce((sum, row) => sum + (row.stock || 0), 0), [rows])
 
   const filteredStockRows = useMemo(() => {
     const text = query.trim().toLowerCase()
     return rows.filter((row) => {
       if (!text) return true
-      return [
-        row.name,
-        row.memo || '',
-        row.linked.map((link) => link.name).join(' '),
-      ]
+      return [row.name, row.nameJP || '', row.productCode || '']
         .join(' ')
         .toLowerCase()
         .includes(text)
@@ -226,11 +181,11 @@ export default function InventoryStandaloneClient() {
 
   const filteredInboundRows = useMemo(() => {
     const text = query.trim().toLowerCase()
-    return inboundRows.filter((row) => {
+    return rows.filter((row) => {
       if (!text) return true
-      return [row.name, row.nameJP || '', row.memo || ''].join(' ').toLowerCase().includes(text)
+      return [row.name, row.nameJP || '', row.productCode || ''].join(' ').toLowerCase().includes(text)
     })
-  }, [inboundRows, query])
+  }, [rows, query])
 
   function openKeypad(row: ProductCandidate) {
     setSelectedProduct(row)
@@ -268,6 +223,7 @@ export default function InventoryStandaloneClient() {
         body: JSON.stringify({
           inboundDate: selectedDate,
           masterId: selectedProduct.id,
+          productId: selectedProduct.sourceId,
           productName: selectedProduct.name,
           productImageUrl: selectedProduct.imageUrl,
           quantity,
@@ -310,8 +266,7 @@ export default function InventoryStandaloneClient() {
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-black tracking-normal text-slate-950 sm:text-2xl">재고관리</h1>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-slate-500">
-                  <span>네이버 {formatNumber(dashboard?.summary.naverStock)}</span>
-                  <span>쿠팡 {formatNumber(dashboard?.summary.coupangStock)}</span>
+                  <span>창고재고 {formatNumber(warehouseStockTotal)}</span>
                   <span>오늘입고 {formatNumber(inbounds.totalQuantity)}</span>
                   {lastLoadedAt && <span>갱신 {lastLoadedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>}
                 </div>
@@ -322,8 +277,7 @@ export default function InventoryStandaloneClient() {
               <button
                 type="button"
                 onClick={() => {
-                  void loadDashboard(true)
-                  void loadInbounds(selectedDate)
+                  void loadInbounds(selectedDate, true)
                 }}
                 className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm"
                 aria-label="새로고침"
@@ -369,8 +323,6 @@ export default function InventoryStandaloneClient() {
         <InboundTab
           loading={loading}
           rows={filteredInboundRows}
-          quickRowsAvailable={quickRows.length > 0}
-          productDbFallbackAvailable={Boolean(inbounds.quickProducts?.length)}
           inbounds={inbounds}
           selectedDate={selectedDate}
           saving={saving}
@@ -408,31 +360,28 @@ function TabButton({ active, label, onClick }: { active: boolean; label: string;
   )
 }
 
-function StockTab({ loading, rows }: { loading: boolean; rows: SmartInventoryMasterRow[] }) {
+function StockTab({ loading, rows }: { loading: boolean; rows: ProductCandidate[] }) {
   return (
     <section className="mx-auto max-w-[1600px] px-4 py-4 sm:px-5">
       {loading && rows.length === 0 ? (
-        <LoadingBlock label="재고 불러오는 중" />
+        <LoadingBlock label="창고재고 불러오는 중" />
       ) : (
         <div className="grid gap-2">
           {rows.map((row) => (
-            <article key={row.id} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <article key={row.sourceId} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
               <div className="flex min-w-0 items-center gap-3">
                 <ProductImage src={row.imageUrl} alt={row.name} />
                 <div className="min-w-0">
                   <h2 className="truncate text-lg font-black tracking-normal text-slate-950">{row.name}</h2>
                   <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
-                    <span>연결 {formatNumber(row.linkCount)}개</span>
-                    {row.totalInboundPending ? <span className="text-orange-600">입고대기 {formatNumber(row.totalInboundPending)}</span> : null}
-                    {row.memo ? <span className="truncate">{row.memo}</span> : null}
+                    {row.nameJP ? <span>{row.nameJP}</span> : null}
+                    {row.productCode ? <span>코드 {row.productCode}</span> : null}
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-3 gap-2 md:min-w-[360px]">
-                <StockPill label="네이버" value={row.naverStock} tone="green" />
-                <StockPill label="쿠팡" value={row.coupangStock} tone="blue" />
-                <StockPill label="합계" value={row.totalStock} tone="dark" />
+              <div className="md:min-w-[150px]">
+                <StockPill label="창고재고" value={row.stock ?? 0} />
               </div>
             </article>
           ))}
@@ -443,17 +392,10 @@ function StockTab({ loading, rows }: { loading: boolean; rows: SmartInventoryMas
   )
 }
 
-function StockPill({ label, value, tone }: { label: string; value: number | null; tone: 'green' | 'blue' | 'dark' }) {
-  const toneClass =
-    tone === 'green'
-      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-      : tone === 'blue'
-        ? 'border-sky-100 bg-sky-50 text-sky-700'
-        : 'border-slate-200 bg-slate-50 text-slate-950'
-
+function StockPill({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className={`rounded-md border px-3 py-2 text-right ${toneClass}`}>
-      <div className="text-[11px] font-black">{label}</div>
+    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-right text-slate-950">
+      <div className="text-[11px] font-black text-slate-500">{label}</div>
       <div className={`mt-1 text-2xl font-black tabular-nums ${stockTone(value)}`}>{formatNumber(value)}</div>
     </div>
   )
@@ -462,8 +404,6 @@ function StockPill({ label, value, tone }: { label: string; value: number | null
 function InboundTab({
   loading,
   rows,
-  quickRowsAvailable,
-  productDbFallbackAvailable,
   inbounds,
   selectedDate,
   saving,
@@ -473,8 +413,6 @@ function InboundTab({
 }: {
   loading: boolean
   rows: ProductCandidate[]
-  quickRowsAvailable: boolean
-  productDbFallbackAvailable: boolean
   inbounds: InboundPayload
   selectedDate: string
   saving: boolean
@@ -528,12 +466,6 @@ function InboundTab({
       </aside>
 
       <div className="min-w-0">
-        {!quickRowsAvailable && !productDbFallbackAvailable ? (
-          <div className="mb-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-bold text-amber-800">
-            퀵베이트 상품을 찾지 못해 전체 마스터 상품을 표시합니다.
-          </div>
-        ) : null}
-
         {loading && rows.length === 0 ? (
           <LoadingBlock label="입고 상품 불러오는 중" />
         ) : (
@@ -546,12 +478,11 @@ function InboundTab({
                 className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99]"
               >
                 <div className="flex items-start gap-3">
-                  <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
+                    <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
                   <div className="min-w-0 flex-1">
                     <div className="line-clamp-2 min-h-[44px] text-base font-black leading-tight tracking-normal text-slate-950">{row.name}</div>
-                    <div className="mt-2 grid grid-cols-2 gap-1 text-xs font-black">
-                      <span className="rounded bg-emerald-50 px-2 py-1 text-right text-emerald-700">N {formatNumber(row.naverStock)}</span>
-                      <span className="rounded bg-sky-50 px-2 py-1 text-right text-sky-700">C {formatNumber(row.coupangStock ?? row.stock)}</span>
+                    <div className="mt-2 text-xs font-black">
+                      <span className="block rounded bg-slate-100 px-2 py-1 text-right text-slate-700">창고 {formatNumber(row.stock ?? 0)}</span>
                     </div>
                   </div>
                 </div>
