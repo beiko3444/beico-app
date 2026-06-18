@@ -24,7 +24,7 @@ export async function middleware(request: NextRequest) {
         return NextResponse.next()
     }
 
-    if (pathname.startsWith('/admin')) {
+    if (pathname.startsWith('/admin') || pathname === '/inventory' || pathname.startsWith('/inventory/')) {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
         if (!token || token.role !== 'ADMIN') {
             return NextResponse.redirect(new URL('/login', request.url))
@@ -44,6 +44,7 @@ export async function middleware(request: NextRequest) {
 export const config = {
     matcher: [
         '/admin/:path*',
+        '/inventory/:path*',
         '/api/products/:path*',
         '/api/admin/:path*',
         '/api/tasks/:path*',
