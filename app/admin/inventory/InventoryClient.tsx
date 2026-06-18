@@ -43,6 +43,7 @@ import type {
   SmartInventoryDashboardPayload,
   SmartInventoryMasterRow,
 } from '@/lib/smartInventoryClient'
+import { externalProductHref } from '@/lib/smartInventoryLinks.mjs'
 
 type FilterMode = 'all' | 'empty' | 'inbound' | 'unlinked' | 'linked'
 type TableMode = 'masters' | 'unlinked'
@@ -92,14 +93,6 @@ function stockTone(value: number | null) {
   if (value <= 0) return 'text-red-600'
   if (value <= 5) return 'text-amber-700'
   return 'text-slate-950'
-}
-
-function externalProductHref(value: string | null | undefined) {
-  const trimmed = String(value || '').trim()
-  if (!trimmed) return null
-  if (/^https?:\/\//i.test(trimmed)) return trimmed
-  if (/^\/\//.test(trimmed)) return `https:${trimmed}`
-  return `https://${trimmed}`
 }
 
 function orderRows(rows: SmartInventoryMasterRow[], order: number[]) {
@@ -200,7 +193,7 @@ function LinkedProducts({ links }: { links: SmartInventoryMasterRow['linked'] })
   return (
     <div className="flex max-w-[280px] flex-wrap gap-1.5">
       {links.slice(0, 3).map((link) => {
-        const href = externalProductHref(link.productUrl)
+        const href = externalProductHref(link.productUrl, link.channel)
 
         return (
           <a
@@ -423,7 +416,7 @@ function UnlinkedTable({ rows }: { rows: SmartInventoryChannelRow[] }) {
                     <ProductImage src={row.imageUrl} alt={row.name} />
                     <div className="min-w-0">
                       {(() => {
-                        const href = externalProductHref(row.productUrl)
+                        const href = externalProductHref(row.productUrl, row.channel)
 
                         return (
                           <a
