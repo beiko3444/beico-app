@@ -124,7 +124,6 @@ final class SmsForwarder {
     }
 
     static void retryPending(Context context) {
-        if (!isEnabled(context)) return;
         new Thread(() -> drainQueue(context.getApplicationContext())).start();
     }
 
@@ -141,10 +140,22 @@ final class SmsForwarder {
         );
         new Thread(() -> {
             try {
-                postBatch(context, java.util.Collections.singletonList(message));
-                callback.onDone("테스트 전송 완료");
+                PostResult result = postBatch(context, java.util.Collections.singletonList(message));
+                if (result.isSuccessful()) {
+                    saveStatus(context, "테스트 전송 완료: HTTP " + result.code + " / "
+                            + formatDisplayTime(System.currentTimeMillis()));
+                    callback.onDone("테스트 전송 완료");
+                } else {
+                    String status = "테스트 전송 실패: " + result.summary() + " / "
+                            + formatDisplayTime(System.currentTimeMillis());
+                    saveStatus(context, status);
+                    callback.onDone(status);
+                }
             } catch (Exception error) {
-                callback.onDone("테스트 전송 실패: " + error.getMessage());
+                String status = "테스트 전송 실패: " + safeError(error) + " / "
+                        + formatDisplayTime(System.currentTimeMillis());
+                saveStatus(context, status);
+                callback.onDone(status);
             }
         }).start();
     }
@@ -155,25 +166,26 @@ final class SmsForwarder {
         if (pending.isEmpty()) return;
 
         try {
-            int code = postBatch(context, pending);
-            if (code >= 200 && code < 300) {
+            PostResult result = postBatch(context, pending);
+            if (result.isSuccessful()) {
                 queue.markSent(pending);
                 saveStatus(context, "전송 완료: " + pending.size() + "건 / 대기 " + queue.countPending()
                         + "건 / " + formatDisplayTime(System.currentTimeMillis()));
             } else {
-                String error = "HTTP " + code;
+                String error = result.summary();
                 queue.markFailed(pending, error);
                 saveStatus(context, "전송 실패: " + error + " / 대기 " + queue.countPending()
                         + "건 / " + formatDisplayTime(System.currentTimeMillis()));
             }
         } catch (Exception error) {
-            queue.markFailed(pending, error.getMessage());
-            saveStatus(context, "전송 실패: " + error.getMessage() + " / 대기 " + queue.countPending()
+            String errorMessage = safeError(error);
+            queue.markFailed(pending, errorMessage);
+            saveStatus(context, "전송 실패: " + errorMessage + " / 대기 " + queue.countPending()
                     + "건 / " + formatDisplayTime(System.currentTimeMillis()));
         }
     }
 
-    private static int postBatch(Context context, List<MessageRecord> messages) throws Exception {
+    private static PostResult postBatch(Context context, List<MessageRecord> messages) throws Exception {
         String endpoint = getEndpoint(context);
         String secret = getSecret(context);
         String username = getUsername(context);
@@ -198,15 +210,21 @@ final class SmsForwarder {
             }
             int code = connection.getResponseCode();
             InputStream responseStream = code >= 400 ? connection.getErrorStream() : connection.getInputStream();
+            String body = "";
             if (responseStream != null) {
-                try (BufferedReader ignored = new BufferedReader(new InputStreamReader(responseStream, StandardCharsets.UTF_8))) {
-                    while (ignored.readLine() != null) {
-                        // Drain body so the connection closes cleanly.
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(responseStream, StandardCharsets.UTF_8))) {
+                    StringBuilder responseBody = new StringBuilder();
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (responseBody.length() < 500) {
+                            responseBody.append(line);
+                        }
                     }
+                    body = responseBody.toString();
                 } catch (Exception ignored) {
                 }
             }
-            return code;
+            return new PostResult(code, body);
         } finally {
             connection.disconnect();
         }
@@ -261,6 +279,12 @@ final class SmsForwarder {
         return formatter.format(new Date(timeMillis));
     }
 
+    private static String safeError(Exception error) {
+        String message = error.getMessage();
+        if (message == null || message.trim().length() == 0) return error.getClass().getSimpleName();
+        return message;
+    }
+
     private static String jsonEscape(String value) {
         if (value == null) return "";
         return value
@@ -285,5 +309,24 @@ final class SmsForwarder {
 
     interface Callback {
         void onDone(String message);
+    }
+
+    private static final class PostResult {
+        final int code;
+        final String body;
+
+        PostResult(int code, String body) {
+            this.code = code;
+            this.body = body == null ? "" : body.trim();
+        }
+
+        boolean isSuccessful() {
+            return code >= 200 && code < 300;
+        }
+
+        String summary() {
+            if (body.length() == 0) return "HTTP " + code;
+            return "HTTP " + code + ": " + body;
+        }
     }
 }

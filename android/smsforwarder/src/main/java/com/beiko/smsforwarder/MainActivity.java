@@ -109,6 +109,7 @@ public class MainActivity extends Activity {
         Button retryButton = actionButton("대기 문자 재전송", 0xFF475467);
         retryButton.setOnClickListener(view -> {
             saveInputs();
+            SmsForwarder.setEnabled(this, true);
             SmsForwarder.retryPending(this);
             toast("재전송을 시작했습니다.");
             refreshStatus();
