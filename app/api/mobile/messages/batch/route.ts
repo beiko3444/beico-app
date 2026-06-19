@@ -93,6 +93,23 @@ export async function POST(request: Request) {
       skipDuplicates: true,
     })
 
+    const senderNameUpdates = rows
+      .filter((message) => message.senderName)
+      .map((message) =>
+        prisma.mobileMessage.updateMany({
+          where: {
+            userId: user.id,
+            deviceMessageId: message.deviceMessageId,
+          },
+          data: {
+            senderName: message.senderName,
+          },
+        })
+      )
+    if (senderNameUpdates.length > 0) {
+      await prisma.$transaction(senderNameUpdates)
+    }
+
     return NextResponse.json({
       success: true,
       accepted: rows.length,
