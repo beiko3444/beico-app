@@ -23,12 +23,52 @@ final class SmsSync {
             try {
                 SmsQueue queue = new SmsQueue(appContext);
                 ArrayList<MessageRecord> records = new ArrayList<>();
-                records.addAll(readSmsInbox(appContext, 0));
-                records.addAll(readMmsInbox(appContext, 0));
+                SmsForwarder.saveProgress(appContext, new SyncProgress(
+                        "SMS 스캔중",
+                        MAX_IMPORT * 2,
+                        0,
+                        0,
+                        0,
+                        0,
+                        queue.countPending(),
+                        ""
+                ));
+                records.addAll(readSmsInbox(appContext, 0, 0));
+                SmsForwarder.saveProgress(appContext, new SyncProgress(
+                        "MMS 스캔중",
+                        MAX_IMPORT * 2,
+                        records.size(),
+                        0,
+                        0,
+                        0,
+                        queue.countPending(),
+                        ""
+                ));
+                records.addAll(readMmsInbox(appContext, 0, records.size()));
                 int queued = queue.enqueueAll(records);
+                SmsForwarder.saveProgress(appContext, new SyncProgress(
+                        "큐 저장 완료",
+                        records.size(),
+                        records.size(),
+                        queued,
+                        0,
+                        0,
+                        queue.countPending(),
+                        ""
+                ));
                 SmsForwarder.retryPending(appContext);
                 callback.onDone("기존 문자 스캔 완료: " + records.size() + "건 확인, " + queued + "건 큐 추가");
             } catch (Exception error) {
+                SmsForwarder.saveProgress(appContext, new SyncProgress(
+                        "기존 문자 스캔 실패",
+                        1,
+                        0,
+                        0,
+                        0,
+                        1,
+                        new SmsQueue(appContext).countPending(),
+                        error.getMessage()
+                ));
                 callback.onDone("기존 문자 스캔 실패: " + error.getMessage());
             }
         }).start();
@@ -36,18 +76,43 @@ final class SmsSync {
 
     static void importRecentMmsAsync(Context context) {
         new Thread(() -> {
-            Context appContext = context.getApplicationContext();
-            try {
-                long since = System.currentTimeMillis() - 10 * 60 * 1000;
-                SmsQueue queue = new SmsQueue(appContext);
-                queue.enqueueAll(readMmsInbox(appContext, since));
-                SmsForwarder.retryPending(appContext);
-            } catch (Exception ignored) {
-            }
+            importRecentMms(context.getApplicationContext());
         }).start();
     }
 
-    private static List<MessageRecord> readSmsInbox(Context context, long sinceMillis) {
+    static void importRecentMms(Context context) {
+        Context appContext = context.getApplicationContext();
+        try {
+            long since = System.currentTimeMillis() - 10 * 60 * 1000;
+            SmsQueue queue = new SmsQueue(appContext);
+            List<MessageRecord> records = readMmsInbox(appContext, since, 0);
+            int queued = queue.enqueueAll(records);
+            SmsForwarder.saveProgress(appContext, new SyncProgress(
+                    "새 MMS 큐 저장",
+                    Math.max(1, records.size()),
+                    records.size(),
+                    queued,
+                    0,
+                    0,
+                    queue.countPending(),
+                    ""
+            ));
+            SmsForwarder.retryPending(appContext);
+        } catch (Exception error) {
+            SmsForwarder.saveProgress(appContext, new SyncProgress(
+                    "새 MMS 처리 실패",
+                    1,
+                    0,
+                    0,
+                    0,
+                    1,
+                    new SmsQueue(appContext).countPending(),
+                    error.getMessage()
+            ));
+        }
+    }
+
+    private static List<MessageRecord> readSmsInbox(Context context, long sinceMillis, int progressOffset) {
         ArrayList<MessageRecord> records = new ArrayList<>();
         String[] projection = new String[]{
                 Telephony.Sms._ID,
@@ -85,12 +150,24 @@ final class SmsSync {
                         threadId
                 ));
                 count++;
+                if (count % 100 == 0) {
+                    SmsForwarder.saveProgress(context, new SyncProgress(
+                            "SMS 스캔중",
+                            MAX_IMPORT * 2,
+                            progressOffset + count,
+                            0,
+                            0,
+                            0,
+                            new SmsQueue(context).countPending(),
+                            ""
+                    ));
+                }
             }
         }
         return records;
     }
 
-    private static List<MessageRecord> readMmsInbox(Context context, long sinceMillis) {
+    private static List<MessageRecord> readMmsInbox(Context context, long sinceMillis, int progressOffset) {
         ArrayList<MessageRecord> records = new ArrayList<>();
         Uri inbox = Uri.parse("content://mms/inbox");
         String[] projection = new String[]{"_id", "date", "thread_id"};
@@ -123,6 +200,18 @@ final class SmsSync {
                         threadId
                 ));
                 count++;
+                if (count % 50 == 0) {
+                    SmsForwarder.saveProgress(context, new SyncProgress(
+                            "MMS 스캔중",
+                            MAX_IMPORT * 2,
+                            progressOffset + count,
+                            0,
+                            0,
+                            0,
+                            new SmsQueue(context).countPending(),
+                            ""
+                    ));
+                }
             }
         }
         return records;

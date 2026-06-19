@@ -27,6 +27,14 @@ final class SmsForwarder {
     static final String KEY_ENABLED = "enabled";
     static final String KEY_LAST_STATUS = "last_status";
     static final String KEY_LAST_SENT_AT = "last_sent_at";
+    private static final String KEY_PROGRESS_STAGE = "progress_stage";
+    private static final String KEY_PROGRESS_TOTAL = "progress_total";
+    private static final String KEY_PROGRESS_SCANNED = "progress_scanned";
+    private static final String KEY_PROGRESS_QUEUED = "progress_queued";
+    private static final String KEY_PROGRESS_SENT = "progress_sent";
+    private static final String KEY_PROGRESS_FAILED = "progress_failed";
+    private static final String KEY_PROGRESS_PENDING = "progress_pending";
+    private static final String KEY_PROGRESS_ERROR = "progress_error";
     private static final int TIMEOUT_MS = 15000;
     private static final int BATCH_SIZE = 100;
 
@@ -89,6 +97,34 @@ final class SmsForwarder {
         return new SmsQueue(context).countPending();
     }
 
+    static SyncProgress getProgress(Context context) {
+        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
+        return new SyncProgress(
+                prefs.getString(KEY_PROGRESS_STAGE, "대기중"),
+                prefs.getInt(KEY_PROGRESS_TOTAL, 0),
+                prefs.getInt(KEY_PROGRESS_SCANNED, 0),
+                prefs.getInt(KEY_PROGRESS_QUEUED, 0),
+                prefs.getInt(KEY_PROGRESS_SENT, 0),
+                prefs.getInt(KEY_PROGRESS_FAILED, 0),
+                new SmsQueue(context).countPending(),
+                prefs.getString(KEY_PROGRESS_ERROR, "")
+        );
+    }
+
+    static void saveProgress(Context context, SyncProgress progress) {
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+                .edit()
+                .putString(KEY_PROGRESS_STAGE, progress.stage)
+                .putInt(KEY_PROGRESS_TOTAL, progress.total)
+                .putInt(KEY_PROGRESS_SCANNED, progress.scanned)
+                .putInt(KEY_PROGRESS_QUEUED, progress.queued)
+                .putInt(KEY_PROGRESS_SENT, progress.sent)
+                .putInt(KEY_PROGRESS_FAILED, progress.failed)
+                .putInt(KEY_PROGRESS_PENDING, progress.pending)
+                .putString(KEY_PROGRESS_ERROR, progress.lastError)
+                .apply();
+    }
+
     static MessageRecord buildMessage(
             Context context,
             String deviceMessageId,
@@ -119,8 +155,38 @@ final class SmsForwarder {
         boolean inserted = queue.enqueue(message);
         if (inserted) {
             saveStatus(context, "문자 큐 저장: " + message.messageType + " / 대기 " + queue.countPending() + "건");
+            saveProgress(context, new SyncProgress(
+                    "새 문자 큐 저장",
+                    1,
+                    1,
+                    1,
+                    0,
+                    0,
+                    queue.countPending(),
+                    ""
+            ));
         }
         retryPending(context);
+    }
+
+    static void enqueueAndRetryBlocking(Context context, MessageRecord message) {
+        if (!isEnabled(context)) return;
+        SmsQueue queue = new SmsQueue(context);
+        boolean inserted = queue.enqueue(message);
+        if (inserted) {
+            saveStatus(context, "문자 큐 저장: " + message.messageType + " / 대기 " + queue.countPending() + "건");
+            saveProgress(context, new SyncProgress(
+                    "새 문자 큐 저장",
+                    1,
+                    1,
+                    1,
+                    0,
+                    0,
+                    queue.countPending(),
+                    ""
+            ));
+        }
+        drainQueue(context.getApplicationContext());
     }
 
     static void retryPending(Context context) {
@@ -144,17 +210,20 @@ final class SmsForwarder {
                 if (result.isSuccessful()) {
                     saveStatus(context, "테스트 전송 완료: HTTP " + result.code + " / "
                             + formatDisplayTime(System.currentTimeMillis()));
+                    saveProgress(context, new SyncProgress("테스트 완료", 1, 0, 0, 1, 0, getPendingCount(context), ""));
                     callback.onDone("테스트 전송 완료");
                 } else {
                     String status = "테스트 전송 실패: " + result.summary() + " / "
                             + formatDisplayTime(System.currentTimeMillis());
                     saveStatus(context, status);
+                    saveProgress(context, new SyncProgress("테스트 실패", 1, 0, 0, 0, 1, getPendingCount(context), result.summary()));
                     callback.onDone(status);
                 }
             } catch (Exception error) {
                 String status = "테스트 전송 실패: " + safeError(error) + " / "
                         + formatDisplayTime(System.currentTimeMillis());
                 saveStatus(context, status);
+                saveProgress(context, new SyncProgress("테스트 실패", 1, 0, 0, 0, 1, getPendingCount(context), safeError(error)));
                 callback.onDone(status);
             }
         }).start();
@@ -163,25 +232,74 @@ final class SmsForwarder {
     private static void drainQueue(Context context) {
         SmsQueue queue = new SmsQueue(context);
         List<MessageRecord> pending = queue.getPending(BATCH_SIZE);
-        if (pending.isEmpty()) return;
+        if (pending.isEmpty()) {
+            saveProgress(context, new SyncProgress("완료", 0, 0, 0, 0, 0, 0, ""));
+            return;
+        }
+
+        int pendingBefore = queue.countPending();
+        saveProgress(context, new SyncProgress(
+                "서버 전송중",
+                pending.size(),
+                0,
+                pending.size(),
+                0,
+                0,
+                pendingBefore,
+                ""
+        ));
 
         try {
             PostResult result = postBatch(context, pending);
             if (result.isSuccessful()) {
                 queue.markSent(pending);
+                int pendingAfter = queue.countPending();
                 saveStatus(context, "전송 완료: " + pending.size() + "건 / 대기 " + queue.countPending()
                         + "건 / " + formatDisplayTime(System.currentTimeMillis()));
+                saveProgress(context, new SyncProgress(
+                        pendingAfter > 0 ? "일부 전송 완료" : "완료",
+                        pending.size(),
+                        0,
+                        pending.size(),
+                        pending.size(),
+                        0,
+                        pendingAfter,
+                        ""
+                ));
+                if (pendingAfter > 0) drainQueue(context);
             } else {
                 String error = result.summary();
                 queue.markFailed(pending, error);
-                saveStatus(context, "전송 실패: " + error + " / 대기 " + queue.countPending()
+                int pendingAfter = queue.countPending();
+                saveStatus(context, "전송 실패: " + error + " / 대기 " + pendingAfter
                         + "건 / " + formatDisplayTime(System.currentTimeMillis()));
+                saveProgress(context, new SyncProgress(
+                        "전송 실패",
+                        pending.size(),
+                        0,
+                        pending.size(),
+                        0,
+                        pending.size(),
+                        pendingAfter,
+                        error
+                ));
             }
         } catch (Exception error) {
             String errorMessage = safeError(error);
             queue.markFailed(pending, errorMessage);
-            saveStatus(context, "전송 실패: " + errorMessage + " / 대기 " + queue.countPending()
+            int pendingAfter = queue.countPending();
+            saveStatus(context, "전송 실패: " + errorMessage + " / 대기 " + pendingAfter
                     + "건 / " + formatDisplayTime(System.currentTimeMillis()));
+            saveProgress(context, new SyncProgress(
+                    "전송 실패",
+                    pending.size(),
+                    0,
+                    pending.size(),
+                    0,
+                    pending.size(),
+                    pendingAfter,
+                    errorMessage
+            ));
         }
     }
 

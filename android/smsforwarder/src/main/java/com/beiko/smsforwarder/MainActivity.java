@@ -6,12 +6,15 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.InputType;
 import android.view.Gravity;
 import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.ProgressBar;
 import android.widget.ScrollView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -22,7 +25,17 @@ public class MainActivity extends Activity {
     private EditText secretInput;
     private EditText usernameInput;
     private TextView permissionStatus;
+    private ProgressBar syncProgressBar;
+    private TextView progressStatus;
     private TextView lastStatus;
+    private final Handler statusHandler = new Handler(Looper.getMainLooper());
+    private final Runnable statusTicker = new Runnable() {
+        @Override
+        public void run() {
+            refreshStatus();
+            statusHandler.postDelayed(this, 1000);
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -34,6 +47,14 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshStatus();
+        statusHandler.removeCallbacks(statusTicker);
+        statusHandler.postDelayed(statusTicker, 1000);
+    }
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        statusHandler.removeCallbacks(statusTicker);
     }
 
     @Override
@@ -136,7 +157,7 @@ public class MainActivity extends Activity {
         root.addView(disableButton, buttonParams());
 
         TextView note = label(
-                "주의: 모든 받은 문자 본문이 서버에 저장됩니다. MMS 첨부파일은 제외하고 텍스트만 저장합니다.",
+                "동기화가 켜져 있으면 앱을 닫아도 새 SMS/MMS는 백그라운드에서 자동 저장/전송됩니다. 과거 문자 전체 가져오기는 이 화면에서 한 번 실행해야 합니다. 안정적인 자동 전송을 위해 Android 배터리 설정에서 이 앱을 제한 없음으로 두세요.",
                 13,
                 0xFF667085,
                 false
@@ -144,6 +165,28 @@ public class MainActivity extends Activity {
         note.setPadding(0, dp(16), 0, dp(8));
         note.setLineSpacing(dp(2), 1.0f);
         root.addView(note);
+
+        TextView progressTitle = label("동기화 진행상태", 15, 0xFF111827, true);
+        progressTitle.setPadding(0, dp(10), 0, dp(8));
+        root.addView(progressTitle);
+
+        syncProgressBar = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
+        syncProgressBar.setMax(100);
+        syncProgressBar.setProgress(0);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                dp(18)
+        );
+        progressParams.setMargins(0, 0, 0, dp(8));
+        root.addView(syncProgressBar, progressParams);
+
+        progressStatus = label("", 13, 0xFF101828, true);
+        progressStatus.setPadding(dp(14), dp(14), dp(14), dp(14));
+        progressStatus.setBackgroundColor(0xFFEFF8FF);
+        root.addView(progressStatus, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+        ));
 
         lastStatus = label("", 14, 0xFF101828, true);
         lastStatus.setPadding(dp(14), dp(14), dp(14), dp(14));
@@ -192,6 +235,13 @@ public class MainActivity extends Activity {
                 : "SMS/MMS 권한 필요 · 버튼을 눌러 허용하세요");
         permissionStatus.setTextColor(granted && enabled ? 0xFF027A48 : 0xFFB42318);
         permissionStatus.setBackgroundColor(granted && enabled ? 0xFFECFDF3 : 0xFFFFF1F1);
+        SyncProgress progress = SmsForwarder.getProgress(this);
+        if (syncProgressBar != null) {
+            syncProgressBar.setProgress(progress.percent());
+        }
+        if (progressStatus != null) {
+            progressStatus.setText(progress.summary());
+        }
         if (lastStatus != null) {
             lastStatus.setText("마지막 상태\n"
                     + SmsForwarder.getLastStatus(this)

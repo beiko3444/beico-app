@@ -42,6 +42,14 @@ public class SmsReceiver extends BroadcastReceiver {
                 receivedAt,
                 ""
         );
-        SmsForwarder.enqueueAndRetry(context.getApplicationContext(), record);
+        PendingResult pendingResult = goAsync();
+        Context appContext = context.getApplicationContext();
+        new Thread(() -> {
+            try {
+                SmsForwarder.enqueueAndRetryBlocking(appContext, record);
+            } finally {
+                pendingResult.finish();
+            }
+        }).start();
     }
 }
