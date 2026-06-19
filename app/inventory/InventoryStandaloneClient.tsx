@@ -54,6 +54,49 @@ type ProductCandidate = {
 }
 
 const REFRESH_MS = 5000
+const KOREAN_PUBLIC_HOLIDAYS: Record<string, string> = {
+  '2026-01-01': '신정',
+  '2026-02-16': '설날',
+  '2026-02-17': '설날',
+  '2026-02-18': '설날',
+  '2026-03-01': '삼일절',
+  '2026-03-02': '대체공휴일',
+  '2026-05-01': '근로자의날',
+  '2026-05-05': '어린이날',
+  '2026-05-24': '부처님오신날',
+  '2026-05-25': '대체공휴일',
+  '2026-06-03': '지방선거',
+  '2026-06-06': '현충일',
+  '2026-07-17': '제헌절',
+  '2026-08-15': '광복절',
+  '2026-08-17': '대체공휴일',
+  '2026-09-24': '추석',
+  '2026-09-25': '추석',
+  '2026-09-26': '추석',
+  '2026-10-03': '개천절',
+  '2026-10-05': '대체공휴일',
+  '2026-10-09': '한글날',
+  '2026-12-25': '성탄절',
+  '2027-01-01': '신정',
+  '2027-02-06': '설날',
+  '2027-02-07': '설날',
+  '2027-02-08': '설날',
+  '2027-02-09': '대체공휴일',
+  '2027-03-01': '삼일절',
+  '2027-05-05': '어린이날',
+  '2027-05-13': '부처님오신날',
+  '2027-06-06': '현충일',
+  '2027-08-15': '광복절',
+  '2027-08-16': '대체공휴일',
+  '2027-09-14': '추석',
+  '2027-09-15': '추석',
+  '2027-09-16': '추석',
+  '2027-10-03': '개천절',
+  '2027-10-04': '대체공휴일',
+  '2027-10-09': '한글날',
+  '2027-10-11': '대체공휴일',
+  '2027-12-25': '성탄절',
+}
 
 function todayYmd() {
   const now = new Date()
@@ -93,6 +136,10 @@ function formatYmd(date: Date) {
   return `${year}-${month}-${day}`
 }
 
+function getHolidayName(dateText: string) {
+  return KOREAN_PUBLIC_HOLIDAYS[dateText] || null
+}
+
 function stockTone(value: number | null | undefined) {
   if (value === null || value === undefined) return 'text-slate-400'
   if (value <= 0) return 'text-red-600'
@@ -102,7 +149,7 @@ function stockTone(value: number | null | undefined) {
 
 function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefined; alt: string; size?: 'sm' | 'md' | 'lg' }) {
   const [failed, setFailed] = useState(false)
-  const sizeClass = size === 'lg' ? 'h-20 w-20' : size === 'sm' ? 'h-11 w-11' : 'h-14 w-14'
+  const sizeClass = size === 'lg' ? 'h-24 w-32' : size === 'sm' ? 'h-12 w-14' : 'h-16 w-20'
 
   if (!src || failed) {
     return (
@@ -468,7 +515,7 @@ function InboundTab({
         {loading && rows.length === 0 ? (
           <LoadingBlock label="입고 상품 불러오는 중" />
         ) : (
-          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {rows.map((row) => (
               <button
                 key={`${row.sourceId || row.id}`}
@@ -476,12 +523,12 @@ function InboundTab({
                 onClick={() => onOpenKeypad(row)}
                 className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99]"
               >
-                <div className="flex items-start gap-3">
-                    <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
+                <div className="flex min-h-[104px] items-center gap-4">
+                  <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
                   <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 min-h-[44px] text-base font-black leading-tight tracking-normal text-slate-950">{row.name}</div>
-                    <div className="mt-2 text-xs font-black">
-                      <span className="block rounded bg-slate-100 px-2 py-1 text-right text-slate-700">창고 {formatNumber(row.stock ?? 0)}</span>
+                    <div className="line-clamp-2 min-h-[50px] text-lg font-black leading-tight tracking-normal text-slate-950">{row.name}</div>
+                    <div className="mt-3 text-sm font-black">
+                      <span className="block rounded bg-slate-100 px-3 py-2 text-right text-slate-700">창고 {formatNumber(row.stock ?? 0)}</span>
                     </div>
                   </div>
                 </div>
@@ -540,7 +587,7 @@ function InboundCalendar({
 
       <div className="grid grid-cols-7 gap-1 text-center text-[11px] font-black text-slate-400">
         {['일', '월', '화', '수', '목', '금', '토'].map((day) => (
-          <div key={day} className="py-1">{day}</div>
+          <div key={day} className={`py-1 ${day === '일' ? 'text-red-500' : ''}`}>{day}</div>
         ))}
       </div>
       <div className="mt-1 grid grid-cols-7 gap-1">
@@ -550,6 +597,8 @@ function InboundCalendar({
           const inCurrentMonth = day.getMonth() === selected.getMonth()
           const active = dateText === selectedDate
           const isToday = dateText === todayYmd()
+          const holidayName = getHolidayName(dateText)
+          const holiday = Boolean(holidayName) || day.getDay() === 0
 
           return (
             <button
@@ -559,17 +608,24 @@ function InboundCalendar({
               className={`min-h-[54px] rounded-md border p-1 text-left transition ${
                 active
                   ? 'border-slate-950 bg-slate-950 text-white'
+                  : holidayName
+                    ? 'border-red-200 bg-red-50 text-red-700'
                   : item
                     ? 'border-emerald-200 bg-emerald-50 text-slate-950'
                     : 'border-slate-200 bg-white text-slate-700'
               } ${inCurrentMonth ? '' : 'opacity-40'}`}
             >
               <div className="flex items-center justify-between gap-1">
-                <span className="text-xs font-black">{day.getDate()}</span>
+                <span className={`text-xs font-black ${!active && holiday ? 'text-red-600' : ''}`}>{day.getDate()}</span>
                 {isToday ? <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-blue-500'}`} /> : null}
               </div>
+              {holidayName ? (
+                <div className={`mt-0.5 truncate text-[9px] font-black leading-tight ${active ? 'text-white' : 'text-red-600'}`}>
+                  {holidayName}
+                </div>
+              ) : null}
               {item ? (
-                <div className={`mt-1 text-[10px] font-black leading-tight ${active ? 'text-white' : 'text-emerald-700'}`}>
+                <div className={`mt-1 text-[10px] font-black leading-tight ${active ? 'text-white' : holidayName ? 'text-red-700' : 'text-emerald-700'}`}>
                   {formatNumber(item.totalQuantity)}개
                 </div>
               ) : null}
