@@ -52,6 +52,21 @@ type SmsSendLogItem = {
   createdAt: string
 }
 
+type MobileSmsItem = {
+  id: string
+  toName: string | null
+  toNumber: string
+  body: string
+  status: string
+  attemptCount: number
+  sourceDevice: string | null
+  claimedAt: string | null
+  sentAt: string | null
+  failedAt: string | null
+  lastError: string | null
+  createdAt: string
+}
+
 type SmsBootstrapResponse = {
   senderId: string
   defaultFromNumber: string
@@ -123,21 +138,41 @@ function getSendStateClass(state: number) {
   return 'bg-slate-100 text-slate-700'
 }
 
+function getMobileStatusLabel(status: string) {
+  if (status === 'PENDING') return '대기'
+  if (status === 'CLAIMED') return '폰 확인중'
+  if (status === 'SENT') return '발송완료'
+  if (status === 'FAILED') return '실패'
+  return status || '-'
+}
+
+function getMobileStatusClass(status: string) {
+  if (status === 'SENT') return 'bg-emerald-100 text-emerald-700'
+  if (status === 'FAILED') return 'bg-red-100 text-red-700'
+  if (status === 'CLAIMED') return 'bg-blue-100 text-blue-700'
+  return 'bg-amber-100 text-amber-700'
+}
+
 export default function SmsClient() {
   const [loading, setLoading] = useState(true)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [mobileSubmitting, setMobileSubmitting] = useState(false)
+  const [mobileLoading, setMobileLoading] = useState(false)
   const [savingRecipient, setSavingRecipient] = useState(false)
   const [deletingRecipientId, setDeletingRecipientId] = useState('')
   const [loadError, setLoadError] = useState('')
   const [historyError, setHistoryError] = useState('')
   const [submitError, setSubmitError] = useState('')
   const [submitSuccess, setSubmitSuccess] = useState('')
+  const [mobileError, setMobileError] = useState('')
+  const [mobileSuccess, setMobileSuccess] = useState('')
   const [recipientActionMessage, setRecipientActionMessage] = useState('')
   const [recipientActionError, setRecipientActionError] = useState('')
   const [fromNumbers, setFromNumbers] = useState<SmsFromNumber[]>([])
   const [recipients, setRecipients] = useState<SmsRecipient[]>([])
   const [sendLogs, setSendLogs] = useState<SmsSendLogItem[]>([])
+  const [mobileMessages, setMobileMessages] = useState<MobileSmsItem[]>([])
   const [selectedRecipientId, setSelectedRecipientId] = useState('')
   const [fromNumber, setFromNumber] = useState('')
   const [toName, setToName] = useState('')
@@ -214,8 +249,27 @@ export default function SmsClient() {
     }
   }
 
+  async function loadMobileMessages() {
+    setMobileLoading(true)
+    setMobileError('')
+
+    try {
+      const response = await fetch('/api/admin/mobile-sms', { cache: 'no-store' })
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : '휴대폰 발송내역을 불러오지 못했습니다.')
+      }
+      setMobileMessages(Array.isArray(result?.messages) ? result.messages : [])
+    } catch (error) {
+      setMobileError(error instanceof Error ? error.message : '휴대폰 발송내역을 불러오지 못했습니다.')
+    } finally {
+      setMobileLoading(false)
+    }
+  }
+
   useEffect(() => {
     void loadSmsData(1, true)
+    void loadMobileMessages()
   }, [])
 
   const byteLength = getByteLength(contents)
@@ -269,6 +323,41 @@ export default function SmsClient() {
       setSubmitError(error instanceof Error ? error.message : '문자 발송에 실패했습니다.')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleMobileSubmit() {
+    setMobileSubmitting(true)
+    setMobileError('')
+    setMobileSuccess('')
+    setSubmitError('')
+    setSubmitSuccess('')
+
+    try {
+      const response = await fetch('/api/admin/mobile-sms', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          toName,
+          toNumber,
+          contents,
+        }),
+      })
+
+      const result = await response.json()
+      if (!response.ok) {
+        throw new Error(typeof result?.error === 'string' ? result.error : '휴대폰 문자 발송 등록에 실패했습니다.')
+      }
+
+      setMobileSuccess('휴대폰 발송 대기열에 등록했습니다. 안드로이드 앱이 동기화되면 실제 문자로 발송됩니다.')
+      setContents('')
+      await loadMobileMessages()
+    } catch (error) {
+      setMobileError(error instanceof Error ? error.message : '휴대폰 문자 발송 등록에 실패했습니다.')
+    } finally {
+      setMobileSubmitting(false)
     }
   }
 
@@ -547,14 +636,106 @@ export default function SmsClient() {
                   </>
                 )}
               </button>
+
+              <button
+                type="button"
+                onClick={handleMobileSubmit}
+                disabled={mobileSubmitting}
+                className="w-full h-12 rounded-xl bg-[#101828] hover:bg-[#1d2939] text-white font-black text-sm tracking-wide inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {mobileSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    대기 등록 중...
+                  </>
+                ) : (
+                  <>
+                    <Smartphone size={16} />
+                    휴대폰으로 발송
+                  </>
+                )}
+              </button>
             </div>
 
             {loadError && <p className="text-sm font-bold text-red-600">{loadError}</p>}
             {submitError && <p className="text-sm font-bold text-red-600">{submitError}</p>}
             {submitSuccess && <p className="text-sm font-bold text-emerald-600">{submitSuccess}</p>}
+            {mobileError && <p className="text-sm font-bold text-red-600">{mobileError}</p>}
+            {mobileSuccess && <p className="text-sm font-bold text-emerald-600">{mobileSuccess}</p>}
           </div>
         </div>
       </form>
+
+      <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
+        <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+          <div>
+            <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Mobile Outbox</p>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">휴대폰 발송 대기열</h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+              안드로이드 폰 앱이 이 목록을 가져가 실제 SMS로 발송하고 결과를 저장합니다.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void loadMobileMessages()}
+            disabled={mobileLoading}
+            className="h-11 px-5 rounded-xl bg-[#101828] text-white text-sm font-black inline-flex items-center justify-center gap-2 disabled:opacity-60"
+          >
+            {mobileLoading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
+            새로고침
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 dark:border-[#2a2a2a] overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-500 dark:text-gray-400">
+                <tr>
+                  <th className="px-4 py-3 text-left font-black">등록시각</th>
+                  <th className="px-4 py-3 text-left font-black">상태</th>
+                  <th className="px-4 py-3 text-left font-black">수신자</th>
+                  <th className="px-4 py-3 text-left font-black">수신번호</th>
+                  <th className="px-4 py-3 text-left font-black">시도</th>
+                  <th className="px-4 py-3 text-left font-black">기기</th>
+                  <th className="px-4 py-3 text-left font-black">결과시각</th>
+                  <th className="px-4 py-3 text-left font-black">내용</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
+                {mobileMessages.length ? (
+                  mobileMessages.map((item) => (
+                    <tr key={item.id} className="align-top">
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{formatIsoDateTime(item.createdAt)}</td>
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <span className={`inline-flex rounded-full px-3 py-1 text-[11px] font-black ${getMobileStatusClass(item.status)}`}>
+                          {getMobileStatusLabel(item.status)}
+                        </span>
+                        {item.lastError ? <div className="mt-2 max-w-[220px] break-words text-[11px] font-bold text-red-600">{item.lastError}</div> : null}
+                      </td>
+                      <td className="px-4 py-4 font-semibold text-gray-900 dark:text-white whitespace-nowrap">{item.toName || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{formatPhoneNumber(item.toNumber || '') || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">{item.attemptCount}</td>
+                      <td className="px-4 py-4 text-gray-500 dark:text-gray-400 min-w-[180px] break-all">{item.sourceDevice || '-'}</td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 whitespace-nowrap">
+                        {formatIsoDateTime(item.sentAt || item.failedAt || item.claimedAt || '')}
+                      </td>
+                      <td className="px-4 py-4 text-gray-700 dark:text-gray-400 min-w-[320px]">
+                        <div className="line-clamp-2 whitespace-pre-wrap break-words">{item.body || '-'}</div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={8} className="px-4 py-12 text-center text-sm font-bold text-gray-400 dark:text-gray-400">
+                      {mobileLoading ? '휴대폰 발송내역을 불러오는 중입니다.' : '휴대폰 발송 대기열이 없습니다.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
       <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-5">
         <div>

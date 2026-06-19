@@ -26,6 +26,7 @@ model User {
   inventoryInbounds InventoryInbound[]
   pushTokens PushToken[]
   mobileMessages MobileMessage[]
+  mobileOutgoingMessages MobileOutgoingMessage[]
 }
 
 model InventoryPreference {
@@ -417,6 +418,28 @@ model MobileMessage {
   @@index([userId, receivedAt])
   @@index([messageType])
   @@index([receivedAt])
+}
+
+model MobileOutgoingMessage {
+  id             String    @id @default(uuid())
+  requestedById  String?
+  toName         String?
+  toNumber       String
+  body           String
+  status         String    @default("PENDING")
+  attemptCount   Int       @default(0)
+  sourceDevice   String?
+  claimedAt      DateTime?
+  sentAt         DateTime?
+  failedAt       DateTime?
+  lastError      String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  requestedBy    User?     @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([status, createdAt])
+  @@index([toNumber])
+  @@index([requestedById])
 }
 
 model NaverSalesDaily {

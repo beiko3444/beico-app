@@ -83,7 +83,7 @@ public class MainActivity extends Activity {
         root.addView(title);
 
         TextView description = label(
-                "받은 SMS와 MMS 본문을 베이코 서버 DB에 저장합니다. 동기화를 켠 뒤에만 기존 문자와 새 문자를 전송합니다.",
+                "받은 SMS/MMS를 베이코 서버 DB에 저장하고, 서버에 등록된 발송 대기 문자를 이 폰의 유심으로 전송합니다.",
                 15,
                 0xFF667085,
                 false
@@ -119,7 +119,7 @@ public class MainActivity extends Activity {
         });
         root.addView(saveButton, buttonParams());
 
-        Button permissionButton = actionButton("SMS/MMS/연락처 권한 허용", 0xFFEE341B);
+        Button permissionButton = actionButton("SMS/MMS/발송/연락처 권한 허용", 0xFFEE341B);
         permissionButton.setOnClickListener(view -> requestSmsPermission());
         root.addView(permissionButton, buttonParams());
 
@@ -136,6 +136,16 @@ public class MainActivity extends Activity {
             refreshStatus();
         });
         root.addView(retryButton, buttonParams());
+
+        Button outgoingButton = actionButton("발송 대기문자 가져와 전송", 0xFF7C3AED);
+        outgoingButton.setOnClickListener(view -> {
+            saveInputs();
+            SmsForwarder.setEnabled(this, true);
+            SmsForwarder.pollAndSendOutgoing(this);
+            toast("발송 대기문자를 확인합니다.");
+            refreshStatus();
+        });
+        root.addView(outgoingButton, buttonParams());
 
         Button testButton = actionButton("테스트 전송", 0xFF2563EB);
         testButton.setOnClickListener(view -> {
@@ -157,7 +167,7 @@ public class MainActivity extends Activity {
         root.addView(disableButton, buttonParams());
 
         TextView note = label(
-                "동기화가 켜져 있으면 앱을 닫아도 새 SMS/MMS는 백그라운드에서 자동 저장/전송됩니다. 연락처 권한을 허용하면 저장된 발신자 이름도 함께 저장됩니다. 과거 문자 전체 가져오기는 이 화면에서 한 번 실행해야 합니다. 안정적인 자동 전송을 위해 Android 배터리 설정에서 이 앱을 제한 없음으로 두세요.",
+                "동기화가 켜져 있으면 앱을 닫아도 새 SMS/MMS는 백그라운드에서 자동 저장/전송됩니다. 연락처 권한을 허용하면 저장된 발신자 이름도 함께 저장됩니다. 발송 권한을 허용하면 서버 대기열의 문자를 이 폰의 유심으로 보냅니다. 과거 문자 전체 가져오기는 이 화면에서 한 번 실행해야 합니다. 안정적인 자동 전송을 위해 Android 배터리 설정에서 이 앱을 제한 없음으로 두세요.",
                 13,
                 0xFF667085,
                 false
@@ -232,7 +242,7 @@ public class MainActivity extends Activity {
         boolean enabled = SmsForwarder.isEnabled(this);
         permissionStatus.setText(granted
                 ? (enabled ? "권한 허용됨 · 동기화 켜짐" : "권한 허용됨 · 동기화 꺼짐")
-                : "SMS/MMS/연락처 권한 필요 · 버튼을 눌러 허용하세요");
+                : "SMS/MMS/발송/연락처 권한 필요 · 버튼을 눌러 허용하세요");
         permissionStatus.setTextColor(granted && enabled ? 0xFF027A48 : 0xFFB42318);
         permissionStatus.setBackgroundColor(granted && enabled ? 0xFFECFDF3 : 0xFFFFF1F1);
         SyncProgress progress = SmsForwarder.getProgress(this);
@@ -258,6 +268,7 @@ public class MainActivity extends Activity {
                 new String[]{
                         Manifest.permission.READ_CONTACTS,
                         Manifest.permission.READ_SMS,
+                        Manifest.permission.SEND_SMS,
                         Manifest.permission.RECEIVE_SMS,
                         Manifest.permission.RECEIVE_MMS,
                         Manifest.permission.RECEIVE_WAP_PUSH
@@ -269,6 +280,7 @@ public class MainActivity extends Activity {
     private boolean hasSmsPermissions() {
         return checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
+                && checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.RECEIVE_MMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.RECEIVE_WAP_PUSH) == PackageManager.PERMISSION_GRANTED;
