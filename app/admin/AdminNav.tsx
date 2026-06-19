@@ -169,6 +169,7 @@ export default function AdminNav({
     { name: '생산관리', path: '/admin/production' },
     { name: '근태관리', path: '/admin/tasks' },
     { name: '카드사용내역', path: '/admin/card-usage' },
+    { name: '수신문자함', path: '/admin/mobile-messages' },
     { name: '문자발송서비스', path: '/admin/sms' },
     { name: '통계', path: '/admin/statistics' },
     { name: '지렁이 발주', path: '/admin/worm-order' },
