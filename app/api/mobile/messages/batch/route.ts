@@ -139,7 +139,9 @@ function normalizeEnum(value: unknown, allowed: string[], fallback: string) {
 }
 
 function toNonEmptyString(value: unknown) {
-  return typeof value === 'string' && value.trim() ? value.trim() : null
+  if (typeof value !== 'string') return null
+  const sanitized = value.replace(/\u0000/g, '').trim()
+  return sanitized ? sanitized : null
 }
 
 function toDate(value: unknown) {
