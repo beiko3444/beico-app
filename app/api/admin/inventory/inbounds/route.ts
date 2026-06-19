@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/requireAdmin'
+import { getProductImageUrl } from '@/lib/product-image-url'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -9,31 +10,31 @@ const DEFAULT_WAREHOUSE_ITEMS = [
   {
     name: 'BEIKO 퀵베이트V3 청갯지렁이',
     productCode: 'quickbait-green',
-    imageUrl: '/inventory-assets/quickbait-green.png',
+    keyword: '청갯지렁이',
     sortOrder: 10,
   },
   {
     name: 'BEIKO 퀵베이트V3 홍갯지렁이',
     productCode: 'quickbait-red',
-    imageUrl: '/inventory-assets/quickbait-red.png',
+    keyword: '홍갯지렁이',
     sortOrder: 20,
   },
   {
     name: 'BEIKO 퀵베이트V3 혼무시',
     productCode: 'quickbait-blue',
-    imageUrl: '/inventory-assets/quickbait-blue.png',
+    keyword: '혼무시',
     sortOrder: 30,
   },
   {
     name: 'BEIKO 퀵베이트V3 멍게',
     productCode: 'quickbait-orange',
-    imageUrl: '/inventory-assets/quickbait-orange.png',
+    keyword: '멍게',
     sortOrder: 40,
   },
   {
     name: 'BEIKO 퀵베이트V3 번데기',
     productCode: 'quickbait-yellow',
-    imageUrl: '/inventory-assets/quickbait-yellow.png',
+    keyword: '번데기',
     sortOrder: 50,
   },
 ]
@@ -216,21 +217,49 @@ function formatYmd(date: Date) {
 
 async function ensureWarehouseInventoryItems() {
   await Promise.all(
-    DEFAULT_WAREHOUSE_ITEMS.map((item) =>
-      prisma.warehouseInventoryItem.upsert({
+    DEFAULT_WAREHOUSE_ITEMS.map(async (item) => {
+      const product = await prisma.product.findFirst({
+        where: {
+          imageUrl: { not: null },
+          OR: [
+            { name: { contains: item.keyword, mode: 'insensitive' } },
+            { nameJP: { contains: item.keyword, mode: 'insensitive' } },
+            { nameEN: { contains: item.keyword, mode: 'insensitive' } },
+          ],
+        },
+        select: {
+          id: true,
+          imageUrl: true,
+          updatedAt: true,
+        },
+        orderBy: { sortOrder: 'asc' },
+      })
+      const imageUrl = product?.imageUrl ? getProductImageUrl(product.id, product.updatedAt) : null
+
+      const warehouseItem = await prisma.warehouseInventoryItem.upsert({
         where: { productCode: item.productCode },
         create: {
-          ...item,
+          name: item.name,
+          productCode: item.productCode,
+          imageUrl,
+          sortOrder: item.sortOrder,
           stock: 0,
           active: true,
         },
         update: {
           name: item.name,
-          imageUrl: item.imageUrl,
+          ...(imageUrl ? { imageUrl } : {}),
           sortOrder: item.sortOrder,
           active: true,
         },
-      }),
-    ),
+      })
+
+      if (imageUrl) {
+        await prisma.inventoryInbound.updateMany({
+          where: { warehouseItemId: warehouseItem.id },
+          data: { productImageUrl: imageUrl },
+        })
+      }
+    }),
   )
 }
