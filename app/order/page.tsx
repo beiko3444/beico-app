@@ -76,6 +76,12 @@ export default async function NewOrderPage() {
         let jpBuy = p.jpBuyPrice || 0, jpSell = p.jpSellPrice || 0;
         let usBuy = p.usBuyPrice || 0, usSell = p.usSellPrice || 0;
         let currentMoq = p.minOrderQuantity || 1;
+        let currentOrderUnit = p.orderUnit || 1;
+
+        const parsePositiveInt = (value: unknown, fallback: number) => {
+            const parsed = Number(String(value || '').replace(/,/g, ''));
+            return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+        };
 
         const parsePrices = (gradeData: any) => {
             krBuy = Number(String(gradeData.KR?.wholesale || '0').replace(/,/g, ''));
@@ -87,11 +93,14 @@ export default async function NewOrderPage() {
 
             // Set regional MOQ
             if (user?.country === 'Korea') {
-                currentMoq = Number(String(gradeData.KR?.moq || p.minOrderQuantity || '1').replace(/,/g, ''));
+                currentMoq = parsePositiveInt(gradeData.KR?.moq, p.minOrderQuantity || 1);
+                currentOrderUnit = parsePositiveInt(gradeData.KR?.orderUnit, p.orderUnit || 1);
             } else if (user?.country === 'Japan') {
-                currentMoq = Number(String(gradeData.JP?.moq || p.minOrderQuantity || '1').replace(/,/g, ''));
+                currentMoq = parsePositiveInt(gradeData.JP?.moq, p.minOrderQuantity || 1);
+                currentOrderUnit = parsePositiveInt(gradeData.JP?.orderUnit, p.orderUnit || 1);
             } else {
-                currentMoq = Number(String(gradeData.US?.moq || p.minOrderQuantity || '1').replace(/,/g, ''));
+                currentMoq = parsePositiveInt(gradeData.US?.moq, p.minOrderQuantity || 1);
+                currentOrderUnit = parsePositiveInt(gradeData.US?.orderUnit, p.orderUnit || 1);
             }
 
             // Set final checkout price based on the user's country
@@ -134,7 +143,7 @@ export default async function NewOrderPage() {
             nameJP: p.nameJP,
             nameEN: p.nameEN,
             minOrderQuantity: currentMoq,
-            orderUnit: p.orderUnit || 1,
+            orderUnit: currentOrderUnit,
             buyPrice: p.buyPrice,
             onlinePrice: p.onlinePrice || 0,
             jpBuyPrice: jpBuy,

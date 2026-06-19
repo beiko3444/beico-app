@@ -162,7 +162,7 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete, check
                 <input
                     type="number"
                     min="1"
-                    value={modifiedOrderUnit !== undefined ? modifiedOrderUnit : (product.orderUnit || 1)}
+                    value={modifiedOrderUnit !== undefined ? modifiedOrderUnit : (product.regionalPrices?.C?.KR?.orderUnit || product.orderUnit || 1)}
                     onChange={(e) => onOrderUnitChange(product.id, e.target.value)}
                     className="w-12 text-center border border-gray-200 rounded py-0.5 text-[11px] focus:border-[var(--color-brand-blue)] outline-none font-bold bg-white transition-colors"
                 />
@@ -472,7 +472,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">KR 최소수량</th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">주문단위</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">KR 주문단위</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">매입가</th>
                             <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">도매가</th>
                             <th className="px-2 py-1.5 text-right font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">판매가</th>

@@ -5,6 +5,40 @@ import { authOptions } from "@/lib/auth"
 import { sendOrderNotification } from "@/lib/notification"
 import { getProductImageUrl } from "@/lib/product-image-url"
 
+const getCountryKey = (country?: string | null) => {
+    if (country === 'Korea') return 'KR'
+    if (country === 'Japan') return 'JP'
+    return 'US'
+}
+
+const getGradeKey = (grade?: string | null) => {
+    const normalized = String(grade || 'C').toUpperCase()
+    return ['A', 'B', 'C', 'D'].includes(normalized) ? normalized : 'C'
+}
+
+const parsePositiveInt = (value: unknown, fallback: number) => {
+    const parsed = Number(String(value || '').replace(/,/g, ''))
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback
+}
+
+const resolveOrderRules = (product: any, gradeKey: string, countryKey: string) => {
+    const regionalPrices = product.regionalPrices
+    const gradeData = regionalPrices && typeof regionalPrices === 'object'
+        ? regionalPrices[gradeKey] || regionalPrices.C
+        : null
+    const countryData = gradeData && typeof gradeData === 'object'
+        ? gradeData[countryKey] || gradeData.KR
+        : null
+
+    const fallbackMoq = product.minOrderQuantity || 1
+    const fallbackOrderUnit = product.orderUnit || 1
+
+    return {
+        minimumQuantity: parsePositiveInt(countryData?.moq, fallbackMoq),
+        orderUnit: parsePositiveInt(countryData?.orderUnit, fallbackOrderUnit),
+    }
+}
+
 export async function POST(request: Request) {
     try {
         const session = await getServerSession(authOptions)
@@ -21,6 +55,18 @@ export async function POST(request: Request) {
 
         // Transaction to create order and update stock
         const result = await prisma.$transaction(async (tx: any) => {
+            const user = await tx.user.findUnique({
+                where: { id: session.user.id },
+                select: {
+                    country: true,
+                    partnerProfile: {
+                        select: { grade: true },
+                    },
+                },
+            })
+            const countryKey = getCountryKey(user?.country)
+            const gradeKey = getGradeKey(user?.partnerProfile?.grade)
+
             // 1. Verify stock for all items first
             for (const item of items) {
                 const product = await tx.product.findUnique({ where: { id: item.productId } })
@@ -30,11 +76,10 @@ export async function POST(request: Request) {
                 if (product.stock < item.quantity) {
                     throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.stock}`)
                 }
-                const minimumQuantity = product.minOrderQuantity || 1
+                const { minimumQuantity, orderUnit } = resolveOrderRules(product, gradeKey, countryKey)
                 if (item.quantity < minimumQuantity) {
                     throw new Error(`${product.name} minimum order quantity is ${minimumQuantity}`)
                 }
-                const orderUnit = product.orderUnit || 1
                 if (item.quantity % orderUnit !== 0) {
                     throw new Error(`${product.name} must be ordered in units of ${orderUnit}`)
                 }

@@ -20,7 +20,15 @@ export async function POST(request: Request) {
 
             ['A', 'B', 'C', 'D'].forEach(grade => {
                 if (!regionalPrices[grade]) regionalPrices[grade] = {};
-                if (!regionalPrices[grade].KR) regionalPrices[grade].KR = { cost: '', wholesale: '', retail: '', moq: '1' };
+                if (!regionalPrices[grade].KR) {
+                    regionalPrices[grade].KR = {
+                        cost: '',
+                        wholesale: '',
+                        retail: '',
+                        moq: '1',
+                        orderUnit: String(product.orderUnit || 1)
+                    };
+                }
                 regionalPrices[grade].KR.moq = String(update.moq);
             });
 

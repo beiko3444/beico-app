@@ -97,20 +97,22 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             .catch(err => console.error("Failed to fetch exchange rates", err));
     }, []);
 
-    type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string };
+    type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string, orderUnit: string };
     type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice };
     const defaultGradePricing = (): GradePricing => ({
-        KR: { cost: '', wholesale: '', retail: '', moq: '1' },
-        JP: { cost: '', wholesale: '', retail: '', moq: '1' },
-        US: { cost: '', wholesale: '', retail: '', moq: '1' }
+        KR: { cost: '', wholesale: '', retail: '', moq: '1', orderUnit: '1' },
+        JP: { cost: '', wholesale: '', retail: '', moq: '1', orderUnit: '1' },
+        US: { cost: '', wholesale: '', retail: '', moq: '1', orderUnit: '1' }
     });
 
-    const [regionalPrices, setRegionalPrices] = useState<{ [grade: string]: GradePricing }>({
+    const createDefaultRegionalPrices = () => ({
         A: defaultGradePricing(),
         B: defaultGradePricing(),
         C: defaultGradePricing(),
         D: defaultGradePricing()
     });
+
+    const [regionalPrices, setRegionalPrices] = useState<{ [grade: string]: GradePricing }>(createDefaultRegionalPrices());
     const [activeGradeTab, setActiveGradeTab] = useState('C');
 
     const normalizeProductCode = (value: string) => value.toUpperCase();
@@ -137,6 +139,25 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
         return val.replace(/,/g, "");
     };
 
+    const normalizeRegionalPrices = (source: any, fallbackOrderUnit: number | string = 1) => {
+        const next = createDefaultRegionalPrices();
+
+        (['A', 'B', 'C', 'D'] as const).forEach(grade => {
+            (['KR', 'JP', 'US'] as const).forEach(country => {
+                const current = source?.[grade]?.[country] || {};
+                next[grade][country] = {
+                    cost: formatNumber(current.cost || ''),
+                    wholesale: formatNumber(current.wholesale || ''),
+                    retail: formatNumber(current.retail || ''),
+                    moq: formatNumber(current.moq || 1),
+                    orderUnit: formatNumber(current.orderUnit || fallbackOrderUnit || 1),
+                };
+            });
+        });
+
+        return next;
+    };
+
     // Initialize form when opening if initialData exists
     useEffect(() => {
         if (isOpen && initialData) {
@@ -154,41 +175,29 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setOrderUnit(formatNumber(initialData.orderUnit || 1))
 
             if (initialData.regionalPrices && Object.keys(initialData.regionalPrices).length > 0) {
-                // Formatting values when loading from existing JSON
-                const formattedPrices = { ...initialData.regionalPrices };
-                Object.keys(formattedPrices).forEach(g => {
-                    Object.keys(formattedPrices[g]).forEach(c => {
-                        formattedPrices[g][c].cost = formatNumber(formattedPrices[g][c].cost);
-                        formattedPrices[g][c].wholesale = formatNumber(formattedPrices[g][c].wholesale);
-                        formattedPrices[g][c].retail = formatNumber(formattedPrices[g][c].retail);
-                        formattedPrices[g][c].moq = formatNumber(formattedPrices[g][c].moq || 1);
-                    });
-                });
-                setRegionalPrices(formattedPrices);
+                setRegionalPrices(normalizeRegionalPrices(initialData.regionalPrices, initialData.orderUnit || 1));
             } else {
                 // Fallback from old schema data or defaults
-                const fallback = {
-                    A: defaultGradePricing(),
-                    B: defaultGradePricing(),
-                    C: defaultGradePricing(),
-                    D: defaultGradePricing()
-                };
+                const fallback = createDefaultRegionalPrices();
 
                 // Try to infer old data to C grade
                 fallback['C'].KR.cost = formatNumber(initialData.buyPrice || '');
                 fallback['C'].KR.wholesale = formatNumber(initialData.krBuyPrice || initialData.sellPrice || '');
                 fallback['C'].KR.retail = formatNumber(initialData.krSellPrice || initialData.onlinePrice || '');
                 fallback['C'].KR.moq = formatNumber(initialData.minOrderQuantity || 1);
+                fallback['C'].KR.orderUnit = formatNumber(initialData.orderUnit || 1);
 
                 fallback['C'].JP.cost = formatNumber(initialData.buyPrice || '');
                 fallback['C'].JP.wholesale = formatNumber(initialData.jpBuyPrice || '');
                 fallback['C'].JP.retail = formatNumber(initialData.jpSellPrice || '');
                 fallback['C'].JP.moq = formatNumber(initialData.minOrderQuantity || 1);
+                fallback['C'].JP.orderUnit = formatNumber(initialData.orderUnit || 1);
 
                 fallback['C'].US.cost = formatNumber(initialData.buyPrice || '');
                 fallback['C'].US.wholesale = formatNumber(initialData.usBuyPrice || '');
                 fallback['C'].US.retail = formatNumber(initialData.usSellPrice || '');
                 fallback['C'].US.moq = formatNumber(initialData.minOrderQuantity || 1);
+                fallback['C'].US.orderUnit = formatNumber(initialData.orderUnit || 1);
 
                 setRegionalPrices(fallback);
             }
@@ -206,12 +215,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setHasImageChanged(false)
             setMinOrderQuantity('1')
             setOrderUnit('1')
-            setRegionalPrices({
-                A: defaultGradePricing(),
-                B: defaultGradePricing(),
-                C: defaultGradePricing(),
-                D: defaultGradePricing()
-            });
+            setRegionalPrices(createDefaultRegionalPrices());
             setActiveGradeTab('C');
         }
     }, [isOpen, initialData, isCopy])
@@ -310,12 +314,8 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setImageUrl(null)
                     setHasImageChanged(false)
                     setMinOrderQuantity('1')
-                    setRegionalPrices({
-                        A: defaultGradePricing(),
-                        B: defaultGradePricing(),
-                        C: defaultGradePricing(),
-                        D: defaultGradePricing()
-                    });
+                    setOrderUnit('1')
+                    setRegionalPrices(createDefaultRegionalPrices());
                     setActiveGradeTab('C');
                 }
             } else {
@@ -347,7 +347,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const modalContent = (
         <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden">
             <div
-                className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-2xl shadow-md animate-in fade-in duration-100 max-h-[95vh] overflow-y-auto relative"
+                className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-5xl shadow-md animate-in fade-in duration-100 max-h-[95vh] overflow-y-auto relative"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Classic Windows-style Header */}
@@ -587,7 +587,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         <div className="absolute top-0 left-0 bg-gray-200 text-gray-700 text-[10px] font-black px-2 py-0.5 border-b border-r border-gray-300">
                                             {labels[country]}
                                         </div>
-                                        <div className="grid grid-cols-6 gap-3 mt-4">
+                                        <div className="grid grid-cols-7 gap-3 mt-4">
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-bold text-gray-600 block h-[15px]">매입단가</label>
                                                 <div className="relative">
@@ -679,6 +679,19 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                                         ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], moq: formatNumber(e.target.value) } }
                                                     }))}
                                                     className="w-full px-2 py-1.5 bg-[#f8f8f8] border border-gray-300 outline-none focus:border-gray-500 text-xs text-right font-bold"
+                                                />
+                                            </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[10px] font-bold text-emerald-700 block h-[15px]">주문단위</label>
+                                                <input
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    value={curPrices.orderUnit}
+                                                    onChange={e => setRegionalPrices(prev => ({
+                                                        ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], orderUnit: formatNumber(e.target.value) } }
+                                                    }))}
+                                                    className="w-full px-2 py-1.5 bg-[#f4fff8] border border-emerald-200 outline-none focus:border-emerald-600 text-xs text-right font-bold text-emerald-700"
                                                 />
                                             </div>
 
