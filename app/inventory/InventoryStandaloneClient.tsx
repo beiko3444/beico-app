@@ -116,7 +116,7 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
     <img
       src={src}
       alt={alt}
-      className={`${sizeClass} shrink-0 rounded-md border border-slate-200 bg-white object-cover`}
+      className={`${sizeClass} shrink-0 rounded-md border border-slate-200 bg-white object-contain p-1`}
       onError={() => setFailed(true)}
     />
   )
