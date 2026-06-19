@@ -2,6 +2,8 @@ package com.beiko.smsforwarder;
 
 import org.junit.Test;
 
+import java.lang.reflect.Method;
+
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 
@@ -43,5 +45,15 @@ public class SyncProgressTest {
         assertTrue(summary.contains("스캔 450/5,000"));
         assertTrue(summary.contains("대기큐 12건"));
         assertTrue(summary.contains("마지막 오류: Unauthorized"));
+    }
+
+    @Test
+    public void jsonEscapeEscapesAllControlCharacters() throws Exception {
+        Method jsonEscape = SmsForwarder.class.getDeclaredMethod("jsonEscape", String.class);
+        jsonEscape.setAccessible(true);
+
+        String escaped = (String) jsonEscape.invoke(null, "앞\u0001뒤\u000B끝");
+
+        assertEquals("앞\\u0001뒤\\u000b끝", escaped);
     }
 }
