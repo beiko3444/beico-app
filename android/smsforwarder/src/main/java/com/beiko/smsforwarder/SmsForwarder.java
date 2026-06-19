@@ -2,7 +2,11 @@ package com.beiko.smsforwarder;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.content.pm.PackageManager;
+import android.database.Cursor;
+import android.net.Uri;
 import android.os.Build;
+import android.provider.ContactsContract;
 import android.provider.Settings;
 
 import java.io.BufferedReader;
@@ -138,6 +142,7 @@ final class SmsForwarder {
                 deviceMessageId,
                 messageType == null ? "SMS" : messageType,
                 sender,
+                lookupContactName(context, sender),
                 body,
                 receivedAtMillis,
                 threadId,
@@ -362,6 +367,7 @@ final class SmsForwarder {
             builder.append("\"messageType\":\"").append(jsonEscape(message.messageType)).append("\",");
             builder.append("\"direction\":\"INBOUND\",");
             builder.append("\"sender\":\"").append(jsonEscape(message.sender)).append("\",");
+            builder.append("\"senderName\":\"").append(jsonEscape(message.senderName)).append("\",");
             builder.append("\"body\":\"").append(jsonEscape(message.body)).append("\",");
             builder.append("\"receivedAt\":\"").append(jsonEscape(formatIso(message.receivedAtMillis))).append("\",");
             builder.append("\"threadId\":\"").append(jsonEscape(message.threadId)).append("\",");
@@ -384,6 +390,32 @@ final class SmsForwarder {
         String androidId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
         String model = Build.MODEL == null ? "Android" : Build.MODEL;
         return "beiko-sms-forwarder/" + model + "/" + (androidId == null ? "unknown" : androidId);
+    }
+
+    private static String lookupContactName(Context context, String phoneNumber) {
+        if (phoneNumber == null || phoneNumber.trim().length() == 0) return "";
+        if (context.checkSelfPermission(android.Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+            return "";
+        }
+
+        Uri uri = Uri.withAppendedPath(
+                ContactsContract.PhoneLookup.CONTENT_FILTER_URI,
+                Uri.encode(phoneNumber)
+        );
+        try (Cursor cursor = context.getContentResolver().query(
+                uri,
+                new String[]{ContactsContract.PhoneLookup.DISPLAY_NAME},
+                null,
+                null,
+                null
+        )) {
+            if (cursor != null && cursor.moveToFirst()) {
+                String name = cursor.getString(0);
+                return name == null ? "" : name;
+            }
+        } catch (Exception ignored) {
+        }
+        return "";
     }
 
     private static String formatIso(long timeMillis) {

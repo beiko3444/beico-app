@@ -18,6 +18,7 @@ interface IncomingMobileMessage {
   messageType?: unknown
   direction?: unknown
   sender?: unknown
+  senderName?: unknown
   body?: unknown
   receivedAt?: unknown
   threadId?: unknown
@@ -29,6 +30,7 @@ type NormalizedMobileMessage = {
   messageType: string
   direction: string
   sender: string | null
+  senderName: string | null
   body: string
   receivedAt: Date
   threadId: string | null
@@ -82,6 +84,7 @@ export async function POST(request: Request) {
         messageType: message.messageType,
         direction: message.direction,
         sender: message.sender,
+        senderName: message.senderName,
         body: message.body,
         receivedAt: message.receivedAt,
         threadId: message.threadId,
@@ -119,6 +122,7 @@ function normalizeMessage(message: IncomingMobileMessage, defaultSourceDevice: s
     messageType,
     direction,
     sender: toNonEmptyString(message.sender),
+    senderName: toNonEmptyString(message.senderName),
     body,
     receivedAt,
     threadId: toNonEmptyString(message.threadId),

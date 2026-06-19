@@ -31,6 +31,7 @@ export default async function MobileMessagesPage() {
                 id: true,
                 messageType: true,
                 sender: true,
+                senderName: true,
                 body: true,
                 receivedAt: true,
                 sourceDevice: true,
@@ -92,7 +93,10 @@ export default async function MobileMessagesPage() {
                                             {formatDateTime(message.receivedAt)}
                                         </td>
                                         <td className="px-4 py-3 text-sm font-black text-slate-900">
-                                            {message.sender || '-'}
+                                            {message.senderName || message.sender || '-'}
+                                            {message.senderName && message.sender ? (
+                                                <div className="mt-1 text-[11px] font-bold text-slate-500">{message.sender}</div>
+                                            ) : null}
                                             <div className="mt-1 text-[10px] font-bold text-slate-400">{message.messageType}</div>
                                         </td>
                                         <td className="whitespace-pre-wrap px-4 py-3 text-sm font-semibold leading-6 text-slate-800">
@@ -115,7 +119,10 @@ export default async function MobileMessagesPage() {
                             <article key={message.id} className="space-y-2 p-4">
                                 <div className="flex items-start justify-between gap-3">
                                     <div>
-                                        <p className="text-base font-black text-slate-950">{message.sender || '-'}</p>
+                                        <p className="text-base font-black text-slate-950">{message.senderName || message.sender || '-'}</p>
+                                        {message.senderName && message.sender ? (
+                                            <p className="text-xs font-bold text-slate-500">{message.sender}</p>
+                                        ) : null}
                                         <p className="text-xs font-bold text-slate-400">{formatDateTime(message.receivedAt)} · {message.messageType}</p>
                                     </div>
                                     <span className="shrink-0 rounded bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-500">

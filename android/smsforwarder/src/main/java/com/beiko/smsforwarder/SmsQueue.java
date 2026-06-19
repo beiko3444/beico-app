@@ -11,7 +11,7 @@ import java.util.List;
 
 final class SmsQueue extends SQLiteOpenHelper {
     private static final String DB_NAME = "beiko_sms_queue.db";
-    private static final int DB_VERSION = 1;
+    private static final int DB_VERSION = 2;
     private static final String TABLE = "pending_messages";
 
     SmsQueue(Context context) {
@@ -24,6 +24,7 @@ final class SmsQueue extends SQLiteOpenHelper {
                 + "device_message_id TEXT PRIMARY KEY,"
                 + "message_type TEXT NOT NULL,"
                 + "sender TEXT,"
+                + "sender_name TEXT,"
                 + "body TEXT NOT NULL,"
                 + "received_at INTEGER NOT NULL,"
                 + "thread_id TEXT,"
@@ -37,8 +38,12 @@ final class SmsQueue extends SQLiteOpenHelper {
 
     @Override
     public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-        db.execSQL("DROP TABLE IF EXISTS " + TABLE);
-        onCreate(db);
+        if (oldVersion < 2) {
+            try {
+                db.execSQL("ALTER TABLE " + TABLE + " ADD COLUMN sender_name TEXT");
+            } catch (Exception ignored) {
+            }
+        }
     }
 
     boolean enqueue(MessageRecord message) {
@@ -48,6 +53,7 @@ final class SmsQueue extends SQLiteOpenHelper {
         values.put("device_message_id", message.deviceMessageId);
         values.put("message_type", message.messageType);
         values.put("sender", message.sender);
+        values.put("sender_name", message.senderName);
         values.put("body", message.body);
         values.put("received_at", message.receivedAtMillis);
         values.put("thread_id", message.threadId);
@@ -75,6 +81,7 @@ final class SmsQueue extends SQLiteOpenHelper {
                 values.put("device_message_id", message.deviceMessageId);
                 values.put("message_type", message.messageType);
                 values.put("sender", message.sender);
+                values.put("sender_name", message.senderName);
                 values.put("body", message.body);
                 values.put("received_at", message.receivedAtMillis);
                 values.put("thread_id", message.threadId);
@@ -94,7 +101,7 @@ final class SmsQueue extends SQLiteOpenHelper {
         ArrayList<MessageRecord> messages = new ArrayList<>();
         try (Cursor cursor = getReadableDatabase().query(
                 TABLE,
-                new String[]{"device_message_id", "message_type", "sender", "body", "received_at", "thread_id", "source_device"},
+                new String[]{"device_message_id", "message_type", "sender", "sender_name", "body", "received_at", "thread_id", "source_device"},
                 null,
                 null,
                 null,
@@ -108,9 +115,10 @@ final class SmsQueue extends SQLiteOpenHelper {
                         cursor.getString(1),
                         cursor.getString(2),
                         cursor.getString(3),
-                        cursor.getLong(4),
-                        cursor.getString(5),
-                        cursor.getString(6)
+                        cursor.getString(4),
+                        cursor.getLong(5),
+                        cursor.getString(6),
+                        cursor.getString(7)
                 ));
             }
         }

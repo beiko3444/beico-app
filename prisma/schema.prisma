@@ -404,6 +404,7 @@ model MobileMessage {
   messageType     String
   direction       String   @default("INBOUND")
   sender          String?
+  senderName      String?
   body            String
   receivedAt      DateTime
   threadId        String?
