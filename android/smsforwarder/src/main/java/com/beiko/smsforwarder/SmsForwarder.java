@@ -54,6 +54,7 @@ final class SmsForwarder {
     private static final int SYNC_ALARM_REQUEST = 7713;
     private static final long SYNC_INTERVAL_MS = 15 * 60 * 1000;
     static final String ACTION_SYNC_TICK = "com.beiko.smsforwarder.SYNC_TICK";
+    private static boolean outgoingPollRunning = false;
 
     private SmsForwarder() {
     }
@@ -411,6 +412,20 @@ final class SmsForwarder {
 
     private static void pollAndSendOutgoingBlocking(Context context) {
         if (!isEnabled(context)) return;
+        synchronized (SmsForwarder.class) {
+            if (outgoingPollRunning) return;
+            outgoingPollRunning = true;
+        }
+        try {
+            pollAndSendOutgoingLocked(context);
+        } finally {
+            synchronized (SmsForwarder.class) {
+                outgoingPollRunning = false;
+            }
+        }
+    }
+
+    private static void pollAndSendOutgoingLocked(Context context) {
         if (context.checkSelfPermission(android.Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             saveStatus(context, "발송 실패: SEND_SMS 권한이 없습니다.");
             saveProgress(context, new SyncProgress("발송 권한 필요", 1, 0, 0, 0, 1, getPendingCount(context), "SEND_SMS 권한 필요"));
@@ -562,11 +577,23 @@ final class SmsForwarder {
     }
 
     private static String getOutgoingEndpoint(Context context) {
-        return getEndpoint(context).replace("/api/mobile/messages/batch", "/api/mobile/messages/outgoing");
+        return resolveMobileMessageEndpoint(context, "/api/mobile/messages/outgoing");
     }
 
     private static String getOutgoingResultEndpoint(Context context) {
-        return getEndpoint(context).replace("/api/mobile/messages/batch", "/api/mobile/messages/outgoing/result");
+        return resolveMobileMessageEndpoint(context, "/api/mobile/messages/outgoing/result");
+    }
+
+    private static String resolveMobileMessageEndpoint(Context context, String path) {
+        String endpoint = getEndpoint(context).trim();
+        int marker = endpoint.indexOf("/api/mobile/messages/");
+        if (marker >= 0) {
+            return endpoint.substring(0, marker) + path;
+        }
+        if (endpoint.endsWith("/")) {
+            return endpoint.substring(0, endpoint.length() - 1) + path;
+        }
+        return endpoint + path;
     }
 
     private static String buildPayload(Context context, String username, List<MessageRecord> messages) {

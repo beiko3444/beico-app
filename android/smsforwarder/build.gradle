@@ -8,8 +8,8 @@ android {
         applicationId "com.beiko.smsforwarder"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion 28
-        versionCode 8
-        versionName "1.1.5"
+        versionCode 9
+        versionName "1.1.6"
     }
 
     signingConfigs {

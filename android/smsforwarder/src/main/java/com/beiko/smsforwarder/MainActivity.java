@@ -21,6 +21,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final int SMS_PERMISSION_REQUEST = 3444;
+    private static final long FOREGROUND_OUTGOING_POLL_MS = 10 * 1000;
     private EditText endpointInput;
     private EditText secretInput;
     private EditText usernameInput;
@@ -28,11 +29,13 @@ public class MainActivity extends Activity {
     private ProgressBar syncProgressBar;
     private TextView progressStatus;
     private TextView lastStatus;
+    private long lastOutgoingPollAt = 0;
     private final Handler statusHandler = new Handler(Looper.getMainLooper());
     private final Runnable statusTicker = new Runnable() {
         @Override
         public void run() {
             refreshStatus();
+            maybePollOutgoing();
             statusHandler.postDelayed(this, 1000);
         }
     };
@@ -47,6 +50,8 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         refreshStatus();
+        lastOutgoingPollAt = 0;
+        maybePollOutgoing();
         statusHandler.removeCallbacks(statusTicker);
         statusHandler.postDelayed(statusTicker, 1000);
     }
@@ -257,6 +262,15 @@ public class MainActivity extends Activity {
                     + SmsForwarder.getLastStatus(this)
                     + "\n\n대기 큐: " + SmsForwarder.getPendingCount(this) + "건");
         }
+    }
+
+    private void maybePollOutgoing() {
+        if (!hasSmsPermissions() || !SmsForwarder.isEnabled(this)) return;
+        if (isBlank(SmsForwarder.getSecret(this))) return;
+        long now = System.currentTimeMillis();
+        if (now - lastOutgoingPollAt < FOREGROUND_OUTGOING_POLL_MS) return;
+        lastOutgoingPollAt = now;
+        SmsForwarder.pollAndSendOutgoing(this);
     }
 
     private void requestSmsPermission() {
