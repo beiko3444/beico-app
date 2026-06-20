@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
 import { MessageSquareText, Search, Smartphone, X } from "lucide-react"
+import DeleteMobileMessageButton from "./DeleteMobileMessageButton"
 
 export const dynamic = 'force-dynamic'
 
@@ -141,6 +142,7 @@ export default async function MobileMessagesPage({ searchParams }: PageProps) {
                                     <th className="px-4 py-3 text-xs font-black">본문</th>
                                     <th className="w-36 px-4 py-3 text-xs font-black">기기</th>
                                     <th className="w-28 px-4 py-3 text-xs font-black">사용자</th>
+                                    <th className="w-16 px-4 py-3 text-xs font-black">삭제</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-100">
@@ -165,6 +167,9 @@ export default async function MobileMessagesPage({ searchParams }: PageProps) {
                                         <td className="px-4 py-3 text-xs font-bold text-slate-500">
                                             {message.user.name || message.user.username || '-'}
                                         </td>
+                                        <td className="px-4 py-3">
+                                            <DeleteMobileMessageButton id={message.id} />
+                                        </td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -187,7 +192,10 @@ export default async function MobileMessagesPage({ searchParams }: PageProps) {
                                     </span>
                                 </div>
                                 <p className="whitespace-pre-wrap text-sm font-semibold leading-6 text-slate-800">{message.body}</p>
-                                <p className="break-all text-[11px] font-semibold text-slate-400">{message.sourceDevice || '-'}</p>
+                                <div className="flex items-center justify-between gap-3">
+                                    <p className="break-all text-[11px] font-semibold text-slate-400">{message.sourceDevice || '-'}</p>
+                                    <DeleteMobileMessageButton id={message.id} />
+                                </div>
                             </article>
                         ))}
                     </div>
