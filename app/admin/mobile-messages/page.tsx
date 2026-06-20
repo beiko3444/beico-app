@@ -2,9 +2,13 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { redirect } from "next/navigation"
 import { authOptions } from "@/lib/auth"
-import { MessageSquareText, Smartphone } from "lucide-react"
+import { MessageSquareText, Search, Smartphone, X } from "lucide-react"
 
 export const dynamic = 'force-dynamic'
+
+type PageProps = {
+    searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
 
 const formatDateTime = (date: Date) =>
     new Intl.DateTimeFormat('ko-KR', {
@@ -16,15 +20,36 @@ const formatDateTime = (date: Date) =>
         minute: '2-digit',
     }).format(date)
 
-export default async function MobileMessagesPage() {
+function firstParam(value: string | string[] | undefined) {
+    if (Array.isArray(value)) return value[0] || ''
+    return value || ''
+}
+
+export default async function MobileMessagesPage({ searchParams }: PageProps) {
     const session = await getServerSession(authOptions)
 
     if (!session || session.user.role !== 'ADMIN') {
         redirect('/login')
     }
 
-    const [messages, totalCount] = await Promise.all([
+    const params = (await searchParams) || {}
+    const query = firstParam(params.q).trim()
+    const where = query
+        ? {
+            OR: [
+                { sender: { contains: query, mode: 'insensitive' as const } },
+                { senderName: { contains: query, mode: 'insensitive' as const } },
+                { body: { contains: query, mode: 'insensitive' as const } },
+                { sourceDevice: { contains: query, mode: 'insensitive' as const } },
+                { user: { name: { contains: query, mode: 'insensitive' as const } } },
+                { user: { username: { contains: query, mode: 'insensitive' as const } } },
+            ],
+        }
+        : undefined
+
+    const [messages, totalCount, matchedCount] = await Promise.all([
         prisma.mobileMessage.findMany({
+            where,
             orderBy: { receivedAt: 'desc' },
             take: 200,
             select: {
@@ -44,6 +69,7 @@ export default async function MobileMessagesPage() {
             },
         }),
         prisma.mobileMessage.count(),
+        prisma.mobileMessage.count({ where }),
     ])
 
     const latest = messages[0]?.receivedAt
@@ -58,7 +84,9 @@ export default async function MobileMessagesPage() {
                     </div>
                     <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">수신문자함</h1>
                     <p className="mt-1 text-sm font-semibold text-slate-500">
-                        전체 {totalCount.toLocaleString()}건 · 최근 {messages.length.toLocaleString()}건 표시
+                        전체 {totalCount.toLocaleString()}건
+                        {query ? ` · 검색결과 ${matchedCount.toLocaleString()}건` : ''}
+                        {' '}· 최근 {messages.length.toLocaleString()}건 표시
                         {latest ? ` · 최신 ${formatDateTime(latest)}` : ''}
                     </p>
                 </div>
@@ -66,6 +94,35 @@ export default async function MobileMessagesPage() {
                     저장 API: /api/mobile/messages/batch
                 </div>
             </div>
+
+            <form action="/admin/mobile-messages" className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-white p-3 shadow-sm sm:flex-row">
+                <div className="relative flex-1">
+                    <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+                    <input
+                        name="q"
+                        defaultValue={query}
+                        placeholder="발신번호, 연락처명, 본문, 기기명 검색"
+                        className="h-12 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-4 text-sm font-bold text-slate-900 outline-none focus:border-blue-500 focus:bg-white"
+                    />
+                </div>
+                <div className="flex gap-2">
+                    <button
+                        type="submit"
+                        className="h-12 rounded-lg bg-slate-950 px-5 text-sm font-black text-white"
+                    >
+                        검색
+                    </button>
+                    {query ? (
+                        <a
+                            href="/admin/mobile-messages"
+                            className="inline-flex h-12 items-center justify-center gap-2 rounded-lg border border-slate-200 px-4 text-sm font-black text-slate-600"
+                        >
+                            <X size={16} />
+                            초기화
+                        </a>
+                    ) : null}
+                </div>
+            </form>
 
             {messages.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-slate-300 bg-white p-12 text-center">
