@@ -1,17 +1,11 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { calculateOrderFinalAmount } from '@/lib/orderAmount'
-import {
-  DEPOSIT_SMS_STATUSES,
-  createDepositSmsHash,
-  parseDepositSms,
-} from '@/lib/depositSms'
+import { processDepositSms } from '@/lib/depositSmsMatcher'
+import { createDepositSmsHash } from '@/lib/depositSms'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-
-const EXCLUDED_ORDER_STATUSES = ['CANCELED', 'SHIPPED']
 
 interface DepositSmsIngestBody {
   messageHash?: unknown
@@ -48,180 +42,19 @@ export async function POST(request: Request) {
     const receivedAt = toDate(payload.receivedAt) || new Date()
     const messageHash = toNonEmptyString(payload.messageHash) || createDepositSmsHash({ sender, body, receivedAt })
     requestMessageHash = messageHash
-    const parsed = parseDepositSms({ body, amount: payload.amount })
-    const amount = parsed.amount
-    const depositorName = toNonEmptyString(payload.depositorName) || parsed.depositorName
-    const bankName = toNonEmptyString(payload.bankName) || parsed.bankName
-    const sourceDevice = toNonEmptyString(payload.sourceDevice)
-
-    const existing = await prisma.depositSms.findUnique({
-      where: { messageHash },
-      select: { id: true, matchStatus: true, matchedOrderId: true, amount: true },
-    })
-    if (existing) {
-      return NextResponse.json({
-        success: true,
-        idempotent: true,
-        depositSmsId: existing.id,
-        matchStatus: existing.matchStatus,
-        matchedOrderId: existing.matchedOrderId,
-        amount: existing.amount,
-      })
-    }
-
-    if (!parsed.isDeposit || !amount) {
-      const sms = await prisma.depositSms.create({
-        data: {
-          messageHash,
-          sender,
-          body,
-          receivedAt,
-          amount,
-          depositorName,
-          bankName,
-          sourceDevice,
-          matchStatus: DEPOSIT_SMS_STATUSES.NOT_DEPOSIT,
-        },
-      })
-      return NextResponse.json({
-        success: true,
-        depositSmsId: sms.id,
-        matchStatus: sms.matchStatus,
-        amount,
-      })
-    }
-
-    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
-    const candidateOrders = await prisma.order.findMany({
-      where: {
-        createdAt: { gte: thirtyDaysAgo },
-        adminDepositConfirmedAt: null,
-        status: { notIn: EXCLUDED_ORDER_STATUSES },
-      },
-      select: {
-        id: true,
-        status: true,
-        depositConfirmedAt: true,
-        adminDepositConfirmedAt: true,
-        items: { select: { quantity: true, price: true } },
-      },
-    })
-
-    const amountMatchedOrders = candidateOrders
-      .map((order) => ({
-        ...order,
-        calculatedAmount: calculateOrderFinalAmount(order.items).finalAmount,
-      }))
-      .filter((order) => order.calculatedAmount === amount)
-
-    const candidateOrderIds = amountMatchedOrders.map((order) => order.id)
-
-    if (amountMatchedOrders.length === 0) {
-      const sms = await createDepositSmsSafely({
+    const result = await processDepositSms({
         messageHash,
         sender,
         body,
         receivedAt,
-        amount,
-        depositorName,
-        bankName,
-        sourceDevice,
-        matchStatus: DEPOSIT_SMS_STATUSES.UNMATCHED,
-        candidateOrderIds,
-      })
-      return NextResponse.json({
-        success: true,
-        depositSmsId: sms.id,
-        matchStatus: sms.matchStatus,
-        amount,
-      })
-    }
-
-    if (amountMatchedOrders.length > 1) {
-      const sms = await createDepositSmsSafely({
-        messageHash,
-        sender,
-        body,
-        receivedAt,
-        amount,
-        depositorName,
-        bankName,
-        sourceDevice,
-        matchStatus: DEPOSIT_SMS_STATUSES.AMBIGUOUS,
-        candidateOrderIds,
-      })
-      return NextResponse.json({
-        success: true,
-        depositSmsId: sms.id,
-        matchStatus: sms.matchStatus,
-        amount,
-        candidateOrderIds,
-      })
-    }
-
-    const matchedOrder = amountMatchedOrders[0]
-    const confirmedAt = receivedAt || new Date()
-    const result = await prisma.$transaction(async (tx) => {
-      const freshOrder = await tx.order.findUnique({
-        where: { id: matchedOrder.id },
-        select: { id: true, adminDepositConfirmedAt: true },
-      })
-      if (!freshOrder || freshOrder.adminDepositConfirmedAt) {
-        const sms = await tx.depositSms.create({
-          data: {
-            messageHash,
-            sender,
-            body,
-            receivedAt,
-            amount,
-            depositorName,
-            bankName,
-            sourceDevice,
-            matchStatus: DEPOSIT_SMS_STATUSES.DUPLICATE_OR_ALREADY_CONFIRMED,
-            matchedOrderId: matchedOrder.id,
-            candidateOrderIds,
-          },
-        })
-        return { sms, orderUpdated: false }
-      }
-
-      const sms = await tx.depositSms.create({
-        data: {
-          messageHash,
-          sender,
-          body,
-          receivedAt,
-          amount,
-          depositorName,
-          bankName,
-          sourceDevice,
-          matchStatus: DEPOSIT_SMS_STATUSES.AUTO_CONFIRMED,
-          matchedOrderId: matchedOrder.id,
-          matchedAt: new Date(),
-          candidateOrderIds,
-        },
-      })
-
-      await tx.order.update({
-        where: { id: matchedOrder.id },
-        data: {
-          status: 'DEPOSIT_COMPLETED',
-          depositConfirmedAt: confirmedAt,
-          adminDepositConfirmedAt: confirmedAt,
-        },
-      })
-
-      return { sms, orderUpdated: true }
+        amount: payload.amount,
+        depositorName: toNonEmptyString(payload.depositorName),
+        bankName: toNonEmptyString(payload.bankName),
+        sourceDevice: toNonEmptyString(payload.sourceDevice),
+      }, {
+        storeNonDeposit: true,
     })
-
-    return NextResponse.json({
-      success: true,
-      depositSmsId: result.sms.id,
-      matchStatus: result.sms.matchStatus,
-      matchedOrderId: result.sms.matchedOrderId,
-      orderUpdated: result.orderUpdated,
-      amount,
-    })
+    return NextResponse.json(result)
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
       if (requestMessageHash) {
@@ -262,16 +95,4 @@ function toDate(value: unknown) {
   if (typeof value !== 'string' && typeof value !== 'number') return null
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? null : date
-}
-
-async function createDepositSmsSafely(data: Prisma.DepositSmsCreateInput) {
-  try {
-    return await prisma.depositSms.create({ data })
-  } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
-      const existing = await prisma.depositSms.findUnique({ where: { messageHash: data.messageHash } })
-      if (existing) return existing
-    }
-    throw error
-  }
 }

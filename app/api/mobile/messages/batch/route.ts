@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { parseDepositSms } from '@/lib/depositSms'
+import { processDepositSms } from '@/lib/depositSmsMatcher'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -110,11 +112,14 @@ export async function POST(request: Request) {
       await prisma.$transaction(senderNameUpdates)
     }
 
+    const depositMatches = await processDepositMatches(rows)
+
     return NextResponse.json({
       success: true,
       accepted: rows.length,
       inserted: result.count,
       duplicates: rows.length - result.count,
+      depositMatches,
     })
   } catch (error) {
     console.error('Mobile message batch ingest error:', error)
@@ -122,6 +127,42 @@ export async function POST(request: Request) {
       { error: error instanceof Error ? error.message : '문자 저장에 실패했습니다.' },
       { status: 500 }
     )
+  }
+}
+
+async function processDepositMatches(rows: NormalizedMobileMessage[]) {
+  let checked = 0
+  let autoConfirmed = 0
+  let actionRequired = 0
+  let errors = 0
+
+  for (const message of rows) {
+    const parsed = parseDepositSms({ body: message.body })
+    if (!parsed.isDeposit) continue
+    checked++
+
+    try {
+      const result = await processDepositSms({
+        sender: message.sender || message.senderName || 'UNKNOWN',
+        body: message.body,
+        receivedAt: message.receivedAt,
+        sourceDevice: message.sourceDevice,
+      }, {
+        storeNonDeposit: false,
+      })
+      if (result.matchStatus === 'AUTO_CONFIRMED') autoConfirmed++
+      if (result.matchStatus === 'UNMATCHED' || result.matchStatus === 'AMBIGUOUS') actionRequired++
+    } catch (error) {
+      errors++
+      console.error('Mobile message deposit match error:', error)
+    }
+  }
+
+  return {
+    checked,
+    autoConfirmed,
+    actionRequired,
+    errors,
   }
 }
 

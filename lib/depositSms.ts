@@ -78,9 +78,25 @@ function extractBankName(body: string) {
 }
 
 function extractDepositorName(body: string) {
+  const amountNameMatch = body.match(/(?:입금|송금|받음|이체)[\s\S]{0,40}?(?:\d{1,3},)*\d{3,}\s*(?:원|KRW)?\s*([가-힣A-Za-z][가-힣A-Za-z0-9\s._-]{1,24})/)
+  const amountName = cleanDepositorName(amountNameMatch?.[1])
+  if (amountName) return amountName
+
   const depositorMatch = body.match(/(?:입금|송금|받음)\s*(?:자|인)?[:\s-]*([가-힣A-Za-z0-9]{2,20})/)
-  const value = depositorMatch?.[1]?.trim()
+  const value = cleanDepositorName(depositorMatch?.[1])
   if (!value || /^\d+$/.test(value)) return null
   if (/원|KRW|잔액|입금/.test(value)) return null
   return value
+}
+
+function cleanDepositorName(value?: string) {
+  if (!value) return null
+  const cleaned = value
+    .replace(/잔액[\s\S]*$/g, '')
+    .replace(/입금[\s\S]*$/g, '')
+    .replace(/출금[\s\S]*$/g, '')
+    .replace(/받음[\s\S]*$/g, '')
+    .replace(/송금[\s\S]*$/g, '')
+    .trim()
+  return cleaned || null
 }
