@@ -54,6 +54,7 @@ final class SmsForwarder {
     private static final int SYNC_ALARM_REQUEST = 7713;
     private static final long SYNC_INTERVAL_MS = 15 * 60 * 1000;
     static final String ACTION_SYNC_TICK = "com.beiko.smsforwarder.SYNC_TICK";
+    private static final SingleFlight syncSingleFlight = new SingleFlight();
     private static boolean outgoingPollRunning = false;
 
     private SmsForwarder() {
@@ -106,8 +107,10 @@ final class SmsForwarder {
                 .apply();
         if (enabled) {
             scheduleSync(context);
+            ForegroundSyncService.start(context);
         } else {
             cancelSync(context);
+            ForegroundSyncService.stop(context);
         }
     }
 
@@ -210,15 +213,12 @@ final class SmsForwarder {
                     ""
             ));
         }
-        drainQueue(context.getApplicationContext());
+        runSyncOnceBlocking(context.getApplicationContext());
     }
 
     static void retryPending(Context context) {
-        new Thread(() -> {
-            Context appContext = context.getApplicationContext();
-            drainQueue(appContext);
-            pollAndSendOutgoingBlocking(appContext);
-        }).start();
+        Context appContext = context.getApplicationContext();
+        new Thread(() -> runSyncOnceBlocking(appContext)).start();
     }
 
     static void pollAndSendOutgoing(Context context) {
@@ -237,6 +237,17 @@ final class SmsForwarder {
                 SYNC_INTERVAL_MS,
                 pendingIntent
         );
+    }
+
+    private static void runSyncOnceBlocking(Context context) {
+        if (!syncSingleFlight.tryStart()) return;
+        try {
+            Context appContext = context.getApplicationContext();
+            drainQueue(appContext);
+            pollAndSendOutgoingBlocking(appContext);
+        } finally {
+            syncSingleFlight.finish();
+        }
     }
 
     private static void cancelSync(Context context) {
@@ -621,7 +632,7 @@ final class SmsForwarder {
         return builder.toString();
     }
 
-    private static void saveStatus(Context context, String status) {
+    static void saveStatus(Context context, String status) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
                 .edit()
                 .putString(KEY_LAST_STATUS, status)

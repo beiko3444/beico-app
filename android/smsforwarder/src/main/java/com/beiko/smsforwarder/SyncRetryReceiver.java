@@ -8,7 +8,9 @@ public class SyncRetryReceiver extends BroadcastReceiver {
     @Override
     public void onReceive(Context context, Intent intent) {
         if (!SmsForwarder.isEnabled(context)) return;
-        SmsForwarder.scheduleSync(context.getApplicationContext());
-        SmsForwarder.retryPending(context.getApplicationContext());
+        Context appContext = context.getApplicationContext();
+        SmsForwarder.scheduleSync(appContext);
+        ForegroundSyncService.start(appContext);
+        SmsForwarder.retryPending(appContext);
     }
 }

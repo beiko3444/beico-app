@@ -5,6 +5,7 @@ import android.app.Activity;
 import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -52,6 +53,9 @@ public class MainActivity extends Activity {
         refreshStatus();
         lastOutgoingPollAt = 0;
         maybePollOutgoing();
+        if (SmsForwarder.isEnabled(this)) {
+            ForegroundSyncService.start(this);
+        }
         statusHandler.removeCallbacks(statusTicker);
         statusHandler.postDelayed(statusTicker, 1000);
     }
@@ -172,7 +176,7 @@ public class MainActivity extends Activity {
         root.addView(disableButton, buttonParams());
 
         TextView note = label(
-                "동기화가 켜져 있으면 앱을 닫아도 새 SMS/MMS는 백그라운드에서 자동 저장/전송됩니다. 연락처 권한을 허용하면 저장된 발신자 이름도 함께 저장됩니다. 발송 권한을 허용하면 서버 대기열의 문자를 이 폰의 유심으로 보냅니다. 과거 문자 전체 가져오기는 이 화면에서 한 번 실행해야 합니다. 안정적인 자동 전송을 위해 Android 배터리 설정에서 이 앱을 제한 없음으로 두세요.",
+                "동기화가 켜져 있으면 상단 알림을 띄운 상태로 새 SMS/MMS 저장과 발송 대기열 확인을 계속 실행합니다. 연락처 권한을 허용하면 저장된 발신자 이름도 함께 저장됩니다. 발송 권한을 허용하면 서버 대기열의 문자를 이 폰의 유심으로 보냅니다. 과거 문자 전체 가져오기는 이 화면에서 한 번 실행해야 합니다. 안정적인 자동 전송을 위해 Android 배터리 설정에서 이 앱을 제한 없음으로 두고, 상단 알림을 끄지 마세요.",
                 13,
                 0xFF667085,
                 false
@@ -279,25 +283,43 @@ public class MainActivity extends Activity {
             return;
         }
         requestPermissions(
-                new String[]{
-                        Manifest.permission.READ_CONTACTS,
-                        Manifest.permission.READ_SMS,
-                        Manifest.permission.SEND_SMS,
-                        Manifest.permission.RECEIVE_SMS,
-                        Manifest.permission.RECEIVE_MMS,
-                        Manifest.permission.RECEIVE_WAP_PUSH
-                },
+                requiredPermissions(),
                 SMS_PERMISSION_REQUEST
         );
     }
 
     private boolean hasSmsPermissions() {
-        return checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
+        boolean notificationGranted = Build.VERSION.SDK_INT < 33
+                || checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED;
+        return notificationGranted
+                && checkSelfPermission(Manifest.permission.READ_CONTACTS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.READ_SMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.RECEIVE_SMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.RECEIVE_MMS) == PackageManager.PERMISSION_GRANTED
                 && checkSelfPermission(Manifest.permission.RECEIVE_WAP_PUSH) == PackageManager.PERMISSION_GRANTED;
+    }
+
+    private String[] requiredPermissions() {
+        if (Build.VERSION.SDK_INT >= 33) {
+            return new String[]{
+                    Manifest.permission.READ_CONTACTS,
+                    Manifest.permission.READ_SMS,
+                    Manifest.permission.SEND_SMS,
+                    Manifest.permission.RECEIVE_SMS,
+                    Manifest.permission.RECEIVE_MMS,
+                    Manifest.permission.RECEIVE_WAP_PUSH,
+                    Manifest.permission.POST_NOTIFICATIONS
+            };
+        }
+        return new String[]{
+                Manifest.permission.READ_CONTACTS,
+                Manifest.permission.READ_SMS,
+                Manifest.permission.SEND_SMS,
+                Manifest.permission.RECEIVE_SMS,
+                Manifest.permission.RECEIVE_MMS,
+                Manifest.permission.RECEIVE_WAP_PUSH
+        };
     }
 
     private TextView label(String text, int sizeSp, int color, boolean bold) {
