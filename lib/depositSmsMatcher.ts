@@ -6,6 +6,10 @@ import {
   createDepositSmsHash,
   parseDepositSms,
 } from '@/lib/depositSms'
+import {
+  getDepositMatchOrderCreatedAtRange,
+  isDepositWithinOrderMatchWindow,
+} from '@/lib/depositMatchWindow.mjs'
 
 const EXCLUDED_ORDER_STATUSES = ['CANCELED', 'SHIPPED']
 
@@ -89,15 +93,16 @@ export async function processDepositSms(
     }
   }
 
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+  const orderCreatedAtRange = getDepositMatchOrderCreatedAtRange(input.receivedAt)
   const candidateOrders = await db.order.findMany({
     where: {
-      createdAt: { gte: thirtyDaysAgo },
+      createdAt: orderCreatedAtRange,
       adminDepositConfirmedAt: null,
       status: { notIn: EXCLUDED_ORDER_STATUSES },
     },
     select: {
       id: true,
+      createdAt: true,
       status: true,
       depositConfirmedAt: true,
       adminDepositConfirmedAt: true,
@@ -122,7 +127,10 @@ export async function processDepositSms(
       ...order,
       calculatedAmount: calculateOrderFinalAmount(order.items).finalAmount,
     }))
-    .filter((order) => order.calculatedAmount === amount)
+    .filter((order) =>
+      order.calculatedAmount === amount &&
+      isDepositWithinOrderMatchWindow(order.createdAt, input.receivedAt)
+    )
 
   const nameMatchedOrders = amountMatchedOrders.filter((order) =>
     matchesOrderName(order, depositorName, input.body)
