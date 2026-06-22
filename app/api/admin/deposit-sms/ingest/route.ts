@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import { processDepositSms } from '@/lib/depositSmsMatcher'
 import { createDepositSmsHash } from '@/lib/depositSms'
+import { sendDepositMatchAdminPush } from '@/lib/adminPush'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -54,6 +55,13 @@ export async function POST(request: Request) {
       }, {
         storeNonDeposit: true,
     })
+    if (!('idempotent' in result && result.idempotent)) {
+      sendDepositMatchAdminPush({
+        matchStatus: result.matchStatus,
+        amount: result.amount,
+        depositorName: toNonEmptyString(payload.depositorName) || sender,
+      }).catch((pushError) => console.error('Deposit SMS push error:', pushError))
+    }
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {

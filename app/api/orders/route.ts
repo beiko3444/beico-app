@@ -4,6 +4,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { sendOrderNotification } from "@/lib/notification"
 import { getProductImageUrl } from "@/lib/product-image-url"
+import { sendNewOrderAdminPush } from "@/lib/adminPush"
 
 const getCountryKey = (country?: string | null) => {
     if (country === 'Korea') return 'KR'
@@ -145,6 +146,12 @@ export async function POST(request: Request) {
                 itemsCount: order.items.length,
                 customerName: session.user.name || session.user.email || '고객'
             }).catch(err => console.error("Notification trigger error:", err));
+            sendNewOrderAdminPush({
+                orderNumber: order.orderNumber,
+                total: order.total,
+                itemsCount: order.items.length,
+                customerName: session.user.name || session.user.email || '고객'
+            }).catch(err => console.error("Admin push notification error:", err));
 
             return order
         })

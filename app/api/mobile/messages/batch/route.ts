@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { parseDepositSms } from '@/lib/depositSms'
 import { processDepositSms } from '@/lib/depositSmsMatcher'
+import { sendDepositMatchAdminPush, sendMobileMessageAdminPush } from '@/lib/adminPush'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -113,6 +114,14 @@ export async function POST(request: Request) {
     }
 
     const depositMatches = await processDepositMatches(rows)
+    if (result.count > 0) {
+      const firstMessage = rows[0]
+      sendMobileMessageAdminPush({
+        count: result.count,
+        sender: firstMessage.senderName || firstMessage.sender || null,
+        body: firstMessage.body,
+      }).catch((error) => console.error('Mobile message push error:', error))
+    }
 
     return NextResponse.json({
       success: true,
@@ -152,6 +161,11 @@ async function processDepositMatches(rows: NormalizedMobileMessage[]) {
       })
       if (result.matchStatus === 'AUTO_CONFIRMED') autoConfirmed++
       if (result.matchStatus === 'UNMATCHED' || result.matchStatus === 'AMBIGUOUS') actionRequired++
+      sendDepositMatchAdminPush({
+        matchStatus: result.matchStatus,
+        amount: result.amount,
+        depositorName: message.senderName || message.sender,
+      }).catch((pushError) => console.error('Deposit match push error:', pushError))
     } catch (error) {
       errors++
       console.error('Mobile message deposit match error:', error)

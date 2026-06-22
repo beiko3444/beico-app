@@ -1,0 +1,25 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.beiko.mobile'
+    compileSdk 36
+
+    defaultConfig {
+        applicationId 'com.beiko.mobile'
+        minSdk 26
+        targetSdk 36
+        versionCode 1
+        versionName '1.0.0'
+    }
+}
+
+dependencies {
+    implementation platform('com.google.firebase:firebase-bom:34.7.0')
+    implementation 'com.google.firebase:firebase-messaging'
+}
+
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
+}
