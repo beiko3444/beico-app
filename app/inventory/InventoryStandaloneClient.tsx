@@ -149,11 +149,11 @@ function stockTone(value: number | null | undefined) {
 
 function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefined; alt: string; size?: 'sm' | 'md' | 'lg' }) {
   const [failed, setFailed] = useState(false)
-  const sizeClass = size === 'lg' ? 'h-24 w-32' : size === 'sm' ? 'h-12 w-14' : 'h-16 w-20'
+  const sizeClass = size === 'lg' ? 'h-28 w-full' : size === 'sm' ? 'h-12 w-14' : 'h-16 w-20'
 
   if (!src || failed) {
     return (
-      <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300`}>
+        <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300`}>
         <Boxes size={size === 'lg' ? 28 : 20} />
       </div>
     )
@@ -467,10 +467,41 @@ function InboundTab({
   onDeleteInbound: (id: string) => void
 }) {
   return (
-    <section className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[380px_minmax(0,1fr)]">
-      <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
-        <InboundCalendar selectedDate={selectedDate} calendar={inbounds.calendar || []} onSelectDate={onSelectDate} />
+    <section className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_380px]">
+      <div className="min-w-0">
+        {loading && rows.length === 0 ? (
+          <LoadingBlock label="입고 상품 불러오는 중" />
+        ) : (
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+            {rows.map((row) => (
+              <button
+                key={`${row.sourceId || row.id}`}
+                type="button"
+                onClick={() => onOpenKeypad(row)}
+                className="rounded-lg border border-slate-200 bg-white p-2 text-left shadow-sm transition active:scale-[0.99] sm:p-3"
+              >
+                <div className="flex flex-col gap-2">
+                  <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
+                  <div className="min-w-0">
+                    <div className="line-clamp-2 min-h-[38px] text-[13px] font-black leading-snug tracking-normal text-slate-950 sm:text-base">{row.name}</div>
+                    {(row.nameJP || row.productCode) ? (
+                      <div className="mt-1 line-clamp-1 text-[11px] font-bold text-slate-500">
+                        {row.nameJP || row.productCode}
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="rounded-md bg-slate-100 px-2 py-2 text-right text-xs font-black text-slate-700">
+                    재고 <span className={`ml-1 tabular-nums ${stockTone(row.stock ?? 0)}`}>{formatNumber(row.stock ?? 0)}</span>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+        {!loading && rows.length === 0 ? <EmptyBlock label="입고할 상품이 없습니다." /> : null}
+      </div>
 
+      <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
         <div className="mb-3 flex items-center justify-between gap-2">
           <div>
             <div className="flex items-center gap-2 text-sm font-black text-slate-950">
@@ -482,11 +513,11 @@ function InboundTab({
         </div>
 
         {inbounds.items.length === 0 ? (
-          <div className="rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-sm font-bold text-slate-400">
+          <div className="mb-4 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-sm font-bold text-slate-400">
             오늘 입고 기록 없음
           </div>
         ) : (
-          <div className="grid gap-2">
+          <div className="mb-4 grid gap-2">
             {inbounds.items.map((item) => (
               <div key={item.id} className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2">
                 <ProductImage src={item.productImageUrl} alt={item.productName} size="sm" />
@@ -509,35 +540,9 @@ function InboundTab({
             ))}
           </div>
         )}
-      </aside>
 
-      <div className="min-w-0">
-        {loading && rows.length === 0 ? (
-          <LoadingBlock label="입고 상품 불러오는 중" />
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {rows.map((row) => (
-              <button
-                key={`${row.sourceId || row.id}`}
-                type="button"
-                onClick={() => onOpenKeypad(row)}
-                className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99]"
-              >
-                <div className="flex min-h-[104px] items-center gap-4">
-                  <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
-                  <div className="min-w-0 flex-1">
-                    <div className="line-clamp-2 min-h-[50px] text-lg font-black leading-tight tracking-normal text-slate-950">{row.name}</div>
-                    <div className="mt-3 text-sm font-black">
-                      <span className="block rounded bg-slate-100 px-3 py-2 text-right text-slate-700">창고 {formatNumber(row.stock ?? 0)}</span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-        {!loading && rows.length === 0 ? <EmptyBlock label="입고할 상품이 없습니다." /> : null}
-      </div>
+        <InboundCalendar selectedDate={selectedDate} calendar={inbounds.calendar || []} onSelectDate={onSelectDate} />
+      </aside>
     </section>
   )
 }

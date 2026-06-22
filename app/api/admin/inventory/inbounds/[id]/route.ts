@@ -1,15 +1,11 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
-import { requireAdminSession } from '@/lib/requireAdmin'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
-  const { unauthorized } = await requireAdminSession()
-  if (unauthorized) return unauthorized
-
   const { id } = await context.params
   if (!id) {
     return NextResponse.json({ error: '삭제할 입고 기록이 없습니다.' }, { status: 400 })

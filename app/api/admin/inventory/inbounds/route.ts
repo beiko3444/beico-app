@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAdminSession } from '@/lib/requireAdmin'
 import { getProductImageUrl } from '@/lib/product-image-url'
 
 export const dynamic = 'force-dynamic'
@@ -40,9 +39,6 @@ const DEFAULT_WAREHOUSE_ITEMS = [
 ]
 
 export async function GET(request: Request) {
-  const { unauthorized } = await requireAdminSession()
-  if (unauthorized) return unauthorized
-
   const url = new URL(request.url)
   const inboundDate = parseInboundDate(url.searchParams.get('date')) || todayStart()
   const nextDate = new Date(inboundDate)
@@ -134,9 +130,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { session, unauthorized } = await requireAdminSession()
-  if (unauthorized) return unauthorized
-
   const body = await request.json().catch(() => ({}))
   const inboundDate = parseInboundDate(body?.inboundDate) || todayStart()
   const warehouseItemId = typeof body?.warehouseItemId === 'string' && body.warehouseItemId.trim() ? body.warehouseItemId.trim() : null
@@ -176,7 +169,7 @@ export async function POST(request: Request) {
         productName: warehouseItem.name || productName,
         productImageUrl: warehouseItem.imageUrl || productImageUrl,
         quantity: Math.trunc(quantity),
-        createdById: session.user.id,
+        createdById: null,
       },
       select: {
         id: true,
