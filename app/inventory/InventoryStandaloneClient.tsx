@@ -14,8 +14,6 @@ import {
   Delete,
 } from 'lucide-react'
 
-type TabMode = 'stock' | 'inbound'
-
 type InboundItem = {
   id: string
   inboundDate: string
@@ -170,7 +168,6 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
 }
 
 export default function InventoryStandaloneClient() {
-  const [tab, setTab] = useState<TabMode>('inbound')
   const [inbounds, setInbounds] = useState<InboundPayload>({ date: todayYmd(), items: [], totalQuantity: 0 })
   const [selectedDate, setSelectedDate] = useState(todayYmd())
   const [query, setQuery] = useState('')
@@ -214,17 +211,6 @@ export default function InventoryStandaloneClient() {
 
   const rows = useMemo(() => inbounds.quickProducts || [], [inbounds.quickProducts])
   const warehouseStockTotal = useMemo(() => rows.reduce((sum, row) => sum + (row.stock || 0), 0), [rows])
-
-  const filteredStockRows = useMemo(() => {
-    const text = query.trim().toLowerCase()
-    return rows.filter((row) => {
-      if (!text) return true
-      return [row.name, row.nameJP || '', row.productCode || '']
-        .join(' ')
-        .toLowerCase()
-        .includes(text)
-    })
-  }, [query, rows])
 
   const filteredInboundRows = useMemo(() => {
     const text = query.trim().toLowerCase()
@@ -307,7 +293,7 @@ export default function InventoryStandaloneClient() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#111827] text-white">
-                {tab === 'stock' ? <Boxes size={22} /> : <PackagePlus size={22} />}
+                <PackagePlus size={22} />
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-black tracking-normal text-slate-950 sm:text-2xl">재고관리</h1>
@@ -333,11 +319,7 @@ export default function InventoryStandaloneClient() {
             </div>
           </div>
 
-          <div className="grid gap-2 lg:grid-cols-[auto_1fr]">
-            <div className="grid grid-cols-2 gap-2">
-              <TabButton active={tab === 'stock'} label="재고현황" onClick={() => setTab('stock')} />
-              <TabButton active={tab === 'inbound'} label="입고관리" onClick={() => setTab('inbound')} />
-            </div>
+          <div className="grid gap-2">
             <div className="flex h-12 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3">
               <Search size={20} className="shrink-0 text-slate-400" />
               <input
@@ -363,20 +345,16 @@ export default function InventoryStandaloneClient() {
         </div>
       </header>
 
-      {tab === 'stock' ? (
-        <StockTab loading={loading} rows={filteredStockRows} />
-      ) : (
-        <InboundTab
-          loading={loading}
-          rows={filteredInboundRows}
-          inbounds={inbounds}
-          selectedDate={selectedDate}
-          saving={saving}
-          onSelectDate={(date) => setSelectedDate(date)}
-          onOpenKeypad={openKeypad}
-          onDeleteInbound={(id) => void deleteInbound(id)}
-        />
-      )}
+      <InboundTab
+        loading={loading}
+        rows={filteredInboundRows}
+        inbounds={inbounds}
+        selectedDate={selectedDate}
+        saving={saving}
+        onSelectDate={(date) => setSelectedDate(date)}
+        onOpenKeypad={openKeypad}
+        onDeleteInbound={(id) => void deleteInbound(id)}
+      />
 
       {selectedProduct && (
         <KeypadModal
@@ -389,61 +367,6 @@ export default function InventoryStandaloneClient() {
         />
       )}
     </main>
-  )
-}
-
-function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`h-12 rounded-md border px-5 text-sm font-black shadow-sm ${
-        active ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700'
-      }`}
-    >
-      {label}
-    </button>
-  )
-}
-
-function StockTab({ loading, rows }: { loading: boolean; rows: ProductCandidate[] }) {
-  return (
-    <section className="mx-auto max-w-[1600px] px-4 py-4 sm:px-5">
-      {loading && rows.length === 0 ? (
-        <LoadingBlock label="창고재고 불러오는 중" />
-      ) : (
-        <div className="grid gap-2">
-          {rows.map((row) => (
-            <article key={row.sourceId} className="grid gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
-              <div className="flex min-w-0 items-center gap-3">
-                <ProductImage src={row.imageUrl} alt={row.name} />
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-black tracking-normal text-slate-950">{row.name}</h2>
-                  <div className="mt-1 flex flex-wrap gap-2 text-xs font-bold text-slate-500">
-                    {row.nameJP ? <span>{row.nameJP}</span> : null}
-                    {row.productCode ? <span>코드 {row.productCode}</span> : null}
-                  </div>
-                </div>
-              </div>
-
-              <div className="md:min-w-[150px]">
-                <StockPill label="창고재고" value={row.stock ?? 0} />
-              </div>
-            </article>
-          ))}
-        </div>
-      )}
-      {!loading && rows.length === 0 ? <EmptyBlock label="표시할 재고가 없습니다." /> : null}
-    </section>
-  )
-}
-
-function StockPill({ label, value }: { label: string; value: number | null }) {
-  return (
-    <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-right text-slate-950">
-      <div className="text-[11px] font-black text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-black tabular-nums ${stockTone(value)}`}>{formatNumber(value)}</div>
-    </div>
   )
 }
 
