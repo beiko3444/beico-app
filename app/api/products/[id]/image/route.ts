@@ -8,9 +8,22 @@ import { resolveProductImage } from "@/lib/product-image-storage"
 export const dynamic = "force-dynamic"
 export const runtime = "nodejs"
 
+function isInventoryReferer(request: Request) {
+    const referer = request.headers.get("referer")
+    if (!referer) return false
+
+    try {
+        const refererUrl = new URL(referer)
+        const requestUrl = new URL(request.url)
+        return refererUrl.origin === requestUrl.origin && (refererUrl.pathname === "/inventory" || refererUrl.pathname.startsWith("/inventory/"))
+    } catch {
+        return false
+    }
+}
+
 export async function GET(request: Request, context: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    if (!session?.user?.id && !isInventoryReferer(request)) {
         return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 

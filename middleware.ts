@@ -17,14 +17,21 @@ const PUBLIC_API_PATHS = [
     '/api/admin/deposit-sms/ingest',
 ]
 
+function isPublicPath(pathname: string) {
+    if (pathname === '/inventory' || pathname.startsWith('/inventory/')) return true
+    if (pathname === '/api/admin/inventory/inbounds' || pathname.startsWith('/api/admin/inventory/inbounds/')) return true
+    if (/^\/api\/products\/[^/]+\/image$/.test(pathname)) return true
+    return PUBLIC_API_PATHS.includes(pathname)
+}
+
 export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
 
-    if (PUBLIC_API_PATHS.includes(pathname)) {
+    if (isPublicPath(pathname)) {
         return NextResponse.next()
     }
 
-    if (pathname.startsWith('/admin') || pathname === '/inventory' || pathname.startsWith('/inventory/')) {
+    if (pathname.startsWith('/admin')) {
         const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
         if (!token || token.role !== 'ADMIN') {
             return NextResponse.redirect(new URL('/login', request.url))
