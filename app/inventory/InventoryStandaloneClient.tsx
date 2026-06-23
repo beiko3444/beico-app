@@ -147,7 +147,7 @@ function stockTone(value: number | null | undefined) {
 
 function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefined; alt: string; size?: 'sm' | 'md' | 'lg' }) {
   const [failed, setFailed] = useState(false)
-  const sizeClass = size === 'lg' ? 'h-28 w-full' : size === 'sm' ? 'h-12 w-14' : 'h-16 w-20'
+  const sizeClass = size === 'lg' ? 'h-40 w-full sm:h-44' : size === 'sm' ? 'h-12 w-14' : 'h-16 w-20'
 
   if (!src || failed) {
     return (
@@ -161,7 +161,7 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
     <img
       src={src}
       alt={alt}
-      className={`${sizeClass} shrink-0 rounded-md border border-slate-200 bg-white object-contain p-1`}
+      className={`${sizeClass} shrink-0 rounded-md border border-slate-200 bg-white object-contain p-2`}
       onError={() => setFailed(true)}
     />
   )
@@ -395,15 +395,15 @@ function InboundTab({
         {loading && rows.length === 0 ? (
           <LoadingBlock label="입고 상품 불러오는 중" />
         ) : (
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {rows.map((row) => (
               <button
                 key={`${row.sourceId || row.id}`}
                 type="button"
                 onClick={() => onOpenKeypad(row)}
-                className="rounded-lg border border-slate-200 bg-white p-2 text-left shadow-sm transition active:scale-[0.99] sm:p-3"
+                className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99] sm:p-4"
               >
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-3">
                   <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
                   <div className="min-w-0">
                     <div className="line-clamp-2 min-h-[38px] text-[13px] font-black leading-snug tracking-normal text-slate-950 sm:text-base">{row.name}</div>
