@@ -6,29 +6,27 @@ This app is intentionally separate from the existing root `android/` Capacitor a
 
 ## Setup
 
-1. Put Firebase Android config at:
+1. Set this server environment variable:
 
-   `apps/beiko-mobile/android/app/google-services.json`
+   - `MOBILE_MESSAGE_INGEST_SECRET`
 
-   Without this file, the app can compile and the SMS screen can open, but FCM token registration and push alerts will not work.
-
-2. Set these server environment variables:
-
-   - `BEIKO_ALERT_APP_REGISTER_SECRET`
-   - `BEIKO_ALERT_APP_ADMIN_USERNAME` optional, defaults to first admin user
-   - existing Firebase Admin variables: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY`
-
-3. Build:
+2. Build:
 
    ```bash
    cd apps/beiko-mobile/android
    ./gradlew assembleDebug
    ```
 
-4. Install `app/build/outputs/apk/debug/app-debug.apk`.
+3. Install `app/build/outputs/apk/debug/app-debug.apk`.
+
+4. Open the app and enter:
+
+   - server URL, for example `https://www.beiko.co.kr`
+   - the same `MOBILE_MESSAGE_INGEST_SECRET`
+
+The app does not require Firebase. It checks `/api/mobile/alerts` periodically and shows local Android notifications.
 
 ## App Features
 
-- Registers this device as an `alerts:android` FCM target.
-- Receives admin push alerts for new orders, incoming mobile messages, and deposit SMS matching.
+- Shows phone notifications for new orders, incoming mobile messages, and deposit SMS matching.
 - Provides a chat-like SMS screen using Android SMS permissions.

@@ -44,3 +44,6 @@ next-env.d.ts
 
 /app/generated/prisma
 .env*.local
+
+# Local debug APK artifacts
+/public/downloads/beiko-mobile-debug.apk

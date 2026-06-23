@@ -21,16 +21,10 @@ import android.widget.LinearLayout;
 import android.widget.ScrollView;
 import android.widget.TextView;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-
-import org.json.JSONObject;
-
 import java.io.BufferedReader;
-import java.io.OutputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
-import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
@@ -40,7 +34,7 @@ public class MainActivity extends Activity {
     public static final String PREFS = "beiko_mobile";
     public static final String KEY_SERVER_URL = "server_url";
     public static final String KEY_SECRET = "secret";
-    public static final String KEY_FCM_TOKEN = "fcm_token";
+    public static final String KEY_LAST_ALERT_AT = "last_alert_at";
     public static final String DEFAULT_SERVER_URL = "https://www.beiko.co.kr";
 
     private LinearLayout content;
@@ -57,16 +51,7 @@ public class MainActivity extends Activity {
         requestRuntimePermissions();
         buildLayout();
         loadAlertTab();
-        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-            if (!task.isSuccessful()) {
-                setStatus("FCM 토큰을 가져오지 못했습니다: " + safeError(task.getException()));
-                return;
-            }
-            String token = task.getResult();
-            getPrefs(this).edit().putString(KEY_FCM_TOKEN, token).apply();
-            setStatus("FCM 토큰 준비됨. 알림 등록을 눌러 서버에 연결하세요.");
-            registerTokenInBackground(this, token);
-        });
+        AlertPollWorker.schedule(this);
     }
 
     private void buildLayout() {
@@ -114,15 +99,15 @@ public class MainActivity extends Activity {
         content.removeAllViews();
         SharedPreferences prefs = getPrefs(this);
 
-        addSectionTitle("알림 앱 등록");
-        addText("이 기기를 신규 주문, 문자 수신, 입금문자 매칭 알림 수신 기기로 등록합니다.");
+        addSectionTitle("알림 감시");
+        addText("서버를 주기적으로 확인해서 신규 주문, 문자 수신, 입금문자 매칭 알림을 이 폰에 표시합니다.");
 
         serverUrlInput = input("서버 주소", prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL), InputType.TYPE_CLASS_TEXT);
-        secretInput = input("등록 시크릿", prefs.getString(KEY_SECRET, ""), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
+        secretInput = input("모바일 시크릿", prefs.getString(KEY_SECRET, ""), InputType.TYPE_CLASS_TEXT | InputType.TYPE_TEXT_VARIATION_PASSWORD);
         content.addView(serverUrlInput);
         content.addView(secretInput);
 
-        Button save = primaryButton("저장하고 알림 등록");
+        Button save = primaryButton("저장하고 알림 시작");
         save.setOnClickListener(v -> {
             String serverUrl = normalizeServerUrl(serverUrlInput.getText().toString());
             String secret = secretInput.getText().toString().trim();
@@ -130,15 +115,22 @@ public class MainActivity extends Activity {
                     .putString(KEY_SERVER_URL, serverUrl)
                     .putString(KEY_SECRET, secret)
                     .apply();
-            String token = getPrefs(this).getString(KEY_FCM_TOKEN, "");
-            if (token == null || token.length() == 0) {
-                setStatus("FCM 토큰이 아직 없습니다. 잠시 후 다시 눌러주세요.");
+            if (secret.length() == 0) {
+                setStatus("모바일 시크릿을 입력하세요.");
                 return;
             }
-            registerTokenInBackground(this, token);
-            setStatus("알림 등록 요청을 보냈습니다.");
+            AlertPollWorker.schedule(this);
+            AlertPollWorker.pollNow(this);
+            setStatus("알림 감시를 시작했습니다. 앱이 주기적으로 서버를 확인합니다.");
         });
         content.addView(save);
+
+        Button checkNow = secondaryButton("지금 알림 확인");
+        checkNow.setOnClickListener(v -> {
+            AlertPollWorker.pollNow(this);
+            setStatus("알림 확인 요청을 보냈습니다.");
+        });
+        content.addView(checkNow);
     }
 
     private void loadSmsTab() {
@@ -238,54 +230,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    public static void registerTokenInBackground(Context context, String token) {
-        SharedPreferences prefs = getPrefs(context);
-        String secret = prefs.getString(KEY_SECRET, "");
-        if (secret == null || secret.trim().length() == 0 || token == null || token.trim().length() == 0) return;
-
-        String serverUrl = normalizeServerUrl(prefs.getString(KEY_SERVER_URL, DEFAULT_SERVER_URL));
-        new Thread(() -> {
-            try {
-                JSONObject body = new JSONObject();
-                body.put("token", token);
-                body.put("platform", "android");
-                body.put("deviceName", Build.MODEL == null ? "Android" : Build.MODEL);
-                postJson(serverUrl + "/api/admin/alert-device/register", secret, "x-alert-app-secret", body);
-            } catch (Exception ignored) {
-            }
-        }).start();
-    }
-
-    private static String postJson(String url, String secret, String secretHeader, JSONObject body) throws Exception {
-        HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
-        try {
-            connection.setRequestMethod("POST");
-            connection.setConnectTimeout(12000);
-            connection.setReadTimeout(12000);
-            connection.setRequestProperty("Content-Type", "application/json; charset=utf-8");
-            connection.setRequestProperty("Authorization", "Bearer " + secret);
-            connection.setRequestProperty(secretHeader, secret);
-            connection.setDoOutput(true);
-            byte[] bytes = body.toString().getBytes(StandardCharsets.UTF_8);
-            connection.setFixedLengthStreamingMode(bytes.length);
-            try (OutputStream outputStream = connection.getOutputStream()) {
-                outputStream.write(bytes);
-            }
-            int code = connection.getResponseCode();
-            BufferedReader reader = new BufferedReader(new InputStreamReader(
-                    code >= 400 ? connection.getErrorStream() : connection.getInputStream(),
-                    StandardCharsets.UTF_8
-            ));
-            StringBuilder response = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) response.append(line);
-            if (code < 200 || code >= 300) throw new Exception("HTTP " + code + ": " + response);
-            return response.toString();
-        } finally {
-            connection.disconnect();
-        }
-    }
-
     private void requestRuntimePermissions() {
         if (Build.VERSION.SDK_INT < 23) return;
         ArrayList<String> permissions = new ArrayList<>();
@@ -375,11 +319,11 @@ public class MainActivity extends Activity {
         return (int) (value * getResources().getDisplayMetrics().density + 0.5f);
     }
 
-    private static SharedPreferences getPrefs(Context context) {
+    public static SharedPreferences getPrefs(Context context) {
         return context.getSharedPreferences(PREFS, MODE_PRIVATE);
     }
 
-    private static String normalizeServerUrl(String value) {
+    public static String normalizeServerUrl(String value) {
         String text = value == null ? "" : value.trim();
         if (text.length() == 0) text = DEFAULT_SERVER_URL;
         while (text.endsWith("/")) text = text.substring(0, text.length() - 1);
