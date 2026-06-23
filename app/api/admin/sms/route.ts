@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getBarobillSmsFromNumbers, getBarobillSmsSendMessagesByPaging, sendBarobillMessage } from '@/lib/barobillSms'
 import { prisma } from '@/lib/prisma'
+import { getSmsForwarderSenderInfo, sendSmsViaForwarder } from '@/lib/smsForwarder'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,6 +16,14 @@ type SenderInfoCacheEntry = {
 }
 
 let senderInfoCache: SenderInfoCacheEntry | null = null
+
+function getSmsProvider() {
+  return (process.env.SMS_PROVIDER || 'forwarder').trim().toLowerCase()
+}
+
+function isForwarderProvider() {
+  return getSmsProvider() === 'forwarder'
+}
 
 function normalizeDigits(value: string) {
   return value.replace(/\D/g, '')
@@ -61,6 +70,10 @@ function getDefaultHistoryRange() {
 }
 
 async function getCachedSenderInfo(forceRefresh = false) {
+  if (isForwarderProvider()) {
+    return getSmsForwarderSenderInfo()
+  }
+
   const now = Date.now()
   if (!forceRefresh && senderInfoCache && senderInfoCache.expiresAt > now) {
     return senderInfoCache.data
@@ -87,7 +100,7 @@ export async function GET(request: Request) {
 
     if (mode === 'sender') {
       const senderInfo = await getCachedSenderInfo(forceRefresh)
-      return NextResponse.json(senderInfo, {
+      return NextResponse.json({ ...senderInfo, provider: getSmsProvider() }, {
         headers: {
           'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
         },
@@ -104,14 +117,25 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: '조회 시작일은 종료일보다 늦을 수 없습니다.' }, { status: 400 })
     }
 
-    const [senderInfo, history, recipients, sendLogs] = await Promise.all([
-      getCachedSenderInfo(forceRefresh),
-      getBarobillSmsSendMessagesByPaging({
+    const senderInfoPromise = getCachedSenderInfo(forceRefresh)
+    const historyPromise = isForwarderProvider()
+      ? Promise.resolve({
+        currentPage: 1,
+        maxIndex: 0,
+        countPerPage,
+        maxPageNum: 1,
+        messages: [],
+      })
+      : getBarobillSmsSendMessagesByPaging({
         fromDate,
         toDate,
         countPerPage,
         currentPage,
-      }),
+      })
+
+    const [senderInfo, history, recipients, sendLogs] = await Promise.all([
+      senderInfoPromise,
+      historyPromise,
       prisma.smsRecipient.findMany({
         orderBy: [{ updatedAt: 'desc' }, { createdAt: 'desc' }],
       }),
@@ -123,6 +147,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       ...senderInfo,
+      provider: getSmsProvider(),
       history: {
         ...history,
         fromDate,
@@ -169,14 +194,26 @@ export async function POST(request: Request) {
     const sendType = Buffer.byteLength(contents, 'utf8') <= 90 ? 'SMS' : 'LMS'
     const scheduled = Boolean(sendDT)
 
-    const result = await sendBarobillMessage({
-      fromNumber,
-      toName,
-      toNumber,
-      contents,
-      sendDT,
-      refKey,
-    })
+    if (isForwarderProvider() && scheduled) {
+      return NextResponse.json({ error: '문자 포워더 발송은 예약 발송을 지원하지 않습니다.' }, { status: 400 })
+    }
+
+    const result = isForwarderProvider()
+      ? await sendSmsViaForwarder({
+        fromNumber,
+        toName,
+        toNumber,
+        contents,
+        refKey,
+      })
+      : await sendBarobillMessage({
+        fromNumber,
+        toName,
+        toNumber,
+        contents,
+        sendDT,
+        refKey,
+      })
 
     if (!result.success) {
       return NextResponse.json(

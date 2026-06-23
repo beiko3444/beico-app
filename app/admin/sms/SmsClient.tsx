@@ -68,6 +68,7 @@ type MobileSmsItem = {
 }
 
 type SmsBootstrapResponse = {
+  provider?: string
   senderId: string
   defaultFromNumber: string
   fromNumbers: SmsFromNumber[]
@@ -175,6 +176,7 @@ export default function SmsClient() {
   const [mobileMessages, setMobileMessages] = useState<MobileSmsItem[]>([])
   const [selectedRecipientId, setSelectedRecipientId] = useState('')
   const [fromNumber, setFromNumber] = useState('')
+  const [smsProvider, setSmsProvider] = useState('forwarder')
   const [toName, setToName] = useState('')
   const [toNumber, setToNumber] = useState('')
   const [contents, setContents] = useState('')
@@ -219,6 +221,7 @@ export default function SmsClient() {
       const nextSendLogs = Array.isArray(result.sendLogs) ? result.sendLogs : []
 
       setFromNumbers(Array.isArray(result.fromNumbers) ? result.fromNumbers : [])
+      setSmsProvider(typeof result.provider === 'string' && result.provider.trim() ? result.provider : 'forwarder')
       setRecipients(nextRecipients)
       setSendLogs(nextSendLogs)
       setFromNumber((current) => {
@@ -274,6 +277,7 @@ export default function SmsClient() {
 
   const byteLength = getByteLength(contents)
   const sendType = byteLength <= 90 ? 'SMS' : 'LMS'
+  const isForwarderProvider = smsProvider === 'forwarder'
 
   function applyRecipient(recipient: SmsRecipient | null) {
     if (!recipient) return
@@ -299,7 +303,7 @@ export default function SmsClient() {
           toName,
           toNumber,
           contents,
-          sendAt,
+          sendAt: isForwarderProvider ? '' : sendAt,
         }),
       })
 
@@ -442,10 +446,10 @@ export default function SmsClient() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Barobill Messaging</p>
+          <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">SMS Forwarder</p>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자발송서비스</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-            바로빌 공식 `SendMessage` 및 `GetSMSSendMessagesByPaging` SOAP API를 사용합니다.
+            010-8119-3313 휴대폰의 문자 포워더 앱을 통해 발송합니다.
           </p>
         </div>
         <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-[#e34219] shadow-sm dark:shadow-none">
@@ -604,9 +608,15 @@ export default function SmsClient() {
                     type="datetime-local"
                     value={sendAt}
                     onChange={(event) => setSendAt(event.target.value)}
-                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                    disabled={isForwarderProvider}
+                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed dark:disabled:bg-[#151515]"
                   />
                 </div>
+                {isForwarderProvider && (
+                  <p className="text-[11px] font-bold text-gray-500 dark:text-gray-400">
+                    문자 포워더는 즉시 발송만 지원합니다.
+                  </p>
+                )}
               </div>
 
               <div className="rounded-2xl bg-[#101828] text-white p-4 space-y-2">
@@ -848,7 +858,7 @@ export default function SmsClient() {
             <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">History</p>
             <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자 발송내역</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-              기간별로 바로빌 문자 발송내역을 조회합니다.
+              문자 포워더 발송 요청과 저장된 발송리스트를 확인합니다.
             </p>
           </div>
 

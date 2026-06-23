@@ -156,7 +156,7 @@ export default function AdminNav({
 }) {
   const pathname = usePathname()
   const [shipmentCount, setShipmentCount] = useState('1')
-  const [fromNumber, setFromNumber] = useState('')
+  const [fromNumber, setFromNumber] = useState('01081193313')
   const [loadingFromNumber, setLoadingFromNumber] = useState(true)
   const [sendingSms, setSendingSms] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
@@ -252,8 +252,8 @@ export default function AdminNav({
 
     const now = new Date()
     const contents = [
-      '도매장님, 익스트래커입니다.',
-      `${now.getMonth() + 1}/${now.getDate()} 출고 ${pickupCount}건 집하 부탁드립니다.`,
+      '소장님, 엑스트래커 입니다.',
+      `${now.getMonth() + 1}/${now.getDate()}, 출고 ${pickupCount}건 집하부탁드립니다.`,
       '감사합니다.',
     ].join('\n')
 
