@@ -407,14 +407,9 @@ function InboundTab({
                   <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
                   <div className="min-w-0">
                     <div className="line-clamp-2 min-h-[38px] text-[13px] font-black leading-snug tracking-normal text-slate-950 sm:text-base">{row.name}</div>
-                    {(row.nameJP || row.productCode) ? (
-                      <div className="mt-1 line-clamp-1 text-[11px] font-bold text-slate-500">
-                        {row.nameJP || row.productCode}
-                      </div>
-                    ) : null}
                   </div>
-                  <div className="rounded-md bg-slate-100 px-2 py-2 text-right text-xs font-black text-slate-700">
-                    재고 <span className={`ml-1 tabular-nums ${stockTone(row.stock ?? 0)}`}>{formatNumber(row.stock ?? 0)}</span>
+                  <div className="rounded-md bg-slate-100 px-3 py-3 text-right text-base font-black text-slate-700">
+                    재고 <span className={`ml-2 text-lg tabular-nums ${stockTone(row.stock ?? 0)}`}>{formatNumber(row.stock ?? 0)}</span>
                   </div>
                 </div>
               </button>
