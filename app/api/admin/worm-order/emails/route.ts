@@ -36,7 +36,10 @@ export async function GET(request: Request) {
             .split(',')
             .map((token) => token.trim())
             .filter(Boolean)
-        const isInvoiceInboxRequest = keywordTokens.includes('invoice') || keywordTokens.includes('payment')
+        const isInvoiceInboxRequest =
+            keywordTokens.includes('invoice') ||
+            keywordTokens.includes('payment') ||
+            keywordTokens.includes('documents for')
         const awbDocumentTokens = new Set([
             'documents',
             'documets',
@@ -50,9 +53,9 @@ export async function GET(request: Request) {
             'waybill',
             'payment invoice',
         ])
-        const isAwbDocumentInboxRequest = keywordTokens.some((token) => awbDocumentTokens.has(token))
+        const isAwbDocumentInboxRequest = !isInvoiceInboxRequest && keywordTokens.some((token) => awbDocumentTokens.has(token))
         const isInvoiceOnlyInboxRequest = isInvoiceInboxRequest && !isAwbDocumentInboxRequest
-        const subjectKeyword = isInvoiceOnlyInboxRequest ? 'invoice,payment' : requestedSubjectKeyword
+        const subjectKeyword = isInvoiceOnlyInboxRequest ? 'invoice,payment,documents for' : requestedSubjectKeyword
 
         const emails = await withTimeout(
             loadWormEmailList({

@@ -3097,7 +3097,7 @@ export default function WormOrderPage() {
 
         try {
             const params = new URLSearchParams()
-            params.set('subjectKeyword', 'invoice,payment')
+            params.set('subjectKeyword', 'invoice,payment,documents for')
             if (forceRefresh) {
                 params.set('forceRefresh', '1')
             }
