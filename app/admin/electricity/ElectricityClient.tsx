@@ -3,6 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { buildElectricitySavePayload, hasSavedLandlordReading } from '@/lib/electricityUsageClient'
+import {
+    defaultRentPaymentChecklistStatus,
+    normalizeRentPaymentStatus,
+    rentPaymentStatusKey,
+    type RentPaymentChecklistStatus,
+} from '@/lib/rentPaymentStatus'
 
 type BillData = {
     year: number
@@ -24,12 +30,6 @@ type LandlordData = {
     outdoorLightKw: number
     photo: string | null
     photoUploadedAt: string | null
-}
-
-type PaymentChecklistStatus = {
-    rentTaxInvoiceIssued: boolean
-    electricityPaid: boolean
-    electricityPaidAt: string | null
 }
 
 type MonthlyCalendarSummary = {
@@ -108,7 +108,7 @@ export default function ElectricityClient() {
     const [loading, setLoading] = useState(false)
     const [prevMonthData, setPrevMonthData] = useState<any>(null)
     const [invoiceRemarks, setInvoiceRemarks] = useState('')
-    const [paymentChecklist, setPaymentChecklist] = useState<Record<string, PaymentChecklistStatus>>({})
+    const [paymentChecklist, setPaymentChecklist] = useState<Record<string, RentPaymentChecklistStatus>>({})
     const [monthlyLandlordTotals, setMonthlyLandlordTotals] = useState<Record<number, number | null>>({})
     const [monthlyBillStatuses, setMonthlyBillStatuses] = useState<Record<number, boolean>>({})
     const [monthlyCalendarSummaries, setMonthlyCalendarSummaries] = useState<Record<number, MonthlyCalendarSummary | null>>({})
@@ -162,18 +162,14 @@ export default function ElectricityClient() {
         })
     }
 
-    const monthKey = (year: number, month: number) => `${year}-${String(month).padStart(2, '0')}`
+    const monthKey = rentPaymentStatusKey
 
     const previousMonthYear = selectedMonth === 1 ? selectedYear - 1 : selectedYear
     const previousMonth = selectedMonth === 1 ? 12 : selectedMonth - 1
     const previousMonthLabel = `${previousMonthYear}년 ${previousMonth}월`
     const currentMonthLabel = `${selectedYear}년 ${selectedMonth}월`
 
-    const defaultPaymentStatus: PaymentChecklistStatus = {
-        rentTaxInvoiceIssued: false,
-        electricityPaid: false,
-        electricityPaidAt: null
-    }
+    const defaultPaymentStatus = defaultRentPaymentChecklistStatus
 
     const yearOptions = Array.from(
         { length: Math.max(today.getFullYear() + 1 - PAYMENT_START_YEAR + 1, 1) },
@@ -187,13 +183,21 @@ export default function ElectricityClient() {
     const updatePaymentStatus = (
         year: number,
         month: number,
-        updater: (prev: PaymentChecklistStatus) => PaymentChecklistStatus
+        updater: (prev: RentPaymentChecklistStatus) => RentPaymentChecklistStatus
     ) => {
         const key = monthKey(year, month)
         const previousStatus = paymentChecklist[key] || defaultPaymentStatus
         const nextStatus = updater(previousStatus)
         setPaymentChecklist(prev => ({ ...prev, [key]: nextStatus }))
         savePaymentChecklistStatus(year, month, nextStatus)
+            .then((savedStatus) => {
+                setPaymentChecklist(prev => ({ ...prev, [key]: savedStatus }))
+            })
+            .catch((error) => {
+                setPaymentChecklist(prev => ({ ...prev, [key]: previousStatus }))
+                const message = error instanceof Error ? error.message : '납부 체크 상태 저장에 실패했습니다.'
+                alert(message)
+            })
     }
 
     // Fetch data when Year/Month changes
@@ -394,21 +398,17 @@ export default function ElectricityClient() {
 
         const fetchRentPayments = async () => {
             try {
-                const res = await fetch(`/api/admin/electricity/rent-payment?year=${selectedYear}`)
+                const res = await fetch(`/api/admin/electricity/rent-payment?year=${selectedYear}`, { cache: 'no-store' })
                 if (!res.ok) return
                 const data = await res.json()
                 const payments = Array.isArray(data?.payments) ? data.payments : []
                 const next: Record<number, string | null> = {}
-                const nextChecklist: Record<string, PaymentChecklistStatus> = {}
+                const nextChecklist: Record<string, RentPaymentChecklistStatus> = {}
                 for (const entry of payments) {
                     const month = Number(entry?.month)
                     if (!Number.isFinite(month)) continue
                     next[month] = entry?.paidDate ? String(entry.paidDate).slice(0, 10) : null
-                    nextChecklist[monthKey(selectedYear, month)] = {
-                        rentTaxInvoiceIssued: Boolean(entry?.rentTaxInvoiceIssued),
-                        electricityPaid: Boolean(entry?.electricityPaid),
-                        electricityPaidAt: entry?.electricityPaidAt ? String(entry.electricityPaidAt) : null,
-                    }
+                    nextChecklist[monthKey(selectedYear, month)] = normalizeRentPaymentStatus(entry)
                 }
                 setRentPaidDates(next)
                 setPaymentChecklist(nextChecklist)
@@ -420,7 +420,7 @@ export default function ElectricityClient() {
         fetchRentPayments()
     }, [activeTab, selectedYear])
 
-    const savePaymentChecklistStatus = async (year: number, month: number, status: PaymentChecklistStatus) => {
+    const savePaymentChecklistStatus = async (year: number, month: number, status: RentPaymentChecklistStatus) => {
         try {
             const res = await fetch('/api/admin/electricity/rent-payment', {
                 method: 'POST',
@@ -433,10 +433,15 @@ export default function ElectricityClient() {
                     electricityPaidAt: status.electricityPaidAt,
                 }),
             })
-            if (!res.ok) throw new Error('save-failed')
+            const data = await res.json().catch(() => null)
+            if (!res.ok) {
+                const message = typeof data?.error === 'string' ? data.error : '납부 체크 상태 저장에 실패했습니다.'
+                throw new Error(message)
+            }
+            return normalizeRentPaymentStatus(data?.payment)
         } catch (error) {
             console.error('Failed to save payment checklist:', error)
-            alert('납부 체크 상태 저장에 실패했습니다.')
+            throw error instanceof Error ? error : new Error('납부 체크 상태 저장에 실패했습니다.')
         }
     }
 

@@ -21,7 +21,11 @@ export async function GET(request: Request) {
             orderBy: { month: 'asc' },
         })
 
-        return NextResponse.json({ payments })
+        return NextResponse.json({ payments }, {
+            headers: {
+                'Cache-Control': 'no-store, max-age=0',
+            },
+        })
     } catch (error) {
         console.error("Failed to fetch rent payments:", error)
         return NextResponse.json({ error: "Failed to fetch rent payments" }, { status: 500 })
@@ -70,7 +74,11 @@ export async function POST(request: Request) {
             },
         })
 
-        return NextResponse.json({ payment })
+        return NextResponse.json({ payment }, {
+            headers: {
+                'Cache-Control': 'no-store, max-age=0',
+            },
+        })
     } catch (error) {
         console.error("Failed to save rent payment:", error)
         return NextResponse.json({ error: "Failed to save rent payment" }, { status: 500 })
