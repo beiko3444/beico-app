@@ -313,6 +313,11 @@ const getStackFirstLine = (error: unknown) => {
 const isTargetClosedAutomationError = (error: unknown) =>
     /target page, context or browser has been closed|browser has been closed|context has been closed|target closed/i.test(getErrorMessage(error))
 
+const createBrowserClosedError = (step: string, error: unknown, detail?: string) => new MoinAutomationError(
+    'Browser closed unexpectedly',
+    `MOIN automation browser closed during ${step}. ${detail ? `${detail} ` : ''}${getErrorMessage(error)}`
+)
+
 const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) => {
     if (signal?.aborted) {
         throw new MoinAutomationCanceledError(step)
@@ -580,6 +585,9 @@ const clickFirstVisible = async (
                 await target.click({ timeout: 5000 })
                 return
             } catch (error) {
+                if (isTargetClosedAutomationError(error)) {
+                    throw createBrowserClosedError(step, error, `selector=${selector}`)
+                }
                 errors.push(`${selector}:${getErrorMessage(error).slice(0, 120)}`)
             }
         }
@@ -630,7 +638,12 @@ const clickVisibleTextAction = async (
             if (typeof target.click === 'function') target.click();
             return 'dom:' + textOf(target).slice(0, 80);
         })()
-    `).catch(() => null)
+    `).catch((error) => {
+        if (isTargetClosedAutomationError(error)) {
+            throw createBrowserClosedError('Click visible text action', error)
+        }
+        return null
+    })
 
     return typeof result === 'string' && result ? result : null
 }
@@ -648,7 +661,12 @@ const clickLastVisible = async (
         for (const selector of selectors) {
             try {
                 const matches = page.locator(selector)
-                const count = await matches.count().catch(() => 0)
+                const count = await matches.count().catch((error) => {
+                    if (isTargetClosedAutomationError(error)) {
+                        throw createBrowserClosedError(step, error, `selector=${selector}`)
+                    }
+                    return 0
+                })
 
                 for (let index = count - 1; index >= 0; index -= 1) {
                     const target = matches.nth(index)
@@ -661,10 +679,16 @@ const clickLastVisible = async (
                         await target.click({ timeout: 5000 })
                         return `${selector}#${index}`
                     } catch (error) {
+                        if (isTargetClosedAutomationError(error)) {
+                            throw createBrowserClosedError(step, error, `selector=${selector}#${index}`)
+                        }
                         errors.push(`${selector}#${index}: ${getErrorMessage(error)}`)
                     }
                 }
             } catch (error) {
+                if (isTargetClosedAutomationError(error)) {
+                    throw createBrowserClosedError(step, error, `selector=${selector}`)
+                }
                 errors.push(`${selector}: ${getErrorMessage(error)}`)
             }
         }
@@ -692,7 +716,10 @@ const fillFirstVisible = async (
             await target.click({ timeout: 5000 })
             await target.fill(value)
             return
-        } catch {
+        } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError(step, error, `selector=${selector}`)
+            }
             // Try next selector.
         }
     }
@@ -704,6 +731,7 @@ const typeInputDirectly = async (
     page: PageLike,
     selectors: string[],
     value: string,
+    step = 'Type input',
 ): Promise<string | null> => {
     const result = await page.evaluate(`
         (() => {
@@ -739,7 +767,12 @@ const typeInputDirectly = async (
             }
             return null;
         })()
-    `).catch(() => null)
+    `).catch((error) => {
+        if (isTargetClosedAutomationError(error)) {
+            throw createBrowserClosedError(step, error, 'direct-dom-input')
+        }
+        return null
+    })
 
     return typeof result === 'string' && result ? result : null
 }
@@ -796,11 +829,14 @@ const typeFirstVisible = async (
             }
             return
         } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError(step, error, `selector=${selector}`)
+            }
             errors.push(`${selector}: ${getErrorMessage(error).slice(0, 180)}`)
         }
     }
 
-    const directResult = await typeInputDirectly(page, selectors, value)
+    const directResult = await typeInputDirectly(page, selectors, value, step)
     if (directResult) return
 
     const diag = await collectInputDiagnostics(page)
@@ -2673,6 +2709,9 @@ const waitForMoinLoginInput = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT
             await page.locator(selector).first().waitFor({ state: 'attached', timeout: timeoutMs })
             return selector
         } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError('Wait for login input', error, `selector=${selector}`)
+            }
             errors.push(`${selector}: ${getErrorMessage(error).slice(0, 120)}`)
         }
     }
@@ -2765,7 +2804,7 @@ const authenticateMoinSessionWithApi = async (
 
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
-    const waitStrategies: Array<'domcontentloaded' | 'load' | 'commit'> = ['domcontentloaded', 'load', 'commit']
+    const waitStrategies: Array<'commit' | 'domcontentloaded' | 'load'> = ['commit', 'domcontentloaded', 'load']
 
     for (const waitUntil of waitStrategies) {
         try {
@@ -2777,12 +2816,18 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
             await waitForMoinLoginInput(page, Math.max(timeoutMs, LOGIN_INPUT_TIMEOUT_MS))
             return waitUntil
         } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError('Open login page', error, `waitUntil=${waitUntil}`)
+            }
             const reason = error instanceof Error ? error.message : String(error)
             navigationErrors.push(`${waitUntil}: ${reason}`)
             try {
                 await waitForMoinLoginInput(page, LOGIN_INPUT_TIMEOUT_MS)
                 return waitUntil
-            } catch {
+            } catch (inputError) {
+                if (isTargetClosedAutomationError(inputError)) {
+                    throw createBrowserClosedError('Open login page', inputError, `waitUntil=${waitUntil}:post-navigation-input-check`)
+                }
                 // Continue with the next navigation strategy.
             }
         }
