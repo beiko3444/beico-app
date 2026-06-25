@@ -116,6 +116,20 @@ function parseNumberInput(value: string, fallback = 0) {
   return Number.isFinite(parsed) ? parsed : fallback
 }
 
+function parseDimensionCbm(dimension: string, cartons: number) {
+  const numbers = dimension
+    .replace(/㎝|센티|cm/gi, '')
+    .split(/[xX*×,\s/]+/)
+    .map((part) => Number(part.trim()))
+    .filter((value) => Number.isFinite(value) && value > 0)
+
+  if (numbers.length < 3) return null
+
+  const [width, depth, height] = numbers
+  const cartonCount = Math.max(0, Math.floor(cartons))
+  return Number(((width * depth * height * cartonCount) / 1_000_000).toFixed(3))
+}
+
 function money(value: number, currency: string) {
   const normalized = currency.trim() || 'US$'
   const separator = normalized.endsWith('$') ? '' : ' '
@@ -429,6 +443,23 @@ export default function ExportDeclarationClient({ products }: { products: Export
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
   }
 
+  const updateCartons = (id: string, value: string) => {
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== id) return item
+      const cartons = Math.max(0, Math.floor(parseNumberInput(value)))
+      const calculatedCbm = parseDimensionCbm(item.dimension, cartons)
+      return { ...item, cartons, cbm: calculatedCbm ?? item.cbm }
+    }))
+  }
+
+  const updateDimension = (id: string, dimension: string) => {
+    setItems((prev) => prev.map((item) => {
+      if (item.id !== id) return item
+      const calculatedCbm = parseDimensionCbm(dimension, item.cartons)
+      return { ...item, dimension, cbm: calculatedCbm ?? item.cbm }
+    }))
+  }
+
   const applyProduct = (rowId: string, productId: string) => {
     const product = productMap.get(productId)
     if (!product) {
@@ -525,55 +556,55 @@ export default function ExportDeclarationClient({ products }: { products: Export
               </button>
             </div>
             <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-              <Field label="Invoice No.">
+              <Field label="Invoice No. / 송장번호">
                 <input className={textInputClass()} value={form.invoiceNo} onChange={(event) => setFormValue('invoiceNo', event.target.value)} />
               </Field>
-              <Field label="Date">
+              <Field label="Date / 작성일">
                 <input type="date" className={textInputClass()} value={form.date} onChange={(event) => setFormValue('date', event.target.value)} />
               </Field>
-              <Field label="Departure Date">
+              <Field label="Departure Date / 출항일">
                 <input type="date" className={textInputClass()} value={form.departureDate} onChange={(event) => setFormValue('departureDate', event.target.value)} />
               </Field>
-              <Field label="Vessel / Flight">
+              <Field label="Vessel / Flight / 선박·항공편">
                 <input className={textInputClass()} value={form.vesselFlight} onChange={(event) => setFormValue('vesselFlight', event.target.value)} />
               </Field>
-              <Field label="Incoterms">
+              <Field label="Incoterms / 거래조건">
                 <input className={textInputClass()} value={form.incoterms} onChange={(event) => setFormValue('incoterms', event.target.value)} />
               </Field>
-              <Field label="Currency">
+              <Field label="Currency / 통화">
                 <input className={textInputClass()} value={form.currency} onChange={(event) => setFormValue('currency', event.target.value.toUpperCase())} />
               </Field>
-              <Field label="Port of Loading">
+              <Field label="Port of Loading / 선적항">
                 <input className={textInputClass()} value={form.portOfLoading} onChange={(event) => setFormValue('portOfLoading', event.target.value)} />
               </Field>
-              <Field label="Port of Discharge">
+              <Field label="Port of Discharge / 도착항">
                 <input className={textInputClass()} value={form.portOfDischarge} onChange={(event) => setFormValue('portOfDischarge', event.target.value)} />
               </Field>
-              <Field label="Exporter">
+              <Field label="Exporter / 수출자">
                 <textarea className={textAreaClass()} value={form.exporter} onChange={(event) => setFormValue('exporter', event.target.value)} />
               </Field>
-              <Field label="Consignee">
+              <Field label="Consignee / 수입자">
                 <textarea className={textAreaClass()} value={form.consignee} onChange={(event) => setFormValue('consignee', event.target.value)} placeholder="수입자 회사명, 주소, 연락처" />
               </Field>
-              <Field label="Buyer">
+              <Field label="Buyer / 구매자">
                 <textarea className={textAreaClass()} value={form.buyer} onChange={(event) => setFormValue('buyer', event.target.value)} />
               </Field>
-              <Field label="L/C No. and Date">
+              <Field label="L/C No. and Date / 신용장번호·일자">
                 <textarea className={textAreaClass()} value={form.lcNoDate} onChange={(event) => setFormValue('lcNoDate', event.target.value)} />
               </Field>
-              <Field label="Other References">
+              <Field label="Other References / 참고사항">
                 <textarea className={textAreaClass()} value={form.otherReferences} onChange={(event) => setFormValue('otherReferences', event.target.value)} />
               </Field>
-              <Field label="Terms of Delivery and Payment">
+              <Field label="Terms of Delivery and Payment / 인도·결제조건">
                 <textarea className={textAreaClass()} value={form.termsDeliveryPayment} onChange={(event) => setFormValue('termsDeliveryPayment', event.target.value)} />
               </Field>
-              <Field label="Shipping Marks">
+              <Field label="Shipping Marks / 화인">
                 <textarea className={textAreaClass()} value={form.shippingMarks} onChange={(event) => setFormValue('shippingMarks', event.target.value)} />
               </Field>
-              <Field label="No. and Kind of Packages">
+              <Field label="No. and Kind of Packages / 포장수량·종류">
                 <textarea className={textAreaClass()} value={form.packagesKind} onChange={(event) => setFormValue('packagesKind', event.target.value)} placeholder="예: 10 CT" />
               </Field>
-              <Field label="Remarks">
+              <Field label="Remarks / 비고">
                 <textarea className={textAreaClass()} value={form.remarks} onChange={(event) => setFormValue('remarks', event.target.value)} />
               </Field>
             </div>
@@ -597,17 +628,17 @@ export default function ExportDeclarationClient({ products }: { products: Export
                     <th className="w-[160px] px-2 py-2 text-left">관리상품</th>
                     <th className="w-[210px] px-2 py-2 text-left">상품명</th>
                     <th className="w-[210px] px-2 py-2 text-left">영문명</th>
-                    <th className="w-[110px] px-2 py-2 text-left">Model</th>
-                    <th className="w-[110px] px-2 py-2 text-left">HS Code</th>
-                    <th className="w-[90px] px-2 py-2 text-left">Origin</th>
-                    <th className="w-[80px] px-2 py-2 text-right">Qty</th>
-                    <th className="w-[110px] px-2 py-2 text-right">Unit</th>
-                    <th className="w-[110px] px-2 py-2 text-right">Amount</th>
-                    <th className="w-[80px] px-2 py-2 text-right">Carton</th>
-                    <th className="w-[95px] px-2 py-2 text-right">Net KG</th>
-                    <th className="w-[95px] px-2 py-2 text-right">Gross KG</th>
-                    <th className="w-[85px] px-2 py-2 text-right">CBM</th>
-                    <th className="w-[130px] px-2 py-2 text-left">규격</th>
+                    <th className="w-[110px] px-2 py-2 text-left">Model<br /><span className="text-[10px] text-slate-400">모델</span></th>
+                    <th className="w-[110px] px-2 py-2 text-left">HS Code<br /><span className="text-[10px] text-slate-400">세번부호</span></th>
+                    <th className="w-[90px] px-2 py-2 text-left">Origin<br /><span className="text-[10px] text-slate-400">원산지</span></th>
+                    <th className="w-[80px] px-2 py-2 text-right">Qty<br /><span className="text-[10px] text-slate-400">수량</span></th>
+                    <th className="w-[110px] px-2 py-2 text-right">Unit<br /><span className="text-[10px] text-slate-400">단가</span></th>
+                    <th className="w-[110px] px-2 py-2 text-right">Amount<br /><span className="text-[10px] text-slate-400">금액</span></th>
+                    <th className="w-[80px] px-2 py-2 text-right">Carton<br /><span className="text-[10px] text-slate-400">박스수</span></th>
+                    <th className="w-[95px] px-2 py-2 text-right">Net KG<br /><span className="text-[10px] text-slate-400">순중량</span></th>
+                    <th className="w-[95px] px-2 py-2 text-right">Gross KG<br /><span className="text-[10px] text-slate-400">총중량</span></th>
+                    <th className="w-[85px] px-2 py-2 text-right">CBM<br /><span className="text-[10px] text-slate-400">부피</span></th>
+                    <th className="w-[130px] px-2 py-2 text-left">규격<br /><span className="text-[10px] text-slate-400">cm</span></th>
                     <th className="w-[54px] px-2 py-2" />
                   </tr>
                 </thead>
@@ -630,11 +661,11 @@ export default function ExportDeclarationClient({ products }: { products: Export
                       <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass()} text-right`} value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Math.max(0, Math.floor(parseNumberInput(event.target.value))) })} /></td>
                       <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.unitPrice} onChange={(event) => updateItem(item.id, { unitPrice: parseNumberInput(event.target.value) })} /></td>
                       <td className="px-2 py-2 text-right font-black text-slate-950">{money(lineAmount(item), form.currency)}</td>
-                      <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass()} text-right`} value={item.cartons} onChange={(event) => updateItem(item.id, { cartons: Math.max(0, Math.floor(parseNumberInput(event.target.value))) })} /></td>
+                      <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass()} text-right`} value={item.cartons} onChange={(event) => updateCartons(item.id, event.target.value)} /></td>
                       <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.netWeight} onChange={(event) => updateItem(item.id, { netWeight: parseNumberInput(event.target.value) })} /></td>
                       <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.grossWeight} onChange={(event) => updateItem(item.id, { grossWeight: parseNumberInput(event.target.value) })} /></td>
                       <td className="px-2 py-2"><input type="number" min={0} step="0.001" className={`${textInputClass()} text-right`} value={item.cbm} onChange={(event) => updateItem(item.id, { cbm: parseNumberInput(event.target.value) })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.dimension} onChange={(event) => updateItem(item.id, { dimension: event.target.value })} placeholder="50x40x30cm" /></td>
+                      <td className="px-2 py-2"><input className={textInputClass()} value={item.dimension} onChange={(event) => updateDimension(item.id, event.target.value)} placeholder="50x40x30cm" /></td>
                       <td className="px-2 py-2 text-center">
                         <button type="button" onClick={() => removeItem(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-600" title="행 삭제">
                           <Trash2 size={15} />
