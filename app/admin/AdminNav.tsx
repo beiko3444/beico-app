@@ -174,6 +174,7 @@ export default function AdminNav({
     { name: '통계', path: '/admin/statistics' },
     { name: '지렁이 발주', path: '/admin/worm-order' },
     { name: 'PI발급', path: '/admin/proforma' },
+    { name: '수출신고', path: '/admin/export-declaration' },
     { name: '전력관리', path: '/admin/electricity' },
   ]
 
