@@ -52,6 +52,30 @@ class FakeTypePage {
   }
 }
 
+class ClosedTargetLocator {
+  first() {
+    return this
+  }
+
+  async waitFor() {
+    throw new Error('locator.waitFor: Target page, context or browser has been closed')
+  }
+}
+
+class ClosedTargetPage {
+  locator() {
+    return new ClosedTargetLocator()
+  }
+
+  url() {
+    return 'https://www.moinbizplus.com/login'
+  }
+
+  async evaluate() {
+    throw new Error('page.evaluate: Target page, context or browser has been closed')
+  }
+}
+
 test('MOIN login typing uses a positive per-character delay', async () => {
   const typeFirstVisible = moin.__moinBizplusTestHooks?.typeFirstVisible
   assert.ok(typeFirstVisible, 'MOIN typeFirstVisible hook is unavailable')
@@ -78,4 +102,19 @@ test('MOIN login typing falls back to direct DOM input when synthetic typing fai
 
   assert.equal(locator.clicked, 1)
   assert.ok(page.evaluateCalls > 0)
+})
+
+test('MOIN login typing surfaces closed browser as retryable automation error', async () => {
+  const typeFirstVisible = moin.__moinBizplusTestHooks?.typeFirstVisible
+  assert.ok(typeFirstVisible, 'MOIN typeFirstVisible hook is unavailable')
+
+  await assert.rejects(
+    () => typeFirstVisible(new ClosedTargetPage(), ['input[data-testid="input-email"]'], 'xtracker@naver.com', 'Fill login ID'),
+    (error) => {
+      assert.equal(error.step, 'Browser closed unexpectedly')
+      assert.match(error.message, /Fill login ID/)
+      assert.match(error.message, /input-email/)
+      return true
+    },
+  )
 })

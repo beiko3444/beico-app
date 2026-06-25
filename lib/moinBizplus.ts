@@ -46,8 +46,14 @@ const KO_LOCK = '\uC7A0\uAE08'
 const KO_LOCKED = '\uC7A0\uACA8'
 const KO_REMIT_REQUEST = '\uC1A1\uAE08 \uC2E0\uCCAD'
 const KO_REMIT_REQUEST_COMPACT = '\uC1A1\uAE08\uC2E0\uCCAD'
+const KO_REMIT_REQUEST_ACTION = '\uC1A1\uAE08 \uC2E0\uCCAD\uD558\uAE30'
+const KO_REMIT_REQUEST_ACTION_COMPACT = '\uC1A1\uAE08\uC2E0\uCCAD\uD558\uAE30'
 const KO_APPLY = '\uC2E0\uCCAD'
+const KO_APPLY_ACTION = '\uC2E0\uCCAD\uD558\uAE30'
 const KO_SUBMIT = '\uC81C\uCD9C'
+const KO_CONFIRM = '\uD655\uC778'
+const KO_COMPLETE = '\uC644\uB8CC'
+const KO_CONTINUE = '\uACC4\uC18D'
 const KO_PURCHASE_REMIT = '\uAD6C\uB9E4\uB300\uD589\uC1A1\uAE08'
 const KO_AMOUNT = '\uAE08\uC561'
 const KO_NEXT_STEP = '\uB2E4\uC74C\uB2E8\uACC4'
@@ -306,6 +312,11 @@ const getStackFirstLine = (error: unknown) => {
 
 const isTargetClosedAutomationError = (error: unknown) =>
     /target page, context or browser has been closed|browser has been closed|context has been closed|target closed/i.test(getErrorMessage(error))
+
+const createBrowserClosedError = (step: string, error: unknown, detail?: string) => new MoinAutomationError(
+    'Browser closed unexpectedly',
+    `MOIN automation browser closed during ${step}. ${detail ? `${detail} ` : ''}${getErrorMessage(error)}`
+)
 
 const throwIfAbortRequested = (signal: AbortSignal | undefined, step: string) => {
     if (signal?.aborted) {
@@ -574,6 +585,9 @@ const clickFirstVisible = async (
                 await target.click({ timeout: 5000 })
                 return
             } catch (error) {
+                if (isTargetClosedAutomationError(error)) {
+                    throw createBrowserClosedError(step, error, `selector=${selector}`)
+                }
                 errors.push(`${selector}:${getErrorMessage(error).slice(0, 120)}`)
             }
         }
@@ -624,7 +638,12 @@ const clickVisibleTextAction = async (
             if (typeof target.click === 'function') target.click();
             return 'dom:' + textOf(target).slice(0, 80);
         })()
-    `).catch(() => null)
+    `).catch((error) => {
+        if (isTargetClosedAutomationError(error)) {
+            throw createBrowserClosedError('Click visible text action', error)
+        }
+        return null
+    })
 
     return typeof result === 'string' && result ? result : null
 }
@@ -642,7 +661,12 @@ const clickLastVisible = async (
         for (const selector of selectors) {
             try {
                 const matches = page.locator(selector)
-                const count = await matches.count().catch(() => 0)
+                const count = await matches.count().catch((error) => {
+                    if (isTargetClosedAutomationError(error)) {
+                        throw createBrowserClosedError(step, error, `selector=${selector}`)
+                    }
+                    return 0
+                })
 
                 for (let index = count - 1; index >= 0; index -= 1) {
                     const target = matches.nth(index)
@@ -655,10 +679,16 @@ const clickLastVisible = async (
                         await target.click({ timeout: 5000 })
                         return `${selector}#${index}`
                     } catch (error) {
+                        if (isTargetClosedAutomationError(error)) {
+                            throw createBrowserClosedError(step, error, `selector=${selector}#${index}`)
+                        }
                         errors.push(`${selector}#${index}: ${getErrorMessage(error)}`)
                     }
                 }
             } catch (error) {
+                if (isTargetClosedAutomationError(error)) {
+                    throw createBrowserClosedError(step, error, `selector=${selector}`)
+                }
                 errors.push(`${selector}: ${getErrorMessage(error)}`)
             }
         }
@@ -686,7 +716,10 @@ const fillFirstVisible = async (
             await target.click({ timeout: 5000 })
             await target.fill(value)
             return
-        } catch {
+        } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError(step, error, `selector=${selector}`)
+            }
             // Try next selector.
         }
     }
@@ -698,6 +731,7 @@ const typeInputDirectly = async (
     page: PageLike,
     selectors: string[],
     value: string,
+    step = 'Type input',
 ): Promise<string | null> => {
     const result = await page.evaluate(`
         (() => {
@@ -733,7 +767,12 @@ const typeInputDirectly = async (
             }
             return null;
         })()
-    `).catch(() => null)
+    `).catch((error) => {
+        if (isTargetClosedAutomationError(error)) {
+            throw createBrowserClosedError(step, error, 'direct-dom-input')
+        }
+        return null
+    })
 
     return typeof result === 'string' && result ? result : null
 }
@@ -790,11 +829,14 @@ const typeFirstVisible = async (
             }
             return
         } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError(step, error, `selector=${selector}`)
+            }
             errors.push(`${selector}: ${getErrorMessage(error).slice(0, 180)}`)
         }
     }
 
-    const directResult = await typeInputDirectly(page, selectors, value)
+    const directResult = await typeInputDirectly(page, selectors, value, step)
     if (directResult) return
 
     const diag = await collectInputDiagnostics(page)
@@ -964,8 +1006,13 @@ const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TI
             const labels = [
                 ${JSON.stringify(KO_REMIT_REQUEST)},
                 ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)},
+                ${JSON.stringify(KO_REMIT_REQUEST_ACTION)},
+                ${JSON.stringify(KO_REMIT_REQUEST_ACTION_COMPACT)},
                 ${JSON.stringify(KO_APPLY)},
+                ${JSON.stringify(KO_APPLY_ACTION)},
                 ${JSON.stringify(KO_SUBMIT)},
+                ${JSON.stringify(KO_CONFIRM)},
+                ${JSON.stringify(KO_CONTINUE)},
                 '신청하기',
                 '확인',
             ].filter(Boolean);
@@ -984,6 +1031,14 @@ const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TI
                 ${JSON.stringify(KO_NEXT_STEP_SPACED)},
                 ${JSON.stringify(KO_NEXT)},
                 ${JSON.stringify(KO_REMIT)},
+                ${JSON.stringify(KO_COMPLETE)},
+                '\uB85C\uADF8\uC544\uC6C3',
+                '\uBA54\uB274',
+                '\uB2EB\uAE30',
+                '\uCDE8\uC18C',
+                '\uC774\uC804',
+                '\uB4A4\uB85C',
+                '\uC218\uC815',
                 '로그아웃',
                 '메뉴',
                 '닫기',
@@ -1002,6 +1057,10 @@ const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TI
                 el.getAttribute && el.getAttribute('aria-label') || '',
                 el.getAttribute && el.getAttribute('title') || '',
             ].join(' '));
+            const bodyText = norm((document.body && document.body.innerText) || '');
+            const hasReviewContext =
+                /\\/transfer\\/(review|confirm)\\b/.test(location.pathname) ||
+                contextLabels.some((label) => label && bodyText.includes(label));
             const hasConfirmationContext = (el) => {
                 let current = el;
                 for (let depth = 0; current && depth < 8; depth += 1) {
@@ -1016,12 +1075,12 @@ const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TI
                 }
                 return false;
             };
-            const candidates = Array.from(document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]'))
+            const candidates = Array.from(document.querySelectorAll('button, [role="button"], a, input[type="button"], input[type="submit"], [onclick], [tabindex]'))
                 .filter((el) => isVisible(el) && !isDisabled(el))
                 .map((el) => ({ el, text: textOf(el), rect: el.getBoundingClientRect() }))
                 .filter((row) => row.text && labels.some((label) => row.text.includes(label)))
-                .filter((row) => !excludedLabels.some((label) => label && row.text === label))
-                .filter((row) => hasConfirmationContext(row.el))
+                .filter((row) => !excludedLabels.some((label) => label && row.text.includes(label)))
+                .filter((row) => hasReviewContext || hasConfirmationContext(row.el))
                 .filter((row) => row.rect.top > 80);
             const target = candidates[candidates.length - 1];
             if (!target) {
@@ -1042,12 +1101,29 @@ const clickFinalRemittanceSubmit = async (page: PageLike, timeoutMs = DEFAULT_TI
     const finalSubmitSelectors = [
         `button:has-text("${KO_REMIT_REQUEST}")`,
         `[role="button"]:has-text("${KO_REMIT_REQUEST}")`,
+        `a:has-text("${KO_REMIT_REQUEST}")`,
         `input[type="button"][value*="${KO_REMIT_REQUEST}"]`,
         `input[type="submit"][value*="${KO_REMIT_REQUEST}"]`,
         `button:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
         `[role="button"]:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
+        `a:has-text("${KO_REMIT_REQUEST_COMPACT}")`,
         `input[type="button"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
         `input[type="submit"][value*="${KO_REMIT_REQUEST_COMPACT}"]`,
+        `button:has-text("${KO_REMIT_REQUEST_ACTION}")`,
+        `[role="button"]:has-text("${KO_REMIT_REQUEST_ACTION}")`,
+        `a:has-text("${KO_REMIT_REQUEST_ACTION}")`,
+        `input[type="button"][value*="${KO_REMIT_REQUEST_ACTION}"]`,
+        `input[type="submit"][value*="${KO_REMIT_REQUEST_ACTION}"]`,
+        `button:has-text("${KO_REMIT_REQUEST_ACTION_COMPACT}")`,
+        `[role="button"]:has-text("${KO_REMIT_REQUEST_ACTION_COMPACT}")`,
+        `a:has-text("${KO_REMIT_REQUEST_ACTION_COMPACT}")`,
+        `input[type="button"][value*="${KO_REMIT_REQUEST_ACTION_COMPACT}"]`,
+        `input[type="submit"][value*="${KO_REMIT_REQUEST_ACTION_COMPACT}"]`,
+        `button:has-text("${KO_APPLY_ACTION}")`,
+        `[role="button"]:has-text("${KO_APPLY_ACTION}")`,
+        `a:has-text("${KO_APPLY_ACTION}")`,
+        `input[type="button"][value*="${KO_APPLY_ACTION}"]`,
+        `input[type="submit"][value*="${KO_APPLY_ACTION}"]`,
     ]
 
     return clickLastVisible(page, finalSubmitSelectors, 'Submit remittance', timeoutMs)
@@ -2763,6 +2839,9 @@ const waitForMoinLoginInput = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT
             await page.locator(selector).first().waitFor({ state: 'attached', timeout: timeoutMs })
             return selector
         } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError('Wait for login input', error, `selector=${selector}`)
+            }
             errors.push(`${selector}: ${getErrorMessage(error).slice(0, 120)}`)
         }
     }
@@ -2855,7 +2934,7 @@ const authenticateMoinSessionWithApi = async (
 
 const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) => {
     const navigationErrors: string[] = []
-    const waitStrategies: Array<'domcontentloaded' | 'load' | 'commit'> = ['domcontentloaded', 'load', 'commit']
+    const waitStrategies: Array<'commit' | 'domcontentloaded' | 'load'> = ['commit', 'domcontentloaded', 'load']
 
     for (const waitUntil of waitStrategies) {
         try {
@@ -2867,12 +2946,18 @@ const openMoinLoginPage = async (page: PageLike, timeoutMs = LONG_TIMEOUT_MS) =>
             await waitForMoinLoginInput(page, Math.max(timeoutMs, LOGIN_INPUT_TIMEOUT_MS))
             return waitUntil
         } catch (error) {
+            if (isTargetClosedAutomationError(error)) {
+                throw createBrowserClosedError('Open login page', error, `waitUntil=${waitUntil}`)
+            }
             const reason = error instanceof Error ? error.message : String(error)
             navigationErrors.push(`${waitUntil}: ${reason}`)
             try {
                 await waitForMoinLoginInput(page, LOGIN_INPUT_TIMEOUT_MS)
                 return waitUntil
-            } catch {
+            } catch (inputError) {
+                if (isTargetClosedAutomationError(inputError)) {
+                    throw createBrowserClosedError('Open login page', inputError, `waitUntil=${waitUntil}:post-navigation-input-check`)
+                }
                 // Continue with the next navigation strategy.
             }
         }
@@ -5034,6 +5119,7 @@ export const __moinBizplusTestHooks = {
     clickMoinLoginSubmit,
     openMoinLoginPage,
     dismissMoinUiOverlays,
+    clickFinalRemittanceSubmit,
     clickLastVisible,
     getMoinRemittanceWindowState,
     normalizeMoinTransaction,

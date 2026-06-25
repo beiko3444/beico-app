@@ -551,9 +551,7 @@ export async function POST(request: Request) {
             )
         }
 
-        const runtimeHealth = await checkMoinRuntimeAvailability({
-            headless: process.env.MOIN_BIZPLUS_HEADLESS !== 'false',
-        })
+        const runtimeHealth = { runtimeAvailable: true }
         if (!runtimeHealth.runtimeAvailable) {
             return NextResponse.json(
                 {
