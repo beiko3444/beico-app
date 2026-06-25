@@ -930,13 +930,28 @@ const uploadFirstFileInput = async (
 }
 
 const clickNextStep = async (page: PageLike, timeoutMs = DEFAULT_TIMEOUT_MS) => {
-    await clickFirstVisible(
+    const domClicked = await clickVisibleTextAction(
+        page,
+        [
+            KO_NEXT_STEP,
+            KO_NEXT_STEP_SPACED,
+            KO_NEXT,
+        ],
+        true
+    )
+    if (domClicked) return domClicked
+
+    return clickLastVisible(
         page,
         [
             `button:has-text("${KO_NEXT_STEP}")`,
             `button:has-text("${KO_NEXT_STEP_SPACED}")`,
             `[role="button"]:has-text("${KO_NEXT_STEP}")`,
+            `[role="button"]:has-text("${KO_NEXT_STEP_SPACED}")`,
+            `input[type="button"][value*="${KO_NEXT_STEP}"]`,
+            `input[type="submit"][value*="${KO_NEXT_STEP}"]`,
             `button:has-text("${KO_NEXT}")`,
+            `[role="button"]:has-text("${KO_NEXT}")`,
         ],
         'Click next step',
         timeoutMs
@@ -2167,8 +2182,12 @@ const inspectPreSubmitState = async (page: PageLike) => {
                 ].join(' ')))
                 .filter(Boolean)
                 .slice(0, 30);
-            const finalKeywords = [${JSON.stringify(KO_REMIT)}, ${JSON.stringify(KO_REMIT_SHORT)}, ${JSON.stringify(KO_REMIT_REQUEST)}, ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)}, ${JSON.stringify(KO_APPLY)}, ${JSON.stringify(KO_SUBMIT)}, ${JSON.stringify(KO_NEXT)}, ${JSON.stringify(KO_NEXT_STEP)}, ${JSON.stringify(KO_NEXT_STEP_SPACED)}, '확인', '완료', '계속'];
-            const finalActionCandidates = buttons.filter((text) => finalKeywords.some((keyword) => keyword && text.includes(keyword))).slice(0, 12);
+            const finalKeywords = [${JSON.stringify(KO_REMIT)}, ${JSON.stringify(KO_REMIT_SHORT)}, ${JSON.stringify(KO_REMIT_REQUEST)}, ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)}, ${JSON.stringify(KO_APPLY)}, ${JSON.stringify(KO_SUBMIT)}, '확인', '완료', '계속'];
+            const excludedKeywords = [${JSON.stringify(KO_NEXT)}, ${JSON.stringify(KO_NEXT_STEP)}, ${JSON.stringify(KO_NEXT_STEP_SPACED)}];
+            const finalActionCandidates = buttons
+                .filter((text) => !excludedKeywords.some((keyword) => keyword && text.includes(keyword)))
+                .filter((text) => finalKeywords.some((keyword) => keyword && text.includes(keyword)))
+                .slice(0, 12);
             return {
                 title,
                 bodyPreview: bodyText.slice(0, 3000),
@@ -2188,6 +2207,117 @@ const inspectPreSubmitState = async (page: PageLike) => {
             ? result.finalActionCandidates.filter((candidate): candidate is string => typeof candidate === 'string' && candidate.trim().length > 0)
             : [],
     }
+}
+
+const inspectTransferStepState = async (page: PageLike) => {
+    const result = await page.evaluate(`
+        (() => {
+            const agreementLabels = [${JSON.stringify(KO_AGREEMENT)}, ${JSON.stringify(KO_AGREEMENT_DESCRIPTION)}];
+            const pricingLabels = [${JSON.stringify(KO_FINAL_RECEIVE_AMOUNT)}, ${JSON.stringify(KO_SEND_AMOUNT)}, ${JSON.stringify(KO_TOTAL_FEE)}, ${JSON.stringify(KO_EXCHANGE_RATE)}];
+            const nextLabels = [${JSON.stringify(KO_NEXT)}, ${JSON.stringify(KO_NEXT_STEP)}, ${JSON.stringify(KO_NEXT_STEP_SPACED)}];
+            const submitLabels = [${JSON.stringify(KO_REMIT_REQUEST)}, ${JSON.stringify(KO_REMIT_REQUEST_COMPACT)}, ${JSON.stringify(KO_APPLY)}, ${JSON.stringify(KO_SUBMIT)}, '확인', '완료', '계속'];
+            const norm = (value) => String(value || '').replace(/\\s+/g, ' ').trim();
+            const isVisible = (el) => {
+                if (!el) return false;
+                const rect = el.getBoundingClientRect();
+                const style = window.getComputedStyle(el);
+                return rect.width > 0 && rect.height > 0 && style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
+            };
+            const isDisabled = (el) => Boolean(el.disabled) || String(el.getAttribute('aria-disabled') || '').toLowerCase() === 'true';
+            const bodyText = norm((document.body && document.body.innerText) || '');
+            const buttons = Array.from(document.querySelectorAll('button, [role="button"], input[type="button"], input[type="submit"]'))
+                .filter((el) => isVisible(el))
+                .map((el) => ({
+                    text: norm(el.textContent || el.value || el.getAttribute('aria-label') || el.getAttribute('title') || ''),
+                    disabled: isDisabled(el),
+                }))
+                .filter((row) => row.text)
+                .slice(0, 30);
+            const hasAgreementText = agreementLabels.some((label) => label && bodyText.includes(label));
+            const hasUncheckedAgreement = Array.from(document.querySelectorAll('input[type="checkbox"], [role="checkbox"]'))
+                .some((el) => isVisible(el) && !Boolean(el.checked) && String(el.getAttribute('aria-checked') || '').toLowerCase() !== 'true');
+            const hasPricingText = pricingLabels.some((label) => label && bodyText.includes(label));
+            const hasUploadInput = Boolean(document.querySelector('input[type="file"]'));
+            const enabledNextButtons = buttons
+                .filter((row) => !row.disabled && nextLabels.some((label) => label && row.text.includes(label)))
+                .map((row) => row.text);
+            const submitCandidates = buttons
+                .filter((row) => !row.disabled)
+                .filter((row) => !nextLabels.some((label) => label && row.text.includes(label)))
+                .filter((row) => submitLabels.some((label) => label && row.text.includes(label)))
+                .map((row) => row.text);
+            return {
+                url: location.href,
+                hasAgreementText,
+                hasUncheckedAgreement,
+                hasPricingText,
+                hasUploadInput,
+                enabledNextButtons,
+                submitCandidates,
+                buttonTexts: buttons.map((row) => row.disabled ? row.text + ' (disabled)' : row.text),
+                bodyPreview: bodyText.slice(0, 600),
+            };
+        })()
+    `).catch((error) => ({
+        url: page.url(),
+        hasAgreementText: false,
+        hasUncheckedAgreement: false,
+        hasPricingText: false,
+        hasUploadInput: false,
+        enabledNextButtons: [],
+        submitCandidates: [],
+        buttonTexts: [],
+        bodyPreview: `diag-failed:${getErrorMessage(error)}`,
+    })) as {
+        url: string
+        hasAgreementText: boolean
+        hasUncheckedAgreement: boolean
+        hasPricingText: boolean
+        hasUploadInput: boolean
+        enabledNextButtons: string[]
+        submitCandidates: string[]
+        buttonTexts: string[]
+        bodyPreview: string
+    }
+
+    return result
+}
+
+const waitForConfirmationStepAfterUpload = async (
+    page: PageLike,
+    steps: string[],
+    timeoutMs = LONG_TIMEOUT_MS,
+) => {
+    const deadline = Date.now() + timeoutMs
+    let lastState = await inspectTransferStepState(page)
+    let attempt = 0
+
+    while (Date.now() < deadline) {
+        lastState = await inspectTransferStepState(page)
+        if (
+            lastState.hasAgreementText ||
+            lastState.hasUncheckedAgreement ||
+            lastState.hasPricingText ||
+            lastState.submitCandidates.length > 0
+        ) {
+            return lastState
+        }
+
+        if (lastState.enabledNextButtons.length > 0) {
+            attempt += 1
+            const selectorUsed = await clickNextStep(page, Math.min(TRANSFER_ACTION_TIMEOUT_MS, Math.max(1000, deadline - Date.now())))
+            steps.push(`next-after-upload-click:${attempt}:${selectorUsed}`)
+            await page.waitForTimeout(700).catch(() => undefined)
+            continue
+        }
+
+        await page.waitForTimeout(250).catch(() => undefined)
+    }
+
+    throw new MoinAutomationError(
+        'Next after upload',
+        `Failed to reach MOIN confirmation/agreement step after invoice upload. (url: ${lastState.url}) buttons=${lastState.buttonTexts.slice(0, 12).join(' | ')} preview=${lastState.bodyPreview.slice(0, 260)}`
+    )
 }
 
 const inspectRemittancePricingSummary = async (page: PageLike): Promise<MoinRemittancePricingSummary> => {
@@ -4745,15 +4875,9 @@ export const submitMoinRemittance = async (input: MoinRemittanceInput): Promise<
 
         // ???? Step 9: Next step after upload ??????????????????????????????????????????????????????????????????
         throwIfAbortRequested(abortSignal, 'Next after upload')
-        const uploadUrl = page.url()
-        await clickNextStep(page, LONG_TIMEOUT_MS)
-        const confirmationPage = page
-        await waitForFastCondition(confirmationPage, async () => {
-            const currentUrl = confirmationPage.url()
-            if (currentUrl !== uploadUrl && !currentUrl.includes('/transfer/amount')) return true
-            const snapshot = await inspectPreSubmitState(confirmationPage)
-            return snapshot.finalActionCandidates.length > 0 || snapshot.bodyPreview.includes(KO_AGREEMENT)
-        }, 6000)
+        const nextAfterUploadSelector = await clickNextStep(page, LONG_TIMEOUT_MS)
+        steps.push(`next-after-upload-initial:${nextAfterUploadSelector}`)
+        await waitForConfirmationStepAfterUpload(page, steps, LONG_TIMEOUT_MS)
         steps.push('next-after-upload')
         pushTiming('confirmation-step-ready')
 
