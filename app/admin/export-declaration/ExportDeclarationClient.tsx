@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { FileText, PackageCheck, Plus, Printer, Trash2 } from 'lucide-react'
+import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Trash2 } from 'lucide-react'
 
 export type ExportProductOption = {
   id: string
@@ -53,6 +53,22 @@ type ExportLineItem = {
 
 type PreviewMode = 'commercial' | 'packing'
 type PrintMode = PreviewMode | 'both'
+type WorkTab = 'unipass' | 'documents'
+type GuideStatus = 'ready' | 'check'
+
+type GuideField = {
+  label: string
+  value: string
+  source: string
+  note: string
+  status?: GuideStatus
+}
+
+type GuideSection = {
+  title: string
+  description: string
+  fields: GuideField[]
+}
 
 const todayYmd = () => {
   const now = new Date()
@@ -138,6 +154,19 @@ function money(value: number, currency: string) {
 
 function weight(value: number) {
   return numberFormatter.format(value)
+}
+
+function compactLines(value: string) {
+  return value
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .join(' / ')
+}
+
+function uniqueJoined(values: string[], fallback = '확인 필요') {
+  const unique = Array.from(new Set(values.map((value) => value.trim()).filter(Boolean)))
+  return unique.length ? unique.join(', ') : fallback
 }
 
 function escapeHtml(value: string | number | null | undefined) {
@@ -428,10 +457,168 @@ function DocumentPreview({
   )
 }
 
+function buildUnipassGuide(form: ExportDocumentForm, items: ExportLineItem[]): GuideSection[] {
+  const activeItems = items.filter((item) => item.productName.trim() || item.productNameEN.trim() || item.model.trim())
+  const guideItems = activeItems.length ? activeItems : items
+  const totalQty = guideItems.reduce((sum, item) => sum + item.quantity, 0)
+  const totalAmount = guideItems.reduce((sum, item) => sum + lineAmount(item), 0)
+  const totalCartons = guideItems.reduce((sum, item) => sum + item.cartons, 0)
+  const totalNet = guideItems.reduce((sum, item) => sum + item.netWeight, 0)
+  const totalGross = guideItems.reduce((sum, item) => sum + item.grossWeight, 0)
+  const firstItem = guideItems[0]
+  const hsCodes = guideItems.map((item) => item.hsCode)
+  const origins = guideItems.map((item) => item.origin)
+  const productNames = guideItems.map((item) => item.productNameEN || item.productName)
+
+  return [
+    {
+      title: '공통사항 1',
+      description: '신고 기본정보와 거래 당사자 정보를 먼저 입력합니다.',
+      fields: [
+        { label: '수출신고번호', value: '채번 클릭 후 자동 생성', source: '유니패스 채번', note: '신고서 작성 시작 시 유니패스에서 채번합니다.' },
+        { label: '전송구분', value: '신규', source: '일반 수출신고', note: '정정·취하가 아닌 최초 신고 기준입니다.' },
+        { label: '신고구분', value: '수출신고', source: '일반 수출신고', note: '일반 자가 수출이면 수출신고로 진행합니다.' },
+        { label: '수출대행자', value: compactLines(form.exporter) || 'beiko Inc.', source: 'Exporter', note: '자가 수출이면 수출화주와 동일하게 입력합니다.' },
+        { label: '수출화주', value: compactLines(form.exporter) || 'beiko Inc.', source: 'Exporter', note: '물품 소유자이자 수출자 정보입니다.' },
+        { label: '구매자/수입자', value: compactLines(form.consignee || form.buyer) || '확인 필요', source: 'Consignee / Buyer', note: '상대 회사명, 주소, 연락처를 송장 기준으로 입력합니다.', status: form.consignee.trim() ? 'ready' : 'check' },
+        { label: '송품장번호', value: form.invoiceNo || '확인 필요', source: 'Invoice No.', note: 'Commercial Invoice 번호와 동일하게 입력합니다.', status: form.invoiceNo.trim() ? 'ready' : 'check' },
+        { label: '신고일자', value: form.date || '확인 필요', source: 'Date', note: '작성일 또는 실제 신고일 기준으로 맞춥니다.', status: form.date ? 'ready' : 'check' },
+      ],
+    },
+    {
+      title: '공통사항 2',
+      description: '운송, 결제, 포장, 금액 정보를 송장과 패킹리스트에서 옮깁니다.',
+      fields: [
+        { label: '거래구분', value: '일반형태 수출', source: '일반 수출신고', note: '특수 거래가 아니면 일반형태로 봅니다.' },
+        { label: '결제방법', value: form.termsDeliveryPayment || 'T/T IN ADVANCE', source: 'Terms of Delivery and Payment', note: '송장 결제조건과 동일하게 입력합니다.' },
+        { label: '인도조건', value: form.incoterms || 'FOB BUSAN', source: 'Incoterms', note: 'FOB/CIF 등 송장 기준입니다.' },
+        { label: '적재항', value: form.portOfLoading || 'BUSAN, KOREA', source: 'Port of Loading', note: '선적항을 입력합니다.' },
+        { label: '목적국/도착항', value: form.portOfDischarge || '확인 필요', source: 'Port of Discharge', note: '수입국 도착항을 입력합니다.', status: form.portOfDischarge.trim() ? 'ready' : 'check' },
+        { label: '선박/항공편', value: form.vesselFlight || '확인 필요', source: 'Vessel / Flight', note: '선적 스케줄 확정 후 입력합니다.', status: form.vesselFlight.trim() ? 'ready' : 'check' },
+        { label: '출항예정일', value: form.departureDate || '확인 필요', source: 'Departure Date', note: 'B/L 또는 선적 일정과 맞춥니다.', status: form.departureDate ? 'ready' : 'check' },
+        { label: '포장개수', value: form.packagesKind || (totalCartons > 0 ? `${intFormatter.format(totalCartons)} CT` : '확인 필요'), source: 'Packing List Carton', note: '총 카톤 수와 포장 종류를 입력합니다.', status: form.packagesKind || totalCartons > 0 ? 'ready' : 'check' },
+        { label: '총중량', value: totalGross > 0 ? `${weight(totalGross)} KG` : '확인 필요', source: 'Packing List Gross Weight', note: '총중량 합계입니다.', status: totalGross > 0 ? 'ready' : 'check' },
+        { label: '결제금액', value: money(totalAmount, form.currency), source: 'Commercial Invoice Total', note: '송장 총액과 통화를 그대로 입력합니다.' },
+      ],
+    },
+    {
+      title: '란사항',
+      description: '품목별 세번, 수량, 금액, 원산지를 입력합니다.',
+      fields: [
+        { label: '수출물품명', value: uniqueJoined(productNames), source: 'Goods description', note: '영문 품명 우선, 없으면 관리 상품명을 사용합니다.', status: productNames.some(Boolean) ? 'ready' : 'check' },
+        { label: '모델규격', value: firstItem?.model || '확인 필요', source: 'Model', note: '상품코드 또는 규격을 입력합니다.', status: firstItem?.model ? 'ready' : 'check' },
+        { label: 'HS Code', value: uniqueJoined(hsCodes), source: 'HS Code', note: '세번부호는 실제 품목 기준으로 최종 확인이 필요합니다.', status: hsCodes.some((code) => code.trim()) ? 'ready' : 'check' },
+        { label: '원산지', value: uniqueJoined(origins, 'KOREA'), source: 'Origin', note: '한국산이면 KOREA/KR 기준으로 입력합니다.' },
+        { label: '수량', value: totalQty > 0 ? intFormatter.format(totalQty) : '확인 필요', source: 'Invoice Quantity', note: '송장 수량 합계입니다.', status: totalQty > 0 ? 'ready' : 'check' },
+        { label: '단가', value: firstItem ? money(firstItem.unitPrice, form.currency) : '확인 필요', source: 'Unit price', note: '품목별 단가입니다.', status: firstItem && firstItem.unitPrice > 0 ? 'ready' : 'check' },
+        { label: '금액', value: money(totalAmount, form.currency), source: 'Amount', note: '품목별 금액 합계입니다.' },
+        { label: '순중량', value: totalNet > 0 ? `${weight(totalNet)} KG` : '확인 필요', source: 'Packing List Net Weight', note: '순중량 합계입니다.', status: totalNet > 0 ? 'ready' : 'check' },
+        { label: '첨부서류', value: 'Commercial Invoice, Packing List', source: '작성 문서 탭', note: 'PI/Packing List 탭에서 출력한 문서를 첨부합니다.' },
+      ],
+    },
+  ]
+}
+
+function UnipassGuideTable({ sections }: { sections: GuideSection[] }) {
+  const copyValue = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      alert('복사에 실패했습니다.')
+    }
+  }
+
+  const checkCount = sections.reduce(
+    (sum, section) => sum + section.fields.filter((field) => field.status === 'check' || field.value === '확인 필요').length,
+    0,
+  )
+
+  return (
+    <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+      <aside className="space-y-4">
+        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">UNIPASS INPUT</div>
+          <h2 className="mt-2 text-[20px] font-black text-slate-950">입력 전 확인</h2>
+          <p className="mt-2 text-[12px] font-bold leading-5 text-slate-500">
+            왼쪽 PI/Packing 값이 바뀌면 이 표의 유니패스 입력값도 같은 기준으로 정리됩니다.
+          </p>
+          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
+            <div className="flex items-center gap-2 text-[13px] font-black">
+              <AlertTriangle size={16} />
+              확인 필요 {checkCount}개
+            </div>
+            <p className="mt-1 text-[11px] font-bold leading-4">
+              HS Code, 도착항, 선박/항공편, 중량은 실제 선적 서류와 유니패스 기준으로 최종 확인하세요.
+            </p>
+          </div>
+        </section>
+      </aside>
+
+      <div className="space-y-4">
+        {sections.map((section) => (
+          <section key={section.title} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-1 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-end md:justify-between">
+              <div>
+                <h2 className="text-[16px] font-black text-slate-950">{section.title}</h2>
+                <p className="mt-1 text-[12px] font-bold text-slate-500">{section.description}</p>
+              </div>
+              <span className="text-[11px] font-black text-slate-400">{section.fields.length} fields</span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] table-fixed text-[12px]">
+                <thead className="bg-white text-[11px] font-black uppercase tracking-wide text-slate-400">
+                  <tr>
+                    <th className="w-[18%] px-4 py-3 text-left">유니패스 항목</th>
+                    <th className="w-[26%] px-4 py-3 text-left">자동 입력값</th>
+                    <th className="w-[20%] px-4 py-3 text-left">근거</th>
+                    <th className="px-4 py-3 text-left">메모</th>
+                    <th className="w-[90px] px-4 py-3 text-center">복사</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {section.fields.map((field) => {
+                    const needsCheck = field.status === 'check' || field.value === '확인 필요'
+                    return (
+                      <tr key={`${section.title}-${field.label}`} className="align-top">
+                        <td className="px-4 py-3 font-black text-slate-900">{field.label}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex flex-col gap-2">
+                            <span className="whitespace-pre-wrap break-words font-black text-slate-900">{field.value}</span>
+                            <span className={`w-fit rounded-full px-2 py-1 text-[10px] font-black ${needsCheck ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'}`}>
+                              {needsCheck ? '확인 필요' : '바로 입력'}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-bold text-slate-600">{field.source}</td>
+                        <td className="px-4 py-3 font-medium leading-5 text-slate-500">{field.note}</td>
+                        <td className="px-4 py-3 text-center">
+                          <button
+                            type="button"
+                            onClick={() => copyValue(field.value)}
+                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 hover:border-[#EF3B2D] hover:text-[#EF3B2D]"
+                          >
+                            <Copy size={14} />
+                            복사
+                          </button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function ExportDeclarationClient({ products }: { products: ExportProductOption[] }) {
   const [form, setForm] = useState<ExportDocumentForm>(() => defaultForm())
   const [items, setItems] = useState<ExportLineItem[]>(() => [createEmptyItem()])
   const [previewMode, setPreviewMode] = useState<PreviewMode>('commercial')
+  const [activeTab, setActiveTab] = useState<WorkTab>('unipass')
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
 
@@ -489,6 +676,8 @@ export default function ExportDeclarationClient({ products }: { products: Export
     [items],
   )
 
+  const guideSections = useMemo(() => buildUnipassGuide(form, items), [form, items])
+
   const printDocuments = (mode: PrintMode) => {
     if (!printableItems.length) {
       alert('출력할 상품 행이 없습니다.')
@@ -544,9 +733,29 @@ export default function ExportDeclarationClient({ products }: { products: Export
             </button>
           </div>
         </div>
+        <div className="mt-4 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
+          <button
+            type="button"
+            onClick={() => setActiveTab('unipass')}
+            className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-black transition ${activeTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <ListChecks size={16} />
+            유니패스 입력 가이드
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('documents')}
+            className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-black transition ${activeTab === 'documents' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
+          >
+            <FileSpreadsheet size={16} />
+            PI / Packing List
+          </button>
+        </div>
       </div>
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(740px,1fr)_minmax(520px,760px)]">
+      {activeTab === 'unipass' ? <UnipassGuideTable sections={guideSections} /> : null}
+
+      <div className={activeTab === 'documents' ? 'grid gap-5 xl:grid-cols-[minmax(740px,1fr)_minmax(520px,760px)]' : 'hidden'}>
         <div className="space-y-5">
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex items-center justify-between gap-3">
