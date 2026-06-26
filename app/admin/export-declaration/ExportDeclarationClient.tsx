@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { Fragment, useMemo, useState } from 'react'
 import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Trash2 } from 'lucide-react'
 
 export type ExportProductOption = {
@@ -533,77 +533,104 @@ function UnipassGuideTable({ sections }: { sections: GuideSection[] }) {
     0,
   )
 
-  return (
-    <div className="grid gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
-      <aside className="space-y-4">
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="text-[11px] font-black uppercase tracking-[0.22em] text-slate-400">UNIPASS INPUT</div>
-          <h2 className="mt-2 text-[20px] font-black text-slate-950">입력 전 확인</h2>
-          <p className="mt-2 text-[12px] font-bold leading-5 text-slate-500">
-            왼쪽 PI/Packing 값이 바뀌면 이 표의 유니패스 입력값도 같은 기준으로 정리됩니다.
-          </p>
-          <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900">
-            <div className="flex items-center gap-2 text-[13px] font-black">
-              <AlertTriangle size={16} />
-              확인 필요 {checkCount}개
-            </div>
-            <p className="mt-1 text-[11px] font-bold leading-4">
-              HS Code, 도착항, 선박/항공편, 중량은 실제 선적 서류와 유니패스 기준으로 최종 확인하세요.
-            </p>
-          </div>
-        </section>
-      </aside>
+  const rowsFor = (fields: GuideField[]) => {
+    const rows: GuideField[][] = []
+    for (let index = 0; index < fields.length; index += 2) {
+      rows.push(fields.slice(index, index + 2))
+    }
+    return rows
+  }
 
-      <div className="space-y-4">
+  return (
+    <div className="rounded-sm border border-[#aeb8c4] bg-[#eef3f8] text-[#1f2937] shadow-sm">
+      <div className="border-b border-[#b7c1cd] bg-[#dce8f5] px-3 py-2">
+        <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+          <div>
+            <div className="text-[11px] font-bold text-[#52657a]">UNI-PASS &gt; 수출신고 &gt; 신고서 작성</div>
+            <h2 className="mt-0.5 text-[16px] font-black text-[#17365d]">수출신고서 입력 화면</h2>
+          </div>
+          <div className="flex items-center gap-2 rounded-sm border border-[#e3c467] bg-[#fff8d8] px-2 py-1 text-[12px] font-bold text-[#765600]">
+            <AlertTriangle size={14} />
+            확인 필요 {checkCount}개
+          </div>
+        </div>
+      </div>
+
+      <div className="border-b border-[#d0d7df] bg-[#fff9df] px-3 py-2 text-[12px] font-bold text-[#6b5600]">
+        PI / Packing List 탭의 값을 기준으로 유니패스 입력칸 순서에 맞춰 배치했습니다. 노란 칸은 실제 서류 또는 유니패스 코드 확인 후 입력하세요.
+      </div>
+
+      <div className="space-y-3 p-3">
         {sections.map((section) => (
-          <section key={section.title} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-            <div className="flex flex-col gap-1 border-b border-slate-200 bg-slate-50 px-4 py-3 md:flex-row md:items-end md:justify-between">
+          <section key={section.title} className="overflow-hidden border border-[#b7c1cd] bg-white">
+            <div className="flex items-center justify-between border-b border-[#b7c1cd] bg-[#e7f0fa] px-3 py-2">
               <div>
-                <h2 className="text-[16px] font-black text-slate-950">{section.title}</h2>
-                <p className="mt-1 text-[12px] font-bold text-slate-500">{section.description}</p>
+                <h3 className="text-[14px] font-black text-[#17365d]">{section.title}</h3>
+                <p className="mt-0.5 text-[11px] font-bold text-[#65758a]">{section.description}</p>
               </div>
-              <span className="text-[11px] font-black text-slate-400">{section.fields.length} fields</span>
+              <span className="rounded-sm border border-[#b7c1cd] bg-white px-2 py-1 text-[10px] font-black text-[#52657a]">
+                {section.fields.length} items
+              </span>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] table-fixed text-[12px]">
-                <thead className="bg-white text-[11px] font-black uppercase tracking-wide text-slate-400">
-                  <tr>
-                    <th className="w-[18%] px-4 py-3 text-left">유니패스 항목</th>
-                    <th className="w-[26%] px-4 py-3 text-left">자동 입력값</th>
-                    <th className="w-[20%] px-4 py-3 text-left">근거</th>
-                    <th className="px-4 py-3 text-left">메모</th>
-                    <th className="w-[90px] px-4 py-3 text-center">복사</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {section.fields.map((field) => {
-                    const needsCheck = field.status === 'check' || field.value === '확인 필요'
-                    return (
-                      <tr key={`${section.title}-${field.label}`} className="align-top">
-                        <td className="px-4 py-3 font-black text-slate-900">{field.label}</td>
-                        <td className="px-4 py-3">
-                          <div className="flex flex-col gap-2">
-                            <span className="whitespace-pre-wrap break-words font-black text-slate-900">{field.value}</span>
-                            <span className={`w-fit rounded-full px-2 py-1 text-[10px] font-black ${needsCheck ? 'bg-amber-50 text-amber-700 ring-1 ring-amber-200' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200'}`}>
-                              {needsCheck ? '확인 필요' : '바로 입력'}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 font-bold text-slate-600">{field.source}</td>
-                        <td className="px-4 py-3 font-medium leading-5 text-slate-500">{field.note}</td>
-                        <td className="px-4 py-3 text-center">
-                          <button
-                            type="button"
-                            onClick={() => copyValue(field.value)}
-                            className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 hover:border-[#EF3B2D] hover:text-[#EF3B2D]"
-                          >
-                            <Copy size={14} />
-                            복사
-                          </button>
-                        </td>
-                      </tr>
-                    )
-                  })}
+              <table className="w-full min-w-[1040px] table-fixed border-collapse text-[12px]">
+                <colgroup>
+                  <col className="w-[150px]" />
+                  <col />
+                  <col className="w-[150px]" />
+                  <col />
+                </colgroup>
+                <tbody>
+                  {rowsFor(section.fields).map((row, rowIndex) => (
+                    <tr key={`${section.title}-${rowIndex}`} className="align-stretch">
+                      {row.map((field) => {
+                        const needsCheck = field.status === 'check' || field.value === '확인 필요'
+                        return (
+                          <Fragment key={`${section.title}-${field.label}`}>
+                            <th className="border border-[#c9d2dc] bg-[#f1f4f7] px-2 py-2 text-left align-middle text-[12px] font-black text-[#27384c]">
+                              <div className="flex items-center gap-1">
+                                <span className="text-[#bf2d18]">*</span>
+                                <span>{field.label}</span>
+                              </div>
+                            </th>
+                            <td className="border border-[#c9d2dc] bg-white p-1.5 align-top">
+                              <button
+                                type="button"
+                                onClick={() => copyValue(field.value)}
+                                className={`group flex min-h-10 w-full items-start justify-between gap-2 rounded-sm border px-2 py-1.5 text-left shadow-inner transition hover:border-[#2b6cb0] ${
+                                  needsCheck
+                                    ? 'border-[#e6cf82] bg-[#fffaf0]'
+                                    : 'border-[#bfc8d2] bg-[#fbfdff]'
+                                }`}
+                                title={`${field.label} 복사`}
+                              >
+                                <span className="min-w-0 flex-1">
+                                  <span className="block whitespace-pre-wrap break-words text-[12px] font-black leading-5 text-[#111827]">{field.value}</span>
+                                  <span className="mt-1 block text-[10px] font-bold leading-4 text-[#718096]">
+                                    {field.source} · {field.note}
+                                  </span>
+                                </span>
+                                <span className={`mt-0.5 inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-black ${
+                                  needsCheck
+                                    ? 'border-[#e2bd46] bg-[#fff3bf] text-[#7a5200]'
+                                    : 'border-[#a7d8c2] bg-[#e8fff3] text-[#047857]'
+                                }`}>
+                                  <Copy size={11} />
+                                  {needsCheck ? '확인' : '복사'}
+                                </span>
+                              </button>
+                            </td>
+                          </Fragment>
+                        )
+                      })}
+                      {row.length === 1 ? (
+                        <>
+                          <th className="border border-[#c9d2dc] bg-[#f1f4f7]" />
+                          <td className="border border-[#c9d2dc] bg-white" />
+                        </>
+                      ) : null}
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
