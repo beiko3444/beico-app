@@ -3,6 +3,26 @@
 import { useEffect } from 'react'
 
 const WORM_EMAIL_CACHE_STORAGE_KEY = 'beico-worm-order-email-cache-v1'
+const WORM_ORDER_AUTO_RECOVERY_KEY = 'beico-worm-order-auto-recovery-v1'
+
+function clearWormOrderBrowserState() {
+    try {
+        window.localStorage.removeItem(WORM_EMAIL_CACHE_STORAGE_KEY)
+    } catch {
+        // Ignore storage access failures and still retry the route.
+    }
+
+    try {
+        for (let index = window.sessionStorage.length - 1; index >= 0; index -= 1) {
+            const key = window.sessionStorage.key(index)
+            if (key && key !== WORM_ORDER_AUTO_RECOVERY_KEY && key.startsWith('beico-worm-order')) {
+                window.sessionStorage.removeItem(key)
+            }
+        }
+    } catch {
+        // Session storage can be unavailable in restricted browser states.
+    }
+}
 
 export default function WormOrderError({
     error,
@@ -15,12 +35,19 @@ export default function WormOrderError({
         console.error('Worm order page crashed:', error)
     }, [error])
 
-    const handleClearCacheAndRetry = () => {
+    useEffect(() => {
         try {
-            window.localStorage.removeItem(WORM_EMAIL_CACHE_STORAGE_KEY)
+            if (window.sessionStorage.getItem(WORM_ORDER_AUTO_RECOVERY_KEY) === '1') return
+            window.sessionStorage.setItem(WORM_ORDER_AUTO_RECOVERY_KEY, '1')
+            clearWormOrderBrowserState()
+            reset()
         } catch {
-            // Ignore storage access failures and still retry the route.
+            // Manual buttons below remain available if automatic recovery cannot run.
         }
+    }, [reset])
+
+    const handleClearCacheAndRetry = () => {
+        clearWormOrderBrowserState()
         reset()
     }
 
@@ -37,6 +64,11 @@ export default function WormOrderError({
                     저장된 메일 캐시나 일시적인 브라우저 상태 때문에 화면 렌더링이 중단되었습니다.
                     캐시를 정리한 뒤 다시 시도하면 대부분 복구됩니다.
                 </p>
+                {error.message ? (
+                    <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+                        오류 내용: {error.message}
+                    </p>
+                ) : null}
                 {error.digest && (
                     <p className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[11px] font-semibold text-slate-500">
                         오류 코드: {error.digest}
