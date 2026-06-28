@@ -58,7 +58,6 @@ const parseItems = (value: unknown): ExportDeclarationPostItem[] => {
         dimension: readString(record.dimension),
       }
     })
-    .filter((item) => item.productName || item.productNameEN || item.model || item.productId)
 }
 
 const buildTotals = (items: ExportDeclarationPostItem[]) => ({
@@ -115,12 +114,11 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const form = body?.form && typeof body.form === 'object' ? body.form as Record<string, unknown> : {}
-    const items = parseItems(body?.items)
+    const parsedItems = parseItems(body?.items)
+    const items = parsedItems.length
+      ? parsedItems
+      : [{ productName: '미입력 상품', quantity: 0, unitPrice: 0, cartons: 0, netWeight: 0, grossWeight: 0, cbm: 0 }]
     const invoiceNo = readString(form.invoiceNo) || `EXP-${Date.now()}`
-
-    if (items.length === 0) {
-      return NextResponse.json({ error: 'items is required' }, { status: 400 })
-    }
 
     const totals = buildTotals(items)
     const created = await (prisma as any).exportDeclaration.create({
@@ -134,7 +132,7 @@ export async function POST(request: Request) {
           create: items.map((item, index) => ({
             productId: item.productId || null,
             lineNo: index + 1,
-            productName: item.productName || item.productNameEN || item.model || 'Untitled',
+            productName: item.productName || item.productNameEN || item.model || '미입력 상품',
             productNameEN: item.productNameEN || null,
             model: item.model || null,
             hsCode: item.hsCode || null,

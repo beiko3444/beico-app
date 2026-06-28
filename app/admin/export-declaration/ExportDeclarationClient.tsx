@@ -1124,17 +1124,14 @@ export default function ExportDeclarationClient({
   const previewItems = printableItems.length ? printableItems : items
 
   const createDeclaration = async () => {
-    if (!printableItems.length) {
-      alert('저장할 상품 행이 없습니다.')
-      return
-    }
+    const saveItems = printableItems.length ? printableItems : items
 
     setIsSaving(true)
     try {
       const response = await fetch('/api/admin/export-declaration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ form, items: printableItems }),
+        body: JSON.stringify({ form, items: saveItems }),
       })
 
       const data = await response.json().catch(() => null)
