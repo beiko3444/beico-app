@@ -4,7 +4,26 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
-import { Boxes, Menu, Star, X } from 'lucide-react'
+import {
+  BarChart3,
+  Boxes,
+  Clock3,
+  CreditCard,
+  Factory,
+  FileText,
+  Handshake,
+  Inbox,
+  Menu,
+  MessageSquareText,
+  Package,
+  PlugZap,
+  Send,
+  Ship,
+  ShoppingCart,
+  Star,
+  Warehouse,
+  X,
+} from 'lucide-react'
 import {
   INVENTORY_FAVORITES_EVENT,
   type InventoryPreferencesPayload,
@@ -162,20 +181,20 @@ export default function AdminNav({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const navItems = [
-    { name: '주문관리', path: '/admin/orders' },
-    { name: '상품관리', path: '/admin/products' },
-    { name: '재고관리', path: '/admin/inventory' },
-    { name: '파트너관리', path: '/admin/partners' },
-    { name: '생산관리', path: '/admin/production' },
-    { name: '근태관리', path: '/admin/tasks' },
-    { name: '카드사용내역', path: '/admin/card-usage' },
-    { name: '수신문자함', path: '/admin/mobile-messages' },
-    { name: '문자발송서비스', path: '/admin/sms' },
-    { name: '통계', path: '/admin/statistics' },
-    { name: '지렁이 발주', path: '/admin/worm-order' },
-    { name: 'PI발급', path: '/admin/proforma' },
-    { name: '수출신고', path: '/admin/export-declaration' },
-    { name: '전력관리', path: '/admin/electricity' },
+    { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
+    { name: '상품관리', path: '/admin/products', icon: Package },
+    { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
+    { name: '파트너관리', path: '/admin/partners', icon: Handshake },
+    { name: '생산관리', path: '/admin/production', icon: Factory },
+    { name: '근태관리', path: '/admin/tasks', icon: Clock3 },
+    { name: '카드사용내역', path: '/admin/card-usage', icon: CreditCard },
+    { name: '수신문자함', path: '/admin/mobile-messages', icon: Inbox },
+    { name: '문자발송서비스', path: '/admin/sms', icon: MessageSquareText },
+    { name: '통계', path: '/admin/statistics', icon: BarChart3 },
+    { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
+    { name: 'PI발급', path: '/admin/proforma', icon: FileText },
+    { name: '수출신고', path: '/admin/export-declaration', icon: Ship },
+    { name: '전력관리', path: '/admin/electricity', icon: PlugZap },
   ]
 
   const alertCountByPath: Record<string, number> = {
@@ -282,39 +301,46 @@ export default function AdminNav({
 
   const renderNavItems = (mobile = false) => (
     <>
-      {navItems.map((item) => (
-        <Link
-          key={item.path}
-          href={item.path}
-          prefetch={false}
-          onClick={() => setIsMobileMenuOpen(false)}
-          className={`flex ${mobile ? 'h-11' : 'h-[38px] min-h-[38px]'} min-w-0 items-center justify-between rounded-[12px] border px-4 text-[14px] font-extrabold tracking-[-0.025em] no-underline transition-all duration-150 ${
-            isActive(item.path)
-              ? 'border-[#EF3B1D] bg-[#EF3B1D] text-white shadow-[0_10px_20px_rgba(239,59,29,0.22)]'
-              : 'border-transparent bg-transparent text-[#1F2937] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
-          }`}
-          style={{ color: isActive(item.path) ? '#FFFFFF' : '#1F2937' }}
-        >
-          <span className="truncate text-inherit">{item.name}</span>
-          <span className="inline-flex items-center gap-1.5">
+      {navItems.map((item) => {
+        const active = isActive(item.path)
+        const Icon = item.icon
+        return (
+          <Link
+            key={item.path}
+            href={item.path}
+            prefetch={false}
+            onClick={() => setIsMobileMenuOpen(false)}
+            className={`group relative flex ${mobile ? 'h-11' : 'h-10 min-h-10'} min-w-0 items-center justify-between rounded-[10px] border px-3 text-[13px] font-extrabold tracking-[-0.02em] no-underline transition-all duration-150 ${
+              active
+                ? 'border-[#FFD5CC] bg-[#FFF1ED] text-[#E8351B] shadow-[0_8px_18px_rgba(239,59,29,0.10)]'
+                : 'border-transparent bg-transparent text-[#293241] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
+            }`}
+            style={{ color: active ? '#E8351B' : '#293241' }}
+          >
+            {active ? <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-[#EF3B1D]" /> : null}
+            <span className="flex min-w-0 items-center gap-2.5">
+              <span
+                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
+                  active ? 'bg-[#EF3B1D] text-white' : 'bg-transparent text-[#94A3B8] group-hover:bg-white group-hover:text-[#64748B]'
+                }`}
+              >
+                <Icon size={15} strokeWidth={2.3} />
+              </span>
+              <span className="truncate text-inherit">{item.name}</span>
+            </span>
             {alertCountByPath[item.path] > 0 ? (
               <span
-                className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
-                  isActive(item.path) ? 'bg-white/25 text-white' : 'bg-[#EF3B1D] text-white'
+                className={`ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
+                  active ? 'bg-[#EF3B1D] text-white' : 'bg-[#EF3B1D] text-white'
                 }`}
                 aria-label={`${alertCountByPath[item.path]}건 알림`}
               >
                 {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
               </span>
             ) : null}
-            {isActive(item.path) && !mobile ? (
-              <span className="inline-flex items-center justify-center rounded-full bg-white/20 px-2 py-1 text-[9px] font-black tracking-[0.08em] text-white">
-                ACTIVE
-              </span>
-            ) : null}
-          </span>
-        </Link>
-      ))}
+          </Link>
+        )
+      })}
     </>
   )
 

@@ -104,19 +104,17 @@ export default function LoginPage() {
 
             {/* Logo Section */}
             <div className="mb-5 flex flex-col items-center">
-                <div className="w-[110px] h-auto mb-4 relative">
-                    <img
-                        src="/logo.png"
-                        alt="BEIKO BAIT"
-                        className="w-full h-full object-contain"
-                    />
+                <div className="mb-4 text-center">
+                    <div className="text-[44px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">
+                        beiko
+                    </div>
+                    <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#7D8491]">
+                        WHOLESALE PORTAL
+                    </div>
                 </div>
 
                 <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">卸売専用ポータル</h1>
                 <div className="flex flex-col items-center gap-1.5">
-                    <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-gray-400 leading-none">
-                        Wholesale Portal
-                    </p>
                     <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-[#e34219] leading-none">
                         For retailers & distributors
                     </p>
