@@ -561,6 +561,49 @@ model ProformaInvoiceItem {
   product           Product?        @relation(fields: [productId], references: [id], onDelete: SetNull)
 }
 
+model ExportDeclaration {
+  id          String                  @id @default(uuid())
+  invoiceNo   String
+  status      String                  @default("DRAFT")
+  form        Json
+  totals      Json
+  createdById String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  items       ExportDeclarationItem[]
+
+  @@index([invoiceNo])
+  @@index([createdAt])
+  @@index([status])
+}
+
+model ExportDeclarationItem {
+  id                  String            @id @default(uuid())
+  exportDeclarationId String
+  productId           String?
+  lineNo              Int
+  productName         String
+  productNameEN       String?
+  model               String?
+  hsCode              String?
+  origin              String?
+  quantity            Int               @default(0)
+  unitPrice           Float             @default(0)
+  amount              Float             @default(0)
+  cartons             Int               @default(0)
+  netWeight           Float             @default(0)
+  grossWeight         Float             @default(0)
+  cbm                 Float             @default(0)
+  dimension           String?
+  raw                 Json?
+  createdAt           DateTime          @default(now())
+  exportDeclaration   ExportDeclaration @relation(fields: [exportDeclarationId], references: [id], onDelete: Cascade)
+
+  @@index([exportDeclarationId])
+  @@index([productId])
+  @@index([lineNo])
+}
+
 model WormEmailAttachmentCache {
   id          String   @id @default(uuid())
   uid         String

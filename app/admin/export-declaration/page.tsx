@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import ExportDeclarationClient, { type ExportProductOption } from './ExportDeclarationClient'
+import ExportDeclarationClient, { type ExportDeclarationListItem, type ExportProductOption } from './ExportDeclarationClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -61,6 +61,11 @@ const getCachedExportProducts = unstable_cache(
   { revalidate: 60 },
 )
 
+const readTotalAmount = (value: unknown): number => {
+  if (!value || typeof value !== 'object') return 0
+  return readNumber((value as Record<string, unknown>).amount)
+}
+
 export default async function ExportDeclarationPage() {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {
@@ -68,10 +73,39 @@ export default async function ExportDeclarationPage() {
   }
 
   let products: Awaited<ReturnType<typeof getCachedExportProducts>> = []
+  let savedDeclarations: ExportDeclarationListItem[] = []
   try {
     products = await getCachedExportProducts()
   } catch (error) {
     console.error('Failed to load export declaration products:', error)
+  }
+
+  try {
+    const rows = await (prisma as any).exportDeclaration.findMany({
+      orderBy: { createdAt: 'desc' },
+      take: 30,
+      select: {
+        id: true,
+        invoiceNo: true,
+        status: true,
+        totals: true,
+        createdAt: true,
+        _count: {
+          select: { items: true },
+        },
+      },
+    })
+
+    savedDeclarations = rows.map((row: any) => ({
+      id: row.id,
+      invoiceNo: row.invoiceNo,
+      status: row.status,
+      createdAt: row.createdAt instanceof Date ? row.createdAt.toISOString() : String(row.createdAt),
+      itemCount: row._count?.items || 0,
+      totalAmount: readTotalAmount(row.totals),
+    }))
+  } catch (error) {
+    console.error('Failed to load export declaration list:', error)
   }
 
   const productOptions: ExportProductOption[] = products.map((product) => ({
@@ -84,5 +118,5 @@ export default async function ExportDeclarationPage() {
     stock: product.stock,
   }))
 
-  return <ExportDeclarationClient products={productOptions} />
+  return <ExportDeclarationClient products={productOptions} savedDeclarations={savedDeclarations} />
 }

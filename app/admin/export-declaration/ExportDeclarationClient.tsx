@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, useMemo, useState } from 'react'
-import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Trash2 } from 'lucide-react'
+import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Save, Trash2 } from 'lucide-react'
 
 export type ExportProductOption = {
   id: string
@@ -11,6 +11,15 @@ export type ExportProductOption = {
   productCode: string | null
   unitPriceUsd: number
   stock: number
+}
+
+export type ExportDeclarationListItem = {
+  id: string
+  invoiceNo: string
+  status: string
+  createdAt: string
+  itemCount: number
+  totalAmount: number
 }
 
 type ExportDocumentForm = {
@@ -53,7 +62,6 @@ type ExportLineItem = {
 
 type PreviewMode = 'commercial' | 'packing'
 type PrintMode = PreviewMode | 'both'
-type WorkTab = 'unipass' | 'documents'
 type UnipassDeclarationTab = 'common1' | 'common2' | 'items'
 type GuideStatus = 'ready' | 'check'
 
@@ -151,6 +159,12 @@ function money(value: number, currency: string) {
   const normalized = currency.trim() || 'US$'
   const separator = normalized.endsWith('$') ? '' : ' '
   return `${normalized}${separator}${numberFormatter.format(value)}`
+}
+
+function formatSavedDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+  return `${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 function weight(value: number) {
@@ -698,7 +712,7 @@ function UnipassValue({ field }: { field: UnipassField }) {
     <button
       type="button"
       onClick={() => copyUnipassValue(field.value, field.later)}
-      className={`flex min-h-7 w-full items-center gap-1 rounded-[1px] border px-1.5 text-left text-[12px] font-bold shadow-inner ${
+      className={`flex min-h-[23px] w-full items-center gap-1 rounded-none border px-1.5 text-left text-[12px] font-normal ${
         field.muted
           ? 'border-[#d5d9df] bg-[#e9eaec] text-[#67707d]'
           : canFillLater
@@ -722,12 +736,12 @@ function UnipassValue({ field }: { field: UnipassField }) {
 function UnipassFieldCell({ field }: { field: UnipassField }) {
   return (
     <>
-      <th className="border border-[#d7dce2] bg-[#f3f3f4] px-2 py-1 text-right align-middle text-[12px] font-bold text-[#4b5563]">
+      <th className="border border-[#d8d8d8] bg-[#f2f2f2] px-2 py-1 text-right align-middle text-[12px] font-normal text-[#333333]">
         {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
         {field.label}
         {field.later ? <span className="ml-1 text-[10px] font-black text-sky-700">(나중)</span> : null}
       </th>
-      <td className="border border-[#d7dce2] bg-white px-1 py-1 align-middle">
+      <td className="border border-[#d8d8d8] bg-white px-1 py-[3px] align-middle">
         <UnipassValue field={field} />
       </td>
     </>
@@ -739,12 +753,12 @@ function UnipassRow({ fields }: { fields: UnipassField[] }) {
     const field = fields[0]
     return (
       <tr>
-        <th className="w-[150px] border border-[#d7dce2] bg-[#f3f3f4] px-2 py-1 text-right align-middle text-[12px] font-bold text-[#4b5563]">
+        <th className="w-[142px] border border-[#d8d8d8] bg-[#f2f2f2] px-2 py-1 text-right align-middle text-[12px] font-normal text-[#333333]">
           {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
           {field.label}
           {field.later ? <span className="ml-1 text-[10px] font-black text-sky-700">(나중)</span> : null}
         </th>
-        <td colSpan={3} className="border border-[#d7dce2] bg-white px-1 py-1 align-middle">
+        <td colSpan={3} className="border border-[#d8d8d8] bg-white px-1 py-[3px] align-middle">
           <UnipassValue field={field} />
         </td>
       </tr>
@@ -761,14 +775,14 @@ function UnipassRow({ fields }: { fields: UnipassField[] }) {
 
 function UnipassSection({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="mt-3">
-      <h3 className="border-b border-[#8f99a5] pb-1 text-[13px] font-black text-[#2f66b2]">*{title}</h3>
+    <section className="mt-4">
+      <h3 className="border-b border-[#8f8f8f] pb-1 text-[13px] font-black text-[#1f55b5]">*{title}</h3>
       <div className="overflow-x-auto">
-        <table className="mt-1 w-full min-w-[1180px] table-fixed border-collapse text-[12px]">
+        <table className="mt-1 w-full min-w-[1040px] table-fixed border-collapse text-[12px]">
           <colgroup>
-            <col className="w-[150px]" />
+            <col className="w-[142px]" />
             <col />
-            <col className="w-[150px]" />
+            <col className="w-[142px]" />
             <col />
           </colgroup>
           <tbody>{children}</tbody>
@@ -799,22 +813,22 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
   ]
 
   return (
-    <div className="overflow-hidden rounded-sm border border-[#c8cdd4] bg-white text-[#1f2937] shadow-sm">
-      <div className="border-b border-[#c8cdd4] px-3 py-2">
+    <div className="overflow-hidden bg-white text-[#222222]">
+      <div className="border-b border-[#d5d5d5] px-0 pb-4 pt-1">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-[18px] font-black text-[#2f66b2]">전자상거래 수출신고서</h2>
-          <div className="text-[11px] font-bold text-[#9aa2ad]">Home &gt; 전자신고 &gt; 신고서작성 &gt; 수출통관 &gt; 전자상거래수출신고서</div>
+          <h2 className="text-[18px] font-black text-[#1f55b5]">전자상거래 수출신고서 <span className="text-[#d6d6d6]">★</span></h2>
+          <div className="hidden text-[11px] font-normal text-[#888888] xl:block">Home &gt; 전자신고 &gt; 신고서작성 &gt; 수출통관 &gt; 전자상거래수출신고서</div>
         </div>
       </div>
 
-      <div className="flex border-b border-[#d7dce2] bg-white px-1 pt-3">
+      <div className="flex border-b border-[#e5e5e5] bg-white pt-4">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             type="button"
             onClick={() => setActiveDeclarationTab(tab.id)}
-            className={`h-8 min-w-[118px] border border-[#d7dce2] px-4 text-[12px] font-black ${
-              activeDeclarationTab === tab.id ? 'border-[#3d71d8] bg-[#3d71d8] text-white' : 'bg-[#eceeef] text-[#4b5563]'
+            className={`h-[31px] min-w-[110px] border border-[#d8d8d8] px-4 text-[12px] font-bold ${
+              activeDeclarationTab === tab.id ? 'border-[#4374d9] bg-[#4374d9] text-white' : 'bg-[#eeeeee] text-[#333333]'
             }`}
           >
             {tab.label}
@@ -822,12 +836,12 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
         ))}
       </div>
 
-      <div className="border-b border-[#c8cdd4] bg-[#eef7ff] px-3 py-2 text-[12px] font-bold text-[#1d5f95]">
+      <div className="border-b border-[#d8d8d8] bg-[#eef7ff] px-2 py-2 text-[12px] font-bold text-[#1d5f95]">
         <span className="mr-2 rounded-[2px] border border-sky-200 bg-white px-1.5 py-0.5 text-[10px] font-black">나중입력</span>
         EMS 접수 후 송장번호, 특송업체, 신고세관 정보가 확정되면 채워도 되는 항목입니다.
       </div>
 
-      <div className="border-b border-[#c8cdd4] bg-[#f7f7f8] px-2 py-2">
+      <div className="border-b border-[#d8d8d8] bg-white py-2">
         <table className="w-full min-w-[900px] table-fixed border-collapse text-[12px]">
           <tbody>
             <UnipassRow fields={[
@@ -838,7 +852,7 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
         </table>
       </div>
 
-      <div className="px-2 pb-8 pt-2">
+      <div className="pb-8 pt-2">
         {activeDeclarationTab === 'common1' ? (
           <>
             <UnipassSection title="신고인">
@@ -1024,11 +1038,18 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
   )
 }
 
-export default function ExportDeclarationClient({ products }: { products: ExportProductOption[] }) {
+export default function ExportDeclarationClient({
+  products,
+  savedDeclarations: initialSavedDeclarations = [],
+}: {
+  products: ExportProductOption[]
+  savedDeclarations?: ExportDeclarationListItem[]
+}) {
   const [form, setForm] = useState<ExportDocumentForm>(() => defaultForm())
   const [items, setItems] = useState<ExportLineItem[]>(() => [createEmptyItem()])
   const [previewMode, setPreviewMode] = useState<PreviewMode>('commercial')
-  const [activeTab, setActiveTab] = useState<WorkTab>('unipass')
+  const [isSaving, setIsSaving] = useState(false)
+  const [savedDeclarations, setSavedDeclarations] = useState<ExportDeclarationListItem[]>(initialSavedDeclarations)
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
 
@@ -1086,6 +1107,36 @@ export default function ExportDeclarationClient({ products }: { products: Export
     [items],
   )
 
+  const previewItems = printableItems.length ? printableItems : items
+
+  const createDeclaration = async () => {
+    if (!printableItems.length) {
+      alert('저장할 상품 행이 없습니다.')
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      const response = await fetch('/api/admin/export-declaration', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ form, items: printableItems }),
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || '신청서 생성에 실패했습니다.')
+      }
+
+      setSavedDeclarations((prev) => [data as ExportDeclarationListItem, ...prev.filter((row) => row.id !== data.id)].slice(0, 30))
+      alert('신청서가 DB에 저장되었습니다.')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '신청서 생성에 실패했습니다.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const printDocuments = (mode: PrintMode) => {
     if (!printableItems.length) {
       alert('출력할 상품 행이 없습니다.')
@@ -1139,40 +1190,57 @@ export default function ExportDeclarationClient({ products }: { products: Export
               <Printer size={15} />
               두 문서 연속 인쇄
             </button>
+            <button
+              type="button"
+              onClick={createDeclaration}
+              disabled={isSaving}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-950 bg-slate-950 px-4 text-[12px] font-black text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Save size={15} />
+              {isSaving ? '생성 중' : '신청서 생성'}
+            </button>
+            <button type="button" onClick={resetForm} className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50">
+              초기화
+            </button>
           </div>
-        </div>
-        <div className="mt-4 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveTab('unipass')}
-            className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-black transition ${activeTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-          >
-            <ListChecks size={16} />
-            전자상거래 신고서
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab('documents')}
-            className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-black transition ${activeTab === 'documents' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
-          >
-            <FileSpreadsheet size={16} />
-            PI / Packing List
-          </button>
         </div>
       </div>
 
-      {activeTab === 'unipass' ? <UnipassDeclarationForm form={form} items={items} /> : null}
+      <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="mb-2 flex items-center justify-between gap-3">
+          <h2 className="text-sm font-black text-slate-950">생성된 신청서</h2>
+          <span className="text-[12px] font-bold text-slate-500">최근 {savedDeclarations.length}건</span>
+        </div>
+        {savedDeclarations.length ? (
+          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+            {savedDeclarations.slice(0, 8).map((row) => (
+              <div key={row.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="truncate text-[12px] font-black text-slate-950">{row.invoiceNo}</span>
+                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500">{row.status}</span>
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                  <span>{formatSavedDate(row.createdAt)}</span>
+                  <span>{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-[12px] font-bold text-slate-500">
+            아직 생성된 신청서가 없습니다. 현재 입력값으로 신청서를 생성하면 DB에 기록됩니다.
+          </div>
+        )}
+      </section>
 
-      <div className={activeTab === 'documents' ? 'grid gap-5 xl:grid-cols-[minmax(740px,1fr)_minmax(520px,760px)]' : 'hidden'}>
+      <div className="grid gap-5 2xl:grid-cols-[minmax(720px,0.92fr)_minmax(680px,1.08fr)]">
         <div className="space-y-5">
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between gap-3">
-              <h2 className="text-sm font-black text-slate-950">문서 기본정보</h2>
-              <button type="button" onClick={resetForm} className="h-8 rounded-lg border border-slate-200 px-3 text-[12px] font-black text-slate-600 hover:bg-slate-50">
-                초기화
-              </button>
+            <div className="mb-4 flex items-center gap-2">
+              <FileSpreadsheet size={17} className="text-slate-500" />
+              <h2 className="text-sm font-black text-slate-950">PI / Packing List 작성</h2>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <div className="grid gap-3 md:grid-cols-2">
               <Field label="Invoice No. / 송장번호">
                 <input className={textInputClass()} value={form.invoiceNo} onChange={(event) => setFormValue('invoiceNo', event.target.value)} />
               </Field>
@@ -1294,18 +1362,26 @@ export default function ExportDeclarationClient({ products }: { products: Export
               </table>
             </div>
           </section>
+
+          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2">
+              <button type="button" onClick={() => setPreviewMode('commercial')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'commercial' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
+                Commercial Invoice
+              </button>
+              <button type="button" onClick={() => setPreviewMode('packing')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'packing' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
+                Packing List
+              </button>
+            </div>
+            <DocumentPreview form={form} items={previewItems} mode={previewMode} />
+          </section>
         </div>
 
-        <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-auto">
-          <div className="mb-3 flex items-center gap-2">
-            <button type="button" onClick={() => setPreviewMode('commercial')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'commercial' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
-              Commercial Invoice
-            </button>
-            <button type="button" onClick={() => setPreviewMode('packing')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'packing' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
-              Packing List
-            </button>
+        <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm 2xl:sticky 2xl:top-24 2xl:max-h-[calc(100vh-7rem)] 2xl:overflow-auto">
+          <div className="mb-2 flex items-center gap-2 px-1">
+            <ListChecks size={17} className="text-[#2f66b2]" />
+            <h2 className="text-sm font-black text-slate-950">전자상거래 수출신고서 자동입력</h2>
           </div>
-          <DocumentPreview form={form} items={printableItems.length ? printableItems : items} mode={previewMode} />
+          <UnipassDeclarationForm form={form} items={items} />
         </section>
       </div>
     </div>
