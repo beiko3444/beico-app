@@ -190,6 +190,26 @@ model ProductionBatch {
   updatedAt       DateTime @updatedAt
 }
 
+model MaterialSupply {
+  id              String    @id @default(uuid())
+  name            String
+  category        String    @default("")
+  supplierName    String    @default("")
+  purchaseUrl     String
+  unit            String    @default("")
+  priceKrw        Int?
+  memo            String    @default("")
+  active          Boolean   @default(true)
+  sortOrder       Int       @default(0)
+  lastPurchasedAt DateTime?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([active])
+  @@index([category])
+  @@index([updatedAt])
+}
+
 model ElectricityUsage {
   id                String   @id @default(uuid())
   year              Int
