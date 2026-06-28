@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
@@ -347,8 +348,14 @@ export default function AdminNav({
   const desktopSidebarContent = (
     <>
       <div className="shrink-0">
-        <div className="text-[30px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
-        <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.22em] text-[#7D8491]">WHOLESALE PORTAL</div>
+        <Image
+          src="/logo.png"
+          alt="beiko"
+          width={128}
+          height={88}
+          priority
+          className="h-auto w-[124px]"
+        />
       </div>
       <div className="mb-4 mt-5 h-px shrink-0 bg-[#E5E7EB]" />
 
@@ -462,8 +469,15 @@ export default function AdminNav({
           <Menu size={18} />
           <span className="text-[13px] font-extrabold">메뉴</span>
         </button>
-        <div className="min-w-0 text-center">
-          <div className="text-[18px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">beiko</div>
+        <div className="flex min-w-0 flex-col items-center">
+          <Image
+            src="/logo.png"
+            alt="beiko"
+            width={74}
+            height={52}
+            priority
+            className="h-auto w-[58px]"
+          />
           <div className="mt-1 truncate text-[11px] font-extrabold tracking-[-0.02em] text-[#111827]">{activeItem?.name || '관리자'}</div>
         </div>
         <div className="h-10 w-10" aria-hidden="true" />

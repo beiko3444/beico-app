@@ -1,5 +1,6 @@
 'use client'
 
+import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -104,13 +105,15 @@ export default function LoginPage() {
 
             {/* Logo Section */}
             <div className="mb-5 flex flex-col items-center">
-                <div className="mb-4 text-center">
-                    <div className="text-[44px] font-black leading-none tracking-[-0.055em] text-[#EF3B1D]">
-                        beiko
-                    </div>
-                    <div className="mt-2 text-[10px] font-extrabold uppercase tracking-[0.24em] text-[#7D8491]">
-                        WHOLESALE PORTAL
-                    </div>
+                <div className="mb-4 flex justify-center">
+                    <Image
+                        src="/logo.png"
+                        alt="beiko"
+                        width={150}
+                        height={105}
+                        priority
+                        className="h-auto w-[142px]"
+                    />
                 </div>
 
                 <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">卸売専用ポータル</h1>
