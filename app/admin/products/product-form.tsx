@@ -120,7 +120,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [activeGradeTab, setActiveGradeTab] = useState('C');
 
     const normalizeProductCode = (value: string) => value.toUpperCase();
-    const normalizeHsCode = (value: string) => value.replace(/[^0-9.]/g, '');
+    const normalizeHsCode = (value: string) => value.replace(/[^0-9.-]/g, '');
 
     // Helper for formatting number with commas
     const formatNumber = (val: string | number) => {
