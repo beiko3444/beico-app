@@ -840,7 +840,17 @@ function UnipassSection({ title, children }: { title: string; children: React.Re
   )
 }
 
-function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; items: ExportLineItem[] }) {
+function UnipassDeclarationForm({
+  form,
+  items,
+  onSaveDraft,
+  isSavingDraft,
+}: {
+  form: ExportDocumentForm
+  items: ExportLineItem[]
+  onSaveDraft: () => void
+  isSavingDraft: boolean
+}) {
   const [activeDeclarationTab, setActiveDeclarationTab] = useState<UnipassDeclarationTab>('common1')
   const declarationItems = getDeclarationItems(items)
   const totals = getDeclarationTotals(declarationItems)
@@ -1075,11 +1085,16 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
         <div className="mt-8 flex items-center justify-between border-t border-[#c8cdd4] pt-3">
           <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">목록</button>
           <div className="flex items-center gap-2">
-            {['미리보기', '임시저장', '일괄저장'].map((label) => (
-              <button key={label} type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">
-                {label}
-              </button>
-            ))}
+            <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">미리보기</button>
+            <button
+              type="button"
+              onClick={onSaveDraft}
+              disabled={isSavingDraft}
+              className="h-8 rounded-[2px] border border-[#1f55b5] bg-[#1f55b5] px-4 text-[12px] font-black text-white disabled:cursor-wait disabled:opacity-60"
+            >
+              {isSavingDraft ? '저장 중' : '임시저장'}
+            </button>
+            <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">일괄저장</button>
             <button type="button" className="h-8 rounded-[2px] border border-[#6b7280] bg-[#6b7280] px-4 text-[12px] font-black text-white">전송</button>
           </div>
         </div>
@@ -1183,12 +1198,12 @@ export default function ExportDeclarationClient({
     setSavedDeclarations((prev) => [row, ...prev.filter((item) => item.id !== row.id)].slice(0, 30))
   }
 
-  const applyDeclaration = (detail: ExportDeclarationDetail) => {
+  const applyDeclaration = (detail: ExportDeclarationDetail, nextWorkTab: WorkTab = 'documents') => {
     setSelectedDeclarationId(detail.id)
     setForm(normalizeLoadedForm(detail.form))
     setItems(normalizeLoadedItems(detail.items))
     setPreviewMode('commercial')
-    setActiveWorkTab('documents')
+    setActiveWorkTab(nextWorkTab)
     upsertDeclarationList(detail)
   }
 
@@ -1235,28 +1250,23 @@ export default function ExportDeclarationClient({
     }
   }
 
-  const updateDeclaration = async () => {
-    if (!selectedDeclarationId) {
-      alert('먼저 신청서를 생성하거나 기존 신청서를 선택해주세요.')
-      return
-    }
-
+  const saveDraftDeclaration = async () => {
     setIsUpdatingDeclaration(true)
     try {
       const response = await fetch('/api/admin/export-declaration', {
-        method: 'PATCH',
+        method: selectedDeclarationId ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: selectedDeclarationId, form, items }),
+        body: JSON.stringify(selectedDeclarationId ? { id: selectedDeclarationId, form, items } : { form, items }),
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) {
-        throw new Error(data?.error || '작성내용 저장에 실패했습니다.')
+        throw new Error(data?.error || '수출신고 내용을 임시저장하지 못했습니다.')
       }
 
-      applyDeclaration(data as ExportDeclarationDetail)
-      alert('작성내용을 저장했습니다.')
+      applyDeclaration(data as ExportDeclarationDetail, selectedDeclarationId ? activeWorkTab : 'documents')
+      alert('수출신고 내용을 임시저장했습니다.')
     } catch (error) {
-      alert(error instanceof Error ? error.message : '작성내용 저장에 실패했습니다.')
+      alert(error instanceof Error ? error.message : '수출신고 내용을 임시저장하지 못했습니다.')
     } finally {
       setIsUpdatingDeclaration(false)
     }
@@ -1357,12 +1367,12 @@ export default function ExportDeclarationClient({
             </button>
             <button
               type="button"
-              onClick={updateDeclaration}
-              disabled={!selectedDeclarationId || isUpdatingDeclaration}
+              onClick={saveDraftDeclaration}
+              disabled={isUpdatingDeclaration}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#1f55b5] bg-[#1f55b5] px-4 text-[12px] font-black text-white shadow-sm hover:bg-[#17438e] disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <FileText size={15} />
-              {isUpdatingDeclaration ? '저장 중' : '작성내용 저장'}
+              <Save size={15} />
+              {isUpdatingDeclaration ? '저장 중' : '임시저장'}
             </button>
             <button type="button" onClick={resetForm} className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50">
               초기화
@@ -1465,9 +1475,20 @@ export default function ExportDeclarationClient({
                 <FileSpreadsheet size={17} className="text-slate-500" />
                 <h2 className="text-sm font-black text-slate-950">PI / Packing List 작성</h2>
               </div>
-              <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${selectedDeclarationId ? 'bg-sky-50 text-sky-700' : 'bg-red-50 text-red-700'}`}>
-                {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신청서 생성/선택 필요'}
-              </span>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${selectedDeclarationId ? 'bg-sky-50 text-sky-700' : 'bg-red-50 text-red-700'}`}>
+                  {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신규 임시저장 가능'}
+                </span>
+                <button
+                  type="button"
+                  onClick={saveDraftDeclaration}
+                  disabled={isUpdatingDeclaration}
+                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#1f55b5] bg-[#1f55b5] px-3 text-[12px] font-black text-white shadow-sm hover:bg-[#17438e] disabled:cursor-wait disabled:opacity-60"
+                >
+                  <Save size={14} />
+                  {isUpdatingDeclaration ? '저장 중' : '임시저장'}
+                </button>
+              </div>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Invoice No. / 송장번호">
@@ -1611,7 +1632,12 @@ export default function ExportDeclarationClient({
             <ListChecks size={17} className="text-[#2f66b2]" />
             <h2 className="text-sm font-black text-slate-950">전자상거래 수출신고서 자동입력</h2>
           </div>
-          <UnipassDeclarationForm form={form} items={items} />
+          <UnipassDeclarationForm
+            form={form}
+            items={items}
+            onSaveDraft={saveDraftDeclaration}
+            isSavingDraft={isUpdatingDeclaration}
+          />
         </section>
       </div>
     </div>
