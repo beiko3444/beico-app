@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { CheckCircle2, ExternalLink, PackagePlus, Pencil, Plus, Search, ShoppingCart, Trash2 } from 'lucide-react'
+import { getMaterialSupplyUnitPrice } from '@/lib/materialSupplies'
 
 export type MaterialSupplyItem = {
   id: string
@@ -51,6 +52,17 @@ const formatCurrency = (value: number | null) => {
   return `${value.toLocaleString()}원`
 }
 
+const parsePriceInput = (value: string) => {
+  const parsed = Number(value.replace(/[^0-9.-]/g, ''))
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+const formatUnitPrice = (value: number | null) => {
+  if (!value) return '단위와 가격을 입력하면 자동 계산됩니다.'
+  const rounded = Math.round(value * 10) / 10
+  return `개당 ${rounded.toLocaleString(undefined, { maximumFractionDigits: 1 })}원`
+}
+
 const formatDateTime = (value: string | null) => {
   if (!value) return '-'
   const date = new Date(value)
@@ -80,6 +92,10 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
         .some((value) => value.toLowerCase().includes(needle))
     })
   }, [activeFilter, items, query])
+
+  const formUnitPrice = useMemo(() => {
+    return getMaterialSupplyUnitPrice(parsePriceInput(form.priceKrw), form.unit)
+  }, [form.priceKrw, form.unit])
 
   const setFormValue = (key: keyof FormState, value: string | boolean) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -231,6 +247,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                       </div>
                       <h2 className="mt-2 truncate text-[16px] font-black text-slate-950">{item.name}</h2>
                       <p className="mt-1 text-[12px] font-bold text-slate-500">{item.supplierName || '구매처 미입력'} · {item.unit || '단위 미입력'} · {formatCurrency(item.priceKrw)}</p>
+                      <p className="mt-1 text-[11px] font-black text-[#EF3B2D]">{formatUnitPrice(getMaterialSupplyUnitPrice(item.priceKrw, item.unit))}</p>
                     </div>
                     <button type="button" onClick={() => editItem(item)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="수정">
                       <Pencil size={15} />
@@ -315,9 +332,16 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
               <Field label="가격">
                 <input inputMode="numeric" className={inputClass} value={form.priceKrw} onChange={(event) => setFormValue('priceKrw', event.target.value)} placeholder="12500" />
               </Field>
-              <Field label="정렬">
+              <Field label="정렬(표시순서)">
                 <input inputMode="numeric" className={inputClass} value={form.sortOrder} onChange={(event) => setFormValue('sortOrder', event.target.value)} />
               </Field>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="flex items-center justify-between gap-3 text-[12px] font-black">
+                <span className="text-slate-500">자동 개당단가</span>
+                <span className={formUnitPrice ? 'text-[#EF3B2D]' : 'text-slate-400'}>{formatUnitPrice(formUnitPrice)}</span>
+              </div>
+              <p className="mt-1 text-[11px] font-bold text-slate-500">정렬은 같은 카테고리 안의 표시 순서입니다. 숫자가 낮을수록 먼저 보입니다.</p>
             </div>
             <Field label="메모">
               <textarea className={`${inputClass} min-h-24 resize-none py-3`} value={form.memo} onChange={(event) => setFormValue('memo', event.target.value)} placeholder="규격, 주의사항, 대체 구매처 등" />

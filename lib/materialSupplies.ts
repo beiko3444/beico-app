@@ -31,6 +31,24 @@ export type SortableMaterialSupply = {
   updatedAt: Date | string
 }
 
+export function parseMaterialSupplyUnitQuantity(value: unknown) {
+  if (typeof value !== 'string') return null
+  const numbers = value
+    .match(/[0-9]+(?:\.[0-9]+)?/g)
+    ?.map((part) => Number(part))
+    .filter((number) => Number.isFinite(number) && number > 0)
+
+  if (!numbers?.length) return null
+  return Math.max(...numbers)
+}
+
+export function getMaterialSupplyUnitPrice(priceKrw: number | null | undefined, unit: unknown) {
+  if (!priceKrw || priceKrw <= 0) return null
+  const quantity = parseMaterialSupplyUnitQuantity(unit)
+  if (!quantity) return null
+  return priceKrw / quantity
+}
+
 function text(value: unknown) {
   return typeof value === 'string' ? value.trim() : ''
 }
