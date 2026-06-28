@@ -1370,12 +1370,12 @@ export default function ExportDeclarationClient({
         )}
       </section>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
-        <div className="grid grid-cols-2 gap-1">
+      <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
+        <div className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setActiveWorkTab('documents')}
-            className={`h-11 rounded-lg text-[13px] font-black transition ${
+            className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
               activeWorkTab === 'documents' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -1384,7 +1384,7 @@ export default function ExportDeclarationClient({
           <button
             type="button"
             onClick={() => setActiveWorkTab('unipass')}
-            className={`h-11 rounded-lg text-[13px] font-black transition ${
+            className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
               activeWorkTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -1394,7 +1394,8 @@ export default function ExportDeclarationClient({
       </div>
 
       <div className="space-y-5">
-        <div className={activeWorkTab === 'documents' ? 'space-y-5' : 'hidden'}>
+        <div className={activeWorkTab === 'documents' ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.74fr)] xl:items-start' : 'hidden'}>
+          <div className="min-w-0 space-y-5">
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -1527,8 +1528,9 @@ export default function ExportDeclarationClient({
               </table>
             </div>
           </section>
+          </div>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-auto">
             <div className="mb-3 flex items-center gap-2">
               <button type="button" onClick={() => setPreviewMode('commercial')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'commercial' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
                 Commercial Invoice
