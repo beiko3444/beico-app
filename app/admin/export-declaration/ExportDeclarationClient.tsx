@@ -67,7 +67,7 @@ type ExportLineItem = {
 
 type PreviewMode = 'commercial' | 'packing'
 type PrintMode = PreviewMode | 'both'
-type WorkTab = 'documents' | 'unipass'
+type WorkTab = 'list' | 'documents' | 'unipass'
 type UnipassDeclarationTab = 'common1' | 'common2' | 'items'
 type GuideStatus = 'ready' | 'check'
 
@@ -1096,11 +1096,12 @@ export default function ExportDeclarationClient({
   const [form, setForm] = useState<ExportDocumentForm>(() => defaultForm())
   const [items, setItems] = useState<ExportLineItem[]>(() => [createEmptyItem()])
   const [previewMode, setPreviewMode] = useState<PreviewMode>('commercial')
-  const [activeWorkTab, setActiveWorkTab] = useState<WorkTab>('documents')
+  const [activeWorkTab, setActiveWorkTab] = useState<WorkTab>('list')
   const [selectedDeclarationId, setSelectedDeclarationId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [isLoadingDeclaration, setIsLoadingDeclaration] = useState(false)
   const [isUpdatingDeclaration, setIsUpdatingDeclaration] = useState(false)
+  const [deletingDeclarationId, setDeletingDeclarationId] = useState<string | null>(null)
   const [savedDeclarations, setSavedDeclarations] = useState<ExportDeclarationListItem[]>(initialSavedDeclarations)
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
@@ -1153,6 +1154,7 @@ export default function ExportDeclarationClient({
     setItems([createEmptyItem()])
     setPreviewMode('commercial')
     setSelectedDeclarationId(null)
+    setActiveWorkTab('list')
   }
 
   const printableItems = useMemo(
@@ -1184,6 +1186,7 @@ export default function ExportDeclarationClient({
     setForm(normalizeLoadedForm(detail.form))
     setItems(normalizeLoadedItems(detail.items))
     setPreviewMode('commercial')
+    setActiveWorkTab('documents')
     upsertDeclarationList(detail)
   }
 
@@ -1254,6 +1257,37 @@ export default function ExportDeclarationClient({
       alert(error instanceof Error ? error.message : '작성내용 저장에 실패했습니다.')
     } finally {
       setIsUpdatingDeclaration(false)
+    }
+  }
+
+  const deleteDeclaration = async (id: string) => {
+    const target = savedDeclarations.find((row) => row.id === id)
+    if (!confirm(`${target?.invoiceNo || '선택한 신청서'}를 삭제할까요? 삭제 후 복구할 수 없습니다.`)) {
+      return
+    }
+
+    setDeletingDeclarationId(id)
+    try {
+      const response = await fetch(`/api/admin/export-declaration?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || '신청서 삭제에 실패했습니다.')
+      }
+
+      setSavedDeclarations((prev) => prev.filter((row) => row.id !== id))
+      if (selectedDeclarationId === id) {
+        setSelectedDeclarationId(null)
+        setForm(defaultForm())
+        setItems([createEmptyItem()])
+        setPreviewMode('commercial')
+        setActiveWorkTab('list')
+      }
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '신청서 삭제에 실패했습니다.')
+    } finally {
+      setDeletingDeclarationId(null)
     }
   }
 
@@ -1335,68 +1369,95 @@ export default function ExportDeclarationClient({
         </div>
       </div>
 
-      <section className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
-        <div className="mb-2 flex items-center justify-between gap-3">
-          <h2 className="text-sm font-black text-slate-950">생성된 신청서</h2>
-          <span className="text-[12px] font-bold text-slate-500">최근 {savedDeclarations.length}건</span>
-        </div>
-        {savedDeclarations.length ? (
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
-            {savedDeclarations.slice(0, 8).map((row) => (
-              <button
-                key={row.id}
-                type="button"
-                onClick={() => loadDeclaration(row.id)}
-                disabled={isLoadingDeclaration}
-                className={`rounded-lg border px-3 py-2 text-left transition hover:border-[#1f55b5] hover:bg-sky-50 disabled:cursor-wait ${
-                  selectedDeclarationId === row.id ? 'border-[#1f55b5] bg-sky-50 ring-2 ring-sky-100' : 'border-slate-200 bg-slate-50'
-                }`}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="truncate text-[12px] font-black text-slate-950">{row.invoiceNo}</span>
-                  <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500">{row.status}</span>
-                </div>
-                <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
-                  <span>{formatSavedDate(row.createdAt)}</span>
-                  <span>{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
-                </div>
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-4 text-[12px] font-bold text-slate-500">
-            아직 생성된 신청서가 없습니다. 현재 입력값으로 신청서를 생성하면 DB에 기록됩니다.
-          </div>
-        )}
-      </section>
-
       <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
+            onClick={() => setActiveWorkTab('list')}
+            className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
+              activeWorkTab === 'list' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            신청서 목록
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveWorkTab('documents')}
+            disabled={!selectedDeclarationId}
             className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
               activeWorkTab === 'documents' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-40`}
           >
             PI / Packing List
           </button>
           <button
             type="button"
             onClick={() => setActiveWorkTab('unipass')}
+            disabled={!selectedDeclarationId}
             className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
               activeWorkTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
-            }`}
+            } disabled:cursor-not-allowed disabled:opacity-40`}
           >
             전자상거래 수출신고서
           </button>
         </div>
       </div>
 
+      <section className={activeWorkTab === 'list' ? 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm' : 'hidden'}>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-sm font-black text-slate-950">신청서 목록</h2>
+            <p className="mt-1 text-[12px] font-bold text-slate-500">신청서를 선택하면 하단 작성 화면이 열립니다.</p>
+          </div>
+          <span className="text-[12px] font-bold text-slate-500">최근 {savedDeclarations.length}건</span>
+        </div>
+        {savedDeclarations.length ? (
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {savedDeclarations.slice(0, 30).map((row) => (
+              <div
+                key={row.id}
+                className={`rounded-lg border bg-slate-50 p-3 transition ${
+                  selectedDeclarationId === row.id ? 'border-[#1f55b5] bg-sky-50 ring-2 ring-sky-100' : 'border-slate-200'
+                }`}
+              >
+                <button
+                  type="button"
+                  onClick={() => loadDeclaration(row.id)}
+                  disabled={isLoadingDeclaration || deletingDeclarationId === row.id}
+                  className="block w-full text-left disabled:cursor-wait"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="truncate text-[12px] font-black text-slate-950">{row.invoiceNo}</span>
+                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500">{row.status}</span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                    <span>{formatSavedDate(row.createdAt)}</span>
+                    <span>{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => deleteDeclaration(row.id)}
+                  disabled={deletingDeclarationId === row.id}
+                  className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-red-100 bg-white text-[11px] font-black text-red-600 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+                >
+                  <Trash2 size={13} />
+                  {deletingDeclarationId === row.id ? '삭제 중' : '삭제'}
+                </button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[12px] font-bold text-slate-500">
+            아직 생성된 신청서가 없습니다. 상단의 신청서 생성 버튼으로 새 신청서를 먼저 만드세요.
+          </div>
+        )}
+      </section>
+
       <div className="space-y-5">
-        <div className={activeWorkTab === 'documents' ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.74fr)] xl:items-start' : 'hidden'}>
-          <div className="min-w-0 space-y-5">
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+        <div className={activeWorkTab === 'documents' && selectedDeclarationId ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.74fr)] xl:items-start' : 'hidden'}>
+          <div className="flex min-w-0 flex-col gap-5">
+          <section className="order-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet size={17} className="text-slate-500" />
@@ -1461,7 +1522,7 @@ export default function ExportDeclarationClient({
             </div>
           </section>
 
-          <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="order-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-sm font-black text-slate-950">상품 / 포장 정보</h2>
@@ -1543,7 +1604,7 @@ export default function ExportDeclarationClient({
           </section>
         </div>
 
-        <section className={activeWorkTab === 'unipass' ? 'min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
+        <section className={activeWorkTab === 'unipass' && selectedDeclarationId ? 'min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
           <div className="mb-2 flex items-center gap-2 px-1">
             <ListChecks size={17} className="text-[#2f66b2]" />
             <h2 className="text-sm font-black text-slate-950">전자상거래 수출신고서 자동입력</h2>

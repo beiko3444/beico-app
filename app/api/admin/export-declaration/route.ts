@@ -266,3 +266,28 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: 'Failed to update export declaration' }, { status: 500 })
   }
 }
+
+export async function DELETE(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const { searchParams } = new URL(request.url)
+    const id = readString(searchParams.get('id'))
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    await (prisma as any).exportDeclaration.delete({
+      where: { id },
+    })
+
+    return NextResponse.json({ ok: true, id })
+  } catch (error) {
+    console.error('Failed to delete export declaration:', error)
+    return NextResponse.json({ error: 'Failed to delete export declaration' }, { status: 500 })
+  }
+}
