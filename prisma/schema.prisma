@@ -198,6 +198,10 @@ model MaterialSupply {
   purchaseUrl     String
   unit            String    @default("")
   priceKrw        Int?
+  widthValue      Float?
+  depthValue      Float?
+  heightValue     Float?
+  dimensionUnit   String    @default("mm")
   memo            String    @default("")
   active          Boolean   @default(true)
   sortOrder       Int       @default(0)

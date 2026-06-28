@@ -21,6 +21,10 @@ type MaterialSupplyRow = {
   purchaseUrl: string
   unit: string
   priceKrw: number | null
+  widthValue: number | null
+  depthValue: number | null
+  heightValue: number | null
+  dimensionUnit: string
   memo: string
   active: boolean
   sortOrder: number

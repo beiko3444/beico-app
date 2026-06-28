@@ -5,6 +5,10 @@ export type MaterialSupplyInput = {
   purchaseUrl?: unknown
   unit?: unknown
   priceKrw?: unknown
+  widthValue?: unknown
+  depthValue?: unknown
+  heightValue?: unknown
+  dimensionUnit?: unknown
   memo?: unknown
   sortOrder?: unknown
   active?: unknown
@@ -17,6 +21,10 @@ export type NormalizedMaterialSupplyInput = {
   purchaseUrl: string
   unit: string
   priceKrw: number | null
+  widthValue: number | null
+  depthValue: number | null
+  heightValue: number | null
+  dimensionUnit: 'mm' | 'cm'
   memo: string
   sortOrder: number
   active: boolean
@@ -60,6 +68,17 @@ function numberOrNull(value: unknown) {
   return Math.round(parsed)
 }
 
+function floatOrNull(value: unknown) {
+  if (value === null || value === undefined || value === '') return null
+  const parsed = Number(String(value).replace(/[^0-9.-]/g, ''))
+  if (!Number.isFinite(parsed) || parsed < 0) return null
+  return Math.round(parsed * 100) / 100
+}
+
+function normalizeDimensionUnit(value: unknown): 'mm' | 'cm' {
+  return text(value).toLowerCase() === 'cm' ? 'cm' : 'mm'
+}
+
 function numberOrZero(value: unknown) {
   const parsed = Number(String(value ?? '').replace(/[^0-9.-]/g, ''))
   if (!Number.isFinite(parsed)) return 0
@@ -90,6 +109,10 @@ export function normalizeMaterialSupplyInput(input: MaterialSupplyInput): Normal
     purchaseUrl: normalizePurchaseUrl(input.purchaseUrl),
     unit: text(input.unit),
     priceKrw: numberOrNull(input.priceKrw),
+    widthValue: floatOrNull(input.widthValue),
+    depthValue: floatOrNull(input.depthValue),
+    heightValue: floatOrNull(input.heightValue),
+    dimensionUnit: normalizeDimensionUnit(input.dimensionUnit),
     memo: text(input.memo),
     sortOrder: numberOrZero(input.sortOrder),
     active: typeof input.active === 'boolean' ? input.active : true,

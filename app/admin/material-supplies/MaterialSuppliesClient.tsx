@@ -13,6 +13,10 @@ export type MaterialSupplyItem = {
   purchaseUrl: string
   unit: string
   priceKrw: number | null
+  widthValue: number | null
+  depthValue: number | null
+  heightValue: number | null
+  dimensionUnit: string
   memo: string
   active: boolean
   sortOrder: number
@@ -29,6 +33,10 @@ type FormState = {
   purchaseUrl: string
   unit: string
   priceKrw: string
+  widthValue: string
+  depthValue: string
+  heightValue: string
+  dimensionUnit: 'mm' | 'cm'
   memo: string
   sortOrder: string
   active: boolean
@@ -42,6 +50,10 @@ const emptyForm = (): FormState => ({
   purchaseUrl: '',
   unit: '',
   priceKrw: '',
+  widthValue: '',
+  depthValue: '',
+  heightValue: '',
+  dimensionUnit: 'mm',
   memo: '',
   sortOrder: '0',
   active: true,
@@ -61,6 +73,12 @@ const formatUnitPrice = (value: number | null) => {
   if (!value) return '단위와 가격을 입력하면 자동 계산됩니다.'
   const rounded = Math.round(value * 10) / 10
   return `개당 ${rounded.toLocaleString(undefined, { maximumFractionDigits: 1 })}원`
+}
+
+const formatDimension = (item: Pick<MaterialSupplyItem, 'widthValue' | 'depthValue' | 'heightValue' | 'dimensionUnit'>) => {
+  const values = [item.widthValue, item.depthValue, item.heightValue]
+  if (values.some((value) => !value || value <= 0)) return ''
+  return `${values.map((value) => Number(value).toLocaleString(undefined, { maximumFractionDigits: 2 })).join(' x ')} ${item.dimensionUnit || 'mm'}`
 }
 
 const formatDateTime = (value: string | null) => {
@@ -110,6 +128,10 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
       purchaseUrl: item.purchaseUrl,
       unit: item.unit,
       priceKrw: item.priceKrw ? String(item.priceKrw) : '',
+      widthValue: item.widthValue ? String(item.widthValue) : '',
+      depthValue: item.depthValue ? String(item.depthValue) : '',
+      heightValue: item.heightValue ? String(item.heightValue) : '',
+      dimensionUnit: item.dimensionUnit === 'cm' ? 'cm' : 'mm',
       memo: item.memo,
       sortOrder: String(item.sortOrder || 0),
       active: item.active,
@@ -248,6 +270,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                       <h2 className="mt-2 truncate text-[16px] font-black text-slate-950">{item.name}</h2>
                       <p className="mt-1 text-[12px] font-bold text-slate-500">{item.supplierName || '구매처 미입력'} · {item.unit || '단위 미입력'} · {formatCurrency(item.priceKrw)}</p>
                       <p className="mt-1 text-[11px] font-black text-[#EF3B2D]">{formatUnitPrice(getMaterialSupplyUnitPrice(item.priceKrw, item.unit))}</p>
+                      {formatDimension(item) ? <p className="mt-1 text-[11px] font-bold text-slate-500">규격 {formatDimension(item)}</p> : null}
                     </div>
                     <button type="button" onClick={() => editItem(item)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50" title="수정">
                       <Pencil size={15} />
@@ -335,6 +358,30 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
               <Field label="정렬(표시순서)">
                 <input inputMode="numeric" className={inputClass} value={form.sortOrder} onChange={(event) => setFormValue('sortOrder', event.target.value)} />
               </Field>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <span className="text-[11px] font-black text-slate-500">규격</span>
+                <select
+                  className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[12px] font-black text-slate-700 outline-none focus:border-slate-400"
+                  value={form.dimensionUnit}
+                  onChange={(event) => setFormValue('dimensionUnit', event.target.value === 'cm' ? 'cm' : 'mm')}
+                >
+                  <option value="mm">mm</option>
+                  <option value="cm">cm</option>
+                </select>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <Field label="가로">
+                  <input inputMode="decimal" className={inputClass} value={form.widthValue} onChange={(event) => setFormValue('widthValue', event.target.value)} placeholder="0" />
+                </Field>
+                <Field label="세로">
+                  <input inputMode="decimal" className={inputClass} value={form.depthValue} onChange={(event) => setFormValue('depthValue', event.target.value)} placeholder="0" />
+                </Field>
+                <Field label="높이">
+                  <input inputMode="decimal" className={inputClass} value={form.heightValue} onChange={(event) => setFormValue('heightValue', event.target.value)} placeholder="0" />
+                </Field>
+              </div>
             </div>
             <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
               <div className="flex items-center justify-between gap-3 text-[12px] font-black">
