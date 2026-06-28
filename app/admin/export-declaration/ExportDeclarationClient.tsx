@@ -188,10 +188,10 @@ const numberFormatter = new Intl.NumberFormat('en-US', {
 
 const intFormatter = new Intl.NumberFormat('en-US')
 
-const exportCountryOptions: Array<{ value: ExportCountryCode; label: string; priceLabel: string }> = [
-  { value: 'US', label: '미국 수출', priceLabel: '미국 판매가' },
-  { value: 'JP', label: '일본 수출', priceLabel: '일본 판매가' },
-  { value: 'KR', label: '한국 기준', priceLabel: '한국 판매가' },
+const exportCountryOptions: Array<{ value: ExportCountryCode; flag: string; label: string; priceLabel: string }> = [
+  { value: 'US', flag: '🇺🇸', label: '미국 수출', priceLabel: '미국 판매가' },
+  { value: 'JP', flag: '🇯🇵', label: '일본 수출', priceLabel: '일본 판매가' },
+  { value: 'KR', flag: '🇰🇷', label: '한국 기준', priceLabel: '한국 판매가' },
 ]
 
 function parseNumberInput(value: string, fallback = 0) {
@@ -1651,13 +1651,14 @@ export default function ExportDeclarationClient({
               <div className="flex flex-wrap items-center gap-2">
                 <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700">
                   <span className="text-[11px] text-slate-500">수출국</span>
+                  <span className="text-[16px] leading-none" aria-hidden="true">{selectedCountryOption.flag}</span>
                   <select
                     className="h-7 bg-transparent text-[12px] font-black text-slate-950 outline-none"
                     value={selectedExportCountry}
                     onChange={(event) => changeExportCountry(normalizeExportCountry(event.target.value))}
                   >
                     {exportCountryOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.label}</option>
+                      <option key={option.value} value={option.value}>{option.flag} {option.label}</option>
                     ))}
                   </select>
                 </label>
