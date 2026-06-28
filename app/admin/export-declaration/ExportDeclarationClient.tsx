@@ -54,6 +54,7 @@ type ExportLineItem = {
 type PreviewMode = 'commercial' | 'packing'
 type PrintMode = PreviewMode | 'both'
 type WorkTab = 'unipass' | 'documents'
+type UnipassDeclarationTab = 'common1' | 'common2' | 'items'
 type GuideStatus = 'ready' | 'check'
 
 type GuideField = {
@@ -641,6 +642,366 @@ function UnipassGuideTable({ sections }: { sections: GuideSection[] }) {
   )
 }
 
+type UnipassField = {
+  label: string
+  value?: string | number
+  required?: boolean
+  suffix?: string
+  lookup?: boolean
+  select?: boolean
+  muted?: boolean
+  wide?: boolean
+}
+
+function getDeclarationItems(items: ExportLineItem[]) {
+  const activeItems = items.filter((item) => item.productName.trim() || item.productNameEN.trim() || item.model.trim())
+  return activeItems.length ? activeItems : items
+}
+
+function getDeclarationTotals(items: ExportLineItem[]) {
+  return {
+    qty: items.reduce((sum, item) => sum + item.quantity, 0),
+    amount: items.reduce((sum, item) => sum + lineAmount(item), 0),
+    cartons: items.reduce((sum, item) => sum + item.cartons, 0),
+    net: items.reduce((sum, item) => sum + item.netWeight, 0),
+    gross: items.reduce((sum, item) => sum + item.grossWeight, 0),
+    cbm: items.reduce((sum, item) => sum + item.cbm, 0),
+  }
+}
+
+function displayUnipassValue(value: string | number | undefined) {
+  const text = String(value ?? '').trim()
+  return text || '확인 필요'
+}
+
+function copyUnipassValue(value: string | number | undefined) {
+  navigator.clipboard.writeText(displayUnipassValue(value)).catch(() => alert('복사에 실패했습니다.'))
+}
+
+function UnipassValue({ field }: { field: UnipassField }) {
+  const value = displayUnipassValue(field.value)
+  const needsCheck = value === '확인 필요'
+
+  return (
+    <button
+      type="button"
+      onClick={() => copyUnipassValue(field.value)}
+      className={`flex min-h-7 w-full items-center gap-1 rounded-[1px] border px-1.5 text-left text-[12px] font-bold shadow-inner ${
+        field.muted
+          ? 'border-[#d5d9df] bg-[#e9eaec] text-[#67707d]'
+          : needsCheck
+            ? 'border-[#d8bd68] bg-[#fff8dd] text-[#8a5a00]'
+            : 'border-[#c7cdd5] bg-white text-[#111827]'
+      }`}
+      title={`${field.label} 복사`}
+    >
+      <span className="min-w-0 flex-1 truncate">{value}</span>
+      {field.suffix ? <span className="shrink-0 text-[11px] text-[#59677a]">{field.suffix}</span> : null}
+      {field.lookup ? <span className="shrink-0 rounded-[1px] border border-[#b7c1d0] bg-[#edf2f9] px-1 text-[10px] text-[#3466b7]">조회</span> : null}
+      {field.select ? <span className="shrink-0 text-[10px] text-[#59677a]">▼</span> : null}
+      <Copy size={10} className="shrink-0 text-[#6a7890]" />
+    </button>
+  )
+}
+
+function UnipassFieldCell({ field }: { field: UnipassField }) {
+  return (
+    <>
+      <th className="border border-[#d7dce2] bg-[#f3f3f4] px-2 py-1 text-right align-middle text-[12px] font-bold text-[#4b5563]">
+        {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
+        {field.label}
+      </th>
+      <td className="border border-[#d7dce2] bg-white px-1 py-1 align-middle">
+        <UnipassValue field={field} />
+      </td>
+    </>
+  )
+}
+
+function UnipassRow({ fields }: { fields: UnipassField[] }) {
+  if (fields.length === 1 || fields[0]?.wide) {
+    const field = fields[0]
+    return (
+      <tr>
+        <th className="w-[150px] border border-[#d7dce2] bg-[#f3f3f4] px-2 py-1 text-right align-middle text-[12px] font-bold text-[#4b5563]">
+          {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
+          {field.label}
+        </th>
+        <td colSpan={3} className="border border-[#d7dce2] bg-white px-1 py-1 align-middle">
+          <UnipassValue field={field} />
+        </td>
+      </tr>
+    )
+  }
+
+  return (
+    <tr>
+      <UnipassFieldCell field={fields[0]} />
+      <UnipassFieldCell field={fields[1]} />
+    </tr>
+  )
+}
+
+function UnipassSection({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-3">
+      <h3 className="border-b border-[#8f99a5] pb-1 text-[13px] font-black text-[#2f66b2]">*{title}</h3>
+      <div className="overflow-x-auto">
+        <table className="mt-1 w-full min-w-[1180px] table-fixed border-collapse text-[12px]">
+          <colgroup>
+            <col className="w-[150px]" />
+            <col />
+            <col className="w-[150px]" />
+            <col />
+          </colgroup>
+          <tbody>{children}</tbody>
+        </table>
+      </div>
+    </section>
+  )
+}
+
+function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; items: ExportLineItem[] }) {
+  const [activeDeclarationTab, setActiveDeclarationTab] = useState<UnipassDeclarationTab>('common1')
+  const declarationItems = getDeclarationItems(items)
+  const totals = getDeclarationTotals(declarationItems)
+  const productName = uniqueJoined(declarationItems.map((item) => item.productNameEN || item.productName), '확인 필요')
+  const hsCode = uniqueJoined(declarationItems.map((item) => item.hsCode), '확인 필요')
+  const origin = uniqueJoined(declarationItems.map((item) => item.origin), 'KOREA')
+  const exporter = compactLines(form.exporter) || 'beiko Inc.'
+  const buyer = compactLines(form.consignee || form.buyer)
+  const totalAmount = money(totals.amount, form.currency)
+  const totalGross = totals.gross > 0 ? weight(totals.gross) : ''
+  const totalNet = totals.net > 0 ? weight(totals.net) : ''
+  const packageText = form.packagesKind || (totals.cartons > 0 ? `${intFormatter.format(totals.cartons)} CT` : '')
+  const currencyCode = form.currency.includes('$') ? 'USD' : form.currency.replace(/[^A-Z]/g, '') || 'USD'
+  const tabs: Array<{ id: UnipassDeclarationTab; label: string }> = [
+    { id: 'common1', label: '공통사항1' },
+    { id: 'common2', label: '공통사항2' },
+    { id: 'items', label: '란사항' },
+  ]
+
+  return (
+    <div className="overflow-hidden rounded-sm border border-[#c8cdd4] bg-white text-[#1f2937] shadow-sm">
+      <div className="border-b border-[#c8cdd4] px-3 py-2">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-[18px] font-black text-[#2f66b2]">전자상거래 수출신고서</h2>
+          <div className="text-[11px] font-bold text-[#9aa2ad]">Home &gt; 전자신고 &gt; 신고서작성 &gt; 수출통관 &gt; 전자상거래수출신고서</div>
+        </div>
+      </div>
+
+      <div className="flex border-b border-[#d7dce2] bg-white px-1 pt-3">
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveDeclarationTab(tab.id)}
+            className={`h-8 min-w-[118px] border border-[#d7dce2] px-4 text-[12px] font-black ${
+              activeDeclarationTab === tab.id ? 'border-[#3d71d8] bg-[#3d71d8] text-white' : 'bg-[#eceeef] text-[#4b5563]'
+            }`}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="border-b border-[#c8cdd4] bg-[#f7f7f8] px-2 py-2">
+        <table className="w-full min-w-[900px] table-fixed border-collapse text-[12px]">
+          <tbody>
+            <UnipassRow fields={[
+              { label: '기존 신고서 조회', value: '', lookup: true, muted: true },
+              { label: '수출신고번호', value: 'WC10E - 26 - 채번', required: true, muted: true },
+            ]} />
+          </tbody>
+        </table>
+      </div>
+
+      <div className="px-2 pb-8 pt-2">
+        {activeDeclarationTab === 'common1' ? (
+          <>
+            <UnipassSection title="신고인">
+              <UnipassRow fields={[
+                { label: '신고인부호', value: 'WC10E', required: true, select: true },
+                { label: '제출자구분', value: '전자상거래업체', required: true, select: true },
+              ]} />
+              <UnipassRow fields={[{ label: '상호', value: '주식회사 베이코', required: true, lookup: true, wide: true }]} />
+              <UnipassRow fields={[{ label: '신고인기재란', value: form.remarks, wide: true }]} />
+            </UnipassSection>
+
+            <UnipassSection title="수출화주">
+              <UnipassRow fields={[
+                { label: '상호', value: '주식회사 베이코', required: true, lookup: true },
+                { label: '대표자명', value: '확인 필요', required: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '식별부호구분', value: '통관고유부호', required: true, select: true },
+                { label: '식별번호', value: '확인 필요', required: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '통관고유부호', value: '확인 필요' },
+                { label: '사업장일련번호', value: '확인 필요' },
+              ]} />
+              <UnipassRow fields={[{ label: '소재지주소', value: exporter, required: true, lookup: true, wide: true }]} />
+            </UnipassSection>
+
+            <UnipassSection title="수출대행자">
+              <UnipassRow fields={[
+                { label: '상호', value: '주식회사 베이코', required: true, lookup: true },
+                { label: '사업장일련번호', value: '확인 필요' },
+              ]} />
+              <UnipassRow fields={[{ label: '통관고유부호', value: '확인 필요' }]} />
+            </UnipassSection>
+
+            <UnipassSection title="제조자">
+              <UnipassRow fields={[
+                { label: '상호', value: '주식회사 베이코' },
+                { label: '사업자등록번호', value: '확인 필요' },
+              ]} />
+              <UnipassRow fields={[
+                { label: '홈페이지 주소/URL', value: 'https://www.beiko.co.kr' },
+                { label: '구매자 상호', value: buyer, required: true },
+              ]} />
+            </UnipassSection>
+          </>
+        ) : null}
+
+        {activeDeclarationTab === 'common2' ? (
+          <>
+            <UnipassSection title="기본 신고사항">
+              <UnipassRow fields={[
+                { label: '적재항', value: form.portOfLoading, required: true, lookup: true },
+                { label: '특송업체부호', value: '확인 필요', required: true, lookup: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '목적국', value: form.portOfDischarge, required: true, lookup: true },
+                { label: '신고세관/과', value: '확인 필요', required: true, lookup: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '총중량', value: totalGross, required: true, suffix: 'KG' },
+                { label: '총신고수량', value: totals.qty > 0 ? intFormatter.format(totals.qty) : '', suffix: 'EA' },
+              ]} />
+              <UnipassRow fields={[
+                { label: '통화코드', value: currencyCode, required: true, lookup: true },
+                { label: '신고총액', value: totalAmount, required: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '물품소재지', value: exporter, required: true, lookup: true },
+                { label: '인도조건', value: form.incoterms, select: true },
+              ]} />
+            </UnipassSection>
+
+            <UnipassSection title="주문/배송 관련 정보">
+              <UnipassRow fields={[
+                { label: '배송번호', value: form.vesselFlight },
+                { label: '주문번호', value: form.invoiceNo, required: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '결제방법', value: form.termsDeliveryPayment || 'T/T IN ADVANCE', required: true, select: true },
+                { label: '결제금액', value: totalAmount, required: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '조정금액', value: '0' },
+                { label: '운임', value: '0' },
+              ]} />
+            </UnipassSection>
+          </>
+        ) : null}
+
+        {activeDeclarationTab === 'items' ? (
+          <>
+            <UnipassSection title="란사항">
+              <UnipassRow fields={[
+                { label: 'HS부호', value: hsCode, required: true, lookup: true },
+                { label: '란번호 / 총란수', value: `001 / ${String(declarationItems.length).padStart(3, '0')}`, muted: true },
+              ]} />
+              <UnipassRow fields={[{ label: '거래품명', value: productName, required: true, wide: true }]} />
+              <UnipassRow fields={[
+                { label: '수출자구분', value: '전자상거래 수출업체', required: true, select: true },
+                { label: '환급신청인', value: '해당없음', select: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '제조자 상호', value: '주식회사 베이코', required: true, lookup: true },
+                { label: '자동간이정액환급', value: '해당없음', required: true, select: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '수량', value: totals.qty > 0 ? intFormatter.format(totals.qty) : '', required: true, suffix: 'EA' },
+                { label: '신고가격', value: totalAmount, required: true },
+              ]} />
+              <UnipassRow fields={[
+                { label: '순중량', value: totalNet, required: true, suffix: 'KG' },
+                { label: '포장개수', value: packageText },
+              ]} />
+            </UnipassSection>
+
+            <section className="mt-4 overflow-hidden border border-[#c8cdd4]">
+              <div className="flex items-center justify-between border-b border-[#d7dce2] bg-white px-2 py-1">
+                <h3 className="text-[13px] font-black text-[#2f66b2]">란 목록</h3>
+                <div className="text-[11px] font-bold text-[#7b8794]">상품 행을 기준으로 자동 생성</div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1180px] table-fixed border-collapse text-[12px]">
+                  <thead className="bg-[#f3f3f4] text-[#4b5563]">
+                    <tr>
+                      <th className="w-[56px] border border-[#d7dce2] px-2 py-1">NO</th>
+                      <th className="border border-[#d7dce2] px-2 py-1">거래품명</th>
+                      <th className="w-[180px] border border-[#d7dce2] px-2 py-1">모델규격</th>
+                      <th className="w-[120px] border border-[#d7dce2] px-2 py-1">HS부호</th>
+                      <th className="w-[120px] border border-[#d7dce2] px-2 py-1">수량</th>
+                      <th className="w-[140px] border border-[#d7dce2] px-2 py-1">단가</th>
+                      <th className="w-[150px] border border-[#d7dce2] px-2 py-1">금액</th>
+                      <th className="w-[110px] border border-[#d7dce2] px-2 py-1">원산지</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {declarationItems.map((item, index) => (
+                      <tr key={item.id}>
+                        <td className="border border-[#d7dce2] px-2 py-1 text-center">{index + 1}</td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: '거래품명', value: item.productNameEN || item.productName }} />
+                        </td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: '모델규격', value: item.model || item.dimension }} />
+                        </td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: 'HS부호', value: item.hsCode }} />
+                        </td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: '수량', value: item.quantity, suffix: 'EA' }} />
+                        </td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: '단가', value: money(item.unitPrice, form.currency) }} />
+                        </td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: '금액', value: money(lineAmount(item), form.currency) }} />
+                        </td>
+                        <td className="border border-[#d7dce2] px-2 py-1">
+                          <UnipassValue field={{ label: '원산지', value: item.origin || origin }} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        <div className="mt-8 flex items-center justify-between border-t border-[#c8cdd4] pt-3">
+          <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">목록</button>
+          <div className="flex items-center gap-2">
+            {['미리보기', '임시저장', '일괄저장'].map((label) => (
+              <button key={label} type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">
+                {label}
+              </button>
+            ))}
+            <button type="button" className="h-8 rounded-[2px] border border-[#6b7280] bg-[#6b7280] px-4 text-[12px] font-black text-white">전송</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function ExportDeclarationClient({ products }: { products: ExportProductOption[] }) {
   const [form, setForm] = useState<ExportDocumentForm>(() => defaultForm())
   const [items, setItems] = useState<ExportLineItem[]>(() => [createEmptyItem()])
@@ -702,8 +1063,6 @@ export default function ExportDeclarationClient({ products }: { products: Export
     () => items.filter((item) => item.productName.trim() || item.productNameEN.trim() || item.model.trim()),
     [items],
   )
-
-  const guideSections = useMemo(() => buildUnipassGuide(form, items), [form, items])
 
   const printDocuments = (mode: PrintMode) => {
     if (!printableItems.length) {
@@ -767,7 +1126,7 @@ export default function ExportDeclarationClient({ products }: { products: Export
             className={`inline-flex h-10 items-center gap-2 rounded-lg px-4 text-[13px] font-black transition ${activeTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'}`}
           >
             <ListChecks size={16} />
-            유니패스 입력 가이드
+            전자상거래 신고서
           </button>
           <button
             type="button"
@@ -780,7 +1139,7 @@ export default function ExportDeclarationClient({ products }: { products: Export
         </div>
       </div>
 
-      {activeTab === 'unipass' ? <UnipassGuideTable sections={guideSections} /> : null}
+      {activeTab === 'unipass' ? <UnipassDeclarationForm form={form} items={items} /> : null}
 
       <div className={activeTab === 'documents' ? 'grid gap-5 xl:grid-cols-[minmax(740px,1fr)_minmax(520px,760px)]' : 'hidden'}>
         <div className="space-y-5">
