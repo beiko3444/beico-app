@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { unstable_cache } from 'next/cache'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { buildExportProductPrices, resolveExportUnitPriceUsd } from '@/lib/exportDeclarationPricing'
 import ExportDeclarationClient, { type ExportDeclarationListItem, type ExportProductOption } from './ExportDeclarationClient'
 
 export const dynamic = 'force-dynamic'
@@ -16,30 +17,6 @@ const readNumber = (value: unknown): number => {
   return 0
 }
 
-type RegionalPriceNode = {
-  wholesale?: unknown
-  cost?: unknown
-}
-
-type RegionalPriceCountry = {
-  US?: RegionalPriceNode
-}
-
-type RegionalPriceRoot = {
-  C?: RegionalPriceCountry
-}
-
-const resolveUsdUnitPrice = (product: { usBuyPrice?: number | null; usSellPrice?: number | null; regionalPrices?: unknown }) => {
-  const direct = readNumber(product.usBuyPrice)
-  if (direct > 0) return direct
-
-  const regional = product.regionalPrices as RegionalPriceRoot | null | undefined
-  const fromRegional = readNumber(regional?.C?.US?.wholesale ?? regional?.C?.US?.cost)
-  if (fromRegional > 0) return fromRegional
-
-  return readNumber(product.usSellPrice)
-}
-
 const getCachedExportProducts = unstable_cache(
   async () => {
     return prisma.product.findMany({
@@ -50,7 +27,9 @@ const getCachedExportProducts = unstable_cache(
         nameEN: true,
         nameJP: true,
         productCode: true,
-        usBuyPrice: true,
+        onlinePrice: true,
+        krSellPrice: true,
+        jpSellPrice: true,
         usSellPrice: true,
         regionalPrices: true,
         stock: true,
@@ -64,6 +43,23 @@ const getCachedExportProducts = unstable_cache(
 const readTotalAmount = (value: unknown): number => {
   if (!value || typeof value !== 'object') return 0
   return readNumber((value as Record<string, unknown>).amount)
+}
+
+type ExportDeclarationRow = {
+  id: string
+  invoiceNo: string
+  status: string
+  totals: unknown
+  createdAt: Date | string
+  _count?: {
+    items?: number
+  }
+}
+
+type ExportDeclarationReader = {
+  exportDeclaration: {
+    findMany: (args: unknown) => Promise<ExportDeclarationRow[]>
+  }
 }
 
 export default async function ExportDeclarationPage() {
@@ -81,7 +77,7 @@ export default async function ExportDeclarationPage() {
   }
 
   try {
-    const rows = await (prisma as any).exportDeclaration.findMany({
+    const rows = await (prisma as unknown as ExportDeclarationReader).exportDeclaration.findMany({
       orderBy: { createdAt: 'desc' },
       take: 30,
       select: {
@@ -96,7 +92,7 @@ export default async function ExportDeclarationPage() {
       },
     })
 
-    savedDeclarations = rows.map((row: any) => ({
+    savedDeclarations = rows.map((row) => ({
       id: row.id,
       invoiceNo: row.invoiceNo,
       status: row.status,
@@ -108,15 +104,24 @@ export default async function ExportDeclarationPage() {
     console.error('Failed to load export declaration list:', error)
   }
 
-  const productOptions: ExportProductOption[] = products.map((product) => ({
-    id: product.id,
-    name: product.name,
-    nameEN: product.nameEN || null,
-    nameJP: product.nameJP || null,
-    productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
-    unitPriceUsd: resolveUsdUnitPrice(product),
-    stock: product.stock,
-  }))
+  const productOptions: ExportProductOption[] = products.map((product) => {
+    const prices = buildExportProductPrices(product)
+    return {
+      id: product.id,
+      name: product.name,
+      nameEN: product.nameEN || null,
+      nameJP: product.nameJP || null,
+      productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
+      prices,
+      unitPriceUsd: resolveExportUnitPriceUsd({
+        prices,
+        exportCountry: 'US',
+        exchangeRates: null,
+        fallbackUsd: readNumber(product.usSellPrice),
+      }),
+      stock: product.stock,
+    }
+  })
 
   return <ExportDeclarationClient products={productOptions} savedDeclarations={savedDeclarations} />
 }

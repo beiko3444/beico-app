@@ -1,7 +1,15 @@
 'use client'
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Save, Trash2 } from 'lucide-react'
+import {
+  getExportCountryCurrency,
+  normalizeExportCountry,
+  resolveExportUnitPriceUsd,
+  type ExportCountryCode,
+  type ExportExchangeRates,
+  type ExportProductPriceMap,
+} from '@/lib/exportDeclarationPricing'
 
 export type ExportProductOption = {
   id: string
@@ -9,6 +17,7 @@ export type ExportProductOption = {
   nameEN: string | null
   nameJP: string | null
   productCode: string | null
+  prices: ExportProductPriceMap
   unitPriceUsd: number
   stock: number
 }
@@ -39,6 +48,7 @@ type ExportDocumentForm = {
   vesselFlight: string
   portOfLoading: string
   portOfDischarge: string
+  exportCountry: ExportCountryCode
   incoterms: string
   termsDeliveryPayment: string
   shippingMarks: string
@@ -126,6 +136,7 @@ const defaultForm = (): ExportDocumentForm => ({
   vesselFlight: '',
   portOfLoading: 'BUSAN, KOREA',
   portOfDischarge: '',
+  exportCountry: 'US',
   incoterms: 'FOB BUSAN',
   termsDeliveryPayment: 'FOB BUSAN\nT/T IN ADVANCE',
   shippingMarks: 'MADE IN KOREA',
@@ -135,10 +146,17 @@ const defaultForm = (): ExportDocumentForm => ({
   remarks: 'Country of Origin: Republic of Korea',
 })
 
-const normalizeLoadedForm = (value: Partial<ExportDocumentForm> | undefined): ExportDocumentForm => ({
-  ...defaultForm(),
-  ...(value || {}),
-})
+const normalizeLoadedForm = (value: Partial<ExportDocumentForm> | undefined): ExportDocumentForm => {
+  const merged = {
+    ...defaultForm(),
+    ...(value || {}),
+  }
+  return {
+    ...merged,
+    exportCountry: normalizeExportCountry(merged.exportCountry),
+    currency: 'US$',
+  }
+}
 
 const normalizeLoadedItems = (value: Partial<ExportLineItem>[] | undefined): ExportLineItem[] => {
   if (!Array.isArray(value) || value.length === 0) return [createEmptyItem()]
@@ -169,6 +187,12 @@ const numberFormatter = new Intl.NumberFormat('en-US', {
 })
 
 const intFormatter = new Intl.NumberFormat('en-US')
+
+const exportCountryOptions: Array<{ value: ExportCountryCode; label: string; priceLabel: string }> = [
+  { value: 'US', label: '미국 수출', priceLabel: '미국 판매가' },
+  { value: 'JP', label: '일본 수출', priceLabel: '일본 판매가' },
+  { value: 'KR', label: '한국 기준', priceLabel: '한국 판매가' },
+]
 
 function parseNumberInput(value: string, fallback = 0) {
   const parsed = Number(value.replace(/,/g, ''))
@@ -1120,8 +1144,53 @@ export default function ExportDeclarationClient({
   const [isUpdatingDeclaration, setIsUpdatingDeclaration] = useState(false)
   const [deletingDeclarationId, setDeletingDeclarationId] = useState<string | null>(null)
   const [savedDeclarations, setSavedDeclarations] = useState<ExportDeclarationListItem[]>(initialSavedDeclarations)
+  const [exchangeRates, setExchangeRates] = useState<ExportExchangeRates | null>(null)
+  const [exchangeRateStatus, setExchangeRateStatus] = useState<'loading' | 'ready' | 'error'>('loading')
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
+  const selectedExportCountry = normalizeExportCountry(form.exportCountry)
+  const selectedCountryOption = exportCountryOptions.find((option) => option.value === selectedExportCountry) || exportCountryOptions[0]
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadExchangeRates() {
+      setExchangeRateStatus('loading')
+      try {
+        const response = await fetch('https://api.exchangerate-api.com/v4/latest/USD', { cache: 'no-store' })
+        if (!response.ok) throw new Error('exchange rate request failed')
+        const data = await response.json()
+        const nextRates = {
+          KRW: Number(data?.rates?.KRW),
+          JPY: Number(data?.rates?.JPY),
+        }
+        if (!Number.isFinite(nextRates.KRW) || !Number.isFinite(nextRates.JPY) || nextRates.KRW <= 0 || nextRates.JPY <= 0) {
+          throw new Error('exchange rate response invalid')
+        }
+        if (!cancelled) {
+          setExchangeRates(nextRates)
+          setExchangeRateStatus('ready')
+        }
+      } catch {
+        if (!cancelled) {
+          setExchangeRates(null)
+          setExchangeRateStatus('error')
+        }
+      }
+    }
+
+    loadExchangeRates()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  const resolveProductUnitPrice = (product: ExportProductOption, country: ExportCountryCode = selectedExportCountry) => resolveExportUnitPriceUsd({
+    prices: product.prices,
+    exportCountry: country,
+    exchangeRates,
+    fallbackUsd: product.unitPriceUsd,
+  })
 
   const setFormValue = (key: keyof ExportDocumentForm, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }))
@@ -1130,6 +1199,34 @@ export default function ExportDeclarationClient({
   const updateItem = (id: string, patch: Partial<ExportLineItem>) => {
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...patch } : item)))
   }
+
+  const repriceSelectedProducts = useCallback((country: ExportCountryCode, rates: ExportExchangeRates | null = exchangeRates) => {
+    setItems((prev) => prev.map((item) => {
+      if (!item.productId) return item
+      const product = productMap.get(item.productId)
+      if (!product) return item
+      return {
+        ...item,
+        unitPrice: resolveExportUnitPriceUsd({
+          prices: product.prices,
+          exportCountry: country,
+          exchangeRates: rates,
+          fallbackUsd: product.unitPriceUsd,
+        }),
+      }
+    }))
+  }, [exchangeRates, productMap])
+
+  const changeExportCountry = (country: ExportCountryCode) => {
+    const normalized = normalizeExportCountry(country)
+    setForm((prev) => ({ ...prev, exportCountry: normalized, currency: 'US$' }))
+    repriceSelectedProducts(normalized)
+  }
+
+  useEffect(() => {
+    if (!exchangeRates) return
+    repriceSelectedProducts(selectedExportCountry, exchangeRates)
+  }, [exchangeRates, repriceSelectedProducts, selectedExportCountry])
 
   const updateCartons = (id: string, value: string) => {
     setItems((prev) => prev.map((item) => {
@@ -1159,7 +1256,7 @@ export default function ExportDeclarationClient({
       productName: product.nameJP || product.name,
       productNameEN: product.nameEN || product.name,
       model: product.productCode || '',
-      unitPrice: product.unitPriceUsd,
+      unitPrice: resolveProductUnitPrice(product),
       origin: 'KOREA',
     })
   }
@@ -1551,10 +1648,33 @@ export default function ExportDeclarationClient({
                 <h2 className="text-sm font-black text-slate-950">상품 / 포장 정보</h2>
                 <p className="mt-1 text-[12px] font-bold text-slate-500">관리 상품을 선택하거나 직접 입력 행으로 작성합니다.</p>
               </div>
-              <button type="button" onClick={addItem} className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-[12px] font-black text-white hover:bg-slate-800">
-                <Plus size={15} />
-                행 추가
-              </button>
+              <div className="flex flex-wrap items-center gap-2">
+                <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700">
+                  <span className="text-[11px] text-slate-500">수출국</span>
+                  <select
+                    className="h-7 bg-transparent text-[12px] font-black text-slate-950 outline-none"
+                    value={selectedExportCountry}
+                    onChange={(event) => changeExportCountry(normalizeExportCountry(event.target.value))}
+                  >
+                    {exportCountryOptions.map((option) => (
+                      <option key={option.value} value={option.value}>{option.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
+                  exchangeRateStatus === 'ready' ? 'bg-emerald-50 text-emerald-700' : exchangeRateStatus === 'error' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'
+                }`}>
+                  {exchangeRateStatus === 'ready' && exchangeRates
+                    ? `${selectedCountryOption.priceLabel}(${getExportCountryCurrency(selectedExportCountry)}) → US$ · 1USD ₩${intFormatter.format(exchangeRates.KRW)} / ¥${numberFormatter.format(exchangeRates.JPY)}`
+                    : exchangeRateStatus === 'error'
+                      ? '환율 조회 실패'
+                      : '환율 조회 중'}
+                </span>
+                <button type="button" onClick={addItem} className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-[12px] font-black text-white hover:bg-slate-800">
+                  <Plus size={15} />
+                  행 추가
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto rounded-lg border border-slate-200">
               <table className="w-[1380px] table-fixed text-[12px]">
