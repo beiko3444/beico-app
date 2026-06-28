@@ -124,6 +124,7 @@ model Product {
   barcode          String?
   productCode      String?
   hsCode           String?
+  japanHsCode      String?
   coupangSku       String?     @unique
   imageUrl         String?
   sortOrder        Int         @default(0)

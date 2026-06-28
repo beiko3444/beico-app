@@ -13,6 +13,7 @@ type Product = {
     barcode?: string | null
     productCode?: string | null
     hsCode?: string | null
+    japanHsCode?: string | null
     coupangSku?: string | null
     buyPrice: number
     sellPrice: number
@@ -55,6 +56,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [barcode, setBarcode] = useState('')
     const [productCode, setProductCode] = useState('')
     const [hsCode, setHsCode] = useState('')
+    const [japanHsCode, setJapanHsCode] = useState('')
     const [coupangSku, setCoupangSku] = useState('')
     const [buyPrice, setBuyPrice] = useState('')
     const [sellPrice, setSellPrice] = useState('')
@@ -170,6 +172,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode((initialData.productCode || '').toUpperCase())
             setHsCode(initialData.hsCode || '')
+            setJapanHsCode(initialData.japanHsCode || '')
             setCoupangSku(initialData.coupangSku || '')
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
@@ -213,6 +216,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setBarcode('')
             setProductCode('')
             setHsCode('')
+            setJapanHsCode('')
             setCoupangSku('')
             setStock('0')
             setSafetyStock('0')
@@ -266,6 +270,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 barcode: barcode.trim(),
                 productCode: normalizeProductCode(productCode.trim()),
                 hsCode: normalizeHsCode(hsCode.trim()),
+                japanHsCode: normalizeHsCode(japanHsCode.trim()),
                 coupangSku: coupangSku.trim(),
                 buyPrice: parseFloat(parseNumber(regionalPrices['C'].KR.cost)) || 0,
                 sellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.wholesale)) || 0,
@@ -315,6 +320,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setBarcode('')
                     setProductCode('')
                     setHsCode('')
+                    setJapanHsCode('')
                     setCoupangSku('')
                     setStock('0')
                     setSafetyStock('0')
@@ -481,6 +487,16 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     type="text"
                                     value={hsCode}
                                     onChange={e => setHsCode(normalizeHsCode(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
+                                    placeholder="예: 9507.90"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">Japan HS Code / 일본세번</label>
+                                <input
+                                    type="text"
+                                    value={japanHsCode}
+                                    onChange={e => setJapanHsCode(normalizeHsCode(e.target.value))}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
                                     placeholder="예: 9507.90"
                                 />

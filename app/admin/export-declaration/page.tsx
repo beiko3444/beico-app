@@ -28,6 +28,7 @@ const getCachedExportProducts = unstable_cache(
         nameJP: true,
         productCode: true,
         hsCode: true,
+        japanHsCode: true,
         onlinePrice: true,
         krSellPrice: true,
         jpSellPrice: true,
@@ -37,7 +38,7 @@ const getCachedExportProducts = unstable_cache(
       },
     })
   },
-  ['admin-export-declaration-products-v2'],
+  ['admin-export-declaration-products-v3'],
   { revalidate: 60 },
 )
 
@@ -114,6 +115,7 @@ export default async function ExportDeclarationPage() {
       nameJP: product.nameJP || null,
       productCode: product.productCode ? String(product.productCode).toUpperCase() : null,
       hsCode: product.hsCode || null,
+      japanHsCode: product.japanHsCode || null,
       prices,
       unitPriceUsd: resolveExportUnitPriceUsd({
         prices,

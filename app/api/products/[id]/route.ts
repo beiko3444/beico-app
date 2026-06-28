@@ -20,6 +20,7 @@ const productResponseSelect = {
     barcode: true,
     productCode: true,
     hsCode: true,
+    japanHsCode: true,
     coupangSku: true,
     sortOrder: true,
     minOrderQuantity: true,
@@ -42,6 +43,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const body = await request.json()
         const normalizedProductCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null
         const normalizedHsCode = body.hsCode ? String(body.hsCode).trim() : null
+        const normalizedJapanHsCode = body.japanHsCode ? String(body.japanHsCode).trim() : null
 
         const { name, buyPrice, sellPrice, stock } = body
 
@@ -57,6 +59,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             barcode: body.barcode ? String(body.barcode).trim() : null,
             productCode: normalizedProductCode,
             hsCode: normalizedHsCode,
+            japanHsCode: normalizedJapanHsCode,
             coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),
