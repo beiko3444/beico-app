@@ -69,13 +69,95 @@ const buildTotals = (items: ExportDeclarationPostItem[]) => ({
   cbm: items.reduce((sum, item) => sum + (item.cbm || 0), 0),
 })
 
-export async function GET() {
+const listShape = (row: any) => ({
+  id: row.id,
+  invoiceNo: row.invoiceNo,
+  status: row.status,
+  createdAt: row.createdAt,
+  itemCount: row._count?.items || row.items?.length || 0,
+  totalAmount: readNumber(row.totals?.amount),
+})
+
+const detailShape = (row: any) => ({
+  ...listShape(row),
+  form: row.form || {},
+  items: Array.isArray(row.items)
+    ? row.items.map((item: any) => {
+        const raw = item.raw && typeof item.raw === 'object' ? item.raw : {}
+        const rawProductName = readString(raw.productName)
+        return {
+          id: item.id,
+          productId: readString(raw.productId) || item.productId || '',
+          productName: rawProductName || (item.productName === '미입력 상품' ? '' : item.productName || ''),
+          productNameEN: readString(raw.productNameEN) || item.productNameEN || '',
+          model: readString(raw.model) || item.model || '',
+          hsCode: readString(raw.hsCode) || item.hsCode || '',
+          origin: readString(raw.origin) || item.origin || 'KOREA',
+          quantity: readNumber(raw.quantity ?? item.quantity),
+          unitPrice: readNumber(raw.unitPrice ?? item.unitPrice),
+          cartons: readNumber(raw.cartons ?? item.cartons),
+          netWeight: readNumber(raw.netWeight ?? item.netWeight),
+          grossWeight: readNumber(raw.grossWeight ?? item.grossWeight),
+          cbm: readNumber(raw.cbm ?? item.cbm),
+          dimension: readString(raw.dimension) || item.dimension || '',
+        }
+      })
+    : [],
+})
+
+const itemCreateData = (item: ExportDeclarationPostItem, index: number) => ({
+  productId: item.productId || null,
+  lineNo: index + 1,
+  productName: item.productName || item.productNameEN || item.model || '미입력 상품',
+  productNameEN: item.productNameEN || null,
+  model: item.model || null,
+  hsCode: item.hsCode || null,
+  origin: item.origin || null,
+  quantity: item.quantity || 0,
+  unitPrice: item.unitPrice || 0,
+  amount: (item.quantity || 0) * (item.unitPrice || 0),
+  cartons: item.cartons || 0,
+  netWeight: item.netWeight || 0,
+  grossWeight: item.grossWeight || 0,
+  cbm: item.cbm || 0,
+  dimension: item.dimension || null,
+  raw: item,
+})
+
+const normalizeItemsForSave = (rawItems: unknown) => {
+  const parsedItems = parseItems(rawItems)
+  return parsedItems.length
+    ? parsedItems
+    : [{ productName: '미입력 상품', quantity: 0, unitPrice: 0, cartons: 0, netWeight: 0, grossWeight: 0, cbm: 0 }]
+}
+
+export async function GET(request: Request) {
   const session = await getServerSession(authOptions)
   if (!session || session.user.role !== 'ADMIN') {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   try {
+    const { searchParams } = new URL(request.url)
+    const id = searchParams.get('id')?.trim()
+
+    if (id) {
+      const row = await (prisma as any).exportDeclaration.findUnique({
+        where: { id },
+        include: {
+          items: {
+            orderBy: { lineNo: 'asc' },
+          },
+        },
+      })
+
+      if (!row) {
+        return NextResponse.json({ error: 'Export declaration not found' }, { status: 404 })
+      }
+
+      return NextResponse.json(detailShape(row))
+    }
+
     const rows = await (prisma as any).exportDeclaration.findMany({
       orderBy: { createdAt: 'desc' },
       take: 30,
@@ -91,14 +173,7 @@ export async function GET() {
       },
     })
 
-    return NextResponse.json(rows.map((row: any) => ({
-      id: row.id,
-      invoiceNo: row.invoiceNo,
-      status: row.status,
-      createdAt: row.createdAt,
-      itemCount: row._count?.items || 0,
-      totalAmount: readNumber(row.totals?.amount),
-    })))
+    return NextResponse.json(rows.map(listShape))
   } catch (error) {
     console.error('Failed to fetch export declarations:', error)
     return NextResponse.json({ error: 'Failed to fetch export declarations' }, { status: 500 })
@@ -114,10 +189,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json()
     const form = body?.form && typeof body.form === 'object' ? body.form as Record<string, unknown> : {}
-    const parsedItems = parseItems(body?.items)
-    const items = parsedItems.length
-      ? parsedItems
-      : [{ productName: '미입력 상품', quantity: 0, unitPrice: 0, cartons: 0, netWeight: 0, grossWeight: 0, cbm: 0 }]
+    const items = normalizeItemsForSave(body?.items)
     const invoiceNo = readString(form.invoiceNo) || `EXP-${Date.now()}`
 
     const totals = buildTotals(items)
@@ -129,48 +201,68 @@ export async function POST(request: Request) {
         totals,
         createdById: session.user.id || null,
         items: {
-          create: items.map((item, index) => ({
-            productId: item.productId || null,
-            lineNo: index + 1,
-            productName: item.productName || item.productNameEN || item.model || '미입력 상품',
-            productNameEN: item.productNameEN || null,
-            model: item.model || null,
-            hsCode: item.hsCode || null,
-            origin: item.origin || null,
-            quantity: item.quantity || 0,
-            unitPrice: item.unitPrice || 0,
-            amount: (item.quantity || 0) * (item.unitPrice || 0),
-            cartons: item.cartons || 0,
-            netWeight: item.netWeight || 0,
-            grossWeight: item.grossWeight || 0,
-            cbm: item.cbm || 0,
-            dimension: item.dimension || null,
-            raw: item,
-          })),
+          create: items.map(itemCreateData),
         },
       },
-      select: {
-        id: true,
-        invoiceNo: true,
-        status: true,
-        totals: true,
-        createdAt: true,
-        _count: {
-          select: { items: true },
+      include: {
+        items: {
+          orderBy: { lineNo: 'asc' },
         },
       },
     })
 
-    return NextResponse.json({
-      id: created.id,
-      invoiceNo: created.invoiceNo,
-      status: created.status,
-      createdAt: created.createdAt,
-      itemCount: created._count?.items || 0,
-      totalAmount: readNumber(created.totals?.amount),
-    })
+    return NextResponse.json(detailShape(created))
   } catch (error) {
     console.error('Failed to create export declaration:', error)
     return NextResponse.json({ error: 'Failed to create export declaration' }, { status: 500 })
+  }
+}
+
+export async function PATCH(request: Request) {
+  const session = await getServerSession(authOptions)
+  if (!session || session.user.role !== 'ADMIN') {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  try {
+    const body = await request.json()
+    const id = readString(body?.id)
+    const form = body?.form && typeof body.form === 'object' ? body.form as Record<string, unknown> : {}
+    const items = normalizeItemsForSave(body?.items)
+
+    if (!id) {
+      return NextResponse.json({ error: 'id is required' }, { status: 400 })
+    }
+
+    const invoiceNo = readString(form.invoiceNo) || `EXP-${Date.now()}`
+    const totals = buildTotals(items)
+
+    const updated = await (prisma as any).$transaction(async (tx: any) => {
+      await tx.exportDeclarationItem.deleteMany({
+        where: { exportDeclarationId: id },
+      })
+
+      return tx.exportDeclaration.update({
+        where: { id },
+        data: {
+          invoiceNo,
+          form,
+          totals,
+          items: {
+            create: items.map(itemCreateData),
+          },
+        },
+        include: {
+          items: {
+            orderBy: { lineNo: 'asc' },
+          },
+        },
+      })
+    })
+
+    return NextResponse.json(detailShape(updated))
+  } catch (error) {
+    console.error('Failed to update export declaration:', error)
+    return NextResponse.json({ error: 'Failed to update export declaration' }, { status: 500 })
   }
 }

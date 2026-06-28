@@ -22,6 +22,11 @@ export type ExportDeclarationListItem = {
   totalAmount: number
 }
 
+type ExportDeclarationDetail = ExportDeclarationListItem & {
+  form?: Partial<ExportDocumentForm>
+  items?: Partial<ExportLineItem>[]
+}
+
 type ExportDocumentForm = {
   invoiceNo: string
   date: string
@@ -128,6 +133,34 @@ const defaultForm = (): ExportDocumentForm => ({
   currency: 'US$',
   remarks: 'Country of Origin: Republic of Korea',
 })
+
+const normalizeLoadedForm = (value: Partial<ExportDocumentForm> | undefined): ExportDocumentForm => ({
+  ...defaultForm(),
+  ...(value || {}),
+})
+
+const normalizeLoadedItems = (value: Partial<ExportLineItem>[] | undefined): ExportLineItem[] => {
+  if (!Array.isArray(value) || value.length === 0) return [createEmptyItem()]
+
+  return value.map((item) => ({
+    ...createEmptyItem(),
+    ...item,
+    id: item.id || (typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : String(Date.now())),
+    productId: item.productId || '',
+    productName: item.productName || '',
+    productNameEN: item.productNameEN || '',
+    model: item.model || '',
+    hsCode: item.hsCode || '',
+    origin: item.origin || 'KOREA',
+    quantity: Number.isFinite(Number(item.quantity)) ? Number(item.quantity) : 0,
+    unitPrice: Number.isFinite(Number(item.unitPrice)) ? Number(item.unitPrice) : 0,
+    cartons: Number.isFinite(Number(item.cartons)) ? Number(item.cartons) : 0,
+    netWeight: Number.isFinite(Number(item.netWeight)) ? Number(item.netWeight) : 0,
+    grossWeight: Number.isFinite(Number(item.grossWeight)) ? Number(item.grossWeight) : 0,
+    cbm: Number.isFinite(Number(item.cbm)) ? Number(item.cbm) : 0,
+    dimension: item.dimension || '',
+  }))
+}
 
 const numberFormatter = new Intl.NumberFormat('en-US', {
   minimumFractionDigits: 2,
@@ -1062,7 +1095,10 @@ export default function ExportDeclarationClient({
   const [form, setForm] = useState<ExportDocumentForm>(() => defaultForm())
   const [items, setItems] = useState<ExportLineItem[]>(() => [createEmptyItem()])
   const [previewMode, setPreviewMode] = useState<PreviewMode>('commercial')
-  const [isSaving, setIsSaving] = useState(false)
+  const [selectedDeclarationId, setSelectedDeclarationId] = useState<string | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [isLoadingDeclaration, setIsLoadingDeclaration] = useState(false)
+  const [isUpdatingDeclaration, setIsUpdatingDeclaration] = useState(false)
   const [savedDeclarations, setSavedDeclarations] = useState<ExportDeclarationListItem[]>(initialSavedDeclarations)
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
@@ -1114,6 +1150,7 @@ export default function ExportDeclarationClient({
     setForm(defaultForm())
     setItems([createEmptyItem()])
     setPreviewMode('commercial')
+    setSelectedDeclarationId(null)
   }
 
   const printableItems = useMemo(
@@ -1123,15 +1160,41 @@ export default function ExportDeclarationClient({
 
   const previewItems = printableItems.length ? printableItems : items
 
-  const createDeclaration = async () => {
-    const saveItems = printableItems.length ? printableItems : items
+  const buildNewDraftForm = () => {
+    const draft = defaultForm()
+    const prefix = `EXP-${defaultInvoiceNo()}-`
+    const nextSequence =
+      savedDeclarations.reduce((max, row) => {
+        if (!row.invoiceNo.startsWith(prefix)) return max
+        const parsed = Number(row.invoiceNo.slice(prefix.length))
+        return Number.isFinite(parsed) ? Math.max(max, parsed) : max
+      }, 0) + 1
 
-    setIsSaving(true)
+    return { ...draft, invoiceNo: `${prefix}${String(nextSequence).padStart(3, '0')}` }
+  }
+
+  const upsertDeclarationList = (row: ExportDeclarationListItem) => {
+    setSavedDeclarations((prev) => [row, ...prev.filter((item) => item.id !== row.id)].slice(0, 30))
+  }
+
+  const applyDeclaration = (detail: ExportDeclarationDetail) => {
+    setSelectedDeclarationId(detail.id)
+    setForm(normalizeLoadedForm(detail.form))
+    setItems(normalizeLoadedItems(detail.items))
+    setPreviewMode('commercial')
+    upsertDeclarationList(detail)
+  }
+
+  const createDeclaration = async () => {
+    const draftForm = buildNewDraftForm()
+    const draftItems = [createEmptyItem()]
+
+    setIsCreating(true)
     try {
       const response = await fetch('/api/admin/export-declaration', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ form, items: saveItems }),
+        body: JSON.stringify({ form: draftForm, items: draftItems }),
       })
 
       const data = await response.json().catch(() => null)
@@ -1139,12 +1202,56 @@ export default function ExportDeclarationClient({
         throw new Error(data?.error || '신청서 생성에 실패했습니다.')
       }
 
-      setSavedDeclarations((prev) => [data as ExportDeclarationListItem, ...prev.filter((row) => row.id !== data.id)].slice(0, 30))
-      alert('신청서가 DB에 저장되었습니다.')
+      applyDeclaration(data as ExportDeclarationDetail)
+      alert('새 신청서를 생성했습니다. 이제 내용을 입력한 뒤 작성내용 저장을 누르세요.')
     } catch (error) {
       alert(error instanceof Error ? error.message : '신청서 생성에 실패했습니다.')
     } finally {
-      setIsSaving(false)
+      setIsCreating(false)
+    }
+  }
+
+  const loadDeclaration = async (id: string) => {
+    setIsLoadingDeclaration(true)
+    try {
+      const response = await fetch(`/api/admin/export-declaration?id=${encodeURIComponent(id)}`)
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || '신청서를 불러오지 못했습니다.')
+      }
+
+      applyDeclaration(data as ExportDeclarationDetail)
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '신청서를 불러오지 못했습니다.')
+    } finally {
+      setIsLoadingDeclaration(false)
+    }
+  }
+
+  const updateDeclaration = async () => {
+    if (!selectedDeclarationId) {
+      alert('먼저 신청서를 생성하거나 기존 신청서를 선택해주세요.')
+      return
+    }
+
+    setIsUpdatingDeclaration(true)
+    try {
+      const response = await fetch('/api/admin/export-declaration', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: selectedDeclarationId, form, items }),
+      })
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        throw new Error(data?.error || '작성내용 저장에 실패했습니다.')
+      }
+
+      applyDeclaration(data as ExportDeclarationDetail)
+      alert('작성내용을 저장했습니다.')
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '작성내용 저장에 실패했습니다.')
+    } finally {
+      setIsUpdatingDeclaration(false)
     }
   }
 
@@ -1204,11 +1311,20 @@ export default function ExportDeclarationClient({
             <button
               type="button"
               onClick={createDeclaration}
-              disabled={isSaving}
+              disabled={isCreating}
               className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-950 bg-slate-950 px-4 text-[12px] font-black text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
             >
               <Save size={15} />
-              {isSaving ? '생성 중' : '신청서 생성'}
+              {isCreating ? '생성 중' : '신청서 생성'}
+            </button>
+            <button
+              type="button"
+              onClick={updateDeclaration}
+              disabled={!selectedDeclarationId || isUpdatingDeclaration}
+              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#1f55b5] bg-[#1f55b5] px-4 text-[12px] font-black text-white shadow-sm hover:bg-[#17438e] disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <FileText size={15} />
+              {isUpdatingDeclaration ? '저장 중' : '작성내용 저장'}
             </button>
             <button type="button" onClick={resetForm} className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50">
               초기화
@@ -1225,7 +1341,15 @@ export default function ExportDeclarationClient({
         {savedDeclarations.length ? (
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
             {savedDeclarations.slice(0, 8).map((row) => (
-              <div key={row.id} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+              <button
+                key={row.id}
+                type="button"
+                onClick={() => loadDeclaration(row.id)}
+                disabled={isLoadingDeclaration}
+                className={`rounded-lg border px-3 py-2 text-left transition hover:border-[#1f55b5] hover:bg-sky-50 disabled:cursor-wait ${
+                  selectedDeclarationId === row.id ? 'border-[#1f55b5] bg-sky-50 ring-2 ring-sky-100' : 'border-slate-200 bg-slate-50'
+                }`}
+              >
                 <div className="flex items-center justify-between gap-2">
                   <span className="truncate text-[12px] font-black text-slate-950">{row.invoiceNo}</span>
                   <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500">{row.status}</span>
@@ -1234,7 +1358,7 @@ export default function ExportDeclarationClient({
                   <span>{formatSavedDate(row.createdAt)}</span>
                   <span>{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         ) : (
@@ -1247,9 +1371,14 @@ export default function ExportDeclarationClient({
       <div className="grid gap-5 2xl:grid-cols-[minmax(720px,0.92fr)_minmax(680px,1.08fr)]">
         <div className="space-y-5">
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center gap-2">
-              <FileSpreadsheet size={17} className="text-slate-500" />
-              <h2 className="text-sm font-black text-slate-950">PI / Packing List 작성</h2>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <FileSpreadsheet size={17} className="text-slate-500" />
+                <h2 className="text-sm font-black text-slate-950">PI / Packing List 작성</h2>
+              </div>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${selectedDeclarationId ? 'bg-sky-50 text-sky-700' : 'bg-red-50 text-red-700'}`}>
+                {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신청서 생성/선택 필요'}
+              </span>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Invoice No. / 송장번호">
