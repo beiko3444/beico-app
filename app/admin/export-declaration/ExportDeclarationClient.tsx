@@ -188,11 +188,43 @@ const numberFormatter = new Intl.NumberFormat('en-US', {
 
 const intFormatter = new Intl.NumberFormat('en-US')
 
-const exportCountryOptions: Array<{ value: ExportCountryCode; flag: string; label: string; priceLabel: string }> = [
-  { value: 'US', flag: '🇺🇸', label: '미국 수출', priceLabel: '미국 판매가' },
-  { value: 'JP', flag: '🇯🇵', label: '일본 수출', priceLabel: '일본 판매가' },
-  { value: 'KR', flag: '🇰🇷', label: '한국 기준', priceLabel: '한국 판매가' },
+const exportCountryOptions: Array<{ value: ExportCountryCode; label: string; priceLabel: string }> = [
+  { value: 'US', label: '미국 수출', priceLabel: '미국 판매가' },
+  { value: 'JP', label: '일본 수출', priceLabel: '일본 판매가' },
+  { value: 'KR', label: '한국 기준', priceLabel: '한국 판매가' },
 ]
+
+function ExportCountryFlag({ country }: { country: ExportCountryCode }) {
+  const normalized = normalizeExportCountry(country)
+
+  if (normalized === 'JP') {
+    return (
+      <span className="relative inline-flex h-4 w-6 shrink-0 items-center justify-center overflow-hidden rounded-[3px] border border-slate-200 bg-white shadow-sm">
+        <span className="h-2.5 w-2.5 rounded-full bg-[#bc002d]" />
+      </span>
+    )
+  }
+
+  if (normalized === 'KR') {
+    return (
+      <span className="relative inline-flex h-4 w-6 shrink-0 items-center justify-center overflow-hidden rounded-[3px] border border-slate-200 bg-white shadow-sm">
+        <span
+          className="h-2.5 w-2.5 rounded-full"
+          style={{ background: 'linear-gradient(180deg, #cd2e3a 0 50%, #0047a0 50% 100%)' }}
+        />
+      </span>
+    )
+  }
+
+  return (
+    <span
+      className="relative inline-flex h-4 w-6 shrink-0 overflow-hidden rounded-[3px] border border-slate-200 shadow-sm"
+      style={{ background: 'repeating-linear-gradient(180deg, #b22234 0 2px, #ffffff 2px 4px)' }}
+    >
+      <span className="absolute left-0 top-0 h-[9px] w-[11px] bg-[#3c3b6e]" />
+    </span>
+  )
+}
 
 function parseNumberInput(value: string, fallback = 0) {
   const parsed = Number(value.replace(/,/g, ''))
@@ -1146,6 +1178,7 @@ export default function ExportDeclarationClient({
   const [savedDeclarations, setSavedDeclarations] = useState<ExportDeclarationListItem[]>(initialSavedDeclarations)
   const [exchangeRates, setExchangeRates] = useState<ExportExchangeRates | null>(null)
   const [exchangeRateStatus, setExchangeRateStatus] = useState<'loading' | 'ready' | 'error'>('loading')
+  const [countryMenuOpen, setCountryMenuOpen] = useState(false)
 
   const productMap = useMemo(() => new Map(products.map((product) => [product.id, product])), [products])
   const selectedExportCountry = normalizeExportCountry(form.exportCountry)
@@ -1220,6 +1253,7 @@ export default function ExportDeclarationClient({
   const changeExportCountry = (country: ExportCountryCode) => {
     const normalized = normalizeExportCountry(country)
     setForm((prev) => ({ ...prev, exportCountry: normalized, currency: 'US$' }))
+    setCountryMenuOpen(false)
     repriceSelectedProducts(normalized)
   }
 
@@ -1649,19 +1683,35 @@ export default function ExportDeclarationClient({
                 <p className="mt-1 text-[12px] font-bold text-slate-500">관리 상품을 선택하거나 직접 입력 행으로 작성합니다.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <label className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700">
-                  <span className="text-[11px] text-slate-500">수출국</span>
-                  <span className="text-[16px] leading-none" aria-hidden="true">{selectedCountryOption.flag}</span>
-                  <select
-                    className="h-7 bg-transparent text-[12px] font-black text-slate-950 outline-none"
-                    value={selectedExportCountry}
-                    onChange={(event) => changeExportCountry(normalizeExportCountry(event.target.value))}
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setCountryMenuOpen((open) => !open)}
+                    className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 hover:bg-slate-50"
                   >
-                    {exportCountryOptions.map((option) => (
-                      <option key={option.value} value={option.value}>{option.flag} {option.label}</option>
-                    ))}
-                  </select>
-                </label>
+                    <span className="text-[11px] text-slate-500">수출국</span>
+                    <ExportCountryFlag country={selectedExportCountry} />
+                    <span className="text-slate-950">{selectedCountryOption.label}</span>
+                    <span className="text-[10px] text-slate-400">▼</span>
+                  </button>
+                  {countryMenuOpen ? (
+                    <div className="absolute left-0 top-10 z-50 min-w-[150px] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                      {exportCountryOptions.map((option) => (
+                        <button
+                          key={option.value}
+                          type="button"
+                          onClick={() => changeExportCountry(option.value)}
+                          className={`flex h-9 w-full items-center gap-2 px-3 text-left text-[12px] font-black ${
+                            selectedExportCountry === option.value ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-50'
+                          }`}
+                        >
+                          <ExportCountryFlag country={option.value} />
+                          <span>{option.label}</span>
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
                 <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
                   exchangeRateStatus === 'ready' ? 'bg-emerald-50 text-emerald-700' : exchangeRateStatus === 'error' ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-500'
                 }`}>
