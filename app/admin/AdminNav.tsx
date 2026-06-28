@@ -140,21 +140,21 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
             >
               <SidebarProductImage src={row.imageUrl} alt={row.name} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[11px] font-black leading-tight text-slate-900" title={row.name}>
+                <div className="truncate text-[12px] font-black leading-tight text-slate-900" title={row.name}>
                   {row.name}
                 </div>
-                <table className="mt-1 w-full table-fixed border-collapse text-[10px] font-extrabold tabular-nums">
+                <table className="mt-1.5 w-full table-fixed border-collapse text-[12px] font-black tabular-nums">
                   <tbody>
                     <tr>
-                      <td className="w-[36%] overflow-hidden whitespace-nowrap pr-1 text-left text-emerald-600">
-                        <span className="inline-block w-2.5">N</span>
+                      <td className="w-[38%] overflow-hidden whitespace-nowrap pr-1 text-left text-emerald-700">
+                        <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-emerald-600 px-1 text-[10px] font-black leading-none text-white">N</span>
                         <span>{formatSidebarStock(row.naverStock)}</span>
                       </td>
-                      <td className="w-[32%] overflow-hidden whitespace-nowrap px-1 text-left text-red-600">
-                        <span className="inline-block w-2.5">C</span>
+                      <td className="w-[34%] overflow-hidden whitespace-nowrap px-1 text-left text-red-700">
+                        <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-red-600 px-1 text-[10px] font-black leading-none text-white">C</span>
                         <span>{formatSidebarStock(row.coupangStock)}</span>
                       </td>
-                      <td className="w-[32%] overflow-hidden whitespace-nowrap pl-1 text-right text-slate-950">
+                      <td className="w-[28%] overflow-hidden whitespace-nowrap pl-1 text-right text-[12px] font-black text-slate-950">
                         {formatSidebarStock(row.totalStock)}
                       </td>
                     </tr>
