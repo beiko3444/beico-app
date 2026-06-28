@@ -439,12 +439,23 @@ function Field({
   )
 }
 
-function textInputClass() {
-  return 'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] font-bold text-slate-900 outline-none transition focus:border-[#EF3B2D] focus:ring-2 focus:ring-[#EF3B2D]/15'
+function isMissingRequired(value: string | number | null | undefined) {
+  if (typeof value === 'number') return !Number.isFinite(value) || value <= 0
+  return String(value ?? '').trim().length === 0
 }
 
-function textAreaClass() {
-  return 'min-h-20 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-bold text-slate-900 outline-none transition focus:border-[#EF3B2D] focus:ring-2 focus:ring-[#EF3B2D]/15'
+function inputToneClass({ later = false, missing = false }: { later?: boolean; missing?: boolean } = {}) {
+  if (missing) return 'border-red-400 bg-red-50 text-red-950 focus:border-red-500 focus:ring-red-500/20'
+  if (later) return 'border-sky-300 bg-sky-50 text-sky-950 focus:border-sky-500 focus:ring-sky-500/20'
+  return 'border-slate-200 bg-white text-slate-900 focus:border-[#EF3B2D] focus:ring-[#EF3B2D]/15'
+}
+
+function textInputClass(options?: { later?: boolean; missing?: boolean }) {
+  return `h-10 w-full rounded-lg border px-3 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
+}
+
+function textAreaClass(options?: { later?: boolean; missing?: boolean }) {
+  return `min-h-20 w-full resize-y rounded-lg border px-3 py-2 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
 }
 
 function DocumentPreview({
@@ -706,6 +717,7 @@ function copyUnipassValue(value: string | number | undefined, later = false) {
 function UnipassValue({ field }: { field: UnipassField }) {
   const value = displayUnipassValue(field.value, field.later)
   const needsCheck = value === '확인 필요'
+  const requiredMissing = field.required && needsCheck
   const canFillLater = field.later && value === 'EMS 접수 후 입력'
 
   return (
@@ -717,6 +729,8 @@ function UnipassValue({ field }: { field: UnipassField }) {
           ? 'border-[#d5d9df] bg-[#e9eaec] text-[#67707d]'
           : canFillLater
             ? 'border-[#9bc7ea] bg-[#eef7ff] text-[#1d5f95]'
+          : requiredMissing
+            ? 'border-red-400 bg-red-50 text-red-950'
           : needsCheck
             ? 'border-[#d8bd68] bg-[#fff8dd] text-[#8a5a00]'
             : 'border-[#c7cdd5] bg-white text-[#111827]'
@@ -1242,40 +1256,40 @@ export default function ExportDeclarationClient({
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Invoice No. / 송장번호">
-                <input className={textInputClass()} value={form.invoiceNo} onChange={(event) => setFormValue('invoiceNo', event.target.value)} />
+                <input className={textInputClass({ missing: isMissingRequired(form.invoiceNo) })} value={form.invoiceNo} onChange={(event) => setFormValue('invoiceNo', event.target.value)} />
               </Field>
               <Field label="Date / 작성일">
-                <input type="date" className={textInputClass()} value={form.date} onChange={(event) => setFormValue('date', event.target.value)} />
+                <input type="date" className={textInputClass({ missing: isMissingRequired(form.date) })} value={form.date} onChange={(event) => setFormValue('date', event.target.value)} />
               </Field>
               <Field label="Departure Date / 출항일" later>
-                <input type="date" className={textInputClass()} value={form.departureDate} onChange={(event) => setFormValue('departureDate', event.target.value)} />
+                <input type="date" className={textInputClass({ later: true })} value={form.departureDate} onChange={(event) => setFormValue('departureDate', event.target.value)} />
               </Field>
               <Field label="Vessel / Flight / 선박·항공편" later>
-                <input className={textInputClass()} value={form.vesselFlight} onChange={(event) => setFormValue('vesselFlight', event.target.value)} />
+                <input className={textInputClass({ later: true })} value={form.vesselFlight} onChange={(event) => setFormValue('vesselFlight', event.target.value)} />
               </Field>
               <Field label="Incoterms / 거래조건">
-                <input className={textInputClass()} value={form.incoterms} onChange={(event) => setFormValue('incoterms', event.target.value)} />
+                <input className={textInputClass({ missing: isMissingRequired(form.incoterms) })} value={form.incoterms} onChange={(event) => setFormValue('incoterms', event.target.value)} />
               </Field>
               <Field label="Currency / 통화">
-                <input className={textInputClass()} value={form.currency} onChange={(event) => setFormValue('currency', event.target.value.toUpperCase())} />
+                <input className={textInputClass({ missing: isMissingRequired(form.currency) })} value={form.currency} onChange={(event) => setFormValue('currency', event.target.value.toUpperCase())} />
               </Field>
               <Field label="Port of Loading / 선적항">
-                <input className={textInputClass()} value={form.portOfLoading} onChange={(event) => setFormValue('portOfLoading', event.target.value)} />
+                <input className={textInputClass({ missing: isMissingRequired(form.portOfLoading) })} value={form.portOfLoading} onChange={(event) => setFormValue('portOfLoading', event.target.value)} />
               </Field>
               <Field label="Port of Discharge / 도착항" later>
-                <input className={textInputClass()} value={form.portOfDischarge} onChange={(event) => setFormValue('portOfDischarge', event.target.value)} />
+                <input className={textInputClass({ later: true })} value={form.portOfDischarge} onChange={(event) => setFormValue('portOfDischarge', event.target.value)} />
               </Field>
               <Field label="Exporter / 수출자">
-                <textarea className={textAreaClass()} value={form.exporter} onChange={(event) => setFormValue('exporter', event.target.value)} />
+                <textarea className={textAreaClass({ missing: isMissingRequired(form.exporter) })} value={form.exporter} onChange={(event) => setFormValue('exporter', event.target.value)} />
               </Field>
               <Field label="Consignee / 수입자">
-                <textarea className={textAreaClass()} value={form.consignee} onChange={(event) => setFormValue('consignee', event.target.value)} placeholder="수입자 회사명, 주소, 연락처" />
+                <textarea className={textAreaClass({ missing: isMissingRequired(form.consignee) })} value={form.consignee} onChange={(event) => setFormValue('consignee', event.target.value)} placeholder="수입자 회사명, 주소, 연락처" />
               </Field>
               <Field label="Buyer / 구매자">
                 <textarea className={textAreaClass()} value={form.buyer} onChange={(event) => setFormValue('buyer', event.target.value)} />
               </Field>
               <Field label="L/C No. and Date / 신용장번호·일자" later>
-                <textarea className={textAreaClass()} value={form.lcNoDate} onChange={(event) => setFormValue('lcNoDate', event.target.value)} />
+                <textarea className={textAreaClass({ later: true })} value={form.lcNoDate} onChange={(event) => setFormValue('lcNoDate', event.target.value)} />
               </Field>
               <Field label="Other References / 참고사항">
                 <textarea className={textAreaClass()} value={form.otherReferences} onChange={(event) => setFormValue('otherReferences', event.target.value)} />
@@ -1338,13 +1352,13 @@ export default function ExportDeclarationClient({
                           ))}
                         </select>
                       </td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.productName} onChange={(event) => updateItem(item.id, { productName: event.target.value })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.productNameEN} onChange={(event) => updateItem(item.id, { productNameEN: event.target.value })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.model} onChange={(event) => updateItem(item.id, { model: event.target.value.toUpperCase() })} /></td>
-                      <td className="px-2 py-2"><input className={textInputClass()} value={item.hsCode} onChange={(event) => updateItem(item.id, { hsCode: event.target.value })} /></td>
+                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.productName) })} value={item.productName} onChange={(event) => updateItem(item.id, { productName: event.target.value })} /></td>
+                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.productNameEN) })} value={item.productNameEN} onChange={(event) => updateItem(item.id, { productNameEN: event.target.value })} /></td>
+                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.model) })} value={item.model} onChange={(event) => updateItem(item.id, { model: event.target.value.toUpperCase() })} /></td>
+                      <td className="px-2 py-2"><input className={textInputClass({ missing: isMissingRequired(item.hsCode) })} value={item.hsCode} onChange={(event) => updateItem(item.id, { hsCode: event.target.value })} /></td>
                       <td className="px-2 py-2"><input className={textInputClass()} value={item.origin} onChange={(event) => updateItem(item.id, { origin: event.target.value.toUpperCase() })} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass()} text-right`} value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Math.max(0, Math.floor(parseNumberInput(event.target.value))) })} /></td>
-                      <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.unitPrice} onChange={(event) => updateItem(item.id, { unitPrice: parseNumberInput(event.target.value) })} /></td>
+                      <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass({ missing: isMissingRequired(item.quantity) })} text-right`} value={item.quantity} onChange={(event) => updateItem(item.id, { quantity: Math.max(0, Math.floor(parseNumberInput(event.target.value))) })} /></td>
+                      <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass({ missing: isMissingRequired(item.unitPrice) })} text-right`} value={item.unitPrice} onChange={(event) => updateItem(item.id, { unitPrice: parseNumberInput(event.target.value) })} /></td>
                       <td className="px-2 py-2 text-right font-black text-slate-950">{money(lineAmount(item), form.currency)}</td>
                       <td className="px-2 py-2"><input type="number" min={0} className={`${textInputClass()} text-right`} value={item.cartons} onChange={(event) => updateCartons(item.id, event.target.value)} /></td>
                       <td className="px-2 py-2"><input type="number" min={0} step="0.01" className={`${textInputClass()} text-right`} value={item.netWeight} onChange={(event) => updateItem(item.id, { netWeight: parseNumberInput(event.target.value) })} /></td>
