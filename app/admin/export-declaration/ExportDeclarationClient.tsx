@@ -826,7 +826,7 @@ function UnipassSection({ title, children }: { title: string; children: React.Re
     <section className="mt-4">
       <h3 className="border-b border-[#8f8f8f] pb-1 text-[13px] font-black text-[#1f55b5]">*{title}</h3>
       <div className="overflow-x-auto">
-        <table className="mt-1 w-full min-w-[1040px] table-fixed border-collapse text-[12px]">
+        <table className="mt-1 w-[1180px] table-fixed border-collapse text-[12px]">
           <colgroup>
             <col className="w-[142px]" />
             <col />
@@ -861,7 +861,7 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
   ]
 
   return (
-    <div className="overflow-hidden bg-white text-[#222222]">
+    <div className="w-full max-w-[1320px] overflow-hidden bg-white text-[#222222]">
       <div className="border-b border-[#d5d5d5] px-0 pb-4 pt-1">
         <div className="flex items-center justify-between gap-3">
           <h2 className="text-[18px] font-black text-[#1f55b5]">전자상거래 수출신고서 <span className="text-[#d6d6d6]">★</span></h2>
@@ -890,7 +890,8 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
       </div>
 
       <div className="border-b border-[#d8d8d8] bg-white py-2">
-        <table className="w-full min-w-[900px] table-fixed border-collapse text-[12px]">
+        <div className="overflow-x-auto">
+        <table className="w-[1180px] table-fixed border-collapse text-[12px]">
           <tbody>
             <UnipassRow fields={[
               { label: '기존 신고서 조회', value: '', lookup: true, muted: true },
@@ -898,6 +899,7 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
             ]} />
           </tbody>
         </table>
+        </div>
       </div>
 
       <div className="pb-8 pt-2">
@@ -1023,7 +1025,7 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
                 <div className="text-[11px] font-bold text-[#7b8794]">상품 행을 기준으로 자동 생성</div>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[1180px] table-fixed border-collapse text-[12px]">
+                <table className="w-[1180px] table-fixed border-collapse text-[12px]">
                   <thead className="bg-[#f3f3f4] text-[#4b5563]">
                     <tr>
                       <th className="w-[56px] border border-[#d7dce2] px-2 py-1">NO</th>
@@ -1604,7 +1606,7 @@ export default function ExportDeclarationClient({
           </section>
         </div>
 
-        <section className={activeWorkTab === 'unipass' && selectedDeclarationId ? 'min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
+        <section className={activeWorkTab === 'unipass' && selectedDeclarationId ? 'min-w-0 max-w-[1360px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
           <div className="mb-2 flex items-center gap-2 px-1">
             <ListChecks size={17} className="text-[#2f66b2]" />
             <h2 className="text-sm font-black text-slate-950">전자상거래 수출신고서 자동입력</h2>
