@@ -17,6 +17,7 @@ export type ExportProductOption = {
   nameEN: string | null
   nameJP: string | null
   productCode: string | null
+  hsCode: string | null
   prices: ExportProductPriceMap
   unitPriceUsd: number
   stock: number
@@ -1290,6 +1291,7 @@ export default function ExportDeclarationClient({
       productName: product.nameJP || product.name,
       productNameEN: product.nameEN || product.name,
       model: product.productCode || '',
+      hsCode: product.hsCode || '',
       unitPrice: resolveProductUnitPrice(product),
       origin: 'KOREA',
     })

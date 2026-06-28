@@ -123,6 +123,7 @@ model Product {
   updatedAt        DateTime    @updatedAt
   barcode          String?
   productCode      String?
+  hsCode           String?
   coupangSku       String?     @unique
   imageUrl         String?
   sortOrder        Int         @default(0)

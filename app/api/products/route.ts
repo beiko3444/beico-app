@@ -19,6 +19,7 @@ const productListSelect = {
     safetyStock: true,
     barcode: true,
     productCode: true,
+    hsCode: true,
     coupangSku: true,
     sortOrder: true,
     minOrderQuantity: true,
@@ -50,8 +51,9 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, minOrderQuantity, orderUnit, coupangSku } = body
+        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, hsCode, minOrderQuantity, orderUnit, coupangSku } = body
         const normalizedProductCode = productCode ? String(productCode).trim().toUpperCase() : null
+        const normalizedHsCode = hsCode ? String(hsCode).trim() : null
         let imageUrl: string | null = null
 
         if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
@@ -75,6 +77,7 @@ export async function POST(request: Request) {
             nameEN: nameEN ? String(nameEN).trim() : null,
             barcode: barcode ? String(barcode).trim() : null,
             productCode: normalizedProductCode,
+            hsCode: normalizedHsCode,
             coupangSku: coupangSku ? String(coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),

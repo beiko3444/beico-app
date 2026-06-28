@@ -12,6 +12,7 @@ type Product = {
     nameEN?: string | null
     barcode?: string | null
     productCode?: string | null
+    hsCode?: string | null
     coupangSku?: string | null
     buyPrice: number
     sellPrice: number
@@ -53,6 +54,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [nameEN, setNameEN] = useState('')
     const [barcode, setBarcode] = useState('')
     const [productCode, setProductCode] = useState('')
+    const [hsCode, setHsCode] = useState('')
     const [coupangSku, setCoupangSku] = useState('')
     const [buyPrice, setBuyPrice] = useState('')
     const [sellPrice, setSellPrice] = useState('')
@@ -116,6 +118,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [activeGradeTab, setActiveGradeTab] = useState('C');
 
     const normalizeProductCode = (value: string) => value.toUpperCase();
+    const normalizeHsCode = (value: string) => value.replace(/[^0-9.]/g, '');
 
     // Helper for formatting number with commas
     const formatNumber = (val: string | number) => {
@@ -166,6 +169,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode((initialData.productCode || '').toUpperCase())
+            setHsCode(initialData.hsCode || '')
             setCoupangSku(initialData.coupangSku || '')
             setStock(formatNumber(initialData.stock || 0))
             setSafetyStock(formatNumber(initialData.safetyStock || 0))
@@ -208,6 +212,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN('')
             setBarcode('')
             setProductCode('')
+            setHsCode('')
             setCoupangSku('')
             setStock('0')
             setSafetyStock('0')
@@ -260,6 +265,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
                 productCode: normalizeProductCode(productCode.trim()),
+                hsCode: normalizeHsCode(hsCode.trim()),
                 coupangSku: coupangSku.trim(),
                 buyPrice: parseFloat(parseNumber(regionalPrices['C'].KR.cost)) || 0,
                 sellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.wholesale)) || 0,
@@ -308,6 +314,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setNameEN('')
                     setBarcode('')
                     setProductCode('')
+                    setHsCode('')
                     setCoupangSku('')
                     setStock('0')
                     setSafetyStock('0')
@@ -466,6 +473,16 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     onChange={e => setProductCode(normalizeProductCode(e.target.value))}
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono uppercase"
                                     placeholder="ITEM CODE"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">HS Code / 세번부호</label>
+                                <input
+                                    type="text"
+                                    value={hsCode}
+                                    onChange={e => setHsCode(normalizeHsCode(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
+                                    placeholder="예: 9507.90"
                                 />
                             </div>
                             <div className="space-y-1">

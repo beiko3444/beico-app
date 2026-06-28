@@ -19,6 +19,7 @@ const productResponseSelect = {
     safetyStock: true,
     barcode: true,
     productCode: true,
+    hsCode: true,
     coupangSku: true,
     sortOrder: true,
     minOrderQuantity: true,
@@ -40,6 +41,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const { id } = await context.params
         const body = await request.json()
         const normalizedProductCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null
+        const normalizedHsCode = body.hsCode ? String(body.hsCode).trim() : null
 
         const { name, buyPrice, sellPrice, stock } = body
 
@@ -54,6 +56,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             nameEN: body.nameEN ? String(body.nameEN).trim() : null,
             barcode: body.barcode ? String(body.barcode).trim() : null,
             productCode: normalizedProductCode,
+            hsCode: normalizedHsCode,
             coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
             sellPrice: Number(sellPrice),
