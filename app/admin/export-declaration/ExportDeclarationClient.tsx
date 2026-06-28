@@ -67,6 +67,7 @@ type ExportLineItem = {
 
 type PreviewMode = 'commercial' | 'packing'
 type PrintMode = PreviewMode | 'both'
+type WorkTab = 'documents' | 'unipass'
 type UnipassDeclarationTab = 'common1' | 'common2' | 'items'
 type GuideStatus = 'ready' | 'check'
 
@@ -1095,6 +1096,7 @@ export default function ExportDeclarationClient({
   const [form, setForm] = useState<ExportDocumentForm>(() => defaultForm())
   const [items, setItems] = useState<ExportLineItem[]>(() => [createEmptyItem()])
   const [previewMode, setPreviewMode] = useState<PreviewMode>('commercial')
+  const [activeWorkTab, setActiveWorkTab] = useState<WorkTab>('documents')
   const [selectedDeclarationId, setSelectedDeclarationId] = useState<string | null>(null)
   const [isCreating, setIsCreating] = useState(false)
   const [isLoadingDeclaration, setIsLoadingDeclaration] = useState(false)
@@ -1368,8 +1370,31 @@ export default function ExportDeclarationClient({
         )}
       </section>
 
-      <div className="grid gap-5 2xl:grid-cols-[minmax(720px,0.92fr)_minmax(680px,1.08fr)]">
-        <div className="space-y-5">
+      <div className="rounded-xl border border-slate-200 bg-white p-1.5 shadow-sm">
+        <div className="grid grid-cols-2 gap-1">
+          <button
+            type="button"
+            onClick={() => setActiveWorkTab('documents')}
+            className={`h-11 rounded-lg text-[13px] font-black transition ${
+              activeWorkTab === 'documents' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            PI / Packing List
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveWorkTab('unipass')}
+            className={`h-11 rounded-lg text-[13px] font-black transition ${
+              activeWorkTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
+            }`}
+          >
+            전자상거래 수출신고서
+          </button>
+        </div>
+      </div>
+
+      <div className="space-y-5">
+        <div className={activeWorkTab === 'documents' ? 'space-y-5' : 'hidden'}>
           <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
@@ -1516,7 +1541,7 @@ export default function ExportDeclarationClient({
           </section>
         </div>
 
-        <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm 2xl:sticky 2xl:top-24 2xl:max-h-[calc(100vh-7rem)] 2xl:overflow-auto">
+        <section className={activeWorkTab === 'unipass' ? 'min-w-0 rounded-xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
           <div className="mb-2 flex items-center gap-2 px-1">
             <ListChecks size={17} className="text-[#2f66b2]" />
             <h2 className="text-sm font-black text-slate-950">전자상거래 수출신고서 자동입력</h2>
