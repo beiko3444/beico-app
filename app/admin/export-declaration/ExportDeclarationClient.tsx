@@ -403,14 +403,23 @@ function makePrintHtml(form: ExportDocumentForm, items: ExportLineItem[], mode: 
 
 function Field({
   label,
+  later,
   children,
 }: {
   label: string
+  later?: boolean
   children: React.ReactNode
 }) {
   return (
     <label className="block">
-      <span className="text-[11px] font-black uppercase tracking-wide text-slate-500">{label}</span>
+      <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">
+        <span>{label}</span>
+        {later ? (
+          <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-black tracking-normal text-sky-700">
+            EMS 후 입력 가능
+          </span>
+        ) : null}
+      </span>
       <div className="mt-1">{children}</div>
     </label>
   )
@@ -646,6 +655,7 @@ type UnipassField = {
   label: string
   value?: string | number
   required?: boolean
+  later?: boolean
   suffix?: string
   lookup?: boolean
   select?: boolean
@@ -669,26 +679,30 @@ function getDeclarationTotals(items: ExportLineItem[]) {
   }
 }
 
-function displayUnipassValue(value: string | number | undefined) {
+function displayUnipassValue(value: string | number | undefined, later = false) {
   const text = String(value ?? '').trim()
-  return text || '확인 필요'
+  if (text) return text
+  return later ? 'EMS 접수 후 입력' : '확인 필요'
 }
 
-function copyUnipassValue(value: string | number | undefined) {
-  navigator.clipboard.writeText(displayUnipassValue(value)).catch(() => alert('복사에 실패했습니다.'))
+function copyUnipassValue(value: string | number | undefined, later = false) {
+  navigator.clipboard.writeText(displayUnipassValue(value, later)).catch(() => alert('복사에 실패했습니다.'))
 }
 
 function UnipassValue({ field }: { field: UnipassField }) {
-  const value = displayUnipassValue(field.value)
+  const value = displayUnipassValue(field.value, field.later)
   const needsCheck = value === '확인 필요'
+  const canFillLater = field.later && value === 'EMS 접수 후 입력'
 
   return (
     <button
       type="button"
-      onClick={() => copyUnipassValue(field.value)}
+      onClick={() => copyUnipassValue(field.value, field.later)}
       className={`flex min-h-7 w-full items-center gap-1 rounded-[1px] border px-1.5 text-left text-[12px] font-bold shadow-inner ${
         field.muted
           ? 'border-[#d5d9df] bg-[#e9eaec] text-[#67707d]'
+          : canFillLater
+            ? 'border-[#9bc7ea] bg-[#eef7ff] text-[#1d5f95]'
           : needsCheck
             ? 'border-[#d8bd68] bg-[#fff8dd] text-[#8a5a00]'
             : 'border-[#c7cdd5] bg-white text-[#111827]'
@@ -697,6 +711,7 @@ function UnipassValue({ field }: { field: UnipassField }) {
     >
       <span className="min-w-0 flex-1 truncate">{value}</span>
       {field.suffix ? <span className="shrink-0 text-[11px] text-[#59677a]">{field.suffix}</span> : null}
+      {field.later ? <span className="shrink-0 rounded-[1px] border border-sky-200 bg-sky-50 px-1 text-[10px] text-sky-700">나중입력</span> : null}
       {field.lookup ? <span className="shrink-0 rounded-[1px] border border-[#b7c1d0] bg-[#edf2f9] px-1 text-[10px] text-[#3466b7]">조회</span> : null}
       {field.select ? <span className="shrink-0 text-[10px] text-[#59677a]">▼</span> : null}
       <Copy size={10} className="shrink-0 text-[#6a7890]" />
@@ -710,6 +725,7 @@ function UnipassFieldCell({ field }: { field: UnipassField }) {
       <th className="border border-[#d7dce2] bg-[#f3f3f4] px-2 py-1 text-right align-middle text-[12px] font-bold text-[#4b5563]">
         {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
         {field.label}
+        {field.later ? <span className="ml-1 text-[10px] font-black text-sky-700">(나중)</span> : null}
       </th>
       <td className="border border-[#d7dce2] bg-white px-1 py-1 align-middle">
         <UnipassValue field={field} />
@@ -726,6 +742,7 @@ function UnipassRow({ fields }: { fields: UnipassField[] }) {
         <th className="w-[150px] border border-[#d7dce2] bg-[#f3f3f4] px-2 py-1 text-right align-middle text-[12px] font-bold text-[#4b5563]">
           {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
           {field.label}
+          {field.later ? <span className="ml-1 text-[10px] font-black text-sky-700">(나중)</span> : null}
         </th>
         <td colSpan={3} className="border border-[#d7dce2] bg-white px-1 py-1 align-middle">
           <UnipassValue field={field} />
@@ -805,6 +822,11 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
         ))}
       </div>
 
+      <div className="border-b border-[#c8cdd4] bg-[#eef7ff] px-3 py-2 text-[12px] font-bold text-[#1d5f95]">
+        <span className="mr-2 rounded-[2px] border border-sky-200 bg-white px-1.5 py-0.5 text-[10px] font-black">나중입력</span>
+        EMS 접수 후 송장번호, 특송업체, 신고세관 정보가 확정되면 채워도 되는 항목입니다.
+      </div>
+
       <div className="border-b border-[#c8cdd4] bg-[#f7f7f8] px-2 py-2">
         <table className="w-full min-w-[900px] table-fixed border-collapse text-[12px]">
           <tbody>
@@ -870,11 +892,11 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
             <UnipassSection title="기본 신고사항">
               <UnipassRow fields={[
                 { label: '적재항', value: form.portOfLoading, required: true, lookup: true },
-                { label: '특송업체부호', value: '확인 필요', required: true, lookup: true },
+                { label: '특송업체부호', value: '', required: true, lookup: true, later: true },
               ]} />
               <UnipassRow fields={[
-                { label: '목적국', value: form.portOfDischarge, required: true, lookup: true },
-                { label: '신고세관/과', value: '확인 필요', required: true, lookup: true },
+                { label: '목적국', value: form.portOfDischarge, required: true, lookup: true, later: true },
+                { label: '신고세관/과', value: '', required: true, lookup: true, later: true },
               ]} />
               <UnipassRow fields={[
                 { label: '총중량', value: totalGross, required: true, suffix: 'KG' },
@@ -892,7 +914,7 @@ function UnipassDeclarationForm({ form, items }: { form: ExportDocumentForm; ite
 
             <UnipassSection title="주문/배송 관련 정보">
               <UnipassRow fields={[
-                { label: '배송번호', value: form.vesselFlight },
+                { label: '배송번호', value: form.vesselFlight, later: true },
                 { label: '주문번호', value: form.invoiceNo, required: true },
               ]} />
               <UnipassRow fields={[
@@ -1157,10 +1179,10 @@ export default function ExportDeclarationClient({ products }: { products: Export
               <Field label="Date / 작성일">
                 <input type="date" className={textInputClass()} value={form.date} onChange={(event) => setFormValue('date', event.target.value)} />
               </Field>
-              <Field label="Departure Date / 출항일">
+              <Field label="Departure Date / 출항일" later>
                 <input type="date" className={textInputClass()} value={form.departureDate} onChange={(event) => setFormValue('departureDate', event.target.value)} />
               </Field>
-              <Field label="Vessel / Flight / 선박·항공편">
+              <Field label="Vessel / Flight / 선박·항공편" later>
                 <input className={textInputClass()} value={form.vesselFlight} onChange={(event) => setFormValue('vesselFlight', event.target.value)} />
               </Field>
               <Field label="Incoterms / 거래조건">
@@ -1172,7 +1194,7 @@ export default function ExportDeclarationClient({ products }: { products: Export
               <Field label="Port of Loading / 선적항">
                 <input className={textInputClass()} value={form.portOfLoading} onChange={(event) => setFormValue('portOfLoading', event.target.value)} />
               </Field>
-              <Field label="Port of Discharge / 도착항">
+              <Field label="Port of Discharge / 도착항" later>
                 <input className={textInputClass()} value={form.portOfDischarge} onChange={(event) => setFormValue('portOfDischarge', event.target.value)} />
               </Field>
               <Field label="Exporter / 수출자">
@@ -1184,7 +1206,7 @@ export default function ExportDeclarationClient({ products }: { products: Export
               <Field label="Buyer / 구매자">
                 <textarea className={textAreaClass()} value={form.buyer} onChange={(event) => setFormValue('buyer', event.target.value)} />
               </Field>
-              <Field label="L/C No. and Date / 신용장번호·일자">
+              <Field label="L/C No. and Date / 신용장번호·일자" later>
                 <textarea className={textAreaClass()} value={form.lcNoDate} onChange={(event) => setFormValue('lcNoDate', event.target.value)} />
               </Field>
               <Field label="Other References / 참고사항">
