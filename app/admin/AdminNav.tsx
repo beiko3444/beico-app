@@ -313,14 +313,14 @@ export default function AdminNav({
             href={item.path}
             prefetch={false}
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`group relative flex ${mobile ? 'h-11' : 'h-10 min-h-10'} min-w-0 items-center justify-between rounded-[10px] border px-3 text-[13px] font-extrabold tracking-[-0.02em] no-underline transition-all duration-150 ${
+            className={`group relative flex ${mobile ? 'h-12' : 'h-11 min-h-11'} min-w-0 items-center justify-between rounded-[10px] border px-3 text-[14px] font-semibold tracking-normal no-underline transition-all duration-150 ${
               active
                 ? 'border-[#FFD5CC] bg-[#FFF1ED] text-[#E8351B] shadow-[0_8px_18px_rgba(239,59,29,0.10)]'
                 : 'border-transparent bg-transparent text-[#293241] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
             }`}
             style={{ color: active ? '#E8351B' : '#293241' }}
           >
-            {active ? <span className="absolute left-0 top-2 h-6 w-1 rounded-r-full bg-[#EF3B1D]" /> : null}
+            {active ? <span className="absolute left-0 top-2.5 h-6 w-1 rounded-r-full bg-[#EF3B1D]" /> : null}
             <span className="flex min-w-0 items-center gap-2.5">
               <span
                 className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
@@ -329,7 +329,7 @@ export default function AdminNav({
               >
                 <Icon size={15} strokeWidth={2.3} />
               </span>
-              <span className="truncate text-inherit">{item.name}</span>
+              <span className="truncate text-inherit leading-none">{item.name}</span>
             </span>
             {alertCountByPath[item.path] > 0 ? (
               <span
