@@ -267,6 +267,20 @@ model Task {
   updatedAt   DateTime @updatedAt
 }
 
+model AdminMemo {
+  id        String   @id @default(uuid())
+  title     String
+  content   String   @default("")
+  category  String   @default("일반")
+  color     String   @default("green")
+  pinned    Boolean  @default(false)
+  archived  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([archived, pinned, updatedAt])
+}
+
 model AttendanceEmployee {
   id          String             @id @default(uuid())
   name        String

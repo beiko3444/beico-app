@@ -23,6 +23,7 @@ import {
   Ship,
   ShoppingCart,
   Star,
+  StickyNote,
   Warehouse,
   X,
 } from 'lucide-react'
@@ -191,6 +192,7 @@ export default function AdminNav({
     { name: '생산관리', path: '/admin/production', icon: Factory },
     { name: '근태관리', path: '/admin/tasks', icon: Clock3 },
     { name: '카드사용내역', path: '/admin/card-usage', icon: CreditCard },
+    { name: '메모', path: '/admin/memos', icon: StickyNote },
     { name: '수신문자함', path: '/admin/mobile-messages', icon: Inbox },
     { name: '문자발송서비스', path: '/admin/sms', icon: MessageSquareText },
     { name: '통계', path: '/admin/statistics', icon: BarChart3 },
