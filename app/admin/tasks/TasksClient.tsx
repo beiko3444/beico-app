@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, UserRound } from 'lucide-react'
 import { createEmployee, deleteEmployee, toggleAttendanceDate, updateEmployee } from './actions'
 import { getKoreanHolidayName } from '@/lib/koreanHolidays'
+import DashboardCalendarWidget from '@/components/DashboardCalendarWidget'
 
 type AttendanceRecord = {
     id: string
@@ -20,6 +21,17 @@ type AttendanceEmployee = {
     records: AttendanceRecord[]
 }
 
+type TaskRecord = {
+    id: string
+    title: string
+    description: string | null
+    fileUrl: string | null
+    completed: boolean
+    date: string | Date
+    createdAt: string | Date
+    updatedAt: string | Date
+}
+
 const dateKey = (date: Date) => {
     const year = date.getFullYear()
     const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -29,7 +41,13 @@ const dateKey = (date: Date) => {
 
 const formatMoney = (value: number) => `${Math.round(value).toLocaleString()}원`
 
-export default function TasksClient({ initialEmployees }: { initialEmployees: AttendanceEmployee[] }) {
+export default function TasksClient({
+    initialEmployees,
+    initialTasks
+}: {
+    initialEmployees: AttendanceEmployee[]
+    initialTasks: TaskRecord[]
+}) {
     const router = useRouter()
     const [employees, setEmployees] = useState(initialEmployees)
     const [selectedEmployeeId, setSelectedEmployeeId] = useState(initialEmployees[0]?.id || '')
@@ -144,7 +162,16 @@ export default function TasksClient({ initialEmployees }: { initialEmployees: At
     }
 
     return (
-        <div className="space-y-6 font-sans">
+        <div className="space-y-10 font-sans">
+            <section className="space-y-6">
+                <div>
+                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">업무관리</h1>
+                    <p className="mt-1 text-sm font-medium text-gray-500">업무를 완료하면 경험치가 쌓이고 레벨이 올라갑니다.</p>
+                </div>
+                <DashboardCalendarWidget tasks={initialTasks} />
+            </section>
+
+            <section className="space-y-6">
             <div className="flex items-center justify-between gap-4">
                 <div>
                     <h1 className="text-3xl font-black text-gray-900 tracking-tight">근태관리</h1>
@@ -325,6 +352,7 @@ export default function TasksClient({ initialEmployees }: { initialEmployees: At
                     </div>
                 </section>
             </div>
+            </section>
         </div>
     )
 }
