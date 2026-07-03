@@ -14,6 +14,19 @@ type AdminMemoRow = {
   color: string
   pinned: boolean
   archived: boolean
+  username: string | null
+  password: string | null
+  siteUrl: string | null
+  attachments: Array<{
+    id: string
+    memoId: string
+    fileName: string
+    contentType: string
+    size: number
+    assetUrl: string
+    createdAt: Date | string
+    updatedAt: Date | string
+  }>
   createdAt: Date | string
   updatedAt: Date | string
 }
@@ -36,6 +49,11 @@ export default async function AdminMemosPage() {
 
   try {
     const rows = await memoClient().findMany({
+      include: {
+        attachments: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
       orderBy: [{ pinned: 'desc' }, { updatedAt: 'desc' }],
     })
 
@@ -43,6 +61,11 @@ export default async function AdminMemosPage() {
       ...memo,
       createdAt: new Date(memo.createdAt).toISOString(),
       updatedAt: new Date(memo.updatedAt).toISOString(),
+      attachments: memo.attachments.map((attachment) => ({
+        ...attachment,
+        createdAt: new Date(attachment.createdAt).toISOString(),
+        updatedAt: new Date(attachment.updatedAt).toISOString(),
+      })),
     }))
   } catch (error) {
     console.error('Failed to load admin memos:', error)
