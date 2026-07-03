@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
 const attendancePath = '/admin/tasks'
+const taskPath = '/admin/tasks'
 
 const toInt = (value: FormDataEntryValue | null) => {
     const parsed = Number(String(value || '').replace(/[^0-9]/g, ''))
@@ -131,7 +132,7 @@ export async function createTask(formData: FormData) {
                 completed: false
             }
         })
-        revalidatePath('/admin')
+        revalidatePath(taskPath)
         return { success: true }
     } catch (error) {
         console.error(error)
@@ -153,7 +154,7 @@ export async function updateTask(id: string, formData: FormData) {
                 fileUrl: fileUrl || undefined
             }
         })
-        revalidatePath('/admin')
+        revalidatePath(taskPath)
         return { success: true }
     } catch (error) {
         console.error(error)
@@ -167,7 +168,7 @@ export async function toggleTask(id: string, completed: boolean) {
             where: { id },
             data: { completed }
         })
-        revalidatePath('/admin')
+        revalidatePath(taskPath)
         return { success: true }
     } catch (error) {
         console.error(error)
@@ -178,7 +179,7 @@ export async function toggleTask(id: string, completed: boolean) {
 export async function deleteTask(id: string) {
     try {
         await prisma.task.delete({ where: { id } })
-        revalidatePath('/admin')
+        revalidatePath(taskPath)
         return { success: true }
     } catch (error) {
         console.error(error)
@@ -192,7 +193,7 @@ export async function updateTaskDate(id: string, newDate: string) {
             where: { id },
             data: { date: new Date(newDate) }
         })
-        revalidatePath('/admin')
+        revalidatePath(taskPath)
         return { success: true }
     } catch (error) {
         console.error(error)
