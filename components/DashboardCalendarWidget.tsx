@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useTransition, useEffect } from 'react'
+import { useState, useTransition, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, Circle, Trash2, Plus, ChevronUp, ChevronDown, X, FileText, Paperclip } from 'lucide-react'
+import { CheckCircle2, Circle, Trash2, ChevronUp, ChevronDown, X, Trophy, Zap } from 'lucide-react'
 import { createTask, updateTask, toggleTask, deleteTask } from '@/app/admin/tasks/actions'
 import { createPortal } from 'react-dom'
 
@@ -15,12 +15,34 @@ type Task = {
     date: Date
 }
 
+const XP_PER_COMPLETED_TASK = 20
+const XP_PER_LEVEL = 100
+
+function getTaskLevelState(tasks: Pick<Task, 'completed'>[]) {
+    const completedCount = tasks.filter(task => task.completed).length
+    const totalXp = completedCount * XP_PER_COMPLETED_TASK
+    const level = Math.floor(totalXp / XP_PER_LEVEL) + 1
+    const progressXp = totalXp % XP_PER_LEVEL
+    const progressPercent = (progressXp / XP_PER_LEVEL) * 100
+    const nextLevelXp = XP_PER_LEVEL - progressXp
+
+    return {
+        completedCount,
+        totalXp,
+        level,
+        progressXp,
+        progressPercent,
+        nextLevelXp: progressXp === 0 && totalXp > 0 ? XP_PER_LEVEL : nextLevelXp
+    }
+}
+
 export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
     const router = useRouter()
     const [parsedTasks, setParsedTasks] = useState<Task[]>(tasks.map(t => ({ ...t, date: new Date(t.date) })))
     const [currentMonth, setCurrentMonth] = useState(new Date())
     const [selectedDate, setSelectedDate] = useState(new Date())
     const [isPending, startTransition] = useTransition()
+    const [levelFeedback, setLevelFeedback] = useState<'xp' | 'level' | null>(null)
 
     // Sync state with props when data is re-fetched
     useEffect(() => {
@@ -33,6 +55,14 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
     const [mounted, setMounted] = useState(false)
 
     useEffect(() => { setMounted(true) }, [])
+
+    useEffect(() => {
+        if (!levelFeedback) return
+        const timer = window.setTimeout(() => setLevelFeedback(null), 1400)
+        return () => window.clearTimeout(timer)
+    }, [levelFeedback])
+
+    const taskLevel = useMemo(() => getTaskLevelState(parsedTasks), [parsedTasks])
 
     const getDaysInMonth = (date: Date) => {
         return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate()
@@ -76,8 +106,18 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
     }
 
     const handleToggleTask = async (id: string, completed: boolean) => {
+        const previousLevel = getTaskLevelState(parsedTasks).level
+        const nextTasks = parsedTasks.map(task => task.id === id ? { ...task, completed } : task)
+        const nextLevel = getTaskLevelState(nextTasks).level
+
+        setParsedTasks(nextTasks)
+        if (completed) {
+            setLevelFeedback(nextLevel > previousLevel ? 'level' : 'xp')
+        }
+
         startTransition(async () => {
-            await toggleTask(id, completed)
+            const result = await toggleTask(id, completed)
+            if (result?.error) alert(result.error)
             router.refresh()
         })
     }
@@ -113,6 +153,43 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
 
     return (
         <div className="flex flex-col gap-6 font-sans">
+            <div className="rounded-3xl border border-gray-900 bg-gray-950 p-5 text-white shadow-sm dark:border-[#2a2a2a]">
+                <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-4">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400 text-gray-950 shadow-sm">
+                            <Trophy className="h-6 w-6" />
+                        </div>
+                        <div>
+                            <div className="flex items-center gap-2">
+                                <h2 className="text-lg font-black tracking-tight">업무 레벨 {taskLevel.level}</h2>
+                                {levelFeedback && (
+                                    <span className={`rounded-full px-2 py-1 text-[10px] font-black leading-none ${levelFeedback === 'level' ? 'bg-amber-300 text-gray-950' : 'bg-emerald-400 text-gray-950'}`}>
+                                        {levelFeedback === 'level' ? 'LEVEL UP' : `+${XP_PER_COMPLETED_TASK} XP`}
+                                    </span>
+                                )}
+                            </div>
+                            <p className="mt-1 text-[11px] font-bold text-gray-400">완료 {taskLevel.completedCount}건 · 누적 {taskLevel.totalXp} XP · 1건 완료 = {XP_PER_COMPLETED_TASK} XP</p>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-[11px] font-black text-gray-200">
+                        <Zap className="h-4 w-4 text-amber-300" />
+                        다음 레벨까지 {taskLevel.nextLevelXp} XP
+                    </div>
+                </div>
+                <div className="mt-5">
+                    <div className="mb-2 flex items-center justify-between text-[10px] font-black text-gray-400">
+                        <span>EXP</span>
+                        <span>{taskLevel.progressXp}/{XP_PER_LEVEL}</span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-white/10">
+                        <div
+                            className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-orange-400 transition-all duration-500"
+                            style={{ width: `${taskLevel.progressPercent}%` }}
+                        />
+                    </div>
+                </div>
+            </div>
+
             <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
                 {/* Header */}
                 <div className="bg-white dark:bg-[#1e1e1e] text-gray-900 dark:text-white p-5 flex justify-between items-center border-b border-gray-100 dark:border-[#2a2a2a]">
