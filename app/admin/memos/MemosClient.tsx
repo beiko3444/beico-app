@@ -1,7 +1,37 @@
 'use client'
 
-import { useMemo, useState } from 'react'
-import { Archive, ArchiveRestore, Edit3, Pin, PinOff, Plus, Save, Search, StickyNote, Trash2, X } from 'lucide-react'
+import { useMemo, useRef, useState } from 'react'
+import {
+  Archive,
+  ArchiveRestore,
+  Download,
+  Edit3,
+  ExternalLink,
+  FileText,
+  Link as LinkIcon,
+  Lock,
+  Paperclip,
+  Pin,
+  PinOff,
+  Plus,
+  Save,
+  Search,
+  StickyNote,
+  Trash2,
+  User,
+  X,
+} from 'lucide-react'
+
+export type AdminMemoAttachmentItem = {
+  id: string
+  memoId: string
+  fileName: string
+  contentType: string
+  size: number
+  assetUrl: string
+  createdAt: string
+  updatedAt: string
+}
 
 export type AdminMemoItem = {
   id: string
@@ -11,6 +41,10 @@ export type AdminMemoItem = {
   color: string
   pinned: boolean
   archived: boolean
+  username: string | null
+  password: string | null
+  siteUrl: string | null
+  attachments: AdminMemoAttachmentItem[]
   createdAt: string
   updatedAt: string
 }
@@ -23,6 +57,9 @@ type MemoForm = {
   color: string
   pinned: boolean
   archived: boolean
+  username: string
+  password: string
+  siteUrl: string
 }
 
 const emptyForm = (): MemoForm => ({
@@ -32,6 +69,9 @@ const emptyForm = (): MemoForm => ({
   color: 'green',
   pinned: false,
   archived: false,
+  username: '',
+  password: '',
+  siteUrl: '',
 })
 
 const categories = ['전체', '일반', '주문', '재고', '수출', '카드', '거래처', '아이디어', '기타']
@@ -56,9 +96,17 @@ const formatDate = (value: string) =>
 
 const includes = (value: string, query: string) => value.toLowerCase().includes(query)
 
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return '0 KB'
+  if (bytes < 1024 * 1024) return `${Math.ceil(bytes / 1024).toLocaleString('ko-KR')} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoItem[] }) {
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const [memos, setMemos] = useState(initialMemos)
   const [form, setForm] = useState<MemoForm>(emptyForm)
+  const [keepAttachmentIds, setKeepAttachmentIds] = useState<string[]>([])
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('전체')
   const [showArchived, setShowArchived] = useState(false)
@@ -70,15 +118,30 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
       if (memo.archived !== showArchived) return false
       if (category !== '전체' && memo.category !== category) return false
       if (!normalized) return true
-      return [memo.title, memo.content, memo.category].some((value) => includes(value || '', normalized))
+      return [
+        memo.title,
+        memo.content,
+        memo.category,
+        memo.username || '',
+        memo.siteUrl || '',
+        ...memo.attachments.map((attachment) => attachment.fileName),
+      ].some((value) => includes(value || '', normalized))
     })
   }, [category, memos, query, showArchived])
 
   const activeCount = memos.filter((memo) => !memo.archived).length
   const pinnedCount = memos.filter((memo) => !memo.archived && memo.pinned).length
   const archivedCount = memos.filter((memo) => memo.archived).length
+  const editingMemo = form.id ? memos.find((memo) => memo.id === form.id) : null
+  const visibleAttachments = editingMemo
+    ? editingMemo.attachments.filter((attachment) => keepAttachmentIds.includes(attachment.id))
+    : []
 
-  const resetForm = () => setForm(emptyForm())
+  const resetForm = () => {
+    setForm(emptyForm())
+    setKeepAttachmentIds([])
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
 
   const applySavedMemo = (memo: AdminMemoItem) => {
     setMemos((prev) => {
@@ -89,17 +152,41 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
   }
 
   const saveMemo = async () => {
-    if (!form.title.trim()) {
-      alert('메모 제목을 입력해주세요.')
+    const hasNewFiles = (fileInputRef.current?.files?.length || 0) > 0
+    if (
+      !form.title.trim() &&
+      !form.content.trim() &&
+      !form.username.trim() &&
+      !form.password.trim() &&
+      !form.siteUrl.trim() &&
+      keepAttachmentIds.length === 0 &&
+      !hasNewFiles
+    ) {
+      alert('제목, 내용, 계정 정보 또는 첨부 문서 중 하나는 입력해주세요.')
       return
     }
 
     setSaving(true)
     try {
+      const formData = new FormData()
+      if (form.id) formData.set('id', form.id)
+      formData.set('title', form.title)
+      formData.set('content', form.content)
+      formData.set('category', form.category)
+      formData.set('color', form.color)
+      formData.set('pinned', String(form.pinned))
+      formData.set('archived', String(form.archived))
+      formData.set('username', form.username)
+      formData.set('password', form.password)
+      formData.set('siteUrl', form.siteUrl)
+      formData.set('keepAttachmentIds', JSON.stringify(keepAttachmentIds))
+      Array.from(fileInputRef.current?.files || []).forEach((file) => {
+        formData.append('attachments', file)
+      })
+
       const response = await fetch('/api/admin/memos', {
         method: form.id ? 'PATCH' : 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: formData,
       })
       const data = await response.json().catch(() => null)
       if (!response.ok) throw new Error(data?.error || '메모를 저장하지 못했습니다.')
@@ -121,7 +208,12 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
       color: memo.color,
       pinned: memo.pinned,
       archived: memo.archived,
+      username: memo.username || '',
+      password: memo.password || '',
+      siteUrl: memo.siteUrl || '',
     })
+    setKeepAttachmentIds(memo.attachments.map((attachment) => attachment.id))
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
   const patchMemo = async (memo: AdminMemoItem, payload: Record<string, unknown>) => {
@@ -252,6 +344,46 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
               </div>
 
               <label className="block">
+                <span className="mb-1 block text-xs font-black text-slate-600">사이트 링크</span>
+                <div className="relative">
+                  <LinkIcon size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input
+                    value={form.siteUrl}
+                    onChange={(event) => setForm((prev) => ({ ...prev, siteUrl: event.target.value }))}
+                    className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                    placeholder="https://example.com"
+                  />
+                </div>
+              </label>
+
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block">
+                  <span className="mb-1 block text-xs font-black text-slate-600">아이디</span>
+                  <div className="relative">
+                    <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={form.username}
+                      onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
+                      className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                      placeholder="아이디"
+                    />
+                  </div>
+                </label>
+                <label className="block">
+                  <span className="mb-1 block text-xs font-black text-slate-600">패스워드</span>
+                  <div className="relative">
+                    <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                    <input
+                      value={form.password}
+                      onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
+                      className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                      placeholder="패스워드"
+                    />
+                  </div>
+                </label>
+              </div>
+
+              <label className="block">
                 <span className="mb-1 block text-xs font-black text-slate-600">내용</span>
                 <textarea
                   value={form.content}
@@ -260,6 +392,59 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   placeholder="메모 내용을 입력하세요."
                 />
               </label>
+
+              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-black text-slate-700">첨부 문서</div>
+                    <div className="mt-1 text-[11px] font-bold text-slate-500">사업자등록증, PDF, JPG 등 회사 업무서류</div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-100"
+                  >
+                    <Paperclip size={14} />
+                    파일 추가
+                  </button>
+                </div>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.txt,.csv"
+                />
+                {visibleAttachments.length > 0 ? (
+                  <div className="mt-3 space-y-1.5">
+                    {visibleAttachments.map((attachment) => (
+                      <div key={attachment.id} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                        <FileText size={14} className="shrink-0 text-slate-500" />
+                        <span className="min-w-0 flex-1 truncate font-black text-slate-700">{attachment.fileName}</span>
+                        <span className="shrink-0 font-bold text-slate-400">{formatFileSize(attachment.size)}</span>
+                        <a
+                          href={`/api/admin/memos/${editingMemo?.id}/attachments/${attachment.id}`}
+                          className="shrink-0 rounded px-1.5 py-1 font-black text-blue-600 hover:bg-blue-50"
+                        >
+                          다운로드
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => setKeepAttachmentIds((prev) => prev.filter((id) => id !== attachment.id))}
+                          className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label={`${attachment.fileName} 삭제`}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-md border border-dashed border-slate-200 bg-white px-3 py-3 text-center text-xs font-bold text-slate-400">
+                    선택한 기존 첨부가 없습니다.
+                  </div>
+                )}
+              </div>
 
               <button
                 type="button"
@@ -346,6 +531,51 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                       </div>
 
                       <p className="mt-3 whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-700">{memo.content || '-'}</p>
+
+                      {(memo.siteUrl || memo.username || memo.password) ? (
+                        <div className="mt-3 grid gap-2 rounded-md bg-white/75 p-3 text-xs font-bold text-slate-700">
+                          {memo.siteUrl ? (
+                            <a
+                              href={memo.siteUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex min-w-0 items-center gap-2 font-black text-blue-600 hover:underline"
+                            >
+                              <ExternalLink size={14} className="shrink-0" />
+                              <span className="truncate">{memo.siteUrl}</span>
+                            </a>
+                          ) : null}
+                          {memo.username ? (
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-black text-slate-500">아이디</span>
+                              <span className="min-w-0 truncate font-black text-slate-950">{memo.username}</span>
+                            </div>
+                          ) : null}
+                          {memo.password ? (
+                            <div className="flex items-center justify-between gap-3">
+                              <span className="font-black text-slate-500">패스워드</span>
+                              <span className="min-w-0 truncate font-mono font-black text-slate-950">{memo.password}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {memo.attachments.length > 0 ? (
+                        <div className="mt-3 space-y-1.5">
+                          {memo.attachments.map((attachment) => (
+                            <a
+                              key={attachment.id}
+                              href={`/api/admin/memos/${memo.id}/attachments/${attachment.id}`}
+                              className="flex items-center gap-2 rounded-md bg-white/80 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-white"
+                            >
+                              <FileText size={14} className="shrink-0 text-slate-500" />
+                              <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
+                              <span className="shrink-0 text-slate-400">{formatFileSize(attachment.size)}</span>
+                              <Download size={14} className="shrink-0 text-blue-600" />
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
 
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/5 pt-3 text-[11px] font-black text-slate-500">
                         <span>수정 {formatDate(memo.updatedAt)}</span>
