@@ -268,17 +268,35 @@ model Task {
 }
 
 model AdminMemo {
-  id        String   @id @default(uuid())
-  title     String
-  content   String   @default("")
-  category  String   @default("일반")
-  color     String   @default("green")
-  pinned    Boolean  @default(false)
-  archived  Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id          String                @id @default(uuid())
+  title       String
+  content     String                @default("")
+  category    String                @default("일반")
+  color       String                @default("green")
+  pinned      Boolean               @default(false)
+  archived    Boolean               @default(false)
+  username    String?
+  password    String?
+  siteUrl     String?
+  attachments AdminMemoAttachment[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
 
   @@index([archived, pinned, updatedAt])
+}
+
+model AdminMemoAttachment {
+  id          String    @id @default(uuid())
+  memoId      String
+  fileName    String
+  contentType String
+  size        Int
+  assetUrl    String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  memo        AdminMemo @relation(fields: [memoId], references: [id], onDelete: Cascade)
+
+  @@index([memoId])
 }
 
 model AttendanceEmployee {
