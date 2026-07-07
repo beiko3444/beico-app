@@ -1146,7 +1146,33 @@ const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
 const NON_AWB_CONTEXT_REGEX = /\b(?:TEL|PHONE|MOBILE|FAX|EMAIL|E-?MAIL|CONTACT|INVOICE|DATE|TOTAL|QTY|PCS|KILO)\b/i
 const PHONE_LIKE_PREFIX_REGEX = /^(010|011|016|017|018|019|070|080)/
 const WORM_EMAIL_CACHE_STORAGE_KEY = 'beico-worm-order-email-cache-v1'
+const WORM_ACTIVE_ORDER_STORAGE_KEY = 'beico-worm-order-active-id-v1'
 const WORM_EMAIL_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
+
+function readStoredActiveWormOrderId() {
+    if (typeof window === 'undefined') return null
+
+    try {
+        return window.localStorage.getItem(WORM_ACTIVE_ORDER_STORAGE_KEY) || null
+    } catch (error) {
+        console.error('Failed to restore active worm order id', error)
+        return null
+    }
+}
+
+function writeStoredActiveWormOrderId(orderId: string | null) {
+    if (typeof window === 'undefined') return
+
+    try {
+        if (orderId) {
+            window.localStorage.setItem(WORM_ACTIVE_ORDER_STORAGE_KEY, orderId)
+        } else {
+            window.localStorage.removeItem(WORM_ACTIVE_ORDER_STORAGE_KEY)
+        }
+    } catch (error) {
+        console.error('Failed to persist active worm order id', error)
+    }
+}
 
 function normalizeWormEmailMatchType(value: unknown): WormEmailMatchType | null {
     if (value === 'INVOICE' || value === 'AWB_DOCUMENT') return value
@@ -1855,6 +1881,7 @@ export default function WormOrderPage() {
     const customsProgressCacheRef = useRef<Map<string, { savedAt: number; result: CustomsProgressResult | null; error: string }>>(new Map())
     const calendarWeatherRequestIdRef = useRef(0)
     const activeWormOrderIdRef = useRef<string | null>(null)
+    const hasLoadedWormOrdersRef = useRef(false)
     const lastResetWormOrderIdRef = useRef<string | null | undefined>(undefined)
     const emailFetchRequestIdRef = useRef(0)
     const matchedEmailRestoreRequestIdRef = useRef(0)
@@ -2062,6 +2089,11 @@ export default function WormOrderPage() {
 
     useEffect(() => {
         activeWormOrderIdRef.current = activeWormOrder?.id ?? null
+    }, [activeWormOrder?.id])
+
+    useEffect(() => {
+        if (!hasLoadedWormOrdersRef.current && !activeWormOrder?.id) return
+        writeStoredActiveWormOrderId(activeWormOrder?.id ?? null)
     }, [activeWormOrder?.id])
 
     const loadForwardLogs = useCallback(async (orderId: string) => {
@@ -2485,28 +2517,33 @@ export default function WormOrderPage() {
                     .filter((item: WormOrderListItem | null): item is WormOrderListItem => item !== null)
                 : []
 
+            const storedActiveOrderId = readStoredActiveWormOrderId()
+            const toOrderSnapshot = (order: WormOrderListItem): WormOrderSnapshot => ({
+                id: order.id,
+                orderNumber: order.orderNumber,
+                receiveDate: toKstDateInputString(order.receiveDate) || '',
+            })
+
+            hasLoadedWormOrdersRef.current = true
             setWormOrderList(nextList)
             setActiveWormOrder((prev) => {
-                if (prev) {
-                    const matched = nextList.find((item) => item.id === prev.id)
+                const preferredOrderId = prev?.id || storedActiveOrderId
+
+                if (preferredOrderId) {
+                    const matched = nextList.find((item) => item.id === preferredOrderId)
                     if (matched) {
-                        const receiveDateText = toKstDateInputString(matched.receiveDate) || prev.receiveDate
+                        const receiveDateText = toKstDateInputString(matched.receiveDate) || prev?.receiveDate || ''
                         return {
                             id: matched.id,
                             orderNumber: matched.orderNumber,
                             receiveDate: receiveDateText,
                         }
                     }
-                    return null
                 }
 
                 const latest = nextList[0]
                 if (!latest) return null
-                return {
-                    id: latest.id,
-                    orderNumber: latest.orderNumber,
-                    receiveDate: toKstDateInputString(latest.receiveDate) || '',
-                }
+                return toOrderSnapshot(latest)
             })
         } catch (error) {
             setWormOrderListError(error instanceof Error ? error.message : '발주 리스트를 불러오지 못했습니다.')
@@ -2636,6 +2673,9 @@ export default function WormOrderPage() {
             setEmailDetails(payload.invoiceEmailDetails)
             setSelectedEmailUid(payload.invoiceEmails[0]?.uid || null)
             setHasFetched(payload.invoiceEmails.length > 0)
+            if (payload.invoiceEmails.length > 0) {
+                setEmailMatchMessage(`DB에 저장된 매칭 인보이스 메일 ${payload.invoiceEmails.length}건을 불러왔습니다.`)
+            }
             setUsingOfflineEmailCache(false)
             setEmailCacheSavedAt(null)
 
@@ -2643,6 +2683,9 @@ export default function WormOrderPage() {
             setDocEmailDetails(payload.awbDocumentEmailDetails)
             setSelectedDocEmailUid(payload.awbDocumentEmails[0]?.uid || null)
             setDocHasFetched(payload.awbDocumentEmails.length > 0)
+            if (payload.awbDocumentEmails.length > 0) {
+                setDocEmailMatchMessage(`DB에 저장된 매칭 AWB 문서 메일 ${payload.awbDocumentEmails.length}건을 불러왔습니다.`)
+            }
 
             const firstAwbEmail = payload.awbDocumentEmails.find((email) => email.awbNumber)
             const firstAwbUid = firstAwbEmail?.uid || payload.awbDocumentEmails[0]?.uid || null
@@ -2682,6 +2725,7 @@ export default function WormOrderPage() {
             orderNumber: order.orderNumber,
             receiveDate: receiveDateText || '',
         })
+        writeStoredActiveWormOrderId(order.id)
         if (receiveDateText) {
             setReceiveDate(receiveDateText)
         }
@@ -4497,6 +4541,7 @@ export default function WormOrderPage() {
 
             setOrderCreateNotice(`새 발주 생성 완료 · ${result?.order?.orderNumber || 'WO 생성'} (${targetReceiveDate})`)
             if (result?.order?.id && result?.order?.orderNumber) {
+                writeStoredActiveWormOrderId(result.order.id)
                 setActiveWormOrder({
                     id: result.order.id,
                     orderNumber: result.order.orderNumber,
