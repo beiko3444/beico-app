@@ -650,6 +650,7 @@ export async function loadWormEmailList(options?: {
   orderId?: string | null
   senderEmail?: string | null
   keywordMatchInSource?: boolean
+  includeAllFromSender?: boolean
   forceRefresh?: boolean
 }) {
   const rawKeyword = (options?.subjectKeyword || 'invoice').toLowerCase().trim()
@@ -659,8 +660,9 @@ export async function loadWormEmailList(options?: {
   const orderId = options?.orderId?.trim() || ''
   const senderEmail = (options?.senderEmail || '').trim().toLowerCase()
   const keywordMatchInSource = options?.keywordMatchInSource === true
+  const includeAllFromSender = options?.includeAllFromSender === true
   const forceRefresh = options?.forceRefresh === true
-  const cacheKey = `${rawKeyword}|${scanLimit}|${listLimit}|${senderEmail}|${keywordMatchInSource ? 'source' : 'subject'}`
+  const cacheKey = `${rawKeyword}|${scanLimit}|${listLimit}|${senderEmail}|${keywordMatchInSource ? 'source' : 'subject'}|${includeAllFromSender ? 'sender-all' : 'keyword'}`
 
   if (!forceRefresh) {
     const cached = getEmailListCache(cacheKey)
@@ -692,14 +694,18 @@ export async function loadWormEmailList(options?: {
       const fromAddresses = (msg.envelope?.from || [])
         .map((from) => (typeof from?.address === 'string' ? from.address.trim().toLowerCase() : ''))
         .filter(Boolean)
+      const isFromRequestedSender = Boolean(senderEmail && fromAddresses.includes(senderEmail))
       if (senderEmail && !fromAddresses.includes(senderEmail)) {
         continue
       }
 
       const sourceLower = keywordMatchInSource ? sourceBuf.toString('utf8').toLowerCase() : ''
+      const keywordMatched =
+        keywords.length === 0 ||
+        keywords.some((kw) => subjectLower.includes(kw) || (keywordMatchInSource && sourceLower.includes(kw)))
       if (
-        keywords.length > 0 &&
-        !keywords.some((kw) => subjectLower.includes(kw) || (keywordMatchInSource && sourceLower.includes(kw)))
+        !keywordMatched &&
+        !(includeAllFromSender && isFromRequestedSender)
       ) {
         continue
       }
