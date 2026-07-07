@@ -221,8 +221,9 @@ function inferWormEmailMatchType(input: {
   invoiceUnitPriceKrw?: number | null
   invoiceTotalAmountKrw?: number | null
 }) {
-  const storedType = normalizeWormEmailMatchType(input.matchType)
-  if (storedType === 'AWB_DOCUMENT') return storedType
+  if (input.matchType === 'INVOICE' || input.matchType === 'AWB_DOCUMENT') {
+    return input.matchType
+  }
 
   const subject = (input.subject || '').toLowerCase()
   const hasInvoiceAmount =
@@ -234,7 +235,7 @@ function inferWormEmailMatchType(input: {
     return 'AWB_DOCUMENT'
   }
 
-  return storedType
+  return normalizeWormEmailMatchType(input.matchType)
 }
 
 function isPdfAttachmentMeta(attachment: { filename?: string | null; contentType?: string | null }) {

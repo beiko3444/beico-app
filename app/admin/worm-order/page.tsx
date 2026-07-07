@@ -1174,6 +1174,34 @@ function writeStoredActiveWormOrderId(orderId: string | null) {
     }
 }
 
+function readUrlActiveWormOrderId() {
+    if (typeof window === 'undefined') return null
+
+    try {
+        const params = new URL(window.location.href).searchParams
+        return (params.get('wormOrderId') || params.get('orderId') || '').trim() || null
+    } catch (error) {
+        console.error('Failed to read active worm order id from URL', error)
+        return null
+    }
+}
+
+function writeUrlActiveWormOrderId(orderId: string | null) {
+    if (typeof window === 'undefined') return
+
+    try {
+        const url = new URL(window.location.href)
+        if (orderId) {
+            url.searchParams.set('wormOrderId', orderId)
+        } else {
+            url.searchParams.delete('wormOrderId')
+        }
+        window.history.replaceState(null, '', `${url.pathname}${url.search}${url.hash}`)
+    } catch (error) {
+        console.error('Failed to persist active worm order id to URL', error)
+    }
+}
+
 function normalizeWormEmailMatchType(value: unknown): WormEmailMatchType | null {
     if (value === 'INVOICE' || value === 'AWB_DOCUMENT') return value
     return null
@@ -1894,6 +1922,7 @@ export default function WormOrderPage() {
     const customsProgressCacheRef = useRef<Map<string, { savedAt: number; result: CustomsProgressResult | null; error: string }>>(new Map())
     const calendarWeatherRequestIdRef = useRef(0)
     const activeWormOrderIdRef = useRef<string | null>(null)
+    const lastAutoCustomsLookupKeyRef = useRef('')
     const hasLoadedWormOrdersRef = useRef(false)
     const lastResetWormOrderIdRef = useRef<string | null | undefined>(undefined)
     const emailFetchRequestIdRef = useRef(0)
@@ -2107,6 +2136,7 @@ export default function WormOrderPage() {
     useEffect(() => {
         if (!hasLoadedWormOrdersRef.current && !activeWormOrder?.id) return
         writeStoredActiveWormOrderId(activeWormOrder?.id ?? null)
+        writeUrlActiveWormOrderId(activeWormOrder?.id ?? null)
     }, [activeWormOrder?.id])
 
     const loadForwardLogs = useCallback(async (orderId: string) => {
@@ -2531,6 +2561,7 @@ export default function WormOrderPage() {
                 : []
 
             const storedActiveOrderId = readStoredActiveWormOrderId()
+            const urlActiveOrderId = readUrlActiveWormOrderId()
             const toOrderSnapshot = (order: WormOrderListItem): WormOrderSnapshot => ({
                 id: order.id,
                 orderNumber: order.orderNumber,
@@ -2540,7 +2571,7 @@ export default function WormOrderPage() {
             hasLoadedWormOrdersRef.current = true
             setWormOrderList(nextList)
             setActiveWormOrder((prev) => {
-                const preferredOrderId = prev?.id || storedActiveOrderId
+                const preferredOrderId = urlActiveOrderId || prev?.id || storedActiveOrderId
 
                 if (preferredOrderId) {
                     const matched = nextList.find((item) => item.id === preferredOrderId)
@@ -2739,6 +2770,7 @@ export default function WormOrderPage() {
             receiveDate: receiveDateText || '',
         })
         writeStoredActiveWormOrderId(order.id)
+        writeUrlActiveWormOrderId(order.id)
         if (receiveDateText) {
             setReceiveDate(receiveDateText)
         }
@@ -3777,7 +3809,11 @@ export default function WormOrderPage() {
         const normalizedAutoBlNo = normalizeCustomsBlNo(autoBlNumber || '')
         if (!normalizedAutoBlNo) return
         setBlNumberQuery(normalizedAutoBlNo)
-    }, [autoBlNumber])
+        const lookupKey = `${activeWormOrder?.id || 'no-order'}:${normalizedAutoBlNo}`
+        if (lastAutoCustomsLookupKeyRef.current === lookupKey) return
+        lastAutoCustomsLookupKeyRef.current = lookupKey
+        setPendingCustomsLookupBlNo(normalizedAutoBlNo)
+    }, [activeWormOrder?.id, autoBlNumber])
 
     const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbUid)
     const savedMatchedAttachments = useMemo(() => {
@@ -3795,7 +3831,7 @@ export default function WormOrderPage() {
         }> = []
         const seen = new Set<string>()
 
-        const collect = (
+        const collectOne = (
             sourceLabel: string,
             email: WormEmailListItem | null,
             details: Record<string, WormEmailDetail>,
@@ -3824,11 +3860,15 @@ export default function WormOrderPage() {
             }
         }
 
-        collect('인보이스', matchedInvoiceEmail, emailDetails)
-        collect('AWB 문서', matchedAwbEmail, docEmailDetails)
+        emails
+            .filter((email) => email.matchedOrderId === activeWormOrder?.id)
+            .forEach((email) => collectOne('인보이스', email, emailDetails))
+        docEmails
+            .filter((email) => email.matchedOrderId === activeWormOrder?.id)
+            .forEach((email) => collectOne('AWB 문서', email, docEmailDetails))
 
         return rows
-    }, [docEmailDetails, emailDetails, matchedAwbEmail, matchedInvoiceEmail])
+    }, [activeWormOrder?.id, docEmailDetails, docEmails, emailDetails, emails])
     const todayKstYmd = useMemo(() => {
         const parts = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'Asia/Seoul',
@@ -4604,6 +4644,7 @@ export default function WormOrderPage() {
             setOrderCreateNotice(`새 발주 생성 완료 · ${result?.order?.orderNumber || 'WO 생성'} (${targetReceiveDate})`)
             if (result?.order?.id && result?.order?.orderNumber) {
                 writeStoredActiveWormOrderId(result.order.id)
+                writeUrlActiveWormOrderId(result.order.id)
                 setActiveWormOrder({
                     id: result.order.id,
                     orderNumber: result.order.orderNumber,
