@@ -1840,6 +1840,7 @@ export default function WormOrderPage() {
     const [customsProgressResult, setCustomsProgressResult] = useState<CustomsProgressResult | null>(null)
     const [customsProgressError, setCustomsProgressError] = useState('')
     const [customsProgressLoading, setCustomsProgressLoading] = useState(false)
+    const [pendingCustomsLookupBlNo, setPendingCustomsLookupBlNo] = useState('')
     const orderSectionRef = useRef<HTMLDivElement>(null)
     const inboxSectionRef = useRef<HTMLDivElement>(null)
     const docInboxSectionRef = useRef<HTMLDivElement>(null)
@@ -1967,6 +1968,35 @@ export default function WormOrderPage() {
                 }
                 : prev
         ))
+        setDocEmails((prev) => prev.map((email) => (
+            email.uid === uid
+                ? { ...email, awbNumber: normalizedAwb }
+                : email
+        )))
+        setDocEmailDetails((prev) => (
+            prev[uid]
+                ? {
+                    ...prev,
+                    [uid]: {
+                        ...prev[uid],
+                        awbNumber: normalizedAwb,
+                    },
+                }
+                : prev
+        ))
+    }, [])
+
+    const applyAwbToCustomsLookup = useCallback((awb: string, options?: { runLookup?: boolean }) => {
+        const normalizedAwb = normalizeCustomsBlNo(awb)
+        if (!normalizedAwb) return
+
+        setBlNumberQuery(normalizedAwb)
+        setCustomsProgressError('')
+        setCustomsProgressResult(null)
+
+        if (options?.runLookup !== false) {
+            setPendingCustomsLookupBlNo(normalizedAwb)
+        }
     }, [])
 
     const persistAwbCache = useCallback(async (
@@ -1978,7 +2008,10 @@ export default function WormOrderPage() {
         if (!uid || !normalizedAwb) return
 
         const fallbackEmail = emails.find((email) => email.uid === uid)
+            || docEmails.find((email) => email.uid === uid)
+            || null
         applyAwbNumberToEmailState(uid, normalizedAwb)
+        applyAwbToCustomsLookup(normalizedAwb)
         setEmailCacheSavedAt(new Date().toISOString())
 
         // 매칭된 발주가 있으면 로컬 발주 리스트에도 AWB 즉시 반영
@@ -2010,7 +2043,7 @@ export default function WormOrderPage() {
         } catch (error) {
             console.warn('Failed to persist AWB cache:', error)
         }
-    }, [applyAwbNumberToEmailState, emails, docEmails])
+    }, [applyAwbNumberToEmailState, applyAwbToCustomsLookup, emails, docEmails])
 
     // ── AWB OCR 관련 State ──
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
@@ -3683,6 +3716,12 @@ export default function WormOrderPage() {
     // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
     const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
     const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
+    useEffect(() => {
+        const normalizedAutoBlNo = normalizeCustomsBlNo(autoBlNumber || '')
+        if (!normalizedAutoBlNo) return
+        setBlNumberQuery(normalizedAutoBlNo)
+    }, [autoBlNumber])
+
     const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbUid)
     const todayKstYmd = useMemo(() => {
         const parts = new Intl.DateTimeFormat('en-CA', {
@@ -4165,7 +4204,7 @@ export default function WormOrderPage() {
         const blNo = (nextBlNo ?? blNumberQuery).replace(/\s+/g, '').trim()
         const normalizedBlNo = normalizeCustomsBlNo(blNo)
         if (nextBlNo) {
-            setBlNumberQuery(blNo)
+            setBlNumberQuery(normalizedBlNo)
         }
 
         if (options?.scrollIntoView) {
@@ -4215,6 +4254,13 @@ export default function WormOrderPage() {
             }
         }
     }
+
+    useEffect(() => {
+        if (!pendingCustomsLookupBlNo) return
+        const nextBlNo = pendingCustomsLookupBlNo
+        setPendingCustomsLookupBlNo('')
+        void handleCustomsProgressSearch(nextBlNo)
+    }, [pendingCustomsLookupBlNo])
 
     const firstSummary = customsProgressResult?.summaryRecords?.[0] || null
     const detailRows = customsProgressResult?.detailRecords || []
@@ -4484,6 +4530,7 @@ export default function WormOrderPage() {
         setRemittanceSaveInfo(null)
         setRemittanceSaveWarning('')
         setBlNumberQuery('')
+        setPendingCustomsLookupBlNo('')
         setCustomsProgressResult(null)
         setCustomsProgressError('')
         setAwbNumber(null)
