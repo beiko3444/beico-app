@@ -111,7 +111,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'cargoCustomsMail' | 'shipping' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'cargoCustomsMail' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -162,47 +162,6 @@ function EmailBodyPreview({ loading, text }: { loading: boolean; text: string })
 type RemittanceProgressStage = {
     percent: number
     label: string
-}
-
-type LogenShippingSsePayload = {
-    ok?: boolean
-    step?: string
-    message?: string
-    trackingNumber?: string
-    printedAt?: string
-    recipientName?: string
-    error?: string
-    canceled?: boolean
-}
-
-function parseSseMessageBlock(block: string): { event: string; payload: LogenShippingSsePayload } | null {
-    const lines = block.split(/\r?\n/)
-    let event = 'message'
-    const dataLines: string[] = []
-
-    for (const line of lines) {
-        if (line.startsWith('event:')) {
-            event = line.slice(6).trim() || 'message'
-            continue
-        }
-        if (line.startsWith('data:')) {
-            dataLines.push(line.slice(5).trimStart())
-        }
-    }
-
-    if (dataLines.length === 0) return null
-
-    try {
-        return {
-            event,
-            payload: JSON.parse(dataLines.join('\n')) as LogenShippingSsePayload,
-        }
-    } catch {
-        return {
-            event,
-            payload: { message: dataLines.join('\n') },
-        }
-    }
 }
 
 type RemittancePricingSummary = {
@@ -547,16 +506,6 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         actionLabel: '수동 픽업',
         target: 'none',
     },
-    {
-        id: 13,
-        title: '로젠 송장 출력',
-        summary: '거래처 주문 정보로 로젠 택배 운송장을 자동 발행합니다.',
-        mode: 'SEMI',
-        owner: '관리자',
-        details: ['로젠 물류 자동 로그인', '수하인/주소 자동 입력', '운송장 출력 및 송장번호 수신'],
-        actionLabel: '송장 출력 실행',
-        target: 'shipping',
-    },
 ]
 
 const PIPELINE_PHASES: PipelinePhaseDefinition[] = [
@@ -564,7 +513,7 @@ const PIPELINE_PHASES: PipelinePhaseDefinition[] = [
     { id: 'remittance', label: '송금', stepIds: [3, 4, 5], tone: 'amber' },
     { id: 'document', label: '선적서류', stepIds: [6], tone: 'sky' },
     { id: 'customs', label: '통관', stepIds: [7, 8, 9], tone: 'emerald' },
-    { id: 'release', label: '출고', stepIds: [10, 11, 12, 13], tone: 'slate' },
+    { id: 'release', label: '출고', stepIds: [10, 11, 12], tone: 'slate' },
 ]
 
 const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
@@ -1921,11 +1870,9 @@ export default function WormOrderPage() {
     const notificationSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
     const cargoCustomsMailSectionRef = useRef<HTMLDivElement>(null)
-    const shippingSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
     const remittanceRequestAbortControllerRef = useRef<AbortController | null>(null)
     const remittanceCancelRequestedRef = useRef(false)
-    const shippingRequestAbortControllerRef = useRef<AbortController | null>(null)
     const invoicePreviewUrlRef = useRef<string | null>(null)
     const invoicePreviewTaskIdRef = useRef(0)
     const customsProgressCacheRef = useRef<Map<string, { savedAt: number; result: CustomsProgressResult | null; error: string }>>(new Map())
@@ -2105,152 +2052,9 @@ export default function WormOrderPage() {
     const [forwardLogsError, setForwardLogsError] = useState('')
     const [remittanceManuallyDone, setRemittanceManuallyDone] = useState(false)
 
-    // ── 로젠 송장 출력 관련 State ──
-    const [shippingRecipientPhone, setShippingRecipientPhone] = useState('')
-    const [shippingRecipientName, setShippingRecipientName] = useState('')
-    const [shippingRecipientAddress, setShippingRecipientAddress] = useState('')
-    const [shippingRecipientDetailAddress, setShippingRecipientDetailAddress] = useState('')
-    const [shippingSubmitting, setShippingSubmitting] = useState(false)
-    const [shippingCancelling, setShippingCancelling] = useState(false)
-    const [shippingError, setShippingError] = useState('')
-    const [shippingSuccess, setShippingSuccess] = useState('')
-    const [shippingTrackingNumber, setShippingTrackingNumber] = useState('')
-    const [shippingPrintedAt, setShippingPrintedAt] = useState('')
-    const [shippingProgressLabel, setShippingProgressLabel] = useState('대기 중')
-    const [shippingProgressEvents, setShippingProgressEvents] = useState<string[]>([])
-
     useEffect(() => {
         activeWormOrderIdRef.current = activeWormOrder?.id ?? null
     }, [activeWormOrder?.id])
-
-    const handleSubmitLogenShipping = useCallback(async () => {
-        if (shippingSubmitting) return
-        if (!shippingRecipientPhone || !shippingRecipientName || !shippingRecipientAddress) {
-            setShippingError('수하인 전화번호, 이름, 주소를 모두 입력해주세요.')
-            return
-        }
-        const abortController = new AbortController()
-        shippingRequestAbortControllerRef.current = abortController
-        setShippingSubmitting(true)
-        setShippingCancelling(false)
-        setShippingError('')
-        setShippingSuccess('')
-        setShippingTrackingNumber('')
-        setShippingPrintedAt('')
-        setShippingProgressEvents([])
-        setShippingProgressLabel('로젠 자동화 시작...')
-        try {
-            const res = await fetch('/api/admin/worm-order/logen-shipping', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                signal: abortController.signal,
-                body: JSON.stringify({
-                    orderId: activeWormOrder?.id || null,
-                    recipientPhone: shippingRecipientPhone,
-                    recipientName: shippingRecipientName,
-                    recipientAddress: shippingRecipientAddress,
-                    recipientDetailAddress: shippingRecipientDetailAddress,
-                }),
-            })
-
-            if (!res.ok) {
-                const data = await res.json().catch(() => ({}))
-                throw new Error(data?.error || '로젠 송장 출력 실패')
-            }
-
-            if (!res.body) {
-                throw new Error('로젠 송장 출력 스트림을 열지 못했습니다.')
-            }
-
-            const reader = res.body.getReader()
-            const decoder = new TextDecoder()
-            let buffer = ''
-
-            const handleSseEvent = (event: string, payload: LogenShippingSsePayload) => {
-                if (event === 'progress' || event === 'step') {
-                    const label = payload.step || payload.message || '진행 중'
-                    setShippingProgressLabel(label)
-                    setShippingProgressEvents((prev) => [...prev.slice(-7), label])
-                    return
-                }
-
-                if (event === 'success' || event === 'done') {
-                    const trackingNumber = payload.trackingNumber || ''
-                    setShippingTrackingNumber(trackingNumber)
-                    setShippingPrintedAt(payload.printedAt || '')
-                    setShippingSuccess(`운송장 발행 완료! 송장번호: ${trackingNumber || '-'}`)
-                    setShippingProgressLabel('완료')
-                    setShippingProgressEvents((prev) => [...prev.slice(-7), payload.message || '완료'])
-                    return
-                }
-
-                if (event === 'warning') {
-                    const label = payload.message || payload.step || '주의가 필요한 단계가 있습니다.'
-                    setShippingProgressEvents((prev) => [...prev.slice(-7), label])
-                    return
-                }
-
-                if (event === 'error') {
-                    throw new Error(payload.error || payload.message || '로젠 송장 출력 중 오류가 발생했습니다.')
-                }
-            }
-
-            while (true) {
-                const { value, done } = await reader.read()
-                if (done) break
-                buffer += decoder.decode(value, { stream: true })
-
-                let boundaryIndex = buffer.indexOf('\n\n')
-                while (boundaryIndex >= 0) {
-                    const block = buffer.slice(0, boundaryIndex).trim()
-                    buffer = buffer.slice(boundaryIndex + 2)
-                    const parsed = parseSseMessageBlock(block)
-                    if (parsed) {
-                        handleSseEvent(parsed.event, parsed.payload)
-                    }
-                    boundaryIndex = buffer.indexOf('\n\n')
-                }
-            }
-
-            const trailingBlock = buffer.trim()
-            if (trailingBlock) {
-                const parsed = parseSseMessageBlock(trailingBlock)
-                if (parsed) {
-                    handleSseEvent(parsed.event, parsed.payload)
-                }
-            }
-        } catch (error) {
-            if (error instanceof DOMException && error.name === 'AbortError') {
-                setShippingError('로젠 송장 출력 요청이 취소되었습니다.')
-                setShippingProgressLabel('취소됨')
-            } else {
-                setShippingError(error instanceof Error ? error.message : '로젠 송장 출력 중 오류가 발생했습니다.')
-                setShippingProgressLabel('실패')
-            }
-        } finally {
-            setShippingSubmitting(false)
-            setShippingCancelling(false)
-            shippingRequestAbortControllerRef.current = null
-        }
-    }, [activeWormOrder?.id, shippingSubmitting, shippingRecipientPhone, shippingRecipientName, shippingRecipientAddress, shippingRecipientDetailAddress])
-
-    const handleCancelLogenShipping = useCallback(async () => {
-        if (!shippingSubmitting || shippingCancelling) return
-        setShippingCancelling(true)
-        setShippingProgressLabel('취소 요청 중...')
-        try {
-            const res = await fetch('/api/admin/worm-order/logen-shipping', { method: 'DELETE' })
-            const data = await res.json().catch(() => ({}))
-            if (!res.ok) {
-                throw new Error(data?.error || '로젠 송장 출력 취소 실패')
-            }
-            setShippingProgressEvents((prev) => [...prev.slice(-7), data?.message || '취소 요청 접수'])
-        } catch (error) {
-            setShippingError(error instanceof Error ? error.message : '로젠 송장 출력 취소 중 오류가 발생했습니다.')
-        } finally {
-            shippingRequestAbortControllerRef.current?.abort()
-        }
-    }, [shippingCancelling, shippingSubmitting])
 
     const loadForwardLogs = useCallback(async (orderId: string) => {
         if (!orderId) return
@@ -2720,9 +2524,6 @@ export default function WormOrderPage() {
             window.clearInterval(remittanceProgressTimerRef.current)
             remittanceProgressTimerRef.current = null
         }
-        shippingRequestAbortControllerRef.current?.abort()
-        shippingRequestAbortControllerRef.current = null
-
         setQuantitiesByType(createInitialQuantitiesByType())
         setGeneratedMessage('')
         setValidationError('')
@@ -2807,17 +2608,6 @@ export default function WormOrderPage() {
         })
         setManualRemittanceError('')
 
-        setShippingRecipientPhone('')
-        setShippingRecipientName('')
-        setShippingRecipientAddress('')
-        setShippingRecipientDetailAddress('')
-        setShippingCancelling(false)
-        setShippingError('')
-        setShippingSuccess('')
-        setShippingTrackingNumber('')
-        setShippingPrintedAt('')
-        setShippingProgressLabel('대기 중')
-        setShippingProgressEvents([])
     }, [replaceInvoicePreviewUrl])
 
     const restoreMatchedEmailsForOrder = useCallback(async (order: WormOrderSnapshot) => {
@@ -4511,7 +4301,6 @@ export default function WormOrderPage() {
         result[10] = hasWarehouseMail ? 'done' : 'todo'
         result[11] = 'todo'
         result[12] = 'todo'
-        result[13] = shippingTrackingNumber ? 'done' : shippingSubmitting ? 'active' : 'todo'
 
         return result
     }, [
@@ -4541,8 +4330,6 @@ export default function WormOrderPage() {
         remittanceManuallyDone,
         remittanceSubmitting,
         remittanceSuccess,
-        shippingSubmitting,
-        shippingTrackingNumber,
         totalBoxes,
     ])
 
@@ -4638,9 +4425,6 @@ export default function WormOrderPage() {
         if (target === 'cargoCustomsMail') {
             cargoCustomsMailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
-        }
-        if (target === 'shipping') {
-            shippingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
         }
     }, [])
 
@@ -4755,17 +4539,6 @@ export default function WormOrderPage() {
         setDocEmailMatchMessage('')
         setPaymentNotificationCopied(false)
         setRemittanceManuallyDone(false)
-        setShippingRecipientPhone('')
-        setShippingRecipientName('')
-        setShippingRecipientAddress('')
-        setShippingRecipientDetailAddress('')
-        setShippingCancelling(false)
-        setShippingError('')
-        setShippingSuccess('')
-        setShippingTrackingNumber('')
-        setShippingPrintedAt('')
-        setShippingProgressLabel('대기 중')
-        setShippingProgressEvents([])
         setCreatingOrder(false)
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
@@ -4777,7 +4550,6 @@ export default function WormOrderPage() {
     const showNotificationTools = visibleStepIdSet.has(5)
     const showCustomsTools = visibleStepIdSet.has(7)
     const showCargoCustomsMailTools = visibleStepIdSet.has(9)
-    const showShippingTools = visibleStepIdSet.has(13)
     const stepRenderOrderMap = useMemo(() => {
         const next = new Map<number, number>()
         filteredPipelineSteps.forEach((step, index) => {
@@ -4801,7 +4573,6 @@ export default function WormOrderPage() {
     const notificationToolOrderBase = getAnchorOrderBase([5], 5)
     const customsToolOrderBase = getAnchorOrderBase([7], 7)
     const cargoCustomsMailToolOrderBase = getAnchorOrderBase([9], 9)
-    const shippingToolOrderBase = getAnchorOrderBase([13], 13)
     const workflowFlowPanel = (
         <aside className="flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
             <div className="border-b border-slate-100 px-4 py-4">
@@ -6853,171 +6624,6 @@ export default function WormOrderPage() {
                                 <p className="text-[12px] font-medium text-slate-500">저장된 발송 이력이 없습니다.</p>
                             )}
                             {forwardLogsError && <p className="text-[12px] font-semibold text-[#e34219]">{forwardLogsError}</p>}
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {showShippingTools && (
-                <div
-                    ref={shippingSectionRef}
-                    style={{ order: shippingToolOrderBase + 5 }}
-                    className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
-                >
-                    <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f8fafc] dark:bg-[#1a1a1a] flex items-center justify-between gap-3">
-                        <div>
-                            <h3 className="text-lg font-black text-[#111827] dark:text-white flex items-center gap-2">
-                                <Package size={18} className="text-slate-700 dark:text-gray-300" />
-                                로젠 송장 출력
-                            </h3>
-                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">
-                                대상 발주: {activeOrderNumberText}
-                            </p>
-                        </div>
-                        {shippingSubmitting && (
-                            <span className="inline-flex items-center gap-1.5 rounded-lg border border-blue-100 bg-blue-50 px-3 py-1.5 text-[11px] font-bold text-blue-700">
-                                <Loader2 size={13} className="animate-spin" />
-                                실행중
-                            </span>
-                        )}
-                    </div>
-
-                    <div className="p-6 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">수하인 전화번호</label>
-                                <input
-                                    type="tel"
-                                    value={shippingRecipientPhone}
-                                    onChange={(event) => setShippingRecipientPhone(event.target.value)}
-                                    placeholder="010-0000-0000"
-                                    disabled={shippingSubmitting}
-                                    className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
-                                />
-                            </div>
-                            <div className="space-y-1.5">
-                                <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">수하인명</label>
-                                <input
-                                    type="text"
-                                    value={shippingRecipientName}
-                                    onChange={(event) => setShippingRecipientName(event.target.value)}
-                                    placeholder="받는 사람 이름"
-                                    disabled={shippingSubmitting}
-                                    className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
-                                />
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">주소</label>
-                                <input
-                                    type="text"
-                                    value={shippingRecipientAddress}
-                                    onChange={(event) => setShippingRecipientAddress(event.target.value)}
-                                    placeholder="도로명/지번 주소"
-                                    disabled={shippingSubmitting}
-                                    className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
-                                />
-                            </div>
-                            <div className="space-y-1.5 md:col-span-2">
-                                <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">상세주소</label>
-                                <input
-                                    type="text"
-                                    value={shippingRecipientDetailAddress}
-                                    onChange={(event) => setShippingRecipientDetailAddress(event.target.value)}
-                                    placeholder="동/호수, 상세 위치"
-                                    disabled={shippingSubmitting}
-                                    className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm font-medium text-slate-900 disabled:bg-slate-100 disabled:text-slate-400"
-                                />
-                            </div>
-                        </div>
-
-                        <div className="rounded-xl border border-slate-200 bg-slate-50/70 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] px-4 py-3 space-y-2">
-                            <div className="flex items-center justify-between gap-3">
-                                <span className={`text-sm font-bold ${shippingError ? 'text-rose-600' : shippingTrackingNumber ? 'text-emerald-700' : 'text-slate-700 dark:text-gray-300'}`}>
-                                    {shippingProgressLabel}
-                                </span>
-                                {shippingPrintedAt && (
-                                    <span className="text-[11px] font-semibold text-slate-500">
-                                        {formatSafeDateTime(shippingPrintedAt)}
-                                    </span>
-                                )}
-                            </div>
-                            {shippingProgressEvents.length > 0 && (
-                                <div className="flex flex-wrap gap-1.5">
-                                    {shippingProgressEvents.map((eventLabel, index) => (
-                                        <span
-                                            key={`${eventLabel}-${index}`}
-                                            className="inline-flex items-center rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-semibold text-slate-600"
-                                        >
-                                            {eventLabel}
-                                        </span>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {shippingError && (
-                            <p className="text-sm font-semibold text-rose-600">{shippingError}</p>
-                        )}
-                        {shippingSuccess && (
-                            <p className="text-sm font-semibold text-emerald-700">{shippingSuccess}</p>
-                        )}
-                        {shippingTrackingNumber && (
-                            <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 px-4 py-3 flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-                                <div>
-                                    <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.14em]">운송장번호</p>
-                                    <p className="text-xl font-black text-emerald-900 tracking-tight">{shippingTrackingNumber}</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    onClick={() => {
-                                        navigator.clipboard.writeText(shippingTrackingNumber)
-                                    }}
-                                    className="h-9 px-4 rounded-lg bg-emerald-700 text-white text-xs font-bold hover:bg-emerald-800 inline-flex items-center justify-center gap-1.5"
-                                >
-                                    <Copy size={14} />
-                                    복사
-                                </button>
-                            </div>
-                        )}
-
-                        <div className="flex flex-col md:flex-row md:items-center gap-2 md:justify-end">
-                            {shippingSubmitting && (
-                                <button
-                                    type="button"
-                                    onClick={handleCancelLogenShipping}
-                                    disabled={shippingCancelling}
-                                    className="h-11 px-5 rounded-lg border border-rose-200 bg-rose-50 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:opacity-60 inline-flex items-center justify-center gap-2"
-                                >
-                                    {shippingCancelling ? (
-                                        <>
-                                            <Loader2 size={15} className="animate-spin" />
-                                            취소중...
-                                        </>
-                                    ) : (
-                                        <>
-                                            <X size={15} />
-                                            취소
-                                        </>
-                                    )}
-                                </button>
-                            )}
-                            <button
-                                type="button"
-                                onClick={() => { void handleSubmitLogenShipping() }}
-                                disabled={shippingSubmitting || !shippingRecipientPhone || !shippingRecipientName || !shippingRecipientAddress}
-                                className="h-11 px-6 rounded-lg bg-[#111827] text-white text-sm font-bold hover:bg-black disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2"
-                            >
-                                {shippingSubmitting ? (
-                                    <>
-                                        <Loader2 size={15} className="animate-spin" />
-                                        출력 실행중...
-                                    </>
-                                ) : shippingError ? (
-                                    '다시 시도'
-                                ) : (
-                                    '출력 시작'
-                                )}
-                            </button>
                         </div>
                     </div>
                 </div>
