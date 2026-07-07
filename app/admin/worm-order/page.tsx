@@ -111,7 +111,7 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type PipelineFilter = 'all' | PipelineMode
-type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'bankPayment' | 'notification' | 'customs' | 'cargoCustomsMail' | 'none'
+type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'customs' | 'cargoCustomsMail' | 'none'
 
 type PipelineStepDefinition = {
     id: number
@@ -417,27 +417,6 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     },
     {
         id: 4,
-        title: '실제 입금 처리',
-        summary: '은행/앱에서 실제 송금을 완료하고 결과를 확인합니다.',
-        mode: 'MANUAL',
-        owner: '관리자',
-        details: ['외부 결제 채널 접속', '실제 입금 수행', '입금 완료 확인'],
-        actionLabel: '송금 정보 확인',
-        target: 'bankPayment',
-        warning: '은행 정책상 시스템 완전 자동화 불가',
-    },
-    {
-        id: 5,
-        title: '입금 완료 통보',
-        summary: '입금 완료 후 거래처 통보를 자동으로 진행합니다.',
-        mode: 'AUTO',
-        owner: '시스템',
-        details: ['완료 알림 메시지 생성', '이메일/메신저 전송', '전송 이력 보관'],
-        actionLabel: '통보 메시지 복사',
-        target: 'notification',
-    },
-    {
-        id: 6,
         title: '선적 서류 수신 및 AWB OCR',
         summary: 'SKM 문서에서 AWB를 OCR로 추출하고 캐시에 저장합니다.',
         mode: 'AUTO',
@@ -447,7 +426,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'docInbox',
     },
     {
-        id: 7,
+        id: 5,
         title: '유니패스 수입 통관 조회',
         summary: 'AWB/B-L 번호로 통관 진행 정보를 조회하고 개입 단계를 강조합니다.',
         mode: 'SEMI',
@@ -457,7 +436,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'customs',
     },
     {
-        id: 8,
+        id: 6,
         title: '통관 승인 문서 수령',
         summary: '통관 완료 후 필요한 문서를 수령/정리합니다.',
         mode: 'MANUAL',
@@ -467,7 +446,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'none',
     },
     {
-        id: 9,
+        id: 7,
         title: '카고/관세사 문서 전달',
         summary: '필요 첨부파일을 지정 이메일로 전달합니다.',
         mode: 'SEMI',
@@ -477,7 +456,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'cargoCustomsMail',
     },
     {
-        id: 10,
+        id: 8,
         title: '창고료 청구 메일 수신',
         summary: '창고료 관련 메일을 감지하고 처리 대상을 표시합니다.',
         mode: 'AUTO',
@@ -487,7 +466,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'none',
     },
     {
-        id: 11,
+        id: 9,
         title: '창고료 결제',
         summary: '청구 금액을 확인하고 결제를 완료합니다.',
         mode: 'SEMI',
@@ -497,7 +476,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
         target: 'none',
     },
     {
-        id: 12,
+        id: 10,
         title: '카고 현장 픽업',
         summary: '최종 현장 픽업을 수행하고 다음 사이클로 종료합니다.',
         mode: 'MANUAL',
@@ -510,10 +489,10 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
 
 const PIPELINE_PHASES: PipelinePhaseDefinition[] = [
     { id: 'order', label: '발주', stepIds: [1, 2], tone: 'red' },
-    { id: 'remittance', label: '송금', stepIds: [3, 4, 5], tone: 'amber' },
-    { id: 'document', label: '선적서류', stepIds: [6], tone: 'sky' },
-    { id: 'customs', label: '통관', stepIds: [7, 8, 9], tone: 'emerald' },
-    { id: 'release', label: '출고', stepIds: [10, 11, 12], tone: 'slate' },
+    { id: 'remittance', label: '송금', stepIds: [3], tone: 'amber' },
+    { id: 'document', label: '선적서류', stepIds: [4], tone: 'sky' },
+    { id: 'customs', label: '통관', stepIds: [5, 6, 7], tone: 'emerald' },
+    { id: 'release', label: '출고', stepIds: [8, 9, 10], tone: 'slate' },
 ]
 
 const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
@@ -1836,7 +1815,6 @@ export default function WormOrderPage() {
     const [remittancePricingSummaryOrderId, setRemittancePricingSummaryOrderId] = useState<string | null>(null)
     const [remittanceSaveInfo, setRemittanceSaveInfo] = useState<{ orderNumber: string; savedAt: string } | null>(null)
     const [remittanceSaveWarning, setRemittanceSaveWarning] = useState('')
-    const [paymentNotificationCopied, setPaymentNotificationCopied] = useState(false)
     const [activeWormOrder, setActiveWormOrder] = useState<WormOrderSnapshot | null>(null)
     const [wormOrderList, setWormOrderList] = useState<WormOrderListItem[]>([])
     const [selectedWormOrderYearMonth, setSelectedWormOrderYearMonth] = useState('')
@@ -1866,8 +1844,6 @@ export default function WormOrderPage() {
     const inboxSectionRef = useRef<HTMLDivElement>(null)
     const docInboxSectionRef = useRef<HTMLDivElement>(null)
     const remittanceSectionRef = useRef<HTMLDivElement>(null)
-    const bankPaymentSectionRef = useRef<HTMLDivElement>(null)
-    const notificationSectionRef = useRef<HTMLDivElement>(null)
     const customsProgressSectionRef = useRef<HTMLDivElement>(null)
     const cargoCustomsMailSectionRef = useRef<HTMLDivElement>(null)
     const remittanceProgressTimerRef = useRef<number | null>(null)
@@ -2050,7 +2026,6 @@ export default function WormOrderPage() {
     const [forwardLogs, setForwardLogs] = useState<WormForwardLogItem[]>([])
     const [forwardLogsLoading, setForwardLogsLoading] = useState(false)
     const [forwardLogsError, setForwardLogsError] = useState('')
-    const [remittanceManuallyDone, setRemittanceManuallyDone] = useState(false)
 
     useEffect(() => {
         activeWormOrderIdRef.current = activeWormOrder?.id ?? null
@@ -2592,8 +2567,6 @@ export default function WormOrderPage() {
         setRemittancePricingSummaryOrderId(null)
         setRemittanceSaveInfo(null)
         setRemittanceSaveWarning('')
-        setRemittanceManuallyDone(false)
-        setPaymentNotificationCopied(false)
         setRemittanceCandidates(null)
         setRemittanceCandidatesOrder(null)
         setRemittanceCandidatePicking(null)
@@ -4275,32 +4248,30 @@ export default function WormOrderPage() {
             : remittanceSubmitting || isAutoRemittanceReady || isManualRemittanceReady
                 ? 'active'
                 : 'todo'
-        result[4] = remittanceManuallyDone ? 'done' : result[3] === 'done' ? 'active' : 'todo'
-        result[5] = paymentNotificationCopied ? 'done' : remittanceManuallyDone || result[3] === 'done' ? 'active' : 'todo'
-        result[6] = matchedAwbUid || persistedAwbNumber
+        result[4] = matchedAwbUid || persistedAwbNumber
             ? 'done'
             : awbLoading || loadingDocEmails || docHasFetched
                 ? 'active'
                 : 'todo'
-        result[7] = customsProgressResult
+        result[5] = customsProgressResult
             ? 'done'
             : customsProgressLoading || Boolean(blNumberQuery.trim())
                 ? 'active'
                 : 'todo'
-        result[8] = detailRows.some((row) => {
+        result[6] = detailRows.some((row) => {
             const normalized = normalizeCustomsStepText(row.cargTrcnRelaBsopTpcd, row.rlbrCn)
             return normalized.includes('\uC218\uC785\uC2E0\uACE0\uC218\uB9AC')
         })
             ? 'done'
             : 'todo'
-        result[9] = forwardSuccess
+        result[7] = forwardSuccess
             ? 'done'
             : forwarding || isCustomsForwardReady
                 ? 'active'
                 : 'todo'
-        result[10] = hasWarehouseMail ? 'done' : 'todo'
-        result[11] = 'todo'
-        result[12] = 'todo'
+        result[8] = hasWarehouseMail ? 'done' : 'todo'
+        result[9] = 'todo'
+        result[10] = 'todo'
 
         return result
     }, [
@@ -4325,9 +4296,7 @@ export default function WormOrderPage() {
         matchedAwbUid,
         matchedInvoiceEmail?.uid,
         matchingEmailUid,
-        paymentNotificationCopied,
         persistedAwbNumber,
-        remittanceManuallyDone,
         remittanceSubmitting,
         remittanceSuccess,
         totalBoxes,
@@ -4345,7 +4314,7 @@ export default function WormOrderPage() {
         [pipelineStatusMap],
     )
     const activeStepId = useMemo(
-        () => PIPELINE_STEP_DEFINITIONS.find((step) => pipelineStatusMap[step.id] !== 'done')?.id ?? 12,
+        () => PIPELINE_STEP_DEFINITIONS.find((step) => pipelineStatusMap[step.id] !== 'done')?.id ?? 10,
         [pipelineStatusMap],
     )
     const activeStepDefinition = useMemo(
@@ -4410,14 +4379,6 @@ export default function WormOrderPage() {
             docInboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
         }
-        if (target === 'notification') {
-            notificationSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-        if (target === 'bankPayment') {
-            bankPaymentSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
         if (target === 'customs') {
             customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
             return
@@ -4449,12 +4410,12 @@ export default function WormOrderPage() {
             return
         }
 
-        if (step.id === 6 && !loadingDocEmails) {
+        if (step.id === 4 && !loadingDocEmails) {
             void fetchDocumentEmails()
             return
         }
 
-        if (step.id === 7 && fallbackAwbCandidate) {
+        if (step.id === 5 && fallbackAwbCandidate) {
             void handleCustomsProgressSearch(fallbackAwbCandidate, { scrollIntoView: true })
         }
     }, [
@@ -4537,19 +4498,15 @@ export default function WormOrderPage() {
         setSelectedDocEmailUid(null)
         setDocEmailError('')
         setDocEmailMatchMessage('')
-        setPaymentNotificationCopied(false)
-        setRemittanceManuallyDone(false)
         setCreatingOrder(false)
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
     const showOrderTools = visibleStepIdSet.has(1)
     const showInboxTools = visibleStepIdSet.has(2)
-    const showDocInboxTools = visibleStepIdSet.has(6)
+    const showDocInboxTools = visibleStepIdSet.has(4)
     const showRemittanceTools = visibleStepIdSet.has(3)
-    const showBankPaymentTools = visibleStepIdSet.has(4)
-    const showNotificationTools = visibleStepIdSet.has(5)
-    const showCustomsTools = visibleStepIdSet.has(7)
-    const showCargoCustomsMailTools = visibleStepIdSet.has(9)
+    const showCustomsTools = visibleStepIdSet.has(5)
+    const showCargoCustomsMailTools = visibleStepIdSet.has(7)
     const stepRenderOrderMap = useMemo(() => {
         const next = new Map<number, number>()
         filteredPipelineSteps.forEach((step, index) => {
@@ -4567,12 +4524,10 @@ export default function WormOrderPage() {
     }, [fallbackOrderBase, stepRenderOrderMap])
     const orderToolOrderBase = getAnchorOrderBase([1], 1)
     const inboxToolOrderBase = getAnchorOrderBase([2], 2)
-    const docInboxToolOrderBase = getAnchorOrderBase([6], 6)
+    const docInboxToolOrderBase = getAnchorOrderBase([4], 4)
     const remittanceToolOrderBase = getAnchorOrderBase([3], 3)
-    const bankPaymentToolOrderBase = getAnchorOrderBase([4], 4)
-    const notificationToolOrderBase = getAnchorOrderBase([5], 5)
-    const customsToolOrderBase = getAnchorOrderBase([7], 7)
-    const cargoCustomsMailToolOrderBase = getAnchorOrderBase([9], 9)
+    const customsToolOrderBase = getAnchorOrderBase([5], 5)
+    const cargoCustomsMailToolOrderBase = getAnchorOrderBase([7], 7)
     const workflowFlowPanel = (
         <aside className="flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
             <div className="border-b border-slate-100 px-4 py-4">
@@ -5982,76 +5937,6 @@ export default function WormOrderPage() {
                 </div>
             )}
 
-            {showBankPaymentTools && (
-                <div
-                    ref={bankPaymentSectionRef}
-                    style={{ order: bankPaymentToolOrderBase + 5 }}
-                    className={`rounded-2xl border shadow-sm dark:shadow-none overflow-hidden transition-all duration-500 ${
-                        remittanceManuallyDone
-                            ? 'bg-[#fff3ef] dark:bg-[#252525] border-[#e34219]'
-                            : 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
-                    }`}
-                >
-                    <div className={`px-6 py-4 border-b flex items-center justify-between ${
-                        remittanceManuallyDone ? 'border-[#f5c4b8] bg-[#fff7f3] dark:bg-[#1a1a1a]' : 'border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a]'
-                    }`}>
-                        <div>
-                            <h3 className="text-lg font-black text-[#111827] dark:text-white">모인비지니스 송금</h3>
-                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">아래 계좌로 최종 금액을 직접 송금해 주세요.</p>
-                        </div>
-                        <Send size={18} className="text-[#e34219] mt-1" />
-                    </div>
-                    <div className="p-6 space-y-4">
-                        <div className="rounded-xl border border-[#f5c4b8] bg-[#fff7f3] px-5 py-4">
-                            <p className="text-sm font-bold text-[#e34219] mb-3">모인비지니스로 최종금액을 송금해주세요.</p>
-                            <table className="w-full text-sm">
-                                <tbody className="divide-y divide-[#f5c4b8]">
-                                    <tr>
-                                        <td className="py-2 font-semibold text-slate-600 dark:text-gray-400 w-32">은행</td>
-                                        <td className="py-2 font-bold text-slate-900 dark:text-white">신한은행</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2 font-semibold text-slate-600 dark:text-gray-400">가상계좌번호</td>
-                                        <td className="py-2 font-black text-slate-900 dark:text-white tracking-wider">562-167-6230695-9</td>
-                                    </tr>
-                                    <tr>
-                                        <td className="py-2 font-semibold text-slate-600 dark:text-gray-400">예금주명</td>
-                                        <td className="py-2 font-bold text-slate-900 dark:text-white">모인_dabin lee(엑스트래커)</td>
-                                    </tr>
-                                    {autoTransferAmountUsd !== null && (
-                                        <tr>
-                                            <td className="py-2 font-semibold text-slate-600 dark:text-gray-400">송금 금액</td>
-                                            <td className="py-2 font-black text-[#e34219] text-base">
-                                                {autoTransferAmountUsd.toLocaleString(undefined, { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                            </td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                            <button
-                                type="button"
-                                onClick={() => setRemittanceManuallyDone((prev) => !prev)}
-                                className={`h-11 px-8 rounded-xl font-black text-sm tracking-wide transition-all duration-300 inline-flex items-center gap-2 ${
-                                    remittanceManuallyDone
-                                        ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-md'
-                                        : 'bg-[#e34219] hover:bg-[#cd3b17] text-white shadow'
-                                }`}
-                            >
-                                {remittanceManuallyDone ? '✓ 송금완료' : '송금완료'}
-                            </button>
-                            {remittanceManuallyDone && (
-                                <span className="text-sm font-semibold text-emerald-700">
-                                    송금이 완료되었습니다. 입금완료 통보를 진행해 주세요.
-                                </span>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-
             {showRemittanceTools && (
                 <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
@@ -6312,61 +6197,6 @@ export default function WormOrderPage() {
 
                 </div>
             )}
-            {/* ── 입금완료 통보 (Step 5) ── */}
-            {showNotificationTools && (() => {
-                const sendAmountText = effectiveRemittancePricingSummary?.sendAmount
-                    || (autoTransferAmountUsd !== null
-                        ? `$${autoTransferAmountUsd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-                        : activeWormOrderRecord?.remittanceSendAmountText || null)
-                const notificationMessage = sendAmountText
-                    ? `Michael, the payment has been completed to the "${sendAmountText}" bank. It should be credited shortly, so please prepare the order for shipment.`
-                    : null
-                return (
-                    <div ref={notificationSectionRef} style={{ order: notificationToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden">
-                        <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0fdf4] dark:bg-[#1a1a1a] flex items-center justify-between">
-                            <div>
-                                <h3 className="text-lg font-black text-[#111827] dark:text-white flex items-center gap-2">
-                                    <Send size={18} className="text-emerald-600" />
-                                    입금완료 통보
-                                </h3>
-                                <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">마이클에게 입금 완료를 통보하는 메시지를 복사해서 전달하세요.</p>
-                            </div>
-                        </div>
-                        <div className="p-6 space-y-4">
-                            {!sendAmountText ? (
-                                <div className="rounded-xl border border-amber-100 bg-amber-50/60 p-3 text-[12px] font-semibold text-amber-700">
-                                    송금 신청을 먼저 완료하면 통보 메시지가 자동으로 생성됩니다.
-                                </div>
-                            ) : (
-                                <>
-                                    <div className="rounded-xl border-2 border-emerald-200 bg-emerald-50/40 px-5 py-4 text-[15px] leading-relaxed text-gray-800 font-medium">
-                                        {notificationMessage}
-                                    </div>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            if (notificationMessage) {
-                                                navigator.clipboard.writeText(notificationMessage)
-                                                setPaymentNotificationCopied(true)
-                                                setTimeout(() => setPaymentNotificationCopied(false), 2500)
-                                            }
-                                        }}
-                                        className={`inline-flex items-center gap-2 h-10 px-5 rounded-xl font-bold text-sm transition-colors ${
-                                            paymentNotificationCopied
-                                                ? 'bg-emerald-600 text-white'
-                                                : 'bg-emerald-700 hover:bg-emerald-600 text-white'
-                                        }`}
-                                    >
-                                        <Copy size={15} />
-                                        {paymentNotificationCopied ? '복사 완료 ✓' : '메시지 복사'}
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                )
-            })()}
-
             {showCustomsTools && (
                 <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
                 <div className="flex items-start justify-between gap-3">
