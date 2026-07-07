@@ -6,9 +6,20 @@ import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
-function toAttachmentResponse(attachment: { content?: unknown; filename?: string | null; contentType?: string | null }, index: number) {
+function isJpegAttachment(attachment: { filename?: string | null; contentType?: string | null }) {
+    const filename = (attachment.filename || '').trim().toLowerCase()
+    const contentType = (attachment.contentType || '').trim().toLowerCase()
+    return filename.endsWith('.jpg') || filename.endsWith('.jpeg') || contentType === 'image/jpeg' || contentType === 'image/jpg'
+}
+
+function toAttachmentResponse(
+    attachment: { content?: unknown; filename?: string | null; contentType?: string | null },
+    index: number,
+    options: { disposition?: 'attachment' | 'inline' } = {},
+) {
     const filename = (attachment.filename || '').trim() || `attachment-${index}`
     const contentType = (attachment.contentType || '').trim() || 'application/octet-stream'
+    const disposition = options.disposition || 'attachment'
 
     const rawContent = attachment.content
     const bytes = rawContent instanceof Uint8Array
@@ -23,7 +34,7 @@ function toAttachmentResponse(attachment: { content?: unknown; filename?: string
         status: 200,
         headers: {
             'Content-Type': contentType,
-            'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`,
+            'Content-Disposition': `${disposition}; filename*=UTF-8''${encodeURIComponent(filename)}`,
             'Cache-Control': 'private, max-age=60',
             'Content-Length': String(bytes.byteLength),
         },
@@ -38,6 +49,8 @@ export async function GET(req: Request) {
     const uid = searchParams.get('uid')
     const indexStr = searchParams.get('index')
     const rawMode = ['1', 'true', 'yes', 'y'].includes((searchParams.get('raw') || '').trim().toLowerCase())
+    const inlineMode = ['1', 'true', 'yes', 'y'].includes((searchParams.get('inline') || '').trim().toLowerCase())
+    const responseDisposition = inlineMode ? 'inline' : 'attachment'
 
     if (!uid || !indexStr) {
         return NextResponse.json({ error: '요청 파라미터가 누락되었습니다.' }, { status: 400 })
@@ -51,12 +64,12 @@ export async function GET(req: Request) {
     try {
         if (rawMode) {
             const attachment = await getWormEmailAttachment(uid, index)
-            return toAttachmentResponse(attachment, index)
+            return toAttachmentResponse(attachment, index, { disposition: responseDisposition })
         }
 
         if (!isR2Configured()) {
             const attachment = await getWormEmailAttachment(uid, index)
-            return toAttachmentResponse(attachment, index)
+            return toAttachmentResponse(attachment, index, { disposition: responseDisposition })
         }
 
         // 1. DB 캐시 확인
@@ -68,6 +81,13 @@ export async function GET(req: Request) {
         let filename: string
 
         if (cached) {
+            if (isJpegAttachment(cached)) {
+                await prisma.wormEmailAttachmentCache.delete({
+                    where: { uid_index: { uid, index } },
+                }).catch(() => undefined)
+                const attachment = await getWormEmailAttachment(uid, index)
+                return toAttachmentResponse(attachment, index, { disposition: responseDisposition })
+            }
             // 이미 R2에 올라가 있음 → presigned URL만 생성 (Vercel 트래픽 0)
             r2Key = cached.r2Key
             filename = cached.filename || `attachment-${index}`
@@ -75,6 +95,9 @@ export async function GET(req: Request) {
             // 최초 요청: IMAP에서 가져와서 R2에 업로드
             const attachment = await getWormEmailAttachment(uid, index)
             filename = attachment.filename || `attachment-${index}`
+            if (isJpegAttachment({ filename, contentType: attachment.contentType })) {
+                return toAttachmentResponse(attachment, index, { disposition: responseDisposition })
+            }
             r2Key = `worm-invoices/${uid}/${index}/${filename}`
 
             await uploadToR2(r2Key, new Uint8Array(attachment.content), attachment.contentType || 'application/octet-stream')
@@ -92,13 +115,13 @@ export async function GET(req: Request) {
         }
 
         // 2. presigned URL 생성 후 리다이렉트 (파일은 R2 → 브라우저 직접 전달)
-        const presignedUrl = await getR2PresignedUrl(r2Key, filename)
+        const presignedUrl = await getR2PresignedUrl(r2Key, filename, { disposition: responseDisposition })
         return NextResponse.redirect(presignedUrl, 302)
     } catch (error: unknown) {
         // R2 경로 실패 시에도 첨부파일 조회 기능은 동작하게 폴백.
         try {
             const attachment = await getWormEmailAttachment(uid, index)
-            return toAttachmentResponse(attachment, index)
+            return toAttachmentResponse(attachment, index, { disposition: responseDisposition })
         } catch {
             // no-op: let the original error response below handle the failure.
         }

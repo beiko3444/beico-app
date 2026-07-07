@@ -243,11 +243,19 @@ function isPdfAttachmentMeta(attachment: { filename?: string | null; contentType
   return fileName.endsWith('.pdf') || contentType.includes('pdf')
 }
 
+function isJpegAttachmentMeta(attachment: { filename?: string | null; contentType?: string | null }) {
+  const fileName = (attachment.filename || '').toLowerCase()
+  const contentType = (attachment.contentType || '').toLowerCase()
+  return fileName.endsWith('.jpg') || fileName.endsWith('.jpeg') || contentType === 'image/jpeg' || contentType === 'image/jpg'
+}
+
 function toAttachmentSnapshots(attachments: WormEmailAttachment[]): WormEmailAttachmentSnapshot[] {
-  return attachments.map((attachment) => ({
-    ...attachment,
-    isPdf: isPdfAttachmentMeta(attachment),
-  }))
+  return attachments
+    .filter((attachment) => !isJpegAttachmentMeta(attachment))
+    .map((attachment) => ({
+      ...attachment,
+      isPdf: isPdfAttachmentMeta(attachment),
+    }))
 }
 
 function sanitizeAttachmentSnapshots(value: unknown): WormEmailAttachmentSnapshot[] {
@@ -272,7 +280,7 @@ function sanitizeAttachmentSnapshots(value: unknown): WormEmailAttachmentSnapsho
         isPdf: candidate.isPdf === true || isPdfAttachmentMeta(candidate),
       }
     })
-    .filter((item): item is WormEmailAttachmentSnapshot => item !== null)
+    .filter((item): item is WormEmailAttachmentSnapshot => item !== null && !isJpegAttachmentMeta(item))
 }
 
 function sanitizeR2KeySegment(value: string, fallback: string) {

@@ -1187,6 +1187,19 @@ function isPdfEmailAttachment(attachment: WormEmailAttachment) {
     )
 }
 
+function isJpegEmailAttachment(attachment: WormEmailAttachment) {
+    const filename = attachment.filename.toLowerCase()
+    const contentType = attachment.contentType.toLowerCase()
+    return filename.endsWith('.jpg') || filename.endsWith('.jpeg') || contentType === 'image/jpeg' || contentType === 'image/jpg'
+}
+
+function formatAttachmentFileSize(size: number) {
+    if (!Number.isFinite(size) || size <= 0) return '-'
+    if (size < 1024) return `${size}B`
+    if (size < 1024 * 1024) return `${Math.round(size / 102.4) / 10}KB`
+    return `${Math.round(size / 1024 / 102.4) / 10}MB`
+}
+
 function sanitizeWormEmailListItem(value: unknown): WormEmailListItem | null {
     if (!value || typeof value !== 'object') return null
 
@@ -3767,6 +3780,55 @@ export default function WormOrderPage() {
     }, [autoBlNumber])
 
     const isCustomsForwardReady = Boolean(matchedInvoiceEmail?.uid && matchedAwbUid)
+    const savedMatchedAttachments = useMemo(() => {
+        const rows: Array<{
+            key: string
+            sourceLabel: string
+            subject: string
+            uid: string
+            index: number
+            filename: string
+            contentType: string
+            size: number
+            isPdf: boolean
+            href: string
+        }> = []
+        const seen = new Set<string>()
+
+        const collect = (
+            sourceLabel: string,
+            email: WormEmailListItem | null,
+            details: Record<string, WormEmailDetail>,
+        ) => {
+            if (!email?.uid) return
+            const detail = details[email.uid]
+            if (!detail?.attachments?.length) return
+
+            for (const attachment of detail.attachments) {
+                if (isJpegEmailAttachment(attachment)) continue
+                const key = `${email.uid}:${attachment.index}`
+                if (seen.has(key)) continue
+                seen.add(key)
+                rows.push({
+                    key,
+                    sourceLabel,
+                    subject: detail.subject || email.subject,
+                    uid: email.uid,
+                    index: attachment.index,
+                    filename: attachment.filename,
+                    contentType: attachment.contentType,
+                    size: attachment.size,
+                    isPdf: isPdfEmailAttachment(attachment),
+                    href: `/api/admin/worm-order/emails/attachment?uid=${encodeURIComponent(email.uid)}&index=${attachment.index}&inline=1`,
+                })
+            }
+        }
+
+        collect('인보이스', matchedInvoiceEmail, emailDetails)
+        collect('AWB 문서', matchedAwbEmail, docEmailDetails)
+
+        return rows
+    }, [docEmailDetails, emailDetails, matchedAwbEmail, matchedInvoiceEmail])
     const todayKstYmd = useMemo(() => {
         const parts = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'Asia/Seoul',
@@ -6462,6 +6524,54 @@ export default function WormOrderPage() {
                         </div>
                     </div>
                     <div className="p-6 space-y-4">
+                        <div className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
+                            <div className="mb-3 flex items-start justify-between gap-3">
+                                <div>
+                                    <p className="text-sm font-black text-slate-900">DB 저장 첨부파일</p>
+                                    <p className="mt-0.5 text-[12px] font-medium text-slate-600">
+                                        현재 발주에 매칭된 인보이스/AWB 첨부만 표시합니다. JPG/JPEG는 저장 및 목록에서 제외됩니다.
+                                    </p>
+                                </div>
+                                <span className="shrink-0 rounded-full bg-white px-2.5 py-1 text-[11px] font-black text-sky-700 ring-1 ring-sky-200">
+                                    {savedMatchedAttachments.length}개
+                                </span>
+                            </div>
+                            {savedMatchedAttachments.length > 0 ? (
+                                <div className="grid gap-2 md:grid-cols-2">
+                                    {savedMatchedAttachments.map((attachment) => (
+                                        <div key={attachment.key} className="rounded-lg border border-sky-100 bg-white px-3 py-2 shadow-sm">
+                                            <div className="flex items-start gap-2">
+                                                <FileText size={15} className={attachment.isPdf ? 'mt-0.5 text-red-500' : 'mt-0.5 text-sky-600'} />
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-600">
+                                                            {attachment.sourceLabel}
+                                                        </span>
+                                                        <p className="min-w-0 truncate text-[12px] font-black text-slate-900">{attachment.filename}</p>
+                                                    </div>
+                                                    <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">{attachment.subject}</p>
+                                                    <p className="mt-0.5 text-[10px] font-bold text-slate-400">
+                                                        {attachment.contentType || 'application/octet-stream'} · {formatAttachmentFileSize(attachment.size)}
+                                                    </p>
+                                                </div>
+                                                <a
+                                                    href={attachment.href}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="shrink-0 rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-sky-500"
+                                                >
+                                                    열기
+                                                </a>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-lg border border-dashed border-sky-200 bg-white/70 px-3 py-3 text-[12px] font-semibold text-slate-500">
+                                    현재 발주에 DB에서 불러올 저장 첨부파일이 없습니다. 인보이스와 AWB 문서를 매칭하면 여기에 바로 표시됩니다.
+                                </div>
+                            )}
+                        </div>
                         {!isCustomsForwardReady ? (
                             <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-3 text-[12px] font-semibold text-amber-700">
                                 인보이스 메일과 AWB 메일을 현재 발주에 모두 매칭하면 발송이 활성화됩니다.
