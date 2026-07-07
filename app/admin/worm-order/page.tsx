@@ -84,6 +84,15 @@ type MatchedWormEmailPayload = {
     awbDocumentEmailDetails: Record<string, WormEmailDetail>
 }
 
+function createEmptyMatchedWormEmailPayload(): MatchedWormEmailPayload {
+    return {
+        invoiceEmails: [],
+        invoiceEmailDetails: {},
+        awbDocumentEmails: [],
+        awbDocumentEmailDetails: {},
+    }
+}
+
 type RemittanceRuntimeHealth = {
     ok?: boolean
     runtimeAvailable?: boolean
@@ -1962,6 +1971,7 @@ export default function WormOrderPage() {
     const [matchingDocEmailUid, setMatchingDocEmailUid] = useState<string | null>(null)
     const [unmatchingDocEmailUid, setUnmatchingDocEmailUid] = useState<string | null>(null)
     const [docEmailMatchMessage, setDocEmailMatchMessage] = useState('')
+    const [dbMatchedEmails, setDbMatchedEmails] = useState<MatchedWormEmailPayload>(() => createEmptyMatchedWormEmailPayload())
 
     const persistEmailOfflineCache = useCallback(() => {
         if (!hasHydratedEmailCacheRef.current) return
@@ -2639,6 +2649,7 @@ export default function WormOrderPage() {
         setDocEmailDetails({})
         setSelectedDocEmailUid(null)
         setDocHasFetched(false)
+        setDbMatchedEmails(createEmptyMatchedWormEmailPayload())
         setLoadingDocEmails(false)
         setLoadingDocEmailDetail(false)
         setMatchingDocEmailUid(null)
@@ -2712,6 +2723,7 @@ export default function WormOrderPage() {
             if (requestId !== matchedEmailRestoreRequestIdRef.current || activeWormOrderIdRef.current !== orderId) return
 
             const payload = sanitizeMatchedWormEmailPayload(result)
+            setDbMatchedEmails(payload)
 
             setEmails(payload.invoiceEmails)
             setEmailDetails(payload.invoiceEmailDetails)
@@ -3185,6 +3197,7 @@ export default function WormOrderPage() {
             } else {
                 setEmailMatchMessage(`메일 매칭 완료: ${matchedOrderNumber}`)
             }
+            void restoreMatchedEmailsForOrder(activeWormOrder)
         } catch (error) {
             setEmailError(error instanceof Error ? error.message : '메일 매칭 중 오류가 발생했습니다.')
         } finally {
@@ -3263,6 +3276,9 @@ export default function WormOrderPage() {
             )
             setEmailCacheSavedAt(new Date().toISOString())
             setEmailMatchMessage(`매칭 해제 완료: ${email.matchedOrderNumber || email.uid}`)
+            if (activeWormOrder) {
+                void restoreMatchedEmailsForOrder(activeWormOrder)
+            }
         } catch (error) {
             setEmailError(error instanceof Error ? error.message : '매칭 해제 중 오류가 발생했습니다.')
         } finally {
@@ -3452,6 +3468,7 @@ export default function WormOrderPage() {
             })
             if (matchedAwbNumber) setAwbNumber(matchedAwbNumber)
             setDocEmailMatchMessage(`매칭 완료: ${matchedOrderNumber}`)
+            void restoreMatchedEmailsForOrder(activeWormOrder)
         } catch (error) {
             setDocEmailError(error instanceof Error ? error.message : '매칭 중 오류가 발생했습니다.')
         } finally {
@@ -3480,6 +3497,9 @@ export default function WormOrderPage() {
                     : item
             ))
             setDocEmailMatchMessage(`매칭 해제 완료: ${email.matchedOrderNumber || email.uid}`)
+            if (activeWormOrder) {
+                void restoreMatchedEmailsForOrder(activeWormOrder)
+            }
         } catch (error) {
             setDocEmailError(error instanceof Error ? error.message : '매칭 해제 중 오류가 발생했습니다.')
         } finally {
@@ -3760,8 +3780,10 @@ export default function WormOrderPage() {
     // 현재 발주에 매칭된 인보이스 메일 자동 추출
     const matchedInvoiceEmail = useMemo(() => {
         if (!activeWormOrder?.id) return null
-        return emails.find(e => e.matchedOrderId === activeWormOrder.id) || null
-    }, [emails, activeWormOrder?.id])
+        return emails.find(e => e.matchedOrderId === activeWormOrder.id)
+            || dbMatchedEmails.invoiceEmails[0]
+            || null
+    }, [dbMatchedEmails.invoiceEmails, emails, activeWormOrder?.id])
 
     const autoTransferAmountUsd = matchedInvoiceEmail?.invoiceTotalAmountUsd ?? null
     const manualTransferAmountUsd = useMemo(() => {
@@ -3798,8 +3820,10 @@ export default function WormOrderPage() {
     // 현재 발주에 매칭된 AWB 메일에서 AWB 번호 자동 추출
     const matchedAwbEmail = useMemo(() => {
         if (!activeWormOrder?.id) return null
-        return docEmails.find(e => e.matchedOrderId === activeWormOrder.id) || null
-    }, [docEmails, activeWormOrder?.id])
+        return docEmails.find(e => e.matchedOrderId === activeWormOrder.id)
+            || dbMatchedEmails.awbDocumentEmails[0]
+            || null
+    }, [dbMatchedEmails.awbDocumentEmails, docEmails, activeWormOrder?.id])
     const matchedAwbUid = matchedAwbEmail?.uid || activeWormOrderRecord?.awbEmailUid || null
 
     // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
@@ -3863,12 +3887,16 @@ export default function WormOrderPage() {
         emails
             .filter((email) => email.matchedOrderId === activeWormOrder?.id)
             .forEach((email) => collectOne('인보이스', email, emailDetails))
+        dbMatchedEmails.invoiceEmails
+            .forEach((email) => collectOne('인보이스', email, dbMatchedEmails.invoiceEmailDetails))
         docEmails
             .filter((email) => email.matchedOrderId === activeWormOrder?.id)
             .forEach((email) => collectOne('AWB 문서', email, docEmailDetails))
+        dbMatchedEmails.awbDocumentEmails
+            .forEach((email) => collectOne('AWB 문서', email, dbMatchedEmails.awbDocumentEmailDetails))
 
         return rows
-    }, [activeWormOrder?.id, docEmailDetails, docEmails, emailDetails, emails])
+    }, [activeWormOrder?.id, dbMatchedEmails, docEmailDetails, docEmails, emailDetails, emails])
     const todayKstYmd = useMemo(() => {
         const parts = new Intl.DateTimeFormat('en-CA', {
             timeZone: 'Asia/Seoul',
@@ -5571,7 +5599,7 @@ export default function WormOrderPage() {
                         className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
                         {loadingEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : '메일 스캔'}</span>
+                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : matchedInvoiceEmail ? '새 메일 찾기' : '메일 스캔'}</span>
                     </button>
                 </div>
                 <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
@@ -5847,7 +5875,7 @@ export default function WormOrderPage() {
                         className="h-9 px-4 bg-blue-700 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
                     >
                         {loadingDocEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingDocEmails ? '스캔 중...' : '메일 스캔'}</span>
+                        <span className="relative z-10">{loadingDocEmails ? '스캔 중...' : matchedAwbEmail ? '새 메일 찾기' : '메일 스캔'}</span>
                     </button>
                 </div>
                 <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">

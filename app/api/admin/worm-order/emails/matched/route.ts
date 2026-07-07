@@ -4,10 +4,6 @@ import { loadMatchedWormOrderEmails } from '@/lib/wormOrderMail'
 
 export const dynamic = 'force-dynamic'
 
-function isUuid(value: string) {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(value)
-}
-
 export async function GET(request: Request) {
   const { unauthorized } = await requireAdminSession()
   if (unauthorized) return unauthorized
@@ -15,7 +11,7 @@ export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url)
     const orderId = (searchParams.get('orderId') || '').trim()
-    if (!orderId || !isUuid(orderId)) {
+    if (!orderId) {
       return NextResponse.json({ error: '유효한 orderId가 필요합니다.' }, { status: 400 })
     }
 
