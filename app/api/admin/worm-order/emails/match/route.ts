@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import {
+  cacheWormEmailAttachmentsToR2,
   getParsedMailByUid,
   getWormEmailSnapshotForMatch,
   type WormEmailMatchType,
@@ -25,6 +26,13 @@ type InvoiceOcrResult = {
   invoiceExtractedAt: string | null
   invoiceSourceFile: string | null
   invoiceOcrError: string | null
+}
+
+type AttachmentCacheResult = {
+  cachedCount: number
+  skippedCount: number
+  skippedReason: string | null
+  error: string | null
 }
 
 type PdfParseModule = typeof import('pdf-parse')
@@ -382,6 +390,30 @@ export async function POST(request: Request) {
       }
     }
 
+    let attachmentCache: AttachmentCacheResult = {
+      cachedCount: 0,
+      skippedCount: 0,
+      skippedReason: null,
+      error: null,
+    }
+    try {
+      const parsedForCache = await getParsedMailByUid(uid)
+      const cacheResult = await cacheWormEmailAttachmentsToR2(uid, parsedForCache.attachments || [], { pdfOnly: true })
+      attachmentCache = {
+        ...cacheResult,
+        error: null,
+      }
+    } catch (cacheError) {
+      const message = cacheError instanceof Error ? cacheError.message : 'unknown attachment cache error'
+      console.error('Worm email attachment R2 cache failed during match:', cacheError)
+      attachmentCache = {
+        cachedCount: 0,
+        skippedCount: 0,
+        skippedReason: null,
+        error: message,
+      }
+    }
+
     const saved = await upsertWormOrderEmailMatch({
       uid,
       orderId,
@@ -422,6 +454,7 @@ export async function POST(request: Request) {
         invoiceExtractedAt: saved.invoiceExtractedAt ? saved.invoiceExtractedAt.toISOString() : null,
         invoiceSourceFile: saved.invoiceSourceFile,
         invoiceOcrError: saved.invoiceOcrError,
+        attachmentCache,
       },
     })
   } catch (error: unknown) {

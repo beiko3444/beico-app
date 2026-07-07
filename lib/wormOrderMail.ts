@@ -2,6 +2,7 @@ import { ImapFlow } from 'imapflow'
 import type { MessageStructureObject } from 'imapflow'
 import { simpleParser, type ParsedMail } from 'mailparser'
 import { prisma } from '@/lib/prisma'
+import { isR2Configured, uploadToR2 } from '@/lib/r2'
 
 type ParsedMailCacheEntry = {
   expiresAt: number
@@ -164,6 +165,7 @@ async function withInboxLock<T>(work: (client: ImapFlow) => Promise<T>) {
 function toBuffer(source: unknown) {
   if (Buffer.isBuffer(source)) return source
   if (source instanceof Uint8Array) return Buffer.from(source)
+  if (typeof source === 'string') return Buffer.from(source)
   return Buffer.from([])
 }
 
@@ -271,6 +273,84 @@ function sanitizeAttachmentSnapshots(value: unknown): WormEmailAttachmentSnapsho
       }
     })
     .filter((item): item is WormEmailAttachmentSnapshot => item !== null)
+}
+
+function sanitizeR2KeySegment(value: string, fallback: string) {
+  const trimmed = value.trim()
+  if (!trimmed) return fallback
+  return trimmed.replace(/[\\/#?%*:|"<>]/g, '_').slice(0, 180) || fallback
+}
+
+function buildWormAttachmentR2Key(uid: string, index: number, filename: string) {
+  const safeUid = sanitizeR2KeySegment(uid, 'unknown-uid')
+  const safeFilename = sanitizeR2KeySegment(filename, `attachment-${index}`)
+  return `worm-invoices/${safeUid}/${index}/${safeFilename}`
+}
+
+export async function cacheWormEmailAttachmentsToR2(
+  uid: string,
+  attachments: Array<{ filename?: string | null; contentType?: string | null; content?: unknown; size?: number | null }>,
+  options: { pdfOnly?: boolean } = {},
+) {
+  const normalizedUid = uid.trim()
+  if (!normalizedUid) {
+    throw new Error('uid is required.')
+  }
+
+  if (!isR2Configured()) {
+    return {
+      cachedCount: 0,
+      skippedCount: attachments.length,
+      skippedReason: 'R2_NOT_CONFIGURED',
+    }
+  }
+
+  const pdfOnly = options.pdfOnly !== false
+  let cachedCount = 0
+  let skippedCount = 0
+
+  for (const [index, attachment] of attachments.entries()) {
+    const filename = attachment.filename?.trim() || `attachment-${index}`
+    const contentType = attachment.contentType?.trim() || 'application/octet-stream'
+
+    if (pdfOnly && !isPdfAttachmentMeta({ filename, contentType })) {
+      skippedCount += 1
+      continue
+    }
+
+    const content = toBuffer(attachment.content)
+    if (content.length === 0) {
+      skippedCount += 1
+      continue
+    }
+
+    const r2Key = buildWormAttachmentR2Key(normalizedUid, index, filename)
+    await uploadToR2(r2Key, new Uint8Array(content), contentType)
+    await prisma.wormEmailAttachmentCache.upsert({
+      where: { uid_index: { uid: normalizedUid, index } },
+      update: {
+        r2Key,
+        r2Url: r2Key,
+        filename,
+        contentType,
+      },
+      create: {
+        uid: normalizedUid,
+        index,
+        r2Key,
+        r2Url: r2Key,
+        filename,
+        contentType,
+      },
+    })
+    cachedCount += 1
+  }
+
+  return {
+    cachedCount,
+    skippedCount,
+    skippedReason: null,
+  }
 }
 
 async function getWormEmailAwbCacheMap(uids: string[]) {
@@ -798,7 +878,50 @@ export async function getParsedMailByUid(uid: string) {
   return parsed
 }
 
+async function getMatchedWormEmailDetailSnapshot(uid: string): Promise<WormEmailDetail | null> {
+  const normalizedUid = uid.trim()
+  if (!normalizedUid) return null
+
+  try {
+    const row = await prisma.wormOrderEmailMatch.findUnique({
+      where: { uid: normalizedUid },
+      select: {
+        uid: true,
+        subject: true,
+        emailDate: true,
+        matchedAt: true,
+        emailBodyText: true,
+        attachmentsJson: true,
+        awbNumber: true,
+      },
+    })
+
+    if (!row) return null
+
+    const attachments = sanitizeAttachmentSnapshots(row.attachmentsJson)
+    if (!row.emailBodyText && attachments.length === 0) return null
+
+    const date = (row.emailDate || row.matchedAt || new Date()).toISOString()
+    return {
+      uid: row.uid,
+      subject: row.subject || '(제목 없음)',
+      date,
+      text: row.emailBodyText || '',
+      hasAttachments: attachments.length > 0,
+      skmIndices: attachments.filter((attachment) => attachment.isPdf).map((attachment) => attachment.index),
+      attachments: attachments.map(({ isPdf: _isPdf, ...attachment }) => attachment),
+      awbNumber: row.awbNumber || null,
+    }
+  } catch (error) {
+    console.error('Failed to load matched worm email detail snapshot:', error)
+    return null
+  }
+}
+
 export async function getWormEmailDetail(uid: string): Promise<WormEmailDetail> {
+  const matchedSnapshot = await getMatchedWormEmailDetailSnapshot(uid)
+  if (matchedSnapshot) return matchedSnapshot
+
   const parsed = await getParsedMailByUid(uid)
   const awbCache = await getWormEmailAwbCacheByUid(uid)
   const attachments = (parsed.attachments || []).map((att, idx: number) => ({
