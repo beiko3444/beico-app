@@ -19,8 +19,8 @@ export default async function OrderLayout({
         redirect('/login')
     }
 
-    let businessName = session.user.name || session.user.email
-    let businessNameJP = session.user.name || session.user.email
+    let businessName = session.user.name || session.user.email || "Partner"
+    let businessNameJP = session.user.name || session.user.email || "Partner"
 
     let businessRegNumber = ""
     let address = ""
@@ -42,8 +42,8 @@ export default async function OrderLayout({
             },
         }) as any
         if (user) {
-            businessName = user.partnerProfile?.businessName || user.name
-            businessNameJP = user.name
+            businessName = user.partnerProfile?.businessName || user.name || "Partner"
+            businessNameJP = user.name || businessName
             businessRegNumber = user.partnerProfile?.businessRegNumber || ""
             address = user.partnerProfile?.address || ""
             country = user.country || ""
@@ -102,9 +102,9 @@ export default async function OrderLayout({
                             <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-1">
                                 <span className="text-[8.5px] text-white/70 font-bold leading-none uppercase tracking-wider mb-0.5">ログイン中:</span>
                                 <span className="text-[17px] text-white font-black leading-none mb-0.5">{businessNameJP}</span>
-                                {countryDisplay && (
+                                {(countryDisplay || country) && (
                                     <div className="bg-white dark:bg-[#2a2a2a] px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-black text-[#e34219] dark:text-white shadow-sm flex items-center leading-none">
-                                        {countryDisplay}
+                                        {countryDisplay || country}
                                     </div>
                                 )}
                             </div>

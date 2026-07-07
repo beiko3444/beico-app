@@ -14,11 +14,47 @@ const parseTrackingNumbers = (value: string | null | undefined) => {
         .filter(Boolean)
 }
 
-export default function OrderHistory({ orders, userCountry }: { orders: any[], userCountry?: string | null }) {
+const safeText = (value: unknown, fallback = '') => {
+    return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+const safeNumber = (value: unknown, fallback = 0) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback
+    if (typeof value === 'bigint') return Number(value)
+    const normalized = String(value ?? '').replace(/,/g, '').trim()
+    if (!normalized) return fallback
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const safeNonNegativeInt = (value: unknown, fallback = 0) => {
+    return Math.max(0, Math.floor(safeNumber(value, fallback)))
+}
+
+const formatNumber = (
+    value: unknown,
+    options?: Intl.NumberFormatOptions,
+) => safeNumber(value).toLocaleString(undefined, options)
+
+const formatMoney = (value: unknown, isUSD: boolean) => {
+    return formatNumber(value, isUSD ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})
+}
+
+const formatOrderDate = (value: unknown) => {
+    const date = value ? new Date(value as string | number | Date) : new Date()
+    const safeDate = Number.isNaN(date.getTime()) ? new Date() : date
+    const datePart = safeDate.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' })
+    const dayPart = safeDate.toLocaleDateString('ja-JP', { weekday: 'short' })
+    const timePart = safeDate.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false })
+    return `${datePart}(${dayPart}) ${timePart}`
+}
+
+export default function OrderHistory({ orders, userCountry }: { orders?: any[] | null, userCountry?: string | null }) {
     const router = useRouter()
     const [loadingMap, setLoadingMap] = useState<Record<string, boolean>>({})
+    const safeOrders = Array.isArray(orders) ? orders : []
 
-    if (!orders || orders.length === 0) {
+    if (safeOrders.length === 0) {
         return (
             <div className="flex items-center justify-center py-20 bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a]">
                 <div className="text-center">
@@ -78,10 +114,14 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                 </div>
             </div>
 
-            {orders.map(order => {
-                const trackingNumbers = parseTrackingNumbers(order.trackingNumber)
-                const productSum = order.items.reduce((sum: number, item: any) => sum + (item.price * (item.quantity || 0)), 0);
-                const totalQuantity = order.items.reduce((sum: number, item: any) => sum + (item.quantity || 0), 0);
+            {safeOrders.map((order, orderIndex) => {
+                const safeOrder = order || {}
+                const orderId = safeText(safeOrder.id) || `missing-order-${orderIndex}`
+                const status = safeText(safeOrder.status)
+                const items = Array.isArray(safeOrder.items) ? safeOrder.items : []
+                const trackingNumbers = parseTrackingNumbers(safeText(safeOrder.trackingNumber))
+                const productSum = items.reduce((sum: number, item: any) => sum + (safeNumber(item?.price) * safeNonNegativeInt(item?.quantity)), 0);
+                const totalQuantity = items.reduce((sum: number, item: any) => sum + safeNonNegativeInt(item?.quantity), 0);
 
                 const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
                 const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
@@ -96,11 +136,11 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                 // Steps: Ordered -> Payment -> Paid -> Shipped -> Invoice
                 // Mapping status to active step index (0-based)
                 let activeStep = 0;
-                if (order.status === 'PENDING') activeStep = 1; // Payment Wait
-                if (order.status === 'PENDING_DEPOSIT') activeStep = 1;
-                if (order.status === 'DEPOSIT_COMPLETED') activeStep = 2; // Paid
-                if (order.status === 'SHIPPED') activeStep = 3; // Shipped
-                if (order.taxInvoiceIssued) activeStep = 4; // Invoice
+                if (status === 'PENDING') activeStep = 1; // Payment Wait
+                if (status === 'PENDING_DEPOSIT') activeStep = 1;
+                if (status === 'DEPOSIT_COMPLETED') activeStep = 2; // Paid
+                if (status === 'SHIPPED') activeStep = 3; // Shipped
+                if (safeOrder.taxInvoiceIssued) activeStep = 4; // Invoice
 
                 // If cancelled (not in standard flow), handle gracefully (maybe show as step 0 or error state)
 
@@ -113,24 +153,20 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                 ];
 
                 return (
-                    <div key={order.id} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${order.taxInvoiceIssued ? 'opacity-70 brightness-[0.8] grayscale-[0.2]' : ''}`}>
+                    <div key={orderId} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${safeOrder.taxInvoiceIssued ? 'opacity-70 brightness-[0.8] grayscale-[0.2]' : ''}`}>
                         {/* Order No & Date Box */}
                         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
                             <div className="flex flex-col text-sm">
                                 <span className="text-gray-400 dark:text-gray-500 mb-0.5 text-xs">注文日時 / {isUSD ? 'Order Date' : '주문일시'}</span>
                                 <span className="font-bold text-gray-700 dark:text-gray-400" suppressHydrationWarning>
                                     {(() => {
-                                        const d = new Date(order.createdAt);
-                                        const datePart = d.toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
-                                        const dayPart = d.toLocaleDateString('ja-JP', { weekday: 'short' });
-                                        const timePart = d.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit', hour12: false });
-                                        return `${datePart}(${dayPart}) ${timePart}`;
+                                        return formatOrderDate(safeOrder.createdAt);
                                     })()}
                                 </span>
                             </div>
                             <div className="flex flex-col text-right text-sm">
                                 <span className="text-gray-400 dark:text-gray-500 mb-0.5 text-xs">注文番号 / {isUSD ? 'Order No' : '주문번호'}</span>
-                                <span className="font-bold text-gray-900 dark:text-white font-inter tracking-[0.01em]">{order.orderNumber || order.id.slice(0, 12)}</span>
+                                <span className="font-bold text-gray-900 dark:text-white font-inter tracking-[0.01em]">{safeText(safeOrder.orderNumber) || orderId.slice(0, 12)}</span>
                             </div>
                         </div>
                         <div className="border-t border-gray-100 dark:border-[#2a2a2a] mx-5 my-0.5" />
@@ -196,30 +232,30 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                 {/* Separator & Total Amount Details */}
                                 <div className="flex justify-between items-center pt-1.5 pb-0 mt-1 border-t border-gray-100 dark:border-[#2a2a2a]">
                                     <span className="font-bold text-sm text-gray-900 dark:text-white underline decoration-[#e34219]/30 decoration-2 underline-offset-4">合計金額 / {isUSD ? 'Total Amount' : '총 합계금액'}</span>
-                                    <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                    <span className="font-bold text-lg text-[#e34219] font-inter"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(totalAmount, isUSD)}</span>
                                 </div>
                                 <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
                                     <span>供給価額 / {isUSD ? 'Supply Price' : '공급가액'}</span>
-                                    <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">{currencySymbol}</span>{supplyPrice.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                    <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">{currencySymbol}</span>{formatMoney(supplyPrice, isUSD)}</span>
                                 </div>
                                 {!isUSD && (
                                     <div className="flex justify-between text-xs text-gray-400 dark:text-gray-500">
                                         <span>消費税 / 부가세 (10%)</span>
-                                        <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">{currencySymbol}</span>{vat.toLocaleString()}</span>
+                                        <span className="font-medium font-inter"><span className="text-[9px] mr-0.5">{currencySymbol}</span>{formatNumber(vat)}</span>
                                     </div>
                                 )}
                             </div>
                         </div>
 
-                        {order.status !== 'DEPOSIT_COMPLETED' && order.status !== 'SHIPPED' && (
+                        {status !== 'DEPOSIT_COMPLETED' && status !== 'SHIPPED' && (
                             <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-3 flex items-start gap-3 mb-4 mx-1">
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
                                 <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-col gap-1.5">
                                     <p className="leading-relaxed">
-                                        <span className="font-bold text-[#e34219]">合計 {totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}{isUSD ? '$' : 'ウォン'}</span>{isUSD ? ' を入金後、' : 'を入金後、'}「入金確認の要請」ボタンを押してください.入金確認後の注文キャンセル는 できません.
+                                        <span className="font-bold text-[#e34219]">合計 {formatMoney(totalAmount, isUSD)}{isUSD ? '$' : 'ウォン'}</span>{isUSD ? ' を入金後、' : 'を入金後、'}「入金確認の要請」ボタンを押してください.入金確認後の注文キャンセル는 できません.
                                     </p>
                                     <p className="font-medium leading-relaxed">
-                                        {isUSD ? `Please request confirmation after depositing ${currencySymbol}${totalAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}. Orders cannot be canceled after deposit confirmation.` : "합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다."}
+                                        {isUSD ? `Please request confirmation after depositing ${currencySymbol}${formatMoney(totalAmount, true)}. Orders cannot be canceled after deposit confirmation.` : "합계 금액을 입금하신 후 확인 요청을 해주세요. 입금 확인 후에는 주문을 취소할 수 없습니다."}
                                     </p>
                                 </div>
                             </div>
@@ -227,25 +263,25 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
 
                         {/* Action Buttons */}
                         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl mb-4 px-1">
-                            <div className={`grid ${order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                            <div className={`grid ${status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0 ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                                 <button
-                                    onClick={() => order.status !== 'DEPOSIT_COMPLETED' && !order.trackingNumber && toggleDeposit(order.id, order.status)}
-                                    disabled={loadingMap[order.id] || order.status === 'DEPOSIT_COMPLETED' || !!order.trackingNumber}
+                                    onClick={() => status !== 'DEPOSIT_COMPLETED' && trackingNumbers.length === 0 && toggleDeposit(orderId, status)}
+                                    disabled={loadingMap[orderId] || status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0}
                                     className={`h-13 border-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center leading-tight
-                                        ${order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber
+                                        ${status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0
                                             ? 'border-gray-200 dark:border-[#2a2a2a] text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#1a1a1a] cursor-not-allowed'
                                             : 'border-[#e34219] text-white bg-[#e34219] hover:bg-[#cc3b16]'
                                         }`}
                                 >
-                                    {loadingMap[order.id] ? 'Processing...' : (
-                                        order.status === 'DEPOSIT_COMPLETED' || order.trackingNumber ? (
+                                    {loadingMap[orderId] ? 'Processing...' : (
+                                        status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0 ? (
                                             <>
-                                                {order.trackingNumber ? (
+                                                {trackingNumbers.length > 0 ? (
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-sm font-black text-[#e34219]">
-                                                            {order.courier === 'Rosen' ? '로젠택배' :
-                                                                order.courier === 'CJ' ? 'CJ대한통운' :
-                                                                    order.courier === 'Lotte' ? '롯데택배' : (order.courier || '배송중')}
+                                                            {safeOrder.courier === 'Rosen' ? '로젠택배' :
+                                                                safeOrder.courier === 'CJ' ? 'CJ대한통운' :
+                                                                    safeOrder.courier === 'Lotte' ? '롯데택배' : (safeText(safeOrder.courier) || '배송중')}
                                                         </span>
                                                         <div className="mt-0.5 flex flex-col items-center">
                                                             {trackingNumbers.map((num, idx) => (
@@ -270,10 +306,10 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                         )
                                     )}
                                 </button>
-                                {order.status !== 'DEPOSIT_COMPLETED' && !order.trackingNumber && (
+                                {status !== 'DEPOSIT_COMPLETED' && trackingNumbers.length === 0 && (
                                     <button
-                                        onClick={() => handleDelete(order.id)}
-                                        disabled={loadingMap[order.id]}
+                                        onClick={() => handleDelete(orderId)}
+                                        disabled={loadingMap[orderId]}
                                         className="h-13 border-2 border-gray-200 dark:border-[#2a2a2a] text-gray-400 dark:text-gray-500 bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight"
                                     >
                                         <span className="text-sm font-bold">注文キャンセル</span>
@@ -284,7 +320,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
 
                             <div className="flex gap-2 w-full mt-2">
                                 <Link
-                                    href={`/invoice/${order.id}`}
+                                    href={`/invoice/${orderId}`}
                                     target="_blank"
                                     style={{ color: 'inherit' }}
                                     className="flex-1 h-14 border-2 border-[#111827] dark:border-gray-600 text-[#111827] dark:text-white bg-white dark:bg-[#1e1e1e] rounded-lg font-bold transition-all hover:bg-gray-50 dark:hover:bg-[#252525] flex flex-col items-center justify-center leading-tight pb-1 px-1 text-center"
@@ -313,28 +349,38 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                             </div>
 
                             <div className="space-y-3">
-                                {order.items.map((item: any, idx: number) => (
-                                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-xl p-4 flex gap-4 md:items-center shadow-sm dark:shadow-none relative overflow-hidden">
+                                {items.map((item: any, idx: number) => {
+                                    const product = item?.product || null
+                                    const itemId = safeText(item?.id) || `${orderId}-${idx}`
+                                    const imageUrl = safeText(product?.imageUrl)
+                                    const barcode = safeText(product?.barcode)
+                                    const price = safeNumber(item?.price)
+                                    const quantity = safeNonNegativeInt(item?.quantity)
+                                    const productName = safeText(product?.nameJP) || safeText(product?.name) || '상품 정보 없음'
+                                    const productSubName = safeText(product?.nameEN) || safeText(product?.name) || (product ? productName : '삭제되었거나 연결되지 않은 상품')
+
+                                    return (
+                                    <div key={itemId} className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-xl p-4 flex gap-4 md:items-center shadow-sm dark:shadow-none relative overflow-hidden">
                                         <div className="flex flex-col items-center gap-1.5 shrink-0">
                                             <span className="text-[10px] font-extrabold text-gray-900 dark:text-white uppercase tracking-tighter">No. {idx + 1}</span>
                                             <div className="w-16 h-16 md:w-20 md:h-20 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center justify-center shrink-0 p-1">
-                                                {item.product.imageUrl ? (
-                                                    <img src={item.product.imageUrl} alt="" className="w-full h-full object-contain" />
+                                                {imageUrl ? (
+                                                    <img src={imageUrl} alt="" className="w-full h-full object-contain" />
                                                 ) : (
                                                     <span className="text-xs text-gray-300 dark:text-gray-500">No Img</span>
                                                 )}
                                             </div>
                                         </div>
                                         <div className="flex-1 min-w-0 flex flex-col gap-0.5">
-                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{item.product.nameJP || item.product.name}</h4>
-                                            <p className="text-xs text-gray-900 dark:text-white font-medium leading-tight">{item.product.nameEN || item.product.name}</p>
+                                            <h4 className="font-bold text-sm text-gray-900 dark:text-white truncate leading-tight">{productName}</h4>
+                                            <p className="text-xs text-gray-900 dark:text-white font-medium leading-tight">{productSubName}</p>
                                             <div className="text-[10px] text-gray-400 dark:text-gray-500 font-medium font-inter leading-tight">
-                                                Code: {item.product.productCode || '-'}
+                                                Code: {safeText(product?.productCode, '-')}
                                             </div>
-                                            {item.product.barcode && (
+                                            {barcode && (
                                                 <div className="mt-1 flex justify-start">
                                                     <BarcodeDisplay
-                                                        value={item.product.barcode}
+                                                        value={barcode}
                                                         height={12}
                                                         width={0.8}
                                                         fontSize={10}
@@ -345,16 +391,17 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                             )}
                                             <div className="flex items-end justify-between mt-1">
                                                 <div className="flex items-center gap-2 text-xs leading-tight">
-                                                    <span className="font-bold text-gray-900 dark:text-white font-inter"><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{item.price.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
-                                                    <span className="text-gray-900 dark:text-white font-inter font-medium">x {item.quantity}ea</span>
+                                                    <span className="font-bold text-gray-900 dark:text-white font-inter"><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatMoney(price, isUSD)}</span>
+                                                    <span className="text-gray-900 dark:text-white font-inter font-medium">x {formatNumber(quantity)}ea</span>
                                                 </div>
                                                 <span className="font-bold text-base md:text-lg text-gray-900 dark:text-white font-inter leading-none">
-                                                    <span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{(item.price * item.quantity).toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}
+                                                    <span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatMoney(price * quantity, isUSD)}
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                ))}
+                                    )
+                                })}
 
                                 {shippingFee > 0 && (
                                     <div className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-xl px-4 py-2 flex gap-4 items-start shadow-sm dark:shadow-none">
@@ -368,7 +415,7 @@ export default function OrderHistory({ orders, userCountry }: { orders: any[], u
                                                     <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5 leading-tight">※ 100개당 3,000원 추가 (총 {totalQuantity}개)</p>
                                                 </div>
                                                 <span className="font-bold text-base md:text-lg text-gray-900 dark:text-white font-inter">
-                                                    <span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{shippingFee.toLocaleString()}
+                                                    <span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatMoney(shippingFee, isUSD)}
                                                 </span>
                                             </div>
                                         </div>

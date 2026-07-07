@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono, Montserrat, Noto_Sans_JP, Inter } from "next/font/google";
 import "./globals.css";
 import ThemeProvider from "@/components/ThemeProvider";
+import ClientErrorReporter from "@/components/ClientErrorReporter";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -55,8 +56,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ja" suppressHydrationWarning>
+    <html lang="ja" className="notranslate" translate="no" suppressHydrationWarning>
       <head>
+        <meta name="google" content="notranslate" />
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             try {
@@ -68,9 +70,11 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${montserrat.variable} ${notoSansJP.variable} ${inter.variable} font-sans antialiased`}
+        translate="no"
         suppressHydrationWarning
       >
         <ThemeProvider>
+          <ClientErrorReporter />
           {children}
         </ThemeProvider>
       </body>

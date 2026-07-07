@@ -1,11 +1,34 @@
 import { prisma } from "@/lib/prisma"
 import OrderInterface from "./order-interface"
-import { Filter } from 'lucide-react'
+import { getProductImageUrl } from "@/lib/product-image-url"
 
 export const dynamic = 'force-dynamic'
 
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
+
+const safeNumber = (value: unknown, fallback = 0) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback
+    if (typeof value === 'bigint') return Number(value)
+    const normalized = String(value ?? '').replace(/,/g, '').trim()
+    if (!normalized) return fallback
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : fallback
+}
+
+const safeNonNegativeNumber = (value: unknown, fallback = 0) => {
+    const parsed = safeNumber(value, fallback)
+    return parsed >= 0 ? parsed : fallback
+}
+
+const safePositiveInt = (value: unknown, fallback = 1) => {
+    const parsed = safeNumber(value, fallback)
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback
+}
+
+const safeText = (value: unknown, fallback = '') => {
+    return typeof value === 'string' && value.trim() ? value : fallback
+}
 
 export default async function NewOrderPage() {
     const session = await getServerSession(authOptions)
@@ -65,42 +88,37 @@ export default async function NewOrderPage() {
 
     // Map products to apply correct price based on grade
     const productsWithTieredPrice = products.map(p => {
-        let finalPrice = p.sellPrice;
+        let finalPrice = safeNonNegativeNumber(p.sellPrice);
 
         let regional = (p as any).regionalPrices as any;
         const validGrades = ['A', 'B', 'C', 'D'];
         let gradeToUse = userGrade.toUpperCase();
         if (!validGrades.includes(gradeToUse)) gradeToUse = 'C';
 
-        let krBuy = p.buyPrice, krSell = p.krSellPrice || 0;
-        let jpBuy = p.jpBuyPrice || 0, jpSell = p.jpSellPrice || 0;
-        let usBuy = p.usBuyPrice || 0, usSell = p.usSellPrice || 0;
-        let currentMoq = p.minOrderQuantity || 1;
-        let currentOrderUnit = p.orderUnit || 1;
-
-        const parsePositiveInt = (value: unknown, fallback: number) => {
-            const parsed = Number(String(value || '').replace(/,/g, ''));
-            return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
-        };
+        let krBuy = safeNonNegativeNumber(p.buyPrice), krSell = safeNonNegativeNumber(p.krSellPrice);
+        let jpBuy = safeNonNegativeNumber(p.jpBuyPrice), jpSell = safeNonNegativeNumber(p.jpSellPrice);
+        let usBuy = safeNonNegativeNumber(p.usBuyPrice), usSell = safeNonNegativeNumber(p.usSellPrice);
+        let currentMoq = safePositiveInt(p.minOrderQuantity, 1);
+        let currentOrderUnit = safePositiveInt(p.orderUnit, 1);
 
         const parsePrices = (gradeData: any) => {
-            krBuy = Number(String(gradeData.KR?.wholesale || '0').replace(/,/g, ''));
-            krSell = Number(String(gradeData.KR?.retail || '0').replace(/,/g, ''));
-            jpBuy = Number(String(gradeData.JP?.wholesale || '0').replace(/,/g, ''));
-            jpSell = Number(String(gradeData.JP?.retail || '0').replace(/,/g, ''));
-            usBuy = Number(String(gradeData.US?.wholesale || '0').replace(/,/g, ''));
-            usSell = Number(String(gradeData.US?.retail || '0').replace(/,/g, ''));
+            krBuy = safeNonNegativeNumber(gradeData?.KR?.wholesale);
+            krSell = safeNonNegativeNumber(gradeData?.KR?.retail);
+            jpBuy = safeNonNegativeNumber(gradeData?.JP?.wholesale);
+            jpSell = safeNonNegativeNumber(gradeData?.JP?.retail);
+            usBuy = safeNonNegativeNumber(gradeData?.US?.wholesale);
+            usSell = safeNonNegativeNumber(gradeData?.US?.retail);
 
             // Set regional MOQ
             if (user?.country === 'Korea') {
-                currentMoq = parsePositiveInt(gradeData.KR?.moq, p.minOrderQuantity || 1);
-                currentOrderUnit = parsePositiveInt(gradeData.KR?.orderUnit, p.orderUnit || 1);
+                currentMoq = safePositiveInt(gradeData?.KR?.moq, safePositiveInt(p.minOrderQuantity, 1));
+                currentOrderUnit = safePositiveInt(gradeData?.KR?.orderUnit, safePositiveInt(p.orderUnit, 1));
             } else if (user?.country === 'Japan') {
-                currentMoq = parsePositiveInt(gradeData.JP?.moq, p.minOrderQuantity || 1);
-                currentOrderUnit = parsePositiveInt(gradeData.JP?.orderUnit, p.orderUnit || 1);
+                currentMoq = safePositiveInt(gradeData?.JP?.moq, safePositiveInt(p.minOrderQuantity, 1));
+                currentOrderUnit = safePositiveInt(gradeData?.JP?.orderUnit, safePositiveInt(p.orderUnit, 1));
             } else {
-                currentMoq = parsePositiveInt(gradeData.US?.moq, p.minOrderQuantity || 1);
-                currentOrderUnit = parsePositiveInt(gradeData.US?.orderUnit, p.orderUnit || 1);
+                currentMoq = safePositiveInt(gradeData?.US?.moq, safePositiveInt(p.minOrderQuantity, 1));
+                currentOrderUnit = safePositiveInt(gradeData?.US?.orderUnit, safePositiveInt(p.orderUnit, 1));
             }
 
             // Set final checkout price based on the user's country
@@ -123,29 +141,29 @@ export default async function NewOrderPage() {
                 'D': p.priceD
             }
 
-            const selectedPrice = gradePriceMap[gradeToUse]
-            if (selectedPrice !== null && selectedPrice !== undefined && selectedPrice > 0) {
+            const selectedPrice = safeNonNegativeNumber(gradePriceMap[gradeToUse])
+            if (selectedPrice > 0) {
                 finalPrice = selectedPrice
-            } else if (p.priceC && p.priceC > 0) {
-                finalPrice = p.priceC
+            } else if (safeNonNegativeNumber(p.priceC) > 0) {
+                finalPrice = safeNonNegativeNumber(p.priceC)
             }
             krBuy = finalPrice;
         }
 
         return {
             id: p.id,
-            name: p.name,
-            imageUrl: p.imageUrl || null,
-            sellPrice: finalPrice,
-            stock: p.stock,
-            productCode: p.productCode,
-            barcode: p.barcode,
-            nameJP: p.nameJP,
-            nameEN: p.nameEN,
+            name: safeText(p.name, '상품 정보 없음'),
+            imageUrl: p.imageUrl ? getProductImageUrl(p.id, p.updatedAt) : null,
+            sellPrice: safeNonNegativeNumber(finalPrice),
+            stock: Math.floor(safeNonNegativeNumber(p.stock)),
+            productCode: safeText(p.productCode) || null,
+            barcode: safeText(p.barcode) || null,
+            nameJP: safeText(p.nameJP) || null,
+            nameEN: safeText(p.nameEN) || null,
             minOrderQuantity: currentMoq,
             orderUnit: currentOrderUnit,
-            buyPrice: p.buyPrice,
-            onlinePrice: p.onlinePrice || 0,
+            buyPrice: safeNonNegativeNumber(p.buyPrice),
+            onlinePrice: safeNonNegativeNumber(p.onlinePrice),
             jpBuyPrice: jpBuy,
             jpSellPrice: jpSell,
             krBuyPrice: krBuy,
@@ -153,7 +171,7 @@ export default async function NewOrderPage() {
             usBuyPrice: usBuy,
             usSellPrice: usSell,
             appliedGrade: gradeToUse,
-            country: user?.country
+            country: user?.country || null
         }
     })
 

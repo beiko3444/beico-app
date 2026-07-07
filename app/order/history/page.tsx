@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import OrderHistory from "@/components/OrderHistory"
+import { getProductImageUrl } from "@/lib/product-image-url"
 
 export const dynamic = 'force-dynamic'
 
@@ -46,7 +47,20 @@ export default async function OrderHistoryPage() {
         orderBy: { createdAt: 'desc' },
     })
 
+    const safeOrders = orders.map((order) => ({
+        ...order,
+        items: order.items.map((item) => ({
+            ...item,
+            product: item.product
+                ? {
+                    ...item.product,
+                    imageUrl: item.product.imageUrl ? getProductImageUrl(item.product.id, item.product.updatedAt) : null,
+                }
+                : null,
+        })),
+    }))
+
     return (
-        <OrderHistory orders={orders} userCountry={session.user.country} />
+        <OrderHistory orders={safeOrders} userCountry={session.user.country} />
     )
 }

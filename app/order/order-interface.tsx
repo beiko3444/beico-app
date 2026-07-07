@@ -1,22 +1,45 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 import { Minus, Plus, ArrowRight } from 'lucide-react'
 
 type Product = {
-    id: string
-    name: string
-    sellPrice: number
-    stock: number
+    id?: string | null
+    name?: string | null
+    sellPrice?: number | string | null
+    stock?: number | string | null
     imageUrl?: string | null
     productCode?: string | null
     barcode?: string | null
     nameJP?: string | null
     nameEN?: string | null
+    minOrderQuantity?: number | string | null
+    orderUnit?: number | string | null
+    appliedGrade?: string
+    onlinePrice?: number | string | null
+    jpBuyPrice?: number | string | null
+    jpSellPrice?: number | string | null
+    krBuyPrice?: number | string | null
+    krSellPrice?: number | string | null
+    usBuyPrice?: number | string | null
+    usSellPrice?: number | string | null
+    country?: string | null
+}
+
+type SafeProduct = {
+    id: string
+    name: string
+    sellPrice: number
+    stock: number
+    imageUrl: string | null
+    productCode: string | null
+    barcode: string | null
+    nameJP: string | null
+    nameEN: string | null
     minOrderQuantity: number
-    orderUnit?: number
+    orderUnit: number
     appliedGrade?: string
     onlinePrice: number
     jpBuyPrice: number
@@ -25,31 +48,92 @@ type Product = {
     krSellPrice: number
     usBuyPrice: number
     usSellPrice: number
-    country?: string | null
+    country: string | null
 }
 
-// Hardcoded bank info for now as requested
-const BANK_INFO = {
-    bank: "Shinhan Bank",
-    account: "110-123-456789",
-    holder: "beiko Inc."
+const safeNumber = (value: unknown, fallback = 0) => {
+    if (typeof value === 'number') return Number.isFinite(value) ? value : fallback
+    if (typeof value === 'bigint') return Number(value)
+    const normalized = String(value ?? '').replace(/,/g, '').trim()
+    if (!normalized) return fallback
+    const parsed = Number(normalized)
+    return Number.isFinite(parsed) ? parsed : fallback
 }
 
-export default function OrderInterface({ products }: { products: Product[] }) {
+const safeNonNegativeNumber = (value: unknown, fallback = 0) => {
+    const parsed = safeNumber(value, fallback)
+    return parsed >= 0 ? parsed : fallback
+}
+
+const safeNonNegativeInt = (value: unknown, fallback = 0) => {
+    return Math.max(0, Math.floor(safeNonNegativeNumber(value, fallback)))
+}
+
+const safePositiveInt = (value: unknown, fallback = 1) => {
+    const parsed = safeNumber(value, fallback)
+    return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback
+}
+
+const safeText = (value: unknown, fallback = '') => {
+    return typeof value === 'string' && value.trim() ? value : fallback
+}
+
+const formatNumber = (
+    value: unknown,
+    options?: Intl.NumberFormatOptions,
+) => safeNumber(value).toLocaleString(undefined, options)
+
+const formatMoney = (value: unknown, isUSD: boolean) => {
+    return formatNumber(value, isUSD ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})
+}
+
+const normalizeProduct = (product: Product): SafeProduct | null => {
+    const id = safeText(product?.id)
+    if (!id) return null
+
+    return {
+        id,
+        name: safeText(product.name, '상품 정보 없음'),
+        sellPrice: safeNonNegativeNumber(product.sellPrice),
+        stock: safeNonNegativeInt(product.stock),
+        imageUrl: safeText(product.imageUrl) || null,
+        productCode: safeText(product.productCode) || null,
+        barcode: safeText(product.barcode) || null,
+        nameJP: safeText(product.nameJP) || null,
+        nameEN: safeText(product.nameEN) || null,
+        minOrderQuantity: safePositiveInt(product.minOrderQuantity, 1),
+        orderUnit: safePositiveInt(product.orderUnit, 1),
+        appliedGrade: safeText(product.appliedGrade) || undefined,
+        onlinePrice: safeNonNegativeNumber(product.onlinePrice),
+        jpBuyPrice: safeNonNegativeNumber(product.jpBuyPrice),
+        jpSellPrice: safeNonNegativeNumber(product.jpSellPrice),
+        krBuyPrice: safeNonNegativeNumber(product.krBuyPrice),
+        krSellPrice: safeNonNegativeNumber(product.krSellPrice),
+        usBuyPrice: safeNonNegativeNumber(product.usBuyPrice),
+        usSellPrice: safeNonNegativeNumber(product.usSellPrice),
+        country: safeText(product.country) || null,
+    }
+}
+
+export default function OrderInterface({ products }: { products?: Product[] | null }) {
     const router = useRouter()
     const [quantities, setQuantities] = useState<Record<string, number>>({})
     const [showSummary, setShowSummary] = useState(false)
+    const safeProducts = useMemo(
+        () => (Array.isArray(products) ? products.map(normalizeProduct).filter((product): product is SafeProduct => Boolean(product)) : []),
+        [products],
+    )
 
     const handleQuantityChange = (productId: string, value: string | number) => {
-        const qty = typeof value === 'string' ? parseInt(value) || 0 : value
-        const product = products.find(p => p.id === productId)
+        const qty = safeNonNegativeInt(value)
+        const product = safeProducts.find(p => p.id === productId)
         if (!product) return
 
-        if (qty > (product.stock || 0)) {
-            alert(`Cannot order more than available stock (${product.stock || 0})`)
+        if (qty > product.stock) {
+            alert(`Cannot order more than available stock (${formatNumber(product.stock)})`)
             setQuantities(prev => ({
                 ...prev,
-                [productId]: product.stock || 0
+                [productId]: product.stock
             }))
             return
         }
@@ -61,25 +145,25 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     }
 
     const handleOrderNow = () => {
-        const minimumViolations = products
+        const minimumViolations = safeProducts
             .filter(p => {
-                const qty = quantities[p.id] || 0;
-                return qty > 0 && qty < (p.minOrderQuantity || 1);
+                const qty = safeNonNegativeInt(quantities[p.id]);
+                return qty > 0 && qty < p.minOrderQuantity;
             })
-            .map(p => `- ${p.name}: 주문 ${quantities[p.id]}개 / 최소 ${p.minOrderQuantity}개`);
+            .map(p => `- ${p.name}: 주문 ${formatNumber(quantities[p.id])}개 / 최소 ${formatNumber(p.minOrderQuantity)}개`);
 
         if (minimumViolations.length > 0) {
             alert(`최소 주문 수량이 미달된 상품이 있습니다:\n\n${minimumViolations.join('\n')}\n\n최소 주문 수량 이상으로 주문해 주세요.`);
             return;
         }
 
-        const unitViolations = products
+        const unitViolations = safeProducts
             .filter(p => {
-                const qty = quantities[p.id] || 0;
-                const orderUnit = p.orderUnit || 1;
+                const qty = safeNonNegativeInt(quantities[p.id]);
+                const orderUnit = p.orderUnit;
                 return qty > 0 && qty % orderUnit !== 0;
             })
-            .map(p => `- ${p.name}: 주문 ${quantities[p.id]}개 / 주문 단위 ${p.orderUnit || 1}개`);
+            .map(p => `- ${p.name}: 주문 ${formatNumber(quantities[p.id])}개 / 주문 단위 ${formatNumber(p.orderUnit)}개`);
 
         if (unitViolations.length > 0) {
             alert(`주문 단위에 맞지 않는 상품이 있습니다:\n\n${unitViolations.join('\n')}\n\n설정된 주문 단위의 배수로 주문해 주세요.`);
@@ -88,12 +172,12 @@ export default function OrderInterface({ products }: { products: Product[] }) {
         setShowSummary(true);
     };
 
-    const productTotal = products.reduce((sum, p) => {
-        return sum + (p.sellPrice * (quantities[p.id] || 0))
+    const productTotal = safeProducts.reduce((sum, p) => {
+        return sum + (p.sellPrice * safeNonNegativeInt(quantities[p.id]))
     }, 0)
 
-    const totalQuantity = Object.values(quantities).reduce((sum, q) => sum + q, 0)
-    const userCountry = products[0]?.country
+    const totalQuantity = Object.values(quantities).reduce((sum, q) => sum + safeNonNegativeInt(q), 0)
+    const userCountry = safeProducts[0]?.country
     const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
     const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
 
@@ -111,9 +195,9 @@ export default function OrderInterface({ products }: { products: Product[] }) {
     return (
         <div className="pb-32 space-y-4">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {products.map((product, index) => {
-                    const qty = quantities[product.id] || 0
-                    const orderUnit = product.orderUnit || 1
+                {safeProducts.map((product, index) => {
+                    const qty = safeNonNegativeInt(quantities[product.id])
+                    const orderUnit = product.orderUnit
                     const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice;
                     const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice;
                     const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : 0;
@@ -185,7 +269,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">wholesale US</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">$</span>{product.usBuyPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    <span className="text-[0.85em] mr-0.5">$</span>{formatNumber(product.usBuyPrice, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </p>
                                             </div>
                                             <div className="py-1.5 px-4">
@@ -194,7 +278,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Retail Price US</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">$</span>{product.usSellPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                                    <span className="text-[0.85em] mr-0.5">$</span>{formatNumber(product.usSellPrice, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                                 </p>
                                             </div>
                                         </div>
@@ -209,7 +293,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">wholesale JP</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">¥</span>{product.jpBuyPrice.toLocaleString()}
+                                                    <span className="text-[0.85em] mr-0.5">¥</span>{formatNumber(product.jpBuyPrice)}
                                                 </p>
                                             </div>
                                             <div className="py-1.5 px-4">
@@ -218,7 +302,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Retail Price JP</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">¥</span>{product.jpSellPrice.toLocaleString()}
+                                                    <span className="text-[0.85em] mr-0.5">¥</span>{formatNumber(product.jpSellPrice)}
                                                 </p>
                                             </div>
                                         </div>
@@ -233,7 +317,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">wholesale KR</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.7em] mr-0.5">₩</span>{product.krBuyPrice.toLocaleString()}
+                                                    <span className="text-[0.7em] mr-0.5">₩</span>{formatNumber(product.krBuyPrice)}
                                                 </p>
                                             </div>
                                             <div className="py-1.5 px-4">
@@ -242,7 +326,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                     <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Retail Price KR</span>
                                                 </div>
                                                 <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.7em] mr-0.5">₩</span>{product.krSellPrice.toLocaleString()}
+                                                    <span className="text-[0.7em] mr-0.5">₩</span>{formatNumber(product.krSellPrice)}
                                                 </p>
                                             </div>
                                         </div>
@@ -256,7 +340,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                                 <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Stock</span>
                                             </div>
                                             <p className={`text-[22px] font-medium leading-none tabular-nums font-inter tracking-tighter text-right ${product.stock <= 0 ? 'text-[#e34219]' : 'text-gray-900 dark:text-white'}`}>
-                                                {product.stock.toLocaleString()}
+                                                {formatNumber(product.stock)}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -276,8 +360,8 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <div className="px-8 pb-8 flex items-center justify-between gap-6 pt-0">
                                 <div className="flex flex-col">
                                     <span className="text-[11px] font-black text-[#e34219] uppercase tracking-widest leading-tight">最小注文数量</span>
-                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Min Order: {product.minOrderQuantity}ea</span>
-                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Order Unit: {orderUnit}ea</span>
+                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Min Order: {formatNumber(product.minOrderQuantity)}ea</span>
+                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Order Unit: {formatNumber(orderUnit)}ea</span>
                                 </div>
 
                                 {product.stock > 0 ? (
@@ -301,7 +385,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                             </button>
                                             <input
                                                 type="text"
-                                                value={qty.toLocaleString()}
+                                                value={formatNumber(qty)}
                                                 onChange={(e) => {
                                                     const val = e.target.value.replace(/,/g, '')
                                                     if (/^\d*$/.test(val)) {
@@ -349,7 +433,7 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                                 <span className="text-[8px] font-bold uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
                             </div>
                             <p className="text-4xl font-medium text-[#111827] dark:text-white leading-none font-inter tracking-tighter">
-                                <span className="text-[0.5em] mr-1">{currencySymbol}</span>{productTotal.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2, maximumFractionDigits: 2 } : {})}
+                                <span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(productTotal, isUSD)}
                             </p>
                         </div>
 
@@ -382,22 +466,22 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-medium uppercase tracking-widest">Order Summary</p>
 
                             <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-                                {products.filter(p => (quantities[p.id] || 0) > 0).map(p => (
+                                {safeProducts.filter(p => safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-[#2a2a2a]">
                                         <div>
                                             <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{p.nameJP || p.name}</p>
                                             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
                                                 {p.nameEN && <span className="mr-1">{p.nameEN}</span>}
-                                                <span>× {quantities[p.id]}</span>
+                                                <span>× {formatNumber(quantities[p.id])}</span>
                                             </p>
                                         </div>
-                                        <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{(p.sellPrice * quantities[p.id]).toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                        <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(p.sellPrice * safeNonNegativeInt(quantities[p.id]), isUSD)}</span>
                                     </div>
                                 ))}
                                 {shippingFee > 0 && (
                                     <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 dark:border-[#2a2a2a] mt-2">
                                         <span className="text-sm font-bold text-gray-600 dark:text-gray-400">配送料 (Shipping)</span>
-                                        <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{shippingFee.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                        <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(shippingFee, isUSD)}</span>
                                     </div>
                                 )}
                             </div>
@@ -405,28 +489,28 @@ export default function OrderInterface({ products }: { products: Product[] }) {
                             <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-2xl p-6 space-y-3 mb-8">
                                 <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 font-medium">
                                     <span>供給価額 (Supply)</span>
-                                    <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{supplyTotal.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                    <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatMoney(supplyTotal, isUSD)}</span>
                                 </div>
                                 {!isUSD && (
                                     <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 font-medium">
                                         <span>消費税 (10%)</span>
-                                        <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{vat.toLocaleString()}</span>
+                                        <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatNumber(vat)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 dark:border-[#2a2a2a] mt-2">
                                     <span className="font-bold text-lg text-gray-900 dark:text-white">合計金額</span>
-                                    <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">{currencySymbol}</span>{totalAmount.toLocaleString(undefined, isUSD ? { minimumFractionDigits: 2 } : {})}</span>
+                                    <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(totalAmount, isUSD)}</span>
                                 </div>
                             </div>
 
                             <button
                                 onClick={async () => {
                                     try {
-                                        const items = products
-                                            .filter(p => (quantities[p.id] || 0) > 0)
+                                        const items = safeProducts
+                                            .filter(p => safeNonNegativeInt(quantities[p.id]) > 0)
                                             .map(p => ({
                                                 productId: p.id,
-                                                quantity: quantities[p.id],
+                                                quantity: safeNonNegativeInt(quantities[p.id]),
                                                 price: p.sellPrice
                                             }))
 
