@@ -225,11 +225,15 @@ function inferWormEmailMatchType(input: {
   if (storedType === 'AWB_DOCUMENT') return storedType
 
   const subject = (input.subject || '').toLowerCase()
+  const looksLikeShippingDocument = /\b(?:documents?|documets|shipping\s+documents?|shipment\s+arrival|air\s*waybill|waybill|awb|skm)\b/i.test(subject)
   const hasInvoiceAmount =
     input.invoiceUnitPriceUsd !== null ||
     input.invoiceTotalAmountUsd !== null ||
     input.invoiceUnitPriceKrw !== null ||
     input.invoiceTotalAmountKrw !== null
+  if (!hasInvoiceAmount && looksLikeShippingDocument) {
+    return 'AWB_DOCUMENT'
+  }
   if (!hasInvoiceAmount && input.awbNumber && /(document|documets|documents|awb|skm|waybill|shipment\s+arrival|payment\s+invoice)/i.test(subject)) {
     return 'AWB_DOCUMENT'
   }
