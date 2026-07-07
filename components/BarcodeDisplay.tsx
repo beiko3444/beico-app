@@ -1,7 +1,23 @@
 'use client';
 
-import { useRef } from 'react';
+import { Component, ReactNode, useRef } from 'react';
 import Barcode from 'react-barcode';
+
+class BarcodeErrorBoundary extends Component<
+    { fallback: ReactNode; children: ReactNode },
+    { hasError: boolean }
+> {
+    state = { hasError: false };
+
+    static getDerivedStateFromError() {
+        return { hasError: true };
+    }
+
+    render() {
+        if (this.state.hasError) return this.props.fallback;
+        return this.props.children;
+    }
+}
 
 export default function BarcodeDisplay({
     value,
@@ -13,7 +29,7 @@ export default function BarcodeDisplay({
     buttonClassName = "",
     containerClassName = ""
 }: {
-    value: string;
+    value: string | number | null | undefined;
     width?: number;
     height?: number;
     fontSize?: number;
@@ -23,8 +39,19 @@ export default function BarcodeDisplay({
     containerClassName?: string;
 }) {
     const barcodeRef = useRef<HTMLDivElement>(null);
+    const safeValue = value === null || value === undefined ? "" : String(value).trim();
 
-    if (!value) return <span className="text-gray-400">-</span>;
+    if (!safeValue) return <span className="text-gray-400">-</span>;
+
+    const fallback = (
+        <span className="max-w-[160px] truncate text-[10px] font-bold text-gray-400" title={safeValue}>
+            {safeValue}
+        </span>
+    );
+
+    if (!/^[\x00-\x7F]+$/.test(safeValue)) {
+        return fallback;
+    }
 
     const downloadPNG = (e: React.MouseEvent) => {
         e.preventDefault();
@@ -59,7 +86,7 @@ export default function BarcodeDisplay({
                 const pngUrl = canvas.toDataURL('image/png');
                 const downloadLink = document.createElement('a');
                 downloadLink.href = pngUrl;
-                downloadLink.download = `barcode-${value}.png`;
+                downloadLink.download = `barcode-${safeValue}.png`;
                 document.body.appendChild(downloadLink);
                 downloadLink.click();
                 document.body.removeChild(downloadLink);
@@ -85,7 +112,7 @@ export default function BarcodeDisplay({
 
         const downloadLink = document.createElement('a');
         downloadLink.href = url;
-        downloadLink.download = `barcode-${value}.svg`;
+        downloadLink.download = `barcode-${safeValue}.svg`;
         document.body.appendChild(downloadLink);
         downloadLink.click();
         document.body.removeChild(downloadLink);
@@ -96,16 +123,18 @@ export default function BarcodeDisplay({
         <div className={`flex items-center group ${containerClassName}`}>
             <div className="flex flex-col items-start">
                 <div ref={barcodeRef}>
-                    <Barcode
-                        value={value}
-                        format="CODE128"
-                        width={width}
-                        height={height}
-                        fontSize={fontSize}
-                        displayValue={displayValue}
-                        margin={0}
-                        background="transparent"
-                    />
+                    <BarcodeErrorBoundary key={safeValue} fallback={fallback}>
+                        <Barcode
+                            value={safeValue}
+                            format="CODE128"
+                            width={width}
+                            height={height}
+                            fontSize={fontSize}
+                            displayValue={displayValue}
+                            margin={0}
+                            background="transparent"
+                        />
+                    </BarcodeErrorBoundary>
                 </div>
             </div>
             {showDownload && (
