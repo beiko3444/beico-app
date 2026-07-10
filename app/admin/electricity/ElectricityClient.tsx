@@ -38,6 +38,7 @@ type MonthlyCalendarSummary = {
 }
 
 const PAYMENT_START_YEAR = 2025
+const MONTHLY_RENT_AMOUNT = 1595000
 
 const toFiniteNumber = (value: unknown) => {
     const num = Number(value)
@@ -148,6 +149,8 @@ export default function ElectricityClient() {
         if (!s) return '';
         return parseInt(s, 10).toLocaleString();
     };
+
+    const formatWon = (amount: number) => `${Math.round(amount).toLocaleString()}원`
 
     const formatPhotoUploadedAt = (value: string | null | undefined) => {
         if (!value) return '업로드일 기록 없음'
@@ -836,25 +839,14 @@ export default function ElectricityClient() {
     const shareRatioBeico = billData && billData.totalAmount > 0 ? (beicoTotal / billData.totalAmount) * 100 : 0
 
     const currentPaymentStatus = getPaymentStatus(selectedYear, selectedMonth)
-    const rentAutoTransferDate = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-14`
     const selectedMonthLandlordTotal = monthlyLandlordTotals[selectedMonth] ?? null
-    const unpaidLandlordElectricitySummary = Array.from({ length: 12 }, (_, idx) => idx + 1)
-        .filter(month => {
-            if (selectedYear < currentYear) return true
-            if (selectedYear > currentYear) return false
-            return month < currentMonth
-        })
-        .reduce((acc, month) => {
-            const amount = monthlyLandlordTotals[month]
-            const status = getPaymentStatus(selectedYear, month)
-            if (amount === null || amount === undefined || status.electricityPaid) {
-                return acc
-            }
-
-            acc.total += amount
-            acc.months += 1
-            return acc
-        }, { total: 0, months: 0 })
+    const isPaymentDueByToday = (year: number, month: number) => {
+        if (year < currentYear) return true
+        if (year > currentYear) return false
+        if (month < currentMonth) return true
+        if (month > currentMonth) return false
+        return currentDay >= 14
+    }
     const formatChecklistTimestamp = (value: string | null) => {
         if (!value) return '-'
         return new Date(value).toLocaleString('ko-KR')
@@ -872,18 +864,70 @@ export default function ElectricityClient() {
         const nextYear = month === 12 ? year + 1 : year;
         const periodStr = `${year}년 ${month}월 14일 ~ ${nextYear}년 ${nextMonth}월 13일`;
         const scheduledDepositDate = year === 2025 && month === 12 ? '12월 18일' : `${month}월 14일`
-        const isPastMonth = year < currentYear || (year === currentYear && month < currentMonth)
-        const isCurrentMonthDepositCompleted = year === currentYear && month === currentMonth && currentDay >= 14
-        const isDeposited = isPastMonth || isCurrentMonthDepositCompleted
+        const isDeposited = isPaymentDueByToday(year, month)
 
         return {
             period: periodStr,
             paidDate: scheduledDepositDate,
-            amount: isDeposited ? "1,595,000원" : "-"
+            amount: isDeposited ? formatWon(MONTHLY_RENT_AMOUNT) : "-",
+            isDeposited
         };
     };
 
     const rentInfo = getRentPaymentInfo(selectedYear, selectedMonth);
+    const paymentMonths = Array.from({ length: 12 }, (_, i) => i + 1)
+        .filter(month => selectedYear > PAYMENT_START_YEAR || (selectedYear === PAYMENT_START_YEAR && month >= 1))
+
+    const monthlyPaymentRows = paymentMonths.map(month => {
+        const status = getPaymentStatus(selectedYear, month)
+        const rowRentInfo = getRentPaymentInfo(selectedYear, month)
+        const landlordElectricityAmount = monthlyLandlordTotals[month]
+        const hasLandlordElectricityAmount = typeof landlordElectricityAmount === 'number' && landlordElectricityAmount > 0
+        const hasRentDeposit = rowRentInfo.isDeposited || Boolean(rentPaidDates[month])
+        const shouldReview = isPaymentDueByToday(selectedYear, month)
+        const missingTaxInvoice = shouldReview && hasRentDeposit && !status.rentTaxInvoiceIssued
+        const missingElectricityPayment = shouldReview && hasLandlordElectricityAmount && !status.electricityPaid
+
+        return {
+            month,
+            status,
+            rowRentInfo,
+            landlordElectricityAmount,
+            hasLandlordElectricityAmount,
+            rentAmount: hasRentDeposit ? MONTHLY_RENT_AMOUNT : 0,
+            missingTaxInvoice,
+            missingElectricityPayment,
+            needsAttention: missingTaxInvoice || missingElectricityPayment,
+        }
+    })
+
+    const paymentSummary = monthlyPaymentRows.reduce((acc, row) => {
+        acc.rentTotal += row.rentAmount
+        if (row.rentAmount > 0 && row.missingTaxInvoice) {
+            acc.missingTaxInvoiceTotal += row.rentAmount
+            acc.missingTaxInvoiceMonths += 1
+        }
+        if (typeof row.landlordElectricityAmount === 'number') {
+            acc.landlordElectricityTotal += row.landlordElectricityAmount
+            if (row.missingElectricityPayment) {
+                acc.unpaidElectricityTotal += row.landlordElectricityAmount
+                acc.unpaidElectricityMonths += 1
+            }
+        }
+        return acc
+    }, {
+        rentTotal: 0,
+        missingTaxInvoiceTotal: 0,
+        missingTaxInvoiceMonths: 0,
+        landlordElectricityTotal: 0,
+        unpaidElectricityTotal: 0,
+        unpaidElectricityMonths: 0,
+    })
+
+    const unpaidLandlordElectricitySummary = {
+        total: paymentSummary.unpaidElectricityTotal,
+        months: paymentSummary.unpaidElectricityMonths,
+    }
 
     return (
         <div id="electricity-main" className="mx-auto w-full max-w-[1280px] space-y-5 font-sans pb-20 print:pb-0 print:space-y-0">
@@ -1329,16 +1373,25 @@ export default function ElectricityClient() {
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                                        {Array.from({ length: 12 }, (_, i) => i + 1)
-                                            .filter(m => selectedYear > PAYMENT_START_YEAR || (selectedYear === PAYMENT_START_YEAR && m >= 1))
-                                            .map(m => {
-                                                const status = getPaymentStatus(selectedYear, m)
+                                        {monthlyPaymentRows.map(row => {
+                                                const {
+                                                    month: m,
+                                                    status,
+                                                    rowRentInfo,
+                                                    landlordElectricityAmount: lTotal,
+                                                    missingTaxInvoice,
+                                                    missingElectricityPayment,
+                                                    needsAttention,
+                                                } = row
                                                 const isSelected = m === selectedMonth
-                                                const lTotal = monthlyLandlordTotals[m]
-                                                const rowRentInfo = getRentPaymentInfo(selectedYear, m)
+                                                const rowClassName = needsAttention
+                                                    ? 'bg-red-50/90 hover:bg-red-100/80 dark:bg-red-950/20 dark:hover:bg-red-950/30'
+                                                    : isSelected
+                                                        ? 'bg-[#d9361b]/5 hover:bg-[#d9361b]/10'
+                                                        : 'hover:bg-gray-50 dark:hover:bg-[#1a1a1a]'
 
                                                 return (
-                                                    <tr key={m} className={`hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors ${isSelected ? 'bg-[#d9361b]/5' : ''}`}>
+                                                    <tr key={m} className={`transition-colors ${rowClassName}`}>
                                                         <td className="whitespace-nowrap px-3 py-2.5">
                                                             <button
                                                                 type="button"
@@ -1370,17 +1423,33 @@ export default function ElectricityClient() {
                                                             {rowRentInfo.period}
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center">
-                                                            <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.rentTaxInvoiceIssued ? 'bg-green-100 text-green-600' : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'}`}>
-                                                                {status.rentTaxInvoiceIssued ? '✓' : '-'}
+                                                            <span className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-1 text-[10px] font-black ${
+                                                                status.rentTaxInvoiceIssued
+                                                                    ? 'bg-green-100 text-green-600'
+                                                                    : missingTaxInvoice
+                                                                        ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
+                                                                        : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'
+                                                            }`}>
+                                                                {status.rentTaxInvoiceIssued ? '✓' : missingTaxInvoice ? '미발행' : '-'}
                                                             </span>
                                                         </td>
-                                                        <td className="whitespace-nowrap px-3 py-2.5 text-right text-gray-600 dark:text-gray-400">
-                                                            {lTotal !== null && lTotal !== undefined ? `${lTotal.toLocaleString()}원` : '-'}
+                                                        <td className={`whitespace-nowrap px-3 py-2.5 text-right ${
+                                                            missingElectricityPayment
+                                                                ? 'font-black text-red-700 dark:text-red-300'
+                                                                : 'text-gray-600 dark:text-gray-400'
+                                                        }`}>
+                                                            {lTotal !== null && lTotal !== undefined ? formatWon(lTotal) : '-'}
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center">
                                                             <div className="flex flex-col items-center">
-                                                                <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full ${status.electricityPaid ? 'bg-green-100 text-green-600' : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'}`}>
-                                                                    {status.electricityPaid ? '✓' : '-'}
+                                                                <span className={`inline-flex min-w-6 items-center justify-center rounded-full px-2 py-1 text-[10px] font-black ${
+                                                                    status.electricityPaid
+                                                                        ? 'bg-green-100 text-green-600'
+                                                                        : missingElectricityPayment
+                                                                            ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
+                                                                            : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'
+                                                                }`}>
+                                                                    {status.electricityPaid ? '✓' : missingElectricityPayment ? '미납' : '-'}
                                                                 </span>
                                                                 {status.electricityPaid && <div className="text-[10px] text-gray-400 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
                                                             </div>
@@ -1389,6 +1458,31 @@ export default function ElectricityClient() {
                                                 )
                                             })}
                                     </tbody>
+                                    <tfoot className="border-t border-gray-200 bg-gray-50 text-xs font-black text-gray-900 dark:border-[#2a2a2a] dark:bg-[#171717] dark:text-white">
+                                        <tr>
+                                            <td className="whitespace-nowrap px-3 py-3">합계</td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-center text-gray-500 dark:text-gray-400">도래 입금</td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-right">{formatWon(paymentSummary.rentTotal)}</td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-center text-gray-400">-</td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-center">
+                                                <span className={paymentSummary.missingTaxInvoiceMonths > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-400'}>
+                                                    미발행 {paymentSummary.missingTaxInvoiceMonths}건
+                                                </span>
+                                                <div className={paymentSummary.missingTaxInvoiceMonths > 0 ? 'mt-0.5 text-[11px] text-red-700 dark:text-red-300' : 'mt-0.5 text-[11px] text-gray-400'}>
+                                                    {paymentSummary.missingTaxInvoiceTotal > 0 ? formatWon(paymentSummary.missingTaxInvoiceTotal) : '-'}
+                                                </div>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-right">{formatWon(paymentSummary.landlordElectricityTotal)}</td>
+                                            <td className="whitespace-nowrap px-3 py-3 text-center">
+                                                <span className={paymentSummary.unpaidElectricityMonths > 0 ? 'text-red-700 dark:text-red-300' : 'text-gray-400'}>
+                                                    미납 {paymentSummary.unpaidElectricityMonths}건
+                                                </span>
+                                                <div className={paymentSummary.unpaidElectricityTotal > 0 ? 'mt-0.5 text-[11px] text-red-700 dark:text-red-300' : 'mt-0.5 text-[11px] text-gray-400'}>
+                                                    {paymentSummary.unpaidElectricityTotal > 0 ? formatWon(paymentSummary.unpaidElectricityTotal) : '-'}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    </tfoot>
                                 </table>
                             </div>
                         </div>
