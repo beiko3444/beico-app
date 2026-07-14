@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
+import { type DragEvent, useMemo, useRef, useState } from 'react'
 import {
   Archive,
   ArchiveRestore,
@@ -102,11 +102,17 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
 
+const MAX_ATTACHMENT_SIZE = 15 * 1024 * 1024
+
+const getFileKey = (file: File) => `${file.name}:${file.size}:${file.lastModified}`
+
 export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoItem[] }) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [memos, setMemos] = useState(initialMemos)
   const [form, setForm] = useState<MemoForm>(emptyForm)
   const [keepAttachmentIds, setKeepAttachmentIds] = useState<string[]>([])
+  const [newAttachments, setNewAttachments] = useState<File[]>([])
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false)
   const [query, setQuery] = useState('')
   const [category, setCategory] = useState('전체')
   const [showArchived, setShowArchived] = useState(false)
@@ -140,7 +146,33 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
   const resetForm = () => {
     setForm(emptyForm())
     setKeepAttachmentIds([])
+    setNewAttachments([])
+    setIsDraggingFiles(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const addAttachments = (files: FileList | File[]) => {
+    const incomingFiles = Array.from(files)
+    const oversizedFiles = incomingFiles.filter((file) => file.size > MAX_ATTACHMENT_SIZE)
+
+    if (oversizedFiles.length > 0) {
+      alert(`${oversizedFiles.map((file) => file.name).join(', ')} 파일은 15MB 이하만 등록할 수 있습니다.`)
+    }
+
+    const validFiles = incomingFiles.filter((file) => file.size > 0 && file.size <= MAX_ATTACHMENT_SIZE)
+    setNewAttachments((currentFiles) => {
+      const existingKeys = new Set(currentFiles.map(getFileKey))
+      return [...currentFiles, ...validFiles.filter((file) => !existingKeys.has(getFileKey(file)))]
+    })
+
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleAttachmentDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+    setIsDraggingFiles(false)
+    addAttachments(event.dataTransfer.files)
   }
 
   const applySavedMemo = (memo: AdminMemoItem) => {
@@ -152,7 +184,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
   }
 
   const saveMemo = async () => {
-    const hasNewFiles = (fileInputRef.current?.files?.length || 0) > 0
+    const hasNewFiles = newAttachments.length > 0
     if (
       !form.title.trim() &&
       !form.content.trim() &&
@@ -180,7 +212,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
       formData.set('password', form.password)
       formData.set('siteUrl', form.siteUrl)
       formData.set('keepAttachmentIds', JSON.stringify(keepAttachmentIds))
-      Array.from(fileInputRef.current?.files || []).forEach((file) => {
+      newAttachments.forEach((file) => {
         formData.append('attachments', file)
       })
 
@@ -213,6 +245,8 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
       siteUrl: memo.siteUrl || '',
     })
     setKeepAttachmentIds(memo.attachments.map((attachment) => attachment.id))
+    setNewAttachments([])
+    setIsDraggingFiles(false)
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -393,7 +427,32 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 />
               </label>
 
-              <div className="rounded-md border border-dashed border-slate-300 bg-slate-50 p-3">
+              <div
+                onDragEnter={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  setIsDraggingFiles(true)
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  event.dataTransfer.dropEffect = 'copy'
+                  setIsDraggingFiles(true)
+                }}
+                onDragLeave={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setIsDraggingFiles(false)
+                  }
+                }}
+                onDrop={handleAttachmentDrop}
+                className={`rounded-md border border-dashed p-3 transition ${
+                  isDraggingFiles
+                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
+                    : 'border-slate-300 bg-slate-50'
+                }`}
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-black text-slate-700">첨부 문서</div>
@@ -414,7 +473,38 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   multiple
                   className="hidden"
                   accept="image/*,application/pdf,.pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.hwp,.hwpx,.txt,.csv"
+                  onChange={(event) => addAttachments(event.target.files || [])}
                 />
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className={`mt-3 cursor-pointer rounded-md border border-dashed px-3 py-4 text-center text-xs font-black transition ${
+                    isDraggingFiles
+                      ? 'border-blue-400 bg-white text-blue-700'
+                      : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
+                  }`}
+                >
+                  {isDraggingFiles ? '여기에 놓으면 첨부됩니다.' : '파일을 이곳에 끌어놓거나 클릭해서 선택하세요.'}
+                </div>
+                {newAttachments.length > 0 && (
+                  <div className="mt-3 space-y-1.5">
+                    {newAttachments.map((file) => (
+                      <div key={getFileKey(file)} className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs">
+                        <Paperclip size={14} className="shrink-0 text-blue-600" />
+                        <span className="min-w-0 flex-1 truncate font-black text-slate-700">{file.name}</span>
+                        <span className="shrink-0 font-bold text-slate-500">{formatFileSize(file.size)}</span>
+                        <span className="shrink-0 font-black text-blue-700">신규</span>
+                        <button
+                          type="button"
+                          onClick={() => setNewAttachments((files) => files.filter((item) => getFileKey(item) !== getFileKey(file)))}
+                          className="shrink-0 rounded p-1 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                          aria-label={`${file.name} 첨부 취소`}
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 {visibleAttachments.length > 0 ? (
                   <div className="mt-3 space-y-1.5">
                     {visibleAttachments.map((attachment) => (
@@ -439,11 +529,11 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                       </div>
                     ))}
                   </div>
-                ) : (
+                ) : editingMemo ? (
                   <div className="mt-3 rounded-md border border-dashed border-slate-200 bg-white px-3 py-3 text-center text-xs font-bold text-slate-400">
                     선택한 기존 첨부가 없습니다.
                   </div>
-                )}
+                ) : null}
               </div>
 
               <button

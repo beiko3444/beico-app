@@ -6,6 +6,7 @@ import {
   PointerSensor,
   closestCenter,
   type DragEndEvent,
+  type Modifier,
   useSensor,
   useSensors,
 } from '@dnd-kit/core'
@@ -60,6 +61,11 @@ const filterOptions: Array<{ value: FilterMode; label: string }> = [
   { value: 'unlinked', label: '미연결' },
   { value: 'linked', label: '연결상품 있음' },
 ]
+
+const restrictToVerticalDrag: Modifier = ({ transform }) => ({
+  ...transform,
+  x: 0,
+})
 
 function formatNumber(value: number | null | undefined) {
   if (value === null || value === undefined) return '-'
@@ -240,6 +246,12 @@ function SortableMasterRow({
   onToggleFavorite: (id: number) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id })
+  const dragHandleStyle = {
+    touchAction: 'none',
+    userSelect: 'none',
+    WebkitUserSelect: 'none',
+    WebkitTouchCallout: 'none',
+  } as const
 
   return (
     <tr
@@ -258,6 +270,7 @@ function SortableMasterRow({
             type="button"
             className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-400 active:cursor-grabbing"
             title="드래그해서 순위 변경"
+            style={dragHandleStyle}
             {...attributes}
             {...listeners}
           >
@@ -339,7 +352,7 @@ function MasterTable({
 
   return (
     <div className="overflow-x-auto rounded-xl border border-[#E5EAF2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalDrag]} onDragEnd={handleDragEnd}>
         <table className="w-[1360px] table-fixed border-collapse text-left text-[13px]">
           <thead className="border-b border-[#E5EAF2] bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
             <tr>

@@ -8,7 +8,8 @@ import {
     PointerSensor,
     useSensor,
     useSensors,
-    DragEndEvent
+    DragEndEvent,
+    type Modifier
 } from '@dnd-kit/core'
 import {
     arrayMove,
@@ -21,6 +22,11 @@ import { CSS } from '@dnd-kit/utilities'
 import ProductForm from "./product-form"
 import BarcodeDisplay from "@/components/BarcodeDisplay"
 import { useRouter } from 'next/navigation'
+
+const restrictToVerticalDrag: Modifier = ({ transform }) => ({
+    ...transform,
+    x: 0,
+})
 
 interface ProductRowProps {
     product: any
@@ -54,6 +60,12 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete, check
         zIndex: isDragging ? 50 : 'auto',
         opacity: isDragging ? 0.5 : 1,
     }
+    const dragHandleStyle = {
+        touchAction: 'none',
+        userSelect: 'none',
+        WebkitUserSelect: 'none',
+        WebkitTouchCallout: 'none',
+    } as const
 
     const margin = (product.sellPrice || 0) - (product.buyPrice || 0);
     const marginPercent = (product.sellPrice ? ((margin / product.sellPrice) * 100) : 0).toFixed(1);
@@ -92,6 +104,7 @@ function SortableProductRow({ product, index, onSortOrderChange, onDelete, check
                 <div
                     {...attributes}
                     {...listeners}
+                    style={dragHandleStyle}
                     className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-600"
                 >
                     ⠿
@@ -447,6 +460,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: any
         <DndContext
             sensors={sensors}
             collisionDetection={closestCenter}
+            modifiers={[restrictToVerticalDrag]}
             onDragEnd={handleDragEnd}
         >
             {checkedIds.size > 0 && (

@@ -186,6 +186,10 @@ export function requestTimeoutMs(override?: number): number {
   return override ?? Math.max(3000, raw ?? 15000)
 }
 
+function readableError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
 async function resolveMonitorUrlFromGist(gistRawUrl: string, timeoutMs: number): Promise<string | null> {
   const rawUrl = normalizeBaseUrl(gistRawUrl)
   if (!rawUrl) return null
@@ -267,6 +271,9 @@ export async function monitorRequest<T>(
     }
     if (error instanceof DOMException && error.name === 'AbortError') {
       throw new Error('라즈베리 서버 응답 시간이 초과되었습니다.')
+    }
+    if (error instanceof TypeError && /fetch failed|failed to fetch/i.test(error.message)) {
+      throw new Error(`라즈베리 서버에 연결하지 못했습니다. 현재 모니터 주소(${base.url})를 확인해 주세요.`)
     }
     throw error
   } finally {
@@ -467,17 +474,20 @@ function sumRows(rows: SmartInventoryMasterRow[], selector: (row: SmartInventory
 async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboardPayload> {
   const warnings = [...base.warnings]
   const [inventoryPayload, mastersResult, linksResult, inboundsResult, healthResult] = await Promise.all([
-    monitorRequest<RawRecord>(base, '/inventory'),
+    monitorRequest<RawRecord>(base, '/inventory').catch((error) => {
+      warnings.push(`판매채널 재고를 불러오지 못했습니다: ${readableError(error)}`)
+      return {}
+    }),
     monitorRequest<RawRecord>(base, '/masters').catch((error) => {
-      warnings.push(`마스터 상품을 불러오지 못했습니다: ${error instanceof Error ? error.message : String(error)}`)
+      warnings.push(`마스터 상품을 불러오지 못했습니다: ${readableError(error)}`)
       return {}
     }),
     monitorRequest<RawRecord>(base, '/master-links').catch((error) => {
-      warnings.push(`마스터 링크를 불러오지 못했습니다: ${error instanceof Error ? error.message : String(error)}`)
+      warnings.push(`마스터 링크를 불러오지 못했습니다: ${readableError(error)}`)
       return {}
     }),
     monitorRequest<RawRecord>(base, '/stock-inbounds').catch((error) => {
-      warnings.push(`입고대기 정보를 불러오지 못했습니다: ${error instanceof Error ? error.message : String(error)}`)
+      warnings.push(`입고대기 정보를 불러오지 못했습니다: ${readableError(error)}`)
       return {}
     }),
     monitorRequest<Record<string, unknown>>(base, '/health').catch(() => null),
