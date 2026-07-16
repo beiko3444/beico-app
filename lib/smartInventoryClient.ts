@@ -122,7 +122,7 @@ type DashboardCacheEntry = {
 
 const CHANNELS: SmartInventoryChannel[] = ['naver', 'coupang']
 const TUNNEL_DOWN_STATUS = new Set([502, 503, 504, 530])
-const DEFAULT_MONITOR_URL_GIST = 'https://gist.githubusercontent.com/beiko3444/5a69e99d96fa2ae34ba4af96c117d5e0/raw/monitor.json'
+const DEFAULT_MONITOR_URL_GIST = 'https://gist.githubusercontent.com/beiko3444/5a69e99d96fa2ae34ba4af96c117d5e0/raw'
 let dashboardCache: DashboardCacheEntry | null = null
 let dashboardRefreshPromise: Promise<SmartInventoryDashboardPayload> | null = null
 
@@ -195,6 +195,9 @@ async function resolveMonitorUrlFromGist(gistRawUrl: string, timeoutMs: number):
   if (!rawUrl) return null
 
   const url = new URL(rawUrl)
+  if (url.hostname === 'gist.githubusercontent.com' && url.pathname.endsWith('/raw/monitor.json')) {
+    url.pathname = url.pathname.slice(0, -'/monitor.json'.length)
+  }
   url.searchParams.set('t', String(Date.now()))
 
   const controller = new AbortController()
@@ -220,7 +223,7 @@ export async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promis
   const warnings: string[] = []
   const envUrl = normalizeBaseUrl(process.env.SMARTINVENTORY_MONITOR_URL)
   const configuredGistRawUrl = cleanString(process.env.SMARTINVENTORY_MONITOR_URL_GIST)
-  const gistRawUrl = configuredGistRawUrl || (envUrl ? '' : DEFAULT_MONITOR_URL_GIST)
+  const gistRawUrl = configuredGistRawUrl || DEFAULT_MONITOR_URL_GIST
 
   if (gistRawUrl) {
     const gistUrl = await resolveMonitorUrlFromGist(gistRawUrl, Math.min(timeoutMs, 5000))
