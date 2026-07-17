@@ -115,6 +115,8 @@ export type MonitorBase = {
   warnings: string[]
 }
 
+type MonitorCandidateSource = MonitorBase['source']
+
 type DashboardCacheEntry = {
   payload: SmartInventoryDashboardPayload
   cachedAt: string
@@ -123,6 +125,7 @@ type DashboardCacheEntry = {
 const CHANNELS: SmartInventoryChannel[] = ['naver', 'coupang']
 const TUNNEL_DOWN_STATUS = new Set([502, 503, 504, 530])
 const DEFAULT_MONITOR_URL_GIST = 'https://gist.githubusercontent.com/beiko3444/5a69e99d96fa2ae34ba4af96c117d5e0/raw'
+const DEFAULT_MONITOR_TIMEOUT_MS = 30000
 let dashboardCache: DashboardCacheEntry | null = null
 let dashboardRefreshPromise: Promise<SmartInventoryDashboardPayload> | null = null
 
@@ -183,7 +186,7 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
 
 export function requestTimeoutMs(override?: number): number {
   const raw = numberOrNull(process.env.SMARTINVENTORY_MONITOR_TIMEOUT_MS)
-  return override ?? Math.max(3000, raw ?? 15000)
+  return override ?? Math.max(3000, raw ?? DEFAULT_MONITOR_TIMEOUT_MS)
 }
 
 function readableError(error: unknown): string {
@@ -219,20 +222,39 @@ async function resolveMonitorUrlFromGist(gistRawUrl: string, timeoutMs: number):
   }
 }
 
-export async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promise<MonitorBase | null> {
+function addMonitorCandidate(candidates: MonitorBase[], url: string | null, source: MonitorCandidateSource, warnings: string[] = []) {
+  if (!url) return
+  if (candidates.some((candidate) => candidate.url === url)) return
+  candidates.push({ url, source, warnings })
+}
+
+export async function resolveMonitorCandidates(timeoutMs = requestTimeoutMs()): Promise<MonitorBase[]> {
   const warnings: string[] = []
+  const candidates: MonitorBase[] = []
   const envUrl = normalizeBaseUrl(process.env.SMARTINVENTORY_MONITOR_URL)
   const configuredGistRawUrl = cleanString(process.env.SMARTINVENTORY_MONITOR_URL_GIST)
   const gistRawUrl = configuredGistRawUrl || DEFAULT_MONITOR_URL_GIST
+  addMonitorCandidate(candidates, envUrl, 'env')
 
   if (gistRawUrl) {
     const gistUrl = await resolveMonitorUrlFromGist(gistRawUrl, Math.min(timeoutMs, 5000))
-    if (gistUrl) return { url: gistUrl, source: 'gist', warnings }
+    if (gistUrl) {
+      addMonitorCandidate(candidates, gistUrl, 'gist', warnings)
+      return candidates
+    }
     warnings.push('라즈베리 터널 Gist에서 현재 URL을 가져오지 못해 SMARTINVENTORY_MONITOR_URL로 시도합니다.')
   }
 
-  if (envUrl) return { url: envUrl, source: 'env', warnings }
-  return null
+  if (candidates.length && warnings.length) {
+    candidates[0] = { ...candidates[0], warnings: [...candidates[0].warnings, ...warnings] }
+  }
+
+  return candidates
+}
+
+export async function resolveMonitorBase(timeoutMs = requestTimeoutMs()): Promise<MonitorBase | null> {
+  const candidates = await resolveMonitorCandidates(timeoutMs)
+  return candidates[0] ?? null
 }
 
 export async function monitorRequest<T>(
@@ -579,9 +601,28 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
   }
 }
 
+function isHardMonitorFailure(payload: SmartInventoryDashboardPayload): boolean {
+  if (!payload.configured || !payload.monitorUrl) return false
+
+  const hasNoMonitorData =
+    payload.rows.length === 0 &&
+    payload.channels.naver.length === 0 &&
+    payload.channels.coupang.length === 0 &&
+    payload.stockInbounds.items.length === 0 &&
+    payload.stockInbounds.summaries.length === 0
+
+  if (!hasNoMonitorData || payload.warnings.length < 4) return false
+
+  const warningText = payload.warnings.join('\n')
+  return (
+    warningText.includes(payload.monitorUrl) ||
+    /HTTP 40[34]|HTTP 50[0234]|fetch failed|failed to fetch|timeout|abort/i.test(warningText)
+  )
+}
+
 async function fetchSmartInventoryDashboardLive(): Promise<SmartInventoryDashboardPayload> {
-  const base = await resolveMonitorBase()
-  if (!base) {
+  const bases = await resolveMonitorCandidates()
+  if (!bases.length) {
     const syncedAt = new Date().toISOString()
     return {
       configured: false,
@@ -613,7 +654,24 @@ async function fetchSmartInventoryDashboardLive(): Promise<SmartInventoryDashboa
     }
   }
 
-  return buildDashboard(base)
+  const skippedWarnings: string[] = []
+  let lastPayload: SmartInventoryDashboardPayload | null = null
+
+  for (const [index, base] of bases.entries()) {
+    const payload = await buildDashboard(base)
+    const shouldTryNext = index < bases.length - 1 && isHardMonitorFailure(payload)
+
+    if (!shouldTryNext) {
+      return skippedWarnings.length
+        ? { ...payload, warnings: [...skippedWarnings, ...payload.warnings] }
+        : payload
+    }
+
+    skippedWarnings.push(...payload.warnings)
+    lastPayload = payload
+  }
+
+  return lastPayload ?? buildDashboard(bases[0])
 }
 
 async function refreshDashboardCache(): Promise<SmartInventoryDashboardPayload> {

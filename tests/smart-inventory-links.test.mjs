@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { externalProductHref } from '../lib/smartInventoryLinks.mjs'
 
 assert.equal(
@@ -23,5 +24,31 @@ assert.equal(
 
 assert.equal(externalProductHref('', 'naver'), null)
 assert.equal(externalProductHref(null, 'naver'), null)
+
+const smartInventoryClientSource = readFileSync(new URL('../lib/smartInventoryClient.ts', import.meta.url), 'utf8')
+
+assert.match(
+  smartInventoryClientSource,
+  /export async function resolveMonitorCandidates/,
+  'smart inventory should expose ordered monitor candidates',
+)
+
+assert.match(
+  smartInventoryClientSource,
+  /addMonitorCandidate\(candidates,\s*envUrl,\s*'env'\)/,
+  'SMARTINVENTORY_MONITOR_URL should be tried before the Gist tunnel',
+)
+
+assert.match(
+  smartInventoryClientSource,
+  /isHardMonitorFailure\(payload\)/,
+  'dead monitor candidates should be skipped before returning an empty dashboard',
+)
+
+assert.match(
+  smartInventoryClientSource,
+  /const DEFAULT_MONITOR_TIMEOUT_MS = 30000/,
+  'the monitor timeout should allow the inventory endpoint to finish its 15-second query',
+)
 
 console.log('smart inventory links ok')
