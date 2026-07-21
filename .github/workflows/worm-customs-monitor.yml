@@ -1,0 +1,35 @@
+name: Monitor Worm Customs Clearance
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: worm-customs-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Process due AWB monitors
+        shell: bash
+        run: |
+          response=$(curl --fail --silent --show-error \
+            -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+            "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=beiko-worm-customs-monitor")
+          token=$(printf '%s' "$response" | jq -r '.value')
+          test -n "$token" && test "$token" != "null"
+          curl --fail-with-body --silent --show-error \
+            --retry 2 \
+            --retry-all-errors \
+            --output /tmp/worm-customs-monitor.json \
+            -H "Authorization: Bearer ${token}" \
+            https://www.beiko.co.kr/api/cron/worm-customs-monitor
+          jq '{ok, checked}' /tmp/worm-customs-monitor.json

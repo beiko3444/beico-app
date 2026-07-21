@@ -1,18 +1,23 @@
 import { NextResponse } from 'next/server'
 import { requireAdminSession } from '@/lib/requireAdmin'
+import { isAuthorizedGithubActionsOidc } from '@/lib/githubActionsOidc'
 import { processDueWormCustomsMonitors } from '@/lib/wormCustomsMonitor'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 60
 
-function isAuthorizedCron(request: Request) {
+async function isAuthorizedCron(request: Request) {
+  const authorization = request.headers.get('authorization') || ''
   const cronSecret = process.env.CRON_SECRET
-  return Boolean(cronSecret && request.headers.get('authorization') === `Bearer ${cronSecret}`)
+  if (cronSecret && authorization === `Bearer ${cronSecret}`) return true
+
+  const bearerToken = authorization.startsWith('Bearer ') ? authorization.slice(7).trim() : ''
+  return isAuthorizedGithubActionsOidc(bearerToken)
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorizedCron(request)) {
+  if (!(await isAuthorizedCron(request))) {
     const { unauthorized } = await requireAdminSession()
     if (unauthorized) return unauthorized
   }

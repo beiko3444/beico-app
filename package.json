@@ -29,6 +29,7 @@
     "http-proxy-agent": "^7.0.2",
     "https-proxy-agent": "^7.0.6",
     "imapflow": "^1.2.18",
+    "jose": "^6.2.3",
     "lucide-react": "^0.563.0",
     "mailparser": "^3.9.6",
     "next": "16.1.6",

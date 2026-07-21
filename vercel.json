@@ -4,10 +4,6 @@
     {
       "path": "/api/admin/inventory/favorite-push",
       "schedule": "50 14 * * *"
-    },
-    {
-      "path": "/api/cron/worm-customs-monitor",
-      "schedule": "*/10 * * * *"
     }
   ]
 }
