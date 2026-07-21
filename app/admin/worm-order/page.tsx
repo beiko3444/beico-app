@@ -3948,6 +3948,9 @@ export default function WormOrderPage() {
     // DB에 저장된 AWB 번호 (메일 스캔 없이도 표시)
     const persistedAwbNumber = activeWormOrderRecord?.awbNumber ?? null
     const autoBlNumber = matchedAwbEmail?.awbNumber ?? persistedAwbNumber
+    const isAwbMonitorComplete = awbMonitorNotice.startsWith('수입신고 수리 완료')
+        || awbMonitorNotice.startsWith('유니패스 수입신고 수리 완료')
+    const isAwbMonitorFailed = awbMonitorNotice.includes('실패')
     useEffect(() => {
         const normalizedAutoBlNo = normalizeCustomsBlNo(autoBlNumber || '')
         if (!normalizedAutoBlNo) return
@@ -4679,14 +4682,15 @@ export default function WormOrderPage() {
             return { ...phase, done, total: phase.stepIds.length, active }
         })
     }, [pipelineStatusMap])
-    const visibleStepIdSet = useMemo(
-        () => new Set([selectedPipelineStepId]),
-        [selectedPipelineStepId],
-    )
-
     const handlePipelineStepAction = (step: PipelineStepDefinition) => {
         setSelectedPipelineStepId(step.id)
         setManualStepNotice('')
+        window.requestAnimationFrame(() => {
+            document.getElementById(`worm-pipeline-step-${step.id}`)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'start',
+            })
+        })
         if (step.id === 2 && !loadingEmails && !hasFetched) {
             void fetchEmails(true)
             return
@@ -4698,7 +4702,7 @@ export default function WormOrderPage() {
         }
 
         if (step.id === 5 && fallbackAwbCandidate) {
-            void handleCustomsProgressSearch(fallbackAwbCandidate, { scrollIntoView: true })
+            void handleCustomsProgressSearch(fallbackAwbCandidate)
         }
     }
 
@@ -4845,12 +4849,12 @@ export default function WormOrderPage() {
         }
     }, [activeWormOrderRecord?.id, manualStepSaving])
 
-    const showOrderTools = visibleStepIdSet.has(1)
-    const showInboxTools = visibleStepIdSet.has(2)
-    const showDocInboxTools = visibleStepIdSet.has(4)
-    const showRemittanceTools = visibleStepIdSet.has(3)
-    const showCustomsTools = visibleStepIdSet.has(5)
-    const showCargoCustomsMailTools = visibleStepIdSet.has(7)
+    const showOrderTools = true
+    const showInboxTools = true
+    const showDocInboxTools = true
+    const showRemittanceTools = true
+    const showCustomsTools = true
+    const showCargoCustomsMailTools = true
     const workflowFlowPanel = (
         <aside className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-4">
@@ -5305,43 +5309,64 @@ export default function WormOrderPage() {
                             </span>
                         ))}
                     </div>
+                    {manualStepNotice && (
+                        <p className="mt-3 text-xs font-semibold text-slate-600">{manualStepNotice}</p>
+                    )}
                 </section>
 
-                {selectedStepDefinition.target === 'none' && (
-                    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                {PIPELINE_STEP_DEFINITIONS.filter((step) => step.target === 'none').map((step) => (
+                    <section
+                        key={`manual-step-${step.id}`}
+                        id={`worm-pipeline-step-${step.id}`}
+                        style={{ order: step.id * 10 }}
+                        className="scroll-mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                    >
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p className="text-sm font-black text-slate-900">현장 처리 상태</p>
-                                <p className="mt-1 text-xs font-medium text-slate-500">
-                                    실제 업무를 마친 뒤 완료로 표시하면 발주 기록에 저장되고 다음 단계로 이동합니다.
-                                </p>
+                            <div className="flex min-w-0 items-start gap-3">
+                                <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-black text-white">
+                                    {step.id}
+                                </span>
+                                <div>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="text-sm font-black text-slate-900">{step.title}</p>
+                                        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[step.id])}`}>
+                                            {getPipelineRuntimeLabel(pipelineStatusMap[step.id])}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs font-medium text-slate-500">{step.summary}</p>
+                                    <p className="mt-2 text-[11px] font-bold text-slate-400">담당 · {step.owner}</p>
+                                </div>
                             </div>
                             <button
                                 type="button"
-                                onClick={() => void handleManualStepToggle(
-                                    selectedStepDefinition.id,
-                                    pipelineStatusMap[selectedStepDefinition.id] !== 'done',
-                                )}
+                                onClick={() => void handleManualStepToggle(step.id, pipelineStatusMap[step.id] !== 'done')}
                                 disabled={manualStepSaving || !activeWormOrderRecord}
                                 className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                    pipelineStatusMap[selectedStepDefinition.id] === 'done'
+                                    pipelineStatusMap[step.id] === 'done'
                                         ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
                                         : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
                                 }`}
                             >
                                 {manualStepSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-                                {pipelineStatusMap[selectedStepDefinition.id] === 'done' ? '완료 취소' : '완료로 표시'}
+                                {pipelineStatusMap[step.id] === 'done' ? '완료 취소' : '완료로 표시'}
                             </button>
                         </div>
-                        {manualStepNotice && (
-                            <p className="mt-3 text-xs font-semibold text-slate-600">{manualStepNotice}</p>
-                        )}
+                        <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
+                            {step.details.map((detail) => (
+                                <span key={detail} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-[#e34219]" />
+                                    {detail}
+                                </span>
+                            ))}
+                        </div>
                     </section>
-                )}
+                ))}
             {showOrderTools && (
                 <div
                     ref={orderSectionRef}
-                    className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
+                    id="worm-pipeline-step-1"
+                    style={{ order: 10 }}
+                    className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
                     <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a] flex items-center justify-between">
                         <div>
@@ -5738,7 +5763,7 @@ export default function WormOrderPage() {
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
             {showInboxTools && (
-                <div ref={inboxSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
+                <div ref={inboxSectionRef} id="worm-pipeline-step-2" style={{ order: 20 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -6024,7 +6049,7 @@ export default function WormOrderPage() {
 
             {/* ── AWB Documents 메일 조회 ── */}
             {showDocInboxTools && (
-                <div ref={docInboxSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
+                <div ref={docInboxSectionRef} id="worm-pipeline-step-4" style={{ order: 40 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
 
                 {docFetchProgress > 0 && (
                     <div className="absolute top-0 left-0 w-full h-[4px] bg-slate-100 z-10 overflow-hidden">
@@ -6385,7 +6410,7 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div ref={remittanceSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
+                <div ref={remittanceSectionRef} id="worm-pipeline-step-3" style={{ order: 30 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">모인 자동 송금 신청</h3>
@@ -6645,7 +6670,7 @@ export default function WormOrderPage() {
                 </div>
             )}
             {showCustomsTools && (
-                <div ref={customsProgressSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
+                <div ref={customsProgressSectionRef} id="worm-pipeline-step-5" style={{ order: 50 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-base font-black text-[#111827] md:text-lg">유니패스 수입 통관 조회</h3>
@@ -6654,6 +6679,50 @@ export default function WormOrderPage() {
                         </p>
                     </div>
                     <Search size={18} className="text-[#e34219] mt-1" />
+                </div>
+
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex items-start gap-3">
+                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                                <Mail size={17} />
+                            </span>
+                            <div>
+                                <p className="text-sm font-black text-emerald-950">수입신고 수리 자동 이메일</p>
+                                <p className="mt-1 text-xs font-semibold leading-5 text-emerald-800">
+                                    유니패스를 10분마다 확인하고 수입신고 수리가 확인되면 이메일을 한 번 발송한 뒤 감시를 종료합니다.
+                                </p>
+                            </div>
+                        </div>
+                        <span className={`inline-flex h-7 shrink-0 items-center rounded-md border px-2.5 text-[11px] font-black ${
+                            isAwbMonitorComplete
+                                ? 'border-emerald-300 bg-white text-emerald-700'
+                                : isAwbMonitorFailed
+                                    ? 'border-red-200 bg-red-50 text-red-700'
+                                : persistedAwbNumber
+                                    ? 'border-blue-200 bg-blue-50 text-blue-700'
+                                    : 'border-slate-200 bg-white text-slate-500'
+                        }`}>
+                            {isAwbMonitorComplete
+                                ? '발송 완료'
+                                : isAwbMonitorFailed
+                                    ? '등록 오류'
+                                : persistedAwbNumber
+                                    ? '감시 중'
+                                    : 'AWB 등록 대기'}
+                        </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 border-t border-emerald-200 pt-3 text-xs font-bold text-emerald-900 sm:grid-cols-3">
+                        <span>수신 · contact@beiko.com</span>
+                        <span>조회 · 10분 간격</span>
+                        <span>완료 · 발송 후 자동 종료</span>
+                    </div>
+                    {persistedAwbNumber && (
+                        <p className="mt-2 text-xs font-semibold text-emerald-800">감시 AWB · {persistedAwbNumber}</p>
+                    )}
+                    {awbMonitorNotice && (
+                        <p className="mt-2 text-xs font-semibold text-emerald-800">{awbMonitorNotice}</p>
+                    )}
                 </div>
 
                 {autoBlNumber && !blNumberQuery && (
@@ -6804,7 +6873,9 @@ export default function WormOrderPage() {
             {showCargoCustomsMailTools && (
                 <div
                     ref={cargoCustomsMailSectionRef}
-                    className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
+                    id="worm-pipeline-step-7"
+                    style={{ order: 70 }}
+                    className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
                     <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0f9ff] dark:bg-[#1a1a1a] flex items-center justify-between">
                         <div>
