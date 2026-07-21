@@ -1,309 +1,50 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { request as httpsRequest } from 'node:https'
 import { requireAdminSession } from '@/lib/requireAdmin'
-import {
-    buildUnipassSearchParams,
-    getKoreaCurrentYear,
-    looksLikeMasterAirWaybill,
-    normalizeBlNo,
-    resolveUnipassQueryAttempts,
-    type UnipassQueryKind,
-} from '@/lib/unipassCustoms'
+import { normalizeBlNo } from '@/lib/unipassCustoms'
+import { lookupUnipassCustomsProgress } from '@/lib/unipassCustomsLookup'
 
-const DEFAULT_UNIPASS_API_KEY = 'r290g216h033p330q080i040q6'
-const UNIPASS_API_URL = 'https://unipass.customs.go.kr:38010/ext/rest/cargCsclPrgsInfoQry/retrieveCargCsclPrgsInfo'
-const LOOKBACK_YEARS = 3
-const CUSTOMS_PROGRESS_CACHE_TTL_MS = 10 * 60 * 1000
-const CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS = 60 * 1000
-const UNIPASS_REQUEST_TIMEOUT_MS = 15 * 1000
-const UNIPASS_REQUEST_RETRY_COUNT = 2
+const CACHE_TTL_MS = 10 * 60 * 1000
+const NOT_FOUND_CACHE_TTL_MS = 60 * 1000
 
 export const runtime = 'nodejs'
 
-function resolveUnipassApiKeys() {
-    const configuredKey = process.env.UNIPASS_API_KEY?.trim()
-    return Array.from(new Set([configuredKey, DEFAULT_UNIPASS_API_KEY].filter((key): key is string => Boolean(key))))
+type CachedResponse = {
+  expiresAt: number
+  status: number
+  payload: unknown
 }
 
-type CachedCustomsProgress = {
-    expiresAt: number
-    status: number
-    payload: unknown
-}
-
-const customsProgressCache = new Map<string, CachedCustomsProgress>()
-
-type Api001ParseResult = {
-    tCnt: number
-    ntceInfo: string
-    summaryRecords: Array<Record<string, string>>
-    detailRecords: Array<Record<string, string>>
-}
-
-function decodeXmlValue(input: string) {
-    return input
-        .replace(/&lt;/g, '<')
-        .replace(/&gt;/g, '>')
-        .replace(/&amp;/g, '&')
-        .replace(/&quot;/g, '"')
-        .replace(/&#39;/g, "'")
-        .trim()
-}
-
-function extractTagValue(xml: string, tagName: string) {
-    const pattern = new RegExp(`<${tagName}>([\\s\\S]*?)<\\/${tagName}>`, 'i')
-    const matched = xml.match(pattern)
-    return matched?.[1] ? decodeXmlValue(matched[1]) : ''
-}
-
-function extractRecordBlocks(xml: string, blockTag: string) {
-    const records: Array<Record<string, string>> = []
-    const blockRegex = new RegExp(`<${blockTag}>([\\s\\S]*?)<\\/${blockTag}>`, 'g')
-
-    for (const blockMatch of xml.matchAll(blockRegex)) {
-        const blockContent = blockMatch[1] || ''
-        const row: Record<string, string> = {}
-        const fieldRegex = /<([a-zA-Z0-9_]+)>([\s\S]*?)<\/\1>/g
-
-        for (const fieldMatch of blockContent.matchAll(fieldRegex)) {
-            const key = fieldMatch[1]
-            const value = decodeXmlValue(fieldMatch[2] || '')
-            row[key] = value
-        }
-
-        if (Object.keys(row).length > 0) {
-            records.push(row)
-        }
-    }
-
-    return records
-}
-
-function parseApi001Xml(xml: string): Api001ParseResult {
-    const tCntRaw = extractTagValue(xml, 'tCnt')
-    const parsedCount = Number.parseInt(tCntRaw, 10)
-    const tCnt = Number.isFinite(parsedCount) ? parsedCount : 0
-    const ntceInfo = extractTagValue(xml, 'ntceInfo')
-    const summaryRecords = extractRecordBlocks(xml, 'cargCsclPrgsInfoQryVo')
-    const detailRecords = extractRecordBlocks(xml, 'cargCsclPrgsInfoDtlQryVo')
-
-    return { tCnt, ntceInfo, summaryRecords, detailRecords }
-}
-
-function sleep(ms: number) {
-    return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function formatRequestError(error: unknown) {
-    if (!(error instanceof Error)) return String(error)
-
-    const cause = (error as Error & { cause?: unknown }).cause
-    if (cause instanceof Error && cause.message && cause.message !== error.message) {
-        return `${error.message}: ${cause.message}`
-    }
-
-    if (cause && typeof cause === 'object' && 'code' in cause) {
-        const code = (cause as { code?: string }).code
-        return code ? `${error.message}: ${code}` : error.message
-    }
-
-    return error.message
-}
-
-function requestXmlWithNodeHttps(url: string) {
-    return new Promise<string>((resolve, reject) => {
-        const request = httpsRequest(
-            url,
-            {
-                method: 'GET',
-                family: 4,
-                headers: {
-                    Accept: 'application/xml,text/xml,*/*',
-                    'User-Agent': 'beiko-admin/1.0',
-                },
-                timeout: UNIPASS_REQUEST_TIMEOUT_MS,
-            },
-            (response) => {
-                const chunks: Buffer[] = []
-
-                response.on('data', (chunk) => {
-                    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk))
-                })
-
-                response.on('end', () => {
-                    const rawXml = Buffer.concat(chunks).toString('utf8')
-                    const statusCode = response.statusCode || 0
-
-                    if (statusCode < 200 || statusCode >= 300) {
-                        reject(new Error(`UNI-PASS node HTTPS request failed (${statusCode})`))
-                        return
-                    }
-
-                    resolve(rawXml)
-                })
-            },
-        )
-
-        request.on('timeout', () => {
-            request.destroy(new Error('UNI-PASS node HTTPS request timed out'))
-        })
-        request.on('error', reject)
-        request.end()
-    })
-}
-
-async function requestXml(url: string) {
-    try {
-        const controller = new AbortController()
-        const timeout = setTimeout(() => controller.abort(), UNIPASS_REQUEST_TIMEOUT_MS)
-
-        try {
-            const response = await fetch(url, {
-                method: 'GET',
-                headers: {
-                    Accept: 'application/xml,text/xml,*/*',
-                    'User-Agent': 'beiko-admin/1.0',
-                },
-                cache: 'no-store',
-                signal: controller.signal,
-            })
-
-            const rawXml = await response.text()
-            if (!response.ok) {
-                throw new Error(`UNI-PASS fetch request failed (${response.status})`)
-            }
-
-            return rawXml
-        } finally {
-            clearTimeout(timeout)
-        }
-    } catch (fetchError) {
-        try {
-            return await requestXmlWithNodeHttps(url)
-        } catch (nodeHttpsError) {
-            throw new Error(
-                `fetch: ${formatRequestError(fetchError)}; node:https: ${formatRequestError(nodeHttpsError)}`,
-            )
-        }
-    }
-}
-
-async function requestApi001(apiKey: string, blNo: string, attempt: { kind: UnipassQueryKind; blYy: string | null; value: string; label: string }) {
-    const params = buildUnipassSearchParams(apiKey, blNo, attempt)
-    const url = `${UNIPASS_API_URL}?${params.toString()}`
-    let lastError: unknown = null
-
-    for (let requestIndex = 0; requestIndex <= UNIPASS_REQUEST_RETRY_COUNT; requestIndex += 1) {
-        try {
-            const rawXml = await requestXml(url)
-            return parseApi001Xml(rawXml)
-        } catch (error) {
-            lastError = error
-            if (requestIndex < UNIPASS_REQUEST_RETRY_COUNT) {
-                await sleep(300 * (requestIndex + 1))
-            }
-        }
-    }
-
-    throw new Error(`UNI-PASS request failed: ${formatRequestError(lastError)}`)
-}
+const responseCache = new Map<string, CachedResponse>()
 
 export async function GET(request: NextRequest) {
-    const { unauthorized } = await requireAdminSession()
-    if (unauthorized) return unauthorized
+  const { unauthorized } = await requireAdminSession()
+  if (unauthorized) return unauthorized
 
-    const apiKeys = resolveUnipassApiKeys()
-    const rawBlNo = request.nextUrl.searchParams.get('blNo') || ''
-    const blNo = normalizeBlNo(rawBlNo)
-    const forceRefresh = request.nextUrl.searchParams.get('force') === '1'
-    const cacheKey = blNo
+  const blNo = normalizeBlNo(request.nextUrl.searchParams.get('blNo') || '')
+  const forceRefresh = request.nextUrl.searchParams.get('force') === '1'
 
-    if (!blNo) {
-        return NextResponse.json({ error: 'B/L 번호를 입력해주세요.' }, { status: 400 })
+  if (!blNo) return NextResponse.json({ error: 'B/L 번호를 입력해주세요.' }, { status: 400 })
+  if (blNo.length < 6) return NextResponse.json({ error: 'B/L 번호 형식이 너무 짧습니다.' }, { status: 400 })
+
+  if (!forceRefresh) {
+    const cached = responseCache.get(blNo)
+    if (cached && cached.expiresAt > Date.now()) {
+      return NextResponse.json(cached.payload, {
+        status: cached.status,
+        headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+      })
     }
+  }
 
-    if (blNo.length < 6) {
-        return NextResponse.json({ error: 'B/L 번호 형식이 너무 짧습니다.' }, { status: 400 })
-    }
+  const outcome = await lookupUnipassCustomsProgress(blNo)
+  responseCache.set(blNo, {
+    expiresAt: Date.now() + (outcome.ok ? CACHE_TTL_MS : NOT_FOUND_CACHE_TTL_MS),
+    status: outcome.status,
+    payload: outcome.payload,
+  })
 
-    if (!forceRefresh) {
-        const cached = customsProgressCache.get(cacheKey)
-        if (cached && cached.expiresAt > Date.now()) {
-            return NextResponse.json(cached.payload, {
-                status: cached.status,
-                headers: {
-                    'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-                },
-            })
-        }
-    }
-
-    const currentYear = getKoreaCurrentYear()
-    const attempts: Array<{ kind: UnipassQueryKind; blYy: string | null; value: string; label: string; tCnt: number; ntceInfo: string }> = []
-
-    for (const apiKey of apiKeys) {
-        for (const attempt of resolveUnipassQueryAttempts(blNo, currentYear, LOOKBACK_YEARS)) {
-            try {
-                const parsed = await requestApi001(apiKey, blNo, attempt)
-                attempts.push({ ...attempt, tCnt: parsed.tCnt, ntceInfo: parsed.ntceInfo })
-
-                const hasData = parsed.tCnt > 0 || parsed.summaryRecords.length > 0 || parsed.detailRecords.length > 0
-                const looksLikeListMode = parsed.ntceInfo.startsWith('[N00]')
-                if (hasData || looksLikeListMode) {
-                    const payload = {
-                        blNo,
-                        query: attempt,
-                        tCnt: parsed.tCnt,
-                        ntceInfo: parsed.ntceInfo,
-                        summaryRecords: parsed.summaryRecords,
-                        detailRecords: parsed.detailRecords,
-                        attempts,
-                    }
-                    customsProgressCache.set(cacheKey, {
-                        expiresAt: Date.now() + CUSTOMS_PROGRESS_CACHE_TTL_MS,
-                        status: 200,
-                        payload,
-                    })
-                    return NextResponse.json(payload, {
-                        status: 200,
-                        headers: {
-                            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-                        },
-                    })
-                }
-            } catch (error) {
-                const message = error instanceof Error ? error.message : '조회 중 오류가 발생했습니다.'
-                attempts.push({ ...attempt, tCnt: -1, ntceInfo: message })
-            }
-        }
-    }
-
-    const hasOnlyRequestFailures = attempts.length > 0 && attempts.every((attempt) => attempt.tCnt === -1 && attempt.ntceInfo)
-    const hasCurrentYearRequestFailure = attempts.some((attempt) => attempt.blYy === String(currentYear) && attempt.tCnt === -1)
-    const hasOnlyZeroResultsAfterFailure = attempts.some((attempt) => attempt.tCnt >= 0) && attempts.every((attempt) => attempt.tCnt <= 0)
-    const shouldReportRequestFailure = hasOnlyRequestFailures || (hasCurrentYearRequestFailure && hasOnlyZeroResultsAfterFailure)
-    const notFoundMessage = looksLikeMasterAirWaybill(blNo)
-        ? `유니패스 통관 DB에 아직 조회 결과가 없습니다. ${blNo.slice(0, 3)}-${blNo.slice(3)} AWB가 실제 운송장이어도, 한국 도착 전이거나 항공사/포워더가 적하목록을 전송하기 전이면 유니패스에 안 뜹니다. House B/L이 따로 있으면 H B/L 번호로 조회하세요.`
-        : '조회 결과가 없습니다. H B/L 또는 M B/L 번호와 입항연도를 확인해주세요.'
-    const notFoundPayload = {
-        error: shouldReportRequestFailure
-            ? '유니패스 서버 요청이 실패했습니다. 잠시 후 다시 조회해주세요.'
-            : '조회 결과가 없습니다. B/L 번호를 다시 확인해주세요.',
-        blNo,
-        attempts,
-    }
-    if (!shouldReportRequestFailure) {
-        notFoundPayload.error = notFoundMessage
-    }
-    customsProgressCache.set(cacheKey, {
-        expiresAt: Date.now() + CUSTOMS_PROGRESS_NOT_FOUND_CACHE_TTL_MS,
-        status: shouldReportRequestFailure ? 502 : 404,
-        payload: notFoundPayload,
-    })
-    return NextResponse.json(notFoundPayload, {
-        status: shouldReportRequestFailure ? 502 : 404,
-        headers: {
-            'Cache-Control': 'private, max-age=60, stale-while-revalidate=300',
-        },
-    })
+  return NextResponse.json(outcome.payload, {
+    status: outcome.status,
+    headers: { 'Cache-Control': 'private, max-age=60, stale-while-revalidate=300' },
+  })
 }

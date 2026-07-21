@@ -2114,21 +2114,61 @@ export default function WormOrderPage() {
                     date: emailMeta?.date || fallbackEmail?.date || '',
                 }),
             })
+            const result = await response.json().catch(() => null)
 
             if (!response.ok) {
-                const result = await response.json().catch(() => null)
                 throw new Error(typeof result?.error === 'string' ? result.error : 'Failed to save AWB cache.')
             }
+            setAwbMonitorNotice(
+                result?.monitor?.notifiedAt
+                    ? '유니패스 수입신고 수리 완료 알림이 발송되었습니다.'
+                    : '유니패스 자동 모니터링 등록됨 · 수입신고 수리 완료 시 contact@beiko.com으로 알립니다.',
+            )
         } catch (error) {
             console.warn('Failed to persist AWB cache:', error)
+            setAwbMonitorNotice('AWB는 확인했지만 유니패스 자동 모니터링 등록에 실패했습니다.')
         }
     }, [applyAwbNumberToEmailState, applyAwbToCustomsLookup, emails, docEmails])
 
     // ── AWB OCR 관련 State ──
     const [awbNumber, setAwbNumber] = useState<string | null>(null)
     const [awbLoading, setAwbLoading] = useState(false)
+    const [awbProgressLabel, setAwbProgressLabel] = useState('')
     const [awbError, setAwbError] = useState('')
     const [awbCandidates, setAwbCandidates] = useState<AwbCandidate[]>([])
+    const [awbMonitorNotice, setAwbMonitorNotice] = useState('')
+
+    useEffect(() => {
+        if (!awbNumber || awbLoading) return
+
+        const controller = new AbortController()
+        fetch(`/api/admin/worm-order/customs-monitor?awbNumber=${encodeURIComponent(awbNumber)}`, {
+            cache: 'no-store',
+            signal: controller.signal,
+        })
+            .then(async (response) => {
+                const result = await response.json().catch(() => null)
+                if (!response.ok) throw new Error(result?.error || '모니터링 상태 조회 실패')
+                return result?.monitor || null
+            })
+            .then((monitor) => {
+                if (!monitor) return
+                if (monitor.notifiedAt || monitor.status === 'COMPLETED') {
+                    setAwbMonitorNotice('수입신고 수리 완료 · contact@beiko.com 알림 발송 완료')
+                    return
+                }
+                const progress = typeof monitor.lastStatus === 'string' && monitor.lastStatus
+                    ? ` · ${monitor.lastStatus}`
+                    : ' · 유니패스 조회 대기'
+                setAwbMonitorNotice(`유니패스 자동 모니터링 중${progress}`)
+            })
+            .catch((error) => {
+                if (error instanceof DOMException && error.name === 'AbortError') return
+                console.warn('Failed to load AWB monitor status:', error)
+            })
+
+        return () => controller.abort()
+    }, [awbLoading, awbNumber])
 
     // ── 관세사 메일 전달 관련 State ──
     const [forwardEmail, setForwardEmail] = useState(DEFAULT_CUSTOMS_FORWARD_EMAIL)
@@ -2234,18 +2274,63 @@ export default function WormOrderPage() {
     const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>('all')
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
-    const ocrOnePdf = useCallback(async (uid: string, attIndex: number): Promise<AwbCandidate[]> => {
-        const res = await fetch(`/api/admin/worm-order/emails/attachment?uid=${uid}&index=${attIndex}`)
-        if (!res.ok) return []
+    const ocrOnePdf = useCallback(async (
+        uid: string,
+        attIndex: number,
+        onProgress: (label: string) => void,
+    ): Promise<AwbCandidate[]> => {
+        onProgress('첨부 문서를 불러오는 중...')
+        const params = new URLSearchParams({ uid, index: String(attIndex), raw: '1', inline: '1' })
+        const res = await fetch(`/api/admin/worm-order/emails/attachment?${params.toString()}`, {
+            cache: 'no-store',
+        })
+        if (!res.ok) {
+            const payload = await res.json().catch(() => null)
+            throw new Error(payload?.error || `첨부 문서를 불러오지 못했습니다. (HTTP ${res.status})`)
+        }
         const blob = await res.blob()
+        if (blob.size === 0) throw new Error('첨부 문서가 비어 있습니다.')
 
+        onProgress('PDF 문서를 분석하는 중...')
         const pdfjsLib = await import('pdfjs-dist')
         pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs'
         const arrayBuffer = await blob.arrayBuffer()
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
 
         const byValue = new Map<string, AwbCandidate>()
-        const worker = await Tesseract.createWorker('eng', 1, { logger: () => {} })
+        const pageLimit = Math.min(pdf.numPages, 3)
+
+        // 텍스트 레이어가 있으면 무거운 이미지 OCR을 실행하지 않는다.
+        for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
+            const page = await pdf.getPage(pageNum)
+            try {
+                const textContent = await page.getTextContent()
+                const pageText = (textContent.items || [])
+                    .map((item) => ('str' in item && typeof item.str === 'string' ? item.str : ''))
+                    .filter(Boolean)
+                    .join('\n')
+                const textCandidates = extractAwbCandidatesFromText(
+                    pageText,
+                    `file=${attIndex},page=${pageNum},text`,
+                    130,
+                )
+                for (const candidate of textCandidates) mergeAwbCandidate(byValue, candidate)
+            } catch (error) {
+                console.warn(`[AWB OCR] text-layer parse failed file=${attIndex},page=${pageNum}`, error)
+            }
+        }
+
+        const textRanked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
+        if (textRanked[0]?.score >= 350) return textRanked
+
+        onProgress('문자 인식 엔진을 준비하는 중...')
+        const worker = await Tesseract.createWorker('eng', 1, {
+            logger: (message) => {
+                if (message.status === 'recognizing text' && typeof message.progress === 'number') {
+                    onProgress(`이미지 문자 인식 중... ${Math.round(message.progress * 100)}%`)
+                }
+            },
+        })
         await worker.setParameters({
             tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
             preserve_interword_spaces: '1',
@@ -2253,38 +2338,16 @@ export default function WormOrderPage() {
         } as any)
 
         try {
-            // 모든 페이지 시도 (최대 5페이지)
-            const totalPages = pdf.numPages
-            for (let pageNum = 1; pageNum <= Math.min(totalPages, 5); pageNum++) {
+            for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
+                onProgress(`PDF ${pageNum}/${pageLimit}페이지를 이미지로 변환하는 중...`)
                 const page = await pdf.getPage(pageNum)
-
-                // 먼저 PDF 텍스트 레이어를 추출 시도 (가능한 경우 OCR보다 정확)
-                try {
-                    const textContent = await page.getTextContent()
-                    const pageText = (textContent.items || [])
-                        .map((item: any) => item?.str || '')
-                        .filter(Boolean)
-                        .join('\n')
-                    const textCandidates = extractAwbCandidatesFromText(
-                        pageText,
-                        `file=${attIndex},page=${pageNum},text`,
-                        130,
-                    )
-                    for (const c of textCandidates) {
-                        mergeAwbCandidate(byValue, c)
-                    }
-                } catch (err) {
-                    console.warn(`[AWB OCR] text-layer parse failed file=${attIndex},page=${pageNum}`, err)
-                }
-
-                const viewport = page.getViewport({ scale: 3.2 })
+                const viewport = page.getViewport({ scale: 2.4 })
                 const canvas = document.createElement('canvas')
                 canvas.width = viewport.width
                 canvas.height = viewport.height
                 const ctx = canvas.getContext('2d')!
                 await page.render({ canvasContext: ctx, viewport } as any).promise
 
-                const fullRaw = canvas
                 const fullBinary = createCanvasFromSource(canvas)
                 applyBinaryThreshold(fullBinary, 165)
                 const topRaw = createTopCropCanvas(canvas, 0.42)
@@ -2292,10 +2355,9 @@ export default function WormOrderPage() {
                 applyBinaryThreshold(topBinary, 165)
 
                 const variants: Array<{ name: string; canvas: HTMLCanvasElement; boost: number }> = [
-                    { name: 'ocr-full-raw', canvas: fullRaw, boost: 30 },
-                    { name: 'ocr-full-binary', canvas: fullBinary, boost: 60 },
                     { name: 'ocr-top-raw', canvas: topRaw, boost: 100 },
                     { name: 'ocr-top-binary', canvas: topBinary, boost: 140 },
+                    { name: 'ocr-full-binary', canvas: fullBinary, boost: 60 },
                 ]
 
                 for (const variant of variants) {
@@ -2311,6 +2373,9 @@ export default function WormOrderPage() {
                     for (const c of candidates) {
                         mergeAwbCandidate(byValue, c)
                     }
+
+                    const currentRanked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
+                    if (currentRanked[0]?.score >= 500) return currentRanked
                 }
             }
         } finally {
@@ -2324,14 +2389,16 @@ export default function WormOrderPage() {
         const requestId = ++awbOcrRequestIdRef.current
         setAwbNumber(null)
         setAwbLoading(true)
+        setAwbProgressLabel('AWB OCR을 준비하는 중...')
         setAwbError('')
         setAwbCandidates([])
+        setAwbMonitorNotice('')
         try {
             const byValue = new Map<string, AwbCandidate>()
 
             // 모든 SKM 파일을 순차적으로 시도해서 점수가 가장 높은 후보를 채택
             for (const idx of emailMeta.skmIndices) {
-                const foundList = await ocrOnePdf(emailMeta.uid, idx)
+                const foundList = await ocrOnePdf(emailMeta.uid, idx, setAwbProgressLabel)
                 for (const c of foundList) {
                     mergeAwbCandidate(byValue, c)
                 }
@@ -2359,6 +2426,7 @@ export default function WormOrderPage() {
         } finally {
             if (requestId === awbOcrRequestIdRef.current) {
                 setAwbLoading(false)
+                setAwbProgressLabel('')
             }
         }
     }, [ocrOnePdf, persistAwbCache])
@@ -2421,7 +2489,9 @@ export default function WormOrderPage() {
         setAwbNumber(emailDetails[selectedEmailUid]?.awbNumber || selectedEmail?.awbNumber || null)
         setAwbCandidates([])
         setAwbLoading(false)
+        setAwbProgressLabel('')
         setAwbError('')
+        setAwbMonitorNotice('')
         fetchEmailDetail(selectedEmailUid)
     }, [emails, emailDetails, selectedEmailUid, fetchEmailDetail])
 
@@ -3514,7 +3584,9 @@ export default function WormOrderPage() {
         setAwbNumber(docEmailDetails[selectedDocEmailUid]?.awbNumber || selectedDoc?.awbNumber || null)
         setAwbCandidates([])
         setAwbLoading(false)
+        setAwbProgressLabel('')
         setAwbError('')
+        setAwbMonitorNotice('')
         fetchDocEmailDetail(selectedDocEmailUid)
     }, [docEmails, docEmailDetails, selectedDocEmailUid, fetchDocEmailDetail])
 
@@ -6076,7 +6148,7 @@ export default function WormOrderPage() {
                                                 {awbLoading && (
                                                     <div className="flex items-center gap-2 text-blue-600">
                                                         <ScanSearch size={16} className="animate-pulse" />
-                                                        <span className="text-[13px] font-bold">SKM 문서에서 Air Waybill 번호를 OCR 스캔 중...</span>
+                                                        <span className="text-[13px] font-bold">{awbProgressLabel || 'SKM 문서에서 Air Waybill 번호를 OCR 스캔 중...'}</span>
                                                         <Loader2 size={14} className="animate-spin ml-auto" />
                                                     </div>
                                                 )}
@@ -6125,6 +6197,11 @@ export default function WormOrderPage() {
                                                     }`}>
                                                         <ScanSearch size={14} />
                                                         {awbError}
+                                                    </div>
+                                                )}
+                                                {awbMonitorNotice && !awbLoading && (
+                                                    <div className="text-[11px] font-bold text-emerald-700">
+                                                        {awbMonitorNotice}
                                                     </div>
                                                 )}
                                             </div>

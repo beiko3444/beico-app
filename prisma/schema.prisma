@@ -333,6 +333,31 @@ model WormEmailAwbCache {
   @@index([updatedAt])
 }
 
+model WormAwbCustomsMonitor {
+  id                   String    @id @default(uuid())
+  awbNumber            String    @unique
+  emailUid             String?
+  orderId              String?
+  sourceSubject        String?
+  status               String    @default("MONITORING")
+  lastStatus           String?
+  lastResult           Json?
+  checkCount           Int       @default(0)
+  lastCheckedAt        DateTime?
+  nextCheckAt          DateTime  @default(now())
+  completionDetectedAt DateTime?
+  notificationClaimedAt DateTime?
+  notifiedAt           DateTime?
+  lastError            String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  @@index([status, nextCheckAt])
+  @@index([emailUid])
+  @@index([orderId])
+  @@index([notifiedAt])
+}
+
 model WormOrder {
   id          String   @id @default(uuid())
   orderNumber String   @unique

@@ -6,6 +6,7 @@ const require = createRequire(import.meta.url)
 const { createJiti } = require('jiti')
 const jiti = createJiti(import.meta.url)
 const customs = jiti('../lib/unipassCustoms.ts')
+const lookup = jiti('../lib/unipassCustomsLookup.ts')
 
 test('UNIPASS BL year is sent as four digits', () => {
   assert.equal(customs.formatBlYear(2026), '2026')
@@ -22,8 +23,8 @@ test('UNIPASS query attempts include cargo management number lookup for cargo nu
     { kind: 'cargMtNo', blYy: null, value: '123456789012345', label: 'cargo-management-number' },
     { kind: 'hblNo', blYy: '2026', value: '123456789012345', label: 'normalized' },
     { kind: 'mblNo', blYy: '2026', value: '123456789012345', label: 'normalized' },
-    { kind: 'hblNo', blYy: '2025', value: '123456789012345', label: 'normalized' },
-    { kind: 'mblNo', blYy: '2025', value: '123456789012345', label: 'normalized' },
+    { kind: 'hblNo', blYy: '2027', value: '123456789012345', label: 'normalized' },
+    { kind: 'mblNo', blYy: '2027', value: '123456789012345', label: 'normalized' },
   ])
 })
 
@@ -32,20 +33,24 @@ test('UNIPASS master air waybill lookup starts with MBL and four digit year', ()
 
   assert.deepEqual(attempts.slice(0, 4), [
     { kind: 'mblNo', blYy: '2026', value: '11206444454', label: 'master-air-waybill' },
-    { kind: 'hblNo', blYy: '2026', value: '11206444454', label: 'master-air-waybill' },
+    { kind: 'mblNo', blYy: '2027', value: '11206444454', label: 'master-air-waybill' },
     { kind: 'mblNo', blYy: '2025', value: '11206444454', label: 'master-air-waybill' },
-    { kind: 'hblNo', blYy: '2025', value: '11206444454', label: 'master-air-waybill' },
+    { kind: 'mblNo', blYy: '2024', value: '11206444454', label: 'master-air-waybill' },
   ])
 
   const params = customs.buildUnipassSearchParams('KEY', '11206444454', attempts[0])
   assert.equal(params.toString(), 'crkyCn=KEY&mblNo=11206444454&blYy=2026')
 })
 
-test('UNIPASS query attempts include next BL year after lookback years', () => {
+test('UNIPASS query attempts include next BL year for MBL and HBL lookup', () => {
   const attempts = customs.resolveUnipassQueryAttempts('11206305924', 2025, 3)
 
-  assert.deepEqual(attempts.slice(-2), [
+  assert.deepEqual(attempts.slice(0, 2), [
+    { kind: 'mblNo', blYy: '2025', value: '11206305924', label: 'master-air-waybill' },
     { kind: 'mblNo', blYy: '2026', value: '11206305924', label: 'master-air-waybill' },
+  ])
+  assert.deepEqual(attempts.slice(4, 6), [
+    { kind: 'hblNo', blYy: '2025', value: '11206305924', label: 'master-air-waybill' },
     { kind: 'hblNo', blYy: '2026', value: '11206305924', label: 'master-air-waybill' },
   ])
 })
@@ -61,6 +66,34 @@ test('UNIPASS params omit BL year for cargo management number lookup', () => {
   assert.equal(params.get('crkyCn'), 'KEY')
   assert.equal(params.get('cargMtNo'), '123456789012345')
   assert.equal(params.has('blYy'), false)
+})
+
+test('UNIPASS monitor detects import declaration acceptance in detail records', () => {
+  const payload = {
+    blNo: '11206444454',
+    query: { kind: 'mblNo', blYy: '2026', value: '11206444454', label: 'master-air-waybill' },
+    tCnt: 1,
+    ntceInfo: '',
+    summaryRecords: [{ csclPrgsStts: '통관진행중' }],
+    detailRecords: [{ cargTrcnRelaBsopTpcd: '수입신고 수리' }],
+    attempts: [],
+  }
+
+  assert.equal(lookup.isImportDeclarationAccepted(payload), true)
+})
+
+test('UNIPASS monitor does not complete before import declaration acceptance', () => {
+  const payload = {
+    blNo: '11206444454',
+    query: { kind: 'mblNo', blYy: '2026', value: '11206444454', label: 'master-air-waybill' },
+    tCnt: 1,
+    ntceInfo: '',
+    summaryRecords: [{ csclPrgsStts: '입항보고 수리' }],
+    detailRecords: [{ cargTrcnRelaBsopTpcd: '하선신고 수리' }],
+    attempts: [],
+  }
+
+  assert.equal(lookup.isImportDeclarationAccepted(payload), false)
 })
 
 test('UNIPASS live lookup finds 11206444454 as a 2026 MBL', { skip: process.env.UNIPASS_LIVE !== '1' }, async () => {

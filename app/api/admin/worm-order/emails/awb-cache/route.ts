@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { upsertWormEmailAwbCache } from '@/lib/wormOrderMail'
 import { requireAdminSession } from '@/lib/requireAdmin'
+import { registerWormAwbCustomsMonitor } from '@/lib/wormCustomsMonitor'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,11 +26,22 @@ export async function POST(request: Request) {
       date,
       awbNumber,
     })
+    const monitor = await registerWormAwbCustomsMonitor({
+      awbNumber: saved.awbNumber,
+      emailUid: saved.uid,
+      sourceSubject: subject,
+    })
 
     return NextResponse.json({
       uid: saved.uid,
       awbNumber: saved.awbNumber,
       updatedAt: saved.updatedAt.toISOString(),
+      monitor: {
+        status: monitor.status,
+        lastStatus: monitor.lastStatus,
+        nextCheckAt: monitor.nextCheckAt.toISOString(),
+        notifiedAt: monitor.notifiedAt?.toISOString() || null,
+      },
     })
   } catch (error: unknown) {
     console.error('AWB cache save error:', error)
