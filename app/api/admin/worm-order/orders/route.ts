@@ -66,6 +66,11 @@ export async function GET(request: NextRequest) {
           select: { awbNumber: true, uid: true },
           take: 1,
         },
+        pipelineSteps: {
+          where: { completed: true },
+          select: { stepId: true },
+          orderBy: { stepId: 'asc' },
+        },
       },
     })
 
@@ -73,7 +78,9 @@ export async function GET(request: NextRequest) {
       ...order,
       awbNumber: order.emailMatches?.[0]?.awbNumber ?? null,
       awbEmailUid: order.emailMatches?.[0]?.uid ?? null,
+      completedStepIds: order.pipelineSteps.map((step) => step.stepId),
       emailMatches: undefined,
+      pipelineSteps: undefined,
     }))
 
     return NextResponse.json({ success: true, orders: ordersWithAwb })

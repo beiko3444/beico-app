@@ -1,9 +1,17 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRight, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
+import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
 import { extractLatestAutomationStep, resolveRemittanceStageFromStep } from '@/lib/remittanceProgress'
+import {
+    bestTrustedAwbCandidate,
+    extractAwbCandidatesFromText,
+    isValidAwbByCheckDigit,
+    mergeAwbCandidate,
+    normalizeOcrDigits,
+    type AwbCandidate,
+} from '@/lib/wormAwbExtraction'
 import { emailBodyToDisplayText } from '@/lib/wormEmailBody'
 
 type WormSize = {
@@ -19,12 +27,6 @@ type WormType = {
     cardActiveClass: string
     cardActiveBorderClass: string
     cardTagClass: string
-}
-
-type AwbCandidate = {
-    value: string
-    score: number
-    source: string
 }
 
 type WormEmailAttachment = {
@@ -119,7 +121,8 @@ type CustomsProgressResult = {
 
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
-type PipelineFilter = 'all' | PipelineMode
+type AwbScanMode = 'fast' | 'precise'
+type TesseractWorker = Awaited<ReturnType<typeof Tesseract.createWorker>>
 type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'customs' | 'cargoCustomsMail' | 'none'
 
 type PipelineStepDefinition = {
@@ -297,6 +300,7 @@ type WormOrderListItem = {
     remittanceExchangeRateText: string | null
     awbNumber: string | null
     awbEmailUid: string | null
+    completedStepIds: number[]
     createdAt: string
     updatedAt: string
 }
@@ -587,12 +591,14 @@ function getPipelinePhaseClass(tone: PipelinePhaseDefinition['tone']) {
 }
 
 function getWormOrderStatusLabel(status: string) {
+    if (status === 'COMPLETED') return '입고완료'
     if (status === 'REMITTANCE_APPLIED') return '송금완료'
     if (status === 'DRAFT') return '작성중'
     return status
 }
 
 function getWormOrderStatusClass(status: string) {
+    if (status === 'COMPLETED') return 'bg-blue-100 text-blue-800 border-blue-200'
     if (status === 'REMITTANCE_APPLIED') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
     if (status === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200'
     return 'bg-amber-100 text-amber-800 border-amber-200'
@@ -1151,9 +1157,6 @@ function getAdminActionStep(row: Record<string, string>) {
     return null
 }
 
-const AWB_KEYWORD_REGEX = /\b(?:AIR\s*WAYBILL|WAYBILL|AWB|MAWB|HAWB)\b/i
-const NON_AWB_CONTEXT_REGEX = /\b(?:TEL|PHONE|MOBILE|FAX|EMAIL|E-?MAIL|CONTACT|INVOICE|DATE|TOTAL|QTY|PCS|KILO)\b/i
-const PHONE_LIKE_PREFIX_REGEX = /^(010|011|016|017|018|019|070|080)/
 const WORM_EMAIL_CACHE_STORAGE_KEY = 'beico-worm-order-email-cache-v1'
 const WORM_ACTIVE_ORDER_STORAGE_KEY = 'beico-worm-order-active-id-v1'
 const WORM_EMAIL_CACHE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000
@@ -1695,6 +1698,9 @@ function sanitizeWormOrderListItem(value: unknown): WormOrderListItem | null {
         remittanceExchangeRateText: typeof candidate.remittanceExchangeRateText === 'string' ? candidate.remittanceExchangeRateText : null,
         awbNumber: typeof candidate.awbNumber === 'string' ? candidate.awbNumber : null,
         awbEmailUid: typeof candidate.awbEmailUid === 'string' ? candidate.awbEmailUid : null,
+        completedStepIds: Array.isArray(candidate.completedStepIds)
+            ? candidate.completedStepIds.filter((stepId): stepId is number => Number.isInteger(stepId))
+            : [],
         createdAt: candidate.createdAt,
         updatedAt: candidate.updatedAt,
     }
@@ -1714,35 +1720,6 @@ function toKstDateInputString(value: string) {
     const month = parts.find((part) => part.type === 'month')?.value ?? ''
     const day = parts.find((part) => part.type === 'day')?.value ?? ''
     return year && month && day ? `${year}-${month}-${day}` : ''
-}
-
-function normalizeOcrPatternText(input: string) {
-    return input
-        .toUpperCase()
-        .replace(/[|IL]/g, '1')
-        .replace(/[OQ]/g, '0')
-        .replace(/Z/g, '2')
-        .replace(/S/g, '5')
-        .replace(/B/g, '8')
-}
-
-function normalizeOcrDigits(input: string) {
-    return normalizeOcrPatternText(input).replace(/[^\d]/g, '')
-}
-
-function isValidAwbByCheckDigit(awb11: string) {
-    if (!/^\d{11}$/.test(awb11)) return false
-    const serial7 = parseInt(awb11.slice(3, 10), 10)
-    const checkDigit = parseInt(awb11.slice(10), 10)
-    if (!Number.isFinite(serial7) || !Number.isFinite(checkDigit)) return false
-    return serial7 % 7 === checkDigit
-}
-
-function mergeAwbCandidate(map: Map<string, AwbCandidate>, candidate: AwbCandidate) {
-    const prev = map.get(candidate.value)
-    if (!prev || candidate.score > prev.score) {
-        map.set(candidate.value, candidate)
-    }
 }
 
 function createCanvasFromSource(source: HTMLCanvasElement) {
@@ -1778,80 +1755,26 @@ function applyBinaryThreshold(canvas: HTMLCanvasElement, threshold: number) {
     ctx.putImageData(imgData, 0, 0)
 }
 
-function extractAwbCandidatesFromText(ocrText: string, source: string, trustBoost = 0): AwbCandidate[] {
-    const lines = ocrText
-        .split(/\r?\n/)
-        .map(line => line.trim())
-        .filter(Boolean)
+async function detectAwbBarcodeCandidates(canvas: HTMLCanvasElement, source: string) {
+    type DetectedBarcode = { rawValue?: string }
+    type BarcodeDetectorInstance = { detect: (input: HTMLCanvasElement) => Promise<DetectedBarcode[]> }
+    type BarcodeDetectorConstructor = new (options?: { formats?: string[] }) => BarcodeDetectorInstance
+    const Detector = (window as typeof window & { BarcodeDetector?: BarcodeDetectorConstructor }).BarcodeDetector
+    if (!Detector) return []
 
-    if (lines.length === 0) return []
-
-    const byValue = new Map<string, AwbCandidate>()
-
-    const addCandidate = (value: string, context: string, patternScore: number, lineIndex: number, sourceSuffix: string) => {
-        const normalized = normalizeOcrDigits(value)
-        if (normalized.length !== 11) return
-
-        const upperContext = context.toUpperCase()
-        const hasKeyword = AWB_KEYWORD_REGEX.test(upperContext)
-        const checkDigitValid = isValidAwbByCheckDigit(normalized)
-
-        let score = trustBoost + patternScore
-        if (hasKeyword) score += 180
-        if (lineIndex <= Math.max(1, Math.floor(lines.length * 0.4))) score += 35
-        if (/^(112|180)/.test(normalized)) score += 20
-        if (checkDigitValid) score += 420
-        else score -= 180
-        if (/^0/.test(normalized)) score -= 200
-        if (PHONE_LIKE_PREFIX_REGEX.test(normalized)) score -= 260
-        if (!hasKeyword && NON_AWB_CONTEXT_REGEX.test(upperContext)) score -= 70
-
-        mergeAwbCandidate(byValue, {
-            value: normalized,
-            score,
-            source: `${source} (${sourceSuffix})`,
-        })
+    try {
+        const detector = new Detector({ formats: ['code_128', 'code_39'] })
+        const detected = await detector.detect(canvas)
+        const byValue = new Map<string, AwbCandidate>()
+        for (const barcode of detected) {
+            if (!barcode.rawValue) continue
+            const candidates = extractAwbCandidatesFromText(barcode.rawValue, `${source},barcode`, 700)
+            for (const candidate of candidates) mergeAwbCandidate(byValue, candidate)
+        }
+        return Array.from(byValue.values()).sort((left, right) => right.score - left.score)
+    } catch {
+        return []
     }
-
-    const addCandidatesFromChunk = (chunk: string, context: string, lineIndex: number, sourceSuffix: string) => {
-        const upper = chunk.toUpperCase()
-        const digitFriendly = normalizeOcrPatternText(upper)
-
-        const airportRegex = /(?:^|[^\d])(\d{3})\s+[A-Z]{3}\s*(\d{4})\s*(\d{4})(?=[^\d]|$)/g
-        let match: RegExpExecArray | null
-        while ((match = airportRegex.exec(upper)) !== null) {
-            addCandidate(`${match[1]}${match[2]}${match[3]}`, context, 300, lineIndex, `${sourceSuffix}-airport`)
-        }
-
-        const groupedRegex = /(?:^|[^\d])(\d{3})[\s\-_.:/]*(\d{4})[\s\-_.:/]*(\d{4})(?=[^\d]|$)/g
-        while ((match = groupedRegex.exec(digitFriendly)) !== null) {
-            addCandidate(`${match[1]}${match[2]}${match[3]}`, context, 270, lineIndex, `${sourceSuffix}-grouped`)
-        }
-
-        // Common AWB display format: 123-12345675 (3 + 8 digits)
-        const tripleEightRegex = /(?:^|[^\d])(\d{3})[\s\-_.:/]*(\d{8})(?=[^\d]|$)/g
-        while ((match = tripleEightRegex.exec(digitFriendly)) !== null) {
-            addCandidate(`${match[1]}${match[2]}`, context, 300, lineIndex, `${sourceSuffix}-3x8`)
-        }
-
-        const compactRegex = /(?:^|[^\d])(\d{11})(?=[^\d]|$)/g
-        while ((match = compactRegex.exec(digitFriendly)) !== null) {
-            addCandidate(match[1], context, 220, lineIndex, `${sourceSuffix}-compact`)
-        }
-    }
-
-    for (let i = 0; i < lines.length; i++) {
-        const line = lines[i] || ''
-        const prevLine = lines[i - 1] || ''
-        const nextLine = lines[i + 1] || ''
-        const merged = `${line} ${nextLine}`.trim()
-        const context = `${prevLine} ${line} ${nextLine}`.trim()
-
-        addCandidatesFromChunk(line, context, i + 1, 'line')
-        if (nextLine) addCandidatesFromChunk(merged, context, i + 1, 'merged')
-    }
-
-    return Array.from(byValue.values()).sort((a, b) => b.score - a.score)
 }
 
 export default function WormOrderPage() {
@@ -1942,6 +1865,10 @@ export default function WormOrderPage() {
     const forwardLogsRequestIdRef = useRef(0)
     const customsProgressRequestIdRef = useRef(0)
     const awbOcrRequestIdRef = useRef(0)
+    const lastActivePipelineStepRef = useRef<number | null>(null)
+    const awbOcrWorkerRef = useRef<TesseractWorker | null>(null)
+    const awbOcrWorkerPromiseRef = useRef<Promise<TesseractWorker> | null>(null)
+    const awbOcrProgressReporterRef = useRef<(label: string) => void>(() => undefined)
 
     const [emails, setEmails] = useState<WormEmailListItem[]>([])
     const [emailDetails, setEmailDetails] = useState<Record<string, WormEmailDetail>>({})
@@ -2137,6 +2064,9 @@ export default function WormOrderPage() {
     const [awbError, setAwbError] = useState('')
     const [awbCandidates, setAwbCandidates] = useState<AwbCandidate[]>([])
     const [awbMonitorNotice, setAwbMonitorNotice] = useState('')
+    const [awbScanMode, setAwbScanMode] = useState<AwbScanMode>('fast')
+    const [awbManualInput, setAwbManualInput] = useState('')
+    const [awbCopied, setAwbCopied] = useState(false)
 
     useEffect(() => {
         if (!awbNumber || awbLoading) return
@@ -2262,8 +2192,8 @@ export default function WormOrderPage() {
                 await loadForwardLogs(activeWormOrder.id)
             }
             setTimeout(() => setForwardSuccess(''), 5000)
-        } catch (err: any) {
-            setForwardError(err.message)
+        } catch (error: unknown) {
+            setForwardError(error instanceof Error ? error.message : '이메일 전달에 실패했습니다.')
         } finally {
             setForwarding(false)
         }
@@ -2271,13 +2201,68 @@ export default function WormOrderPage() {
 
     // ── 자동 페치 & 게이지 관련 State ──
     const [fetchProgress, setFetchProgress] = useState(0)
-    const [pipelineFilter, setPipelineFilter] = useState<PipelineFilter>('all')
+    const [selectedPipelineStepId, setSelectedPipelineStepId] = useState(1)
+    const [orderListOpen, setOrderListOpen] = useState(false)
+    const [manualStepSaving, setManualStepSaving] = useState(false)
+    const [manualStepNotice, setManualStepNotice] = useState('')
+
+    const getAwbOcrWorker = useCallback(async (onProgress: (label: string) => void) => {
+        awbOcrProgressReporterRef.current = onProgress
+        if (awbOcrWorkerRef.current) return awbOcrWorkerRef.current
+        if (awbOcrWorkerPromiseRef.current) return awbOcrWorkerPromiseRef.current
+
+        onProgress('문자 인식 엔진을 준비하는 중...')
+        const promise = Tesseract.createWorker('eng', 1, {
+            logger: (message) => {
+                if (message.status === 'recognizing text' && typeof message.progress === 'number') {
+                    awbOcrProgressReporterRef.current(`이미지 문자 인식 중... ${Math.round(message.progress * 100)}%`)
+                }
+            },
+        }).then(async (worker) => {
+            await worker.setParameters({
+                tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+                preserve_interword_spaces: '1',
+                tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._:/ ',
+            } as Parameters<TesseractWorker['setParameters']>[0])
+            awbOcrWorkerRef.current = worker
+            return worker
+        }).finally(() => {
+            awbOcrWorkerPromiseRef.current = null
+        })
+        awbOcrWorkerPromiseRef.current = promise
+        return promise
+    }, [])
+
+    const cancelAwbOcr = useCallback(() => {
+        awbOcrRequestIdRef.current += 1
+        setAwbLoading(false)
+        setAwbProgressLabel('')
+        const worker = awbOcrWorkerRef.current
+        awbOcrWorkerRef.current = null
+        awbOcrWorkerPromiseRef.current = null
+        if (worker) void worker.terminate().catch(() => undefined)
+    }, [])
+
+    useEffect(() => () => {
+        const worker = awbOcrWorkerRef.current
+        awbOcrWorkerRef.current = null
+        if (worker) void worker.terminate().catch(() => undefined)
+    }, [])
+
+    useEffect(() => {
+        if (!docHasFetched || awbOcrWorkerRef.current || awbOcrWorkerPromiseRef.current) return
+        const timeoutId = window.setTimeout(() => {
+            void getAwbOcrWorker(() => undefined).catch(() => undefined)
+        }, 800)
+        return () => window.clearTimeout(timeoutId)
+    }, [docHasFetched, getAwbOcrWorker])
 
     // ── 메일 선택 시 SKM 첨부파일 OCR 자동 실행 ──
     const ocrOnePdf = useCallback(async (
         uid: string,
         attIndex: number,
         onProgress: (label: string) => void,
+        mode: AwbScanMode,
     ): Promise<AwbCandidate[]> => {
         onProgress('첨부 문서를 불러오는 중...')
         const params = new URLSearchParams({ uid, index: String(attIndex), raw: '1', inline: '1' })
@@ -2298,7 +2283,7 @@ export default function WormOrderPage() {
         const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
 
         const byValue = new Map<string, AwbCandidate>()
-        const pageLimit = Math.min(pdf.numPages, 3)
+        const pageLimit = mode === 'fast' ? Math.min(pdf.numPages, 1) : Math.min(pdf.numPages, 3)
 
         // 텍스트 레이어가 있으면 무거운 이미지 OCR을 실행하지 않는다.
         for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
@@ -2321,49 +2306,47 @@ export default function WormOrderPage() {
         }
 
         const textRanked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
-        if (textRanked[0]?.score >= 350) return textRanked
+        if (bestTrustedAwbCandidate(textRanked)) return textRanked
 
-        onProgress('문자 인식 엔진을 준비하는 중...')
-        const worker = await Tesseract.createWorker('eng', 1, {
-            logger: (message) => {
-                if (message.status === 'recognizing text' && typeof message.progress === 'number') {
-                    onProgress(`이미지 문자 인식 중... ${Math.round(message.progress * 100)}%`)
-                }
-            },
-        })
-        await worker.setParameters({
-            tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
-            preserve_interword_spaces: '1',
-            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._:/ ',
-        } as any)
-
-        try {
-            for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
-                onProgress(`PDF ${pageNum}/${pageLimit}페이지를 이미지로 변환하는 중...`)
+        let worker: TesseractWorker | null = null
+        for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
+                onProgress(`PDF ${pageNum}/${pageLimit}페이지를 빠르게 읽는 중...`)
                 const page = await pdf.getPage(pageNum)
-                const viewport = page.getViewport({ scale: 2.4 })
+                const baseScale = mode === 'fast' ? 1.55 : 2.2
+                const maxDimension = mode === 'fast' ? 1800 : 2800
+                const initialViewport = page.getViewport({ scale: baseScale })
+                const scaleRatio = Math.min(1, maxDimension / Math.max(initialViewport.width, initialViewport.height))
+                const viewport = scaleRatio < 1 ? page.getViewport({ scale: baseScale * scaleRatio }) : initialViewport
                 const canvas = document.createElement('canvas')
-                canvas.width = viewport.width
-                canvas.height = viewport.height
+                canvas.width = Math.max(1, Math.floor(viewport.width))
+                canvas.height = Math.max(1, Math.floor(viewport.height))
                 const ctx = canvas.getContext('2d')!
-                await page.render({ canvasContext: ctx, viewport } as any).promise
+                await page.render({ canvasContext: ctx, viewport }).promise
+
+                onProgress('AWB 바코드를 확인하는 중...')
+                const barcodeCandidates = await detectAwbBarcodeCandidates(canvas, `file=${attIndex},page=${pageNum}`)
+                for (const candidate of barcodeCandidates) mergeAwbCandidate(byValue, candidate)
+                const barcodeRanked = Array.from(byValue.values()).sort((left, right) => right.score - left.score)
+                if (bestTrustedAwbCandidate(barcodeRanked)) return barcodeRanked
 
                 const fullBinary = createCanvasFromSource(canvas)
                 applyBinaryThreshold(fullBinary, 165)
-                const topRaw = createTopCropCanvas(canvas, 0.42)
+                const topRaw = createTopCropCanvas(canvas, mode === 'fast' ? 0.48 : 0.42)
                 const topBinary = createCanvasFromSource(topRaw)
                 applyBinaryThreshold(topBinary, 165)
 
-                const variants: Array<{ name: string; canvas: HTMLCanvasElement; boost: number }> = [
-                    { name: 'ocr-top-raw', canvas: topRaw, boost: 100 },
-                    { name: 'ocr-top-binary', canvas: topBinary, boost: 140 },
-                    { name: 'ocr-full-binary', canvas: fullBinary, boost: 60 },
-                ]
+                const variants: Array<{ name: string; canvas: HTMLCanvasElement; boost: number }> = mode === 'fast'
+                    ? [{ name: 'ocr-fast-top', canvas: topBinary, boost: 180 }]
+                    : [
+                        { name: 'ocr-top-raw', canvas: topRaw, boost: 100 },
+                        { name: 'ocr-top-binary', canvas: topBinary, boost: 140 },
+                        { name: 'ocr-full-binary', canvas: fullBinary, boost: 60 },
+                    ]
 
                 for (const variant of variants) {
+                    worker ||= await getAwbOcrWorker(onProgress)
                     const result = await worker.recognize(variant.canvas)
                     const ocrText = result.data.text || ''
-                    console.log(`[AWB OCR] file=${attIndex}, page=${pageNum}, variant=${variant.name}`, ocrText)
 
                     const candidates = extractAwbCandidatesFromText(
                         ocrText,
@@ -2375,54 +2358,55 @@ export default function WormOrderPage() {
                     }
 
                     const currentRanked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
-                    if (currentRanked[0]?.score >= 500) return currentRanked
+                    if (bestTrustedAwbCandidate(currentRanked)) return currentRanked
                 }
             }
-        } finally {
-            await worker.terminate()
-        }
 
         return Array.from(byValue.values()).sort((a, b) => b.score - a.score)
-    }, [])
+    }, [getAwbOcrWorker])
 
-    const runAwbOcr = useCallback(async (emailMeta: Pick<WormEmailDetail, 'uid' | 'subject' | 'date' | 'skmIndices'>) => {
+    const runAwbOcr = useCallback(async (
+        emailMeta: Pick<WormEmailDetail, 'uid' | 'subject' | 'date' | 'skmIndices'>,
+        mode: AwbScanMode = 'fast',
+    ) => {
         const requestId = ++awbOcrRequestIdRef.current
         setAwbNumber(null)
         setAwbLoading(true)
-        setAwbProgressLabel('AWB OCR을 준비하는 중...')
+        setAwbScanMode(mode)
+        setAwbProgressLabel(mode === 'fast' ? 'AWB 빠른 분석을 시작합니다...' : 'AWB 정밀 분석을 시작합니다...')
         setAwbError('')
         setAwbCandidates([])
         setAwbMonitorNotice('')
         try {
             const byValue = new Map<string, AwbCandidate>()
-
-            // 모든 SKM 파일을 순차적으로 시도해서 점수가 가장 높은 후보를 채택
-            for (const idx of emailMeta.skmIndices) {
-                const foundList = await ocrOnePdf(emailMeta.uid, idx, setAwbProgressLabel)
+            const targetIndexes = mode === 'fast' ? emailMeta.skmIndices.slice(0, 1) : emailMeta.skmIndices
+            for (const idx of targetIndexes) {
+                const foundList = await ocrOnePdf(emailMeta.uid, idx, setAwbProgressLabel, mode)
                 for (const c of foundList) {
                     mergeAwbCandidate(byValue, c)
                 }
+                if (bestTrustedAwbCandidate(Array.from(byValue.values()))) break
             }
 
             const ranked = Array.from(byValue.values()).sort((a, b) => b.score - a.score)
             if (requestId !== awbOcrRequestIdRef.current) return
-            setAwbCandidates(ranked.slice(0, 6))
+            setAwbCandidates(ranked.filter((candidate) => isValidAwbByCheckDigit(candidate.value)).slice(0, 6))
 
-            if (ranked.length > 0) {
-                const resolvedAwb = ranked[0].value
+            const trusted = bestTrustedAwbCandidate(ranked)
+            if (trusted) {
+                const resolvedAwb = trusted.value
                 setAwbNumber(resolvedAwb)
                 await persistAwbCache(emailMeta.uid, resolvedAwb, emailMeta)
-                if (ranked[0].score < 350) {
-                    setAwbError('OCR 신뢰도가 낮습니다. 아래 대안 후보에서 번호를 직접 선택해주세요.')
-                }
                 return
             }
 
-            setAwbError('모든 SKM 문서에서 운송장 번호를 찾지 못했습니다. 브라우저 콘솔(F12)에서 OCR 원문을 확인해주세요.')
-        } catch (err: any) {
+            setAwbError(mode === 'fast'
+                ? '빠른 분석에서 AWB를 찾지 못했습니다. 정밀 재스캔 또는 직접 입력을 사용해주세요.'
+                : '정밀 분석에서도 AWB를 확정하지 못했습니다. 후보를 선택하거나 직접 입력해주세요.')
+        } catch (error: unknown) {
             if (requestId !== awbOcrRequestIdRef.current) return
-            console.error('AWB OCR Error:', err)
-            setAwbError(err.message || 'OCR 처리 실패')
+            console.error('AWB OCR Error:', error)
+            setAwbError(error instanceof Error ? error.message : 'OCR 처리 실패')
         } finally {
             if (requestId === awbOcrRequestIdRef.current) {
                 setAwbLoading(false)
@@ -2456,9 +2440,9 @@ export default function WormOrderPage() {
                 }
             }
             return data
-        } catch (err: any) {
+        } catch (error: unknown) {
             if (requestId !== emailDetailRequestIdRef.current) return null
-            setEmailError(err.message || '메일 상세 조회 실패')
+            setEmailError(error instanceof Error ? error.message : '메일 상세 조회 실패')
             return null
         } finally {
             if (requestId === emailDetailRequestIdRef.current) {
@@ -2568,7 +2552,7 @@ export default function WormOrderPage() {
                 throw new Error('Canvas context unavailable')
             }
 
-            await page.render({ canvasContext, viewport } as any).promise
+            await page.render({ canvasContext, viewport }).promise
             const previewBlob = await new Promise<Blob>((resolve, reject) => {
                 canvas.toBlob((blob) => {
                     if (!blob) {
@@ -2856,6 +2840,8 @@ export default function WormOrderPage() {
         if (receiveDateText) {
             setReceiveDate(receiveDateText)
         }
+        setOrderListOpen(false)
+        setManualStepNotice('')
 
         // Keep already-fetched inbox state when user re-selects the same order.
         if (isSameOrder) return
@@ -3104,13 +3090,13 @@ export default function WormOrderPage() {
                     setFetchProgress(0)
                 }
             }, 500)
-        } catch (err: any) {
+        } catch (error: unknown) {
             clearInterval(interval)
             if (requestId !== emailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             setFetchProgress(0)
-            const message = err?.name === 'AbortError'
+            const message = error instanceof Error && error.name === 'AbortError'
                 ? 'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
-                : err.message || 'Failed to fetch emails'
+                : error instanceof Error ? error.message : 'Failed to fetch emails'
             const hasCachedEmails = emails.length > 0 || Object.keys(emailDetails).length > 0
             setEmailError(hasCachedEmails ? `${message} Showing saved email cache.` : message)
             setHasFetched(true)
@@ -3420,13 +3406,13 @@ export default function WormOrderPage() {
                     setDocFetchProgress(0)
                 }
             }, 500)
-        } catch (err: any) {
+        } catch (error: unknown) {
             clearInterval(interval)
             if (requestId !== docEmailFetchRequestIdRef.current || activeWormOrderIdRef.current !== requestOrderId) return
             setDocFetchProgress(0)
-            setDocEmailError(err?.name === 'AbortError'
+            setDocEmailError(error instanceof Error && error.name === 'AbortError'
                 ? 'Daum 메일 스캔 시간이 초과되었습니다. 잠시 후 다시 시도해주세요.'
-                : err.message || 'Failed to fetch document emails')
+                : error instanceof Error ? error.message : 'Failed to fetch document emails')
             setDocHasFetched(true)
         } finally {
             window.clearTimeout(timeoutId)
@@ -3457,9 +3443,9 @@ export default function WormOrderPage() {
                 }
             }
             return data
-        } catch (err: any) {
+        } catch (error: unknown) {
             if (requestId !== docEmailDetailRequestIdRef.current) return null
-            setDocEmailError(err.message || '메일 상세 조회 실패')
+            setDocEmailError(error instanceof Error ? error.message : '메일 상세 조회 실패')
             return null
         } finally {
             if (requestId === docEmailDetailRequestIdRef.current) {
@@ -3483,6 +3469,11 @@ export default function WormOrderPage() {
         setDocEmailMatchMessage('')
         try {
             const result = await requestEmailMatchAndInvoiceOcr(email, activeWormOrder, 'AWB_DOCUMENT')
+            const awbExtraction = result?.awbExtraction as {
+                status?: unknown
+                awbNumber?: unknown
+                attachmentIndexes?: unknown
+            } | null
             const match = result?.match as {
                 subject?: unknown
                 date?: unknown
@@ -3536,8 +3527,30 @@ export default function WormOrderPage() {
                     },
                 }
             })
-            if (matchedAwbNumber) setAwbNumber(matchedAwbNumber)
-            setDocEmailMatchMessage(`매칭 완료: ${matchedOrderNumber}`)
+            setSelectedDocEmailUid(email.uid)
+            if (matchedAwbNumber) {
+                setAwbNumber(matchedAwbNumber)
+                setAwbMonitorNotice('유니패스 자동 모니터링 등록됨 · 수입신고 수리 완료 시 contact@beiko.com으로 알립니다.')
+                setDocEmailMatchMessage(`매칭 및 AWB 추출 완료: ${matchedOrderNumber}`)
+            } else {
+                setDocEmailMatchMessage(`매칭 완료: ${matchedOrderNumber} · AWB 빠른 분석 시작`)
+                const extractionIndexes = Array.isArray(awbExtraction?.attachmentIndexes)
+                    ? awbExtraction.attachmentIndexes.filter((value): value is number => Number.isInteger(value))
+                    : []
+                const skmIndices = extractionIndexes.length > 0
+                    ? extractionIndexes
+                    : attachments.filter(isPdfEmailAttachment).map((attachment) => attachment.index)
+                if (skmIndices.length > 0) {
+                    void runAwbOcr({
+                        uid: email.uid,
+                        subject: typeof match?.subject === 'string' ? match.subject : email.subject,
+                        date: typeof match?.date === 'string' ? match.date : email.date,
+                        skmIndices,
+                    }, 'fast')
+                } else {
+                    setAwbError('AWB를 분석할 PDF 첨부파일이 없습니다. 번호를 직접 입력해주세요.')
+                }
+            }
             void restoreMatchedEmailsForOrder(activeWormOrder)
         } catch (error) {
             setDocEmailError(error instanceof Error ? error.message : '매칭 중 오류가 발생했습니다.')
@@ -3599,13 +3612,47 @@ export default function WormOrderPage() {
             setAwbError('선택한 메일에 SKM 첨부파일이 없어 OCR을 실행할 수 없습니다.')
             return
         }
-        runAwbOcr({
+        void runAwbOcr({
             uid: selectedDocEmailUid,
             subject: detail.subject,
             date: detail.date,
             skmIndices: detail.skmIndices,
-        })
+        }, 'fast')
     }, [selectedDocEmailUid, docEmailDetails, fetchDocEmailDetail, runAwbOcr])
+
+    const handleRunPreciseDocAwbOcr = useCallback(async () => {
+        if (!selectedDocEmailUid) return
+        const detail = docEmailDetails[selectedDocEmailUid] || await fetchDocEmailDetail(selectedDocEmailUid)
+        if (!detail?.skmIndices.length) {
+            setAwbError('정밀 분석할 PDF 첨부파일이 없습니다.')
+            return
+        }
+        void runAwbOcr({
+            uid: selectedDocEmailUid,
+            subject: detail.subject,
+            date: detail.date,
+            skmIndices: detail.skmIndices,
+        }, 'precise')
+    }, [selectedDocEmailUid, docEmailDetails, fetchDocEmailDetail, runAwbOcr])
+
+    const handleSaveManualAwb = useCallback(async () => {
+        if (!selectedDocEmailUid) return
+        const normalized = normalizeOcrDigits(awbManualInput)
+        if (!/^\d{11}$/.test(normalized)) {
+            setAwbError('AWB 번호 11자리를 입력해주세요.')
+            return
+        }
+        if (!isValidAwbByCheckDigit(normalized)) {
+            setAwbError('체크디지트가 일치하지 않습니다. 입력한 번호를 다시 확인해주세요.')
+            return
+        }
+        const detail = docEmailDetails[selectedDocEmailUid] || await fetchDocEmailDetail(selectedDocEmailUid)
+        setAwbNumber(normalized)
+        setAwbCandidates([])
+        setAwbError('')
+        await persistAwbCache(selectedDocEmailUid, normalized, detail)
+        setAwbManualInput('')
+    }, [awbManualInput, docEmailDetails, fetchDocEmailDetail, persistAwbCache, selectedDocEmailUid])
 
     const selectedOrders = useMemo(() => {
         return WORM_TYPES.flatMap((wormType) =>
@@ -4522,6 +4569,10 @@ export default function WormOrderPage() {
         () => emails.some((email) => /창고|warehouse|storage/i.test(email.subject)),
         [emails],
     )
+    const completedPipelineStepIds = useMemo(
+        () => new Set(activeWormOrderRecord?.completedStepIds || []),
+        [activeWormOrderRecord?.completedStepIds],
+    )
 
     const pipelineStatusMap = useMemo<Record<number, PipelineRuntimeStatus>>(() => {
         const result: Record<number, PipelineRuntimeStatus> = {}
@@ -4540,7 +4591,7 @@ export default function WormOrderPage() {
             : remittanceSubmitting || isAutoRemittanceReady || isManualRemittanceReady
                 ? 'active'
                 : 'todo'
-        result[4] = matchedAwbUid || persistedAwbNumber
+        result[4] = persistedAwbNumber
             ? 'done'
             : awbLoading || loadingDocEmails || docHasFetched
                 ? 'active'
@@ -4550,20 +4601,15 @@ export default function WormOrderPage() {
             : customsProgressLoading || Boolean(blNumberQuery.trim())
                 ? 'active'
                 : 'todo'
-        result[6] = detailRows.some((row) => {
-            const normalized = normalizeCustomsStepText(row.cargTrcnRelaBsopTpcd, row.rlbrCn)
-            return normalized.includes('\uC218\uC785\uC2E0\uACE0\uC218\uB9AC')
-        })
-            ? 'done'
-            : 'todo'
-        result[7] = forwardSuccess
+        result[6] = completedPipelineStepIds.has(6) ? 'done' : 'todo'
+        result[7] = forwardSuccess || forwardLogs.length > 0
             ? 'done'
             : forwarding || isCustomsForwardReady
                 ? 'active'
                 : 'todo'
-        result[8] = hasWarehouseMail ? 'done' : 'todo'
-        result[9] = 'todo'
-        result[10] = 'todo'
+        result[8] = completedPipelineStepIds.has(8) || hasWarehouseMail ? 'done' : 'todo'
+        result[9] = completedPipelineStepIds.has(9) ? 'done' : 'todo'
+        result[10] = completedPipelineStepIds.has(10) ? 'done' : 'todo'
 
         return result
     }, [
@@ -4571,10 +4617,11 @@ export default function WormOrderPage() {
         blNumberQuery,
         customsProgressLoading,
         customsProgressResult,
-        detailRows,
+        completedPipelineStepIds,
         docHasFetched,
         forwarding,
         forwardSuccess,
+        forwardLogs.length,
         generatedMessage,
         hasFetched,
         hasWarehouseMail,
@@ -4585,7 +4632,6 @@ export default function WormOrderPage() {
         isCustomsForwardReady,
         loadingDocEmails,
         loadingEmails,
-        matchedAwbUid,
         matchedInvoiceEmail?.uid,
         matchingEmailUid,
         persistedAwbNumber,
@@ -4593,13 +4639,6 @@ export default function WormOrderPage() {
         remittanceSuccess,
         totalBoxes,
     ])
-
-    const pipelineModeCounts = useMemo(() => {
-        return PIPELINE_STEP_DEFINITIONS.reduce<Record<PipelineMode, number>>((acc, step) => {
-            acc[step.mode] += 1
-            return acc
-        }, { AUTO: 0, SEMI: 0, MANUAL: 0 })
-    }, [])
 
     const doneStepCount = useMemo(
         () => Object.values(pipelineStatusMap).filter((status) => status === 'done').length,
@@ -4612,6 +4651,10 @@ export default function WormOrderPage() {
     const activeStepDefinition = useMemo(
         () => PIPELINE_STEP_DEFINITIONS.find((step) => step.id === activeStepId) || null,
         [activeStepId],
+    )
+    const selectedStepDefinition = useMemo(
+        () => PIPELINE_STEP_DEFINITIONS.find((step) => step.id === selectedPipelineStepId) || PIPELINE_STEP_DEFINITIONS[0],
+        [selectedPipelineStepId],
     )
     const activeOrderDateText = activeWormOrderRecord?.receiveDate
         ? formatYmdWithKoreanWeekday(toKstDateInputString(activeWormOrderRecord.receiveDate), '/')
@@ -4636,73 +4679,20 @@ export default function WormOrderPage() {
             return { ...phase, done, total: phase.stepIds.length, active }
         })
     }, [pipelineStatusMap])
-    const pipelineFilterOptions = useMemo<Array<{ value: PipelineFilter; label: string; count: number }>>(
-        () => [
-            { value: 'all', label: '전체', count: PIPELINE_STEP_DEFINITIONS.length },
-            { value: 'AUTO', label: '자동', count: pipelineModeCounts.AUTO },
-            { value: 'SEMI', label: '반자동', count: pipelineModeCounts.SEMI },
-            { value: 'MANUAL', label: '수동', count: pipelineModeCounts.MANUAL },
-        ],
-        [pipelineModeCounts],
-    )
-    const filteredPipelineSteps = useMemo(
-        () => PIPELINE_STEP_DEFINITIONS.filter((step) => pipelineFilter === 'all' || step.mode === pipelineFilter),
-        [pipelineFilter],
-    )
     const visibleStepIdSet = useMemo(
-        () => new Set(filteredPipelineSteps.map((step) => step.id)),
-        [filteredPipelineSteps],
+        () => new Set([selectedPipelineStepId]),
+        [selectedPipelineStepId],
     )
 
-    const scrollToPipelineSection = useCallback((target: PipelineSectionTarget) => {
-        if (target === 'order') {
-            orderSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-        if (target === 'inbox') {
-            inboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-        if (target === 'remittance') {
-            remittanceSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-        if (target === 'docInbox') {
-            docInboxSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-        if (target === 'customs') {
-            customsProgressSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-        if (target === 'cargoCustomsMail') {
-            cargoCustomsMailSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-            return
-        }
-    }, [])
-
-    const handlePipelineStepAction = useCallback((step: PipelineStepDefinition) => {
-        if (step.target !== 'none') {
-            const targetIsHiddenByFilter = pipelineFilter !== 'all' && pipelineFilter !== step.mode
-            if (targetIsHiddenByFilter) {
-                setPipelineFilter('all')
-                window.setTimeout(() => scrollToPipelineSection(step.target), 0)
-            } else {
-                scrollToPipelineSection(step.target)
-            }
-        }
-
-        if (step.id === 1 && selectedOrders.length > 0 && !generatedMessage) {
-            handleGenerate()
-            return
-        }
-
-        if (step.id === 2 && !loadingEmails) {
+    const handlePipelineStepAction = (step: PipelineStepDefinition) => {
+        setSelectedPipelineStepId(step.id)
+        setManualStepNotice('')
+        if (step.id === 2 && !loadingEmails && !hasFetched) {
             void fetchEmails(true)
             return
         }
 
-        if (step.id === 4 && !loadingDocEmails) {
+        if (step.id === 4 && !loadingDocEmails && !docHasFetched) {
             void fetchDocumentEmails()
             return
         }
@@ -4710,17 +4700,29 @@ export default function WormOrderPage() {
         if (step.id === 5 && fallbackAwbCandidate) {
             void handleCustomsProgressSearch(fallbackAwbCandidate, { scrollIntoView: true })
         }
-    }, [
-        fallbackAwbCandidate,
-        generatedMessage,
-        handleCustomsProgressSearch,
-        handleGenerate,
-        loadingDocEmails,
-        loadingEmails,
-        pipelineFilter,
-        scrollToPipelineSection,
-        selectedOrders.length,
-    ])
+    }
+
+    useEffect(() => {
+        const previousActiveStep = lastActivePipelineStepRef.current
+        if (previousActiveStep === null) {
+            lastActivePipelineStepRef.current = activeStepId
+            const requestedStep = Number.parseInt(new URLSearchParams(window.location.search).get('step') || '', 10)
+            setSelectedPipelineStepId(
+                PIPELINE_STEP_DEFINITIONS.some((step) => step.id === requestedStep) ? requestedStep : activeStepId,
+            )
+            return
+        }
+        if (previousActiveStep !== activeStepId && selectedPipelineStepId === previousActiveStep) {
+            setSelectedPipelineStepId(activeStepId)
+        }
+        lastActivePipelineStepRef.current = activeStepId
+    }, [activeStepId, selectedPipelineStepId])
+
+    useEffect(() => {
+        const url = new URL(window.location.href)
+        url.searchParams.set('step', String(selectedPipelineStepId))
+        window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+    }, [selectedPipelineStepId])
 
     const handleStartNewOrder = useCallback(async () => {
         if (creatingOrder) return
@@ -4750,6 +4752,8 @@ export default function WormOrderPage() {
                     orderNumber: result.order.orderNumber,
                     receiveDate: targetReceiveDate,
                 })
+                setSelectedPipelineStepId(1)
+                setOrderListOpen(false)
             }
             void fetchWormOrders({ silent: true })
         } catch (error) {
@@ -4796,35 +4800,59 @@ export default function WormOrderPage() {
         setCreatingOrder(false)
     }, [creatingOrder, fetchWormOrders, receiveDate, today])
 
+    const handleManualStepToggle = useCallback(async (stepId: number, completed: boolean) => {
+        if (!activeWormOrderRecord?.id || manualStepSaving) {
+            if (!activeWormOrderRecord?.id) setManualStepNotice('먼저 상단에서 발주를 선택해주세요.')
+            return
+        }
+
+        setManualStepSaving(true)
+        setManualStepNotice('')
+        try {
+            const response = await fetch(
+                `/api/admin/worm-order/orders/${encodeURIComponent(activeWormOrderRecord.id)}/steps/${stepId}`,
+                {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ completed }),
+                },
+            )
+            const result = await response.json().catch(() => null)
+            if (!response.ok) {
+                throw new Error(typeof result?.error === 'string' ? result.error : '단계 상태를 저장하지 못했습니다.')
+            }
+
+            setWormOrderList((previous) => previous.map((order) => {
+                if (order.id !== activeWormOrderRecord.id) return order
+                const nextCompletedStepIds = new Set(order.completedStepIds)
+                if (completed) nextCompletedStepIds.add(stepId)
+                else nextCompletedStepIds.delete(stepId)
+                return {
+                    ...order,
+                    completedStepIds: Array.from(nextCompletedStepIds).sort((left, right) => left - right),
+                    status: typeof result?.order?.status === 'string' ? result.order.status : order.status,
+                    updatedAt: typeof result?.order?.updatedAt === 'string' ? result.order.updatedAt : order.updatedAt,
+                }
+            }))
+            setManualStepNotice(completed ? '완료 상태를 저장했습니다.' : '완료 상태를 취소했습니다.')
+            if (completed && stepId < PIPELINE_STEP_DEFINITIONS.length) {
+                setSelectedPipelineStepId(stepId + 1)
+            }
+        } catch (error) {
+            setManualStepNotice(error instanceof Error ? error.message : '단계 상태를 저장하지 못했습니다.')
+        } finally {
+            setManualStepSaving(false)
+        }
+    }, [activeWormOrderRecord?.id, manualStepSaving])
+
     const showOrderTools = visibleStepIdSet.has(1)
     const showInboxTools = visibleStepIdSet.has(2)
     const showDocInboxTools = visibleStepIdSet.has(4)
     const showRemittanceTools = visibleStepIdSet.has(3)
     const showCustomsTools = visibleStepIdSet.has(5)
     const showCargoCustomsMailTools = visibleStepIdSet.has(7)
-    const stepRenderOrderMap = useMemo(() => {
-        const next = new Map<number, number>()
-        filteredPipelineSteps.forEach((step, index) => {
-            next.set(step.id, (index + 1) * 10)
-        })
-        return next
-    }, [filteredPipelineSteps])
-    const fallbackOrderBase = filteredPipelineSteps.length * 10 + 10
-    const getAnchorOrderBase = useCallback((stepIds: number[], defaultStepId: number) => {
-        for (const stepId of stepIds) {
-            const mapped = stepRenderOrderMap.get(stepId)
-            if (mapped) return mapped
-        }
-        return stepRenderOrderMap.get(defaultStepId) ?? fallbackOrderBase
-    }, [fallbackOrderBase, stepRenderOrderMap])
-    const orderToolOrderBase = getAnchorOrderBase([1], 1)
-    const inboxToolOrderBase = getAnchorOrderBase([2], 2)
-    const docInboxToolOrderBase = getAnchorOrderBase([4], 4)
-    const remittanceToolOrderBase = getAnchorOrderBase([3], 3)
-    const customsToolOrderBase = getAnchorOrderBase([5], 5)
-    const cargoCustomsMailToolOrderBase = getAnchorOrderBase([7], 7)
     const workflowFlowPanel = (
-        <aside className="flex max-h-[calc(100vh-1.5rem)] flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-[0_18px_45px_rgba(15,23,42,0.08)]">
+        <aside className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
@@ -4838,7 +4866,7 @@ export default function WormOrderPage() {
                         <button
                             type="button"
                             onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                            className="inline-flex h-9 items-center gap-2 rounded-xl bg-[#e34219] px-3 text-xs font-black text-white shadow-sm hover:bg-[#cd3b17]"
+                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#e34219] px-3 text-xs font-black text-white shadow-sm hover:bg-[#cd3b17]"
                         >
                             {activeStepDefinition.id}
                             이동
@@ -4850,7 +4878,7 @@ export default function WormOrderPage() {
                     {phaseProgressSummaries.map((phase) => (
                         <div
                             key={phase.id}
-                            className={`rounded-xl border px-2 py-2 text-center ${getPipelinePhaseClass(phase.tone)} ${phase.active ? 'ring-2 ring-[#e34219]/20' : ''}`}
+                            className={`rounded-md border px-2 py-2 text-center ${getPipelinePhaseClass(phase.tone)} ${phase.active ? 'ring-2 ring-[#e34219]/20' : ''}`}
                         >
                             <p className="truncate text-[10px] font-black">{phase.label}</p>
                             <p className="mt-1 text-[10px] font-bold opacity-75">{phase.done}/{phase.total}</p>
@@ -4858,29 +4886,13 @@ export default function WormOrderPage() {
                     ))}
                 </div>
 
-                <div className="mt-4 flex flex-wrap gap-1.5">
-                    {pipelineFilterOptions.map((option) => (
-                        <button
-                            key={option.value}
-                            type="button"
-                            onClick={() => setPipelineFilter(option.value)}
-                            className={`inline-flex h-8 items-center gap-1 rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${
-                                pipelineFilter === option.value
-                                    ? 'border-[#e34219] bg-[#fff3ef] text-[#d9361b]'
-                                    : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'
-                            }`}
-                        >
-                            {option.label}
-                            <span className="opacity-70">{option.count}</span>
-                        </button>
-                    ))}
-                </div>
             </div>
 
             <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                {filteredPipelineSteps.map((step) => {
+                {PIPELINE_STEP_DEFINITIONS.map((step) => {
                     const runtimeStatus = pipelineStatusMap[step.id]
-                    const isCurrent = step.id === activeStepId
+                    const isCurrent = step.id === selectedPipelineStepId
+                    const isNext = step.id === activeStepId
                     return (
                         <button
                             key={`flow-table-${step.id}`}
@@ -4922,7 +4934,7 @@ export default function WormOrderPage() {
                                         {getPipelineModeLabel(step.mode)}
                                     </span>
                                     <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                        {getPipelineRuntimeLabel(runtimeStatus)}
+                                        {isNext && runtimeStatus !== 'done' ? '다음 단계' : getPipelineRuntimeLabel(runtimeStatus)}
                                     </span>
                                 </span>
                             </span>
@@ -4934,29 +4946,34 @@ export default function WormOrderPage() {
     )
 
     return (
-        <div className="mx-auto flex max-w-[1840px] flex-col gap-6 px-3 pb-10 md:px-5 xl:px-7">
-            <div className="rounded-3xl border border-[#f3ddd8] bg-gradient-to-br from-white via-[#fff8f6] to-[#fff3ef] p-5 text-slate-900 shadow-[0_14px_34px_rgba(15,23,42,0.08)] md:p-7">
+        <div className="mx-auto flex max-w-[1840px] flex-col gap-4 px-3 pb-10 md:px-5 xl:px-7">
+            <header className="rounded-lg border border-slate-200 bg-white p-4 text-slate-900 shadow-sm md:p-5">
                 <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="space-y-1">
                         <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#e34219]">Worm Import Pipeline</p>
                         <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">지렁이 수입 자동화 파이프라인</h1>
                         <p className="text-sm text-slate-600 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={handleStartNewOrder}
-                        disabled={creatingOrder}
-                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-[#e34219] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
-                    >
-                        {creatingOrder ? (
-                            <>
-                                <Loader2 size={14} className="animate-spin" />
-                                생성중...
-                            </>
-                        ) : (
-                            '+ 새 발주 시작'
-                        )}
-                    </button>
+                    <div className="grid grid-cols-2 gap-2 md:flex">
+                        <button
+                            type="button"
+                            onClick={() => setOrderListOpen(true)}
+                            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 md:max-w-[260px]"
+                        >
+                            <Package size={16} className="shrink-0" />
+                            <span className="truncate">{activeOrderNumberText}</span>
+                            <ChevronDown size={14} className="shrink-0 text-slate-400" />
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleStartNewOrder}
+                            disabled={creatingOrder}
+                            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#e34219] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {creatingOrder ? <Loader2 size={15} className="animate-spin" /> : <Plus size={16} />}
+                            {creatingOrder ? '생성중...' : '새 발주'}
+                        </button>
+                    </div>
                 </div>
 
                 {orderCreateNotice && (
@@ -4981,26 +4998,26 @@ export default function WormOrderPage() {
                         {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                     </span>
                 </div>
-            </div>
+            </header>
 
-            <section className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
-                <div className="grid gap-3 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
-                    <div className="rounded-2xl border border-[#ffd7cc] bg-[#fff7f3] px-4 py-3">
+            <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                <div className="grid gap-0 sm:grid-cols-2 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+                    <div className="border-b border-slate-100 px-3 py-3 sm:border-r md:border-b-0">
                         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#e34219]">Active Order</p>
                         <p className="mt-1 text-lg font-black text-slate-950">{activeOrderNumberText}</p>
                         <p className="text-xs font-semibold text-slate-500">{activeOrderDateText}</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <div className="border-b border-slate-100 px-3 py-3 md:border-b-0 md:border-r">
                         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">현재 상태</p>
                         <p className="mt-1 text-lg font-black text-slate-950">{activeOrderStatusText}</p>
                         <p className="text-xs font-semibold text-slate-500">발주 {filteredWormOrderList.length}건 표시중</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <div className="border-b border-slate-100 px-3 py-3 sm:border-b-0 sm:border-r">
                         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">다음 액션</p>
                         <p className="mt-1 line-clamp-1 text-lg font-black text-[#d9361b]">{nextActionText}</p>
                         <p className="text-xs font-semibold text-slate-500">{activeStepDefinition?.summary || '완료 상태를 확인하세요.'}</p>
                     </div>
-                    <div className="rounded-2xl border border-slate-200 bg-slate-50/70 px-4 py-3">
+                    <div className="px-3 py-3">
                         <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">발주 수량</p>
                         <p className="mt-1 text-lg font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')} boxes</p>
                         <div className="mt-1 flex flex-wrap gap-1">
@@ -5014,22 +5031,41 @@ export default function WormOrderPage() {
                 </div>
             </section>
 
-            <div className="min-w-0 flex flex-col gap-6">
-            <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none md:p-7">
+            <div className="grid min-w-0 gap-4 md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
+            <div className="sticky top-4 hidden self-start md:block">{workflowFlowPanel}</div>
+            {orderListOpen && (
+            <>
+            <button
+                type="button"
+                className="fixed inset-0 z-40 bg-slate-950/35"
+                onClick={() => setOrderListOpen(false)}
+                aria-label="발주 리스트 닫기"
+            />
+            <section className="fixed inset-y-0 right-0 z-50 w-full max-w-[900px] overflow-y-auto border-l border-slate-200 bg-white p-4 shadow-2xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] md:p-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">발주 리스트</h2>
-                        <p className="mt-3 text-sm font-medium text-slate-500 dark:text-gray-400">새 발주 생성 시 DB에 저장되며, 아래에서 바로 선택할 수 있습니다.</p>
+                        <p className="mt-1 text-sm font-medium text-slate-500 dark:text-gray-400">작업할 발주를 선택하세요.</p>
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => { void fetchWormOrders() }}
-                        disabled={wormOrderListLoading}
-                        className="inline-flex h-12 items-center justify-center gap-2 rounded-xl bg-[#e34219] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60"
-                    >
-                        {wormOrderListLoading ? <Loader2 size={16} className="animate-spin" /> : <Plus size={18} />}
-                        리스트 새로고침
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => { void fetchWormOrders() }}
+                            disabled={wormOrderListLoading}
+                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                            {wormOrderListLoading ? <Loader2 size={15} className="animate-spin" /> : <ScanSearch size={15} />}
+                            새로고침
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => setOrderListOpen(false)}
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            aria-label="닫기"
+                        >
+                            <X size={18} />
+                        </button>
+                    </div>
                 </div>
 
                 {wormOrderMonthGroups.length > 0 && (
@@ -5059,8 +5095,8 @@ export default function WormOrderPage() {
                     <p className="mt-3 whitespace-pre-wrap text-xs font-semibold text-red-600">{wormOrderListError}</p>
                 )}
 
-                <div className="mt-7 overflow-hidden rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
-                    <table className="w-full table-fixed text-sm">
+                <div className="mt-5 overflow-x-auto rounded-lg border border-slate-200 dark:border-[#2a2a2a]">
+                    <table className="w-full min-w-[760px] table-fixed text-sm">
                         <thead className="bg-slate-50/80 text-slate-700 dark:bg-[#1a1a1a] dark:text-gray-300">
                             <tr>
                                 <th className="w-9 px-2 py-5" />
@@ -5210,35 +5246,101 @@ export default function WormOrderPage() {
                     모든 금액은 실시간 환율을 기준으로 계산되며, 실제 송금 시점의 환율에 따라 변동될 수 있습니다.
                 </div>
             </section>
+            </>
+            )}
 
-            <div className="flex flex-col gap-4">
-                {activeStepDefinition && (
-                    <div className="flex items-center justify-between rounded-2xl border border-[#f5c4b8] bg-[#fff7f3] px-4 py-3 xl:hidden">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <span className="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-[#e34219] text-xs font-black text-white">
-                                {activeStepDefinition.id}
+            <div className="flex min-w-0 flex-col gap-4 md:col-start-2 md:row-start-1">
+                <div className="-mx-1 overflow-x-auto pb-1 md:hidden">
+                    <div className="flex min-w-max gap-2 px-1">
+                        {PIPELINE_STEP_DEFINITIONS.map((step) => {
+                            const runtimeStatus = pipelineStatusMap[step.id]
+                            const selected = step.id === selectedPipelineStepId
+                            return (
+                                <button
+                                    key={`mobile-step-${step.id}`}
+                                    type="button"
+                                    onClick={() => handlePipelineStepAction(step)}
+                                    className={`inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-xs font-black ${
+                                        selected
+                                            ? 'border-[#e34219] bg-[#e34219] text-white'
+                                            : runtimeStatus === 'done'
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                                : 'border-slate-200 bg-white text-slate-600'
+                                    }`}
+                                    aria-label={`${step.id}단계 ${step.title}`}
+                                >
+                                    {step.id}
+                                </button>
+                            )
+                        })}
+                    </div>
+                </div>
+
+                <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="flex min-w-0 items-start gap-3">
+                            <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-[#e34219] text-sm font-black text-white">
+                                {selectedStepDefinition.id}
                             </span>
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-black text-slate-900">{activeStepDefinition.title}</p>
-                                <p className="text-[11px] font-bold text-[#d9361b]">{getPipelineRuntimeLabel(pipelineStatusMap[activeStepDefinition.id])}</p>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <h2 className="text-lg font-black text-slate-950">{selectedStepDefinition.title}</h2>
+                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(selectedStepDefinition.mode)}`}>
+                                        {getPipelineModeLabel(selectedStepDefinition.mode)}
+                                    </span>
+                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[selectedStepDefinition.id])}`}>
+                                        {getPipelineRuntimeLabel(pipelineStatusMap[selectedStepDefinition.id])}
+                                    </span>
+                                </div>
+                                <p className="mt-1 text-sm font-medium text-slate-600">{selectedStepDefinition.summary}</p>
                             </div>
                         </div>
-                        {activeStepDefinition.target !== 'none' && (
+                        <span className="shrink-0 text-xs font-bold text-slate-500">담당 · {selectedStepDefinition.owner}</span>
+                    </div>
+                    <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
+                        {selectedStepDefinition.details.map((detail) => (
+                            <span key={detail} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
+                                <span className="h-1.5 w-1.5 rounded-full bg-[#e34219]" />
+                                {detail}
+                            </span>
+                        ))}
+                    </div>
+                </section>
+
+                {selectedStepDefinition.target === 'none' && (
+                    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-sm font-black text-slate-900">현장 처리 상태</p>
+                                <p className="mt-1 text-xs font-medium text-slate-500">
+                                    실제 업무를 마친 뒤 완료로 표시하면 발주 기록에 저장되고 다음 단계로 이동합니다.
+                                </p>
+                            </div>
                             <button
                                 type="button"
-                                onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                                className="inline-flex h-8 items-center justify-center gap-1 rounded-lg bg-[#e34219] px-3 text-[11px] font-bold text-white"
+                                onClick={() => void handleManualStepToggle(
+                                    selectedStepDefinition.id,
+                                    pipelineStatusMap[selectedStepDefinition.id] !== 'done',
+                                )}
+                                disabled={manualStepSaving || !activeWormOrderRecord}
+                                className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
+                                    pipelineStatusMap[selectedStepDefinition.id] === 'done'
+                                        ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
+                                        : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
+                                }`}
                             >
-                                이동
-                                <ArrowRight size={11} />
+                                {manualStepSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+                                {pipelineStatusMap[selectedStepDefinition.id] === 'done' ? '완료 취소' : '완료로 표시'}
                             </button>
+                        </div>
+                        {manualStepNotice && (
+                            <p className="mt-3 text-xs font-semibold text-slate-600">{manualStepNotice}</p>
                         )}
-                    </div>
+                    </section>
                 )}
             {showOrderTools && (
                 <div
                     ref={orderSectionRef}
-                    style={{ order: orderToolOrderBase + 5 }}
                     className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
                     <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a] flex items-center justify-between">
@@ -5636,7 +5738,7 @@ export default function WormOrderPage() {
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
             {showInboxTools && (
-                <div ref={inboxSectionRef} style={{ order: inboxToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
+                <div ref={inboxSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -5922,7 +6024,7 @@ export default function WormOrderPage() {
 
             {/* ── AWB Documents 메일 조회 ── */}
             {showDocInboxTools && (
-                <div ref={docInboxSectionRef} style={{ order: docInboxToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
+                <div ref={docInboxSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
 
                 {docFetchProgress > 0 && (
                     <div className="absolute top-0 left-0 w-full h-[4px] bg-slate-100 z-10 overflow-hidden">
@@ -6115,13 +6217,13 @@ export default function WormOrderPage() {
                                             <span>수신일시: {formatSafeDateTime(selectedDoc.date)}</span>
                                         </div>
 
-                                        <div className="mt-4 flex items-center gap-2">
+                                        <div className="mt-4 flex flex-wrap items-center gap-2">
                                             <button
                                                 onClick={handleRunDocAwbOcr}
                                                 disabled={loadingDocEmailDetail || awbLoading || selectedDoc.skmIndices.length === 0}
-                                                className="h-9 px-3 rounded-lg bg-blue-700 text-white text-[12px] font-bold disabled:opacity-50"
+                                                className="h-11 px-4 rounded-lg bg-slate-950 text-white text-[12px] font-bold disabled:opacity-50"
                                             >
-                                                {awbLoading ? 'OCR 실행중...' : 'AWB OCR 실행'}
+                                                {awbLoading ? '분석 중...' : '빠른 AWB 인식'}
                                             </button>
                                             {loadingDocEmailDetail ? (
                                                 <span className="text-[12px] text-slate-500 dark:text-gray-400 font-medium">메일 상세를 불러오는 중입니다...</span>
@@ -6148,8 +6250,17 @@ export default function WormOrderPage() {
                                                 {awbLoading && (
                                                     <div className="flex items-center gap-2 text-blue-600">
                                                         <ScanSearch size={16} className="animate-pulse" />
-                                                        <span className="text-[13px] font-bold">{awbProgressLabel || 'SKM 문서에서 Air Waybill 번호를 OCR 스캔 중...'}</span>
-                                                        <Loader2 size={14} className="animate-spin ml-auto" />
+                                                        <span className="text-[13px] font-bold">
+                                                            {awbScanMode === 'fast' ? '빠른 분석' : '정밀 분석'} · {awbProgressLabel || 'Air Waybill 번호를 읽는 중...'}
+                                                        </span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={cancelAwbOcr}
+                                                            className="ml-auto inline-flex h-9 items-center gap-1 rounded-lg border border-blue-200 bg-white px-3 text-[11px] font-bold text-blue-700"
+                                                        >
+                                                            <X size={13} />
+                                                            중지
+                                                        </button>
                                                     </div>
                                                 )}
                                                 {awbNumber && !awbLoading && (
@@ -6162,20 +6273,23 @@ export default function WormOrderPage() {
                                                             <span className="text-[20px] font-black text-blue-900 tracking-tight leading-none">{awbNumber}</span>
                                                             <button
                                                                 onClick={() => {
-                                                                    navigator.clipboard.writeText(awbNumber)
-                                                                    alert('운송장 번호 ' + awbNumber + ' 이(가) 복사되었습니다.')
+                                                                    void navigator.clipboard.writeText(awbNumber).then(() => {
+                                                                        setAwbCopied(true)
+                                                                        window.setTimeout(() => setAwbCopied(false), 1800)
+                                                                    })
                                                                 }}
-                                                                className="h-9 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center shrink-0"
+                                                                className="h-11 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-1.5 shrink-0"
                                                             >
-                                                                복사하기
+                                                                <Copy size={14} />
+                                                                {awbCopied ? '복사됨' : '복사'}
                                                             </button>
                                                         </div>
                                                     </>
                                                 )}
-                                                {awbCandidates.length > 1 && !awbLoading && (
+                                                {awbCandidates.filter((candidate) => candidate.value !== awbNumber).length > 0 && !awbLoading && (
                                                     <div className="mt-1 pt-2 border-t border-blue-100/70 flex flex-wrap items-center gap-2">
                                                         <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400">대안 후보</span>
-                                                        {awbCandidates.slice(1, 6).map((candidate) => (
+                                                        {awbCandidates.filter((candidate) => candidate.value !== awbNumber).slice(0, 6).map((candidate) => (
                                                             <button
                                                                 key={`${candidate.value}-${candidate.source}`}
                                                                 onClick={() => {
@@ -6183,7 +6297,7 @@ export default function WormOrderPage() {
                                                                     setAwbError('')
                                                                     persistAwbCache(selectedDoc.uid, candidate.value, selectedDoc)
                                                                 }}
-                                                                className="h-7 px-2.5 rounded-md border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
+                                                                className="h-10 px-3 rounded-md border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
                                                                 title={`source: ${candidate.source}, score: ${candidate.score}`}
                                                             >
                                                                 {candidate.value}
@@ -6202,6 +6316,39 @@ export default function WormOrderPage() {
                                                 {awbMonitorNotice && !awbLoading && (
                                                     <div className="text-[11px] font-bold text-emerald-700">
                                                         {awbMonitorNotice}
+                                                    </div>
+                                                )}
+                                                {!awbLoading && (awbError || !awbNumber) && (
+                                                    <div className="mt-1 grid gap-2 border-t border-slate-200/70 pt-3 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void handleRunPreciseDocAwbOcr() }}
+                                                            disabled={selectedDoc.skmIndices.length === 0}
+                                                            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-[12px] font-bold text-slate-700 disabled:opacity-50"
+                                                        >
+                                                            <ScanSearch size={14} />
+                                                            정밀 재스캔
+                                                        </button>
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            maxLength={13}
+                                                            value={awbManualInput}
+                                                            onChange={(event) => setAwbManualInput(event.target.value)}
+                                                            onKeyDown={(event) => {
+                                                                if (event.key === 'Enter') void handleSaveManualAwb()
+                                                            }}
+                                                            placeholder="AWB 11자리 직접 입력"
+                                                            className="h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => { void handleSaveManualAwb() }}
+                                                            disabled={!awbManualInput.trim()}
+                                                            className="h-11 rounded-lg bg-slate-900 px-4 text-[12px] font-bold text-white disabled:opacity-40"
+                                                        >
+                                                            저장
+                                                        </button>
                                                     </div>
                                                 )}
                                             </div>
@@ -6238,7 +6385,7 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div ref={remittanceSectionRef} style={{ order: remittanceToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
+                <div ref={remittanceSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">모인 자동 송금 신청</h3>
@@ -6498,7 +6645,7 @@ export default function WormOrderPage() {
                 </div>
             )}
             {showCustomsTools && (
-                <div ref={customsProgressSectionRef} style={{ order: customsToolOrderBase + 5 }} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
+                <div ref={customsProgressSectionRef} className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-base font-black text-[#111827] md:text-lg">유니패스 수입 통관 조회</h3>
@@ -6657,7 +6804,6 @@ export default function WormOrderPage() {
             {showCargoCustomsMailTools && (
                 <div
                     ref={cargoCustomsMailSectionRef}
-                    style={{ order: cargoCustomsMailToolOrderBase + 5 }}
                     className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
                     <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0f9ff] dark:bg-[#1a1a1a] flex items-center justify-between">

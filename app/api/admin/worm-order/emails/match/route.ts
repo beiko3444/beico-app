@@ -7,8 +7,16 @@ import {
   getParsedMailByUid,
   getWormEmailSnapshotForMatch,
   type WormEmailMatchType,
+  upsertWormEmailAwbCache,
   upsertWormOrderEmailMatch,
 } from '@/lib/wormOrderMail'
+import {
+  bestTrustedAwbCandidate,
+  extractAwbCandidatesFromText,
+  isValidAwbByCheckDigit,
+  normalizeOcrDigits,
+} from '@/lib/wormAwbExtraction'
+import { registerWormAwbCustomsMonitor } from '@/lib/wormCustomsMonitor'
 
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
@@ -42,16 +50,16 @@ async function getPdfParseModule() {
   if (!pdfParseModulePromise) {
     pdfParseModulePromise = (async () => {
       // Polyfill DOMMatrix for pdfjs-dist used by pdf-parse
-      if (typeof (globalThis as any).DOMMatrix === 'undefined') {
+      const runtimeGlobal = globalThis as unknown as { DOMMatrix?: unknown }
+      if (typeof runtimeGlobal.DOMMatrix === 'undefined') {
         try {
           const canvasObj = await import('@napi-rs/canvas')
           if (canvasObj && canvasObj.DOMMatrix) {
-            ;(globalThis as any).DOMMatrix = canvasObj.DOMMatrix as any
+            runtimeGlobal.DOMMatrix = canvasObj.DOMMatrix
           }
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        } catch (_) {
+        } catch {
           // Fallback dummy
-          ;(globalThis as any).DOMMatrix = class DOMMatrix {} as any
+          runtimeGlobal.DOMMatrix = class DOMMatrix {}
         }
       }
       return import('pdf-parse')
@@ -60,14 +68,77 @@ async function getPdfParseModule() {
   return pdfParseModulePromise
 }
 
-async function extractPdfText(buffer: Buffer) {
+async function extractPdfText(buffer: Buffer, first = 12) {
   const { PDFParse } = await getPdfParseModule()
   const parser = new PDFParse({ data: buffer })
   try {
-    const result = await parser.getText({ first: 12 })
+    const result = await parser.getText({ first })
     return typeof result?.text === 'string' ? result.text.trim() : ''
   } finally {
     await parser.destroy().catch(() => undefined)
+  }
+}
+
+type AwbExtractionResult = {
+  status: 'cached' | 'found' | 'fast_scan_required'
+  awbNumber: string | null
+  attachmentIndexes: number[]
+  sourceFile: string | null
+}
+
+function scoreAwbPdf(attachment: { filename?: string | null }) {
+  const filename = (attachment.filename || '').toLowerCase()
+  let score = 0
+  if (/air[\s_-]*waybill|awb|mawb|hawb/.test(filename)) score += 20
+  if (/document|shipping|shipment|skm/.test(filename)) score += 8
+  if (/invoice|packing|remittance/.test(filename)) score -= 8
+  return score
+}
+
+async function runAwbPdfTextExtraction(uid: string, cachedAwb: string | null): Promise<AwbExtractionResult> {
+  const parsed = await getParsedMailByUid(uid)
+  const attachments = (parsed.attachments || [])
+    .map((attachment, index) => ({ attachment, index }))
+    .filter(({ attachment }) => isPdfAttachment(attachment))
+    .sort((left, right) => scoreAwbPdf(right.attachment) - scoreAwbPdf(left.attachment) || left.index - right.index)
+
+  const attachmentIndexes = attachments.map(({ index }) => index)
+  const normalizedCachedAwb = normalizeOcrDigits(cachedAwb || '')
+  if (isValidAwbByCheckDigit(normalizedCachedAwb)) {
+    return { status: 'cached', awbNumber: normalizedCachedAwb, attachmentIndexes, sourceFile: null }
+  }
+
+  const target = attachments[0]
+  if (!target) {
+    return { status: 'fast_scan_required', awbNumber: null, attachmentIndexes: [], sourceFile: null }
+  }
+
+  try {
+    const raw = target.attachment.content
+    const buffer = Buffer.isBuffer(raw) ? raw : raw ? Buffer.from(raw) : Buffer.alloc(0)
+    if (buffer.length > 0) {
+      const text = await extractPdfText(buffer, 1)
+      const candidate = bestTrustedAwbCandidate(
+        extractAwbCandidatesFromText(text, `server:${target.attachment.filename || target.index}`, 220),
+      )
+      if (candidate) {
+        return {
+          status: 'found',
+          awbNumber: candidate.value,
+          attachmentIndexes,
+          sourceFile: target.attachment.filename || `attachment-${target.index}.pdf`,
+        }
+      }
+    }
+  } catch (error) {
+    console.warn('[AWB] fast PDF text extraction failed', error)
+  }
+
+  return {
+    status: 'fast_scan_required',
+    awbNumber: null,
+    attachmentIndexes,
+    sourceFile: target.attachment.filename || `attachment-${target.index}.pdf`,
   }
 }
 
@@ -342,7 +413,8 @@ export async function POST(request: Request) {
     const subject = typeof body?.subject === 'string' ? body.subject : ''
     const date = typeof body?.date === 'string' ? body.date : ''
     const matchType: WormEmailMatchType = body?.matchType === 'AWB_DOCUMENT' ? 'AWB_DOCUMENT' : 'INVOICE'
-    const bodyAwbNumber = typeof body?.awbNumber === 'string' ? body.awbNumber.replace(/\s+/g, '').trim() : ''
+    const rawBodyAwbNumber = typeof body?.awbNumber === 'string' ? normalizeOcrDigits(body.awbNumber) : ''
+    const bodyAwbNumber = isValidAwbByCheckDigit(rawBodyAwbNumber) ? rawBodyAwbNumber : ''
 
     if (!uid) {
       return NextResponse.json({ error: 'uid is required.' }, { status: 400 })
@@ -360,8 +432,9 @@ export async function POST(request: Request) {
     }
 
     const snapshot = await getWormEmailSnapshotForMatch(uid)
-
-    let invoiceOcr: InvoiceOcrResult = {
+    const snapshotAwbNumber = normalizeOcrDigits(snapshot.detail.awbNumber || '')
+    const trustedSnapshotAwbNumber = isValidAwbByCheckDigit(snapshotAwbNumber) ? snapshotAwbNumber : ''
+    const emptyInvoiceOcr: InvoiceOcrResult = {
       invoiceUnitPriceUsd: null,
       invoiceTotalAmountUsd: null,
       usdKrwRate: null,
@@ -371,48 +444,45 @@ export async function POST(request: Request) {
       invoiceSourceFile: null,
       invoiceOcrError: null,
     }
-    if (matchType === 'INVOICE') {
-      try {
-        invoiceOcr = await runInvoicePdfOcr(uid)
-      } catch (ocrError) {
-        const message = ocrError instanceof Error ? ocrError.message : 'unknown OCR error'
-        console.error('Invoice OCR failed during email match:', ocrError)
-        invoiceOcr = {
-          invoiceUnitPriceUsd: null,
-          invoiceTotalAmountUsd: null,
-          usdKrwRate: null,
-          invoiceUnitPriceKrw: null,
-          invoiceTotalAmountKrw: null,
-          invoiceExtractedAt: null,
-          invoiceSourceFile: null,
-          invoiceOcrError: `인보이스 OCR 실행 실패: ${message}`,
-        }
-      }
-    }
 
-    let attachmentCache: AttachmentCacheResult = {
-      cachedCount: 0,
-      skippedCount: 0,
-      skippedReason: null,
-      error: null,
-    }
-    try {
-      const parsedForCache = await getParsedMailByUid(uid)
-      const cacheResult = await cacheWormEmailAttachmentsToR2(uid, parsedForCache.attachments || [], { pdfOnly: true })
-      attachmentCache = {
-        ...cacheResult,
-        error: null,
-      }
-    } catch (cacheError) {
-      const message = cacheError instanceof Error ? cacheError.message : 'unknown attachment cache error'
-      console.error('Worm email attachment R2 cache failed during match:', cacheError)
-      attachmentCache = {
-        cachedCount: 0,
-        skippedCount: 0,
-        skippedReason: null,
-        error: message,
-      }
-    }
+    // The parsed email is now cached. Run independent PDF work together so
+    // matching does not wait for extraction and R2 upload sequentially.
+    const awbExtractionPromise = matchType === 'AWB_DOCUMENT'
+      ? runAwbPdfTextExtraction(uid, bodyAwbNumber || trustedSnapshotAwbNumber)
+      : Promise.resolve(null)
+    const invoiceOcrPromise = matchType === 'INVOICE'
+      ? runInvoicePdfOcr(uid).catch((ocrError): InvoiceOcrResult => {
+          const message = ocrError instanceof Error ? ocrError.message : 'unknown OCR error'
+          console.error('Invoice OCR failed during email match:', ocrError)
+          return {
+            ...emptyInvoiceOcr,
+            invoiceOcrError: `인보이스 OCR 실행 실패: ${message}`,
+          }
+        })
+      : Promise.resolve(emptyInvoiceOcr)
+    const attachmentCachePromise = getParsedMailByUid(uid)
+      .then((parsedForCache) => cacheWormEmailAttachmentsToR2(
+        uid,
+        parsedForCache.attachments || [],
+        { pdfOnly: true },
+      ))
+      .then((cacheResult): AttachmentCacheResult => ({ ...cacheResult, error: null }))
+      .catch((cacheError): AttachmentCacheResult => {
+        const message = cacheError instanceof Error ? cacheError.message : 'unknown attachment cache error'
+        console.error('Worm email attachment R2 cache failed during match:', cacheError)
+        return {
+          cachedCount: 0,
+          skippedCount: 0,
+          skippedReason: null,
+          error: message,
+        }
+      })
+
+    const [awbExtraction, invoiceOcr, attachmentCache] = await Promise.all([
+      awbExtractionPromise,
+      invoiceOcrPromise,
+      attachmentCachePromise,
+    ])
 
     const saved = await upsertWormOrderEmailMatch({
       uid,
@@ -420,7 +490,7 @@ export async function POST(request: Request) {
       matchType,
       subject: snapshot.detail.subject || subject,
       date: snapshot.detail.date || date,
-      awbNumber: bodyAwbNumber || snapshot.detail.awbNumber,
+      awbNumber: awbExtraction?.awbNumber || bodyAwbNumber || trustedSnapshotAwbNumber,
       emailBodyText: snapshot.emailBodyText,
       attachmentsJson: snapshot.attachmentsJson,
       invoiceUnitPriceUsd: invoiceOcr.invoiceUnitPriceUsd,
@@ -433,8 +503,23 @@ export async function POST(request: Request) {
       invoiceOcrError: invoiceOcr.invoiceOcrError,
     })
 
+    if (matchType === 'AWB_DOCUMENT' && saved.awbNumber) {
+      await upsertWormEmailAwbCache({
+        uid: saved.uid,
+        subject: saved.subject,
+        date: saved.emailDate?.toISOString() || date,
+        awbNumber: saved.awbNumber,
+      })
+      await registerWormAwbCustomsMonitor({
+        awbNumber: saved.awbNumber,
+        emailUid: saved.uid,
+        sourceSubject: saved.subject,
+      })
+    }
+
     return NextResponse.json({
       ok: true,
+      awbExtraction,
       match: {
         uid: saved.uid,
         matchType: saved.matchType,

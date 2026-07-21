@@ -375,11 +375,27 @@ model WormOrder {
   remittanceExchangeRateText      String?
   emailMatches WormOrderEmailMatch[]
   forwardLogs WormEmailForwardLog[]
+  pipelineSteps WormOrderPipelineStep[]
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   @@index([receiveDate])
   @@index([createdAt])
+}
+
+model WormOrderPipelineStep {
+  id            String    @id @default(uuid())
+  orderId       String
+  stepId        Int
+  completed     Boolean   @default(false)
+  completedAt   DateTime?
+  completedById String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  order         WormOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@unique([orderId, stepId])
+  @@index([orderId, completed])
 }
 
 model WormOrderEmailMatch {
