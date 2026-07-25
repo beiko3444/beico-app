@@ -125,7 +125,7 @@ type DashboardCacheEntry = {
 const CHANNELS: SmartInventoryChannel[] = ['naver', 'coupang']
 const TUNNEL_DOWN_STATUS = new Set([502, 503, 504, 530])
 const DEFAULT_MONITOR_URL_GIST = 'https://gist.githubusercontent.com/beiko3444/5a69e99d96fa2ae34ba4af96c117d5e0/raw'
-const DEFAULT_MONITOR_TIMEOUT_MS = 30000
+const DEFAULT_MONITOR_TIMEOUT_MS = 55000
 let dashboardCache: DashboardCacheEntry | null = null
 let dashboardRefreshPromise: Promise<SmartInventoryDashboardPayload> | null = null
 
@@ -186,7 +186,7 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
 
 export function requestTimeoutMs(override?: number): number {
   const raw = numberOrNull(process.env.SMARTINVENTORY_MONITOR_TIMEOUT_MS)
-  return override ?? Math.max(3000, raw ?? DEFAULT_MONITOR_TIMEOUT_MS)
+  return override ?? Math.max(DEFAULT_MONITOR_TIMEOUT_MS, raw ?? DEFAULT_MONITOR_TIMEOUT_MS)
 }
 
 function readableError(error: unknown): string {
@@ -676,6 +676,28 @@ async function fetchSmartInventoryDashboardLive(): Promise<SmartInventoryDashboa
 
 async function refreshDashboardCache(): Promise<SmartInventoryDashboardPayload> {
   const payload = await fetchSmartInventoryDashboardLive()
+
+  if (isHardMonitorFailure(payload)) {
+    if (!dashboardCache) return payload
+
+    return withCacheMeta(
+      {
+        ...dashboardCache.payload,
+        health: payload.health,
+        warnings: [
+          ...payload.warnings,
+          '라즈베리 응답이 지연되어 마지막 정상 재고를 유지합니다.',
+        ],
+        syncedAt: payload.syncedAt,
+      },
+      {
+        hit: true,
+        cachedAt: dashboardCache.cachedAt,
+        refreshing: false,
+      },
+    )
+  }
+
   const cachedAt = new Date().toISOString()
   dashboardCache = { payload, cachedAt }
   return withCacheMeta(payload, { hit: false, cachedAt, refreshing: false })

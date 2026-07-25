@@ -514,7 +514,37 @@ export default function InventoryClient() {
       const response = await fetch(`/api/admin/inventory${refresh ? '?refresh=1' : ''}`, { cache: 'no-store' })
       const payload = await response.json().catch(() => null)
       if (!response.ok) throw new Error(payload?.error || '재고 정보를 불러오지 못했습니다.')
-      setData(payload)
+      setData((current) => {
+        const receivedNoInventory =
+          payload?.rows?.length === 0 &&
+          payload?.channels?.naver?.length === 0 &&
+          payload?.channels?.coupang?.length === 0 &&
+          Array.isArray(payload?.warnings) &&
+          payload.warnings.length > 0
+        const hasCurrentInventory =
+          Boolean(current?.rows.length) ||
+          Boolean(current?.channels.naver.length) ||
+          Boolean(current?.channels.coupang.length)
+
+        if (!receivedNoInventory || !hasCurrentInventory || !current) return payload
+
+        return {
+          ...current,
+          health: payload.health,
+          monitorUrl: payload.monitorUrl,
+          monitorSource: payload.monitorSource,
+          syncedAt: payload.syncedAt,
+          cache: {
+            ...current.cache,
+            hit: true,
+            refreshing: false,
+          },
+          warnings: [
+            ...payload.warnings,
+            '라즈베리 응답이 지연되어 화면의 마지막 정상 재고를 유지합니다.',
+          ],
+        }
+      })
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : '재고 정보를 불러오지 못했습니다.')
     } finally {

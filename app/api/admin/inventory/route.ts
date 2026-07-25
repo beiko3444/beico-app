@@ -4,6 +4,7 @@ import { fetchSmartInventoryDashboard, syncSmartInventory } from '@/lib/smartInv
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+export const maxDuration = 300
 
 export async function GET(request: Request) {
   const { unauthorized } = await requireAdminSession()

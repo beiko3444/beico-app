@@ -47,8 +47,14 @@ assert.match(
 
 assert.match(
   smartInventoryClientSource,
-  /const DEFAULT_MONITOR_TIMEOUT_MS = 30000/,
-  'the monitor timeout should allow the inventory endpoint to finish its 15-second query',
+  /const DEFAULT_MONITOR_TIMEOUT_MS = 55000/,
+  'the monitor timeout should leave enough time for a queued Raspberry Pi inventory response',
+)
+
+assert.match(
+  smartInventoryClientSource,
+  /if \(isHardMonitorFailure\(payload\)\)[\s\S]*라즈베리 응답이 지연되어 마지막 정상 재고를 유지합니다/,
+  'a transient full monitor failure should not replace the last healthy dashboard cache',
 )
 
 console.log('smart inventory links ok')
