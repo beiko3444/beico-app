@@ -1,0 +1,17 @@
+[Unit]
+Description=Beiko SmartThings Tapo temperature and humidity collector
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+# Change pi to the Raspberry Pi account that owns /opt/beiko-tapo and /var/lib/beiko.
+User=pi
+Group=pi
+EnvironmentFile=/etc/beiko/tapo-sensors.env
+WorkingDirectory=/opt/beiko-tapo
+ExecStart=/usr/bin/python3 /opt/beiko-tapo/raspberry-pi-tapo-sensors.py poll
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+ReadWritePaths=/var/lib/beiko

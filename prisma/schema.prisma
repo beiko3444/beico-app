@@ -780,3 +780,53 @@ model CoupangPurchase {
   @@index([orderedAt])
   @@index([totalAmount])
 }
+
+model SmartThingsConnection {
+  id                    String    @id @default("primary")
+  accessTokenEncrypted  String
+  refreshTokenEncrypted String
+  expiresAt             DateTime
+  installedAppId        String?
+  scope                 String?
+  connectedAt           DateTime  @default(now())
+  lastSyncAt            DateTime?
+  lastError             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model SmartThingsSensor {
+  id              String               @id @default(uuid())
+  deviceId        String               @unique
+  label           String
+  manufacturer    String?
+  model           String?
+  active          Boolean              @default(true)
+  lastTemperature Float?
+  lastHumidity    Float?
+  lastBattery     Float?
+  lastSeenAt      DateTime?
+  metadata        Json?
+  readings        SmartThingsReading[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([active])
+  @@index([lastSeenAt])
+}
+
+model SmartThingsReading {
+  id              String            @id @default(uuid())
+  sensorId        String
+  recordedAt      DateTime
+  sourceUpdatedAt DateTime?
+  temperatureC    Float?
+  humidityPercent Float?
+  batteryPercent  Float?
+  collectedAt     DateTime          @default(now())
+  sensor          SmartThingsSensor @relation(fields: [sensorId], references: [id], onDelete: Cascade)
+
+  @@unique([sensorId, recordedAt])
+  @@index([recordedAt])
+  @@index([sensorId, recordedAt])
+}

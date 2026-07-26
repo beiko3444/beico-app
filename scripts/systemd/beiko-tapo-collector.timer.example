@@ -1,0 +1,12 @@
+[Unit]
+Description=Poll Tapo temperature and humidity sensors every five minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=5min
+RandomizedDelaySec=20s
+Persistent=true
+Unit=beiko-tapo-collector.service
+
+[Install]
+WantedBy=timers.target

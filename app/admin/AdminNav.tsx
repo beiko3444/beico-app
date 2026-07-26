@@ -24,6 +24,7 @@ import {
   ShoppingCart,
   Star,
   StickyNote,
+  ThermometerSun,
   Warehouse,
   X,
 } from 'lucide-react'
@@ -187,6 +188,7 @@ export default function AdminNav({
     { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
     { name: '상품관리', path: '/admin/products', icon: Package },
     { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
+    { name: '온습도', path: '/admin/environment', icon: ThermometerSun },
     { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
     { name: '파트너관리', path: '/admin/partners', icon: Handshake },
     { name: '생산관리', path: '/admin/production', icon: Factory },

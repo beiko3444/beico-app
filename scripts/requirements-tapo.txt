@@ -1,0 +1,3 @@
+# SmartThings cloud mode only uses Python's standard library.
+# python-kasa is retained for an H200 on the same local network.
+python-kasa==0.10.2
