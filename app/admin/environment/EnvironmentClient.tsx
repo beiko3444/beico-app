@@ -16,6 +16,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -64,6 +65,8 @@ type EnvironmentPayload = {
 }
 
 const dayOptions = [1, 7, 30]
+const DAY_MS = 86_400_000
+const KOREA_OFFSET_MS = 9 * 60 * 60 * 1000
 
 function formatValue(value: number | null, suffix: string) {
   return value === null ? '-' : `${value.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}${suffix}`
@@ -186,9 +189,23 @@ export default function EnvironmentClient() {
       .filter((_, index) => index % stride === 0 || index === readings.length - 1)
       .map((reading) => ({
         ...reading,
+        recordedAtMs: new Date(reading.recordedAt).getTime(),
         label: formatDateTime(reading.recordedAt),
       }))
   }, [selectedSensor])
+  const dayBoundaries = useMemo(() => {
+    if (chartData.length < 2) return []
+    const first = chartData[0].recordedAtMs
+    const last = chartData[chartData.length - 1].recordedAtMs
+    const nextKoreanMidnight = (
+      Math.floor((first + KOREA_OFFSET_MS) / DAY_MS) + 1
+    ) * DAY_MS - KOREA_OFFSET_MS
+    const boundaries: number[] = []
+    for (let timestamp = nextKoreanMidnight; timestamp < last; timestamp += DAY_MS) {
+      boundaries.push(timestamp)
+    }
+    return boundaries
+  }, [chartData])
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-5 pb-16">
@@ -367,11 +384,29 @@ export default function EnvironmentClient() {
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData} margin={{ top: 8, right: 5, left: -15, bottom: 0 }}>
                             <CartesianGrid stroke="#E2E8F0" strokeDasharray="4 4" vertical={false} />
-                            <XAxis dataKey="label" minTickGap={42} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }} />
+                            <XAxis
+                              dataKey="recordedAtMs"
+                              type="number"
+                              scale="time"
+                              domain={['dataMin', 'dataMax']}
+                              minTickGap={42}
+                              tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }}
+                              tickFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString())}
+                            />
                             <YAxis yAxisId="temperature" tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }} unit="℃" />
                             <YAxis yAxisId="humidity" orientation="right" domain={[0, 100]} tick={{ fontSize: 10, fontWeight: 700, fill: '#64748B' }} unit="%" />
+                            {dayBoundaries.map((timestamp) => (
+                              <ReferenceLine
+                                key={timestamp}
+                                yAxisId="temperature"
+                                x={timestamp}
+                                stroke="#E5E7EB"
+                                strokeWidth={1}
+                              />
+                            ))}
                             <Tooltip
                               contentStyle={{ borderRadius: 12, borderColor: '#E2E8F0', fontSize: 11, fontWeight: 700 }}
+                              labelFormatter={(value) => formatDateTime(new Date(Number(value)).toISOString())}
                               formatter={(value, name) => [
                                 `${Number(value).toLocaleString('ko-KR', { maximumFractionDigits: 1 })}${name === '온도' ? '℃' : '%'}`,
                                 name,
