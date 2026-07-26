@@ -45,6 +45,7 @@ import type {
   SmartInventoryMasterRow,
 } from '@/lib/smartInventoryClient'
 import { externalProductHref } from '@/lib/smartInventoryLinks.mjs'
+import ProductInventoryHistoryModal from './ProductInventoryHistoryModal'
 
 type FilterMode = 'all' | 'empty' | 'inbound' | 'unlinked' | 'linked'
 type TableMode = 'masters' | 'unlinked'
@@ -239,11 +240,13 @@ function SortableMasterRow({
   rank,
   favorite,
   onToggleFavorite,
+  onSelect,
 }: {
   row: SmartInventoryMasterRow
   rank: number
   favorite: boolean
   onToggleFavorite: (id: number) => void
+  onSelect: (row: SmartInventoryMasterRow) => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id })
   const dragHandleStyle = {
@@ -293,16 +296,24 @@ function SortableMasterRow({
           >
             <Star size={16} fill={favorite ? 'currentColor' : 'none'} />
           </button>
-          <ProductImage src={row.imageUrl} alt={row.name} />
-          <div className="min-w-0">
-            <div className="truncate text-[14px] font-black text-slate-950" title={row.name}>
-              {row.name || `마스터 #${row.id}`}
+          <button
+            type="button"
+            onClick={() => onSelect(row)}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg text-left outline-none transition hover:bg-slate-100 focus-visible:ring-2 focus-visible:ring-[#EF3B2D]/40"
+            title={`${row.name} 재고차감 그래프 보기`}
+          >
+            <ProductImage src={row.imageUrl} alt={row.name} />
+            <div className="min-w-0">
+              <div className="truncate text-[14px] font-black text-slate-950" title={row.name}>
+                {row.name || `마스터 #${row.id}`}
+              </div>
+              <div className="mt-1 truncate text-[12px] font-bold text-slate-500">
+                단가 {formatMoney(row.unitCost)}
+                <span className="ml-2 text-[#EF3B2D]">차감 그래프</span>
+                {row.memo ? <span className="ml-2 text-emerald-700">메모 {row.memo}</span> : null}
+              </div>
             </div>
-            <div className="mt-1 truncate text-[12px] font-bold text-slate-500">
-              단가 {formatMoney(row.unitCost)}
-              {row.memo ? <span className="ml-2 text-emerald-700">메모 {row.memo}</span> : null}
-            </div>
-          </div>
+          </button>
         </div>
       </td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
@@ -323,12 +334,14 @@ function MasterTable({
   favoriteIds,
   onToggleFavorite,
   onReorder,
+  onSelect,
 }: {
   rows: SmartInventoryMasterRow[]
   allRows: SmartInventoryMasterRow[]
   favoriteIds: number[]
   onToggleFavorite: (id: number) => void
   onReorder: (nextOrder: number[]) => void
+  onSelect: (row: SmartInventoryMasterRow) => void
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -378,6 +391,7 @@ function MasterTable({
                     rank={index + 1}
                     favorite={favoriteIds.includes(row.id)}
                     onToggleFavorite={onToggleFavorite}
+                    onSelect={onSelect}
                   />
                 ))}
               </SortableContext>
@@ -478,6 +492,7 @@ export default function InventoryClient() {
   const [tableMode, setTableMode] = useState<TableMode>('masters')
   const [masterOrder, setMasterOrder] = useState<number[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>([])
+  const [selectedHistoryProduct, setSelectedHistoryProduct] = useState<SmartInventoryMasterRow | null>(null)
 
   const savePreferences = useCallback(async (patch: Partial<InventoryPreferencesPayload>) => {
     try {
@@ -757,10 +772,17 @@ export default function InventoryClient() {
           favoriteIds={favoriteIds}
           onToggleFavorite={handleToggleFavorite}
           onReorder={handleReorder}
+          onSelect={setSelectedHistoryProduct}
         />
       ) : (
         <UnlinkedTable rows={filteredUnlinkedRows} />
       )}
+      {selectedHistoryProduct ? (
+        <ProductInventoryHistoryModal
+          product={selectedHistoryProduct}
+          onClose={() => setSelectedHistoryProduct(null)}
+        />
+      ) : null}
     </div>
   )
 }
