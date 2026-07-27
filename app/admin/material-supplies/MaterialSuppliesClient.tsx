@@ -215,7 +215,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
     <div className="space-y-3">
       <header className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-[#EF3B2D]">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-700">
             <PackagePlus size={20} />
           </span>
           <div>
@@ -297,7 +297,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                   <article
                     key={item.id}
                     className={`group flex min-h-[178px] flex-col rounded-xl border p-3 transition hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${
-                      item.active ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50 opacity-65'
+                      item.active ? 'border-slate-200 bg-[#FCFCFD]' : 'border-slate-200 bg-slate-100 opacity-65'
                     }`}
                   >
                     <div className="flex items-start justify-between gap-2">
@@ -323,7 +323,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                         <p className="truncate text-[10px] font-bold text-slate-400">{item.supplierName || '구매처 미입력'} · {item.unit || '단위 미입력'}</p>
                         <p className="mt-0.5 text-[15px] font-black text-slate-950">{formatCurrency(item.priceKrw)}</p>
                       </div>
-                      <span className="shrink-0 text-right text-[10px] font-black text-[#EF3B2D]">
+                      <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-1 text-right text-[10px] font-black text-slate-600">
                         {unitPrice ? `개당 ${(Math.round(unitPrice * 10) / 10).toLocaleString()}원` : '-'}
                       </span>
                     </div>
@@ -341,7 +341,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                         href={item.purchaseUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg bg-[#EF3B2D] px-2 text-[11px] font-black text-white transition hover:bg-[#D83326]"
+                        className="inline-flex h-8 min-w-0 items-center justify-center gap-1 rounded-lg bg-[#07122F] px-2 text-[11px] font-black !text-white transition hover:bg-slate-800"
                       >
                         <ExternalLink size={12} />
                         구매
@@ -350,7 +350,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                         type="button"
                         onClick={() => markPurchased(item)}
                         disabled={busyId === item.id}
-                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-emerald-200 px-2 text-[10px] font-black text-emerald-700 transition hover:bg-emerald-50 disabled:opacity-50"
+                        className="inline-flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
                         title="구매 완료 기록"
                       >
                         <CheckCircle2 size={12} />
@@ -463,9 +463,9 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                 </Field>
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-lg border border-red-100 bg-red-50/70 px-3 py-2 text-[11px] font-black">
+            <div className="flex items-center justify-between rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-black">
                 <span className="text-slate-500">개당 단가</span>
-                <span className={formUnitPrice ? 'text-[#EF3B2D]' : 'text-slate-400'}>{formatUnitPrice(formUnitPrice)}</span>
+                <span className={formUnitPrice ? 'text-slate-950' : 'text-slate-400'}>{formatUnitPrice(formUnitPrice)}</span>
             </div>
             <Field label="메모">
               <textarea className={`${inputClass} min-h-16 resize-none py-2`} value={form.memo} onChange={(event) => setFormValue('memo', event.target.value)} placeholder="주의사항, 대체 구매처 등" />
