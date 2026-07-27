@@ -16,6 +16,8 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
+  ReferenceDot,
   ReferenceLine,
   ResponsiveContainer,
   Tooltip,
@@ -67,6 +69,7 @@ type EnvironmentPayload = {
 const dayOptions = [1, 7, 30]
 const DAY_MS = 86_400_000
 const KOREA_OFFSET_MS = 9 * 60 * 60 * 1000
+const HOUR_MS = 60 * 60 * 1000
 
 function formatValue(value: number | null, suffix: string) {
   return value === null ? '-' : `${value.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}${suffix}`
@@ -206,6 +209,43 @@ export default function EnvironmentClient() {
     }
     return boundaries
   }, [chartData])
+  const daylightBands = useMemo(() => {
+    if (chartData.length < 2) return []
+    const first = chartData[0].recordedAtMs
+    const last = chartData[chartData.length - 1].recordedAtMs
+    const firstKoreanMidnight = Math.floor((first + KOREA_OFFSET_MS) / DAY_MS) * DAY_MS - KOREA_OFFSET_MS
+    const bands: Array<{ start: number; end: number; gradient: string }> = []
+    const phases = [
+      { from: 0, to: 5, gradient: 'night' },
+      { from: 5, to: 8, gradient: 'dawn' },
+      { from: 8, to: 18, gradient: 'day' },
+      { from: 18, to: 21, gradient: 'dusk' },
+      { from: 21, to: 24, gradient: 'night' },
+    ]
+    for (let midnight = firstKoreanMidnight; midnight < last; midnight += DAY_MS) {
+      for (const phase of phases) {
+        const start = Math.max(first, midnight + phase.from * HOUR_MS)
+        const end = Math.min(last, midnight + phase.to * HOUR_MS)
+        if (start < end) bands.push({ start, end, gradient: phase.gradient })
+      }
+    }
+    return bands
+  }, [chartData])
+  const temperatureExtremes = useMemo(() => {
+    const readings = selectedSensor?.readings.filter(
+      (reading): reading is SensorReading & { temperatureC: number } => (
+        typeof reading.temperatureC === 'number' && Number.isFinite(reading.temperatureC)
+      ),
+    ) || []
+    if (!readings.length) return null
+    return readings.reduce(
+      (extremes, reading) => ({
+        min: reading.temperatureC < extremes.min.temperatureC ? reading : extremes.min,
+        max: reading.temperatureC > extremes.max.temperatureC ? reading : extremes.max,
+      }),
+      { min: readings[0], max: readings[0] },
+    )
+  }, [selectedSensor])
 
   return (
     <div className="mx-auto w-full max-w-[1280px] space-y-5 pb-16">
@@ -383,6 +423,37 @@ export default function EnvironmentClient() {
                       {chartData.length ? (
                         <ResponsiveContainer width="100%" height="100%">
                           <LineChart data={chartData} margin={{ top: 8, right: 5, left: -15, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="climate-night" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#C7D2FE" stopOpacity={0.24} />
+                                <stop offset="100%" stopColor="#DBEAFE" stopOpacity={0.16} />
+                              </linearGradient>
+                              <linearGradient id="climate-dawn" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#DBEAFE" stopOpacity={0.18} />
+                                <stop offset="100%" stopColor="#FEF3C7" stopOpacity={0.22} />
+                              </linearGradient>
+                              <linearGradient id="climate-day" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#FEF3C7" stopOpacity={0.2} />
+                                <stop offset="50%" stopColor="#FFF7D6" stopOpacity={0.13} />
+                                <stop offset="100%" stopColor="#FFEDD5" stopOpacity={0.18} />
+                              </linearGradient>
+                              <linearGradient id="climate-dusk" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#FFEDD5" stopOpacity={0.2} />
+                                <stop offset="100%" stopColor="#C7D2FE" stopOpacity={0.22} />
+                              </linearGradient>
+                            </defs>
+                            {daylightBands.map((band, index) => (
+                              <ReferenceArea
+                                key={`${band.start}-${index}`}
+                                yAxisId="temperature"
+                                x1={band.start}
+                                x2={band.end}
+                                fill={`url(#climate-${band.gradient})`}
+                                fillOpacity={1}
+                                stroke="none"
+                                ifOverflow="hidden"
+                              />
+                            ))}
                             <CartesianGrid stroke="#E2E8F0" strokeDasharray="4 4" vertical={false} />
                             <XAxis
                               dataKey="recordedAtMs"
@@ -415,6 +486,42 @@ export default function EnvironmentClient() {
                             <Legend wrapperStyle={{ fontSize: 11, fontWeight: 800 }} />
                             <Line yAxisId="temperature" type="monotone" dataKey="temperatureC" name="온도" stroke="#EF3B2D" strokeWidth={2.5} dot={false} connectNulls />
                             <Line yAxisId="humidity" type="monotone" dataKey="humidityPercent" name="습도" stroke="#0EA5E9" strokeWidth={2.5} dot={false} connectNulls />
+                            {temperatureExtremes ? (
+                              <>
+                                <ReferenceDot
+                                  yAxisId="temperature"
+                                  x={new Date(temperatureExtremes.max.recordedAt).getTime()}
+                                  y={temperatureExtremes.max.temperatureC}
+                                  r={5}
+                                  fill="#EF3B2D"
+                                  stroke="#FFFFFF"
+                                  strokeWidth={2}
+                                  label={{
+                                    value: `최고 ${temperatureExtremes.max.temperatureC.toFixed(1)}℃`,
+                                    position: 'top',
+                                    fill: '#B42318',
+                                    fontSize: 11,
+                                    fontWeight: 900,
+                                  }}
+                                />
+                                <ReferenceDot
+                                  yAxisId="temperature"
+                                  x={new Date(temperatureExtremes.min.recordedAt).getTime()}
+                                  y={temperatureExtremes.min.temperatureC}
+                                  r={5}
+                                  fill="#2563EB"
+                                  stroke="#FFFFFF"
+                                  strokeWidth={2}
+                                  label={{
+                                    value: `최저 ${temperatureExtremes.min.temperatureC.toFixed(1)}℃`,
+                                    position: 'bottom',
+                                    fill: '#1D4ED8',
+                                    fontSize: 11,
+                                    fontWeight: 900,
+                                  }}
+                                />
+                              </>
+                            ) : null}
                           </LineChart>
                         </ResponsiveContainer>
                       ) : (
