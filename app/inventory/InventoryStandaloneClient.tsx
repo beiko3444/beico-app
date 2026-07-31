@@ -178,24 +178,29 @@ export default function InventoryStandaloneClient() {
   const [selectedProduct, setSelectedProduct] = useState<ProductCandidate | null>(null)
   const [keypadValue, setKeypadValue] = useState('')
   const selectedRef = useRef<ProductCandidate | null>(null)
+  const loadRequestIdRef = useRef(0)
 
   useEffect(() => {
     selectedRef.current = selectedProduct
   }, [selectedProduct])
 
   async function loadInbounds(date = selectedDate, showLoader = false) {
+    const requestId = loadRequestIdRef.current + 1
+    loadRequestIdRef.current = requestId
     if (showLoader) setLoading(true)
     try {
       const response = await fetch(`/api/admin/inventory/inbounds?date=${date}`, { cache: 'no-store' })
       const payload = await response.json()
       if (!response.ok) throw new Error(payload?.error || '입고 목록을 불러오지 못했습니다.')
+      if (requestId !== loadRequestIdRef.current) return
       setInbounds(payload)
       setLastLoadedAt(new Date())
       setError('')
     } catch (loadError) {
+      if (requestId !== loadRequestIdRef.current) return
       setError(loadError instanceof Error ? loadError.message : '입고 목록을 불러오지 못했습니다.')
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestIdRef.current) setLoading(false)
     }
   }
 

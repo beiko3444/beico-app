@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getProductImageUrl } from '@/lib/product-image-url'
+import { formatKoreanYmd, koreanMonthRange, parseKoreanYmd } from '@/lib/inventoryInboundDates.mjs'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -40,13 +41,14 @@ const DEFAULT_WAREHOUSE_ITEMS = [
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const inboundDate = parseInboundDate(url.searchParams.get('date')) || todayStart()
-  const nextDate = new Date(inboundDate)
-  nextDate.setDate(nextDate.getDate() + 1)
-  const monthStart = new Date(inboundDate)
-  monthStart.setDate(1)
-  const monthEnd = new Date(monthStart)
-  monthEnd.setMonth(monthEnd.getMonth() + 1)
+  const requestedDate = url.searchParams.get('date')
+  const inboundDate = parseKoreanYmd(requestedDate) || todayStart()
+  const dateText = formatKoreanYmd(inboundDate)
+  const nextDate = new Date(inboundDate.getTime() + 86_400_000)
+  const monthRange = koreanMonthRange(dateText)
+  if (!monthRange) {
+    return NextResponse.json({ error: '입고 조회 날짜가 올바르지 않습니다.' }, { status: 400 })
+  }
 
   await ensureWarehouseInventoryItems()
 
@@ -74,8 +76,8 @@ export async function GET(request: Request) {
     prisma.inventoryInbound.findMany({
       where: {
         inboundDate: {
-          gte: monthStart,
-          lt: monthEnd,
+          gte: monthRange.start,
+          lt: monthRange.end,
         },
       },
       select: {
@@ -99,7 +101,7 @@ export async function GET(request: Request) {
 
   const calendar = Array.from(
     monthItems.reduce((map, item) => {
-      const date = formatYmd(item.inboundDate)
+      const date = formatKoreanYmd(item.inboundDate)
       const current = map.get(date) || { date, totalQuantity: 0, count: 0 }
       current.totalQuantity += item.quantity
       current.count += 1
@@ -119,7 +121,7 @@ export async function GET(request: Request) {
   }))
 
   return NextResponse.json({
-    date: formatYmd(inboundDate),
+    date: dateText,
     items,
     totalQuantity: items.reduce((sum, item) => sum + item.quantity, 0),
     calendar,
@@ -131,7 +133,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
-  const inboundDate = parseInboundDate(body?.inboundDate) || todayStart()
+  const inboundDate = parseKoreanYmd(body?.inboundDate) || todayStart()
   const warehouseItemId = typeof body?.warehouseItemId === 'string' && body.warehouseItemId.trim() ? body.warehouseItemId.trim() : null
   const productName = typeof body?.productName === 'string' ? body.productName.trim() : ''
   const productImageUrl = typeof body?.productImageUrl === 'string' && body.productImageUrl.trim() ? body.productImageUrl.trim() : null
@@ -190,22 +192,8 @@ export async function POST(request: Request) {
   })
 }
 
-function parseInboundDate(value: unknown) {
-  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
-  const date = new Date(`${value}T00:00:00+09:00`)
-  return Number.isNaN(date.getTime()) ? null : date
-}
-
 function todayStart() {
-  return parseInboundDate(formatYmd(new Date())) || new Date()
-}
-
-function formatYmd(date: Date) {
-  const koreaDate = new Date(date.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
-  const year = koreaDate.getFullYear()
-  const month = String(koreaDate.getMonth() + 1).padStart(2, '0')
-  const day = String(koreaDate.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+  return parseKoreanYmd(formatKoreanYmd(new Date())) || new Date()
 }
 
 async function ensureWarehouseInventoryItems() {
