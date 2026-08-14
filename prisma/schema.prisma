@@ -299,6 +299,14 @@ model AdminMemoAttachment {
   @@index([memoId])
 }
 
+model MindBoard {
+  id        String   @id @default(uuid())
+  title     String   @default("New Board")
+  items     String   @db.Text
+  groups    String   @db.Text
+  updatedAt DateTime @updatedAt
+}
+
 model AttendanceEmployee {
   id          String             @id @default(uuid())
   name        String
