@@ -9,7 +9,6 @@ type Product = {
     id?: string | null
     name?: string | null
     sellPrice?: number | string | null
-    stock?: number | string | null
     imageUrl?: string | null
     productCode?: string | null
     barcode?: string | null
@@ -32,7 +31,6 @@ type SafeProduct = {
     id: string
     name: string
     sellPrice: number
-    stock: number
     imageUrl: string | null
     productCode: string | null
     barcode: string | null
@@ -95,7 +93,6 @@ const normalizeProduct = (product: Product): SafeProduct | null => {
         id,
         name: safeText(product.name, '상품 정보 없음'),
         sellPrice: safeNonNegativeNumber(product.sellPrice),
-        stock: safeNonNegativeInt(product.stock),
         imageUrl: safeText(product.imageUrl) || null,
         productCode: safeText(product.productCode) || null,
         barcode: safeText(product.barcode) || null,
@@ -128,15 +125,6 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
         const qty = safeNonNegativeInt(value)
         const product = safeProducts.find(p => p.id === productId)
         if (!product) return
-
-        if (qty > product.stock) {
-            alert(`Cannot order more than available stock (${formatNumber(product.stock)})`)
-            setQuantities(prev => ({
-                ...prev,
-                [productId]: product.stock
-            }))
-            return
-        }
 
         setQuantities(prev => ({
             ...prev,
@@ -216,11 +204,6 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                             <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110" />
                                         ) : (
                                             <div className="text-xs text-gray-300 dark:text-gray-500 font-bold uppercase tracking-widest">No Image</div>
-                                        )}
-                                        {product.stock <= 0 && (
-                                            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px] flex items-center justify-center">
-                                                <span className="bg-white/90 text-black px-3 py-1 rounded-full text-[10px] font-black tracking-widest uppercase">売り切れ</span>
-                                            </div>
                                         )}
                                     </div>
 
@@ -332,15 +315,15 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                         </div>
                                     )}
 
-                                    {/* Stock & Margin */}
+                                    {/* Order Availability & Margin */}
                                     <div className="grid grid-cols-2">
                                         <div className="py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a]">
                                             <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black dark:text-white leading-tight">在庫</span>
-                                                <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Stock</span>
+                                                <span className="text-[11px] font-black text-black dark:text-white leading-tight">注文状態</span>
+                                                <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Order Status</span>
                                             </div>
-                                            <p className={`text-[22px] font-medium leading-none tabular-nums font-inter tracking-tighter text-right ${product.stock <= 0 ? 'text-[#e34219]' : 'text-gray-900 dark:text-white'}`}>
-                                                {formatNumber(product.stock)}
+                                            <p className="text-[18px] font-black leading-none text-emerald-600 text-right">
+                                                注文可能
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -364,59 +347,47 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                     <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Order Unit: {formatNumber(orderUnit)}ea</span>
                                 </div>
 
-                                {product.stock > 0 ? (
-                                    <div className="flex flex-col items-end gap-2">
-                                        <div className={`flex items-center border rounded-md overflow-hidden shadow-sm dark:shadow-none transition-all duration-300 ${qty === 0
-                                            ? 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
-                                            : qty < product.minOrderQuantity
-                                                ? 'bg-[#fff5f5] dark:bg-[#2a1a1a] border-[#e34219]'
-                                                : 'bg-[#fff7f3] dark:bg-[#2a1a1a] border-[#e34219]'
-                                            }`}>
-                                            <button
-                                                onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))}
-                                                className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
-                                                    ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
-                                                    : qty < product.minOrderQuantity
-                                                        ? 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                        : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                    }`}
-                                            >
-                                                <Minus size={14} strokeWidth={2.5} />
-                                            </button>
-                                            <input
-                                                type="text"
-                                                value={formatNumber(qty)}
-                                                onChange={(e) => {
-                                                    const val = e.target.value.replace(/,/g, '')
-                                                    if (/^\d*$/.test(val)) {
-                                                        handleQuantityChange(product.id, val)
-                                                    }
-                                                }}
-                                                className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
-                                                    ? 'text-[#1e293b] dark:text-white'
-                                                    : qty < product.minOrderQuantity
-                                                        ? 'text-[#e34219]'
-                                                        : 'text-[#e34219]'
-                                                    }`}
-                                            />
-                                            <button
-                                                onClick={() => handleQuantityChange(product.id, qty + orderUnit)}
-                                                className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
-                                                    ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
-                                                    : qty < product.minOrderQuantity
-                                                        ? 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                        : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                    }`}
-                                            >
-                                                <Plus size={14} strokeWidth={2.5} />
-                                            </button>
-                                        </div>
+                                <div className="flex flex-col items-end gap-2">
+                                    <div className={`flex items-center border rounded-md overflow-hidden shadow-sm dark:shadow-none transition-all duration-300 ${qty === 0
+                                        ? 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
+                                        : qty < product.minOrderQuantity
+                                            ? 'bg-[#fff5f5] dark:bg-[#2a1a1a] border-[#e34219]'
+                                            : 'bg-[#fff7f3] dark:bg-[#2a1a1a] border-[#e34219]'
+                                        }`}>
+                                        <button
+                                            onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))}
+                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
+                                                ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
+                                                : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
+                                                }`}
+                                        >
+                                            <Minus size={14} strokeWidth={2.5} />
+                                        </button>
+                                        <input
+                                            type="text"
+                                            value={formatNumber(qty)}
+                                            onChange={(e) => {
+                                                const val = e.target.value.replace(/,/g, '')
+                                                if (/^\d*$/.test(val)) {
+                                                    handleQuantityChange(product.id, val)
+                                                }
+                                            }}
+                                            className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
+                                                ? 'text-[#1e293b] dark:text-white'
+                                                : 'text-[#e34219]'
+                                                }`}
+                                        />
+                                        <button
+                                            onClick={() => handleQuantityChange(product.id, qty + orderUnit)}
+                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
+                                                ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
+                                                : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
+                                                }`}
+                                        >
+                                            <Plus size={14} strokeWidth={2.5} />
+                                        </button>
                                     </div>
-                                ) : (
-                                    <div className="flex items-center text-[13px] font-bold text-[#e34219] bg-[#fff5f5] dark:bg-[#2a1a1a] px-4 py-2 rounded-lg border border-red-100 dark:border-[#3a2a2a]">
-                                        こちらの商品は品切れとなりました。
-                                    </div>
-                                )}
+                                </div>
                             </div>
                         </div>
                     )

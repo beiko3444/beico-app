@@ -118,8 +118,10 @@ export default function OrderHistory({ orders, userCountry }: { orders?: any[] |
                 const safeOrder = order || {}
                 const orderId = safeText(safeOrder.id) || `missing-order-${orderIndex}`
                 const status = safeText(safeOrder.status)
+                const isOrderCompleted = status === 'COMPLETED'
                 const items = Array.isArray(safeOrder.items) ? safeOrder.items : []
                 const trackingNumbers = parseTrackingNumbers(safeText(safeOrder.trackingNumber))
+                const isOrderLocked = isOrderCompleted || status === 'DEPOSIT_COMPLETED' || status === 'SHIPPED' || trackingNumbers.length > 0
                 const productSum = items.reduce((sum: number, item: any) => sum + (safeNumber(item?.price) * safeNonNegativeInt(item?.quantity)), 0);
                 const totalQuantity = items.reduce((sum: number, item: any) => sum + safeNonNegativeInt(item?.quantity), 0);
 
@@ -153,7 +155,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: any[] |
                 ];
 
                 return (
-                    <div key={orderId} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${safeOrder.taxInvoiceIssued ? 'opacity-70 brightness-[0.8] grayscale-[0.2]' : ''}`}>
+                    <div key={orderId} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${isOrderCompleted ? 'opacity-80 brightness-[0.92] grayscale-[0.1]' : ''}`}>
                         {/* Order No & Date Box */}
                         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
                             <div className="flex flex-col text-sm">
@@ -169,6 +171,13 @@ export default function OrderHistory({ orders, userCountry }: { orders?: any[] |
                                 <span className="font-bold text-gray-900 dark:text-white font-inter tracking-[0.01em]">{safeText(safeOrder.orderNumber) || orderId.slice(0, 12)}</span>
                             </div>
                         </div>
+
+                        {isOrderCompleted && (
+                            <div className="mx-1 mb-4 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-center">
+                                <div className="text-sm font-black text-emerald-700">取引完了 / 거래완료</div>
+                                <div className="mt-1 text-[11px] font-bold text-emerald-600">관리자가 주문을 완료 처리했습니다.</div>
+                            </div>
+                        )}
                         <div className="border-t border-gray-100 dark:border-[#2a2a2a] mx-5 my-0.5" />
 
                         {/* Progress Stepper moved under Order No */}
@@ -247,7 +256,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: any[] |
                             </div>
                         </div>
 
-                        {status !== 'DEPOSIT_COMPLETED' && status !== 'SHIPPED' && (
+                        {!isOrderLocked && (
                             <div className="bg-[#FFF5F5] border border-[#e34219] rounded-xl py-3 px-3 flex items-start gap-3 mb-4 mx-1">
                                 <div className="w-5 h-5 rounded-full bg-[#e34219] text-white flex items-center justify-center shrink-0 mt-0.5 font-bold text-sm font-serif">i</div>
                                 <div className="text-xs text-gray-600 dark:text-gray-400 flex flex-col gap-1.5">
@@ -263,20 +272,25 @@ export default function OrderHistory({ orders, userCountry }: { orders?: any[] |
 
                         {/* Action Buttons */}
                         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl mb-4 px-1">
-                            <div className={`grid ${status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0 ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
+                            <div className={`grid ${isOrderLocked ? 'grid-cols-1' : 'grid-cols-2'} gap-2`}>
                                 <button
-                                    onClick={() => status !== 'DEPOSIT_COMPLETED' && trackingNumbers.length === 0 && toggleDeposit(orderId, status)}
-                                    disabled={loadingMap[orderId] || status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0}
+                                    onClick={() => !isOrderLocked && toggleDeposit(orderId, status)}
+                                    disabled={loadingMap[orderId] || isOrderLocked}
                                     className={`h-13 border-2 rounded-lg font-bold transition-all flex flex-col items-center justify-center leading-tight
-                                        ${status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0
+                                        ${isOrderLocked
                                             ? 'border-gray-200 dark:border-[#2a2a2a] text-gray-400 dark:text-gray-500 bg-gray-50 dark:bg-[#1a1a1a] cursor-not-allowed'
                                             : 'border-[#e34219] text-white bg-[#e34219] hover:bg-[#cc3b16]'
                                         }`}
                                 >
                                     {loadingMap[orderId] ? 'Processing...' : (
-                                        status === 'DEPOSIT_COMPLETED' || trackingNumbers.length > 0 ? (
+                                        isOrderLocked ? (
                                             <>
-                                                {trackingNumbers.length > 0 ? (
+                                                {isOrderCompleted ? (
+                                                    <div className="flex flex-col items-center text-emerald-700">
+                                                        <span className="text-sm font-black">取引完了</span>
+                                                        <span className="text-[11px] font-bold">주문 완료 처리됨</span>
+                                                    </div>
+                                                ) : trackingNumbers.length > 0 ? (
                                                     <div className="flex flex-col items-center">
                                                         <span className="text-sm font-black text-[#e34219]">
                                                             {safeOrder.courier === 'Rosen' ? '로젠택배' :
@@ -306,7 +320,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: any[] |
                                         )
                                     )}
                                 </button>
-                                {status !== 'DEPOSIT_COMPLETED' && trackingNumbers.length === 0 && (
+                                {!isOrderLocked && (
                                     <button
                                         onClick={() => handleDelete(orderId)}
                                         disabled={loadingMap[orderId]}

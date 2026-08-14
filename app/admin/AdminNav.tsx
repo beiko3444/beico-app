@@ -174,7 +174,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
 export default function AdminNav({
   counts,
 }: {
-  counts?: { pendingOrders: number; lowStock: number; pendingPartners: number; missingBill: number }
+  counts?: { pendingOrders: number; pendingPartners: number; missingBill: number }
   userName?: string
 }) {
   const pathname = usePathname()
@@ -206,7 +206,6 @@ export default function AdminNav({
 
   const alertCountByPath: Record<string, number> = {
     '/admin/orders': counts?.pendingOrders ?? 0,
-    '/admin/products': counts?.lowStock ?? 0,
     '/admin/partners': counts?.pendingPartners ?? 0,
     '/admin/electricity': counts?.missingBill ?? 0,
   }

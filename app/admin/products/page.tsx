@@ -22,8 +22,6 @@ const getCachedProducts = unstable_cache(
             priceB: true,
             priceC: true,
             priceD: true,
-            stock: true,
-            safetyStock: true,
             barcode: true,
             productCode: true,
             hsCode: true,
@@ -46,7 +44,7 @@ const getCachedProducts = unstable_cache(
         },
         orderBy: { sortOrder: 'asc' }
     }),
-    ['admin-products-page-v4'],
+    ['admin-products-page-v5'],
     { revalidate: 60, tags: ['products'] }
 )
 

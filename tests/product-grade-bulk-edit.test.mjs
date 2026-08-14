@@ -1,0 +1,59 @@
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+
+import {
+  isProductGrade,
+  readProductGradeOrderValue,
+  readProductGradePriceValue,
+  setProductGradeOrderValue,
+  setProductGradePriceValue,
+} from '../lib/productGradePricing.ts'
+
+const original = {
+  A: {
+    KR: { wholesale: '3,500', moq: '10', orderUnit: '5' },
+  },
+  C: {
+    KR: { wholesale: '4,500', moq: '2', orderUnit: '2' },
+  },
+}
+
+const updatedA = setProductGradeOrderValue(original, 'A', 'moq', 30)
+assert.equal(readProductGradeOrderValue(updatedA, 'A', 'moq', 1), 30)
+assert.equal(readProductGradeOrderValue(updatedA, 'A', 'orderUnit', 1), 5)
+assert.equal(readProductGradeOrderValue(updatedA, 'C', 'moq', 1), 2)
+assert.equal(updatedA.A.KR.wholesale, '3,500')
+assert.equal(original.A.KR.moq, '10')
+
+const repricedB = setProductGradePriceValue(original, 'B', 'wholesale', 3200)
+assert.equal(readProductGradePriceValue(repricedB, 'B', 'wholesale', 0), 3200)
+assert.equal(readProductGradePriceValue(repricedB, 'C', 'wholesale', 0), 4500)
+assert.equal(readProductGradePriceValue({}, 'D', 'retail', 7000), 7000)
+
+const createdD = setProductGradeOrderValue(original, 'D', 'orderUnit', 12)
+assert.equal(readProductGradeOrderValue(createdD, 'D', 'orderUnit', 1), 12)
+assert.equal(readProductGradeOrderValue(createdD, 'D', 'moq', 7), 7)
+assert.equal(readProductGradeOrderValue({}, 'B', 'moq', 9), 9)
+
+assert.equal(isProductGrade('A'), true)
+assert.equal(isProductGrade('D'), true)
+assert.equal(isProductGrade('C 등급'), false)
+
+const readSource = (path) => readFileSync(new URL(`../${path}`, import.meta.url), 'utf8')
+const productTable = readSource('app/admin/products/ProductTable.tsx')
+const moqRoute = readSource('app/api/products/bulk/moq/route.ts')
+const orderUnitRoute = readSource('app/api/products/bulk/order-unit/route.ts')
+const gradePricingRoute = readSource('app/api/products/bulk/grade-pricing/route.ts')
+
+assert.match(productTable, /PRODUCT_GRADES\.map/)
+assert.match(productTable, /setActiveGrade\(grade\)/)
+assert.match(productTable, /\/api\/products\/bulk\/grade-pricing/)
+assert.match(moqRoute, /grade === 'C'/)
+assert.match(orderUnitRoute, /grade === 'C'/)
+assert.match(gradePricingRoute, /buildLegacyPriceUpdates/)
+assert.match(gradePricingRoute, /setProductGradePriceValue/)
+assert.match(gradePricingRoute, /setProductGradeOrderValue/)
+assert.doesNotMatch(moqRoute, /\['A', 'B', 'C', 'D'\]\.forEach/)
+assert.doesNotMatch(orderUnitRoute, /\['A', 'B', 'C', 'D'\]\.forEach/)
+
+console.log('product grade bulk edit tests passed')

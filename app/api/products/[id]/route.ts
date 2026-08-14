@@ -45,10 +45,10 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const normalizedHsCode = body.hsCode ? String(body.hsCode).trim() : null
         const normalizedJapanHsCode = body.japanHsCode ? String(body.japanHsCode).trim() : null
 
-        const { name, buyPrice, sellPrice, stock } = body
+        const { name, buyPrice, sellPrice } = body
 
         // Validation - ensure required fields are present and not empty
-        if (!name || buyPrice === undefined || sellPrice === undefined || stock === undefined) {
+        if (!name || buyPrice === undefined || sellPrice === undefined) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
         }
 
@@ -70,7 +70,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             krSellPrice: (body.krSellPrice !== null && body.krSellPrice !== undefined && body.krSellPrice !== "") ? Number(body.krSellPrice) : 0,
             usBuyPrice: (body.usBuyPrice !== null && body.usBuyPrice !== undefined && body.usBuyPrice !== "") ? Number(body.usBuyPrice) : 0,
             usSellPrice: (body.usSellPrice !== null && body.usSellPrice !== undefined && body.usSellPrice !== "") ? Number(body.usSellPrice) : 0,
-            stock: Math.round(Number(stock)),
+            wholesaleAvailable: typeof body.wholesaleAvailable === 'boolean'
+                ? body.wholesaleAvailable
+                : undefined,
             priceA: (body.priceA !== null && body.priceA !== undefined && body.priceA !== "") ? Number(body.priceA) : null,
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,

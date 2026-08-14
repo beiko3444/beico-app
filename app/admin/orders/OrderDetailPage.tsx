@@ -6,6 +6,7 @@ import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import {
   AlertTriangle,
   Check,
+  CircleCheckBig,
   Copy,
   FileText,
   Package,
@@ -29,20 +30,6 @@ interface OrderProductRecord {
     name: string
     imageUrl: string | null
   }
-}
-
-interface DepositSmsRecord {
-  id: string
-  messageHash?: string
-  sender: string
-  body: string
-  receivedAt: string | Date
-  amount: number | null
-  depositorName?: string | null
-  bankName?: string | null
-  sourceDevice?: string | null
-  matchStatus: string
-  matchedAt?: string | Date | null
 }
 
 export interface OrderRecord {
@@ -69,7 +56,6 @@ export interface OrderRecord {
     } | null
   }
   items: OrderProductRecord[]
-  depositSmsMessages?: DepositSmsRecord[]
 }
 
 interface ProductLineItem {
@@ -122,7 +108,6 @@ interface NormalizedOrderDetail {
   products: ProductLineItem[]
   depositConfirmedAt: string | null
   adminDepositConfirmedAt: string | null
-  depositSmsMessages: DepositSmsRecord[]
   rawStatus: string
 }
 
@@ -178,7 +163,6 @@ const sampleOrderData: NormalizedOrderDetail = {
   ],
   depositConfirmedAt: '2026-05-04 10:31',
   adminDepositConfirmedAt: '2026-05-04 11:15',
-  depositSmsMessages: [],
   rawStatus: 'DEPOSIT_COMPLETED',
 }
 
@@ -215,6 +199,7 @@ function parseTrackingNumbers(value: string | null | undefined) {
 
 function mapStatusMeta(status: string, hasTracking: boolean, taxInvoiceIssued: boolean): { label: string; tone: Tone } {
   if (status === 'CANCELED') return { label: '주문취소', tone: 'red' }
+  if (status === 'COMPLETED') return { label: '거래완료', tone: 'green' }
   if (hasTracking || status === 'SHIPPED') return { label: taxInvoiceIssued ? '배송완료' : '배송진행', tone: 'blue' }
   if (status === 'DEPOSIT_COMPLETED') return { label: '입금확인', tone: 'green' }
   if (status === 'APPROVED' || status === 'PENDING_DEPOSIT' || status === 'PENDING') return { label: '입금대기', tone: 'orange' }
@@ -285,7 +270,6 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
     products: products.length > 0 ? products : sampleOrderData.products,
     depositConfirmedAt: order.depositConfirmedAt ? formatDateTime(order.depositConfirmedAt) : null,
     adminDepositConfirmedAt: order.adminDepositConfirmedAt ? formatDateTime(order.adminDepositConfirmedAt) : null,
-    depositSmsMessages: order.depositSmsMessages || [],
     rawStatus: order.status,
   }
 }
@@ -456,7 +440,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     return () => window.clearTimeout(timeout)
   }, [toastMessage])
 
-  const isCompletedOrder = trackingNumber.trim().length > 0 && taxInvoiceIssued
+  const isCompletedOrder = currentStatus === 'COMPLETED'
   const currentStatusMeta = useMemo(
     () => (isCompletedOrder
       ? { label: '거래완료', tone: 'green' as Tone }
@@ -511,9 +495,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       await patchOrder({
         courier: carrier,
         trackingNumber: trackingNumber.trim(),
-        status: 'SHIPPED',
+        ...(currentStatus === 'COMPLETED' ? {} : { status: 'SHIPPED' }),
       })
-      setCurrentStatus('SHIPPED')
+      if (currentStatus !== 'COMPLETED') setCurrentStatus('SHIPPED')
       router.refresh()
     } catch (error) {
       alert(error instanceof Error ? error.message : '배송 처리에 실패했습니다.')
@@ -543,6 +527,23 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       router.refresh()
     } catch (error) {
       alert(error instanceof Error ? error.message : '세금계산서 발행에 실패했습니다.')
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+
+  const handleCompleteOrder = async () => {
+    if (currentStatus === 'COMPLETED') return
+    if (!confirm('배송 처리나 계산서 발급 여부와 관계없이 이 주문을 마감 처리하시겠습니까?')) return
+
+    try {
+      setLoadingAction('complete')
+      await patchOrder({ status: 'COMPLETED' })
+      setCurrentStatus('COMPLETED')
+      setToastMessage('주문을 마감 처리했습니다.')
+      router.refresh()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '주문 마감 처리에 실패했습니다.')
     } finally {
       setLoadingAction(null)
     }
@@ -681,12 +682,20 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
           </div>
 
-          <div className="grid content-start gap-3 sm:grid-cols-3 2xl:grid-cols-1">
+          <div className="grid content-start gap-3 sm:grid-cols-2 2xl:grid-cols-1">
             <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
               <FileText className="h-4 w-4 shrink-0" /> 거래명세표 출력
             </button>
             <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
               <ReceiptText className="h-4 w-4 shrink-0" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
+            </button>
+            <button
+              type="button"
+              onClick={handleCompleteOrder}
+              disabled={currentStatus === 'CANCELED' || currentStatus === 'COMPLETED' || loadingAction === 'complete'}
+              className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-[13px] font-extrabold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CircleCheckBig className="h-4 w-4 shrink-0" /> {currentStatus === 'COMPLETED' ? '주문 마감됨' : loadingAction === 'complete' ? '마감 처리 중...' : '주문 마감 처리'}
             </button>
             <button
               type="button"

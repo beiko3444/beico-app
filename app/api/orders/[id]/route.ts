@@ -23,7 +23,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
         // Validation
         if (status) {
-            const validStatuses = ['PENDING', 'CANCELED', 'DEPOSIT_COMPLETED', 'APPROVED', 'SHIPPED']
+            const validStatuses = ['PENDING', 'CANCELED', 'DEPOSIT_COMPLETED', 'APPROVED', 'SHIPPED', 'COMPLETED']
             if (!validStatuses.includes(status)) {
                 return NextResponse.json({ error: "Invalid status" }, { status: 400 })
             }
@@ -60,6 +60,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
             return NextResponse.json({ error: "Order not found" }, { status: 404 })
         }
 
+        if (session.user.role === 'ADMIN' && status === 'COMPLETED' && order.status === 'CANCELED') {
+            return NextResponse.json({ error: '취소된 주문은 완료 처리할 수 없습니다.' }, { status: 400 })
+        }
+
         // Authorization logic
         if (session.user.role !== 'ADMIN') {
             if (order.userId !== session.user.id) {
@@ -93,52 +97,33 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
 
         const updateData: any = {}
-        if (status) updateData.status = status
+        const preserveCompletedStatus = order.status === 'COMPLETED'
+            && Boolean(status)
+            && status !== 'COMPLETED'
+            && status !== 'CANCELED'
+        if (status && !preserveCompletedStatus) updateData.status = status
         if (trackingNumber !== undefined) updateData.trackingNumber = trackingNumber
         if (courier !== undefined) updateData.courier = courier
         if (taxInvoiceIssued !== undefined) updateData.taxInvoiceIssued = taxInvoiceIssued
         if (adminDepositConfirmedAt !== undefined) updateData.adminDepositConfirmedAt = adminDepositConfirmedAt ? new Date(adminDepositConfirmedAt) : null
         if (depositConfirmedAt !== undefined) updateData.depositConfirmedAt = depositConfirmedAt ? new Date(depositConfirmedAt) : null
 
-        // Transaction to update order and restore stock if canceled
+        // Transaction keeps status checks and the update consistent.
         const result = await prisma.$transaction(async (tx: any) => {
-            // Restore stock if being canceled from non-canceled state
-            if (status === 'CANCELED' && order.status !== 'CANCELED') {
-                const orderItems = await tx.orderItem.findMany({
-                    where: { orderId: id }
-                })
-                for (const item of orderItems) {
-                    await tx.product.update({
-                        where: { id: item.productId },
-                        data: { stock: { increment: item.quantity } }
-                    })
-                }
-            }
-
-            // Deduct stock if un-canceling? (Logic simplistic for now, strictly follow "Restore on Cancel")
-            // If changing from CANCELED to PENDING/APPROVED, we should re-deduct? 
-            // For now, let's assume one-way flow for safety or just handle cancellation.
-            // If user reverts CANCELED -> PENDING, we need to check stock again?
-            // Let's stick to the prompt: "Ordered -> Deduct", "Canceled/Deleted -> Restore".
-
-            // Re-deduct if moving FROM CANCELED TO PENDING
+            // A canceled order can only be reactivated while all of its products
+            // remain available for ordering.
             if (order.status === 'CANCELED' && status === 'PENDING') {
                 const orderItems = await tx.orderItem.findMany({
                     where: { orderId: id }
                 })
-                // Verify stock first
                 for (const item of orderItems) {
-                    const product = await tx.product.findUnique({ where: { id: item.productId } })
-                    if (!product || product.stock < item.quantity) {
-                        throw new Error(`Insufficient stock to re-activate order for ${product?.name}`)
-                    }
-                }
-                // Deduct
-                for (const item of orderItems) {
-                    await tx.product.update({
+                    const product = await tx.product.findUnique({
                         where: { id: item.productId },
-                        data: { stock: { decrement: item.quantity } }
+                        select: { name: true, wholesaleAvailable: true },
                     })
+                    if (!product?.wholesaleAvailable) {
+                        throw new Error(`현재 발주 불가능한 상품이 포함되어 있습니다: ${product?.name || item.productId}`)
+                    }
                 }
             }
 
@@ -149,7 +134,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                     if (!updateData.adminDepositConfirmedAt) updateData.adminDepositConfirmedAt = new Date()
                 } else if (adminDepositConfirmedAt) {
                     // If specifically setting admin confirmation, ensure user confirmation and status are also set
-                    updateData.status = 'DEPOSIT_COMPLETED'
+                    if (order.status !== 'COMPLETED') updateData.status = 'DEPOSIT_COMPLETED'
                     if (!updateData.depositConfirmedAt) updateData.depositConfirmedAt = new Date()
                     updateData.adminDepositConfirmedAt = new Date(adminDepositConfirmedAt)
                 }
@@ -265,7 +250,11 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
 
         const order = await prisma.order.findUnique({
             where: { id },
-            include: { items: true }
+            select: {
+                id: true,
+                userId: true,
+                status: true,
+            },
         })
 
         if (!order) {
@@ -283,16 +272,6 @@ export async function DELETE(request: Request, context: { params: Promise<{ id: 
         }
 
         await prisma.$transaction(async (tx: any) => {
-            // Restore stock if order wasn't already canceled (stock held)
-            if (order.status !== 'CANCELED') {
-                for (const item of order.items) {
-                    await tx.product.update({
-                        where: { id: item.productId },
-                        data: { stock: { increment: item.quantity } }
-                    })
-                }
-            }
-
             await tx.orderItem.deleteMany({
                 where: { orderId: id }
             })

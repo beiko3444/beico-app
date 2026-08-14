@@ -3,7 +3,6 @@ import { getProductImageUrl } from "@/lib/product-image-url"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
-import Link from 'next/link'
 import OrdersClient from "./OrdersClient"
 
 export const dynamic = 'force-dynamic'
@@ -59,25 +58,6 @@ const orderListSelect = {
                     },
                 },
     },
-    depositSmsMessages: {
-        orderBy: {
-            receivedAt: 'desc',
-        },
-        take: 5,
-        select: {
-            id: true,
-            messageHash: true,
-            sender: true,
-            body: true,
-            receivedAt: true,
-            amount: true,
-            depositorName: true,
-            bankName: true,
-            sourceDevice: true,
-            matchStatus: true,
-            matchedAt: true,
-        },
-    },
 } as const
 
 export default async function OrdersPage() {
@@ -86,54 +66,49 @@ export default async function OrdersPage() {
     if (!session || session.user.role !== 'ADMIN') {
         redirect('/login')
     }
-    const orders = await prisma.order.findMany({
-        select: orderListSelect,
-        orderBy: {
-            createdAt: 'desc'
-        }
-    })
-    const [depositSmsGroups, depositSmsActionItems] = await Promise.all([
-        prisma.depositSms.groupBy({
-            by: ['matchStatus'],
-            where: {
-                matchStatus: {
-                    in: ['UNMATCHED', 'AMBIGUOUS'],
-                },
-            },
-            _count: {
-                _all: true,
-            },
+    const [orders, partners, products] = await Promise.all([
+        prisma.order.findMany({
+            select: orderListSelect,
+            orderBy: { createdAt: 'desc' },
         }),
-        prisma.depositSms.findMany({
+        prisma.user.findMany({
             where: {
-                matchStatus: {
-                    in: ['UNMATCHED', 'AMBIGUOUS'],
-                },
+                role: 'PARTNER',
+                status: { not: 'DELETED' },
             },
-            orderBy: {
-                receivedAt: 'desc',
-            },
-            take: 10,
             select: {
                 id: true,
-                sender: true,
-                body: true,
-                receivedAt: true,
-                amount: true,
-                depositorName: true,
-                bankName: true,
-                matchStatus: true,
+                name: true,
+                country: true,
+                status: true,
+                partnerProfile: {
+                    select: {
+                        businessName: true,
+                        representativeName: true,
+                        grade: true,
+                    },
+                },
             },
+            orderBy: { name: 'asc' },
+        }),
+        prisma.product.findMany({
+            where: { wholesaleAvailable: true },
+            select: {
+                id: true,
+                name: true,
+                productCode: true,
+                sellPrice: true,
+                priceA: true,
+                priceB: true,
+                priceC: true,
+                priceD: true,
+                minOrderQuantity: true,
+                orderUnit: true,
+                regionalPrices: true,
+            },
+            orderBy: { sortOrder: 'asc' },
         }),
     ])
-    const depositSmsSummary = depositSmsGroups.reduce(
-        (acc, group) => {
-            if (group.matchStatus === 'UNMATCHED') acc.unmatched = group._count._all
-            if (group.matchStatus === 'AMBIGUOUS') acc.ambiguous = group._count._all
-            return acc
-        },
-        { unmatched: 0, ambiguous: 0 }
-    )
 
     const ordersWithImageUrls = orders.map(order => ({
         ...order,
@@ -152,8 +127,8 @@ export default async function OrdersPage() {
     return (
         <OrdersClient
             orders={ordersWithImageUrls}
-            depositSmsSummary={depositSmsSummary}
-            depositSmsActionItems={depositSmsActionItems}
+            partners={partners}
+            products={products}
         />
     )
 }

@@ -7,17 +7,13 @@ import { unstable_cache } from "next/cache"
 import AdminNav from "./AdminNav"
 import PushNotificationRegistrar from "@/components/PushNotificationRegistrar"
 
-type LowStockCountRow = {
-    count: number | bigint
-}
-
 const getCachedAdminCounts = unstable_cache(
     async () => {
         // 1. Pending Orders
         const pendingOrderCount = await prisma.order.count({
             where: {
                 AND: [
-                    { status: { not: 'CANCELLED' } },
+                    { status: { notIn: ['CANCELED', 'COMPLETED'] } },
                     {
                         OR: [
                             { trackingNumber: null },
@@ -29,21 +25,12 @@ const getCachedAdminCounts = unstable_cache(
             }
         })
 
-        // 2. Low Stock Products (stock <= safetyStock) - count directly in DB
-        const lowStockRows = await prisma.$queryRaw<LowStockCountRow[]>`
-            SELECT COUNT(*)::int AS count
-            FROM "Product"
-            WHERE "stock" <= "safetyStock"
-        `
-        const lowStockRaw = lowStockRows[0]?.count ?? 0
-        const lowStockCount = typeof lowStockRaw === "bigint" ? Number(lowStockRaw) : lowStockRaw
-
-        // 3. Pending Partners
+        // 2. Pending Partners
         const pendingPartnerCount = await prisma.user.count({
             where: { role: 'PARTNER', status: 'PENDING' }
         })
 
-        // 4. Electricity Bill Status
+        // 3. Electricity Bill Status
         const now = new Date()
         const year = now.getFullYear()
         const month = now.getMonth() + 1
@@ -59,12 +46,11 @@ const getCachedAdminCounts = unstable_cache(
 
         return {
             pendingOrders: pendingOrderCount,
-            lowStock: lowStockCount,
             pendingPartners: pendingPartnerCount,
             missingBill
         }
     },
-    ['admin-layout-counts-v1'],
+    ['admin-layout-counts-v2'],
     { revalidate: 60 }
 )
 
@@ -80,7 +66,6 @@ export default async function AdminLayout({
 
     let counts = {
         pendingOrders: 0,
-        lowStock: 0,
         pendingPartners: 0,
         missingBill: 0
     }

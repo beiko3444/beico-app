@@ -52,7 +52,7 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { name, nameJP, nameEN, buyPrice, sellPrice, stock, barcode, productCode, hsCode, japanHsCode, minOrderQuantity, orderUnit, coupangSku } = body
+        const { name, nameJP, nameEN, buyPrice, sellPrice, barcode, productCode, hsCode, japanHsCode, minOrderQuantity, orderUnit, coupangSku } = body
         const normalizedProductCode = productCode ? String(productCode).trim().toUpperCase() : null
         const normalizedHsCode = hsCode ? String(hsCode).trim() : null
         const normalizedJapanHsCode = japanHsCode ? String(japanHsCode).trim() : null
@@ -91,7 +91,7 @@ export async function POST(request: Request) {
             krSellPrice: (body.krSellPrice !== null && body.krSellPrice !== undefined && body.krSellPrice !== "") ? Number(body.krSellPrice) : 0,
             usBuyPrice: (body.usBuyPrice !== null && body.usBuyPrice !== undefined && body.usBuyPrice !== "") ? Number(body.usBuyPrice) : 0,
             usSellPrice: (body.usSellPrice !== null && body.usSellPrice !== undefined && body.usSellPrice !== "") ? Number(body.usSellPrice) : 0,
-            stock: stock !== undefined ? Math.round(Number(stock)) : 0,
+            wholesaleAvailable: body.wholesaleAvailable !== false,
             imageUrl,
             priceA: (body.priceA !== null && body.priceA !== undefined && body.priceA !== "") ? Number(body.priceA) : null,
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,

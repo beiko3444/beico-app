@@ -54,7 +54,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "No items" }, { status: 400 })
         }
 
-        // Transaction to create order and update stock
+        // Keep availability validation and order creation atomic so a status change
+        // cannot slip in between the final check and order creation.
         const result = await prisma.$transaction(async (tx: any) => {
             const user = await tx.user.findUnique({
                 where: { id: session.user.id },
@@ -68,14 +69,14 @@ export async function POST(request: Request) {
             const countryKey = getCountryKey(user?.country)
             const gradeKey = getGradeKey(user?.partnerProfile?.grade)
 
-            // 1. Verify stock for all items first
+            // 1. Verify that every product is currently available for partner orders.
             for (const item of items) {
                 const product = await tx.product.findUnique({ where: { id: item.productId } })
                 if (!product) {
                     throw new Error(`Product ${item.productId} not found`)
                 }
-                if (product.stock < item.quantity) {
-                    throw new Error(`Insufficient stock for product ${product.name}. Available: ${product.stock}`)
+                if (!product.wholesaleAvailable) {
+                    throw new Error(`현재 발주 불가능한 상품입니다: ${product.name}`)
                 }
                 const { minimumQuantity, orderUnit } = resolveOrderRules(product, gradeKey, countryKey)
                 if (item.quantity < minimumQuantity) {
@@ -86,15 +87,7 @@ export async function POST(request: Request) {
                 }
             }
 
-            // 2. Deduct stock
-            for (const item of items) {
-                await tx.product.update({
-                    where: { id: item.productId },
-                    data: { stock: { decrement: item.quantity } }
-                })
-            }
-
-            // 3. Generate Order Number (YYYYMMDD + 3-digit sequence)
+            // 2. Generate Order Number (YYYYMMDD + 3-digit sequence)
             const now = new Date()
             const yyyy = now.getFullYear()
             const mm = String(now.getMonth() + 1).padStart(2, '0')
@@ -122,7 +115,7 @@ export async function POST(request: Request) {
             const sequence = String(sequenceNum).padStart(3, '0')
             const orderNumber = `${datePrefix}${sequence}`
 
-            // 4. Create Order
+            // 3. Create Order
             const order = await tx.order.create({
                 data: {
                     orderNumber,
@@ -139,7 +132,7 @@ export async function POST(request: Request) {
                 include: { items: true }
             })
 
-            // 5. Trigger Notification (Async, don't block response)
+            // 4. Trigger Notification (Async, don't block response)
             sendOrderNotification({
                 orderNumber: order.orderNumber,
                 total: order.total,

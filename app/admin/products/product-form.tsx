@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 
-type Product = {
+export type Product = {
     id: string
     name: string
     nameJP?: string | null
@@ -28,8 +28,7 @@ type Product = {
     priceB?: number | null
     priceC?: number | null
     priceD?: number | null
-    stock: number
-    safetyStock?: number
+    wholesaleAvailable?: boolean
     imageUrl?: string | null
     regionalPrices?: any
     minOrderQuantity: number
@@ -67,8 +66,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [krSellPrice, setKrSellPrice] = useState('')
     const [usBuyPrice, setUsBuyPrice] = useState('')
     const [usSellPrice, setUsSellPrice] = useState('')
-    const [stock, setStock] = useState('')
-    const [safetyStock, setSafetyStock] = useState('')
+    const [orderAvailable, setOrderAvailable] = useState(true)
     const [priceA, setPriceA] = useState('')
     const [priceB, setPriceB] = useState('')
     const [priceC, setPriceC] = useState('')
@@ -174,8 +172,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setHsCode(initialData.hsCode || '')
             setJapanHsCode(initialData.japanHsCode || '')
             setCoupangSku(initialData.coupangSku || '')
-            setStock(formatNumber(initialData.stock || 0))
-            setSafetyStock(formatNumber(initialData.safetyStock || 0))
+            setOrderAvailable(initialData.wholesaleAvailable !== false)
             setImageUrl(initialData.imageUrl || null)
             setHasImageChanged(false)
             setMinOrderQuantity(formatNumber(initialData.minOrderQuantity || 1))
@@ -218,8 +215,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setHsCode('')
             setJapanHsCode('')
             setCoupangSku('')
-            setStock('0')
-            setSafetyStock('0')
+            setOrderAvailable(true)
             setImageUrl(null)
             setHasImageChanged(false)
             setMinOrderQuantity('1')
@@ -281,8 +277,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 krSellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.retail)) || 0,
                 usBuyPrice: parseFloat(parseNumber(regionalPrices['C'].US.wholesale)) || 0,
                 usSellPrice: parseFloat(parseNumber(regionalPrices['C'].US.retail)) || 0,
-                stock: parseInt(parseNumber(stock)) || 0,
-                safetyStock: parseInt(parseNumber(safetyStock)) || 0,
+                wholesaleAvailable: orderAvailable,
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
                 orderUnit: parseInt(parseNumber(orderUnit)) || 1,
                 regionalPrices: regionalPrices,
@@ -322,8 +317,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setHsCode('')
                     setJapanHsCode('')
                     setCoupangSku('')
-                    setStock('0')
-                    setSafetyStock('0')
+                    setOrderAvailable(true)
                     setImageUrl(null)
                     setHasImageChanged(false)
                     setMinOrderQuantity('1')
@@ -524,30 +518,20 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                         </div>
                     </fieldset>
 
-                    {/* Inventory Group */}
+                    {/* Order Settings Group */}
                     <fieldset className="border border-gray-400 p-4 pt-2">
-                        <legend className="px-2 text-xs font-bold text-gray-700">재고 및 주문 (Inventory)</legend>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <legend className="px-2 text-xs font-bold text-gray-700">발주 설정 (Order Settings)</legend>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">현재고 수량</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={stock}
-                                    onChange={e => setStock(formatNumber(e.target.value))}
-                                    className={`w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold ${parseInt(parseNumber(stock)) <= 0 ? 'text-red-600' : 'text-black'}`}
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">안전재고 설정</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={safetyStock}
-                                    onChange={e => setSafetyStock(formatNumber(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-orange-700"
-                                />
+                                <label className="text-[11px] font-bold text-gray-600">발주 상태</label>
+                                <select
+                                    value={orderAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}
+                                    onChange={e => setOrderAvailable(e.target.value === 'AVAILABLE')}
+                                    className={`w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-bold ${orderAvailable ? 'text-emerald-700' : 'text-red-600'}`}
+                                >
+                                    <option value="AVAILABLE">발주 가능</option>
+                                    <option value="UNAVAILABLE">발주 불가능</option>
+                                </select>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[11px] font-bold text-gray-600">최소 주문량</label>

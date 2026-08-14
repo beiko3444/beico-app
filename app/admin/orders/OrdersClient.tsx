@@ -3,31 +3,23 @@
 import { useMemo, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ChevronRight, ArrowLeft } from 'lucide-react'
+import { ChevronRight, ArrowLeft, Plus } from 'lucide-react'
 import AdminOrderCard from './AdminOrderCard'
+import AdminOrderCreateModal, {
+  type AdminOrderPartnerOption,
+  type AdminOrderProductOption,
+} from './AdminOrderCreateModal'
 import type { OrderRecord } from './OrderDetailPage'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 
 export default function OrdersClient({
   orders,
-  depositSmsSummary,
-  depositSmsActionItems = [],
+  partners,
+  products,
 }: {
   orders: OrderRecord[]
-  depositSmsSummary?: {
-    unmatched: number
-    ambiguous: number
-  }
-  depositSmsActionItems?: Array<{
-    id: string
-    sender: string
-    body: string
-    receivedAt: string | Date
-    amount: number | null
-    depositorName?: string | null
-    bankName?: string | null
-    matchStatus: string
-  }>
+  partners: AdminOrderPartnerOption[]
+  products: AdminOrderProductOption[]
 }) {
   const searchParams = useSearchParams()
   const type = searchParams.get('type')
@@ -37,6 +29,7 @@ export default function OrdersClient({
   }, [orders])
   const [selectedYear, setSelectedYear] = useState<number>(latestOrderDate.getFullYear())
   const [selectedMonth, setSelectedMonth] = useState<number>(latestOrderDate.getMonth() + 1)
+  const [createOrderOpen, setCreateOrderOpen] = useState(false)
 
   const availableYears = useMemo(() => {
     const years = new Set<number>()
@@ -73,17 +66,21 @@ export default function OrdersClient({
       const matchesType = (() => {
         if (type === 'invoice') return !order.taxInvoiceIssued
         if (type === 'tracking') return !order.trackingNumber && order.status === 'APPROVED'
-        if (type === 'inprogress') return !order.trackingNumber || !order.taxInvoiceIssued
-        if (type === 'completed') return order.trackingNumber && order.taxInvoiceIssued
+        if (type === 'inprogress') return order.status !== 'COMPLETED' && order.status !== 'CANCELED'
+        if (type === 'completed') return order.status === 'COMPLETED'
         return true
       })()
       return matchesType
     })
   }, [monthlyOrders, type])
-  const hasDepositSmsActionItems = depositSmsActionItems.length > 0
-
   return (
     <div className="min-h-screen bg-[#F6F8FB] -mx-4 px-4 py-6 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <AdminOrderCreateModal
+        open={createOrderOpen}
+        onClose={() => setCreateOrderOpen(false)}
+        partners={partners}
+        products={products}
+      />
       <div className="mx-auto max-w-[1720px] space-y-6">
         <div className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_10px_35px_rgba(15,23,42,0.05)]">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -105,6 +102,13 @@ export default function OrdersClient({
             </div>
 
             <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setCreateOrderOpen(true)}
+                className="inline-flex h-9 items-center gap-2 rounded-xl bg-blue-600 px-4 text-[12px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700"
+              >
+                <Plus className="h-4 w-4" /> 업체 발주서 생성
+              </button>
               <div className="flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
                 <span className="text-[12px] font-bold text-slate-500">연도</span>
                 <select
@@ -138,12 +142,6 @@ export default function OrdersClient({
                   필터 적용: {type}
                 </span>
               ) : null}
-              <span className="inline-flex items-center rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-[12px] font-black text-rose-700">
-                입금문자 미매칭 {depositSmsSummary?.unmatched || 0}건
-              </span>
-              <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[12px] font-black text-amber-700">
-                복수매칭 {depositSmsSummary?.ambiguous || 0}건
-              </span>
               <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-[12px] font-bold text-slate-600">
                 총 {filteredOrders.length}건
               </span>
@@ -160,42 +158,6 @@ export default function OrdersClient({
               </div>
             </div>
           </div>
-          {hasDepositSmsActionItems ? (
-            <div className="mt-5 rounded-2xl border border-rose-100 bg-rose-50/70 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <h2 className="text-[14px] font-black text-rose-800">입금문자 수동확인 필요</h2>
-                  <p className="mt-1 text-[12px] font-medium text-rose-600">
-                    금액이 주문과 맞지 않거나 같은 금액 주문이 여러 건인 문자입니다.
-                  </p>
-                </div>
-                <span className="rounded-full bg-white px-3 py-1 text-[12px] font-black text-rose-700">
-                  {depositSmsActionItems.length}건 표시
-                </span>
-              </div>
-              <div className="mt-3 grid gap-2 lg:grid-cols-2">
-                {depositSmsActionItems.map((item) => (
-                  <div key={item.id} className="rounded-xl border border-white bg-white px-4 py-3 shadow-sm">
-                    <div className="flex items-center justify-between gap-3">
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${
-                        item.matchStatus === 'AMBIGUOUS' ? 'bg-amber-50 text-amber-700' : 'bg-rose-50 text-rose-700'
-                      }`}>
-                        {item.matchStatus === 'AMBIGUOUS' ? '복수매칭' : '미매칭'}
-                      </span>
-                      <span className="text-[13px] font-black text-slate-900">
-                        {item.amount ? `${Math.round(item.amount).toLocaleString('ko-KR')}원` : '금액 없음'}
-                      </span>
-                    </div>
-                    <div className="mt-2 text-[12px] font-bold text-slate-500">
-                      {formatCompactDateTime(item.receivedAt)} · {item.bankName || item.sender}
-                      {item.depositorName ? ` · ${item.depositorName}` : ''}
-                    </div>
-                    <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-600">{item.body}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ) : null}
         </div>
 
         {filteredOrders.length === 0 ? (
@@ -213,12 +175,6 @@ export default function OrdersClient({
       </div>
     </div>
   )
-}
-
-function formatCompactDateTime(value: string | Date) {
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  return `${date.getMonth() + 1}/${date.getDate()} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
 function formatCurrency(value: number) {
