@@ -1,11 +1,11 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Copy, Layers, Pencil, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Copy, Layers, Pencil, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import BarcodeDisplay from "@/components/BarcodeDisplay"
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import {
     PRODUCT_GRADES,
     readProductGradeOrderValue,
@@ -14,6 +14,13 @@ import {
     setProductGradePriceValue,
     type ProductGrade,
 } from '@/lib/productGradePricing'
+import {
+    classifyProductCatalogCategory,
+    getGroupedSkuLabel,
+    PRODUCT_CATALOG_CATEGORIES,
+    PRODUCT_CATALOG_CATEGORY_LABELS,
+    type ProductCatalogCategory,
+} from '@/lib/productCatalogDisplay'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const PRODUCT_TABLE_WIDTH = 1740
@@ -156,6 +163,7 @@ async function postBulkUpdate(url: string, payload: Record<string, unknown>) {
 
 interface ProductRowProps {
     product: ProductTableProduct
+    displayName?: string
     index: number
     activeGrade: ProductGrade
     onSelect: () => void
@@ -182,7 +190,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSelect, onDragStartProduct, onDragEndProduct, onSortOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+const ProductRow = memo(function ProductRow({ product, displayName, index, activeGrade, onSelect, onDragStartProduct, onDragEndProduct, onSortOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -281,8 +289,8 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSel
                 <ProductForm
                     initialData={product}
                     trigger={
-                        <div className="cursor-pointer text-left">
-                            <div className="font-bold text-gray-900 group-hover:text-[var(--color-brand-blue)] truncate">{product.name}</div>
+                        <div className="cursor-pointer text-left" title={product.name}>
+                            <div className="truncate font-black text-gray-900 group-hover:text-[var(--color-brand-blue)]">{displayName || product.name}</div>
                             {product.nameJP && (
                                 <div className="text-[10px] text-gray-400 truncate">{product.nameJP}</div>
                             )}
@@ -453,13 +461,6 @@ type ProductGroupView = {
     products: ProductTableProduct[]
 }
 
-type ProductPagination = {
-    page: number
-    pageSize: number
-    totalCount: number
-    totalPages: number
-}
-
 type ProductViewMode = 'group' | 'sku'
 type ProductAvailabilityFilter = 'all' | 'available' | 'unavailable'
 type ProductStockFilter = 'all' | 'stocked' | 'empty'
@@ -475,67 +476,6 @@ const getProductSearchText = (product: ProductTableProduct) => [
     product.hsCode,
     product.japanHsCode,
 ].filter(Boolean).join(' ').toLocaleLowerCase('ko-KR')
-
-function ProductPaginationControls({
-    pagination,
-    pageStart,
-    pageEnd,
-    onPageChange,
-    onPageSizeChange,
-    className = '',
-}: {
-    pagination: ProductPagination
-    pageStart: number
-    pageEnd: number
-    onPageChange: (page: number) => void
-    onPageSizeChange: (pageSize: number) => void
-    className?: string
-}) {
-    const canGoPrev = pagination.page > 1
-    const canGoNext = pagination.page < pagination.totalPages
-
-    return (
-        <div className={`flex flex-wrap items-center gap-2 ${className}`}>
-            <div className="text-[11px] font-bold text-slate-500">
-                전체 <span className="text-slate-900">{formatInteger(pagination.totalCount)}</span>개 중{' '}
-                <span className="text-blue-700">{formatInteger(pageStart)}-{formatInteger(pageEnd)}</span> 표시
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-                <select
-                    value={pagination.pageSize}
-                    onChange={(event) => onPageSizeChange(Number(event.target.value))}
-                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-600 outline-none transition focus:border-blue-500"
-                    title="한 페이지 상품 수"
-                >
-                    <option value={30}>30개씩</option>
-                    <option value={50}>50개씩</option>
-                    <option value={100}>100개씩</option>
-                </select>
-                <button
-                    type="button"
-                    onClick={() => onPageChange(pagination.page - 1)}
-                    disabled={!canGoPrev}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
-                    title="이전 페이지"
-                >
-                    <ChevronLeft size={15} />
-                </button>
-                <div className="min-w-20 text-center text-[11px] font-black tabular-nums text-slate-700">
-                    {formatInteger(pagination.page)} / {formatInteger(pagination.totalPages)}
-                </div>
-                <button
-                    type="button"
-                    onClick={() => onPageChange(pagination.page + 1)}
-                    disabled={!canGoNext}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
-                    title="다음 페이지"
-                >
-                    <ChevronRight size={15} />
-                </button>
-            </div>
-        </div>
-    )
-}
 
 const ProductGroupHeader = memo(function ProductGroupHeader({
     group,
@@ -736,7 +676,15 @@ function ProductSummaryPanel({
                         {group.products.slice(0, 6).map(product => (
                             <div key={product.id} className="flex items-center justify-between gap-2 text-[11px]">
                                 <div className="min-w-0">
-                                    <div className="truncate font-bold text-slate-700">{product.name}</div>
+                                    <div className="truncate font-bold text-slate-700" title={product.name}>
+                                        {group.isNamed
+                                            ? getGroupedSkuLabel({
+                                                productName: product.name,
+                                                groupName: group.name,
+                                                productCode: product.productCode,
+                                            })
+                                            : product.name}
+                                    </div>
                                     <div className="truncate text-[10px] text-slate-400">{product.productCode || product.barcode || '-'}</div>
                                 </div>
                                 <span className="shrink-0 font-black tabular-nums text-emerald-700">{formatInteger(getProductStock(product))}</span>
@@ -749,15 +697,10 @@ function ProductSummaryPanel({
     )
 }
 
-export default function ProductTable({
-    initialProducts,
-    pagination,
-}: {
-    initialProducts: ProductTableProduct[]
-    pagination: ProductPagination
-}) {
+export default function ProductTable({ initialProducts }: { initialProducts: ProductTableProduct[] }) {
     const [products, setProducts] = useState(initialProducts)
     const [activeGrade, setActiveGrade] = useState<ProductGrade>('C')
+    const [activeCategory, setActiveCategory] = useState<ProductCatalogCategory>('soft')
     const [modifiedCosts, setModifiedCosts] = useState<Record<string, string>>({})
     const [modifiedWholesales, setModifiedWholesales] = useState<Record<string, string>>({})
     const [modifiedRetails, setModifiedRetails] = useState<Record<string, string>>({})
@@ -774,20 +717,6 @@ export default function ProductTable({
     const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
-    const pathname = usePathname()
-    const searchParams = useSearchParams()
-
-    const hasDraftChanges = useMemo(() => (
-        Object.keys(modifiedCosts).length > 0
-        || Object.keys(modifiedWholesales).length > 0
-        || Object.keys(modifiedRetails).length > 0
-        || Object.keys(modifiedStocks).length > 0
-        || Object.keys(modifiedMoqs).length > 0
-        || Object.keys(modifiedOrderUnits).length > 0
-    ), [modifiedCosts, modifiedWholesales, modifiedRetails, modifiedStocks, modifiedMoqs, modifiedOrderUnits])
-    const pageOffset = (pagination.page - 1) * pagination.pageSize
-    const pageStart = pagination.totalCount === 0 ? 0 : pageOffset + 1
-    const pageEnd = Math.min(pagination.totalCount, pageOffset + products.length)
 
     useEffect(() => {
         setProducts(initialProducts)
@@ -803,9 +732,20 @@ export default function ProductTable({
         setDraggingProductId(null)
     }, [initialProducts])
 
+    const categoryCounts = useMemo(() => {
+        const counts = Object.fromEntries(
+            PRODUCT_CATALOG_CATEGORIES.map(category => [category, 0]),
+        ) as Record<ProductCatalogCategory, number>
+        products.forEach(product => {
+            counts[classifyProductCatalogCategory(product)] += 1
+        })
+        return counts
+    }, [products])
+
     const filteredProducts = useMemo(() => {
         const query = productQuery.trim().toLocaleLowerCase('ko-KR')
         return products.filter(product => {
+            if (classifyProductCatalogCategory(product) !== activeCategory) return false
             if (query && !getProductSearchText(product).includes(query)) return false
             if (availabilityFilter === 'available' && product.wholesaleAvailable === false) return false
             if (availabilityFilter === 'unavailable' && product.wholesaleAvailable !== false) return false
@@ -813,7 +753,7 @@ export default function ProductTable({
             if (stockFilter === 'empty' && getProductStock(product) > 0) return false
             return true
         })
-    }, [availabilityFilter, productQuery, products, stockFilter])
+    }, [activeCategory, availabilityFilter, productQuery, products, stockFilter])
 
     const productGroups = useMemo<ProductGroupView[]>(() => {
         const inferred = filteredProducts.map(product => ({ product, candidate: inferProductGroup(product) }))
@@ -847,8 +787,8 @@ export default function ProductTable({
     }, [filteredProducts])
 
     const productIndexById = useMemo(
-        () => new Map(products.map((product, index) => [product.id, pageOffset + index])),
-        [pageOffset, products],
+        () => new Map(products.map((product, index) => [product.id, index])),
+        [products],
     )
     const visibleProductIds = useMemo(() => filteredProducts.map(product => product.id), [filteredProducts])
     const checkedVisibleCount = visibleProductIds.filter(id => checkedIds.has(id)).length
@@ -867,50 +807,19 @@ export default function ProductTable({
     }, [productGroups])
     const hasActiveFilters = Boolean(productQuery.trim()) || availabilityFilter !== 'all' || stockFilter !== 'all'
 
+    const handleCategoryChange = useCallback((category: ProductCatalogCategory) => {
+        setActiveCategory(category)
+        setCheckedIds(new Set())
+        setCollapsedGroupKeys(new Set())
+        setSelectedGroupKey(null)
+        setDraggingProductId(null)
+    }, [])
+
     useEffect(() => {
         if (selectedGroup && selectedGroup.key !== selectedGroupKey) {
             setSelectedGroupKey(selectedGroup.key)
         }
     }, [selectedGroup, selectedGroupKey])
-
-    const pushProductPage = useCallback((page: number, pageSize = pagination.pageSize) => {
-        const nextPage = Math.min(Math.max(1, page), pagination.totalPages)
-        if (nextPage === pagination.page && pageSize === pagination.pageSize) return
-        if (hasDraftChanges && !confirm('저장하지 않은 수정사항이 있습니다. 페이지를 이동하시겠습니까?')) return
-
-        const params = new URLSearchParams(searchParams.toString())
-        if (nextPage <= 1) params.delete('page')
-        else params.set('page', String(nextPage))
-        if (pageSize === 50) params.delete('pageSize')
-        else params.set('pageSize', String(pageSize))
-
-        const query = params.toString()
-        router.push(query ? `${pathname}?${query}` : pathname)
-    }, [hasDraftChanges, pagination.page, pagination.pageSize, pagination.totalPages, pathname, router, searchParams])
-
-    const handlePageSizeChange = useCallback((pageSize: number) => {
-        pushProductPage(1, pageSize)
-    }, [pushProductPage])
-
-    useEffect(() => {
-        const handleKeyDown = (event: KeyboardEvent) => {
-            if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
-            const target = event.target as HTMLElement | null
-            const tagName = target?.tagName
-            if (target?.isContentEditable || tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return
-
-            if (event.key === 'ArrowLeft') {
-                event.preventDefault()
-                pushProductPage(pagination.page - 1)
-            } else if (event.key === 'ArrowRight') {
-                event.preventDefault()
-                pushProductPage(pagination.page + 1)
-            }
-        }
-
-        window.addEventListener('keydown', handleKeyDown)
-        return () => window.removeEventListener('keydown', handleKeyDown)
-    }, [pagination.page, pushProductPage])
 
     const saveOrder = useCallback(async (productIds: string[], startOrder = 0) => {
         try {
@@ -928,18 +837,16 @@ export default function ProductTable({
 
     const onSortOrderChange = useCallback(async (productId: string, newIndex: number) => {
         // ... (existing code)
-        const lastPageIndex = pageOffset + products.length - 1
-        const clampedIndex = Math.max(pageOffset, Math.min(newIndex, lastPageIndex))
-        const localIndex = clampedIndex - pageOffset
+        const clampedIndex = Math.max(0, Math.min(newIndex, products.length - 1))
         const oldIndex = products.findIndex(p => p.id === productId)
-        if (oldIndex === localIndex) return
+        if (oldIndex === clampedIndex) return
         const newItems = [...products]
         const [movedProduct] = newItems.splice(oldIndex, 1)
         if (!movedProduct) return
-        newItems.splice(localIndex, 0, movedProduct)
+        newItems.splice(clampedIndex, 0, movedProduct)
         setProducts(newItems)
-        saveOrder(newItems.map(item => item.id), pageOffset)
-    }, [pageOffset, products, saveOrder])
+        saveOrder(newItems.map(item => item.id))
+    }, [products, saveOrder])
 
     const handleDelete = useCallback(async (id: string) => {
         if (!confirm('정말 삭제하시겠습니까? 관련 주문 데이터가 있을 경우 오류가 발생할 수 있습니다.')) return
@@ -1264,31 +1171,43 @@ export default function ProductTable({
     return (
         <div className="overflow-hidden rounded-2xl bg-white">
             <div className="border-b border-slate-100 bg-white p-3">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                <div>
                     <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                             <h2 className="text-sm font-black text-slate-950">상품 관리</h2>
                             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">
-                                {formatInteger(pagination.totalCount)}개 상품
+                                전체 {formatInteger(products.length)}개
                             </span>
-                            {hasActiveFilters ? (
-                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-700">
-                                    현재 페이지 {formatInteger(filteredProducts.length)}개 표시
-                                </span>
-                            ) : null}
+                            <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-700">
+                                {PRODUCT_CATALOG_CATEGORY_LABELS[activeCategory]} {formatInteger(filteredProducts.length)}개 표시
+                            </span>
                         </div>
                         <p className="mt-1 text-[11px] font-medium text-slate-500">
-                            등급별 가격과 관리용 재고를 한 화면에서 수정합니다. 페이지 이동은 좌우 방향키도 사용할 수 있습니다.
+                            제품 종류를 선택하면 해당 상품을 한 화면에서 관리할 수 있습니다.
                         </p>
                     </div>
-                    <ProductPaginationControls
-                        pagination={pagination}
-                        pageStart={pageStart}
-                        pageEnd={pageEnd}
-                        onPageChange={pushProductPage}
-                        onPageSizeChange={handlePageSizeChange}
-                        className="justify-start xl:justify-end"
-                    />
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1 sm:grid-cols-4">
+                    {PRODUCT_CATALOG_CATEGORIES.map(category => (
+                        <button
+                            key={category}
+                            type="button"
+                            onClick={() => handleCategoryChange(category)}
+                            className={`flex h-10 min-w-0 items-center justify-center gap-2 rounded-lg px-2 text-[11px] font-black transition ${
+                                activeCategory === category
+                                    ? 'bg-blue-700 text-white shadow-sm'
+                                    : 'bg-transparent text-slate-600 hover:bg-white hover:text-slate-950'
+                            }`}
+                        >
+                            <span className="truncate">{PRODUCT_CATALOG_CATEGORY_LABELS[category]}</span>
+                            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${
+                                activeCategory === category ? 'bg-white/20 text-white' : 'bg-white text-slate-500'
+                            }`}>
+                                {formatInteger(categoryCounts[category])}
+                            </span>
+                        </button>
+                    ))}
                 </div>
 
                 <div className="mt-3 flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
@@ -1539,6 +1458,13 @@ export default function ProductTable({
                                             <ProductRow
                                                 key={product.id}
                                                 product={product}
+                                                displayName={group.isNamed
+                                                    ? getGroupedSkuLabel({
+                                                        productName: product.name,
+                                                        groupName: group.name,
+                                                        productCode: product.productCode,
+                                                    })
+                                                    : product.name}
                                                 index={productIndexById.get(product.id) ?? 0}
                                                 activeGrade={activeGrade}
                                                 onSelect={() => setSelectedGroupKey(group.key)}
@@ -1571,16 +1497,6 @@ export default function ProductTable({
                         })
                     )}
                     </table>
-                </div>
-                <div className="border-t border-slate-100 bg-white px-3 py-2">
-                    <ProductPaginationControls
-                        pagination={pagination}
-                        pageStart={pageStart}
-                        pageEnd={pageEnd}
-                        onPageChange={pushProductPage}
-                        onPageSizeChange={handlePageSizeChange}
-                        className="justify-end"
-                    />
                 </div>
             </div>
             <ProductSummaryPanel group={selectedGroup} activeGrade={activeGrade} />
