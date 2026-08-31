@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getProductImageUrl } from "@/lib/product-image-url"
 import { Prisma } from "@prisma/client"
-import { unstable_cache } from "next/cache"
 import ProductForm from "./product-form"
 import Link from 'next/link'
 import ProductTable from "./ProductTable"
@@ -45,6 +44,7 @@ const productSelect = Prisma.validator<Prisma.ProductSelect>()({
     barcode: true,
     productCode: true,
     groupName: true,
+    autoGroupingDisabled: true,
     hsCode: true,
     japanHsCode: true,
     coupangSku: true,
@@ -64,32 +64,28 @@ const productSelect = Prisma.validator<Prisma.ProductSelect>()({
     updatedAt: true,
 })
 
-const getCachedProductsPage = unstable_cache(
-    async (requestedPage: number, pageSize: number) => {
-        const totalCount = await prisma.product.count()
-        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
-        const page = Math.min(Math.max(1, requestedPage), totalPages)
-        const products = await prisma.product.findMany({
-            select: productSelect,
-            orderBy: [
-                { sortOrder: 'asc' },
-                { createdAt: 'asc' },
-            ],
-            skip: (page - 1) * pageSize,
-            take: pageSize,
-        })
+const getProductsPage = async (requestedPage: number, pageSize: number) => {
+    const totalCount = await prisma.product.count()
+    const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+    const page = Math.min(Math.max(1, requestedPage), totalPages)
+    const products = await prisma.product.findMany({
+        select: productSelect,
+        orderBy: [
+            { sortOrder: 'asc' },
+            { createdAt: 'asc' },
+        ],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+    })
 
-        return { products, page, pageSize, totalCount, totalPages }
-    },
-    ['admin-products-page-v8'],
-    { revalidate: 60, tags: ['products'] }
-)
+    return { products, page, pageSize, totalCount, totalPages }
+}
 
 export default async function ProductsPage({ searchParams }: PageProps) {
     const params = (await searchParams) || {}
     const requestedPage = parsePositiveInt(firstParam(params.page), 1)
     const pageSize = parsePageSize(firstParam(params.pageSize))
-    const productPage = await getCachedProductsPage(requestedPage, pageSize)
+    const productPage = await getProductsPage(requestedPage, pageSize)
     const products = productPage.products.map(({ imageUrl, updatedAt, ...product }) => ({
         ...product,
         imageUrl: imageUrl ? getProductImageUrl(product.id, updatedAt) : null,

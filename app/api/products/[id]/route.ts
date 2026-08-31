@@ -26,6 +26,7 @@ const productResponseSelect = {
     barcode: true,
     productCode: true,
     groupName: true,
+    autoGroupingDisabled: true,
     hsCode: true,
     japanHsCode: true,
     coupangSku: true,
@@ -67,6 +68,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             barcode: body.barcode ? String(body.barcode).trim() : null,
             productCode: normalizedProductCode,
             groupName: normalizedGroupName,
+            autoGroupingDisabled: normalizedGroupName
+                ? false
+                : body.autoGroupingDisabled === true,
             hsCode: normalizedHsCode,
             japanHsCode: normalizedJapanHsCode,
             coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
@@ -147,6 +151,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
         if (Object.prototype.hasOwnProperty.call(body, 'groupName')) {
             patchData.groupName = body.groupName ? String(body.groupName).trim() : null
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'autoGroupingDisabled')) {
+            patchData.autoGroupingDisabled = body.autoGroupingDisabled === true
         }
 
         const changedById = hasStockChange ? await getProductStockActorId() : null

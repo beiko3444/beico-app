@@ -125,6 +125,7 @@ model Product {
   barcode              String?
   productCode          String?
   groupName            String?
+  autoGroupingDisabled Boolean               @default(false)
   hsCode               String?
   japanHsCode          String?
   coupangSku           String?               @unique

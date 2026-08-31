@@ -48,6 +48,7 @@ export type Product = {
     barcode?: string | null
     productCode?: string | null
     groupName?: string | null
+    autoGroupingDisabled?: boolean
     hsCode?: string | null
     japanHsCode?: string | null
     coupangSku?: string | null
@@ -114,6 +115,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [stock, setStock] = useState('0')
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
     const [orderUnit, setOrderUnit] = useState('1')
+    const [preserveUngroupedState, setPreserveUngroupedState] = useState(false)
     const [hasImageChanged, setHasImageChanged] = useState(false)
     const [loading, setLoading] = useState(false)
     const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(cachedExchangeRates);
@@ -205,6 +207,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode((initialData.productCode || '').toUpperCase())
             setGroupName(initialData.groupName || '')
+            setPreserveUngroupedState(!isCopy && initialData.autoGroupingDisabled === true)
             setHsCode(initialData.hsCode || '')
             setJapanHsCode(initialData.japanHsCode || '')
             setCoupangSku(initialData.coupangSku || '')
@@ -250,6 +253,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setBarcode('')
             setProductCode('')
             setGroupName('')
+            setPreserveUngroupedState(false)
             setHsCode('')
             setJapanHsCode('')
             setCoupangSku('')
@@ -305,6 +309,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 barcode: barcode.trim(),
                 productCode: normalizeProductCode(productCode.trim()),
                 groupName: groupName.trim(),
+                autoGroupingDisabled: groupName.trim() ? false : preserveUngroupedState,
                 hsCode: normalizeHsCode(hsCode.trim()),
                 japanHsCode: normalizeHsCode(japanHsCode.trim()),
                 coupangSku: coupangSku.trim(),

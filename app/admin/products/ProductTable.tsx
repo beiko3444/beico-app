@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Copy, Layers, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, Layers, Pencil, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import BarcodeDisplay from "@/components/BarcodeDisplay"
@@ -16,41 +16,43 @@ import {
 } from '@/lib/productGradePricing'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
-const PRODUCT_TABLE_WIDTH = 1700
+const PRODUCT_TABLE_WIDTH = 1740
 const PRODUCT_TABLE_COLS = 18
 
 const normalizeGroupName = (value?: string | null) => String(value || '').trim()
 const normalizeGroupKey = (value: string) => value.toLocaleLowerCase('ko-KR').replace(/\s+/g, ' ').trim()
 const normalizeProductCode = (value?: string | null) => String(value || '').trim().toUpperCase()
 const inferProductGroup = (product: ProductTableProduct) => {
+    if (product.autoGroupingDisabled) return null
+
     const manualName = normalizeGroupName(product.groupName)
     if (manualName) {
-        return { key: `manual:${normalizeGroupKey(manualName)}`, name: manualName, source: '직접 그룹' as const }
+        return { key: `group:${normalizeGroupKey(manualName)}`, name: manualName, source: '직접 그룹' as const }
     }
 
     const productName = normalizeGroupName(product.name)
     const colonBase = productName.split(/\s*[:：]\s*/)[0]?.trim()
     if (colonBase && colonBase !== productName && colonBase.length >= 4) {
-        return { key: `name:${normalizeGroupKey(colonBase)}`, name: colonBase, source: '자동 그룹' as const }
+        return { key: `group:${normalizeGroupKey(colonBase)}`, name: colonBase, source: '자동 그룹' as const }
     }
 
     const seriesMatch = productName.match(/^(.+?시리즈\s*\d+)/i)
     if (seriesMatch?.[1]) {
         const name = seriesMatch[1].trim()
-        return { key: `name:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
+        return { key: `group:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
     }
 
     const versionMatch = productName.match(/^(.+?V\s*\d+)/i)
     if (versionMatch?.[1]) {
         const name = versionMatch[1].replace(/\s+V\s*/i, 'V').trim()
-        return { key: `name:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
+        return { key: `group:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
     }
 
     const productCode = normalizeProductCode(product.productCode)
     const codeParts = productCode.split('-').filter(Boolean)
     if (codeParts.length >= 3 && /^\d+[A-Z]*$/i.test(codeParts[codeParts.length - 1] || '')) {
         const name = codeParts.slice(0, -1).join('-')
-        return { key: `code:${name}`, name, source: '자동 그룹' as const }
+        return { key: `group:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
     }
 
     return null
@@ -157,8 +159,12 @@ interface ProductRowProps {
     index: number
     activeGrade: ProductGrade
     onSelect: () => void
+    onDragStartProduct: (productId: string) => void
+    onDragEndProduct: () => void
     onSortOrderChange: (productId: string, newOrder: number) => void
     onDelete: (productId: string) => void
+    onUngroup: (productId: string) => void
+    onRestoreAutoGroup: (productId: string) => void
     checked: boolean
     onToggleCheck: (id: string) => void
     modifiedCost: string | undefined
@@ -176,7 +182,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSelect, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSelect, onDragStartProduct, onDragEndProduct, onSortOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -197,6 +203,8 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSel
     const retailNumber = parseNumericDraft(retailValue)
     const wholesaleMargin = wholesaleNumber > 0 ? ((wholesaleNumber - costNumber) / wholesaleNumber) * 100 : 0
     const retailMargin = retailNumber > 0 ? ((retailNumber - wholesaleNumber) / retailNumber) * 100 : 0
+    const visibleGroupName = normalizeGroupName(product.groupName)
+    const ungrouped = product.autoGroupingDisabled === true
 
     const [tempOrder, setTempOrder] = useState<string>(String(index + 1))
 
@@ -229,8 +237,15 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSel
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
                 <span
-                    className="inline-flex h-5 w-5 items-center justify-center text-gray-300"
-                    title="순서 숫자를 수정해 정렬합니다."
+                    draggable
+                    onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = 'move'
+                        event.dataTransfer.setData('text/plain', product.id)
+                        onDragStartProduct(product.id)
+                    }}
+                    onDragEnd={onDragEndProduct}
+                    className="inline-flex h-6 w-6 cursor-grab items-center justify-center rounded-md text-gray-300 transition hover:bg-blue-50 hover:text-blue-600 active:cursor-grabbing"
+                    title="끌어서 다른 그룹으로 이동"
                 >
                     ≡
                 </span>
@@ -271,8 +286,11 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSel
                             {product.nameJP && (
                                 <div className="text-[10px] text-gray-400 truncate">{product.nameJP}</div>
                             )}
-                            {product.groupName && (
-                                <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {product.groupName}</div>
+                            {visibleGroupName && (
+                                <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {visibleGroupName}</div>
+                            )}
+                            {ungrouped && (
+                                <div className="mt-0.5 truncate text-[10px] font-bold text-amber-600">그룹 해제됨</div>
                             )}
                         </div>
                     }
@@ -403,6 +421,18 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSel
                     />
                     <button
                         type="button"
+                        onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)}
+                        className={`inline-flex h-7 w-7 items-center justify-center rounded-md border transition ${
+                            ungrouped
+                                ? 'border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
+                                : 'border-amber-100 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white'
+                        }`}
+                        title={ungrouped ? '자동 그룹 복귀' : '그룹 해제'}
+                    >
+                        {ungrouped ? <RotateCcw size={13} /> : <Unlink size={13} />}
+                    </button>
+                    <button
+                        type="button"
                         onClick={() => onDelete(product.id)}
                         className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-500 transition hover:bg-red-500 hover:text-white"
                         title="삭제"
@@ -512,24 +542,47 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
     expanded,
     checkedCount,
     selected,
+    canDrop,
     onToggle,
     onToggleCheck,
     onSelect,
+    onDropProduct,
 }: {
     group: ProductGroupView
     expanded: boolean
     checkedCount: number
     selected: boolean
+    canDrop: boolean
     onToggle: () => void
     onToggleCheck: () => void
     onSelect: () => void
+    onDropProduct: (productId: string) => void
 }) {
     const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
     const availableCount = group.products.filter(product => product.wholesaleAvailable !== false).length
     const representative = group.products[0]
 
     return (
-        <tr className={`border-b border-blue-100 transition-colors ${selected ? 'bg-blue-50' : 'bg-slate-50 hover:bg-blue-50/60'}`}>
+        <tr
+            onDragOver={(event) => {
+                if (!canDrop) return
+                event.preventDefault()
+                event.dataTransfer.dropEffect = 'move'
+            }}
+            onDrop={(event) => {
+                if (!canDrop) return
+                event.preventDefault()
+                const productId = event.dataTransfer.getData('text/plain')
+                if (productId) onDropProduct(productId)
+            }}
+            className={`border-b transition-colors ${
+                canDrop
+                    ? 'border-blue-300 bg-blue-100/80 ring-1 ring-inset ring-blue-300'
+                    : selected
+                        ? 'border-blue-100 bg-blue-50'
+                        : 'border-blue-100 bg-slate-50 hover:bg-blue-50/60'
+            }`}
+        >
             <td colSpan={PRODUCT_TABLE_COLS} className="px-3 py-2">
                 <div
                     className="flex min-w-0 cursor-pointer items-center justify-between gap-3"
@@ -574,7 +627,7 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">{group.source}</span>
                             </div>
                             <div className="mt-0.5 text-[10px] font-bold text-blue-500">
-                                그룹을 누르면 SKU 목록을 접고 펼칩니다.
+                                {canDrop ? '여기에 놓으면 이 그룹으로 이동합니다.' : '그룹을 누르면 요약이 표시되고, 화살표로 SKU 목록을 접고 펼칩니다.'}
                             </div>
                         </div>
                     </div>
@@ -718,6 +771,7 @@ export default function ProductTable({
     const [availabilityFilter, setAvailabilityFilter] = useState<ProductAvailabilityFilter>('all')
     const [stockFilter, setStockFilter] = useState<ProductStockFilter>('all')
     const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
+    const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
     const pathname = usePathname()
@@ -746,6 +800,7 @@ export default function ProductTable({
         setModifiedOrderUnits({})
         setCollapsedGroupKeys(new Set())
         setSelectedGroupKey(null)
+        setDraggingProductId(null)
     }, [initialProducts])
 
     const filteredProducts = useMemo(() => {
@@ -777,6 +832,7 @@ export default function ProductTable({
             const existingGroup = groups.get(key)
             if (existingGroup) {
                 existingGroup.products.push(product)
+                if (source === '직접 그룹') existingGroup.source = '직접 그룹'
                 return
             }
             groups.set(key, {
@@ -901,6 +957,64 @@ export default function ProductTable({
             alert('삭제 중 오류 발생')
         }
     }, [router])
+
+    const patchProductGroups = useCallback(async (updates: Array<{ id: string; groupName: string | null; autoGroupingDisabled: boolean }>) => {
+        if (updates.length === 0) return
+
+        const previousProducts = products
+        const updateMap = new Map(updates.map(update => [update.id, update]))
+        setProducts(current => current.map(product => (
+            updateMap.has(product.id)
+                ? {
+                    ...product,
+                    groupName: updateMap.get(product.id)?.groupName ?? null,
+                    autoGroupingDisabled: updateMap.get(product.id)?.autoGroupingDisabled ?? false,
+                }
+                : product
+        )))
+
+        try {
+            const responses = await Promise.all(updates.map(update => fetch(`/api/products/${update.id}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    groupName: update.groupName,
+                    autoGroupingDisabled: update.autoGroupingDisabled,
+                }),
+            })))
+            if (responses.some(response => !response.ok)) {
+                throw new Error('그룹 변경 저장에 실패했습니다.')
+            }
+            router.refresh()
+        } catch (error) {
+            console.error(error)
+            setProducts(previousProducts)
+            alert('그룹 변경 중 오류가 발생했습니다.')
+        } finally {
+            setDraggingProductId(null)
+        }
+    }, [products, router])
+
+    const handleDropProductToGroup = useCallback((productId: string, targetGroup: ProductGroupView) => {
+        if (!productId || groupKeyByProductId.get(productId) === targetGroup.key) {
+            setDraggingProductId(null)
+            return
+        }
+        setSelectedGroupKey(targetGroup.key)
+        void patchProductGroups([{ id: productId, groupName: targetGroup.name, autoGroupingDisabled: false }])
+    }, [groupKeyByProductId, patchProductGroups])
+
+    const handleUngroupProduct = useCallback((productId: string) => {
+        setSelectedGroupKey(`single:${productId}`)
+        void patchProductGroups([{ id: productId, groupName: null, autoGroupingDisabled: true }])
+    }, [patchProductGroups])
+
+    const handleRestoreAutoGroup = useCallback((productId: string) => {
+        const product = products.find(item => item.id === productId)
+        const restoredGroup = product ? inferProductGroup({ ...product, groupName: null, autoGroupingDisabled: false }) : null
+        setSelectedGroupKey(restoredGroup?.key || `single:${productId}`)
+        void patchProductGroups([{ id: productId, groupName: null, autoGroupingDisabled: false }])
+    }, [patchProductGroups, products])
 
     const handleToggleCheck = useCallback((id: string) => {
         setCheckedIds(current => {
@@ -1327,7 +1441,7 @@ export default function ProductTable({
                         <col className="w-[94px]" />
                         <col className="w-[94px]" />
                         <col className="w-[150px]" />
-                        <col className="w-[96px]" />
+                        <col className="w-[132px]" />
                     </colgroup>
                     <thead className="sticky top-0 z-10 bg-blue-700 text-white shadow-sm">
                         <tr>
@@ -1375,8 +1489,12 @@ export default function ProductTable({
                                     index={productIndexById.get(product.id) ?? 0}
                                     activeGrade={activeGrade}
                                     onSelect={() => setSelectedGroupKey(groupKeyByProductId.get(product.id) || null)}
+                                    onDragStartProduct={setDraggingProductId}
+                                    onDragEndProduct={() => setDraggingProductId(null)}
                                     onSortOrderChange={onSortOrderChange}
                                     onDelete={handleDelete}
+                                    onUngroup={handleUngroupProduct}
+                                    onRestoreAutoGroup={handleRestoreAutoGroup}
                                     checked={checkedIds.has(product.id)}
                                     onToggleCheck={handleToggleCheck}
                                     modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
@@ -1408,9 +1526,11 @@ export default function ProductTable({
                                                 expanded={expanded}
                                                 checkedCount={checkedCount}
                                                 selected={selectedGroup?.key === group.key}
+                                                canDrop={Boolean(draggingProductId && !group.products.some(product => product.id === draggingProductId))}
                                                 onToggle={() => toggleGroup(group.key)}
                                                 onToggleCheck={() => handleToggleGroupCheck(group.products.map(product => product.id))}
                                                 onSelect={() => setSelectedGroupKey(group.key)}
+                                                onDropProduct={(productId) => handleDropProductToGroup(productId, group)}
                                             />
                                         </tbody>
                                     ) : null}
@@ -1422,8 +1542,12 @@ export default function ProductTable({
                                                 index={productIndexById.get(product.id) ?? 0}
                                                 activeGrade={activeGrade}
                                                 onSelect={() => setSelectedGroupKey(group.key)}
+                                                onDragStartProduct={setDraggingProductId}
+                                                onDragEndProduct={() => setDraggingProductId(null)}
                                                 onSortOrderChange={onSortOrderChange}
                                                 onDelete={handleDelete}
+                                                onUngroup={handleUngroupProduct}
+                                                onRestoreAutoGroup={handleRestoreAutoGroup}
                                                 checked={checkedIds.has(product.id)}
                                                 onToggleCheck={handleToggleCheck}
                                                 modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
