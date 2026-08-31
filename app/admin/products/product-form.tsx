@@ -5,6 +5,41 @@ import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 
+type ExchangeRates = { USD: number, JPY: number, CNY: number }
+
+let cachedExchangeRates: ExchangeRates | null = null
+let pendingExchangeRates: Promise<ExchangeRates | null> | null = null
+
+async function loadExchangeRates() {
+    if (cachedExchangeRates) return cachedExchangeRates
+    if (pendingExchangeRates) return pendingExchangeRates
+
+    pendingExchangeRates = fetch('https://open.er-api.com/v6/latest/USD')
+        .then(res => res.json())
+        .then(data => {
+            const krw = data?.rates?.KRW
+            const jpy = data?.rates?.JPY
+            const cny = data?.rates?.CNY
+            if (!krw || !jpy || !cny) return null
+
+            cachedExchangeRates = {
+                USD: krw,
+                JPY: krw / jpy,
+                CNY: krw / cny,
+            }
+            return cachedExchangeRates
+        })
+        .catch(err => {
+            console.error("Failed to fetch exchange rates", err)
+            return null
+        })
+        .finally(() => {
+            pendingExchangeRates = null
+        })
+
+    return pendingExchangeRates
+}
+
 export type Product = {
     id: string
     name: string
@@ -81,28 +116,23 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [orderUnit, setOrderUnit] = useState('1')
     const [hasImageChanged, setHasImageChanged] = useState(false)
     const [loading, setLoading] = useState(false)
-    const [exchangeRates, setExchangeRates] = useState<{ USD: number, JPY: number, CNY: number } | null>(null);
+    const [exchangeRates, setExchangeRates] = useState<ExchangeRates | null>(cachedExchangeRates);
 
     useEffect(() => {
-        // Fetch exchange rates
-        fetch('https://open.er-api.com/v6/latest/USD')
-            .then(res => res.json())
-            .then(data => {
-                if (data && data.rates) {
-                    const krw = data.rates.KRW;
-                    const jpy = data.rates.JPY;
-                    const cny = data.rates.CNY;
-                    if (krw && jpy && cny) {
-                        setExchangeRates({
-                            USD: krw,
-                            JPY: krw / jpy,
-                            CNY: krw / cny
-                        });
-                    }
-                }
-            })
-            .catch(err => console.error("Failed to fetch exchange rates", err));
-    }, []);
+        if (!isOpen) return
+        if (cachedExchangeRates) {
+            setExchangeRates(cachedExchangeRates)
+            return
+        }
+
+        let cancelled = false
+        loadExchangeRates().then(rates => {
+            if (!cancelled && rates) setExchangeRates(rates)
+        })
+        return () => {
+            cancelled = true
+        }
+    }, [isOpen]);
 
     type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string, orderUnit: string };
     type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice };

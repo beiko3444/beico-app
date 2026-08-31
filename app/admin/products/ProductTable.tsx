@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useMemo, useState, useEffect } from 'react'
+import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
 import {
     DndContext,
@@ -111,6 +111,51 @@ const formatNumberInput = (value: number | string | null | undefined) => {
     return dotIndex >= 0 ? `${formattedInteger}.${decimalRaw}` : formattedInteger
 }
 
+const LazyBarcodeCell = memo(function LazyBarcodeCell({ value }: { value: string | number | null | undefined }) {
+    const containerRef = useRef<HTMLDivElement>(null)
+    const [canRenderBarcode, setCanRenderBarcode] = useState(false)
+    const safeValue = value === null || value === undefined ? '' : String(value).trim()
+
+    useEffect(() => {
+        setCanRenderBarcode(false)
+        if (!safeValue) return
+
+        const node = containerRef.current
+        if (!node || typeof IntersectionObserver === 'undefined') {
+            const frame = window.requestAnimationFrame(() => setCanRenderBarcode(true))
+            return () => window.cancelAnimationFrame(frame)
+        }
+
+        let frame = 0
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (!entries.some(entry => entry.isIntersecting)) return
+                observer.disconnect()
+                frame = window.requestAnimationFrame(() => setCanRenderBarcode(true))
+            },
+            { rootMargin: '360px 0px' },
+        )
+
+        observer.observe(node)
+        return () => {
+            observer.disconnect()
+            if (frame) window.cancelAnimationFrame(frame)
+        }
+    }, [safeValue])
+
+    return (
+        <div ref={containerRef} className="flex min-h-8 items-center justify-center">
+            {canRenderBarcode ? (
+                <BarcodeDisplay value={safeValue} />
+            ) : (
+                <span className="max-w-[160px] truncate text-[10px] font-bold text-gray-400" title={safeValue}>
+                    {safeValue || '-'}
+                </span>
+            )}
+        </div>
+    )
+})
+
 async function postBulkUpdate(url: string, payload: Record<string, unknown>) {
     const response = await fetch(url, {
         method: 'POST',
@@ -146,7 +191,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-function SortableProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+const SortableProductRow = memo(function SortableProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const {
         attributes,
         listeners,
@@ -367,7 +412,7 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-500 font-mono text-[10px] whitespace-nowrap">{product.hsCode || '-'}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-500 font-mono text-[10px] whitespace-nowrap">{product.japanHsCode || '-'}</td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-400 font-mono text-[10px] whitespace-nowrap">
-                <BarcodeDisplay value={product.barcode} />
+                <LazyBarcodeCell value={product.barcode} />
             </td>
             <td className="px-2 py-1.5 text-center whitespace-nowrap">
                 <div className="flex items-center justify-center gap-1">
@@ -394,7 +439,7 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
             </td>
         </tr>
     )
-}
+})
 
 type ProductGroupView = {
     key: string
@@ -404,7 +449,7 @@ type ProductGroupView = {
     products: ProductTableProduct[]
 }
 
-function ProductGroupHeader({
+const ProductGroupHeader = memo(function ProductGroupHeader({
     group,
     expanded,
     checkedCount,
@@ -466,7 +511,7 @@ function ProductGroupHeader({
             </td>
         </tr>
     )
-}
+})
 
 export default function ProductTable({ initialProducts }: { initialProducts: ProductTableProduct[] }) {
     const [products, setProducts] = useState(initialProducts)
@@ -520,6 +565,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         () => productGroups.flatMap(group => (group.isNamed && collapsedGroupKeys.has(group.key)) ? [] : group.products),
         [productGroups, collapsedGroupKeys],
     )
+    const visibleProductIds = useMemo(() => visibleProducts.map(product => product.id), [visibleProducts])
     const productIndexById = useMemo(
         () => new Map(products.map((product, index) => [product.id, index])),
         [products],
@@ -536,7 +582,21 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         })
     )
 
-    const handleDragEnd = async (event: DragEndEvent) => {
+    const saveOrder = useCallback(async (productIds: string[]) => {
+        try {
+            await fetch('/api/products/reorder', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productIds })
+            })
+            // router.refresh() // Optional: Refresh to sync server state
+        } catch (e) {
+            console.error(e)
+            alert("Failed to save product order")
+        }
+    }, [])
+
+    const handleDragEnd = useCallback(async (event: DragEndEvent) => {
         const { active, over } = event
 
         if (over && active.id !== over.id) {
@@ -551,23 +611,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 return newItems
             })
         }
-    }
+    }, [saveOrder])
 
-    const saveOrder = async (productIds: string[]) => {
-        try {
-            await fetch('/api/products/reorder', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productIds })
-            })
-            // router.refresh() // Optional: Refresh to sync server state
-        } catch (e) {
-            console.error(e)
-            alert("Failed to save product order")
-        }
-    }
-
-    const onSortOrderChange = async (productId: string, newIndex: number) => {
+    const onSortOrderChange = useCallback(async (productId: string, newIndex: number) => {
         // ... (existing code)
         const clampedIndex = Math.max(0, Math.min(newIndex, products.length - 1))
         const oldIndex = products.findIndex(p => p.id === productId)
@@ -575,9 +621,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         const newItems = arrayMove(products, oldIndex, clampedIndex)
         setProducts(newItems)
         saveOrder(newItems.map(item => item.id))
-    }
+    }, [products, saveOrder])
 
-    const handleDelete = async (id: string) => {
+    const handleDelete = useCallback(async (id: string) => {
         if (!confirm('정말 삭제하시겠습니까? 관련 주문 데이터가 있을 경우 오류가 발생할 수 있습니다.')) return
         try {
             const res = await fetch(`/api/products/${id}`, { method: 'DELETE' })
@@ -592,21 +638,23 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             console.error(e)
             alert('삭제 중 오류 발생')
         }
-    }
+    }, [router])
 
-    const handleToggleCheck = (id: string) => {
-        const next = new Set(checkedIds)
-        if (next.has(id)) next.delete(id)
-        else next.add(id)
-        setCheckedIds(next)
-    }
+    const handleToggleCheck = useCallback((id: string) => {
+        setCheckedIds(current => {
+            const next = new Set(current)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+        })
+    }, [])
 
-    const handleToggleAll = () => {
+    const handleToggleAll = useCallback(() => {
         if (checkedIds.size === products.length) setCheckedIds(new Set())
         else setCheckedIds(new Set(products.map(p => p.id)))
-    }
+    }, [checkedIds.size, products])
 
-    const handleToggleGroupCheck = (ids: string[]) => {
+    const handleToggleGroupCheck = useCallback((ids: string[]) => {
         setCheckedIds(current => {
             const allChecked = ids.every(id => current.has(id))
             const next = new Set(current)
@@ -616,57 +664,57 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             })
             return next
         })
-    }
+    }, [])
 
-    const toggleGroup = (key: string) => {
+    const toggleGroup = useCallback((key: string) => {
         setCollapsedGroupKeys(current => {
             const next = new Set(current)
             if (next.has(key)) next.delete(key)
             else next.add(key)
             return next
         })
-    }
+    }, [])
 
-    const ensureProductChecked = (id: string) => {
+    const ensureProductChecked = useCallback((id: string) => {
         setCheckedIds(current => {
             if (current.has(id)) return current
             const next = new Set(current)
             next.add(id)
             return next
         })
-    }
+    }, [])
 
-    const handleCostChange = (id: string, val: string) => {
+    const handleCostChange = useCallback((id: string, val: string) => {
         setModifiedCosts(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
         ensureProductChecked(id)
-    }
+    }, [activeGrade, ensureProductChecked])
 
-    const handleWholesaleChange = (id: string, val: string) => {
+    const handleWholesaleChange = useCallback((id: string, val: string) => {
         setModifiedWholesales(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
         ensureProductChecked(id)
-    }
+    }, [activeGrade, ensureProductChecked])
 
-    const handleRetailChange = (id: string, val: string) => {
+    const handleRetailChange = useCallback((id: string, val: string) => {
         setModifiedRetails(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
         ensureProductChecked(id)
-    }
+    }, [activeGrade, ensureProductChecked])
 
-    const handleStockChange = (id: string, val: string) => {
+    const handleStockChange = useCallback((id: string, val: string) => {
         setModifiedStocks(prev => ({ ...prev, [id]: val }))
         ensureProductChecked(id)
-    }
+    }, [ensureProductChecked])
 
-    const handleMoqChange = (id: string, val: string) => {
+    const handleMoqChange = useCallback((id: string, val: string) => {
         setModifiedMoqs(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
         ensureProductChecked(id)
-    }
+    }, [activeGrade, ensureProductChecked])
 
-    const handleOrderUnitChange = (id: string, val: string) => {
+    const handleOrderUnitChange = useCallback((id: string, val: string) => {
         setModifiedOrderUnits(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
         ensureProductChecked(id)
-    }
+    }, [activeGrade, ensureProductChecked])
 
-    const handleToggleOrderAvailability = async (id: string) => {
+    const handleToggleOrderAvailability = useCallback(async (id: string) => {
         const product = products.find(p => p.id === id)
         if (!product) return
         const newValue = product.wholesaleAvailable === false ? true : false
@@ -684,7 +732,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         } catch {
             alert('오류 발생')
         }
-    }
+    }, [products])
 
     const handleSaveChanges = async () => {
         if (checkedIds.size === 0) return
@@ -920,7 +968,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         <SortableContext
-                            items={visibleProducts.map(p => p.id)}
+                            items={visibleProductIds}
                             strategy={verticalListSortingStrategy}
                         >
                             {products.length === 0 ? (
