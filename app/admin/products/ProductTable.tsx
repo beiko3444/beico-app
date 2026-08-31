@@ -21,6 +21,7 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
+import ProductStockHistoryModal from './ProductStockHistoryModal'
 import BarcodeDisplay from "@/components/BarcodeDisplay"
 import { useRouter } from 'next/navigation'
 import {
@@ -42,9 +43,40 @@ const PRODUCT_TABLE_WIDTH = 1920
 const PRODUCT_TABLE_COLS = 18
 
 const normalizeGroupName = (value?: string | null) => String(value || '').trim()
-const productGroupKey = (product: ProductTableProduct) => {
-    const groupName = normalizeGroupName(product.groupName)
-    return groupName ? `group:${groupName.toLocaleLowerCase('ko-KR')}` : `single:${product.id}`
+const normalizeGroupKey = (value: string) => value.toLocaleLowerCase('ko-KR').replace(/\s+/g, ' ').trim()
+const normalizeProductCode = (value?: string | null) => String(value || '').trim().toUpperCase()
+const inferProductGroup = (product: ProductTableProduct) => {
+    const manualName = normalizeGroupName(product.groupName)
+    if (manualName) {
+        return { key: `manual:${normalizeGroupKey(manualName)}`, name: manualName, source: '직접 그룹' as const }
+    }
+
+    const productName = normalizeGroupName(product.name)
+    const colonBase = productName.split(/\s*[:：]\s*/)[0]?.trim()
+    if (colonBase && colonBase !== productName && colonBase.length >= 4) {
+        return { key: `name:${normalizeGroupKey(colonBase)}`, name: colonBase, source: '자동 그룹' as const }
+    }
+
+    const seriesMatch = productName.match(/^(.+?시리즈\s*\d+)/i)
+    if (seriesMatch?.[1]) {
+        const name = seriesMatch[1].trim()
+        return { key: `name:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
+    }
+
+    const versionMatch = productName.match(/^(.+?V\s*\d+)/i)
+    if (versionMatch?.[1]) {
+        const name = versionMatch[1].replace(/\s+V\s*/i, 'V').trim()
+        return { key: `name:${normalizeGroupKey(name)}`, name, source: '자동 그룹' as const }
+    }
+
+    const productCode = normalizeProductCode(product.productCode)
+    const codeParts = productCode.split('-').filter(Boolean)
+    if (codeParts.length >= 3 && /^\d+[A-Z]*$/i.test(codeParts[codeParts.length - 1] || '')) {
+        const name = codeParts.slice(0, -1).join('-')
+        return { key: `code:${name}`, name, source: '자동 그룹' as const }
+    }
+
+    return null
 }
 const formatInteger = (value: number | string | null | undefined) => {
     const number = Number(value)
@@ -215,14 +247,17 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums whitespace-nowrap">
-                <input
-                    type="number"
-                    min="0"
-                    value={modifiedStock !== undefined ? modifiedStock : product.stock ?? 0}
-                    onChange={(event) => onStockChange(product.id, event.target.value)}
-                    className="w-16 rounded border border-emerald-200 bg-emerald-50/60 px-1 py-0.5 text-right text-[11px] font-black text-emerald-700 outline-none transition-colors focus:border-emerald-500"
-                    title="관리자용 재고입니다. 도매 발주/파트너 주문 재고와는 연결하지 않습니다."
-                />
+                <div className="flex flex-col items-center">
+                    <input
+                        type="number"
+                        min="0"
+                        value={modifiedStock !== undefined ? modifiedStock : product.stock ?? 0}
+                        onChange={(event) => onStockChange(product.id, event.target.value)}
+                        className="w-16 rounded border border-emerald-200 bg-emerald-50/60 px-1 py-0.5 text-right text-[11px] font-black text-emerald-700 outline-none transition-colors focus:border-emerald-500"
+                        title="관리자용 재고입니다. 도매 발주/파트너 주문 재고와는 연결하지 않습니다."
+                    />
+                    <ProductStockHistoryModal productId={product.id} productName={product.name} />
+                </div>
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
                 <button
@@ -341,6 +376,7 @@ type ProductGroupView = {
     key: string
     name: string
     isNamed: boolean
+    source: '직접 그룹' | '자동 그룹' | '단일 상품'
     products: ProductTableProduct[]
 }
 
@@ -391,6 +427,7 @@ function ProductGroupHeader({
                             <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate text-[12px] font-black text-indigo-950">상품 그룹 · {group.name}</span>
                                 <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-indigo-600">{group.products.length} SKU</span>
+                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-black text-indigo-500">{group.source}</span>
                             </div>
                             <div className="mt-0.5 text-[10px] font-bold text-indigo-500">
                                 그룹을 누르면 SKU 목록을 접고 펼칩니다.
@@ -426,19 +463,29 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     }, [initialProducts])
 
     const productGroups = useMemo<ProductGroupView[]>(() => {
+        const inferred = products.map(product => ({ product, candidate: inferProductGroup(product) }))
+        const inferredCounts = new Map<string, number>()
+        inferred.forEach(({ candidate }) => {
+            if (!candidate) return
+            inferredCounts.set(candidate.key, (inferredCounts.get(candidate.key) || 0) + 1)
+        })
+
         const groups = new Map<string, ProductGroupView>()
-        products.forEach((product) => {
-            const groupName = normalizeGroupName(product.groupName)
-            const key = productGroupKey(product)
-            const group = groups.get(key)
-            if (group) {
-                group.products.push(product)
+        inferred.forEach(({ product, candidate }) => {
+            const shouldGroup = Boolean(candidate && (candidate.source === '직접 그룹' || (inferredCounts.get(candidate.key) || 0) > 1))
+            const key = shouldGroup && candidate ? candidate.key : `single:${product.id}`
+            const name = shouldGroup && candidate ? candidate.name : product.name
+            const source = shouldGroup && candidate ? candidate.source : '단일 상품'
+            const existingGroup = groups.get(key)
+            if (existingGroup) {
+                existingGroup.products.push(product)
                 return
             }
             groups.set(key, {
                 key,
-                name: groupName || product.name,
-                isNamed: Boolean(groupName),
+                name,
+                isNamed: shouldGroup,
+                source,
                 products: [product],
             })
         })

@@ -2,6 +2,12 @@ import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
+import {
+    getProductStockActorId,
+    normalizeProductStock,
+    PRODUCT_STOCK_SOURCES,
+    recordProductStockChange,
+} from "@/lib/product-stock-history"
 
 const productResponseSelect = {
     id: true,
@@ -80,7 +86,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
             priceD: (body.priceD !== null && body.priceD !== undefined && body.priceD !== "") ? Number(body.priceD) : null,
-            stock: body.stock !== undefined ? Math.max(0, Math.round(Number(body.stock) || 0)) : 0,
+            stock: body.stock !== undefined ? normalizeProductStock(body.stock) : 0,
             minOrderQuantity: body.minOrderQuantity !== undefined ? Math.max(1, Math.round(Number(body.minOrderQuantity))) : 1,
             orderUnit: body.orderUnit !== undefined ? Math.max(1, Math.round(Number(body.orderUnit))) : 1,
             sortOrder: body.sortOrder !== undefined ? Math.round(Number(body.sortOrder)) : undefined,
@@ -90,10 +96,26 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             updateData.imageUrl = await normalizeIncomingProductImage(body.imageUrl)
         }
 
-        const product = await prisma.product.update({
-            where: { id },
-            data: updateData,
-            select: productResponseSelect
+        const changedById = await getProductStockActorId()
+        const product = await prisma.$transaction(async (tx) => {
+            const existing = await tx.product.findUniqueOrThrow({
+                where: { id },
+                select: { stock: true },
+            })
+            const updated = await tx.product.update({
+                where: { id },
+                data: updateData,
+                select: productResponseSelect,
+            })
+            await recordProductStockChange(tx, {
+                productId: id,
+                previousStock: existing.stock,
+                newStock: updated.stock,
+                source: PRODUCT_STOCK_SOURCES.EDIT,
+                changedById,
+                note: '상품 상세 수정',
+            })
+            return updated
         })
 
         revalidatePath('/admin/products')
@@ -119,17 +141,35 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
 
         delete patchData.copyImageFromProductId
-        if (Object.prototype.hasOwnProperty.call(body, 'stock')) {
-            patchData.stock = Math.max(0, Math.round(Number(body.stock) || 0))
+        const hasStockChange = Object.prototype.hasOwnProperty.call(body, 'stock')
+        if (hasStockChange) {
+            patchData.stock = normalizeProductStock(body.stock)
         }
         if (Object.prototype.hasOwnProperty.call(body, 'groupName')) {
             patchData.groupName = body.groupName ? String(body.groupName).trim() : null
         }
 
-        const product = await prisma.product.update({
-            where: { id },
-            data: patchData,
-            select: productResponseSelect,
+        const changedById = hasStockChange ? await getProductStockActorId() : null
+        const product = await prisma.$transaction(async (tx) => {
+            const existing = hasStockChange
+                ? await tx.product.findUniqueOrThrow({ where: { id }, select: { stock: true } })
+                : null
+            const updated = await tx.product.update({
+                where: { id },
+                data: patchData,
+                select: productResponseSelect,
+            })
+            if (existing) {
+                await recordProductStockChange(tx, {
+                    productId: id,
+                    previousStock: existing.stock,
+                    newStock: updated.stock,
+                    source: PRODUCT_STOCK_SOURCES.PATCH,
+                    changedById,
+                    note: '상품 빠른 수정',
+                })
+            }
+            return updated
         })
 
         revalidatePath('/admin/products')

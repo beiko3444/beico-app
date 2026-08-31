@@ -2,6 +2,12 @@ import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
+import {
+    getProductStockActorId,
+    normalizeProductStock,
+    PRODUCT_STOCK_SOURCES,
+    recordProductStockChange,
+} from "@/lib/product-stock-history"
 
 const productListSelect = {
     id: true,
@@ -100,7 +106,7 @@ export async function POST(request: Request) {
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
             priceD: (body.priceD !== null && body.priceD !== undefined && body.priceD !== "") ? Number(body.priceD) : null,
-            stock: body.stock !== undefined ? Math.max(0, Math.round(Number(body.stock) || 0)) : 0,
+            stock: body.stock !== undefined ? normalizeProductStock(body.stock) : 0,
             minOrderQuantity: minOrderQuantity !== undefined ? Math.max(1, Math.round(Number(minOrderQuantity))) : 1,
             orderUnit: orderUnit !== undefined ? Math.max(1, Math.round(Number(orderUnit))) : 1,
             regionalPrices: body.regionalPrices !== undefined ? body.regionalPrices : undefined,
@@ -113,12 +119,24 @@ export async function POST(request: Request) {
         })
         const nextSortOrder = (maxSortOrderProduct?.sortOrder ?? -1) + 1
 
-        const product = await prisma.product.create({
-            data: {
-                ...productData,
-                sortOrder: nextSortOrder
-            },
-            select: productListSelect
+        const changedById = await getProductStockActorId()
+        const product = await prisma.$transaction(async (tx) => {
+            const created = await tx.product.create({
+                data: {
+                    ...productData,
+                    sortOrder: nextSortOrder
+                },
+                select: productListSelect
+            })
+            await recordProductStockChange(tx, {
+                productId: created.id,
+                previousStock: 0,
+                newStock: created.stock,
+                source: PRODUCT_STOCK_SOURCES.CREATE,
+                changedById,
+                note: '상품 등록',
+            })
+            return created
         })
 
         revalidatePath('/admin/products')

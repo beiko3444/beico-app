@@ -10,23 +10,24 @@ datasource db {
 }
 
 model User {
-  id             String          @id @default(uuid())
-  username       String          @unique
-  password       String
-  name           String
-  role           String          @default("PARTNER")
-  status         String          @default("PENDING")
-  createdAt      DateTime        @default(now())
-  updatedAt      DateTime        @updatedAt
-  country        String?
-  orders         Order[]
-  proformaInvoices ProformaInvoice[]
-  partnerProfile PartnerProfile?
-  inventoryPreference InventoryPreference?
-  inventoryInbounds InventoryInbound[]
-  pushTokens PushToken[]
-  mobileMessages MobileMessage[]
+  id                     String                  @id @default(uuid())
+  username               String                  @unique
+  password               String
+  name                   String
+  role                   String                  @default("PARTNER")
+  status                 String                  @default("PENDING")
+  createdAt              DateTime                @default(now())
+  updatedAt              DateTime                @updatedAt
+  country                String?
+  orders                 Order[]
+  proformaInvoices       ProformaInvoice[]
+  partnerProfile         PartnerProfile?
+  inventoryPreference    InventoryPreference?
+  inventoryInbounds      InventoryInbound[]
+  pushTokens             PushToken[]
+  mobileMessages         MobileMessage[]
   mobileOutgoingMessages MobileOutgoingMessage[]
+  productStockHistories  ProductStockHistory[]
 }
 
 model InventoryPreference {
@@ -40,7 +41,7 @@ model InventoryPreference {
 }
 
 model InventoryInbound {
-  id              String   @id @default(uuid())
+  id              String                  @id @default(uuid())
   inboundDate     DateTime
   warehouseItemId String?
   masterId        Int?
@@ -48,9 +49,9 @@ model InventoryInbound {
   productImageUrl String?
   quantity        Int
   createdById     String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  createdBy       User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  createdBy       User?                   @relation(fields: [createdById], references: [id], onDelete: SetNull)
   warehouseItem   WarehouseInventoryItem? @relation(fields: [warehouseItemId], references: [id], onDelete: SetNull)
 
   @@index([inboundDate])
@@ -60,16 +61,16 @@ model InventoryInbound {
 }
 
 model WarehouseInventoryItem {
-  id          String   @id @default(uuid())
+  id          String             @id @default(uuid())
   name        String
   nameJP      String?
-  productCode String?  @unique
+  productCode String?            @unique
   imageUrl    String?
-  stock       Int      @default(0)
-  sortOrder   Int      @default(0)
-  active      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  stock       Int                @default(0)
+  sortOrder   Int                @default(0)
+  active      Boolean            @default(true)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
   inbounds    InventoryInbound[]
 
   @@index([active])
@@ -77,15 +78,15 @@ model WarehouseInventoryItem {
 }
 
 model PushToken {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  platform  String
-  enabled   Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id         String   @id @default(uuid())
+  userId     String
+  token      String   @unique
+  platform   String
+  enabled    Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
   lastSeenAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([enabled])
@@ -107,56 +108,74 @@ model PartnerProfile {
 }
 
 model Product {
-  id               String      @id @default(uuid())
-  name             String
-  nameJP           String?
-  buyPrice         Float
-  sellPrice        Float
-  onlinePrice      Float?      @default(0)
-  priceA           Float?
-  priceB           Float?
-  priceC           Float?
-  priceD           Float?
-  stock            Int         @default(0)
-  safetyStock      Int         @default(0)
-  createdAt        DateTime    @default(now())
-  updatedAt        DateTime    @updatedAt
-  barcode          String?
-  productCode      String?
-  groupName        String?
-  hsCode           String?
-  japanHsCode      String?
-  coupangSku       String?     @unique
-  imageUrl         String?
-  sortOrder        Int         @default(0)
-  minOrderQuantity Int         @default(1)
-  orderUnit        Int         @default(1)
-  nameEN           String?
-  jpBuyPrice       Float?      @default(0)
-  jpSellPrice      Float?      @default(0)
-  krBuyPrice       Float?      @default(0)
-  krSellPrice      Float?      @default(0)
-  usBuyPrice       Float?      @default(0)
-  usSellPrice      Float?      @default(0)
-  regionalPrices      Json?       @default("{}")
-  wholesaleAvailable  Boolean     @default(true)
-  orderItems       OrderItem[]
+  id                   String                @id @default(uuid())
+  name                 String
+  nameJP               String?
+  buyPrice             Float
+  sellPrice            Float
+  onlinePrice          Float?                @default(0)
+  priceA               Float?
+  priceB               Float?
+  priceC               Float?
+  priceD               Float?
+  stock                Int                   @default(0)
+  safetyStock          Int                   @default(0)
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  barcode              String?
+  productCode          String?
+  groupName            String?
+  hsCode               String?
+  japanHsCode          String?
+  coupangSku           String?               @unique
+  imageUrl             String?
+  sortOrder            Int                   @default(0)
+  minOrderQuantity     Int                   @default(1)
+  orderUnit            Int                   @default(1)
+  nameEN               String?
+  jpBuyPrice           Float?                @default(0)
+  jpSellPrice          Float?                @default(0)
+  krBuyPrice           Float?                @default(0)
+  krSellPrice          Float?                @default(0)
+  usBuyPrice           Float?                @default(0)
+  usSellPrice          Float?                @default(0)
+  regionalPrices       Json?                 @default("{}")
+  wholesaleAvailable   Boolean               @default(true)
+  orderItems           OrderItem[]
   proformaInvoiceItems ProformaInvoiceItem[]
+  stockHistory         ProductStockHistory[]
+}
+
+model ProductStockHistory {
+  id            String   @id @default(uuid())
+  productId     String
+  previousStock Int
+  newStock      Int
+  delta         Int
+  source        String
+  note          String?
+  changedById   String?
+  createdAt     DateTime @default(now())
+  product       Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  changedBy     User?    @relation(fields: [changedById], references: [id], onDelete: SetNull)
+
+  @@index([productId, createdAt])
+  @@index([changedById])
 }
 
 model Order {
-  id                      String      @id @default(uuid())
+  id                      String       @id @default(uuid())
   userId                  String
   total                   Float
-  createdAt               DateTime    @default(now())
-  status                  String      @default("PENDING")
+  createdAt               DateTime     @default(now())
+  status                  String       @default("PENDING")
   trackingNumber          String?
   courier                 String?
-  taxInvoiceIssued        Boolean     @default(false)
-  orderNumber             String?     @unique
+  taxInvoiceIssued        Boolean      @default(false)
+  orderNumber             String?      @unique
   depositConfirmedAt      DateTime?
   adminDepositConfirmedAt DateTime?
-  user                    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                    User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   items                   OrderItem[]
   depositSmsMessages      DepositSms[]
 }
@@ -218,27 +237,27 @@ model MaterialSupply {
 }
 
 model ElectricityUsage {
-  id                String   @id @default(uuid())
-  year              Int
-  month             Int
-  readingDate       String
-  usagePeriod       String
-  meterCurrent      String
-  meterPrevious     String
-  totalUsage        Int
-  totalAmount       Int
-  rawBillData       String
-  landlordMeterPrev Int?
-  landlordMeterCurr Int?
-  landlordUsage     Int?
-  waterHeaterKw     Float?
-  outdoorLightKw    Float?
-  meterPhotoUrl     String?
+  id                   String    @id @default(uuid())
+  year                 Int
+  month                Int
+  readingDate          String
+  usagePeriod          String
+  meterCurrent         String
+  meterPrevious        String
+  totalUsage           Int
+  totalAmount          Int
+  rawBillData          String
+  landlordMeterPrev    Int?
+  landlordMeterCurr    Int?
+  landlordUsage        Int?
+  waterHeaterKw        Float?
+  outdoorLightKw       Float?
+  meterPhotoUrl        String?
   meterPhotoUploadedAt DateTime?
-  rawText           String?
-  extractionHistory String?
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  rawText              String?
+  extractionHistory    String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
   @@unique([year, month])
 }
@@ -309,14 +328,14 @@ model MindBoard {
 }
 
 model AttendanceEmployee {
-  id          String             @id @default(uuid())
-  name        String
-  hourlyWage  Int                @default(0)
-  dailyHours  Float              @default(8)
-  active      Boolean            @default(true)
-  records     AttendanceRecord[]
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  id         String             @id @default(uuid())
+  name       String
+  hourlyWage Int                @default(0)
+  dailyHours Float              @default(8)
+  active     Boolean            @default(true)
+  records    AttendanceRecord[]
+  createdAt  DateTime           @default(now())
+  updatedAt  DateTime           @updatedAt
 }
 
 model AttendanceRecord {
@@ -331,35 +350,35 @@ model AttendanceRecord {
 }
 
 model WormEmailAwbCache {
-  id        String   @id @default(uuid())
-  uid       String   @unique
+  id        String    @id @default(uuid())
+  uid       String    @unique
   subject   String?
   emailDate DateTime?
   awbNumber String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
   @@index([updatedAt])
 }
 
 model WormAwbCustomsMonitor {
-  id                   String    @id @default(uuid())
-  awbNumber            String    @unique
-  emailUid             String?
-  orderId              String?
-  sourceSubject        String?
-  status               String    @default("MONITORING")
-  lastStatus           String?
-  lastResult           Json?
-  checkCount           Int       @default(0)
-  lastCheckedAt        DateTime?
-  nextCheckAt          DateTime  @default(now())
-  completionDetectedAt DateTime?
+  id                    String    @id @default(uuid())
+  awbNumber             String    @unique
+  emailUid              String?
+  orderId               String?
+  sourceSubject         String?
+  status                String    @default("MONITORING")
+  lastStatus            String?
+  lastResult            Json?
+  checkCount            Int       @default(0)
+  lastCheckedAt         DateTime?
+  nextCheckAt           DateTime  @default(now())
+  completionDetectedAt  DateTime?
   notificationClaimedAt DateTime?
-  notifiedAt           DateTime?
-  lastError            String?
-  createdAt            DateTime  @default(now())
-  updatedAt            DateTime  @updatedAt
+  notifiedAt            DateTime?
+  lastError             String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
 
   @@index([status, nextCheckAt])
   @@index([emailUid])
@@ -368,25 +387,25 @@ model WormAwbCustomsMonitor {
 }
 
 model WormOrder {
-  id          String   @id @default(uuid())
-  orderNumber String   @unique
-  receiveDate DateTime
-  status      String   @default("DRAFT")
-  createdById String?
-  remittanceAppliedAt             DateTime?
-  remittanceFinalReceiveAmount    Float?
+  id                               String                  @id @default(uuid())
+  orderNumber                      String                  @unique
+  receiveDate                      DateTime
+  status                           String                  @default("DRAFT")
+  createdById                      String?
+  remittanceAppliedAt              DateTime?
+  remittanceFinalReceiveAmount     Float?
   remittanceFinalReceiveAmountText String?
-  remittanceSendAmount            Float?
-  remittanceSendAmountText        String?
-  remittanceTotalFee              Float?
-  remittanceTotalFeeText          String?
-  remittanceExchangeRate          Float?
-  remittanceExchangeRateText      String?
-  emailMatches WormOrderEmailMatch[]
-  forwardLogs WormEmailForwardLog[]
-  pipelineSteps WormOrderPipelineStep[]
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  remittanceSendAmount             Float?
+  remittanceSendAmountText         String?
+  remittanceTotalFee               Float?
+  remittanceTotalFeeText           String?
+  remittanceExchangeRate           Float?
+  remittanceExchangeRateText       String?
+  emailMatches                     WormOrderEmailMatch[]
+  forwardLogs                      WormEmailForwardLog[]
+  pipelineSteps                    WormOrderPipelineStep[]
+  createdAt                        DateTime                @default(now())
+  updatedAt                        DateTime                @updatedAt
 
   @@index([receiveDate])
   @@index([createdAt])
@@ -435,16 +454,16 @@ model WormOrderEmailMatch {
 }
 
 model WormEmailForwardLog {
-  id             String    @id @default(uuid())
+  id              String     @id @default(uuid())
   orderId         String?
   toEmail         String
   fromEmail       String
   subject         String
-  attachmentCount Int       @default(0)
+  attachmentCount Int        @default(0)
   sourceUids      Json?
   sentByUserId    String?
   sentByUserName  String?
-  createdAt       DateTime  @default(now())
+  createdAt       DateTime   @default(now())
   order           WormOrder? @relation(fields: [orderId], references: [id], onDelete: SetNull)
 
   @@index([orderId, createdAt])
@@ -482,23 +501,23 @@ model SmsSendLog {
 }
 
 model DepositSms {
-  id              String    @id @default(uuid())
-  messageHash     String    @unique
-  sender          String
-  body            String
-  receivedAt      DateTime
-  amount          Int?
-  depositorName   String?
-  bankName        String?
-  sourceDevice    String?
-  matchStatus     String    @default("RECEIVED")
-  matchedOrderId  String?
-  matchedAt       DateTime?
+  id                String    @id @default(uuid())
+  messageHash       String    @unique
+  sender            String
+  body              String
+  receivedAt        DateTime
+  amount            Int?
+  depositorName     String?
+  bankName          String?
+  sourceDevice      String?
+  matchStatus       String    @default("RECEIVED")
+  matchedOrderId    String?
+  matchedAt         DateTime?
   candidateOrderIds Json?
-  errorMessage    String?
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  matchedOrder    Order?    @relation(fields: [matchedOrderId], references: [id], onDelete: SetNull)
+  errorMessage      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  matchedOrder      Order?    @relation(fields: [matchedOrderId], references: [id], onDelete: SetNull)
 
   @@index([receivedAt])
   @@index([amount])
@@ -529,21 +548,21 @@ model MobileMessage {
 }
 
 model MobileOutgoingMessage {
-  id             String    @id @default(uuid())
-  requestedById  String?
-  toName         String?
-  toNumber       String
-  body           String
-  status         String    @default("PENDING")
-  attemptCount   Int       @default(0)
-  sourceDevice   String?
-  claimedAt      DateTime?
-  sentAt         DateTime?
-  failedAt       DateTime?
-  lastError      String?
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-  requestedBy    User?     @relation(fields: [requestedById], references: [id], onDelete: SetNull)
+  id            String    @id @default(uuid())
+  requestedById String?
+  toName        String?
+  toNumber      String
+  body          String
+  status        String    @default("PENDING")
+  attemptCount  Int       @default(0)
+  sourceDevice  String?
+  claimedAt     DateTime?
+  sentAt        DateTime?
+  failedAt      DateTime?
+  lastError     String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  requestedBy   User?     @relation(fields: [requestedById], references: [id], onDelete: SetNull)
 
   @@index([status, createdAt])
   @@index([toNumber])
@@ -641,17 +660,17 @@ model CoupangSyncHistory {
 }
 
 model ProformaInvoice {
-  id            String                @id @default(uuid())
-  invoiceNumber String                @unique
-  partnerId     String?
-  partnerName   String
-  issueDate     DateTime              @default(now())
-  totalUsd      Float                 @default(0)
-  productionTime String               @default("3-5 days after receiving the deposit")
-  createdAt     DateTime              @default(now())
-  updatedAt     DateTime              @updatedAt
-  partner       User?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
-  items         ProformaInvoiceItem[]
+  id             String                @id @default(uuid())
+  invoiceNumber  String                @unique
+  partnerId      String?
+  partnerName    String
+  issueDate      DateTime              @default(now())
+  totalUsd       Float                 @default(0)
+  productionTime String                @default("3-5 days after receiving the deposit")
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  partner        User?                 @relation(fields: [partnerId], references: [id], onDelete: SetNull)
+  items          ProformaInvoiceItem[]
 }
 
 model ProformaInvoiceItem {
@@ -727,7 +746,7 @@ model WormEmailAttachmentCache {
 }
 
 model CardUsage {
-  id                    String   @id @default(uuid())
+  id                    String           @id @default(uuid())
   corpNum               String
   cardNum               String
   useKey                String
@@ -760,9 +779,9 @@ model CardUsage {
   coupangPurchaseId     String?
   coupangPurchase       CoupangPurchase? @relation(fields: [coupangPurchaseId], references: [id], onDelete: SetNull)
   raw                   Json?
-  syncedAt              DateTime @default(now())
-  createdAt             DateTime @default(now())
-  updatedAt             DateTime @updatedAt
+  syncedAt              DateTime         @default(now())
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   @@unique([corpNum, cardNum, useKey])
   @@index([usedAt])
