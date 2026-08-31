@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Copy, Layers, Pencil, Search, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import BarcodeDisplay from "@/components/BarcodeDisplay"
@@ -16,7 +16,7 @@ import {
 } from '@/lib/productGradePricing'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
-const PRODUCT_TABLE_WIDTH = 1920
+const PRODUCT_TABLE_WIDTH = 1700
 const PRODUCT_TABLE_COLS = 18
 
 const normalizeGroupName = (value?: string | null) => String(value || '').trim()
@@ -121,9 +121,16 @@ const LazyBarcodeCell = memo(function LazyBarcodeCell({ value }: { value: string
     }, [safeValue])
 
     return (
-        <div ref={containerRef} className="flex min-h-8 items-center justify-center">
+        <div ref={containerRef} className="flex min-h-7 items-center justify-center">
             {canRenderBarcode ? (
-                <BarcodeDisplay value={safeValue} />
+                <BarcodeDisplay
+                    value={safeValue}
+                    width={0.82}
+                    height={24}
+                    fontSize={8}
+                    containerClassName="justify-center"
+                    buttonClassName="text-[8px] text-gray-400 hover:text-blue-600 border border-gray-200 rounded px-1 py-0.5 bg-white transition-colors"
+                />
             ) : (
                 <span className="max-w-[160px] truncate text-[10px] font-bold text-gray-400" title={safeValue}>
                     {safeValue || '-'}
@@ -149,6 +156,7 @@ interface ProductRowProps {
     product: ProductTableProduct
     index: number
     activeGrade: ProductGrade
+    onSelect: () => void
     onSortOrderChange: (productId: string, newOrder: number) => void
     onDelete: (productId: string) => void
     checked: boolean
@@ -168,7 +176,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSelect, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -208,6 +216,7 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSor
 
     return (
         <tr
+            onClick={onSelect}
             className={`text-[11px] border-b border-gray-100 hover:bg-gray-50 transition-colors group ${checked ? 'bg-blue-50/30' : ''}`}
         >
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
@@ -370,21 +379,35 @@ const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSor
                     <ProductForm
                         initialData={product}
                         trigger={
-                            <button className="bg-gray-50 text-gray-500 hover:bg-[var(--color-brand-blue)] hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-gray-200 hover:border-transparent">수정</button>
+                            <button
+                                type="button"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700"
+                                title="수정"
+                            >
+                                <Pencil size={13} />
+                            </button>
                         }
                     />
                     <ProductForm
                         initialData={product}
                         isCopy={true}
                         trigger={
-                            <button className="bg-gray-50 text-blue-600 hover:bg-blue-600 hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-blue-100 hover:border-transparent">복사</button>
+                            <button
+                                type="button"
+                                className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-blue-100 bg-blue-50 text-blue-600 transition hover:bg-blue-600 hover:text-white"
+                                title="복사"
+                            >
+                                <Copy size={13} />
+                            </button>
                         }
                     />
                     <button
+                        type="button"
                         onClick={() => onDelete(product.id)}
-                        className="bg-gray-50 text-red-500 hover:bg-red-500 hover:text-white px-2 py-1 rounded text-[10px] font-bold transition-all border border-red-100 hover:border-transparent"
+                        className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-500 transition hover:bg-red-500 hover:text-white"
+                        title="삭제"
                     >
-                        삭제
+                        <Trash2 size={13} />
                     </button>
                 </div>
             </td>
@@ -407,29 +430,47 @@ type ProductPagination = {
     totalPages: number
 }
 
+type ProductViewMode = 'group' | 'sku'
+type ProductAvailabilityFilter = 'all' | 'available' | 'unavailable'
+type ProductStockFilter = 'all' | 'stocked' | 'empty'
+
+const getProductStock = (product: ProductTableProduct) => Math.max(0, Number(product.stock) || 0)
+const getProductSearchText = (product: ProductTableProduct) => [
+    product.name,
+    product.nameJP,
+    product.nameEN,
+    product.productCode,
+    product.barcode,
+    product.groupName,
+    product.hsCode,
+    product.japanHsCode,
+].filter(Boolean).join(' ').toLocaleLowerCase('ko-KR')
+
 function ProductPaginationControls({
     pagination,
     pageStart,
     pageEnd,
     onPageChange,
     onPageSizeChange,
+    className = '',
 }: {
     pagination: ProductPagination
     pageStart: number
     pageEnd: number
     onPageChange: (page: number) => void
     onPageSizeChange: (pageSize: number) => void
+    className?: string
 }) {
     const canGoPrev = pagination.page > 1
     const canGoNext = pagination.page < pagination.totalPages
 
     return (
-        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className={`flex flex-wrap items-center gap-2 ${className}`}>
             <div className="text-[11px] font-bold text-slate-500">
                 전체 <span className="text-slate-900">{formatInteger(pagination.totalCount)}</span>개 중{' '}
                 <span className="text-blue-700">{formatInteger(pageStart)}-{formatInteger(pageEnd)}</span> 표시
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1.5">
                 <select
                     value={pagination.pageSize}
                     onChange={(event) => onPageSizeChange(Number(event.target.value))}
@@ -470,65 +511,190 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
     group,
     expanded,
     checkedCount,
+    selected,
     onToggle,
     onToggleCheck,
+    onSelect,
 }: {
     group: ProductGroupView
     expanded: boolean
     checkedCount: number
+    selected: boolean
     onToggle: () => void
     onToggleCheck: () => void
+    onSelect: () => void
 }) {
-    const totalStock = group.products.reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0)
+    const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
+    const availableCount = group.products.filter(product => product.wholesaleAvailable !== false).length
     const representative = group.products[0]
 
     return (
-        <tr className="border-b border-indigo-100 bg-indigo-50/70">
+        <tr className={`border-b border-blue-100 transition-colors ${selected ? 'bg-blue-50' : 'bg-slate-50 hover:bg-blue-50/60'}`}>
             <td colSpan={PRODUCT_TABLE_COLS} className="px-3 py-2">
-                <div className="flex min-w-0 items-center justify-between gap-3">
+                <div
+                    className="flex min-w-0 cursor-pointer items-center justify-between gap-3"
+                    role="button"
+                    tabIndex={0}
+                    onClick={onSelect}
+                    onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') onSelect()
+                    }}
+                >
                     <div className="flex min-w-0 items-center gap-2">
                         <input
                             type="checkbox"
-                            checked={checkedCount === group.products.length}
+                            checked={group.products.length > 0 && checkedCount === group.products.length}
                             onChange={onToggleCheck}
+                            onClick={(event) => event.stopPropagation()}
                             className="cursor-pointer"
                             title="그룹 SKU 전체 선택"
                         />
                         <button
                             type="button"
-                            onClick={onToggle}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-indigo-200 bg-white text-indigo-700 transition hover:bg-indigo-100"
+                            onClick={(event) => {
+                                event.stopPropagation()
+                                onToggle()
+                            }}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 shadow-sm transition hover:bg-blue-50"
                             title={expanded ? '그룹 접기' : '그룹 펼치기'}
                         >
                             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         </button>
                         {representative?.imageUrl ? (
-                            <img src={representative.imageUrl} alt={group.name} loading="lazy" className="h-8 w-8 rounded border border-indigo-100 bg-white object-cover" />
+                            <img src={representative.imageUrl} alt={group.name} loading="lazy" className="h-9 w-9 rounded-md border border-slate-200 bg-white object-cover shadow-sm" />
                         ) : (
-                            <div className="flex h-8 w-8 items-center justify-center rounded border border-indigo-100 bg-white text-indigo-300">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-300">
                                 <Layers size={15} />
                             </div>
                         )}
                         <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
-                                <span className="truncate text-[12px] font-black text-indigo-950">상품 그룹 · {group.name}</span>
-                                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-indigo-600">{group.products.length} SKU</span>
-                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-black text-indigo-500">{group.source}</span>
+                                <span className="truncate text-[12px] font-black text-slate-950">상품 그룹 · {group.name}</span>
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-blue-600 shadow-sm">{group.products.length} SKU</span>
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">{group.source}</span>
                             </div>
-                            <div className="mt-0.5 text-[10px] font-bold text-indigo-500">
+                            <div className="mt-0.5 text-[10px] font-bold text-blue-500">
                                 그룹을 누르면 SKU 목록을 접고 펼칩니다.
                             </div>
                         </div>
                     </div>
-                    <div className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right">
-                        <div className="text-[9px] font-black text-emerald-600">관리용 재고 합계</div>
-                        <div className="text-[13px] font-black tabular-nums text-emerald-700">{formatInteger(totalStock)}</div>
+                    <div className="flex shrink-0 items-center gap-2">
+                        <div className="rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right shadow-sm">
+                            <div className="text-[9px] font-black text-emerald-600">발주 가능 SKU</div>
+                            <div className="text-[12px] font-black tabular-nums text-emerald-700">{formatInteger(availableCount)}</div>
+                        </div>
+                        <div className="rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right shadow-sm">
+                            <div className="text-[9px] font-black text-emerald-600">관리용 재고 합계</div>
+                            <div className="text-[13px] font-black tabular-nums text-emerald-700">{formatInteger(totalStock)}</div>
+                        </div>
                     </div>
                 </div>
             </td>
         </tr>
     )
 })
+
+function ProductSummaryPanel({
+    group,
+    activeGrade,
+}: {
+    group: ProductGroupView | null
+    activeGrade: ProductGrade
+}) {
+    if (!group) {
+        return (
+            <aside className="border-t border-slate-100 bg-slate-50/80 p-4 xl:border-l xl:border-t-0">
+                <div className="rounded-xl border border-dashed border-slate-200 bg-white p-5 text-center text-xs font-bold text-slate-400">
+                    그룹이나 상품을 선택하면 요약이 표시됩니다.
+                </div>
+            </aside>
+        )
+    }
+
+    const representative = group.products[0]
+    const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
+    const availableCount = group.products.filter(product => product.wholesaleAvailable !== false).length
+    const unavailableCount = group.products.length - availableCount
+    const wholesaleValues = group.products
+        .map(product => readProductGradePriceValue(product.regionalPrices, activeGrade, 'wholesale', {
+            A: product.priceA,
+            B: product.priceB,
+            C: product.priceC ?? product.sellPrice,
+            D: product.priceD,
+        }[activeGrade] ?? product.sellPrice ?? 0))
+        .filter(value => Number.isFinite(value) && value > 0)
+    const averageWholesale = wholesaleValues.length > 0
+        ? wholesaleValues.reduce((sum, value) => sum + value, 0) / wholesaleValues.length
+        : 0
+
+    return (
+        <aside className="border-t border-slate-100 bg-slate-50/80 p-3 xl:border-l xl:border-t-0">
+            <div className="sticky top-20 space-y-3">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2">
+                            {representative?.imageUrl ? (
+                                <img src={representative.imageUrl} alt={group.name} loading="lazy" className="h-11 w-11 rounded-lg border border-slate-200 object-cover" />
+                            ) : (
+                                <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-300">
+                                    <Layers size={18} />
+                                </div>
+                            )}
+                            <div className="min-w-0">
+                                <div className="truncate text-[12px] font-black text-slate-950">{group.name}</div>
+                                <div className="mt-1 flex items-center gap-1">
+                                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">{group.products.length} SKU</span>
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">{group.source}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="mb-2 text-[11px] font-black text-slate-900">재고 요약</div>
+                    <div className="divide-y divide-slate-100 text-[11px]">
+                        <div className="flex items-center justify-between py-1.5">
+                            <span className="font-bold text-slate-500">관리용 재고 합계</span>
+                            <span className="font-black tabular-nums text-emerald-700">{formatInteger(totalStock)}</span>
+                        </div>
+                        <div className="flex items-center justify-between py-1.5">
+                            <span className="font-bold text-slate-500">발주 가능</span>
+                            <span className="font-black tabular-nums text-emerald-700">{formatInteger(availableCount)}</span>
+                        </div>
+                        <div className="flex items-center justify-between py-1.5">
+                            <span className="font-bold text-slate-500">발주 불가</span>
+                            <span className="font-black tabular-nums text-red-500">{formatInteger(unavailableCount)}</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="mb-2 text-[11px] font-black text-slate-900">{activeGrade}등급 가격 요약</div>
+                    <div className="flex items-center justify-between rounded-lg bg-blue-50 px-3 py-2 text-[11px]">
+                        <span className="font-bold text-blue-700">평균 KR 도매가</span>
+                        <span className="font-black tabular-nums text-blue-900">{formatInteger(Math.round(averageWholesale))}</span>
+                    </div>
+                </div>
+
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
+                    <div className="mb-2 text-[11px] font-black text-slate-900">SKU 미리보기</div>
+                    <div className="space-y-2">
+                        {group.products.slice(0, 6).map(product => (
+                            <div key={product.id} className="flex items-center justify-between gap-2 text-[11px]">
+                                <div className="min-w-0">
+                                    <div className="truncate font-bold text-slate-700">{product.name}</div>
+                                    <div className="truncate text-[10px] text-slate-400">{product.productCode || product.barcode || '-'}</div>
+                                </div>
+                                <span className="shrink-0 font-black tabular-nums text-emerald-700">{formatInteger(getProductStock(product))}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </aside>
+    )
+}
 
 export default function ProductTable({
     initialProducts,
@@ -547,6 +713,11 @@ export default function ProductTable({
     const [modifiedOrderUnits, setModifiedOrderUnits] = useState<Record<string, string>>({})
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
     const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set())
+    const [viewMode, setViewMode] = useState<ProductViewMode>('group')
+    const [productQuery, setProductQuery] = useState('')
+    const [availabilityFilter, setAvailabilityFilter] = useState<ProductAvailabilityFilter>('all')
+    const [stockFilter, setStockFilter] = useState<ProductStockFilter>('all')
+    const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
     const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
     const pathname = usePathname()
@@ -574,10 +745,23 @@ export default function ProductTable({
         setModifiedMoqs({})
         setModifiedOrderUnits({})
         setCollapsedGroupKeys(new Set())
+        setSelectedGroupKey(null)
     }, [initialProducts])
 
+    const filteredProducts = useMemo(() => {
+        const query = productQuery.trim().toLocaleLowerCase('ko-KR')
+        return products.filter(product => {
+            if (query && !getProductSearchText(product).includes(query)) return false
+            if (availabilityFilter === 'available' && product.wholesaleAvailable === false) return false
+            if (availabilityFilter === 'unavailable' && product.wholesaleAvailable !== false) return false
+            if (stockFilter === 'stocked' && getProductStock(product) <= 0) return false
+            if (stockFilter === 'empty' && getProductStock(product) > 0) return false
+            return true
+        })
+    }, [availabilityFilter, productQuery, products, stockFilter])
+
     const productGroups = useMemo<ProductGroupView[]>(() => {
-        const inferred = products.map(product => ({ product, candidate: inferProductGroup(product) }))
+        const inferred = filteredProducts.map(product => ({ product, candidate: inferProductGroup(product) }))
         const inferredCounts = new Map<string, number>()
         inferred.forEach(({ candidate }) => {
             if (!candidate) return
@@ -604,12 +788,34 @@ export default function ProductTable({
             })
         })
         return Array.from(groups.values())
-    }, [products])
+    }, [filteredProducts])
 
     const productIndexById = useMemo(
         () => new Map(products.map((product, index) => [product.id, pageOffset + index])),
         [pageOffset, products],
     )
+    const visibleProductIds = useMemo(() => filteredProducts.map(product => product.id), [filteredProducts])
+    const checkedVisibleCount = visibleProductIds.filter(id => checkedIds.has(id)).length
+    const namedGroupKeys = useMemo(() => productGroups.filter(group => group.isNamed).map(group => group.key), [productGroups])
+    const collapsedNamedGroupCount = namedGroupKeys.filter(key => collapsedGroupKeys.has(key)).length
+    const selectedGroup = useMemo(
+        () => productGroups.find(group => group.key === selectedGroupKey) || productGroups[0] || null,
+        [productGroups, selectedGroupKey],
+    )
+    const groupKeyByProductId = useMemo(() => {
+        const result = new Map<string, string>()
+        productGroups.forEach(group => {
+            group.products.forEach(product => result.set(product.id, group.key))
+        })
+        return result
+    }, [productGroups])
+    const hasActiveFilters = Boolean(productQuery.trim()) || availabilityFilter !== 'all' || stockFilter !== 'all'
+
+    useEffect(() => {
+        if (selectedGroup && selectedGroup.key !== selectedGroupKey) {
+            setSelectedGroupKey(selectedGroup.key)
+        }
+    }, [selectedGroup, selectedGroupKey])
 
     const pushProductPage = useCallback((page: number, pageSize = pagination.pageSize) => {
         const nextPage = Math.min(Math.max(1, page), pagination.totalPages)
@@ -706,9 +912,17 @@ export default function ProductTable({
     }, [])
 
     const handleToggleAll = useCallback(() => {
-        if (checkedIds.size === products.length) setCheckedIds(new Set())
-        else setCheckedIds(new Set(products.map(p => p.id)))
-    }, [checkedIds.size, products])
+        if (visibleProductIds.length === 0) return
+        setCheckedIds(current => {
+            const allVisibleChecked = visibleProductIds.every(id => current.has(id))
+            const next = new Set(current)
+            visibleProductIds.forEach(id => {
+                if (allVisibleChecked) next.delete(id)
+                else next.add(id)
+            })
+            return next
+        })
+    }, [visibleProductIds])
 
     const handleToggleGroupCheck = useCallback((ids: string[]) => {
         setCheckedIds(current => {
@@ -729,6 +943,20 @@ export default function ProductTable({
             else next.add(key)
             return next
         })
+    }, [])
+
+    const handleCollapseAllGroups = useCallback(() => {
+        setCollapsedGroupKeys(new Set(namedGroupKeys))
+    }, [namedGroupKeys])
+
+    const handleExpandAllGroups = useCallback(() => {
+        setCollapsedGroupKeys(new Set())
+    }, [])
+
+    const resetFilters = useCallback(() => {
+        setProductQuery('')
+        setAvailabilityFilter('all')
+        setStockFilter('all')
     }, [])
 
     const ensureProductChecked = useCallback((id: string) => {
@@ -920,55 +1148,154 @@ export default function ProductTable({
     }
 
     return (
-        <>
-            <div className="flex flex-col gap-3 border-b border-blue-100 bg-blue-50/70 p-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <div className="text-xs font-black text-blue-950">등급별 발주 조건 일괄 수정</div>
-                    <div className="mt-1 text-[11px] font-medium text-blue-700">
-                        등급을 선택한 뒤 KR 단가·최소수량·주문단위를 수정하세요. 관리용 재고는 도매 발주와 별도로 저장됩니다.
+        <div className="overflow-hidden rounded-2xl bg-white">
+            <div className="border-b border-slate-100 bg-white p-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                    <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <h2 className="text-sm font-black text-slate-950">상품 관리</h2>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">
+                                {formatInteger(pagination.totalCount)}개 상품
+                            </span>
+                            {hasActiveFilters ? (
+                                <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[11px] font-black text-blue-700">
+                                    현재 페이지 {formatInteger(filteredProducts.length)}개 표시
+                                </span>
+                            ) : null}
+                        </div>
+                        <p className="mt-1 text-[11px] font-medium text-slate-500">
+                            등급별 가격과 관리용 재고를 한 화면에서 수정합니다. 페이지 이동은 좌우 방향키도 사용할 수 있습니다.
+                        </p>
+                    </div>
+                    <ProductPaginationControls
+                        pagination={pagination}
+                        pageStart={pageStart}
+                        pageEnd={pageEnd}
+                        onPageChange={pushProductPage}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="justify-start xl:justify-end"
+                    />
+                </div>
+
+                <div className="mt-3 flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+                            {(['group', 'sku'] as ProductViewMode[]).map(mode => (
+                                <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setViewMode(mode)}
+                                    className={`h-8 rounded-lg px-3 text-[11px] font-black transition ${
+                                        viewMode === mode
+                                            ? 'bg-slate-950 text-white shadow-sm'
+                                            : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                                    }`}
+                                >
+                                    {mode === 'group' ? '그룹' : 'SKU'}
+                                </button>
+                            ))}
+                        </div>
+                        <label className="flex h-10 w-full min-w-[260px] max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[12px] text-slate-500 focus-within:border-blue-400 sm:w-[360px]">
+                            <Search size={15} className="shrink-0 text-slate-400" />
+                            <input
+                                value={productQuery}
+                                onChange={(event) => setProductQuery(event.target.value)}
+                                placeholder="상품명, 상품코드, 바코드 검색"
+                                className="min-w-0 flex-1 bg-transparent text-[12px] font-bold text-slate-700 outline-none placeholder:text-slate-400"
+                            />
+                            {productQuery ? (
+                                <button type="button" onClick={() => setProductQuery('')} className="text-slate-400 hover:text-slate-700" title="검색어 지우기">
+                                    <X size={14} />
+                                </button>
+                            ) : null}
+                        </label>
+                        <label className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3">
+                            <SlidersHorizontal size={14} className="text-slate-400" />
+                            <select
+                                value={availabilityFilter}
+                                onChange={(event) => setAvailabilityFilter(event.target.value as ProductAvailabilityFilter)}
+                                className="bg-transparent text-[11px] font-black text-slate-600 outline-none"
+                                title="발주 상태 필터"
+                            >
+                                <option value="all">발주 상태 전체</option>
+                                <option value="available">발주 가능</option>
+                                <option value="unavailable">발주 불가능</option>
+                            </select>
+                        </label>
+                        <select
+                            value={stockFilter}
+                            onChange={(event) => setStockFilter(event.target.value as ProductStockFilter)}
+                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none"
+                            title="재고 필터"
+                        >
+                            <option value="all">재고 상태 전체</option>
+                            <option value="stocked">재고 있음</option>
+                            <option value="empty">재고 없음</option>
+                        </select>
+                        {hasActiveFilters ? (
+                            <button
+                                type="button"
+                                onClick={resetFilters}
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
+                            >
+                                필터 초기화
+                            </button>
+                        ) : null}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={handleExpandAllGroups}
+                            disabled={namedGroupKeys.length === 0 || collapsedNamedGroupCount === 0}
+                            className="h-9 rounded-xl border border-blue-100 bg-blue-50 px-3 text-[11px] font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            전체 펼치기
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleCollapseAllGroups}
+                            disabled={namedGroupKeys.length === 0 || collapsedNamedGroupCount === namedGroupKeys.length}
+                            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            전체 접기
+                        </button>
+                        <div className="flex items-center gap-1 rounded-xl border border-blue-100 bg-blue-50 p-1">
+                            {PRODUCT_GRADES.map(grade => {
+                                const changedCount = Array.from(checkedIds).filter(id => (
+                                    modifiedCosts[draftKey(grade, id)] !== undefined
+                                    || modifiedWholesales[draftKey(grade, id)] !== undefined
+                                    || modifiedRetails[draftKey(grade, id)] !== undefined
+                                    || modifiedMoqs[draftKey(grade, id)] !== undefined
+                                    || modifiedOrderUnits[draftKey(grade, id)] !== undefined
+                                )).length
+                                return (
+                                    <button
+                                        key={grade}
+                                        type="button"
+                                        onClick={() => setActiveGrade(grade)}
+                                        className={`relative h-8 min-w-14 rounded-lg px-3 text-[11px] font-black transition ${
+                                            activeGrade === grade
+                                                ? 'bg-blue-600 text-white shadow-sm'
+                                                : 'text-blue-700 hover:bg-white'
+                                        }`}
+                                    >
+                                        {grade}등급
+                                        {changedCount > 0 ? (
+                                            <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[9px] ${activeGrade === grade ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>
+                                                {changedCount}
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                )
+                            })}
+                        </div>
                     </div>
                 </div>
-                <div className="flex items-center gap-1 rounded-xl border border-blue-200 bg-white p-1 shadow-sm">
-                    {PRODUCT_GRADES.map(grade => {
-                        const changedCount = Array.from(checkedIds).filter(id => (
-                            modifiedCosts[draftKey(grade, id)] !== undefined
-                            || modifiedWholesales[draftKey(grade, id)] !== undefined
-                            || modifiedRetails[draftKey(grade, id)] !== undefined
-                            || modifiedMoqs[draftKey(grade, id)] !== undefined
-                            || modifiedOrderUnits[draftKey(grade, id)] !== undefined
-                        )).length
-                        return (
-                            <button
-                                key={grade}
-                                type="button"
-                                onClick={() => setActiveGrade(grade)}
-                                className={`relative min-w-16 rounded-lg px-3 py-2 text-xs font-black transition ${
-                                    activeGrade === grade
-                                        ? 'bg-blue-600 text-white shadow-sm'
-                                        : 'text-slate-500 hover:bg-blue-50 hover:text-blue-700'
-                                }`}
-                            >
-                                {grade} 등급
-                                {changedCount > 0 ? (
-                                    <span className={`ml-1 rounded-full px-1.5 py-0.5 text-[9px] ${activeGrade === grade ? 'bg-white/20 text-white' : 'bg-blue-100 text-blue-700'}`}>
-                                        {changedCount}
-                                    </span>
-                                ) : null}
-                            </button>
-                        )
-                    })}
-                </div>
             </div>
-            <ProductPaginationControls
-                pagination={pagination}
-                pageStart={pageStart}
-                pageEnd={pageEnd}
-                onPageChange={pushProductPage}
-                onPageSizeChange={handlePageSizeChange}
-            />
             {checkedIds.size > 0 && (
-                <div className="flex justify-between items-center p-2.5 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 rounded-t-lg">
-                    <span className="text-xs font-bold text-blue-800 dark:text-blue-300">{checkedIds.size}개 상품 선택됨</span>
+                <div className="flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-3 py-2">
+                    <span className="text-xs font-bold text-blue-800">{checkedIds.size}개 상품 선택됨</span>
                     <button
                         onClick={handleSaveChanges}
                         disabled={isSaving}
@@ -978,32 +1305,39 @@ export default function ProductTable({
                     </button>
                 </div>
             )}
-            <div className="w-full overflow-x-auto pb-2">
+            <div className="grid min-h-[520px] xl:grid-cols-[minmax(0,1fr)_310px]">
+                <div className="min-w-0">
+                    <div className="w-full overflow-x-auto pb-2">
                 <table className="table-fixed border-collapse" style={{ width: PRODUCT_TABLE_WIDTH, minWidth: PRODUCT_TABLE_WIDTH }}>
                     <colgroup>
                         <col className="w-[34px]" />
-                        <col className="w-[34px]" />
+                        <col className="w-[28px]" />
                         <col className="w-[44px]" />
-                        <col className="w-[56px]" />
-                        <col className="w-[292px]" />
-                        <col className="w-[92px]" />
-                        <col className="w-[90px]" />
-                        <col className="w-[104px]" />
-                        <col className="w-[104px]" />
-                        <col className="w-[104px]" />
-                        <col className="w-[104px]" />
-                        <col className="w-[104px]" />
+                        <col className="w-[54px]" />
+                        <col className="w-[260px]" />
+                        <col className="w-[84px]" />
+                        <col className="w-[84px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[100px]" />
                         <col className="w-[110px]" />
-                        <col className="w-[126px]" />
-                        <col className="w-[112px]" />
-                        <col className="w-[104px]" />
-                        <col className="w-[180px]" />
-                        <col className="w-[126px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[94px]" />
+                        <col className="w-[150px]" />
+                        <col className="w-[96px]" />
                     </colgroup>
-                    <thead className="bg-[var(--color-brand-blue)] text-white">
+                    <thead className="sticky top-0 z-10 bg-blue-700 text-white shadow-sm">
                         <tr>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">
-                                <input type="checkbox" onChange={handleToggleAll} checked={products.length > 0 && checkedIds.size === products.length} className="cursor-pointer" />
+                                <input
+                                    type="checkbox"
+                                    onChange={handleToggleAll}
+                                    checked={visibleProductIds.length > 0 && checkedVisibleCount === visibleProductIds.length}
+                                    className="cursor-pointer"
+                                />
                             </th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">순서</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">No</th>
@@ -1024,13 +1358,42 @@ export default function ProductTable({
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] last:border-0 whitespace-nowrap">관리</th>
                         </tr>
                     </thead>
-                    {products.length === 0 ? (
+                    {filteredProducts.length === 0 ? (
                         <tbody className="divide-y divide-gray-100">
                             <tr>
                                 <td colSpan={PRODUCT_TABLE_COLS} className="px-6 py-12 text-center text-gray-500">
-                                    등록된 상품이 없습니다.
+                                    조건에 맞는 상품이 없습니다.
                                 </td>
                             </tr>
+                        </tbody>
+                    ) : viewMode === 'sku' ? (
+                        <tbody className="divide-y divide-gray-100">
+                            {filteredProducts.map((product) => (
+                                <ProductRow
+                                    key={product.id}
+                                    product={product}
+                                    index={productIndexById.get(product.id) ?? 0}
+                                    activeGrade={activeGrade}
+                                    onSelect={() => setSelectedGroupKey(groupKeyByProductId.get(product.id) || null)}
+                                    onSortOrderChange={onSortOrderChange}
+                                    onDelete={handleDelete}
+                                    checked={checkedIds.has(product.id)}
+                                    onToggleCheck={handleToggleCheck}
+                                    modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
+                                    onCostChange={handleCostChange}
+                                    modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
+                                    onWholesaleChange={handleWholesaleChange}
+                                    modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
+                                    onRetailChange={handleRetailChange}
+                                    modifiedStock={modifiedStocks[product.id]}
+                                    onStockChange={handleStockChange}
+                                    modifiedMoq={modifiedMoqs[draftKey(activeGrade, product.id)]}
+                                    onMoqChange={handleMoqChange}
+                                    modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
+                                    onOrderUnitChange={handleOrderUnitChange}
+                                    onToggleOrderAvailability={handleToggleOrderAvailability}
+                                />
+                            ))}
                         </tbody>
                     ) : (
                         productGroups.map((group) => {
@@ -1044,8 +1407,10 @@ export default function ProductTable({
                                                 group={group}
                                                 expanded={expanded}
                                                 checkedCount={checkedCount}
+                                                selected={selectedGroup?.key === group.key}
                                                 onToggle={() => toggleGroup(group.key)}
                                                 onToggleCheck={() => handleToggleGroupCheck(group.products.map(product => product.id))}
+                                                onSelect={() => setSelectedGroupKey(group.key)}
                                             />
                                         </tbody>
                                     ) : null}
@@ -1056,6 +1421,7 @@ export default function ProductTable({
                                                 product={product}
                                                 index={productIndexById.get(product.id) ?? 0}
                                                 activeGrade={activeGrade}
+                                                onSelect={() => setSelectedGroupKey(group.key)}
                                                 onSortOrderChange={onSortOrderChange}
                                                 onDelete={handleDelete}
                                                 checked={checkedIds.has(product.id)}
@@ -1080,15 +1446,21 @@ export default function ProductTable({
                             )
                         })
                     )}
-                </table>
+                    </table>
+                </div>
+                <div className="border-t border-slate-100 bg-white px-3 py-2">
+                    <ProductPaginationControls
+                        pagination={pagination}
+                        pageStart={pageStart}
+                        pageEnd={pageEnd}
+                        onPageChange={pushProductPage}
+                        onPageSizeChange={handlePageSizeChange}
+                        className="justify-end"
+                    />
+                </div>
             </div>
-            <ProductPaginationControls
-                pagination={pagination}
-                pageStart={pageStart}
-                pageEnd={pageEnd}
-                onPageChange={pushProductPage}
-                onPageSizeChange={handlePageSizeChange}
-            />
-        </>
+            <ProductSummaryPanel group={selectedGroup} activeGrade={activeGrade} />
+            </div>
+        </div>
     )
 }

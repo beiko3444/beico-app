@@ -115,7 +115,7 @@ export default async function ProductsPage({ searchParams }: PageProps) {
                 </div>
             </div>
 
-            <div className="glass-panel p-1 rounded-2xl shadow-lg dark:shadow-none bg-white dark:bg-[#1e1e1e] border-t-2 border-t-[var(--color-brand-blue)] overflow-x-auto">
+            <div className="glass-panel overflow-hidden rounded-2xl border-t-2 border-t-[var(--color-brand-blue)] bg-white shadow-lg dark:bg-[#1e1e1e] dark:shadow-none">
                 <ProductTable
                     initialProducts={products}
                     pagination={{
