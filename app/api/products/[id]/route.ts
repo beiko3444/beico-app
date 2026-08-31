@@ -19,6 +19,7 @@ const productResponseSelect = {
     safetyStock: true,
     barcode: true,
     productCode: true,
+    groupName: true,
     hsCode: true,
     japanHsCode: true,
     coupangSku: true,
@@ -42,6 +43,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
         const { id } = await context.params
         const body = await request.json()
         const normalizedProductCode = body.productCode ? String(body.productCode).trim().toUpperCase() : null
+        const normalizedGroupName = body.groupName ? String(body.groupName).trim() : null
         const normalizedHsCode = body.hsCode ? String(body.hsCode).trim() : null
         const normalizedJapanHsCode = body.japanHsCode ? String(body.japanHsCode).trim() : null
 
@@ -58,6 +60,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             nameEN: body.nameEN ? String(body.nameEN).trim() : null,
             barcode: body.barcode ? String(body.barcode).trim() : null,
             productCode: normalizedProductCode,
+            groupName: normalizedGroupName,
             hsCode: normalizedHsCode,
             japanHsCode: normalizedJapanHsCode,
             coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
@@ -77,6 +80,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
             priceD: (body.priceD !== null && body.priceD !== undefined && body.priceD !== "") ? Number(body.priceD) : null,
+            stock: body.stock !== undefined ? Math.max(0, Math.round(Number(body.stock) || 0)) : 0,
             minOrderQuantity: body.minOrderQuantity !== undefined ? Math.max(1, Math.round(Number(body.minOrderQuantity))) : 1,
             orderUnit: body.orderUnit !== undefined ? Math.max(1, Math.round(Number(body.orderUnit))) : 1,
             sortOrder: body.sortOrder !== undefined ? Math.round(Number(body.sortOrder)) : undefined,
@@ -115,6 +119,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
 
         delete patchData.copyImageFromProductId
+        if (Object.prototype.hasOwnProperty.call(body, 'stock')) {
+            patchData.stock = Math.max(0, Math.round(Number(body.stock) || 0))
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'groupName')) {
+            patchData.groupName = body.groupName ? String(body.groupName).trim() : null
+        }
 
         const product = await prisma.product.update({
             where: { id },

@@ -12,6 +12,7 @@ export type Product = {
     nameEN?: string | null
     barcode?: string | null
     productCode?: string | null
+    groupName?: string | null
     hsCode?: string | null
     japanHsCode?: string | null
     coupangSku?: string | null
@@ -31,6 +32,8 @@ export type Product = {
     wholesaleAvailable?: boolean
     imageUrl?: string | null
     regionalPrices?: any
+    stock?: number | null
+    safetyStock?: number | null
     minOrderQuantity: number
     orderUnit?: number
 }
@@ -54,6 +57,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [nameEN, setNameEN] = useState('')
     const [barcode, setBarcode] = useState('')
     const [productCode, setProductCode] = useState('')
+    const [groupName, setGroupName] = useState('')
     const [hsCode, setHsCode] = useState('')
     const [japanHsCode, setJapanHsCode] = useState('')
     const [coupangSku, setCoupangSku] = useState('')
@@ -72,6 +76,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [priceC, setPriceC] = useState('')
     const [priceD, setPriceD] = useState('')
     const [imageUrl, setImageUrl] = useState<string | null>(null)
+    const [stock, setStock] = useState('0')
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
     const [orderUnit, setOrderUnit] = useState('1')
     const [hasImageChanged, setHasImageChanged] = useState(false)
@@ -169,12 +174,14 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN(initialData.nameEN || '')
             setBarcode(isCopy ? '' : (initialData.barcode || ''))
             setProductCode((initialData.productCode || '').toUpperCase())
+            setGroupName(initialData.groupName || '')
             setHsCode(initialData.hsCode || '')
             setJapanHsCode(initialData.japanHsCode || '')
             setCoupangSku(initialData.coupangSku || '')
             setOrderAvailable(initialData.wholesaleAvailable !== false)
             setImageUrl(initialData.imageUrl || null)
             setHasImageChanged(false)
+            setStock(formatNumber(isCopy ? 0 : (initialData.stock ?? 0)))
             setMinOrderQuantity(formatNumber(initialData.minOrderQuantity || 1))
             setOrderUnit(formatNumber(initialData.orderUnit || 1))
 
@@ -212,12 +219,14 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setNameEN('')
             setBarcode('')
             setProductCode('')
+            setGroupName('')
             setHsCode('')
             setJapanHsCode('')
             setCoupangSku('')
             setOrderAvailable(true)
             setImageUrl(null)
             setHasImageChanged(false)
+            setStock('0')
             setMinOrderQuantity('1')
             setOrderUnit('1')
             setRegionalPrices(createDefaultRegionalPrices());
@@ -265,6 +274,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 nameEN: nameEN.trim(),
                 barcode: barcode.trim(),
                 productCode: normalizeProductCode(productCode.trim()),
+                groupName: groupName.trim(),
                 hsCode: normalizeHsCode(hsCode.trim()),
                 japanHsCode: normalizeHsCode(japanHsCode.trim()),
                 coupangSku: coupangSku.trim(),
@@ -278,6 +288,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 usBuyPrice: parseFloat(parseNumber(regionalPrices['C'].US.wholesale)) || 0,
                 usSellPrice: parseFloat(parseNumber(regionalPrices['C'].US.retail)) || 0,
                 wholesaleAvailable: orderAvailable,
+                stock: Math.max(0, Math.round(parseFloat(parseNumber(stock)) || 0)),
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
                 orderUnit: parseInt(parseNumber(orderUnit)) || 1,
                 regionalPrices: regionalPrices,
@@ -314,12 +325,14 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setNameEN('')
                     setBarcode('')
                     setProductCode('')
+                    setGroupName('')
                     setHsCode('')
                     setJapanHsCode('')
                     setCoupangSku('')
                     setOrderAvailable(true)
                     setImageUrl(null)
                     setHasImageChanged(false)
+                    setStock('0')
                     setMinOrderQuantity('1')
                     setOrderUnit('1')
                     setRegionalPrices(createDefaultRegionalPrices());
@@ -474,6 +487,28 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono uppercase"
                                     placeholder="ITEM CODE"
                                 />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-gray-600">상품 그룹명</label>
+                                <input
+                                    type="text"
+                                    value={groupName}
+                                    onChange={e => setGroupName(e.target.value)}
+                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
+                                    placeholder="예: 퀵베이트 V3"
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[11px] font-bold text-emerald-700">관리용 재고</label>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    value={stock}
+                                    onChange={e => setStock(formatNumber(e.target.value))}
+                                    className="w-full px-2 py-1.5 bg-emerald-50/60 border border-emerald-200 outline-none focus:border-emerald-600 text-sm text-right font-black text-emerald-700"
+                                    placeholder="도매 발주와 무관"
+                                />
+                                <p className="text-[10px] font-bold text-gray-500">관리자가 보는 내부 재고입니다. 파트너 발주 가능 여부와 별도로 관리됩니다.</p>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[11px] font-bold text-gray-600">HS Code / 세번부호</label>

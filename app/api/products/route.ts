@@ -19,6 +19,7 @@ const productListSelect = {
     safetyStock: true,
     barcode: true,
     productCode: true,
+    groupName: true,
     hsCode: true,
     japanHsCode: true,
     coupangSku: true,
@@ -52,8 +53,9 @@ export async function GET() {
 export async function POST(request: Request) {
     try {
         const body = await request.json()
-        const { name, nameJP, nameEN, buyPrice, sellPrice, barcode, productCode, hsCode, japanHsCode, minOrderQuantity, orderUnit, coupangSku } = body
+        const { name, nameJP, nameEN, buyPrice, sellPrice, barcode, productCode, groupName, hsCode, japanHsCode, minOrderQuantity, orderUnit, coupangSku } = body
         const normalizedProductCode = productCode ? String(productCode).trim().toUpperCase() : null
+        const normalizedGroupName = groupName ? String(groupName).trim() : null
         const normalizedHsCode = hsCode ? String(hsCode).trim() : null
         const normalizedJapanHsCode = japanHsCode ? String(japanHsCode).trim() : null
         let imageUrl: string | null = null
@@ -79,6 +81,7 @@ export async function POST(request: Request) {
             nameEN: nameEN ? String(nameEN).trim() : null,
             barcode: barcode ? String(barcode).trim() : null,
             productCode: normalizedProductCode,
+            groupName: normalizedGroupName,
             hsCode: normalizedHsCode,
             japanHsCode: normalizedJapanHsCode,
             coupangSku: coupangSku ? String(coupangSku).trim() : null,
@@ -97,6 +100,7 @@ export async function POST(request: Request) {
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
             priceD: (body.priceD !== null && body.priceD !== undefined && body.priceD !== "") ? Number(body.priceD) : null,
+            stock: body.stock !== undefined ? Math.max(0, Math.round(Number(body.stock) || 0)) : 0,
             minOrderQuantity: minOrderQuantity !== undefined ? Math.max(1, Math.round(Number(minOrderQuantity))) : 1,
             orderUnit: orderUnit !== undefined ? Math.max(1, Math.round(Number(orderUnit))) : 1,
             regionalPrices: body.regionalPrices !== undefined ? body.regionalPrices : undefined,

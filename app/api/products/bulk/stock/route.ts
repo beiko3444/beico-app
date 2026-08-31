@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 
 export async function POST(request: Request) {
@@ -12,13 +13,15 @@ export async function POST(request: Request) {
 
         const results = []
         for (const update of updates) {
+            const stock = Math.max(0, Math.round(Number(update.stock) || 0))
             const updated = await prisma.product.update({
                 where: { id: update.id },
-                data: { stock: update.stock },
+                data: { stock },
             })
             results.push(updated.id)
         }
 
+        revalidatePath('/admin/products')
         return NextResponse.json({ success: true, count: results.length })
     } catch (error: any) {
         console.error("Bulk stock update error:", error)

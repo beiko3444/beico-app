@@ -12,11 +12,15 @@ const orderDetailRouteSource = readSource('app/api/orders/[id]/route.ts')
 
 assert.match(productFormSource, /발주 상태/)
 assert.match(productFormSource, /wholesaleAvailable: orderAvailable/)
-assert.doesNotMatch(productFormSource, /현재고 수량|안전재고 설정/)
+assert.match(productFormSource, /관리용 재고/)
+assert.match(productFormSource, /groupName/)
 
 assert.match(productTableSource, /발주 가능/)
 assert.match(productTableSource, /발주 불가능/)
-assert.doesNotMatch(productTableSource, /bulk\/stock|modifiedStock/)
+assert.match(productTableSource, /관리용 재고/)
+assert.match(productTableSource, /\/api\/products\/bulk\/stock/)
+assert.match(productTableSource, /collapsedGroupKeys/)
+assert.match(productTableSource, /상품 그룹/)
 
 assert.match(orderPageSource, /where: \{ wholesaleAvailable: true \}/)
 assert.doesNotMatch(orderPageSource, /stock: true/)

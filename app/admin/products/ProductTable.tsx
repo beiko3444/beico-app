@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { Fragment, useMemo, useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
 import {
     DndContext,
     closestCenter,
@@ -37,6 +38,19 @@ const restrictToVerticalDrag: Modifier = ({ transform }) => ({
 })
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
+const PRODUCT_TABLE_WIDTH = 1920
+const PRODUCT_TABLE_COLS = 18
+
+const normalizeGroupName = (value?: string | null) => String(value || '').trim()
+const productGroupKey = (product: ProductTableProduct) => {
+    const groupName = normalizeGroupName(product.groupName)
+    return groupName ? `group:${groupName.toLocaleLowerCase('ko-KR')}` : `single:${product.id}`
+}
+const formatInteger = (value: number | string | null | undefined) => {
+    const number = Number(value)
+    if (!Number.isFinite(number)) return '0'
+    return Math.round(number).toLocaleString('ko-KR')
+}
 
 async function postBulkUpdate(url: string, payload: Record<string, unknown>) {
     const response = await fetch(url, {
@@ -64,6 +78,8 @@ interface ProductRowProps {
     onWholesaleChange: (id: string, val: string) => void
     modifiedRetail: string | undefined
     onRetailChange: (id: string, val: string) => void
+    modifiedStock: string | undefined
+    onStockChange: (id: string, val: string) => void
     modifiedMoq: string | undefined
     onMoqChange: (id: string, val: string) => void
     modifiedOrderUnit: string | undefined
@@ -71,7 +87,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-function SortableProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+function SortableProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const {
         attributes,
         listeners,
@@ -182,7 +198,7 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
                     }
                 />
             </td>
-            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 whitespace-nowrap min-w-[200px]">
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 whitespace-nowrap">
                 <ProductForm
                     initialData={product}
                     trigger={
@@ -191,8 +207,21 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
                             {product.nameJP && (
                                 <div className="text-[10px] text-gray-400 truncate">{product.nameJP}</div>
                             )}
+                            {product.groupName && (
+                                <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {product.groupName}</div>
+                            )}
                         </div>
                     }
+                />
+            </td>
+            <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums whitespace-nowrap">
+                <input
+                    type="number"
+                    min="0"
+                    value={modifiedStock !== undefined ? modifiedStock : product.stock ?? 0}
+                    onChange={(event) => onStockChange(product.id, event.target.value)}
+                    className="w-16 rounded border border-emerald-200 bg-emerald-50/60 px-1 py-0.5 text-right text-[11px] font-black text-emerald-700 outline-none transition-colors focus:border-emerald-500"
+                    title="관리자용 재고입니다. 도매 발주/파트너 주문 재고와는 연결하지 않습니다."
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
@@ -308,21 +337,122 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
     )
 }
 
+type ProductGroupView = {
+    key: string
+    name: string
+    isNamed: boolean
+    products: ProductTableProduct[]
+}
+
+function ProductGroupHeader({
+    group,
+    expanded,
+    checkedCount,
+    onToggle,
+    onToggleCheck,
+}: {
+    group: ProductGroupView
+    expanded: boolean
+    checkedCount: number
+    onToggle: () => void
+    onToggleCheck: () => void
+}) {
+    const totalStock = group.products.reduce((sum, product) => sum + Math.max(0, Number(product.stock) || 0), 0)
+    const representative = group.products[0]
+
+    return (
+        <tr className="border-b border-indigo-100 bg-indigo-50/70">
+            <td colSpan={PRODUCT_TABLE_COLS} className="px-3 py-2">
+                <div className="flex min-w-0 items-center justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-2">
+                        <input
+                            type="checkbox"
+                            checked={checkedCount === group.products.length}
+                            onChange={onToggleCheck}
+                            className="cursor-pointer"
+                            title="그룹 SKU 전체 선택"
+                        />
+                        <button
+                            type="button"
+                            onClick={onToggle}
+                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-indigo-200 bg-white text-indigo-700 transition hover:bg-indigo-100"
+                            title={expanded ? '그룹 접기' : '그룹 펼치기'}
+                        >
+                            {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                        </button>
+                        {representative?.imageUrl ? (
+                            <img src={representative.imageUrl} alt={group.name} className="h-8 w-8 rounded border border-indigo-100 bg-white object-cover" />
+                        ) : (
+                            <div className="flex h-8 w-8 items-center justify-center rounded border border-indigo-100 bg-white text-indigo-300">
+                                <Layers size={15} />
+                            </div>
+                        )}
+                        <div className="min-w-0">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <span className="truncate text-[12px] font-black text-indigo-950">상품 그룹 · {group.name}</span>
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-indigo-600">{group.products.length} SKU</span>
+                            </div>
+                            <div className="mt-0.5 text-[10px] font-bold text-indigo-500">
+                                그룹을 누르면 SKU 목록을 접고 펼칩니다.
+                            </div>
+                        </div>
+                    </div>
+                    <div className="shrink-0 rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right">
+                        <div className="text-[9px] font-black text-emerald-600">관리용 재고 합계</div>
+                        <div className="text-[13px] font-black tabular-nums text-emerald-700">{formatInteger(totalStock)}</div>
+                    </div>
+                </div>
+            </td>
+        </tr>
+    )
+}
+
 export default function ProductTable({ initialProducts }: { initialProducts: ProductTableProduct[] }) {
     const [products, setProducts] = useState(initialProducts)
     const [activeGrade, setActiveGrade] = useState<ProductGrade>('C')
     const [modifiedCosts, setModifiedCosts] = useState<Record<string, string>>({})
     const [modifiedWholesales, setModifiedWholesales] = useState<Record<string, string>>({})
     const [modifiedRetails, setModifiedRetails] = useState<Record<string, string>>({})
+    const [modifiedStocks, setModifiedStocks] = useState<Record<string, string>>({})
     const [modifiedMoqs, setModifiedMoqs] = useState<Record<string, string>>({})
     const [modifiedOrderUnits, setModifiedOrderUnits] = useState<Record<string, string>>({})
     const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set())
+    const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set())
     const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
         setProducts(initialProducts)
     }, [initialProducts])
+
+    const productGroups = useMemo<ProductGroupView[]>(() => {
+        const groups = new Map<string, ProductGroupView>()
+        products.forEach((product) => {
+            const groupName = normalizeGroupName(product.groupName)
+            const key = productGroupKey(product)
+            const group = groups.get(key)
+            if (group) {
+                group.products.push(product)
+                return
+            }
+            groups.set(key, {
+                key,
+                name: groupName || product.name,
+                isNamed: Boolean(groupName),
+                products: [product],
+            })
+        })
+        return Array.from(groups.values())
+    }, [products])
+
+    const visibleProducts = useMemo(
+        () => productGroups.flatMap(group => (group.isNamed && collapsedGroupKeys.has(group.key)) ? [] : group.products),
+        [productGroups, collapsedGroupKeys],
+    )
+    const productIndexById = useMemo(
+        () => new Map(products.map((product, index) => [product.id, index])),
+        [products],
+    )
 
     const sensors = useSensors(
         useSensor(PointerSensor, {
@@ -405,6 +535,27 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         else setCheckedIds(new Set(products.map(p => p.id)))
     }
 
+    const handleToggleGroupCheck = (ids: string[]) => {
+        setCheckedIds(current => {
+            const allChecked = ids.every(id => current.has(id))
+            const next = new Set(current)
+            ids.forEach(id => {
+                if (allChecked) next.delete(id)
+                else next.add(id)
+            })
+            return next
+        })
+    }
+
+    const toggleGroup = (key: string) => {
+        setCollapsedGroupKeys(current => {
+            const next = new Set(current)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+        })
+    }
+
     const ensureProductChecked = (id: string) => {
         setCheckedIds(current => {
             if (current.has(id)) return current
@@ -426,6 +577,11 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
 
     const handleRetailChange = (id: string, val: string) => {
         setModifiedRetails(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
+        ensureProductChecked(id)
+    }
+
+    const handleStockChange = (id: string, val: string) => {
+        setModifiedStocks(prev => ({ ...prev, [id]: val }))
         ensureProductChecked(id)
     }
 
@@ -462,6 +618,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const handleSaveChanges = async () => {
         if (checkedIds.size === 0) return
 
+        const stockChangedIds = Array.from(checkedIds).filter(id => modifiedStocks[id] !== undefined)
         const changedGrades = PRODUCT_GRADES.filter(grade => (
             Array.from(checkedIds).some(id => (
                 modifiedCosts[draftKey(grade, id)] !== undefined
@@ -472,7 +629,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             ))
         ))
         const changedProductIds = new Set(Array.from(checkedIds).filter(id => (
-            changedGrades.some(grade => (
+            modifiedStocks[id] !== undefined
+            || changedGrades.some(grade => (
                 modifiedCosts[draftKey(grade, id)] !== undefined
                 || modifiedWholesales[draftKey(grade, id)] !== undefined
                 || modifiedRetails[draftKey(grade, id)] !== undefined
@@ -481,14 +639,26 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             ))
         )))
 
-        if (changedGrades.length === 0) {
-            alert('수정된 등급별 값이 없습니다.')
+        if (changedProductIds.size === 0) {
+            alert('수정된 값이 없습니다.')
             return
         }
-        if (!confirm(`${changedProductIds.size}개 상품의 ${changedGrades.join(', ')} 등급 수정사항을 저장하시겠습니까?`)) return
+        const gradeLabel = changedGrades.length > 0 ? `${changedGrades.join(', ')} 등급` : ''
+        const stockLabel = stockChangedIds.length > 0 ? '관리용 재고' : ''
+        const changeLabel = [stockLabel, gradeLabel].filter(Boolean).join(' / ')
+        if (!confirm(`${changedProductIds.size}개 상품의 ${changeLabel} 수정사항을 저장하시겠습니까?`)) return
 
         setIsSaving(true)
         try {
+            if (stockChangedIds.length > 0) {
+                await postBulkUpdate('/api/products/bulk/stock', {
+                    updates: stockChangedIds.map(id => ({
+                        id,
+                        stock: Math.max(0, Math.round(Number(modifiedStocks[id]) || 0)),
+                    })),
+                })
+            }
+
             for (const grade of changedGrades) {
                 const updates = Array.from(checkedIds).flatMap(id => {
                     const key = draftKey(grade, id)
@@ -515,6 +685,11 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 if (!changedProductIds.has(product.id)) return product
                 let regionalPrices = product.regionalPrices
                 let nextProduct = { ...product }
+
+                const stockDraft = modifiedStocks[product.id]
+                if (stockDraft !== undefined) {
+                    nextProduct.stock = Math.max(0, Math.round(Number(stockDraft) || 0))
+                }
 
                 for (const grade of changedGrades) {
                     const costDraft = modifiedCosts[draftKey(grade, product.id)]
@@ -555,6 +730,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             setModifiedCosts({})
             setModifiedWholesales({})
             setModifiedRetails({})
+            setModifiedStocks({})
             setModifiedMoqs({})
             setModifiedOrderUnits({})
             router.refresh()
@@ -577,7 +753,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 <div>
                     <div className="text-xs font-black text-blue-950">등급별 발주 조건 일괄 수정</div>
                     <div className="mt-1 text-[11px] font-medium text-blue-700">
-                        등급을 선택한 뒤 KR 단가·최소수량·주문단위를 수정하세요. 다른 등급 값은 변경되지 않습니다.
+                        등급을 선택한 뒤 KR 단가·최소수량·주문단위를 수정하세요. 관리용 재고는 도매 발주와 별도로 저장됩니다.
                     </div>
                 </div>
                 <div className="flex items-center gap-1 rounded-xl border border-blue-200 bg-white p-1 shadow-sm">
@@ -623,8 +799,28 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </button>
                 </div>
             )}
-            <div className="overflow-x-auto w-full pb-2">
-                <table className="w-full table-auto min-w-max border-collapse">
+            <div className="w-full overflow-x-auto pb-2">
+                <table className="table-fixed border-collapse" style={{ width: PRODUCT_TABLE_WIDTH, minWidth: PRODUCT_TABLE_WIDTH }}>
+                    <colgroup>
+                        <col className="w-[34px]" />
+                        <col className="w-[34px]" />
+                        <col className="w-[44px]" />
+                        <col className="w-[56px]" />
+                        <col className="w-[292px]" />
+                        <col className="w-[92px]" />
+                        <col className="w-[90px]" />
+                        <col className="w-[104px]" />
+                        <col className="w-[104px]" />
+                        <col className="w-[104px]" />
+                        <col className="w-[104px]" />
+                        <col className="w-[104px]" />
+                        <col className="w-[110px]" />
+                        <col className="w-[126px]" />
+                        <col className="w-[112px]" />
+                        <col className="w-[104px]" />
+                        <col className="w-[180px]" />
+                        <col className="w-[126px]" />
+                    </colgroup>
                     <thead className="bg-[var(--color-brand-blue)] text-white">
                         <tr>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">
@@ -634,6 +830,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">No</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">이미지</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
+                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">관리용 재고</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">발주 상태</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">{activeGrade}등급 KR 최소수량</th>
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">{activeGrade}등급 KR 주문단위</th>
@@ -650,39 +847,58 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                         <SortableContext
-                            items={products.map(p => p.id)}
+                            items={visibleProducts.map(p => p.id)}
                             strategy={verticalListSortingStrategy}
                         >
                             {products.length === 0 ? (
                                 <tr>
-                                    <td colSpan={17} className="px-6 py-12 text-center text-gray-500">
+                                    <td colSpan={PRODUCT_TABLE_COLS} className="px-6 py-12 text-center text-gray-500">
                                         등록된 상품이 없습니다.
                                     </td>
                                 </tr>
                             ) : (
-                                products.map((product, index) => (
-                                    <SortableProductRow
-                                        key={product.id}
-                                        product={product}
-                                        index={index}
-                                        activeGrade={activeGrade}
-                                        onSortOrderChange={onSortOrderChange}
-                                        onDelete={handleDelete}
-                                        checked={checkedIds.has(product.id)}
-                                        onToggleCheck={handleToggleCheck}
-                                        modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
-                                        onCostChange={handleCostChange}
-                                        modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
-                                        onWholesaleChange={handleWholesaleChange}
-                                        modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
-                                        onRetailChange={handleRetailChange}
-                                        modifiedMoq={modifiedMoqs[draftKey(activeGrade, product.id)]}
-                                        onMoqChange={handleMoqChange}
-                                        modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
-                                        onOrderUnitChange={handleOrderUnitChange}
-                                        onToggleOrderAvailability={handleToggleOrderAvailability}
-                                    />
-                                ))
+                                productGroups.map((group) => {
+                                    const expanded = !group.isNamed || !collapsedGroupKeys.has(group.key)
+                                    const checkedCount = group.products.filter(product => checkedIds.has(product.id)).length
+                                    return (
+                                        <Fragment key={group.key}>
+                                            {group.isNamed ? (
+                                                <ProductGroupHeader
+                                                    group={group}
+                                                    expanded={expanded}
+                                                    checkedCount={checkedCount}
+                                                    onToggle={() => toggleGroup(group.key)}
+                                                    onToggleCheck={() => handleToggleGroupCheck(group.products.map(product => product.id))}
+                                                />
+                                            ) : null}
+                                            {expanded ? group.products.map((product) => (
+                                                <SortableProductRow
+                                                    key={product.id}
+                                                    product={product}
+                                                    index={productIndexById.get(product.id) ?? 0}
+                                                    activeGrade={activeGrade}
+                                                    onSortOrderChange={onSortOrderChange}
+                                                    onDelete={handleDelete}
+                                                    checked={checkedIds.has(product.id)}
+                                                    onToggleCheck={handleToggleCheck}
+                                                    modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
+                                                    onCostChange={handleCostChange}
+                                                    modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
+                                                    onWholesaleChange={handleWholesaleChange}
+                                                    modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
+                                                    onRetailChange={handleRetailChange}
+                                                    modifiedStock={modifiedStocks[product.id]}
+                                                    onStockChange={handleStockChange}
+                                                    modifiedMoq={modifiedMoqs[draftKey(activeGrade, product.id)]}
+                                                    onMoqChange={handleMoqChange}
+                                                    modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
+                                                    onOrderUnitChange={handleOrderUnitChange}
+                                                    onToggleOrderAvailability={handleToggleOrderAvailability}
+                                                />
+                                            )) : null}
+                                        </Fragment>
+                                    )
+                                })
                             )}
                         </SortableContext>
                     </tbody>

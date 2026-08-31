@@ -123,6 +123,7 @@ model Product {
   updatedAt        DateTime    @updatedAt
   barcode          String?
   productCode      String?
+  groupName        String?
   hsCode           String?
   japanHsCode      String?
   coupangSku       String?     @unique
