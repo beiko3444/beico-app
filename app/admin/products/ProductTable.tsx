@@ -2,24 +2,6 @@
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
-import {
-    DndContext,
-    closestCenter,
-    KeyboardSensor,
-    PointerSensor,
-    useSensor,
-    useSensors,
-    DragEndEvent,
-    type Modifier
-} from '@dnd-kit/core'
-import {
-    arrayMove,
-    SortableContext,
-    sortableKeyboardCoordinates,
-    verticalListSortingStrategy,
-    useSortable
-} from '@dnd-kit/sortable'
-import { CSS } from '@dnd-kit/utilities'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import BarcodeDisplay from "@/components/BarcodeDisplay"
@@ -32,11 +14,6 @@ import {
     setProductGradePriceValue,
     type ProductGrade,
 } from '@/lib/productGradePricing'
-
-const restrictToVerticalDrag: Modifier = ({ transform }) => ({
-    ...transform,
-    x: 0,
-})
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const PRODUCT_TABLE_WIDTH = 1920
@@ -191,29 +168,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-const SortableProductRow = memo(function SortableProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
-    const {
-        attributes,
-        listeners,
-        setNodeRef,
-        transform,
-        transition,
-        isDragging
-    } = useSortable({ id: product.id })
-
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        zIndex: isDragging ? 50 : 'auto',
-        opacity: isDragging ? 0.5 : 1,
-    }
-    const dragHandleStyle = {
-        touchAction: 'none',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        WebkitTouchCallout: 'none',
-    } as const
-
+const ProductRow = memo(function ProductRow({ product, index, activeGrade, onSortOrderChange, onDelete, checked, onToggleCheck, modifiedCost, onCostChange, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -253,9 +208,7 @@ const SortableProductRow = memo(function SortableProductRow({ product, index, ac
 
     return (
         <tr
-            ref={setNodeRef}
-            style={style}
-            className={`text-[11px] border-b border-gray-100 hover:bg-gray-50 transition-colors group ${isDragging ? 'bg-blue-50' : ''} ${checked ? 'bg-blue-50/30' : ''}`}
+            className={`text-[11px] border-b border-gray-100 hover:bg-gray-50 transition-colors group ${checked ? 'bg-blue-50/30' : ''}`}
         >
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
                 <input
@@ -266,14 +219,12 @@ const SortableProductRow = memo(function SortableProductRow({ product, index, ac
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
-                <div
-                    {...attributes}
-                    {...listeners}
-                    style={dragHandleStyle}
-                    className="cursor-grab active:cursor-grabbing p-1 text-gray-300 hover:text-gray-600"
+                <span
+                    className="inline-flex h-5 w-5 items-center justify-center text-gray-300"
+                    title="순서 숫자를 수정해 정렬합니다."
                 >
-                    ⠿
-                </div>
+                    ≡
+                </span>
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center whitespace-nowrap">
                 <input
@@ -292,7 +243,7 @@ const SortableProductRow = memo(function SortableProductRow({ product, index, ac
                     trigger={
                         <div className="w-8 h-8 mx-auto bg-white rounded border border-gray-100 overflow-hidden flex items-center justify-center cursor-pointer hover:border-[var(--color-brand-blue)] transition-all shadow-sm group-hover:shadow-md">
                             {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
                             ) : (
                                 <div className="text-center">
                                     <span className="text-[8px] font-bold text-gray-300">Img</span>
@@ -486,7 +437,7 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         </button>
                         {representative?.imageUrl ? (
-                            <img src={representative.imageUrl} alt={group.name} className="h-8 w-8 rounded border border-indigo-100 bg-white object-cover" />
+                            <img src={representative.imageUrl} alt={group.name} loading="lazy" className="h-8 w-8 rounded border border-indigo-100 bg-white object-cover" />
                         ) : (
                             <div className="flex h-8 w-8 items-center justify-center rounded border border-indigo-100 bg-white text-indigo-300">
                                 <Layers size={15} />
@@ -561,25 +512,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         return Array.from(groups.values())
     }, [products])
 
-    const visibleProducts = useMemo(
-        () => productGroups.flatMap(group => (group.isNamed && collapsedGroupKeys.has(group.key)) ? [] : group.products),
-        [productGroups, collapsedGroupKeys],
-    )
-    const visibleProductIds = useMemo(() => visibleProducts.map(product => product.id), [visibleProducts])
     const productIndexById = useMemo(
         () => new Map(products.map((product, index) => [product.id, index])),
         [products],
-    )
-
-    const sensors = useSensors(
-        useSensor(PointerSensor, {
-            activationConstraint: {
-                distance: 8,
-            },
-        }),
-        useSensor(KeyboardSensor, {
-            coordinateGetter: sortableKeyboardCoordinates,
-        })
     )
 
     const saveOrder = useCallback(async (productIds: string[]) => {
@@ -596,29 +531,15 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         }
     }, [])
 
-    const handleDragEnd = useCallback(async (event: DragEndEvent) => {
-        const { active, over } = event
-
-        if (over && active.id !== over.id) {
-            setProducts((items) => {
-                const oldIndex = items.findIndex((i) => i.id === active.id)
-                const newIndex = items.findIndex((i) => i.id === over.id)
-                const newItems = arrayMove(items, oldIndex, newIndex)
-
-                // Call API to save order
-                saveOrder(newItems.map(item => item.id))
-
-                return newItems
-            })
-        }
-    }, [saveOrder])
-
     const onSortOrderChange = useCallback(async (productId: string, newIndex: number) => {
         // ... (existing code)
         const clampedIndex = Math.max(0, Math.min(newIndex, products.length - 1))
         const oldIndex = products.findIndex(p => p.id === productId)
         if (oldIndex === clampedIndex) return
-        const newItems = arrayMove(products, oldIndex, clampedIndex)
+        const newItems = [...products]
+        const [movedProduct] = newItems.splice(oldIndex, 1)
+        if (!movedProduct) return
+        newItems.splice(clampedIndex, 0, movedProduct)
         setProducts(newItems)
         saveOrder(newItems.map(item => item.id))
     }, [products, saveOrder])
@@ -864,12 +785,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     }
 
     return (
-        <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            modifiers={[restrictToVerticalDrag]}
-            onDragEnd={handleDragEnd}
-        >
+        <>
             <div className="flex flex-col gap-3 border-b border-blue-100 bg-blue-50/70 p-3 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                     <div className="text-xs font-black text-blue-950">등급별 발주 조건 일괄 수정</div>
@@ -966,65 +882,64 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <th className="px-2 py-1.5 text-center font-bold text-[11px] last:border-0 whitespace-nowrap">관리</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        <SortableContext
-                            items={visibleProductIds}
-                            strategy={verticalListSortingStrategy}
-                        >
-                            {products.length === 0 ? (
-                                <tr>
-                                    <td colSpan={PRODUCT_TABLE_COLS} className="px-6 py-12 text-center text-gray-500">
-                                        등록된 상품이 없습니다.
-                                    </td>
-                                </tr>
-                            ) : (
-                                productGroups.map((group) => {
-                                    const expanded = !group.isNamed || !collapsedGroupKeys.has(group.key)
-                                    const checkedCount = group.products.filter(product => checkedIds.has(product.id)).length
-                                    return (
-                                        <Fragment key={group.key}>
-                                            {group.isNamed ? (
-                                                <ProductGroupHeader
-                                                    group={group}
-                                                    expanded={expanded}
-                                                    checkedCount={checkedCount}
-                                                    onToggle={() => toggleGroup(group.key)}
-                                                    onToggleCheck={() => handleToggleGroupCheck(group.products.map(product => product.id))}
-                                                />
-                                            ) : null}
-                                            {expanded ? group.products.map((product) => (
-                                                <SortableProductRow
-                                                    key={product.id}
-                                                    product={product}
-                                                    index={productIndexById.get(product.id) ?? 0}
-                                                    activeGrade={activeGrade}
-                                                    onSortOrderChange={onSortOrderChange}
-                                                    onDelete={handleDelete}
-                                                    checked={checkedIds.has(product.id)}
-                                                    onToggleCheck={handleToggleCheck}
-                                                    modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
-                                                    onCostChange={handleCostChange}
-                                                    modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
-                                                    onWholesaleChange={handleWholesaleChange}
-                                                    modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
-                                                    onRetailChange={handleRetailChange}
-                                                    modifiedStock={modifiedStocks[product.id]}
-                                                    onStockChange={handleStockChange}
-                                                    modifiedMoq={modifiedMoqs[draftKey(activeGrade, product.id)]}
-                                                    onMoqChange={handleMoqChange}
-                                                    modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
-                                                    onOrderUnitChange={handleOrderUnitChange}
-                                                    onToggleOrderAvailability={handleToggleOrderAvailability}
-                                                />
-                                            )) : null}
-                                        </Fragment>
-                                    )
-                                })
-                            )}
-                        </SortableContext>
-                    </tbody>
+                    {products.length === 0 ? (
+                        <tbody className="divide-y divide-gray-100">
+                            <tr>
+                                <td colSpan={PRODUCT_TABLE_COLS} className="px-6 py-12 text-center text-gray-500">
+                                    등록된 상품이 없습니다.
+                                </td>
+                            </tr>
+                        </tbody>
+                    ) : (
+                        productGroups.map((group) => {
+                            const expanded = !group.isNamed || !collapsedGroupKeys.has(group.key)
+                            const checkedCount = group.products.filter(product => checkedIds.has(product.id)).length
+                            return (
+                                <Fragment key={group.key}>
+                                    {group.isNamed ? (
+                                        <tbody>
+                                            <ProductGroupHeader
+                                                group={group}
+                                                expanded={expanded}
+                                                checkedCount={checkedCount}
+                                                onToggle={() => toggleGroup(group.key)}
+                                                onToggleCheck={() => handleToggleGroupCheck(group.products.map(product => product.id))}
+                                            />
+                                        </tbody>
+                                    ) : null}
+                                    <tbody className="divide-y divide-gray-100" hidden={group.isNamed && !expanded}>
+                                        {group.products.map((product) => (
+                                            <ProductRow
+                                                key={product.id}
+                                                product={product}
+                                                index={productIndexById.get(product.id) ?? 0}
+                                                activeGrade={activeGrade}
+                                                onSortOrderChange={onSortOrderChange}
+                                                onDelete={handleDelete}
+                                                checked={checkedIds.has(product.id)}
+                                                onToggleCheck={handleToggleCheck}
+                                                modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
+                                                onCostChange={handleCostChange}
+                                                modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
+                                                onWholesaleChange={handleWholesaleChange}
+                                                modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
+                                                onRetailChange={handleRetailChange}
+                                                modifiedStock={modifiedStocks[product.id]}
+                                                onStockChange={handleStockChange}
+                                                modifiedMoq={modifiedMoqs[draftKey(activeGrade, product.id)]}
+                                                onMoqChange={handleMoqChange}
+                                                modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
+                                                onOrderUnitChange={handleOrderUnitChange}
+                                                onToggleOrderAvailability={handleToggleOrderAvailability}
+                                            />
+                                        ))}
+                                    </tbody>
+                                </Fragment>
+                            )
+                        })
+                    )}
                 </table>
             </div>
-        </DndContext>
+        </>
     )
 }
