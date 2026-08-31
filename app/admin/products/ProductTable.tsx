@@ -294,7 +294,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, index, activ
                             {product.nameJP && (
                                 <div className="text-[10px] text-gray-400 truncate">{product.nameJP}</div>
                             )}
-                            {visibleGroupName && (
+                            {visibleGroupName && !displayName && (
                                 <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {visibleGroupName}</div>
                             )}
                             {ungrouped && (
@@ -715,6 +715,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const [stockFilter, setStockFilter] = useState<ProductStockFilter>('all')
     const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
     const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
+    const orderSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
     const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
 
@@ -809,7 +810,6 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
 
     const handleCategoryChange = useCallback((category: ProductCatalogCategory) => {
         setActiveCategory(category)
-        setCheckedIds(new Set())
         setCollapsedGroupKeys(new Set())
         setSelectedGroupKey(null)
         setDraggingProductId(null)
@@ -821,19 +821,28 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         }
     }, [selectedGroup, selectedGroupKey])
 
-    const saveOrder = useCallback(async (productIds: string[], startOrder = 0) => {
-        try {
-            await fetch('/api/products/reorder', {
+    const saveOrder = useCallback((productIds: string[], startOrder = 0) => {
+        const queuedSave = orderSaveQueueRef.current.then(async () => {
+            const response = await fetch('/api/products/reorder', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ productIds, startOrder })
             })
-            // router.refresh() // Optional: Refresh to sync server state
-        } catch (e) {
-            console.error(e)
-            alert("Failed to save product order")
-        }
-    }, [])
+
+            if (!response.ok) {
+                const data = await response.json().catch(() => null)
+                throw new Error(data?.error || '상품 순서를 저장하지 못했습니다.')
+            }
+        })
+
+        orderSaveQueueRef.current = queuedSave.catch(error => {
+            console.error(error)
+            alert(error instanceof Error ? error.message : '상품 순서를 저장하지 못했습니다.')
+            router.refresh()
+        })
+
+        return orderSaveQueueRef.current
+    }, [router])
 
     const onSortOrderChange = useCallback(async (productId: string, newIndex: number) => {
         // ... (existing code)
@@ -845,7 +854,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         if (!movedProduct) return
         newItems.splice(clampedIndex, 0, movedProduct)
         setProducts(newItems)
-        saveOrder(newItems.map(item => item.id))
+        const changedRangeStart = Math.min(oldIndex, clampedIndex)
+        const changedRangeEnd = Math.max(oldIndex, clampedIndex)
+        void saveOrder(
+            newItems.slice(changedRangeStart, changedRangeEnd + 1).map(item => item.id),
+            changedRangeStart,
+        )
     }, [products, saveOrder])
 
     const handleDelete = useCallback(async (id: string) => {
