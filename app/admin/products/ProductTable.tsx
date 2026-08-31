@@ -83,6 +83,33 @@ const formatInteger = (value: number | string | null | undefined) => {
     if (!Number.isFinite(number)) return '0'
     return Math.round(number).toLocaleString('ko-KR')
 }
+const normalizeNumericDraft = (value: string, allowDecimal = false) => {
+    const compact = value.replace(/[^\d.]/g, '')
+    if (!allowDecimal) return compact.replace(/\D/g, '')
+
+    const [integer = '', ...decimalParts] = compact.split('.')
+    const decimal = decimalParts.join('').replace(/\D/g, '')
+    return decimalParts.length > 0 ? `${integer}.${decimal}` : integer
+}
+const parseNumericDraft = (value: number | string | null | undefined) => {
+    const number = Number(String(value ?? '').replace(/,/g, ''))
+    return Number.isFinite(number) ? number : 0
+}
+const parseIntegerDraft = (value: number | string | null | undefined, fallback = 0) => {
+    const number = Math.round(parseNumericDraft(value))
+    return Number.isFinite(number) ? number : fallback
+}
+const formatNumberInput = (value: number | string | null | undefined) => {
+    const raw = String(value ?? '').replace(/[,\s]/g, '')
+    if (!raw) return ''
+
+    const dotIndex = raw.indexOf('.')
+    const integerRaw = dotIndex >= 0 ? raw.slice(0, dotIndex) : raw
+    const decimalRaw = dotIndex >= 0 ? raw.slice(dotIndex + 1).replace(/\./g, '') : ''
+    const integerNumber = Number(integerRaw || 0)
+    const formattedInteger = Number.isFinite(integerNumber) ? integerNumber.toLocaleString('ko-KR') : '0'
+    return dotIndex >= 0 ? `${formattedInteger}.${decimalRaw}` : formattedInteger
+}
 
 async function postBulkUpdate(url: string, payload: Record<string, unknown>) {
     const response = await fetch(url, {
@@ -157,9 +184,9 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
     const retailValue = modifiedRetail !== undefined
         ? modifiedRetail
         : readProductGradePriceValue(product.regionalPrices, activeGrade, 'retail', product.onlinePrice || 0)
-    const costNumber = Number(costValue) || 0
-    const wholesaleNumber = Number(wholesaleValue) || 0
-    const retailNumber = Number(retailValue) || 0
+    const costNumber = parseNumericDraft(costValue)
+    const wholesaleNumber = parseNumericDraft(wholesaleValue)
+    const retailNumber = parseNumericDraft(retailValue)
     const wholesaleMargin = wholesaleNumber > 0 ? ((wholesaleNumber - costNumber) / wholesaleNumber) * 100 : 0
     const retailMargin = retailNumber > 0 ? ((retailNumber - wholesaleNumber) / retailNumber) * 100 : 0
 
@@ -249,10 +276,10 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums whitespace-nowrap">
                 <div className="flex flex-col items-center">
                     <input
-                        type="number"
-                        min="0"
-                        value={modifiedStock !== undefined ? modifiedStock : product.stock ?? 0}
-                        onChange={(event) => onStockChange(product.id, event.target.value)}
+                        type="text"
+                        inputMode="numeric"
+                        value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
+                        onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
                         className="w-16 rounded border border-emerald-200 bg-emerald-50/60 px-1 py-0.5 text-right text-[11px] font-black text-emerald-700 outline-none transition-colors focus:border-emerald-500"
                         title="관리자용 재고입니다. 도매 발주/파트너 주문 재고와는 연결하지 않습니다."
                     />
@@ -273,53 +300,50 @@ function SortableProductRow({ product, index, activeGrade, onSortOrderChange, on
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-800 font-bold whitespace-nowrap">
                 <input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
                     value={modifiedMoq !== undefined
-                        ? modifiedMoq
-                        : readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1)}
-                    onChange={(e) => onMoqChange(product.id, e.target.value)}
+                        ? formatNumberInput(modifiedMoq)
+                        : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1))}
+                    onChange={(e) => onMoqChange(product.id, normalizeNumericDraft(e.target.value))}
                     className="w-12 text-center border border-gray-200 rounded py-0.5 text-[11px] focus:border-[var(--color-brand-blue)] outline-none font-bold bg-white transition-colors"
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center text-gray-800 font-bold whitespace-nowrap">
                 <input
-                    type="number"
-                    min="1"
+                    type="text"
+                    inputMode="numeric"
                     value={modifiedOrderUnit !== undefined
-                        ? modifiedOrderUnit
-                        : readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1)}
-                    onChange={(e) => onOrderUnitChange(product.id, e.target.value)}
+                        ? formatNumberInput(modifiedOrderUnit)
+                        : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))}
+                    onChange={(e) => onOrderUnitChange(product.id, normalizeNumericDraft(e.target.value))}
                     className="w-12 text-center border border-gray-200 rounded py-0.5 text-[11px] focus:border-[var(--color-brand-blue)] outline-none font-bold bg-white transition-colors"
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums text-gray-500 whitespace-nowrap">
                 <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={costValue}
-                    onChange={(event) => onCostChange(product.id, event.target.value)}
+                    type="text"
+                    inputMode="decimal"
+                    value={formatNumberInput(costValue)}
+                    onChange={(event) => onCostChange(product.id, normalizeNumericDraft(event.target.value, true))}
                     className="w-20 rounded border border-gray-200 bg-white px-1 py-0.5 text-right text-[11px] outline-none transition-colors focus:border-blue-500"
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-[var(--color-brand-blue)] whitespace-nowrap">
                 <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={wholesaleValue}
-                    onChange={(event) => onWholesaleChange(product.id, event.target.value)}
+                    type="text"
+                    inputMode="decimal"
+                    value={formatNumberInput(wholesaleValue)}
+                    onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))}
                     className="w-20 rounded border border-blue-200 bg-blue-50/40 px-1 py-0.5 text-right text-[11px] font-bold text-blue-700 outline-none transition-colors focus:border-blue-500"
                 />
             </td>
             <td className="px-2 py-1.5 border-r border-gray-100 last:border-0 text-center tabular-nums font-bold text-gray-700 whitespace-nowrap">
                 <input
-                    type="number"
-                    min="0"
-                    step="any"
-                    value={retailValue}
-                    onChange={(event) => onRetailChange(product.id, event.target.value)}
+                    type="text"
+                    inputMode="decimal"
+                    value={formatNumberInput(retailValue)}
+                    onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))}
                     className="w-20 rounded border border-emerald-200 bg-emerald-50/40 px-1 py-0.5 text-right text-[11px] font-bold text-emerald-700 outline-none transition-colors focus:border-emerald-500"
                 />
             </td>
@@ -701,7 +725,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 await postBulkUpdate('/api/products/bulk/stock', {
                     updates: stockChangedIds.map(id => ({
                         id,
-                        stock: Math.max(0, Math.round(Number(modifiedStocks[id]) || 0)),
+                        stock: Math.max(0, parseIntegerDraft(modifiedStocks[id], 0)),
                     })),
                 })
             }
@@ -718,11 +742,11 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
 
                     return [{
                         id,
-                        ...(cost !== undefined ? { cost: Math.max(0, Number(cost) || 0) } : {}),
-                        ...(wholesale !== undefined ? { wholesale: Math.max(0, Number(wholesale) || 0) } : {}),
-                        ...(retail !== undefined ? { retail: Math.max(0, Number(retail) || 0) } : {}),
-                        ...(moq !== undefined ? { moq: Math.max(1, parseInt(moq) || 1) } : {}),
-                        ...(orderUnit !== undefined ? { orderUnit: Math.max(1, parseInt(orderUnit) || 1) } : {}),
+                        ...(cost !== undefined ? { cost: Math.max(0, parseNumericDraft(cost)) } : {}),
+                        ...(wholesale !== undefined ? { wholesale: Math.max(0, parseNumericDraft(wholesale)) } : {}),
+                        ...(retail !== undefined ? { retail: Math.max(0, parseNumericDraft(retail)) } : {}),
+                        ...(moq !== undefined ? { moq: Math.max(1, parseIntegerDraft(moq, 1)) } : {}),
+                        ...(orderUnit !== undefined ? { orderUnit: Math.max(1, parseIntegerDraft(orderUnit, 1)) } : {}),
                     }]
                 })
                 await postBulkUpdate('/api/products/bulk/grade-pricing', { grade, updates })
@@ -735,7 +759,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
 
                 const stockDraft = modifiedStocks[product.id]
                 if (stockDraft !== undefined) {
-                    nextProduct.stock = Math.max(0, Math.round(Number(stockDraft) || 0))
+                    nextProduct.stock = Math.max(0, parseIntegerDraft(stockDraft, 0))
                 }
 
                 for (const grade of changedGrades) {
@@ -745,28 +769,30 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     const moqDraft = modifiedMoqs[draftKey(grade, product.id)]
                     const orderUnitDraft = modifiedOrderUnits[draftKey(grade, product.id)]
                     if (costDraft !== undefined) {
-                        const cost = Math.max(0, Number(costDraft) || 0)
+                        const cost = Math.max(0, parseNumericDraft(costDraft))
                         regionalPrices = setProductGradePriceValue(regionalPrices, grade, 'cost', cost)
                         if (grade === 'C') nextProduct.buyPrice = cost
                     }
                     if (wholesaleDraft !== undefined) {
-                        const wholesale = Math.max(0, Number(wholesaleDraft) || 0)
+                        const wholesale = Math.max(0, parseNumericDraft(wholesaleDraft))
                         regionalPrices = setProductGradePriceValue(regionalPrices, grade, 'wholesale', wholesale)
                         nextProduct = { ...nextProduct, [`price${grade}`]: wholesale }
                         if (grade === 'C') nextProduct.sellPrice = wholesale
                     }
                     if (retailDraft !== undefined) {
-                        const retail = Math.max(0, Number(retailDraft) || 0)
+                        const retail = Math.max(0, parseNumericDraft(retailDraft))
                         regionalPrices = setProductGradePriceValue(regionalPrices, grade, 'retail', retail)
                         if (grade === 'C') nextProduct.onlinePrice = retail
                     }
                     if (moqDraft !== undefined) {
-                        regionalPrices = setProductGradeOrderValue(regionalPrices, grade, 'moq', parseInt(moqDraft))
-                        if (grade === 'C') nextProduct.minOrderQuantity = Math.max(1, parseInt(moqDraft) || 1)
+                        const moq = Math.max(1, parseIntegerDraft(moqDraft, 1))
+                        regionalPrices = setProductGradeOrderValue(regionalPrices, grade, 'moq', moq)
+                        if (grade === 'C') nextProduct.minOrderQuantity = moq
                     }
                     if (orderUnitDraft !== undefined) {
-                        regionalPrices = setProductGradeOrderValue(regionalPrices, grade, 'orderUnit', parseInt(orderUnitDraft))
-                        if (grade === 'C') nextProduct.orderUnit = Math.max(1, parseInt(orderUnitDraft) || 1)
+                        const orderUnit = Math.max(1, parseIntegerDraft(orderUnitDraft, 1))
+                        regionalPrices = setProductGradeOrderValue(regionalPrices, grade, 'orderUnit', orderUnit)
+                        if (grade === 'C') nextProduct.orderUnit = orderUnit
                     }
                 }
 
