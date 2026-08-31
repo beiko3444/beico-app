@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { getProductImageUrl } from "@/lib/product-image-url"
+import { Prisma } from "@prisma/client"
 import { unstable_cache } from "next/cache"
 import ProductForm from "./product-form"
 import Link from 'next/link'
@@ -8,51 +9,88 @@ import ProductTable from "./ProductTable"
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
 
-const getCachedProducts = unstable_cache(
-    async () => prisma.product.findMany({
-        select: {
-            id: true,
-            name: true,
-            nameJP: true,
-            nameEN: true,
-            buyPrice: true,
-            sellPrice: true,
-            onlinePrice: true,
-            priceA: true,
-            priceB: true,
-            priceC: true,
-            priceD: true,
-            stock: true,
-            safetyStock: true,
-            barcode: true,
-            productCode: true,
-            groupName: true,
-            hsCode: true,
-            japanHsCode: true,
-            coupangSku: true,
-            imageUrl: true,
-            sortOrder: true,
-            minOrderQuantity: true,
-            orderUnit: true,
-            jpBuyPrice: true,
-            jpSellPrice: true,
-            krBuyPrice: true,
-            krSellPrice: true,
-            usBuyPrice: true,
-            usSellPrice: true,
-            regionalPrices: true,
-            wholesaleAvailable: true,
-            createdAt: true,
-            updatedAt: true,
-        },
-        orderBy: { sortOrder: 'asc' }
-    }),
-    ['admin-products-page-v6'],
+const PRODUCT_PAGE_SIZE_OPTIONS = [30, 50, 100] as const
+const DEFAULT_PRODUCT_PAGE_SIZE = 50
+
+type PageProps = {
+    searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+const firstParam = (value: string | string[] | undefined) => Array.isArray(value) ? value[0] : value
+const parsePositiveInt = (value: string | undefined, fallback: number) => {
+    const parsed = Number.parseInt(value || '', 10)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+const parsePageSize = (value: string | undefined) => {
+    const parsed = parsePositiveInt(value, DEFAULT_PRODUCT_PAGE_SIZE)
+    return PRODUCT_PAGE_SIZE_OPTIONS.includes(parsed as typeof PRODUCT_PAGE_SIZE_OPTIONS[number])
+        ? parsed
+        : DEFAULT_PRODUCT_PAGE_SIZE
+}
+
+const productSelect = Prisma.validator<Prisma.ProductSelect>()({
+    id: true,
+    name: true,
+    nameJP: true,
+    nameEN: true,
+    buyPrice: true,
+    sellPrice: true,
+    onlinePrice: true,
+    priceA: true,
+    priceB: true,
+    priceC: true,
+    priceD: true,
+    stock: true,
+    safetyStock: true,
+    barcode: true,
+    productCode: true,
+    groupName: true,
+    hsCode: true,
+    japanHsCode: true,
+    coupangSku: true,
+    imageUrl: true,
+    sortOrder: true,
+    minOrderQuantity: true,
+    orderUnit: true,
+    jpBuyPrice: true,
+    jpSellPrice: true,
+    krBuyPrice: true,
+    krSellPrice: true,
+    usBuyPrice: true,
+    usSellPrice: true,
+    regionalPrices: true,
+    wholesaleAvailable: true,
+    createdAt: true,
+    updatedAt: true,
+})
+
+const getCachedProductsPage = unstable_cache(
+    async (requestedPage: number, pageSize: number) => {
+        const totalCount = await prisma.product.count()
+        const totalPages = Math.max(1, Math.ceil(totalCount / pageSize))
+        const page = Math.min(Math.max(1, requestedPage), totalPages)
+        const products = await prisma.product.findMany({
+            select: productSelect,
+            orderBy: [
+                { sortOrder: 'asc' },
+                { createdAt: 'asc' },
+            ],
+            skip: (page - 1) * pageSize,
+            take: pageSize,
+        })
+
+        return { products, page, pageSize, totalCount, totalPages }
+    },
+    ['admin-products-page-v8'],
     { revalidate: 60, tags: ['products'] }
 )
 
-export default async function ProductsPage() {
-    const products = (await getCachedProducts()).map(({ imageUrl, updatedAt, ...product }) => ({
+export default async function ProductsPage({ searchParams }: PageProps) {
+    const params = (await searchParams) || {}
+    const requestedPage = parsePositiveInt(firstParam(params.page), 1)
+    const pageSize = parsePageSize(firstParam(params.pageSize))
+    const productPage = await getCachedProductsPage(requestedPage, pageSize)
+    const products = productPage.products.map(({ imageUrl, updatedAt, ...product }) => ({
         ...product,
         imageUrl: imageUrl ? getProductImageUrl(product.id, updatedAt) : null,
     }))
@@ -78,7 +116,15 @@ export default async function ProductsPage() {
             </div>
 
             <div className="glass-panel p-1 rounded-2xl shadow-lg dark:shadow-none bg-white dark:bg-[#1e1e1e] border-t-2 border-t-[var(--color-brand-blue)] overflow-x-auto">
-                <ProductTable initialProducts={products} />
+                <ProductTable
+                    initialProducts={products}
+                    pagination={{
+                        page: productPage.page,
+                        pageSize: productPage.pageSize,
+                        totalCount: productPage.totalCount,
+                        totalPages: productPage.totalPages,
+                    }}
+                />
             </div>
         </div>
     )

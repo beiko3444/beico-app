@@ -10,7 +10,8 @@ export async function POST(req: Request) {
     }
 
     try {
-        const { productIds } = await req.json()
+        const { productIds, startOrder = 0 } = await req.json()
+        const offset = Math.max(0, Math.round(Number(startOrder) || 0))
 
         // Update sortOrder for each product in the array
         // productIds is an array of IDs in the new order
@@ -18,7 +19,7 @@ export async function POST(req: Request) {
             productIds.map((id: string, index: number) =>
                 prisma.product.update({
                     where: { id },
-                    data: { sortOrder: index }
+                    data: { sortOrder: offset + index }
                 })
             )
         )

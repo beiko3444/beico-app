@@ -1,11 +1,11 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Layers } from 'lucide-react'
+import { ChevronDown, ChevronLeft, ChevronRight, Layers } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import BarcodeDisplay from "@/components/BarcodeDisplay"
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import {
     PRODUCT_GRADES,
     readProductGradeOrderValue,
@@ -400,6 +400,72 @@ type ProductGroupView = {
     products: ProductTableProduct[]
 }
 
+type ProductPagination = {
+    page: number
+    pageSize: number
+    totalCount: number
+    totalPages: number
+}
+
+function ProductPaginationControls({
+    pagination,
+    pageStart,
+    pageEnd,
+    onPageChange,
+    onPageSizeChange,
+}: {
+    pagination: ProductPagination
+    pageStart: number
+    pageEnd: number
+    onPageChange: (page: number) => void
+    onPageSizeChange: (pageSize: number) => void
+}) {
+    const canGoPrev = pagination.page > 1
+    const canGoNext = pagination.page < pagination.totalPages
+
+    return (
+        <div className="flex flex-col gap-2 border-b border-slate-100 bg-white px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="text-[11px] font-bold text-slate-500">
+                전체 <span className="text-slate-900">{formatInteger(pagination.totalCount)}</span>개 중{' '}
+                <span className="text-blue-700">{formatInteger(pageStart)}-{formatInteger(pageEnd)}</span> 표시
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+                <select
+                    value={pagination.pageSize}
+                    onChange={(event) => onPageSizeChange(Number(event.target.value))}
+                    className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-600 outline-none transition focus:border-blue-500"
+                    title="한 페이지 상품 수"
+                >
+                    <option value={30}>30개씩</option>
+                    <option value={50}>50개씩</option>
+                    <option value={100}>100개씩</option>
+                </select>
+                <button
+                    type="button"
+                    onClick={() => onPageChange(pagination.page - 1)}
+                    disabled={!canGoPrev}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                    title="이전 페이지"
+                >
+                    <ChevronLeft size={15} />
+                </button>
+                <div className="min-w-20 text-center text-[11px] font-black tabular-nums text-slate-700">
+                    {formatInteger(pagination.page)} / {formatInteger(pagination.totalPages)}
+                </div>
+                <button
+                    type="button"
+                    onClick={() => onPageChange(pagination.page + 1)}
+                    disabled={!canGoNext}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-35"
+                    title="다음 페이지"
+                >
+                    <ChevronRight size={15} />
+                </button>
+            </div>
+        </div>
+    )
+}
+
 const ProductGroupHeader = memo(function ProductGroupHeader({
     group,
     expanded,
@@ -464,7 +530,13 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
     )
 })
 
-export default function ProductTable({ initialProducts }: { initialProducts: ProductTableProduct[] }) {
+export default function ProductTable({
+    initialProducts,
+    pagination,
+}: {
+    initialProducts: ProductTableProduct[]
+    pagination: ProductPagination
+}) {
     const [products, setProducts] = useState(initialProducts)
     const [activeGrade, setActiveGrade] = useState<ProductGrade>('C')
     const [modifiedCosts, setModifiedCosts] = useState<Record<string, string>>({})
@@ -477,9 +549,31 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const [collapsedGroupKeys, setCollapsedGroupKeys] = useState<Set<string>>(new Set())
     const [isSaving, setIsSaving] = useState(false)
     const router = useRouter()
+    const pathname = usePathname()
+    const searchParams = useSearchParams()
+
+    const hasDraftChanges = useMemo(() => (
+        Object.keys(modifiedCosts).length > 0
+        || Object.keys(modifiedWholesales).length > 0
+        || Object.keys(modifiedRetails).length > 0
+        || Object.keys(modifiedStocks).length > 0
+        || Object.keys(modifiedMoqs).length > 0
+        || Object.keys(modifiedOrderUnits).length > 0
+    ), [modifiedCosts, modifiedWholesales, modifiedRetails, modifiedStocks, modifiedMoqs, modifiedOrderUnits])
+    const pageOffset = (pagination.page - 1) * pagination.pageSize
+    const pageStart = pagination.totalCount === 0 ? 0 : pageOffset + 1
+    const pageEnd = Math.min(pagination.totalCount, pageOffset + products.length)
 
     useEffect(() => {
         setProducts(initialProducts)
+        setCheckedIds(new Set())
+        setModifiedCosts({})
+        setModifiedWholesales({})
+        setModifiedRetails({})
+        setModifiedStocks({})
+        setModifiedMoqs({})
+        setModifiedOrderUnits({})
+        setCollapsedGroupKeys(new Set())
     }, [initialProducts])
 
     const productGroups = useMemo<ProductGroupView[]>(() => {
@@ -513,16 +607,55 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     }, [products])
 
     const productIndexById = useMemo(
-        () => new Map(products.map((product, index) => [product.id, index])),
-        [products],
+        () => new Map(products.map((product, index) => [product.id, pageOffset + index])),
+        [pageOffset, products],
     )
 
-    const saveOrder = useCallback(async (productIds: string[]) => {
+    const pushProductPage = useCallback((page: number, pageSize = pagination.pageSize) => {
+        const nextPage = Math.min(Math.max(1, page), pagination.totalPages)
+        if (nextPage === pagination.page && pageSize === pagination.pageSize) return
+        if (hasDraftChanges && !confirm('저장하지 않은 수정사항이 있습니다. 페이지를 이동하시겠습니까?')) return
+
+        const params = new URLSearchParams(searchParams.toString())
+        if (nextPage <= 1) params.delete('page')
+        else params.set('page', String(nextPage))
+        if (pageSize === 50) params.delete('pageSize')
+        else params.set('pageSize', String(pageSize))
+
+        const query = params.toString()
+        router.push(query ? `${pathname}?${query}` : pathname)
+    }, [hasDraftChanges, pagination.page, pagination.pageSize, pagination.totalPages, pathname, router, searchParams])
+
+    const handlePageSizeChange = useCallback((pageSize: number) => {
+        pushProductPage(1, pageSize)
+    }, [pushProductPage])
+
+    useEffect(() => {
+        const handleKeyDown = (event: KeyboardEvent) => {
+            if (event.defaultPrevented || event.repeat || event.altKey || event.ctrlKey || event.metaKey) return
+            const target = event.target as HTMLElement | null
+            const tagName = target?.tagName
+            if (target?.isContentEditable || tagName === 'INPUT' || tagName === 'TEXTAREA' || tagName === 'SELECT') return
+
+            if (event.key === 'ArrowLeft') {
+                event.preventDefault()
+                pushProductPage(pagination.page - 1)
+            } else if (event.key === 'ArrowRight') {
+                event.preventDefault()
+                pushProductPage(pagination.page + 1)
+            }
+        }
+
+        window.addEventListener('keydown', handleKeyDown)
+        return () => window.removeEventListener('keydown', handleKeyDown)
+    }, [pagination.page, pushProductPage])
+
+    const saveOrder = useCallback(async (productIds: string[], startOrder = 0) => {
         try {
             await fetch('/api/products/reorder', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productIds })
+                body: JSON.stringify({ productIds, startOrder })
             })
             // router.refresh() // Optional: Refresh to sync server state
         } catch (e) {
@@ -533,16 +666,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
 
     const onSortOrderChange = useCallback(async (productId: string, newIndex: number) => {
         // ... (existing code)
-        const clampedIndex = Math.max(0, Math.min(newIndex, products.length - 1))
+        const lastPageIndex = pageOffset + products.length - 1
+        const clampedIndex = Math.max(pageOffset, Math.min(newIndex, lastPageIndex))
+        const localIndex = clampedIndex - pageOffset
         const oldIndex = products.findIndex(p => p.id === productId)
-        if (oldIndex === clampedIndex) return
+        if (oldIndex === localIndex) return
         const newItems = [...products]
         const [movedProduct] = newItems.splice(oldIndex, 1)
         if (!movedProduct) return
-        newItems.splice(clampedIndex, 0, movedProduct)
+        newItems.splice(localIndex, 0, movedProduct)
         setProducts(newItems)
-        saveOrder(newItems.map(item => item.id))
-    }, [products, saveOrder])
+        saveOrder(newItems.map(item => item.id), pageOffset)
+    }, [pageOffset, products, saveOrder])
 
     const handleDelete = useCallback(async (id: string) => {
         if (!confirm('정말 삭제하시겠습니까? 관련 주문 데이터가 있을 경우 오류가 발생할 수 있습니다.')) return
@@ -824,6 +959,13 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     })}
                 </div>
             </div>
+            <ProductPaginationControls
+                pagination={pagination}
+                pageStart={pageStart}
+                pageEnd={pageEnd}
+                onPageChange={pushProductPage}
+                onPageSizeChange={handlePageSizeChange}
+            />
             {checkedIds.size > 0 && (
                 <div className="flex justify-between items-center p-2.5 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-100 dark:border-blue-800 rounded-t-lg">
                     <span className="text-xs font-bold text-blue-800 dark:text-blue-300">{checkedIds.size}개 상품 선택됨</span>
@@ -940,6 +1082,13 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     )}
                 </table>
             </div>
+            <ProductPaginationControls
+                pagination={pagination}
+                pageStart={pageStart}
+                pageEnd={pageEnd}
+                onPageChange={pushProductPage}
+                onPageSizeChange={handlePageSizeChange}
+            />
         </>
     )
 }
