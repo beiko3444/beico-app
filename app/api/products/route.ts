@@ -11,6 +11,7 @@ import {
 
 const productListSelect = {
     id: true,
+    productNumber: true,
     name: true,
     nameJP: true,
     nameEN: true,

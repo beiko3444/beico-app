@@ -11,6 +11,7 @@ import {
 
 const productResponseSelect = {
     id: true,
+    productNumber: true,
     name: true,
     nameJP: true,
     nameEN: true,

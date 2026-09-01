@@ -42,6 +42,7 @@ async function loadExchangeRates() {
 
 export type Product = {
     id: string
+    productNumber: number
     name: string
     nameJP?: string | null
     nameEN?: string | null

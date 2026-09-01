@@ -109,6 +109,7 @@ model PartnerProfile {
 
 model Product {
   id                   String                @id @default(uuid())
+  productNumber        Int                   @unique @default(autoincrement())
   name                 String
   nameJP               String?
   buyPrice             Float
