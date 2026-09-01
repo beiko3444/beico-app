@@ -31,3 +31,12 @@ test('connects permanent product numbers and the configurable table UI', () => {
     assert.match(table, /그룹순서/)
     assert.match(table, /PRODUCT_TABLE_COLUMNS_STORAGE_KEY/)
 })
+
+test('keeps the product table and optional summary in one compact workspace', () => {
+    const table = readFileSync(new URL('../app/admin/products/ProductTable.tsx', import.meta.url), 'utf8')
+
+    assert.match(table, /maxWidth: productTableWidth \+ \(selectedGroup \? 310 : 0\)/)
+    assert.match(table, /selectedGroupKey \? productGroups\.find/)
+    assert.match(table, /onClose=\{\(\) => setSelectedGroupKey\(null\)\}/)
+    assert.doesNotMatch(table, /productGroups\[0\] \|\| null/)
+})

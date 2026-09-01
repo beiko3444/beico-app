@@ -494,20 +494,12 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
 function ProductSummaryPanel({
     group,
     activeGrade,
+    onClose,
 }: {
-    group: ProductGroupView | null
+    group: ProductGroupView
     activeGrade: ProductGrade
+    onClose: () => void
 }) {
-    if (!group) {
-        return (
-            <aside className="border-t border-slate-100 bg-slate-50/80 p-4 xl:border-l xl:border-t-0">
-                <div className="rounded-xl border border-dashed border-slate-200 bg-white p-5 text-center text-xs font-bold text-slate-400">
-                    그룹이나 상품을 선택하면 요약이 표시됩니다.
-                </div>
-            </aside>
-        )
-    }
-
     const representative = group.products[0]
     const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
     const costValues = group.products
@@ -524,7 +516,7 @@ function ProductSummaryPanel({
         : 0
 
     return (
-        <aside className="border-t border-slate-100 bg-slate-50/80 p-3 xl:border-l xl:border-t-0">
+        <aside className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0" aria-label="선택한 상품 요약">
             <div className="sticky top-20 space-y-3">
                 <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
@@ -544,6 +536,15 @@ function ProductSummaryPanel({
                                 </div>
                             </div>
                         </div>
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
+                            title="요약 닫기"
+                            aria-label="선택한 상품 요약 닫기"
+                        >
+                            <X size={15} />
+                        </button>
                     </div>
                 </div>
 
@@ -729,7 +730,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const namedGroupKeys = useMemo(() => productGroups.filter(group => group.isNamed).map(group => group.key), [productGroups])
     const collapsedNamedGroupCount = namedGroupKeys.filter(key => collapsedGroupKeys.has(key)).length
     const selectedGroup = useMemo(
-        () => productGroups.find(group => group.key === selectedGroupKey) || productGroups[0] || null,
+        () => selectedGroupKey ? productGroups.find(group => group.key === selectedGroupKey) || null : null,
         [productGroups, selectedGroupKey],
     )
     const groupKeyByProductId = useMemo(() => {
@@ -763,13 +764,6 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         setSelectedGroupKey(null)
         setDraggingProductId(null)
     }, [])
-
-    useEffect(() => {
-        if (selectedGroup && selectedGroup.key !== selectedGroupKey) {
-            const frame = window.requestAnimationFrame(() => setSelectedGroupKey(selectedGroup.key))
-            return () => window.cancelAnimationFrame(frame)
-        }
-    }, [selectedGroup, selectedGroupKey])
 
     const saveOrder = useCallback((productIds: string[], startOrder = 0) => {
         const queuedSave = orderSaveQueueRef.current.then(async () => {
@@ -1161,7 +1155,10 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     }
 
     return (
-        <div className="-mx-4 overflow-hidden bg-white shadow-sm sm:-mx-6 lg:-mx-8">
+        <div
+            className="ux-panel w-full overflow-hidden"
+            style={{ maxWidth: productTableWidth + (selectedGroup ? 310 : 0) }}
+        >
             <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-xl sm:px-6 lg:px-8">
                 <div className="flex min-h-14 flex-col gap-2 xl:flex-row xl:items-center">
                     <div className="flex shrink-0 items-center gap-2">
@@ -1309,7 +1306,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </button>
                 </div>
             )}
-            <div className="grid min-h-[520px] xl:grid-cols-[minmax(0,1fr)_310px]">
+            <div className={`grid min-h-[520px] ${selectedGroup ? 'xl:grid-cols-[minmax(0,1fr)_310px]' : ''}`}>
                 <div className="min-w-0">
                     <div className="w-full overflow-x-auto pb-2">
                 <table className="table-fixed border-collapse" style={{ width: productTableWidth, minWidth: productTableWidth }}>
@@ -1451,7 +1448,13 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </table>
                 </div>
             </div>
-            <ProductSummaryPanel group={selectedGroup} activeGrade={activeGrade} />
+            {selectedGroup ? (
+                <ProductSummaryPanel
+                    group={selectedGroup}
+                    activeGrade={activeGrade}
+                    onClose={() => setSelectedGroupKey(null)}
+                />
+            ) : null}
             </div>
         </div>
     )
