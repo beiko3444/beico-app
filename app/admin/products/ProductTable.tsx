@@ -1257,7 +1257,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                 표시 열 설정
                             </button>
                             {columnSettingsOpen ? (
-                                <div className="absolute right-0 top-11 z-50 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
+                                <div className="absolute left-0 top-11 z-50 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
                                     <div className="border-b border-slate-100 px-4 py-3 text-[12px] font-black text-slate-950">표시할 열</div>
                                     <div className="max-h-[420px] overflow-y-auto p-2">
                                         {['상품번호', '그룹순서', '이미지', '상품명'].map(label => (
