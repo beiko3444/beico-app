@@ -14,20 +14,20 @@ export default function LogoutButton({
 }) {
     return (
         <button
+            type="button"
             onClick={() => signOut({ callbackUrl: '/login' })}
             className={`
-                flex transition-colors group
-                ${vertical ? 'flex-col items-center min-w-[60px] gap-1' : 'items-center gap-2 text-sm font-medium'}
-                opacity-80 hover:opacity-100 ${className}
+                group inline-flex items-center justify-center transition-colors
+                ${vertical ? 'min-h-10 min-w-[72px] gap-2 px-3 text-[12px] font-bold' : 'min-h-10 gap-2 px-3 text-sm font-semibold'}
+                ${className || ''}
             `}
+            aria-label="로그아웃"
         >
             {children || (
                 <>
-                    <LogOut size={vertical ? 26 : 18} strokeWidth={2.5} className={vertical ? 'mb-0.5' : ''} />
+                    <LogOut size={18} strokeWidth={2.2} />
                     {vertical ? (
-                        <>
-                            <span className="text-[11.5px] font-black leading-none">ログアウト</span>
-                        </>
+                        <span className="leading-none">ログアウト</span>
                     ) : (
                         <span>로그아웃</span>
                     )}

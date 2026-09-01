@@ -5,8 +5,6 @@ import { redirect } from "next/navigation"
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
-import { Building2 } from 'lucide-react'
-import Clock from '@/components/Clock'
 
 export default async function OrderLayout({
     children,
@@ -22,8 +20,6 @@ export default async function OrderLayout({
     let businessName = session.user.name || session.user.email || "Partner"
     let businessNameJP = session.user.name || session.user.email || "Partner"
 
-    let businessRegNumber = ""
-    let address = ""
     let country = ""
 
     if (session?.user?.id) {
@@ -32,20 +28,12 @@ export default async function OrderLayout({
             select: {
                 name: true,
                 country: true,
-                partnerProfile: {
-                    select: {
-                        businessName: true,
-                        businessRegNumber: true,
-                        address: true,
-                    },
-                },
+                partnerProfile: { select: { businessName: true } },
             },
         }) as any
         if (user) {
             businessName = user.partnerProfile?.businessName || user.name || "Partner"
             businessNameJP = user.name || businessName
-            businessRegNumber = user.partnerProfile?.businessRegNumber || ""
-            address = user.partnerProfile?.address || ""
             country = user.country || ""
         }
     }
@@ -60,69 +48,37 @@ export default async function OrderLayout({
                                 country
 
     return (
-        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111]">
-            {/* Sophisticated Top Navigation Bar */}
-            <header className="sticky top-0 z-50 bg-white dark:bg-[#1a1a1a] shadow-[0_2px_15px_-3px_rgba(0,0,0,0.07)] dark:shadow-none dark:border-b dark:border-[#2a2a2a]">
-                {/* Main White Header */}
-                <div className="max-w-6xl mx-auto px-4 md:px-8">
-                    <div className="h-20 flex justify-between items-center">
-                        <Link href="/order" className="flex items-center group">
-                            <div className="w-16 h-auto transition-all duration-300 group-hover:scale-105">
-                                <img
-                                    src="/logo.png"
-                                    alt="BEIKO BAIT"
-                                    className="w-full h-full object-contain"
-                                />
-                            </div>
-                        </Link>
+        <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
+            <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--card)]/95 shadow-[0_1px_2px_rgba(16,24,40,0.06)] backdrop-blur">
+                <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-3 sm:px-5 lg:px-7">
+                    <Link href="/order" className="flex shrink-0 items-center no-underline" aria-label="주문 홈">
+                        <img src="/logo.png" alt="BEIKO BAIT" className="h-auto w-[62px] object-contain" />
+                    </Link>
 
-                        {/* Navigation Tabs */}
-                        <div className="flex items-center">
-                            <UserNavbar />
-                        </div>
+                    <div className="hidden min-w-0 flex-1 items-center justify-center sm:flex">
+                        <UserNavbar />
                     </div>
-                </div>
 
-                {/* Brand Red User Info Bar */}
-                <div className="bg-[#e34219] dark:bg-[#1e1e1e] text-white border-t border-white/10 dark:border-[#333] shadow-sm dark:shadow-none">
-                    <div className="max-w-6xl mx-auto px-4 md:px-8 h-[64px] flex items-center justify-between">
-                        {/* LEFT: Retailer Info & Clock */}
-                        <div className="flex items-center gap-8">
-                            <div className="flex flex-col gap-1.5">
-                                <div className="flex flex-col">
-                                    <span className="text-[13px] font-black text-white tracking-tight leading-none">小売店・卸売業者向け</span>
-                                    <span className="text-[7.5px] font-bold text-white/80 uppercase tracking-widest leading-none mt-1.5">For retailers & distributors</span>
-                                </div>
-                                <Clock className="text-white/80 text-[11px] leading-none" />
-                            </div>
+                    <div className="ml-auto flex min-w-0 items-center gap-2 sm:ml-0">
+                        <div className="min-w-0 text-right">
+                            <div className="max-w-[170px] truncate text-[12px] font-extrabold text-[var(--foreground)]">{businessNameJP}</div>
+                            {(countryDisplay || country) ? (
+                                <div className="mt-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">{countryDisplay || country}</div>
+                            ) : null}
                         </div>
-
-                        {/* RIGHT: User Information & Logout */}
-                        <div className="flex items-center">
-                            <div className="flex flex-col items-end border-r border-white/20 pr-5 gap-1">
-                                <span className="text-[8.5px] text-white/70 font-bold leading-none uppercase tracking-wider mb-0.5">ログイン中:</span>
-                                <span className="text-[17px] text-white font-black leading-none mb-0.5">{businessNameJP}</span>
-                                {(countryDisplay || country) && (
-                                    <div className="bg-white dark:bg-[#2a2a2a] px-1.5 py-0.5 rounded-[4px] text-[9.5px] font-black text-[#e34219] dark:text-white shadow-sm flex items-center leading-none">
-                                        {countryDisplay || country}
-                                    </div>
-                                )}
-                            </div>
-                            <div className="pl-5">
-                                <LogoutButton vertical className="text-white hover:text-white" />
-                            </div>
-                        </div>
+                        <LogoutButton className="rounded-md border border-[var(--border-strong)] bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)]">
+                            <span className="hidden md:inline">ログアウト</span>
+                        </LogoutButton>
                     </div>
                 </div>
             </header>
 
-            {/* Main Content Area */}
-            <main className="max-w-6xl mx-auto pt-3 pb-8 px-4 md:px-8">
-                <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    {children}
-                </div>
+            <main className="ux-page mx-auto max-w-[1440px] px-3 pb-24 pt-4 sm:px-5 sm:pb-10 lg:px-7">
+                {children}
             </main>
-
+            <div className="sm:hidden">
+                <UserNavbar />
+            </div>
         </div>
     )
 }

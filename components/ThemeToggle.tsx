@@ -8,9 +8,11 @@ export default function ThemeToggle({ className }: { className?: string }) {
 
     return (
         <button
+            type="button"
             onClick={toggleTheme}
-            className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${className || ''}`}
+            className={`ux-icon-button ${className || ''}`}
             title={theme === 'dark' ? '라이트 모드' : '다크 모드'}
+            aria-label={theme === 'dark' ? '라이트 모드로 전환' : '다크 모드로 전환'}
         >
             {theme === 'dark' ? (
                 <Sun size={17} className="text-yellow-400" />

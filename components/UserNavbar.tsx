@@ -14,7 +14,7 @@ export default function UserNavbar() {
     const pathname = usePathname()
 
     return (
-        <nav className="flex items-center gap-2 md:gap-8">
+        <nav className="fixed inset-x-0 bottom-0 z-[100] grid min-h-[68px] grid-cols-3 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] sm:static sm:flex sm:min-h-0 sm:items-center sm:gap-1 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label="파트너 메뉴">
             {NAV_ITEMS.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
                 const Icon = item.icon
@@ -24,16 +24,19 @@ export default function UserNavbar() {
                         key={item.href}
                         href={item.href}
                         style={{ color: 'inherit' }}
-                        className={`
-                            flex flex-col items-center group transition-colors duration-200 min-w-[60px]
-                            ${isActive ? 'text-[#e34219]' : 'text-[#9aa3b2] hover:text-[#7f8897] dark:text-[#9aa3b2] dark:hover:text-[#c4cad4]'}
-                        `}
+                        aria-current={isActive ? 'page' : undefined}
+                        className={`group relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-3 text-center no-underline transition-colors sm:min-h-10 sm:min-w-[98px] sm:flex-row sm:gap-2 ${
+                            isActive
+                                ? 'bg-[#FFF2EE] text-[#D9341A]'
+                                : 'text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)]'
+                        }`}
                     >
-                        <Icon size={26} strokeWidth={isActive ? 2.5 : 2} className="mb-0.5" />
-                        <span className="mb-1 text-[12.5px] font-black leading-none">
+                        {isActive ? <span className="absolute inset-x-4 top-0 h-0.5 rounded-b bg-[#E43D20] sm:inset-y-2 sm:left-0 sm:right-auto sm:h-auto sm:w-0.5" /> : null}
+                        <Icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                        <span className="text-[11px] font-extrabold leading-none sm:text-[12px]">
                             {item.label}
                         </span>
-                        <span className="text-[9px] font-bold uppercase tracking-[0.2em] leading-none">
+                        <span className="hidden text-[9px] font-semibold leading-none lg:inline">
                             {item.subLabel}
                         </span>
                     </Link>

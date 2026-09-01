@@ -15,6 +15,7 @@ import {
   Handshake,
   Inbox,
   LayoutGrid,
+  LogOut,
   Menu,
   MessageSquareText,
   Package,
@@ -318,18 +319,18 @@ export default function AdminNav({
             href={item.path}
             prefetch={false}
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`group relative flex ${mobile ? 'h-12' : 'h-11 min-h-11'} min-w-0 items-center justify-between rounded-[10px] border px-3 text-[14px] font-semibold tracking-normal no-underline transition-all duration-150 ${
+            className={`group relative flex ${mobile ? 'min-h-12' : 'h-11 min-h-11'} min-w-0 items-center justify-between rounded-md border px-3 text-[13px] font-bold tracking-normal no-underline transition-colors duration-150 ${
               active
-                ? 'border-[#FFD5CC] bg-[#FFF1ED] text-[#E8351B] shadow-[0_8px_18px_rgba(239,59,29,0.10)]'
-                : 'border-transparent bg-transparent text-[#293241] hover:border-[#E5E7EB] hover:bg-[#F4F5F7] hover:text-[#111827]'
+                ? 'border-[#FFD5CC] bg-[#FFF3EF] text-[#D9341A]'
+                : 'border-transparent bg-transparent text-[#344054] hover:border-[#E5E9EF] hover:bg-[#F4F6F8] hover:text-[#172033]'
             }`}
-            style={{ color: active ? '#E8351B' : '#293241' }}
+            style={{ color: active ? '#D9341A' : '#344054' }}
           >
             {active ? <span className="absolute left-0 top-2.5 h-6 w-1 rounded-r-full bg-[#EF3B1D]" /> : null}
             <span className="flex min-w-0 items-center gap-2.5">
               <span
-                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-colors ${
-                  active ? 'bg-[#EF3B1D] text-white' : 'bg-transparent text-[#94A3B8] group-hover:bg-white group-hover:text-[#64748B]'
+                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
+                  active ? 'bg-[#E43D20] text-white' : 'bg-transparent text-[#98A2B3] group-hover:bg-white group-hover:text-[#667085]'
                 }`}
               >
                 <Icon size={15} strokeWidth={2.3} />
@@ -364,9 +365,9 @@ export default function AdminNav({
           className="h-auto w-[124px]"
         />
       </div>
-      <div className="mb-4 mt-5 h-px shrink-0 bg-[#E5E7EB]" />
+      <div className="mb-3 mt-4 h-px shrink-0 bg-[#E5E9EF]" />
 
-      <nav className="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto pb-3">{renderNavItems()}</nav>
+      <nav className="ux-scrollbar flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-3" aria-label="관리자 메뉴">{renderNavItems()}</nav>
 
       <FavoriteInventoryPanel />
 
@@ -394,12 +395,13 @@ export default function AdminNav({
         </button>
       </div>
 
-      <div className="mt-3 shrink-0 border-t border-[#E5E7EB] pt-4">
+      <div className="mt-3 shrink-0 border-t border-[#E5E9EF] pt-3">
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex h-[44px] w-full items-center justify-center rounded-full border-none bg-[#0B1220] px-[18px] text-[15px] font-extrabold tracking-[-0.02em] text-white shadow-[0_10px_22px_rgba(11,18,32,0.18)] transition-all duration-150 hover:bg-[#111827]"
+          className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#D0D5DD] bg-white px-4 text-[13px] font-bold text-[#344054] transition-colors hover:border-[#98A2B3] hover:bg-[#F8FAFC]"
         >
+          <LogOut size={16} />
           로그아웃
         </button>
       </div>
@@ -423,7 +425,7 @@ export default function AdminNav({
         </button>
       </div>
 
-      <nav className="mt-4 grid max-h-[calc(100vh-260px)] grid-cols-2 gap-2 overflow-y-auto pr-1">{renderNavItems(true)}</nav>
+      <nav className="ux-scrollbar mt-4 grid max-h-[calc(100vh-260px)] grid-cols-2 gap-2 overflow-y-auto pr-1" aria-label="모바일 관리자 메뉴">{renderNavItems(true)}</nav>
 
       <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
 
@@ -454,8 +456,9 @@ export default function AdminNav({
         <button
           type="button"
           onClick={() => signOut({ callbackUrl: '/login' })}
-          className="mt-3 flex h-10 w-full items-center justify-center rounded-full border-none bg-[#0B1220] px-[18px] text-[14px] font-extrabold text-white shadow-[0_8px_18px_rgba(11,18,32,0.14)] transition-all duration-150 hover:bg-[#111827]"
+          className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#D0D5DD] bg-white px-4 text-[13px] font-bold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
         >
+          <LogOut size={16} />
           로그아웃
         </button>
       </div>
@@ -464,11 +467,11 @@ export default function AdminNav({
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E7EB] bg-white/95 px-4 shadow-[0_8px_24px_rgba(15,23,42,0.08)] backdrop-blur print:hidden lg:hidden">
+      <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E9EF] bg-white/95 px-3 shadow-[0_1px_2px_rgba(16,24,40,0.06)] backdrop-blur print:hidden lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen(true)}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-full border border-[#E5E7EB] bg-white px-3 text-[#111827] transition hover:bg-[#F4F5F7]"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#D0D5DD] bg-white px-3 text-[#172033] transition-colors hover:bg-[#F4F6F8]"
           aria-label="관리자 메뉴 열기"
           aria-expanded={isMobileMenuOpen}
           aria-controls="admin-mobile-menu"
@@ -485,7 +488,7 @@ export default function AdminNav({
             priority
             className="h-auto w-[58px]"
           />
-          <div className="mt-1 truncate text-[11px] font-extrabold tracking-[-0.02em] text-[#111827]">{activeItem?.name || '관리자'}</div>
+          <div className="mt-0.5 truncate text-[11px] font-bold text-[#172033]">{activeItem?.name || '관리자'}</div>
         </div>
         <div className="h-10 w-10" aria-hidden="true" />
       </header>
@@ -503,7 +506,7 @@ export default function AdminNav({
             role="dialog"
             aria-modal="true"
             aria-label="관리자 메뉴"
-            className="fixed left-3 top-16 z-[1002] box-border max-h-[calc(100vh-76px)] w-[calc(100vw-24px)] max-w-[420px] overflow-y-auto rounded-2xl border border-[#E5E7EB] bg-white p-4 shadow-[0_18px_46px_rgba(15,23,42,0.22)] print:hidden lg:hidden"
+            className="ux-scrollbar fixed left-3 top-16 z-[1002] box-border max-h-[calc(100vh-76px)] w-[calc(100vw-24px)] max-w-[420px] overflow-y-auto rounded-lg border border-[#D0D5DD] bg-white p-4 shadow-[0_18px_46px_rgba(15,23,42,0.18)] print:hidden lg:hidden"
           >
             {mobileMenuContent}
           </aside>
@@ -512,7 +515,7 @@ export default function AdminNav({
 
       <aside
         id="admin-desktop-sidebar"
-        className="fixed bottom-0 left-0 top-0 z-[1000] box-border hidden h-screen w-[260px] flex-col overflow-hidden border-r border-[#E5E7EB] bg-white px-5 pb-5 pt-6 shadow-[12px_0_34px_rgba(15,23,42,0.06)] print:hidden lg:flex"
+        className="fixed bottom-0 left-0 top-0 z-[1000] box-border hidden h-screen w-[248px] flex-col overflow-hidden border-r border-[#E5E9EF] bg-white px-4 pb-4 pt-5 shadow-[4px_0_16px_rgba(16,24,40,0.04)] print:hidden lg:flex"
       >
         {desktopSidebarContent}
       </aside>

@@ -212,34 +212,34 @@ export default function SignupPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111] flex flex-col items-center justify-center p-4 font-sans text-[#333] dark:text-gray-200 py-6">
-            <div className="w-full max-w-[500px] mb-5">
-                <div className="flex items-center gap-6">
-                    <div className="w-[77px] h-auto relative shrink-0">
+        <main className="min-h-screen bg-[var(--background)] px-4 py-8 text-[var(--foreground)] sm:px-6">
+            <div className="mx-auto mb-6 w-full max-w-[560px]">
+                <div className="flex items-center gap-4">
+                    <div className="h-auto w-[72px] shrink-0">
                         <img
                             src="/logo.png"
                             alt="BEIKO BAIT"
                             className="w-full h-full object-contain"
                         />
                     </div>
-                    <div className="flex flex-col justify-center mt-2">
-                        <h1 className="text-xl font-bold text-gray-800 dark:text-gray-100 tracking-tight mb-1">{t.title}</h1>
-                        <p className="text-[9px] font-bold tracking-[0.4em] uppercase text-slate-400 dark:text-slate-500 whitespace-nowrap">
+                    <div className="flex min-w-0 flex-col justify-center">
+                        <h1 className="text-xl font-black text-[var(--foreground)]">{t.title}</h1>
+                        <p className="mt-1 text-xs font-semibold text-[var(--muted-foreground)]">
                             {t.subtitle}
                         </p>
                     </div>
                 </div>
             </div>
 
-            <div className="w-full max-w-[500px]">
+            <div className="mx-auto w-full max-w-[560px]">
                 {error && (
-                    <div className="mb-6 bg-red-50 dark:bg-red-900/20 border-l-4 border-[#e34219] text-[#e34219] dark:text-red-400 px-4 py-3 rounded-r-lg text-sm font-medium">
-                        ⚠️ {error}
+                    <div role="alert" className="mb-5 rounded-md border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--danger)]">
+                        {error}
                     </div>
                 )}
 
                 {step === 1 ? (
-                    <form onSubmit={handleNextStep} className="space-y-5 bg-white dark:bg-[#1e1e1e] p-6 rounded-xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
+                    <form onSubmit={handleNextStep} className="ux-panel space-y-5 p-5 sm:p-7">
                         <div className="space-y-1.5">
                             <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> 国籍 / Nationality / 국가
@@ -275,7 +275,7 @@ export default function SignupPage() {
                         <div className="pt-4">
                             <button
                                 type="submit"
-                                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight group"
+                                className="ux-button ux-button-primary h-12 w-full text-[15px]"
                             >
                                 <span>Next / 次へ / 다음</span>
                                 <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
@@ -283,17 +283,17 @@ export default function SignupPage() {
                         </div>
                     </form>
                 ) : (
-                    <form onSubmit={handleSubmit} className="space-y-5">
+                    <form onSubmit={handleSubmit} className="ux-panel space-y-5 p-5 sm:p-7">
                         <div className="flex justify-between items-center mb-6">
                             <button
                                 type="button"
                                 onClick={() => setStep(1)}
-                                className="flex items-center gap-1.5 text-[11px] font-bold text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors uppercase tracking-widest px-3 py-1.5 rounded-full hover:bg-gray-100 dark:hover:bg-[#2a2a2a]"
+                                className="ux-button min-h-10 border border-[var(--border)] bg-[var(--card)] px-3 text-[11px] text-[var(--muted-foreground)] hover:bg-[var(--card-hover)]"
                             >
                                 <ArrowLeft size={12} strokeWidth={3} />
                                 Change Nationality / 国籍変更 / 국가 변경
                             </button>
-                            <div className="px-3 py-1 text-[10px] font-black text-[#e34219] dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-full border border-red-100 dark:border-red-800 uppercase tracking-widest">
+                            <div className="rounded-md border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-1 text-[10px] font-black text-[var(--danger)]">
                                 Step 2/2
                             </div>
                         </div>
@@ -494,7 +494,7 @@ export default function SignupPage() {
                         </div>
 
                         {/* Phone & Fax Grid */}
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {/* Phone */}
                             <div className="space-y-1.5">
                                 <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
@@ -583,7 +583,7 @@ export default function SignupPage() {
                             <button
                                 type="submit"
                                 disabled={loading}
-                                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center gap-2 font-bold text-[15px] tracking-tight disabled:opacity-70 disabled:cursor-not-allowed group"
+                                className="ux-button ux-button-primary h-12 w-full text-[15px] disabled:opacity-70"
                             >
                                 {loading ? (
                                     <span className="animate-pulse">Processing...</span>
@@ -599,12 +599,12 @@ export default function SignupPage() {
                 )}
 
                 {/* Footer */}
-                <div className="mt-8 text-center">
-                    <p className="text-xs text-gray-500 dark:text-gray-400 font-medium tracking-wide">
+                <div className="mt-6 text-center">
+                    <p className="text-xs font-medium text-[var(--muted-foreground)]">
                         {t.loginText} <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">{t.loginLink}</Link>
                     </p>
                 </div>
             </div>
-        </div>
+        </main>
     )
 }

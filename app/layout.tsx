@@ -33,6 +33,7 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://www.beiko.co.kr"),
   title: "ベイコ・ベイトルアー | 小売店・卸売業者向け",
   description: "ベイコ・ベイトルアー 小売店・卸売業者向け For retailers & distributors",
 

@@ -78,10 +78,10 @@ export default async function AdminLayout({
     const userName = session.user.name || '관리자'
 
     return (
-        <div className="apple-admin-shell relative min-h-screen bg-[#F7F7F8] print:bg-white">
+        <div className="apple-admin-shell relative min-h-screen print:bg-white">
             <AdminNav counts={counts} userName={userName} />
             <PushNotificationRegistrar />
-            <main className="min-h-screen bg-[#F7F7F8] p-4 pb-12 pt-20 sm:p-6 sm:pt-20 lg:ml-[260px] lg:p-8 lg:pb-12 print:ml-0 print:bg-white print:p-0">
+            <main className="ux-page min-h-screen p-3 pb-10 pt-[68px] sm:p-5 sm:pt-[76px] lg:ml-[248px] lg:p-6 lg:pb-10 print:ml-0 print:bg-white print:p-0">
                 {children}
             </main>
         </div>

@@ -174,13 +174,13 @@ export default async function NewOrderPage() {
     })
 
     return (
-        <div className="space-y-4">
-            <div className="mb-2 flex flex-col md:flex-row md:items-end justify-between gap-4">
-                <div className="flex items-baseline gap-3 text-left">
-                    <h2 className="text-4xl font-black text-[#111827] tracking-tight">
+        <div className="ux-page-stack">
+            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
+                <div className="text-left">
+                    <h1 className="ux-page-title">
                         商品リスト
-                    </h2>
-                    <p className="text-sm font-normal text-gray-400 tracking-wide uppercase">Product List</p>
+                    </h1>
+                    <p className="ux-helper mt-1">商品を選択して数量を入力してください。</p>
                 </div>
             </div>
             <OrderInterface products={productsWithTieredPrice} />
