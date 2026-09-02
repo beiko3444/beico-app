@@ -28,7 +28,7 @@ import {
     PRODUCT_TABLE_COLUMNS_STORAGE_KEY,
     type ProductTableColumnKey,
 } from '@/lib/productTableColumns'
-import { getNaverSellingProductUrl } from '@/lib/naverSellingProductLinks.mjs'
+import { getNaverProductUrl } from '@/lib/naverProductLinks.mjs'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const FIXED_PRODUCT_TABLE_WIDTH = 40 + 68 + 78 + 72 + 360
@@ -480,7 +480,7 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
         return stock <= 0 || (safetyStock > 0 && stock <= safetyStock)
     }).length
     const representative = group.products[0]
-    const naverProductUrl = getNaverSellingProductUrl(
+    const naverProductUrl = getNaverProductUrl(
         group.name,
         group.products.flatMap(product => [product.name, product.nameJP, product.nameEN]),
     )
@@ -554,8 +554,8 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                                         onClick={(event) => event.stopPropagation()}
                                         onKeyDown={(event) => event.stopPropagation()}
                                         className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-white text-emerald-700 transition hover:border-emerald-500 hover:bg-emerald-50"
-                                        title="네이버 스마트스토어 판매 상품 보기"
-                                        aria-label={`${group.name} 네이버 판매 상품 열기`}
+                                        title="네이버 스마트스토어 상품 보기"
+                                        aria-label={`${group.name} 네이버 상품 열기`}
                                     >
                                         <ExternalLink size={13} />
                                     </a>
