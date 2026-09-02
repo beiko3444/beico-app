@@ -183,13 +183,13 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
         }
     }
 
-    const cellClass = 'px-3 py-2 text-center whitespace-nowrap'
+    const cellClass = 'px-3 py-2.5 text-center whitespace-nowrap'
 
     const renderOptionalCell = (column: ProductTableColumnKey) => {
         switch (column) {
             case 'barcode':
                 return (
-                    <td key={column} className={`${cellClass} font-mono text-[10px] font-bold text-slate-500`}>
+                    <td key={column} className={`${cellClass} font-mono text-[12px] font-bold text-slate-600`}>
                         {product.barcode || '-'}
                     </td>
                 )
@@ -202,7 +202,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                                 inputMode="numeric"
                                 value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
                                 onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
-                                className="h-9 w-[72px] rounded-md border border-emerald-300 bg-emerald-50 px-2 text-right text-[12px] font-black text-emerald-800 outline-none transition-colors focus:border-emerald-600 focus:bg-white"
+                                className="h-10 w-[76px] rounded-md border border-emerald-400 bg-emerald-50 px-2 text-right text-[15px] font-black text-emerald-900 outline-none transition-colors focus:border-emerald-700 focus:bg-white"
                                 title="관리자용 재고"
                             />
                             <ProductStockHistoryModal productId={product.id} productName={product.name} compact />
@@ -211,14 +211,14 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 )
             case 'safetyStock':
                 return (
-                    <td key={column} className={`${cellClass} tabular-nums text-[12px] font-bold text-slate-600`}>
+                    <td key={column} className={`${cellClass} tabular-nums text-[14px] font-black text-slate-700`}>
                         {safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}
                     </td>
                 )
             case 'stockStatus':
                 return (
                     <td key={column} className={cellClass}>
-                        <span className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-[11px] font-black ${stockStatus.className}`}>
+                        <span className={`inline-flex min-w-[56px] items-center justify-center rounded-md border px-2.5 py-1.5 text-[12px] font-black ${stockStatus.className}`}>
                             {stockStatus.label}
                         </span>
                     </td>
@@ -229,7 +229,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                         <button
                             type="button"
                             onClick={() => onToggleOrderAvailability(product.id)}
-                            className={`rounded border px-2 py-1 text-[10px] font-bold transition ${product.wholesaleAvailable !== false ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-500'}`}
+                            className={`rounded-md border px-2.5 py-1.5 text-[12px] font-black transition ${product.wholesaleAvailable !== false ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-600'}`}
                         >
                             {product.wholesaleAvailable !== false ? '발주 가능' : '발주 불가능'}
                         </button>
@@ -238,46 +238,46 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
             case 'moq':
                 return (
                     <td key={column} className={cellClass}>
-                        <input type="text" inputMode="numeric" value={modifiedMoq !== undefined ? formatNumberInput(modifiedMoq) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1))} onChange={(event) => onMoqChange(product.id, normalizeNumericDraft(event.target.value))} className="w-16 rounded border border-gray-200 px-2 py-1 text-center text-[11px] font-bold outline-none focus:border-blue-500" />
+                        <input type="text" inputMode="numeric" value={modifiedMoq !== undefined ? formatNumberInput(modifiedMoq) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1))} onChange={(event) => onMoqChange(product.id, normalizeNumericDraft(event.target.value))} className="h-9 w-16 rounded-md border border-slate-300 px-2 text-center text-[13px] font-bold outline-none focus:border-blue-500" />
                     </td>
                 )
             case 'orderUnit':
                 return (
                     <td key={column} className={cellClass}>
-                        <input type="text" inputMode="numeric" value={modifiedOrderUnit !== undefined ? formatNumberInput(modifiedOrderUnit) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))} onChange={(event) => onOrderUnitChange(product.id, normalizeNumericDraft(event.target.value))} className="w-16 rounded border border-gray-200 px-2 py-1 text-center text-[11px] font-bold outline-none focus:border-blue-500" />
+                        <input type="text" inputMode="numeric" value={modifiedOrderUnit !== undefined ? formatNumberInput(modifiedOrderUnit) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))} onChange={(event) => onOrderUnitChange(product.id, normalizeNumericDraft(event.target.value))} className="h-9 w-16 rounded-md border border-slate-300 px-2 text-center text-[13px] font-bold outline-none focus:border-blue-500" />
                     </td>
                 )
             case 'cost':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(costValue)} onChange={(event) => onCostChange(product.id, normalizeNumericDraft(event.target.value, true))} className="w-20 rounded border border-gray-200 bg-white px-2 py-1 text-right text-[11px] font-bold outline-none focus:border-blue-500" />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(costValue)} onChange={(event) => onCostChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-md border border-slate-300 bg-white px-2 text-right text-[13px] font-bold outline-none focus:border-blue-500" />
                     </td>
                 )
             case 'wholesale':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className="w-20 rounded border border-blue-200 bg-blue-50/40 px-2 py-1 text-right text-[11px] font-bold text-blue-700 outline-none focus:border-blue-500" />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-md border border-blue-300 bg-blue-50 px-2 text-right text-[13px] font-black text-blue-800 outline-none focus:border-blue-600" />
                     </td>
                 )
             case 'retail':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className="w-20 rounded border border-emerald-200 bg-emerald-50/40 px-2 py-1 text-right text-[11px] font-bold text-emerald-700 outline-none focus:border-emerald-500" />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-right text-[13px] font-black text-emerald-800 outline-none focus:border-emerald-600" />
                     </td>
                 )
             case 'margin':
                 return (
-                    <td key={column} className={`${cellClass} tabular-nums text-[10px] font-bold`}>
+                    <td key={column} className={`${cellClass} tabular-nums text-[12px] font-bold`}>
                         <div className="text-blue-600">도매 {wholesaleMargin.toFixed(1)}%</div>
                         <div className="text-emerald-600">판매 {retailMargin.toFixed(1)}%</div>
                     </td>
                 )
             case 'productCode':
-                return <td key={column} className={`${cellClass} font-mono text-[10px] text-slate-500`}>{product.productCode ? String(product.productCode).toUpperCase() : '-'}</td>
+                return <td key={column} className={`${cellClass} font-mono text-[12px] font-semibold text-slate-600`}>{product.productCode ? String(product.productCode).toUpperCase() : '-'}</td>
             case 'hsCode':
-                return <td key={column} className={`${cellClass} font-mono text-[10px] text-slate-500`}>{product.hsCode || '-'}</td>
+                return <td key={column} className={`${cellClass} font-mono text-[12px] font-semibold text-slate-600`}>{product.hsCode || '-'}</td>
             case 'japanHsCode':
-                return <td key={column} className={`${cellClass} font-mono text-[10px] text-slate-500`}>{product.japanHsCode || '-'}</td>
+                return <td key={column} className={`${cellClass} font-mono text-[12px] font-semibold text-slate-600`}>{product.japanHsCode || '-'}</td>
             case 'actions':
                 return (
                     <td key={column} className={cellClass}>
@@ -295,7 +295,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     return (
         <tr
             onClick={onSelect}
-            className={`group h-16 border-b border-slate-100 text-[12px] transition-colors hover:bg-blue-50/40 ${checked ? 'bg-blue-50/60' : 'bg-white even:bg-slate-50/35'}`}
+            className={`group h-[68px] border-b border-slate-200 text-[13px] transition-colors hover:bg-blue-50/50 ${checked ? 'bg-blue-50/70' : 'bg-white even:bg-slate-50/50'}`}
         >
             <td className={cellClass}>
                 <input
@@ -305,7 +305,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     className="cursor-pointer"
                 />
             </td>
-            <td className={`${cellClass} tabular-nums font-black text-slate-700`}>
+            <td className={`${cellClass} tabular-nums text-[13px] font-black text-slate-800`}>
                 {product.productNumber}
             </td>
             <td className={cellClass}>
@@ -332,7 +332,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') event.currentTarget.blur()
                     }}
-                    className="w-8 rounded border border-gray-200 bg-gray-50 py-0.5 text-center text-[11px] font-bold outline-none transition-colors focus:border-blue-500 focus:bg-white"
+                    className="h-9 w-10 rounded-md border border-slate-300 bg-white text-center text-[13px] font-bold outline-none transition-colors focus:border-blue-500"
                 />
                 </div>
             </td>
@@ -357,9 +357,9 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     initialData={product}
                     trigger={
                         <div className="cursor-pointer text-left" title={product.name}>
-                            <div className="truncate text-[13px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
+                            <div className="truncate text-[14px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
                             {product.nameJP && (
-                                <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{product.nameJP}</div>
+                                <div className="mt-0.5 truncate text-[12px] font-semibold text-slate-600">{product.nameJP}</div>
                             )}
                             {visibleGroupName && !displayName && (
                                 <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {visibleGroupName}</div>
@@ -1333,7 +1333,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             )}
             <div className={`grid min-h-[520px] ${selectedGroup ? 'xl:grid-cols-[minmax(0,1fr)_310px]' : ''}`}>
                 <div className="min-w-0">
-                    <div className="w-full overflow-x-auto pb-2">
+                    <div className="max-h-[calc(100vh-190px)] w-full overflow-auto pb-2" data-testid="product-table-scroll">
                 <table className="table-fixed border-collapse" style={{ width: productTableWidth, minWidth: productTableWidth }}>
                     <colgroup>
                         <col className="w-[40px]" />
@@ -1343,9 +1343,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         <col className="w-[360px]" />
                         {visibleColumnOptions.map(option => <col key={option.key} style={{ width: option.width }} />)}
                     </colgroup>
-                    <thead className="sticky top-0 z-10 bg-slate-900 text-white shadow-sm">
+                    <thead className="sticky top-0 z-30 bg-slate-900 text-white shadow-[0_2px_5px_rgba(15,23,42,0.25)]">
                         <tr>
-                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap w-8">
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap w-8">
                                 <input
                                     type="checkbox"
                                     onChange={handleToggleAll}
@@ -1353,12 +1353,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                     className="cursor-pointer"
                                 />
                             </th>
-                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">번호</th>
-                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">순서</th>
-                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">이미지</th>
-                            <th className="px-3 py-2.5 text-left text-[11px] font-bold whitespace-nowrap">상품명</th>
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">번호</th>
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">순서</th>
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">이미지</th>
+                            <th className="px-3 py-3 text-left text-[12px] font-black whitespace-nowrap">상품명</th>
                             {visibleColumnOptions.map(option => (
-                                <th key={option.key} className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">{option.label}</th>
+                                <th key={option.key} className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">{option.label === '재고' ? '현재고' : option.label}</th>
                             ))}
                         </tr>
                     </thead>
