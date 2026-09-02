@@ -8,7 +8,7 @@ import {
 } from '../lib/productTableColumns.ts'
 
 test('uses the approved business columns by default', () => {
-    assert.deepEqual(DEFAULT_PRODUCT_TABLE_COLUMNS, ['stock', 'safetyStock', 'stockStatus', 'wholesale', 'retail'])
+    assert.deepEqual(DEFAULT_PRODUCT_TABLE_COLUMNS, ['stock', 'safetyStock', 'stockStatus', 'cnyCost', 'cost', 'wholesale', 'retail'])
 })
 
 test('normalizes saved columns and removes duplicates or unknown values', () => {
@@ -42,4 +42,6 @@ test('keeps the product table and optional summary in one compact workspace', ()
     assert.match(table, /data-testid="product-table-scroll"/)
     assert.match(table, /max-h-\[calc\(100vh-190px\)\]/)
     assert.match(table, /sticky top-0 z-30/)
+    assert.match(table, /CN¥ 1/)
+    assert.match(table, /onCnyCostChange/)
 })

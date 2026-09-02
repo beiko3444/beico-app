@@ -13,6 +13,7 @@ const productSelect = Prisma.validator<Prisma.ProductSelect>()({
     nameJP: true,
     nameEN: true,
     buyPrice: true,
+    cnyBuyPrice: true,
     sellPrice: true,
     onlinePrice: true,
     priceA: true,

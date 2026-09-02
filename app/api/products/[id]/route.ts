@@ -16,6 +16,7 @@ const productResponseSelect = {
     nameJP: true,
     nameEN: true,
     buyPrice: true,
+    cnyBuyPrice: true,
     sellPrice: true,
     onlinePrice: true,
     priceA: true,
@@ -76,6 +77,9 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             japanHsCode: normalizedJapanHsCode,
             coupangSku: body.coupangSku ? String(body.coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
+            cnyBuyPrice: Object.prototype.hasOwnProperty.call(body, 'cnyBuyPrice')
+                ? Math.max(0, Number(body.cnyBuyPrice) || 0)
+                : undefined,
             sellPrice: Number(sellPrice),
             onlinePrice: (body.onlinePrice !== null && body.onlinePrice !== undefined && body.onlinePrice !== "") ? Number(body.onlinePrice) : 0,
             jpBuyPrice: (body.jpBuyPrice !== null && body.jpBuyPrice !== undefined && body.jpBuyPrice !== "") ? Number(body.jpBuyPrice) : 0,

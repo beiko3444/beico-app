@@ -13,6 +13,7 @@ import { requireAdminSession } from '@/lib/requireAdmin'
 
 type GradePricingUpdate = {
   id: string
+  cnyCost?: number
   cost?: number
   wholesale?: number
   retail?: number
@@ -101,6 +102,7 @@ function parseUpdates(value: unknown): GradePricingUpdate[] {
 
     const update: GradePricingUpdate = { id }
     assignNonNegativeNumber(update, 'cost', source.cost)
+    assignNonNegativeNumber(update, 'cnyCost', source.cnyCost)
     assignNonNegativeNumber(update, 'wholesale', source.wholesale)
     assignNonNegativeNumber(update, 'retail', source.retail)
     assignPositiveInt(update, 'moq', source.moq)
@@ -112,7 +114,7 @@ function parseUpdates(value: unknown): GradePricingUpdate[] {
 
 function assignNonNegativeNumber(
   target: GradePricingUpdate,
-  key: 'cost' | 'wholesale' | 'retail',
+  key: 'cnyCost' | 'cost' | 'wholesale' | 'retail',
   value: unknown,
 ) {
   if (value === undefined) return
@@ -135,6 +137,7 @@ function buildLegacyPriceUpdates(grade: ProductGrade, update: GradePricingUpdate
   if (update.wholesale !== undefined) data[`price${grade}`] = update.wholesale
 
   if (grade === 'C') {
+    if (update.cnyCost !== undefined) data.cnyBuyPrice = update.cnyCost
     if (update.cost !== undefined) data.buyPrice = update.cost
     if (update.wholesale !== undefined) {
       data.sellPrice = update.wholesale

@@ -16,6 +16,7 @@ const productListSelect = {
     nameJP: true,
     nameEN: true,
     buyPrice: true,
+    cnyBuyPrice: true,
     sellPrice: true,
     onlinePrice: true,
     priceA: true,
@@ -93,6 +94,9 @@ export async function POST(request: Request) {
             japanHsCode: normalizedJapanHsCode,
             coupangSku: coupangSku ? String(coupangSku).trim() : null,
             buyPrice: Number(buyPrice),
+            cnyBuyPrice: Number.isFinite(Number(body.cnyBuyPrice))
+                ? Math.max(0, Number(body.cnyBuyPrice))
+                : 0,
             sellPrice: Number(sellPrice),
             onlinePrice: (body.onlinePrice !== null && body.onlinePrice !== undefined && body.onlinePrice !== "") ? Number(body.onlinePrice) : 0,
             jpBuyPrice: (body.jpBuyPrice !== null && body.jpBuyPrice !== undefined && body.jpBuyPrice !== "") ? Number(body.jpBuyPrice) : 0,
