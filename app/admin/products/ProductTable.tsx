@@ -335,12 +335,13 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
 
     return (
         <tr
+            id={`product-row-${product.id}`}
             onClick={onSelect}
             onContextMenu={(event) => {
                 event.preventDefault()
                 onOpenContextMenu(product.id, event.clientX, event.clientY)
             }}
-            className={`group h-[68px] border-b border-slate-200 text-[13px] transition-colors hover:bg-blue-50/50 ${checked ? 'bg-blue-50/70' : 'bg-white even:bg-slate-50/50'}`}
+            className={`group h-[68px] border-b border-slate-200 text-[13px] transition-colors hover:bg-blue-50/50 ${checked ? 'bg-blue-50/70' : ungrouped ? 'bg-amber-50/60' : 'bg-white even:bg-slate-50/50'}`}
         >
             <td className={cellClass}>
                 <input
@@ -402,15 +403,17 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     initialData={product}
                     trigger={
                         <div className="cursor-pointer text-left" title={product.name}>
-                            <div className="truncate text-[14px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
+                            <div className="flex min-w-0 items-center gap-2">
+                                <div className="truncate text-[14px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
+                                {ungrouped ? (
+                                    <span className="shrink-0 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">단일 SKU</span>
+                                ) : null}
+                            </div>
                             {product.nameJP && (
                                 <div className="mt-0.5 truncate text-[12px] font-semibold text-slate-600">{product.nameJP}</div>
                             )}
                             {visibleGroupName && !displayName && (
                                 <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {visibleGroupName}</div>
-                            )}
-                            {ungrouped && (
-                                <div className="mt-0.5 truncate text-[10px] font-bold text-amber-600">그룹 해제됨</div>
                             )}
                         </div>
                     }
@@ -425,6 +428,7 @@ type ProductGroupView = {
     key: string
     name: string
     isNamed: boolean
+    isManuallyUngrouped: boolean
     source: '직접 그룹' | '자동 그룹' | '단일 상품'
     products: ProductTableProduct[]
 }
@@ -857,17 +861,30 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 key,
                 name,
                 isNamed: shouldGroup,
+                isManuallyUngrouped: product.autoGroupingDisabled === true,
                 source,
                 products: [product],
             })
         })
-        return Array.from(groups.values())
+        const grouped = Array.from(groups.values())
+        return [
+            ...grouped.filter(group => !group.isManuallyUngrouped),
+            ...grouped.filter(group => group.isManuallyUngrouped),
+        ]
     }, [filteredProducts])
 
     const visibleProductIds = useMemo(() => filteredProducts.map(product => product.id), [filteredProducts])
     const checkedVisibleCount = visibleProductIds.filter(id => checkedIds.has(id)).length
     const namedGroupKeys = useMemo(() => productGroups.filter(group => group.isNamed).map(group => group.key), [productGroups])
     const collapsedNamedGroupCount = namedGroupKeys.filter(key => collapsedGroupKeys.has(key)).length
+    const manuallyUngroupedCount = useMemo(
+        () => productGroups.reduce((count, group) => count + (group.isManuallyUngrouped ? group.products.length : 0), 0),
+        [productGroups],
+    )
+    const firstManuallyUngroupedIndex = useMemo(
+        () => productGroups.findIndex(group => group.isManuallyUngrouped),
+        [productGroups],
+    )
     const selectedGroup = useMemo(
         () => selectedGroupKey ? productGroups.find(group => group.key === selectedGroupKey) || null : null,
         [productGroups, selectedGroupKey],
@@ -1028,6 +1045,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const handleUngroupProduct = useCallback((productId: string) => {
         setSelectedGroupKey(`single:${productId}`)
         void patchProductGroups([{ id: productId, groupName: null, autoGroupingDisabled: true }])
+        window.setTimeout(() => {
+            document.getElementById(`product-row-${productId}`)?.scrollIntoView({
+                behavior: 'smooth',
+                block: 'center',
+            })
+        }, 50)
     }, [patchProductGroups])
 
     const handleRestoreAutoGroup = useCallback((productId: string) => {
@@ -1641,11 +1664,28 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             ))}
                         </tbody>
                     ) : (
-                        productGroups.map((group) => {
+                        productGroups.map((group, groupIndex) => {
                             const expanded = !group.isNamed || !collapsedGroupKeys.has(group.key)
                             const checkedCount = group.products.filter(product => checkedIds.has(product.id)).length
                             return (
                                 <Fragment key={group.key}>
+                                    {groupIndex === firstManuallyUngroupedIndex ? (
+                                        <tbody>
+                                            <tr className="border-y border-amber-200 bg-amber-100/80">
+                                                <td colSpan={productTableColumnCount} className="px-4 py-3">
+                                                    <div className="flex items-center gap-2 text-left">
+                                                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-200 bg-white text-amber-700">
+                                                            <Unlink size={14} />
+                                                        </span>
+                                                        <div>
+                                                            <div className="text-[13px] font-black text-amber-950">단일 SKU</div>
+                                                            <div className="text-[10px] font-bold text-amber-700">그룹에서 분리한 상품 {formatInteger(manuallyUngroupedCount)}개</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    ) : null}
                                     {group.isNamed ? (
                                         <tbody>
                                             <ProductGroupHeader
