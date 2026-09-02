@@ -30,7 +30,7 @@ import {
 } from '@/lib/productTableColumns'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
-const FIXED_PRODUCT_TABLE_WIDTH = 34 + 82 + 104 + 56 + 320
+const FIXED_PRODUCT_TABLE_WIDTH = 40 + 68 + 78 + 72 + 360
 
 const normalizeGroupName = (value?: string | null) => String(value || '').trim()
 const normalizeGroupKey = (value: string) => value.toLocaleLowerCase('ko-KR').replace(/\s+/g, ' ').trim()
@@ -168,6 +168,13 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     const retailMargin = retailNumber > 0 ? ((retailNumber - wholesaleNumber) / retailNumber) * 100 : 0
     const visibleGroupName = normalizeGroupName(product.groupName)
     const ungrouped = product.autoGroupingDisabled === true
+    const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
+    const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
+    const stockStatus = stockNumber <= 0
+        ? { label: '품절', className: 'border-red-200 bg-red-50 text-red-700' }
+        : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
+            ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
+            : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
 
     const handleBlur = (value: string) => {
         const val = parseInt(value)
@@ -176,7 +183,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
         }
     }
 
-    const cellClass = 'border-r border-gray-100 px-2 py-1.5 text-center last:border-0 whitespace-nowrap'
+    const cellClass = 'px-3 py-2 text-center whitespace-nowrap'
 
     const renderOptionalCell = (column: ProductTableColumnKey) => {
         switch (column) {
@@ -189,17 +196,31 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
             case 'stock':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
-                        <div className="flex flex-col items-center">
+                        <div className="flex items-center justify-center gap-1">
                             <input
                                 type="text"
                                 inputMode="numeric"
                                 value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
                                 onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
-                                className="w-20 rounded border border-emerald-200 bg-emerald-50/60 px-2 py-1 text-right text-[11px] font-black text-emerald-700 outline-none transition-colors focus:border-emerald-500"
+                                className="h-9 w-[72px] rounded-md border border-emerald-300 bg-emerald-50 px-2 text-right text-[12px] font-black text-emerald-800 outline-none transition-colors focus:border-emerald-600 focus:bg-white"
                                 title="관리자용 재고"
                             />
-                            <ProductStockHistoryModal productId={product.id} productName={product.name} />
+                            <ProductStockHistoryModal productId={product.id} productName={product.name} compact />
                         </div>
+                    </td>
+                )
+            case 'safetyStock':
+                return (
+                    <td key={column} className={`${cellClass} tabular-nums text-[12px] font-bold text-slate-600`}>
+                        {safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}
+                    </td>
+                )
+            case 'stockStatus':
+                return (
+                    <td key={column} className={cellClass}>
+                        <span className={`inline-flex min-w-[52px] items-center justify-center rounded-md border px-2 py-1 text-[11px] font-black ${stockStatus.className}`}>
+                            {stockStatus.label}
+                        </span>
                     </td>
                 )
             case 'availability':
@@ -274,7 +295,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     return (
         <tr
             onClick={onSelect}
-            className={`text-[11px] border-b border-gray-100 hover:bg-gray-50 transition-colors group ${checked ? 'bg-blue-50/30' : ''}`}
+            className={`group h-16 border-b border-slate-100 text-[12px] transition-colors hover:bg-blue-50/40 ${checked ? 'bg-blue-50/60' : 'bg-white even:bg-slate-50/35'}`}
         >
             <td className={cellClass}>
                 <input
@@ -319,7 +340,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 <ProductForm
                     initialData={product}
                     trigger={
-                        <div className="w-8 h-8 mx-auto bg-white rounded border border-gray-100 overflow-hidden flex items-center justify-center cursor-pointer hover:border-[var(--color-brand-blue)] transition-all shadow-sm group-hover:shadow-md">
+                        <div className="mx-auto flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition-all hover:border-blue-400 group-hover:shadow-md">
                             {product.imageUrl ? (
                                 <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
                             ) : (
@@ -336,9 +357,9 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     initialData={product}
                     trigger={
                         <div className="cursor-pointer text-left" title={product.name}>
-                            <div className="truncate font-black text-gray-900 group-hover:text-[var(--color-brand-blue)]">{displayName || product.name}</div>
+                            <div className="truncate text-[13px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
                             {product.nameJP && (
-                                <div className="text-[10px] text-gray-400 truncate">{product.nameJP}</div>
+                                <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{product.nameJP}</div>
                             )}
                             {visibleGroupName && !displayName && (
                                 <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {visibleGroupName}</div>
@@ -403,7 +424,11 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
     onDropProduct: (productId: string) => void
 }) {
     const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
-    const availableCount = group.products.filter(product => product.wholesaleAvailable !== false).length
+    const lowStockCount = group.products.filter(product => {
+        const stock = getProductStock(product)
+        const safetyStock = Math.max(0, Number(product.safetyStock) || 0)
+        return stock <= 0 || (safetyStock > 0 && stock <= safetyStock)
+    }).length
     const representative = group.products[0]
 
     return (
@@ -419,15 +444,15 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                 const productId = event.dataTransfer.getData('text/plain')
                 if (productId) onDropProduct(productId)
             }}
-            className={`border-b transition-colors ${
+            className={`border-y transition-colors ${
                 canDrop
                     ? 'border-blue-300 bg-blue-100/80 ring-1 ring-inset ring-blue-300'
                     : selected
                         ? 'border-blue-100 bg-blue-50'
-                        : 'border-blue-100 bg-slate-50 hover:bg-blue-50/60'
+                        : 'border-slate-200 bg-slate-100 hover:bg-blue-50'
             }`}
         >
-            <td colSpan={columnCount} className="px-3 py-2">
+            <td colSpan={columnCount} className="px-3 py-2.5">
                 <div
                     className="flex min-w-0 cursor-pointer items-center justify-between gap-3"
                     role="button"
@@ -466,19 +491,19 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                         )}
                         <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
-                                <span className="truncate text-[12px] font-black text-slate-950">상품 그룹 · {group.name}</span>
+                                <span className="truncate text-[13px] font-black text-slate-950">{group.name}</span>
                                 <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-blue-600 shadow-sm">{group.products.length} SKU</span>
                                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">{group.source}</span>
                             </div>
                             <div className="mt-0.5 text-[10px] font-bold text-blue-500">
-                                {canDrop ? '여기에 놓으면 이 그룹으로 이동합니다.' : '그룹을 누르면 요약이 표시되고, 화살표로 SKU 목록을 접고 펼칩니다.'}
+                                {canDrop ? '여기에 놓으면 이 그룹으로 이동합니다.' : '화살표로 SKU 목록을 접고 펼칩니다.'}
                             </div>
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                         <div className="rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right shadow-sm">
-                            <div className="text-[9px] font-black text-emerald-600">발주 가능 SKU</div>
-                            <div className="text-[12px] font-black tabular-nums text-emerald-700">{formatInteger(availableCount)}</div>
+                            <div className="text-[9px] font-black text-amber-700">재고 부족 SKU</div>
+                            <div className={`text-[12px] font-black tabular-nums ${lowStockCount > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatInteger(lowStockCount)}</div>
                         </div>
                         <div className="rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right shadow-sm">
                             <div className="text-[9px] font-black text-emerald-600">관리용 재고 합계</div>
@@ -1311,16 +1336,16 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     <div className="w-full overflow-x-auto pb-2">
                 <table className="table-fixed border-collapse" style={{ width: productTableWidth, minWidth: productTableWidth }}>
                     <colgroup>
-                        <col className="w-[34px]" />
-                        <col className="w-[82px]" />
-                        <col className="w-[104px]" />
-                        <col className="w-[56px]" />
-                        <col className="w-[320px]" />
+                        <col className="w-[40px]" />
+                        <col className="w-[68px]" />
+                        <col className="w-[78px]" />
+                        <col className="w-[72px]" />
+                        <col className="w-[360px]" />
                         {visibleColumnOptions.map(option => <col key={option.key} style={{ width: option.width }} />)}
                     </colgroup>
-                    <thead className="sticky top-0 z-10 bg-blue-700 text-white shadow-sm">
+                    <thead className="sticky top-0 z-10 bg-slate-900 text-white shadow-sm">
                         <tr>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap w-8">
+                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap w-8">
                                 <input
                                     type="checkbox"
                                     onChange={handleToggleAll}
@@ -1328,12 +1353,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                     className="cursor-pointer"
                                 />
                             </th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품번호</th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">그룹순서</th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">이미지</th>
-                            <th className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">상품명</th>
+                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">번호</th>
+                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">순서</th>
+                            <th className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">이미지</th>
+                            <th className="px-3 py-2.5 text-left text-[11px] font-bold whitespace-nowrap">상품명</th>
                             {visibleColumnOptions.map(option => (
-                                <th key={option.key} className="px-2 py-1.5 text-center font-bold text-[11px] border-r border-white/20 last:border-0 whitespace-nowrap">{option.label}</th>
+                                <th key={option.key} className="px-2 py-2.5 text-center text-[11px] font-bold whitespace-nowrap">{option.label}</th>
                             ))}
                         </tr>
                     </thead>

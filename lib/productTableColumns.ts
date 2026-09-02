@@ -1,8 +1,10 @@
-export const PRODUCT_TABLE_COLUMNS_STORAGE_KEY = 'admin-product-table-visible-columns-v1'
+export const PRODUCT_TABLE_COLUMNS_STORAGE_KEY = 'admin-product-table-visible-columns-v2'
 
 export const PRODUCT_TABLE_COLUMN_OPTIONS = [
     { key: 'barcode', label: '바코드번호', width: 160 },
     { key: 'stock', label: '재고', width: 104 },
+    { key: 'safetyStock', label: '안전재고', width: 92 },
+    { key: 'stockStatus', label: '재고상태', width: 104 },
     { key: 'cost', label: '매입가', width: 112 },
     { key: 'retail', label: '판매가', width: 112 },
     { key: 'availability', label: '발주 상태', width: 96 },
@@ -19,9 +21,10 @@ export const PRODUCT_TABLE_COLUMN_OPTIONS = [
 export type ProductTableColumnKey = typeof PRODUCT_TABLE_COLUMN_OPTIONS[number]['key']
 
 export const DEFAULT_PRODUCT_TABLE_COLUMNS: ProductTableColumnKey[] = [
-    'barcode',
     'stock',
-    'cost',
+    'safetyStock',
+    'stockStatus',
+    'wholesale',
     'retail',
 ]
 

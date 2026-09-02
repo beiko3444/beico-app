@@ -43,9 +43,11 @@ const formatDateTime = (value: string) => new Intl.DateTimeFormat('ko-KR', {
 export default function ProductStockHistoryModal({
   productId,
   productName,
+  compact = false,
 }: {
   productId: string
   productName: string
+  compact?: boolean
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [payload, setPayload] = useState<StockHistoryPayload | null>(null)
@@ -169,10 +171,14 @@ export default function ProductStockHistoryModal({
       <button
         type="button"
         onClick={openHistory}
-        className="mt-1 inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 hover:text-emerald-900"
+        className={compact
+          ? 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-emerald-700'
+          : 'mt-1 inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 hover:text-emerald-900'}
         aria-label={`${productName} 관리용 재고 이력 보기`}
+        title="재고 이력"
       >
-        <Clock3 size={11} /> 이력
+        <Clock3 size={compact ? 15 : 11} />
+        {compact ? null : ' 이력'}
       </button>
       {modal ? createPortal(modal, document.body) : null}
     </>
