@@ -28,6 +28,7 @@ import {
     PRODUCT_TABLE_COLUMNS_STORAGE_KEY,
     type ProductTableColumnKey,
 } from '@/lib/productTableColumns'
+import { getNaverSellingProductUrl } from '@/lib/naverSellingProductLinks.mjs'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const FIXED_PRODUCT_TABLE_WIDTH = 40 + 68 + 78 + 72 + 360
@@ -37,9 +38,6 @@ type ProductContextMenu = { productId: string, x: number, y: number }
 
 const getPurchaseCurrency = (product: ProductTableProduct): PurchaseCurrency => (
     product.purchaseCurrency === 'USD' ? 'USD' : 'CNY'
-)
-const getNaverGroupUrl = (groupName: string) => (
-    `https://smartstore.naver.com/beiko/search?q=${encodeURIComponent(groupName.trim())}`
 )
 
 const normalizeGroupName = (value?: string | null) => String(value || '').trim()
@@ -482,6 +480,10 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
         return stock <= 0 || (safetyStock > 0 && stock <= safetyStock)
     }).length
     const representative = group.products[0]
+    const naverProductUrl = getNaverSellingProductUrl(
+        group.name,
+        group.products.flatMap(product => [product.name, product.nameJP, product.nameEN]),
+    )
 
     return (
         <tr
@@ -544,18 +546,20 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                         <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
                                 <span className="truncate text-[13px] font-black text-slate-950">{group.name}</span>
-                                <a
-                                    href={getNaverGroupUrl(group.name)}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    onClick={(event) => event.stopPropagation()}
-                                    onKeyDown={(event) => event.stopPropagation()}
-                                    className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-white text-emerald-700 transition hover:border-emerald-500 hover:bg-emerald-50"
-                                    title="네이버 스마트스토어에서 이 상품 보기"
-                                    aria-label={`${group.name} 네이버 스마트스토어 검색`}
-                                >
-                                    <ExternalLink size={13} />
-                                </a>
+                                {naverProductUrl ? (
+                                    <a
+                                        href={naverProductUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(event) => event.stopPropagation()}
+                                        onKeyDown={(event) => event.stopPropagation()}
+                                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-white text-emerald-700 transition hover:border-emerald-500 hover:bg-emerald-50"
+                                        title="네이버 스마트스토어 판매 상품 보기"
+                                        aria-label={`${group.name} 네이버 판매 상품 열기`}
+                                    >
+                                        <ExternalLink size={13} />
+                                    </a>
+                                ) : null}
                                 <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-blue-600 shadow-sm">{group.products.length} SKU</span>
                                 <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">{group.source}</span>
                             </div>
