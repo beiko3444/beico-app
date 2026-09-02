@@ -17,6 +17,8 @@ const productListSelect = {
     nameEN: true,
     buyPrice: true,
     cnyBuyPrice: true,
+    usdPurchasePrice: true,
+    purchaseCurrency: true,
     sellPrice: true,
     onlinePrice: true,
     priceA: true,
@@ -97,6 +99,10 @@ export async function POST(request: Request) {
             cnyBuyPrice: Number.isFinite(Number(body.cnyBuyPrice))
                 ? Math.max(0, Number(body.cnyBuyPrice))
                 : 0,
+            usdPurchasePrice: Number.isFinite(Number(body.usdPurchasePrice))
+                ? Math.max(0, Number(body.usdPurchasePrice))
+                : 0,
+            purchaseCurrency: body.purchaseCurrency === 'USD' ? 'USD' : 'CNY',
             sellPrice: Number(sellPrice),
             onlinePrice: (body.onlinePrice !== null && body.onlinePrice !== undefined && body.onlinePrice !== "") ? Number(body.onlinePrice) : 0,
             jpBuyPrice: (body.jpBuyPrice !== null && body.jpBuyPrice !== undefined && body.jpBuyPrice !== "") ? Number(body.jpBuyPrice) : 0,

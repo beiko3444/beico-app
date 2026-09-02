@@ -114,6 +114,8 @@ model Product {
   nameJP               String?
   buyPrice             Float
   cnyBuyPrice          Float?                @default(0)
+  usdPurchasePrice     Float?                @default(0)
+  purchaseCurrency     String                @default("CNY")
   sellPrice            Float
   onlinePrice          Float?                @default(0)
   priceA               Float?

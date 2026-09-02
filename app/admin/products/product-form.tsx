@@ -55,6 +55,8 @@ export type Product = {
     coupangSku?: string | null
     buyPrice: number
     cnyBuyPrice?: number | null
+    usdPurchasePrice?: number | null
+    purchaseCurrency?: string | null
     sellPrice: number
     onlinePrice?: number | null
     jpBuyPrice?: number | null
@@ -317,6 +319,8 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 coupangSku: coupangSku.trim(),
                 buyPrice: parseFloat(parseNumber(regionalPrices['C'].KR.cost)) || 0,
                 cnyBuyPrice: initialData?.cnyBuyPrice ?? 0,
+                usdPurchasePrice: initialData?.usdPurchasePrice ?? 0,
+                purchaseCurrency: initialData?.purchaseCurrency === 'USD' ? 'USD' : 'CNY',
                 sellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.wholesale)) || 0,
                 onlinePrice: parseFloat(parseNumber(regionalPrices['C'].KR.retail)) || 0,
                 jpBuyPrice: parseFloat(parseNumber(regionalPrices['C'].JP.wholesale)) || 0,

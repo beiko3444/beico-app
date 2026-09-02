@@ -23,6 +23,7 @@ export async function GET() {
 
     return NextResponse.json({
       cnyKrw: krw / cny,
+      usdKrw: krw,
       updatedAt: data?.time_last_update_utc || new Date().toISOString(),
     })
   } catch (error) {

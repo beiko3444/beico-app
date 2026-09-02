@@ -1,7 +1,7 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, ChevronRight, Copy, Layers, Pencil, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, Layers, Pencil, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import { useRouter } from 'next/navigation'
@@ -32,6 +32,12 @@ import {
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const FIXED_PRODUCT_TABLE_WIDTH = 40 + 68 + 78 + 72 + 360
 const CNY_RATE_CACHE_KEY = 'admin-product-cny-krw-rate-v1'
+type PurchaseCurrency = 'CNY' | 'USD'
+type ProductContextMenu = { productId: string, x: number, y: number }
+
+const getPurchaseCurrency = (product: ProductTableProduct): PurchaseCurrency => (
+    product.purchaseCurrency === 'USD' ? 'USD' : 'CNY'
+)
 
 const normalizeGroupName = (value?: string | null) => String(value || '').trim()
 const normalizeGroupKey = (value: string) => value.toLocaleLowerCase('ko-KR').replace(/\s+/g, ' ').trim()
@@ -134,8 +140,11 @@ interface ProductRowProps {
     modifiedCost: string | undefined
     onCostChange: (id: string, val: string) => void
     modifiedCnyCost: string | undefined
-    onCnyCostChange: (id: string, val: string) => void
+    modifiedUsdCost: string | undefined
+    onForeignCostChange: (id: string, currency: PurchaseCurrency, val: string) => void
     cnyRateAvailable: boolean
+    usdRateAvailable: boolean
+    onOpenContextMenu: (productId: string, x: number, y: number) => void
     modifiedWholesale: string | undefined
     onWholesaleChange: (id: string, val: string) => void
     modifiedRetail: string | undefined
@@ -149,7 +158,7 @@ interface ProductRowProps {
     onToggleOrderAvailability: (id: string) => void
 }
 
-const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, onCnyCostChange, cnyRateAvailable, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, modifiedUsdCost, onForeignCostChange, cnyRateAvailable, usdRateAvailable, onOpenContextMenu, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -159,7 +168,11 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     const costValue = modifiedCost !== undefined
         ? modifiedCost
         : readProductGradePriceValue(product.regionalPrices, activeGrade, 'cost', product.buyPrice || 0)
-    const cnyCostValue = modifiedCnyCost !== undefined ? modifiedCnyCost : product.cnyBuyPrice || ''
+    const purchaseCurrency = getPurchaseCurrency(product)
+    const purchaseRateAvailable = purchaseCurrency === 'USD' ? usdRateAvailable : cnyRateAvailable
+    const foreignCostValue = purchaseCurrency === 'USD'
+        ? modifiedUsdCost !== undefined ? modifiedUsdCost : product.usdPurchasePrice || ''
+        : modifiedCnyCost !== undefined ? modifiedCnyCost : product.cnyBuyPrice || ''
     const wholesaleValue = modifiedWholesale !== undefined
         ? modifiedWholesale
         : readProductGradePriceValue(product.regionalPrices, activeGrade, 'wholesale', legacyWholesale || 0)
@@ -265,16 +278,18 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
                         <div className="relative mx-auto w-[94px]">
-                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black text-red-500">CN¥</span>
+                            <span className={`pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black ${purchaseCurrency === 'USD' ? 'text-blue-600' : 'text-red-500'}`}>
+                                {purchaseCurrency === 'USD' ? 'US$' : 'CN¥'}
+                            </span>
                             <input
                                 type="text"
                                 inputMode="decimal"
-                                value={formatNumberInput(cnyCostValue)}
+                                value={formatNumberInput(foreignCostValue)}
                                 placeholder="0"
-                                onChange={(event) => onCnyCostChange(product.id, normalizeNumericDraft(event.target.value, true))}
-                                disabled={!cnyRateAvailable}
-                                className="h-9 w-full rounded-md border border-red-200 bg-red-50 pl-9 pr-2 text-right text-[13px] font-black text-red-800 outline-none focus:border-red-500 focus:bg-white disabled:cursor-not-allowed disabled:opacity-50"
-                                title={cnyRateAvailable ? '위안 매입가를 입력하면 한화 매입가가 즉시 계산됩니다.' : '환율을 불러온 뒤 입력할 수 있습니다.'}
+                                onChange={(event) => onForeignCostChange(product.id, purchaseCurrency, normalizeNumericDraft(event.target.value, true))}
+                                disabled={!purchaseRateAvailable}
+                                className={`h-9 w-full rounded-md border pl-9 pr-2 text-right text-[13px] font-black outline-none focus:bg-white disabled:cursor-not-allowed disabled:opacity-50 ${purchaseCurrency === 'USD' ? 'border-blue-200 bg-blue-50 text-blue-800 focus:border-blue-500' : 'border-red-200 bg-red-50 text-red-800 focus:border-red-500'}`}
+                                title={purchaseRateAvailable ? `${purchaseCurrency} 매입가를 입력하면 한화 매입가가 즉시 계산됩니다. 우클릭으로 통화를 변경할 수 있습니다.` : '환율을 불러온 뒤 입력할 수 있습니다.'}
                             />
                         </div>
                     </td>
@@ -321,6 +336,10 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     return (
         <tr
             onClick={onSelect}
+            onContextMenu={(event) => {
+                event.preventDefault()
+                onOpenContextMenu(product.id, event.clientX, event.clientY)
+            }}
             className={`group h-[68px] border-b border-slate-200 text-[13px] transition-colors hover:bg-blue-50/50 ${checked ? 'bg-blue-50/70' : 'bg-white even:bg-slate-50/50'}`}
         >
             <td className={cellClass}>
@@ -656,10 +675,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const activeGrade: ProductGrade = 'C'
     const [activeCategory, setActiveCategory] = useState<ProductCatalogCategory>('soft')
     const [cnyKrwRate, setCnyKrwRate] = useState<number | null>(null)
+    const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
     const [cnyRateUpdatedAt, setCnyRateUpdatedAt] = useState<string | null>(null)
     const [isCnyRateLoading, setIsCnyRateLoading] = useState(true)
     const [cnyRateError, setCnyRateError] = useState(false)
     const [modifiedCnyCosts, setModifiedCnyCosts] = useState<Record<string, string>>({})
+    const [modifiedUsdCosts, setModifiedUsdCosts] = useState<Record<string, string>>({})
     const [modifiedCosts, setModifiedCosts] = useState<Record<string, string>>({})
     const [modifiedWholesales, setModifiedWholesales] = useState<Record<string, string>>({})
     const [modifiedRetails, setModifiedRetails] = useState<Record<string, string>>({})
@@ -674,6 +695,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const [stockFilter, setStockFilter] = useState<ProductStockFilter>('all')
     const [selectedGroupKey, setSelectedGroupKey] = useState<string | null>(null)
     const [draggingProductId, setDraggingProductId] = useState<string | null>(null)
+    const [productContextMenu, setProductContextMenu] = useState<ProductContextMenu | null>(null)
     const orderSaveQueueRef = useRef<Promise<void>>(Promise.resolve())
     const [isSaving, setIsSaving] = useState(false)
     const [visibleColumns, setVisibleColumns] = useState<ProductTableColumnKey[]>(DEFAULT_PRODUCT_TABLE_COLUMNS)
@@ -689,13 +711,17 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             const response = await fetch('/api/exchange-rates', { cache: 'no-store' })
             if (!response.ok) throw new Error('환율 조회 실패')
             const data = await response.json()
-            const rate = Number(data?.cnyKrw)
-            if (!Number.isFinite(rate) || rate <= 0) throw new Error('유효하지 않은 환율')
+            const cnyRate = Number(data?.cnyKrw)
+            const usdRate = Number(data?.usdKrw)
+            if (!Number.isFinite(cnyRate) || cnyRate <= 0 || !Number.isFinite(usdRate) || usdRate <= 0) {
+                throw new Error('유효하지 않은 환율')
+            }
 
             const updatedAt = typeof data?.updatedAt === 'string' ? data.updatedAt : new Date().toISOString()
-            setCnyKrwRate(rate)
+            setCnyKrwRate(cnyRate)
+            setUsdKrwRate(usdRate)
             setCnyRateUpdatedAt(updatedAt)
-            window.localStorage.setItem(CNY_RATE_CACHE_KEY, JSON.stringify({ rate, updatedAt }))
+            window.localStorage.setItem(CNY_RATE_CACHE_KEY, JSON.stringify({ cnyRate, usdRate, updatedAt }))
         } catch (error) {
             console.error('[products] Failed to load CNY/KRW rate', error)
             setCnyRateError(true)
@@ -707,11 +733,13 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     useEffect(() => {
         try {
             const cached = JSON.parse(window.localStorage.getItem(CNY_RATE_CACHE_KEY) || 'null')
-            const cachedRate = Number(cached?.rate)
-            if (Number.isFinite(cachedRate) && cachedRate > 0) {
-                setCnyKrwRate(cachedRate)
+            const cachedCnyRate = Number(cached?.cnyRate ?? cached?.rate)
+            const cachedUsdRate = Number(cached?.usdRate)
+            if (Number.isFinite(cachedCnyRate) && cachedCnyRate > 0) {
+                setCnyKrwRate(cachedCnyRate)
                 setCnyRateUpdatedAt(typeof cached?.updatedAt === 'string' ? cached.updatedAt : null)
             }
+            if (Number.isFinite(cachedUsdRate) && cachedUsdRate > 0) setUsdKrwRate(cachedUsdRate)
         } catch {
             window.localStorage.removeItem(CNY_RATE_CACHE_KEY)
         }
@@ -747,10 +775,27 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     }, [columnSettingsOpen])
 
     useEffect(() => {
+        if (!productContextMenu) return
+        const closeMenu = () => setProductContextMenu(null)
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') closeMenu()
+        }
+        window.addEventListener('pointerdown', closeMenu)
+        window.addEventListener('scroll', closeMenu, true)
+        window.addEventListener('keydown', closeOnEscape)
+        return () => {
+            window.removeEventListener('pointerdown', closeMenu)
+            window.removeEventListener('scroll', closeMenu, true)
+            window.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [productContextMenu])
+
+    useEffect(() => {
         const frame = window.requestAnimationFrame(() => {
             setProducts(initialProducts)
             setCheckedIds(new Set())
             setModifiedCnyCosts({})
+            setModifiedUsdCosts({})
             setModifiedCosts({})
             setModifiedWholesales({})
             setModifiedRetails({})
@@ -760,6 +805,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             setCollapsedGroupKeys(new Set())
             setSelectedGroupKey(null)
             setDraggingProductId(null)
+            setProductContextMenu(null)
         })
         return () => window.cancelAnimationFrame(frame)
     }, [initialProducts])
@@ -825,6 +871,10 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const selectedGroup = useMemo(
         () => selectedGroupKey ? productGroups.find(group => group.key === selectedGroupKey) || null : null,
         [productGroups, selectedGroupKey],
+    )
+    const contextMenuProduct = useMemo(
+        () => productContextMenu ? products.find(product => product.id === productContextMenu.productId) || null : null,
+        [productContextMenu, products],
     )
     const groupKeyByProductId = useMemo(() => {
         const result = new Map<string, string>()
@@ -987,6 +1037,58 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         void patchProductGroups([{ id: productId, groupName: null, autoGroupingDisabled: false }])
     }, [patchProductGroups, products])
 
+    const handleOpenProductContextMenu = useCallback((productId: string, x: number, y: number) => {
+        setProductContextMenu({
+            productId,
+            x: Math.max(8, Math.min(x, window.innerWidth - 248)),
+            y: Math.max(8, Math.min(y, window.innerHeight - 210)),
+        })
+    }, [])
+
+    const handlePurchaseCurrencyChange = useCallback(async (productId: string, purchaseCurrency: PurchaseCurrency) => {
+        const previousProduct = products.find(product => product.id === productId)
+        if (!previousProduct || getPurchaseCurrency(previousProduct) === purchaseCurrency) {
+            setProductContextMenu(null)
+            return
+        }
+
+        setProductContextMenu(null)
+        setProducts(current => current.map(product => (
+            product.id === productId ? { ...product, purchaseCurrency } : product
+        )))
+        const key = draftKey(activeGrade, productId)
+        const foreignValue = purchaseCurrency === 'USD'
+            ? modifiedUsdCosts[key] ?? previousProduct.usdPurchasePrice
+            : modifiedCnyCosts[key] ?? previousProduct.cnyBuyPrice
+        const rate = purchaseCurrency === 'USD' ? usdKrwRate : cnyKrwRate
+        if (rate && Number(foreignValue) > 0) {
+            setModifiedCosts(current => ({
+                ...current,
+                [key]: String(Math.round(Number(foreignValue) * rate)),
+            }))
+            setCheckedIds(current => {
+                if (current.has(productId)) return current
+                const next = new Set(current)
+                next.add(productId)
+                return next
+            })
+        }
+        try {
+            const response = await fetch(`/api/products/${productId}`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ purchaseCurrency }),
+            })
+            if (!response.ok) throw new Error('매입 통화 저장 실패')
+        } catch (error) {
+            console.error(error)
+            setProducts(current => current.map(product => (
+                product.id === productId ? previousProduct : product
+            )))
+            alert('매입 통화를 저장하지 못했습니다.')
+        }
+    }, [activeGrade, cnyKrwRate, modifiedCnyCosts, modifiedUsdCosts, products, usdKrwRate])
+
     const handleToggleCheck = useCallback((id: string) => {
         setCheckedIds(current => {
             const next = new Set(current)
@@ -1073,15 +1175,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         ensureProductChecked(id)
     }, [activeGrade, ensureProductChecked])
 
-    const handleCnyCostChange = useCallback((id: string, val: string) => {
+    const handleForeignCostChange = useCallback((id: string, currency: PurchaseCurrency, val: string) => {
         const key = draftKey(activeGrade, id)
-        setModifiedCnyCosts(prev => ({ ...prev, [key]: val }))
-        if (cnyKrwRate) {
-            const convertedKrw = val === '' ? '' : String(Math.round(parseNumericDraft(val) * cnyKrwRate))
+        if (currency === 'USD') setModifiedUsdCosts(prev => ({ ...prev, [key]: val }))
+        else setModifiedCnyCosts(prev => ({ ...prev, [key]: val }))
+
+        const rate = currency === 'USD' ? usdKrwRate : cnyKrwRate
+        if (rate) {
+            const convertedKrw = val === '' ? '' : String(Math.round(parseNumericDraft(val) * rate))
             setModifiedCosts(prev => ({ ...prev, [key]: convertedKrw }))
         }
         ensureProductChecked(id)
-    }, [activeGrade, cnyKrwRate, ensureProductChecked])
+    }, [activeGrade, cnyKrwRate, ensureProductChecked, usdKrwRate])
 
     const handleWholesaleChange = useCallback((id: string, val: string) => {
         setModifiedWholesales(prev => ({ ...prev, [draftKey(activeGrade, id)]: val }))
@@ -1135,6 +1240,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         const changedGrades = PRODUCT_GRADES.filter(grade => (
             Array.from(checkedIds).some(id => (
                 modifiedCnyCosts[draftKey(grade, id)] !== undefined
+                || modifiedUsdCosts[draftKey(grade, id)] !== undefined
                 || modifiedCosts[draftKey(grade, id)] !== undefined
                 || modifiedWholesales[draftKey(grade, id)] !== undefined
                 || modifiedRetails[draftKey(grade, id)] !== undefined
@@ -1146,6 +1252,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             modifiedStocks[id] !== undefined
             || changedGrades.some(grade => (
                 modifiedCnyCosts[draftKey(grade, id)] !== undefined
+                || modifiedUsdCosts[draftKey(grade, id)] !== undefined
                 || modifiedCosts[draftKey(grade, id)] !== undefined
                 || modifiedWholesales[draftKey(grade, id)] !== undefined
                 || modifiedRetails[draftKey(grade, id)] !== undefined
@@ -1178,16 +1285,22 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 const updates = Array.from(checkedIds).flatMap(id => {
                     const key = draftKey(grade, id)
                     const cnyCost = modifiedCnyCosts[key]
+                    const usdCost = modifiedUsdCosts[key]
                     const cost = modifiedCosts[key]
                     const wholesale = modifiedWholesales[key]
                     const retail = modifiedRetails[key]
                     const moq = modifiedMoqs[key]
                     const orderUnit = modifiedOrderUnits[key]
-                    if ([cnyCost, cost, wholesale, retail, moq, orderUnit].every(value => value === undefined)) return []
+                    if ([cnyCost, usdCost, cost, wholesale, retail, moq, orderUnit].every(value => value === undefined)) return []
+
+                    const product = products.find(item => item.id === id)
+                    const purchaseCurrency = product ? getPurchaseCurrency(product) : 'CNY'
 
                     return [{
                         id,
+                        purchaseCurrency,
                         ...(cnyCost !== undefined ? { cnyCost: Math.max(0, parseNumericDraft(cnyCost)) } : {}),
+                        ...(usdCost !== undefined ? { usdCost: Math.max(0, parseNumericDraft(usdCost)) } : {}),
                         ...(cost !== undefined ? { cost: Math.max(0, parseNumericDraft(cost)) } : {}),
                         ...(wholesale !== undefined ? { wholesale: Math.max(0, parseNumericDraft(wholesale)) } : {}),
                         ...(retail !== undefined ? { retail: Math.max(0, parseNumericDraft(retail)) } : {}),
@@ -1210,6 +1323,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
 
                 for (const grade of changedGrades) {
                     const cnyCostDraft = modifiedCnyCosts[draftKey(grade, product.id)]
+                    const usdCostDraft = modifiedUsdCosts[draftKey(grade, product.id)]
                     const costDraft = modifiedCosts[draftKey(grade, product.id)]
                     const wholesaleDraft = modifiedWholesales[draftKey(grade, product.id)]
                     const retailDraft = modifiedRetails[draftKey(grade, product.id)]
@@ -1217,6 +1331,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     const orderUnitDraft = modifiedOrderUnits[draftKey(grade, product.id)]
                     if (cnyCostDraft !== undefined && grade === 'C') {
                         nextProduct.cnyBuyPrice = Math.max(0, parseNumericDraft(cnyCostDraft))
+                    }
+                    if (usdCostDraft !== undefined && grade === 'C') {
+                        nextProduct.usdPurchasePrice = Math.max(0, parseNumericDraft(usdCostDraft))
                     }
                     if (costDraft !== undefined) {
                         const cost = Math.max(0, parseNumericDraft(costDraft))
@@ -1251,6 +1368,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             alert('저장되었습니다.')
             setCheckedIds(new Set())
             setModifiedCnyCosts({})
+            setModifiedUsdCosts({})
             setModifiedCosts({})
             setModifiedWholesales({})
             setModifiedRetails({})
@@ -1345,12 +1463,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         </select>
                         <div
                             className={`flex h-10 items-center gap-2 rounded-xl border px-3 text-[11px] font-black ${cnyRateError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-100 bg-red-50 text-red-800'}`}
-                            title={cnyRateUpdatedAt ? `환율 갱신: ${new Date(cnyRateUpdatedAt).toLocaleString('ko-KR')}` : '중국 위안 환율'}
+                            title={cnyRateUpdatedAt ? `환율 갱신: ${new Date(cnyRateUpdatedAt).toLocaleString('ko-KR')}` : '매입 통화 환율'}
                         >
                             <span className="text-red-600">CN¥ 1</span>
                             <span className="text-slate-400">=</span>
                             <span className="tabular-nums">
                                 {cnyKrwRate ? `₩${cnyKrwRate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}` : isCnyRateLoading ? '불러오는 중' : '조회 실패'}
+                            </span>
+                            <span className="h-4 border-l border-slate-200" />
+                            <span className="text-blue-600">US$ 1</span>
+                            <span className="text-slate-400">=</span>
+                            <span className="tabular-nums">
+                                {usdKrwRate ? `₩${usdKrwRate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}` : isCnyRateLoading ? '불러오는 중' : '조회 실패'}
                             </span>
                             <button
                                 type="button"
@@ -1497,8 +1621,11 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                     modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
                                     onCostChange={handleCostChange}
                                     modifiedCnyCost={modifiedCnyCosts[draftKey(activeGrade, product.id)]}
-                                    onCnyCostChange={handleCnyCostChange}
+                                    modifiedUsdCost={modifiedUsdCosts[draftKey(activeGrade, product.id)]}
+                                    onForeignCostChange={handleForeignCostChange}
                                     cnyRateAvailable={Boolean(cnyKrwRate)}
+                                    usdRateAvailable={Boolean(usdKrwRate)}
+                                    onOpenContextMenu={handleOpenProductContextMenu}
                                     modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
                                     onWholesaleChange={handleWholesaleChange}
                                     modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
@@ -1562,8 +1689,11 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                                 modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
                                                 onCostChange={handleCostChange}
                                                 modifiedCnyCost={modifiedCnyCosts[draftKey(activeGrade, product.id)]}
-                                                onCnyCostChange={handleCnyCostChange}
+                                                modifiedUsdCost={modifiedUsdCosts[draftKey(activeGrade, product.id)]}
+                                                onForeignCostChange={handleForeignCostChange}
                                                 cnyRateAvailable={Boolean(cnyKrwRate)}
+                                                usdRateAvailable={Boolean(usdKrwRate)}
+                                                onOpenContextMenu={handleOpenProductContextMenu}
                                                 modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
                                                 onWholesaleChange={handleWholesaleChange}
                                                 modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
@@ -1593,6 +1723,53 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 />
             ) : null}
             </div>
+            {productContextMenu && contextMenuProduct ? (
+                <div
+                    role="menu"
+                    aria-label={`${contextMenuProduct.name} 빠른 메뉴`}
+                    onPointerDown={(event) => event.stopPropagation()}
+                    className="fixed z-[100] w-60 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+                    style={{ left: productContextMenu.x, top: productContextMenu.y }}
+                >
+                    <div className="border-b border-slate-100 px-3 py-2.5">
+                        <div className="truncate text-[12px] font-black text-slate-950">{contextMenuProduct.name}</div>
+                        <div className="mt-0.5 text-[10px] font-bold text-slate-500">매입 통화 선택</div>
+                    </div>
+                    <div className="p-1.5">
+                        {(['CNY', 'USD'] as PurchaseCurrency[]).map(currency => {
+                            const active = getPurchaseCurrency(contextMenuProduct) === currency
+                            return (
+                                <button
+                                    key={currency}
+                                    type="button"
+                                    role="menuitemradio"
+                                    aria-checked={active}
+                                    onClick={() => void handlePurchaseCurrencyChange(contextMenuProduct.id, currency)}
+                                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[12px] font-black transition ${active ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}`}
+                                >
+                                    <span>{currency === 'CNY' ? '중국 위안 (CNY)' : '미국 달러 (USD)'}</span>
+                                    {active ? <Check size={15} /> : null}
+                                </button>
+                            )
+                        })}
+                    </div>
+                    <div className="border-t border-slate-100 p-1.5">
+                        <button
+                            type="button"
+                            role="menuitem"
+                            onClick={() => {
+                                setProductContextMenu(null)
+                                if (contextMenuProduct.autoGroupingDisabled) handleRestoreAutoGroup(contextMenuProduct.id)
+                                else handleUngroupProduct(contextMenuProduct.id)
+                            }}
+                            className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-[12px] font-black text-amber-700 transition hover:bg-amber-50"
+                        >
+                            {contextMenuProduct.autoGroupingDisabled ? <RotateCcw size={15} /> : <Unlink size={15} />}
+                            {contextMenuProduct.autoGroupingDisabled ? '자동 그룹으로 복귀' : '그룹 해제 · 단일 SKU'}
+                        </button>
+                    </div>
+                </div>
+            ) : null}
         </div>
     )
 }

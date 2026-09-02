@@ -17,6 +17,8 @@ const productResponseSelect = {
     nameEN: true,
     buyPrice: true,
     cnyBuyPrice: true,
+    usdPurchasePrice: true,
+    purchaseCurrency: true,
     sellPrice: true,
     onlinePrice: true,
     priceA: true,
@@ -79,6 +81,12 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             buyPrice: Number(buyPrice),
             cnyBuyPrice: Object.prototype.hasOwnProperty.call(body, 'cnyBuyPrice')
                 ? Math.max(0, Number(body.cnyBuyPrice) || 0)
+                : undefined,
+            usdPurchasePrice: Object.prototype.hasOwnProperty.call(body, 'usdPurchasePrice')
+                ? Math.max(0, Number(body.usdPurchasePrice) || 0)
+                : undefined,
+            purchaseCurrency: Object.prototype.hasOwnProperty.call(body, 'purchaseCurrency')
+                ? body.purchaseCurrency === 'USD' ? 'USD' : 'CNY'
                 : undefined,
             sellPrice: Number(sellPrice),
             onlinePrice: (body.onlinePrice !== null && body.onlinePrice !== undefined && body.onlinePrice !== "") ? Number(body.onlinePrice) : 0,
@@ -159,6 +167,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
         if (Object.prototype.hasOwnProperty.call(body, 'autoGroupingDisabled')) {
             patchData.autoGroupingDisabled = body.autoGroupingDisabled === true
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'purchaseCurrency')) {
+            patchData.purchaseCurrency = body.purchaseCurrency === 'USD' ? 'USD' : 'CNY'
+        }
+        if (Object.prototype.hasOwnProperty.call(body, 'usdPurchasePrice')) {
+            const usdPurchasePrice = Number(body.usdPurchasePrice)
+            patchData.usdPurchasePrice = Number.isFinite(usdPurchasePrice) ? Math.max(0, usdPurchasePrice) : 0
         }
 
         const changedById = hasStockChange ? await getProductStockActorId() : null
