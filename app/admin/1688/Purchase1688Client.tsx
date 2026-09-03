@@ -6,9 +6,9 @@ import {
   Box,
   ChevronDown,
   ChevronUp,
+  Download,
   ExternalLink,
   ImageOff,
-  PackageCheck,
   Pencil,
   Plus,
   Search,
@@ -94,13 +94,6 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
     }))
   }, [items, query, status])
 
-  const totals = useMemo(() => ({
-    orders: new Set(items.map((item) => item.orderNo)).size,
-    products: items.length,
-    quantity: items.reduce((sum, item) => sum + item.quantity, 0),
-    paid: [...new Map(items.map((item) => [item.orderNo, item.orderPaid])).values()].reduce((sum, value) => sum + value, 0),
-  }), [items])
-
   function toggle(orderNo: string) {
     setExpanded((current) => {
       const next = new Set(current)
@@ -146,25 +139,27 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
     } catch { setMessage('삭제하지 못했습니다.') }
   }
 
+  function downloadBackup() {
+    const blob = new Blob([JSON.stringify({ exportedAt: new Date().toISOString(), cnyKrwRate: rate, items }, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `1688-주문장부-${new Date().toISOString().slice(0, 10)}.json`
+    anchor.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
-    <div className="mx-auto w-full max-w-[1500px] space-y-4">
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-5 bg-gradient-to-br from-[#fff7f2] via-white to-[#fffaf7] p-5 sm:p-7 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <div className="mb-2 flex items-center gap-2 text-xs font-black uppercase tracking-[0.16em] text-[#ef5b2a]"><PackageCheck size={16} /> 1688 Purchase Ledger</div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">1688 구매내역</h1>
-            <p className="mt-2 text-sm text-slate-500">중문·한글 상품명, 주문 금액, 배송 정보를 한 화면에서 관리합니다.</p>
-          </div>
-          <button onClick={() => setEditing(blankItem())} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#ef5b2a] px-5 text-sm font-extrabold text-white shadow-sm transition hover:bg-[#d94b1e] focus:outline-none focus:ring-2 focus:ring-[#ef5b2a] focus:ring-offset-2"><Plus size={18} /> 내역 추가</button>
+    <div className="mx-auto w-full max-w-[1180px] space-y-3">
+      <section className="flex items-center justify-between gap-3 border-b border-[#eadfd5] bg-white px-1 pb-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#ff5a00] text-lg font-black text-white">16</div>
+          <div className="min-w-0"><h1 className="text-xl font-black tracking-tight text-[#211c18]">1688 주문장부</h1><p className="truncate text-sm text-[#7d6f64]">구매·배송 내역을 한곳에서 관리하세요</p></div>
         </div>
-        <div className="grid grid-cols-2 border-t border-slate-100 lg:grid-cols-4">
-          {[
-            ['주문', `${money(totals.orders, 0)}건`], ['품목', `${money(totals.products, 0)}개`], ['총수량', `${money(totals.quantity, 0)}개`], ['주문결제액', `¥${money(totals.paid)} · ≈${money(totals.paid * rate, 0)}원`],
-          ].map(([label, value]) => <div key={label} className="border-b border-r border-slate-100 p-4 last:border-r-0 lg:border-b-0"><div className="text-xs font-bold text-slate-400">{label}</div><div className="mt-1 text-lg font-black text-slate-900">{value}</div></div>)}
-        </div>
+        <div className="flex shrink-0 gap-2"><button onClick={downloadBackup} className="hidden min-h-11 items-center gap-2 rounded-xl border border-[#e5d8cc] bg-[#fffaf5] px-4 text-sm font-bold text-[#3f352d] hover:bg-[#fff4e9] sm:inline-flex"><Download size={18} /> 백업</button><button onClick={() => setEditing(blankItem())} className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#ff5a00] px-4 text-sm font-extrabold text-white shadow-sm hover:bg-[#e95000]"><Plus size={19} /> 주문 추가</button></div>
       </section>
 
-      <section className="sticky top-[68px] z-20 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur sm:top-[76px]">
+      <section className="sticky top-[68px] z-20 rounded-xl border border-[#eadfd5] bg-white/95 p-2 shadow-sm backdrop-blur sm:top-[76px]">
         <div className="flex flex-col gap-2 md:flex-row">
           <label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="주문번호, 상품명, 판매자, 운송장 검색" className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-[#ef5b2a] focus:bg-white focus:ring-2 focus:ring-orange-100" /></label>
           <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#ef5b2a]">{['전체', ...statuses].map((value) => <option key={value}>{value}</option>)}</select>
@@ -173,29 +168,50 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
         {message && <div className="mt-2 rounded-lg bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{message}</div>}
       </section>
 
-      <div className="space-y-3">
+      <div className="overflow-hidden rounded-2xl border border-[#eadfd5] bg-white">
         {groups.map((group) => {
           const isOpen = expanded.has(group.orderNo)
           const quantity = group.items.reduce((sum, item) => sum + item.quantity, 0)
+          const lead = group.items[0]
           return (
-            <article key={group.orderNo} className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <button onClick={() => toggle(group.orderNo)} className="grid w-full gap-4 p-4 text-left transition hover:bg-slate-50 sm:p-5 lg:grid-cols-[minmax(260px,1.4fr)_100px_110px_210px_32px] lg:items-center">
-                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(group.status)}`}>{group.status}</span><span className="text-xs font-bold text-slate-400">{group.orderedOn}</span></div><div className="mt-2 truncate text-base font-black text-slate-900">주문 {group.orderNo}</div><div className="mt-1 truncate text-sm text-slate-500">{group.shop || '판매자 미확인'}{group.trackingNo ? ` · 운송장 ${group.trackingNo}` : ''}</div></div>
-                <Metric label="품목" value={`${group.items.length}개`} />
-                <Metric label="총수량" value={`${money(quantity, 0)}개`} />
-                <Metric label="주문결제액" value={`¥${money(group.orderPaid)}`} sub={`≈ ${money(group.orderPaid * rate, 0)}원`} />
-                <span className="hidden text-slate-400 lg:block">{isOpen ? <ChevronUp /> : <ChevronDown />}</span>
-              </button>
-              {isOpen && <div className="border-t border-slate-100 bg-slate-50/70 p-3 sm:p-4"><div className="space-y-2">{group.items.map((item) => <ItemRow key={item.id} item={item} rate={rate} onEdit={() => setEditing({ ...item })} onDelete={() => removeItem(item)} />)}</div></div>}
+            <article key={group.orderNo} className="border-b border-[#eadfd5] last:border-b-0">
+              <div className="relative p-4 sm:p-5">
+                <button onClick={() => toggle(group.orderNo)} aria-label={isOpen ? '주문 접기' : '주문 펼치기'} className="absolute right-2 top-3 flex h-11 w-11 items-center justify-center rounded-full text-[#75675b] hover:bg-[#fff7ef]">{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
+                <div className="grid min-w-0 grid-cols-[94px_minmax(0,1fr)] gap-4 pr-8">
+                  <LeadImage item={lead} />
+                  <button onClick={() => toggle(group.orderNo)} className="min-w-0 text-left">
+                    <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(group.status)}`}>{group.status}</span><span className="text-xs font-bold text-[#9a897a]">{group.orderedOn}</span></div>
+                    <p className="mt-2 truncate text-base font-black text-[#211c18] sm:text-lg">{lead.productCn}</p>
+                    <p className="mt-1 truncate text-base font-extrabold text-[#ff5a00]">{lead.productKo || '한글 상품명 미등록'}</p>
+                    <p className="mt-1 truncate text-sm text-[#796b60]">{group.shop || '판매자 미확인'} · 주문번호 {group.orderNo}{group.trackingNo ? ` · 운송장 ${group.trackingNo}` : ''}</p>
+                  </button>
+                </div>
+                <div className="mt-4 grid grid-cols-4 divide-x divide-[#eadfd5] rounded-[20px] border border-[#eadfd5] bg-[#fffcf9] py-3 text-center">
+                  <OrderMetric label="품목" value={`${group.items.length}개`} />
+                  <OrderMetric label="총수량" value={money(quantity, 0)} />
+                  <OrderMetric label="주문결제액" value={`¥${money(group.orderPaid)}`} />
+                  <OrderMetric label="한화 예상" value={`₩${money(group.orderPaid * rate, 0)}`} accent />
+                </div>
+              </div>
+              {isOpen && <div className="border-t border-[#eadfd5] bg-[#fffaf5] p-3 sm:p-4"><div className="space-y-2">{group.items.map((item) => <ItemRow key={item.id} item={item} rate={rate} onEdit={() => setEditing({ ...item })} onDelete={() => removeItem(item)} />)}</div></div>}
             </article>
           )
         })}
-        {!groups.length && <div className="rounded-2xl border border-dashed border-slate-300 bg-white py-16 text-center"><Box className="mx-auto text-slate-300" size={36} /><p className="mt-3 font-bold text-slate-600">조건에 맞는 구매내역이 없습니다.</p></div>}
+        {!groups.length && <div className="py-16 text-center"><Box className="mx-auto text-slate-300" size={36} /><p className="mt-3 font-bold text-slate-600">조건에 맞는 구매내역이 없습니다.</p></div>}
       </div>
 
       {editing && <EditModal item={editing} setItem={setEditing} saving={saving} onSave={saveItem} onClose={() => setEditing(null)} />}
     </div>
   )
+}
+
+function LeadImage({ item }: { item: Purchase1688Item }) {
+  const [failed, setFailed] = useState(false)
+  return <div className="relative h-[94px] w-[94px] overflow-hidden rounded-[20px] border border-[#eadfd5] bg-[#f7f2ed]">{item.imageUrl && !failed ? <Image src={item.imageUrl} alt={item.productKo || item.productCn} fill sizes="94px" className="object-cover" onError={() => setFailed(true)} /> : <div className="flex h-full items-center justify-center"><ImageOff className="text-[#c8b9ac]" /></div>}</div>
+}
+
+function OrderMetric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return <div className="min-w-0 px-1"><div className="truncate text-[11px] font-bold text-[#8d7c6e] sm:text-xs">{label}</div><div className={`mt-0.5 truncate text-sm font-black sm:text-base ${accent ? 'text-[#ff5a00]' : 'text-[#211c18]'}`}>{value}</div></div>
 }
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
