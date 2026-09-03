@@ -173,8 +173,9 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
           const isOpen = expanded.has(group.orderNo)
           const quantity = group.items.reduce((sum, item) => sum + item.quantity, 0)
           const lead = group.items[0]
+          const isCancelled = group.status === '취소'
           return (
-            <article key={group.orderNo} className="border-b border-[#eadfd5] last:border-b-0">
+            <article key={group.orderNo} className={`border-b border-[#eadfd5] transition-opacity last:border-b-0 ${isCancelled ? 'bg-slate-50/70 opacity-45 grayscale' : ''}`}>
               <div className="relative p-4 sm:p-5">
                 <button onClick={() => toggle(group.orderNo)} aria-label={isOpen ? '주문 접기' : '주문 펼치기'} className="absolute right-2 top-3 flex h-11 w-11 items-center justify-center rounded-full text-[#75675b] hover:bg-[#fff7ef]">{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
                 <div className="grid min-w-0 grid-cols-[94px_minmax(0,1fr)] gap-4 pr-8">
@@ -189,8 +190,8 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
                 <div className="mt-4 grid grid-cols-4 divide-x divide-[#eadfd5] rounded-[20px] border border-[#eadfd5] bg-[#fffcf9] py-3 text-center">
                   <OrderMetric label="품목" value={`${group.items.length}개`} />
                   <OrderMetric label="총수량" value={money(quantity, 0)} />
-                  <OrderMetric label="주문결제액" value={`¥${money(group.orderPaid)}`} />
-                  <OrderMetric label="한화 예상" value={`₩${money(group.orderPaid * rate, 0)}`} accent />
+                  <OrderMetric label="주문결제액" value={`¥${money(group.orderPaid)}`} strike={isCancelled} />
+                  <OrderMetric label="한화 예상" value={`₩${money(group.orderPaid * rate, 0)}`} accent strike={isCancelled} />
                 </div>
               </div>
               {isOpen && <div className="border-t border-[#eadfd5] bg-[#fffaf5] p-3 sm:p-4"><div className="space-y-2">{group.items.map((item) => <ItemRow key={item.id} item={item} rate={rate} onEdit={() => setEditing({ ...item })} onDelete={() => removeItem(item)} />)}</div></div>}
@@ -210,8 +211,8 @@ function LeadImage({ item }: { item: Purchase1688Item }) {
   return <div className="relative h-[94px] w-[94px] overflow-hidden rounded-[20px] border border-[#eadfd5] bg-[#f7f2ed]">{item.imageUrl && !failed ? <Image src={item.imageUrl} alt={item.productKo || item.productCn} fill sizes="94px" className="object-cover" onError={() => setFailed(true)} /> : <div className="flex h-full items-center justify-center"><ImageOff className="text-[#c8b9ac]" /></div>}</div>
 }
 
-function OrderMetric({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
-  return <div className="min-w-0 px-1"><div className="truncate text-[11px] font-bold text-[#8d7c6e] sm:text-xs">{label}</div><div className={`mt-0.5 truncate text-sm font-black sm:text-base ${accent ? 'text-[#ff5a00]' : 'text-[#211c18]'}`}>{value}</div></div>
+function OrderMetric({ label, value, accent, strike }: { label: string; value: string; accent?: boolean; strike?: boolean }) {
+  return <div className="min-w-0 px-1"><div className="truncate text-[11px] font-bold text-[#8d7c6e] sm:text-xs">{label}</div><div className={`mt-0.5 truncate text-sm font-black sm:text-base ${accent ? 'text-[#ff5a00]' : 'text-[#211c18]'} ${strike ? 'line-through decoration-2' : ''}`}>{value}</div></div>
 }
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
