@@ -863,3 +863,38 @@ model SmartThingsReading {
   @@index([recordedAt])
   @@index([sensorId, recordedAt])
 }
+
+model Purchase1688Item {
+  id         String   @id
+  orderNo    String
+  orderedOn  String
+  shop       String   @default("")
+  productCn  String
+  productKo  String   @default("")
+  spec       String   @default("")
+  quantity   Int      @default(1)
+  unitPrice  Float    @default(0)
+  itemTotal  Float    @default(0)
+  orderPaid  Float    @default(0)
+  status     String   @default("확인필요")
+  trackingNo String   @default("")
+  note       String   @default("")
+  offerId    String   @default("")
+  skuId      String   @default("")
+  imageUrl   String   @default("")
+  sourceUrl  String   @default("")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([orderNo])
+  @@index([orderedOn])
+  @@index([status])
+}
+
+model Purchase1688Setting {
+  id          String   @id @default("default")
+  cnyKrwRate  Float    @default(204)
+  seedVersion String   @default("")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
