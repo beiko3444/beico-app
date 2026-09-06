@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 import { Minus, Plus, ArrowRight } from 'lucide-react'
+import { isPartnerProductOrderable, normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 
 type Product = {
     id?: string | null
@@ -25,6 +26,7 @@ type Product = {
     usBuyPrice?: number | string | null
     usSellPrice?: number | string | null
     country?: string | null
+    partnerSaleStatus?: string | null
 }
 
 type SafeProduct = {
@@ -47,6 +49,7 @@ type SafeProduct = {
     usBuyPrice: number
     usSellPrice: number
     country: string | null
+    partnerSaleStatus: PartnerProductStatus
 }
 
 const safeNumber = (value: unknown, fallback = 0) => {
@@ -109,6 +112,7 @@ const normalizeProduct = (product: Product): SafeProduct | null => {
         usBuyPrice: safeNonNegativeNumber(product.usBuyPrice),
         usSellPrice: safeNonNegativeNumber(product.usSellPrice),
         country: safeText(product.country) || null,
+        partnerSaleStatus: normalizePartnerProductStatus(product.partnerSaleStatus),
     }
 }
 
@@ -124,7 +128,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
     const handleQuantityChange = (productId: string, value: string | number) => {
         const qty = safeNonNegativeInt(value)
         const product = safeProducts.find(p => p.id === productId)
-        if (!product) return
+        if (!product || !isPartnerProductOrderable(product.partnerSaleStatus)) return
 
         setQuantities(prev => ({
             ...prev,
@@ -134,6 +138,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
 
     const handleOrderNow = () => {
         const minimumViolations = safeProducts
+            .filter(p => isPartnerProductOrderable(p.partnerSaleStatus))
             .filter(p => {
                 const qty = safeNonNegativeInt(quantities[p.id]);
                 return qty > 0 && qty < p.minOrderQuantity;
@@ -146,6 +151,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
         }
 
         const unitViolations = safeProducts
+            .filter(p => isPartnerProductOrderable(p.partnerSaleStatus))
             .filter(p => {
                 const qty = safeNonNegativeInt(quantities[p.id]);
                 const orderUnit = p.orderUnit;
@@ -161,6 +167,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
     };
 
     const productTotal = safeProducts.reduce((sum, p) => {
+        if (!isPartnerProductOrderable(p.partnerSaleStatus)) return sum
         return sum + (p.sellPrice * safeNonNegativeInt(quantities[p.id]))
     }, 0)
 
@@ -185,13 +192,14 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                 {safeProducts.map((product, index) => {
                     const qty = safeNonNegativeInt(quantities[product.id])
+                    const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
                     const orderUnit = product.orderUnit
                     const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice;
                     const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice;
                     const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : 0;
 
                     return (
-                        <div key={product.id} className="bg-white dark:bg-[#1e1e1e] rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] flex flex-col h-full transition-all duration-300 relative">
+                        <div key={product.id} className={`bg-white dark:bg-[#1e1e1e] rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 dark:shadow-none border flex flex-col h-full transition-all duration-300 relative ${isSoldOut ? 'border-red-200' : 'border-gray-100 dark:border-[#2a2a2a]'}`}>
                             {/* Product Index Number */}
                             <div className="absolute top-2 left-3 text-[10px] font-bold text-gray-600 dark:text-gray-400 font-inter">
                                 {String(index + 1).padStart(3, '0')}
@@ -322,8 +330,8 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                                 <span className="text-[11px] font-black text-black dark:text-white leading-tight">注文状態</span>
                                                 <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Order Status</span>
                                             </div>
-                                            <p className="text-[18px] font-black leading-none text-emerald-600 text-right">
-                                                注文可能
+                                            <p className={`text-[18px] font-black leading-none text-right ${isSoldOut ? 'text-red-600' : 'text-emerald-600'}`}>
+                                                {isSoldOut ? '品切れ' : '注文可能'}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -348,6 +356,11 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                 </div>
 
                                 <div className="flex flex-col items-end gap-2">
+                                    {isSoldOut ? (
+                                        <div className="flex h-10 min-w-[142px] items-center justify-center rounded-md border border-red-200 bg-red-50 px-5 text-sm font-black text-red-700">
+                                            品切れ / SOLD OUT
+                                        </div>
+                                    ) : (
                                     <div className={`flex items-center border rounded-md overflow-hidden shadow-sm dark:shadow-none transition-all duration-300 ${qty === 0
                                         ? 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
                                         : qty < product.minOrderQuantity
@@ -387,6 +400,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                             <Plus size={14} strokeWidth={2.5} />
                                         </button>
                                     </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -437,7 +451,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-medium uppercase tracking-widest">Order Summary</p>
 
                             <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
-                                {safeProducts.filter(p => safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
+                                {safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-[#2a2a2a]">
                                         <div>
                                             <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{p.nameJP || p.name}</p>
@@ -478,7 +492,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                 onClick={async () => {
                                     try {
                                         const items = safeProducts
-                                            .filter(p => safeNonNegativeInt(quantities[p.id]) > 0)
+                                            .filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0)
                                             .map(p => ({
                                                 productId: p.id,
                                                 quantity: safeNonNegativeInt(quantities[p.id]),

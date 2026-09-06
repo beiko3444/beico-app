@@ -146,6 +146,7 @@ model Product {
   usSellPrice          Float?                @default(0)
   regionalPrices       Json?                 @default("{}")
   wholesaleAvailable   Boolean               @default(true)
+  partnerSaleStatus    String?
   orderItems           OrderItem[]
   proformaInvoiceItems ProformaInvoiceItem[]
   stockHistory         ProductStockHistory[]

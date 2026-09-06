@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
+import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 
 type ExchangeRates = { USD: number, JPY: number, CNY: number }
 
@@ -70,6 +71,7 @@ export type Product = {
     priceC?: number | null
     priceD?: number | null
     wholesaleAvailable?: boolean
+    partnerSaleStatus?: string | null
     imageUrl?: string | null
     regionalPrices?: any
     stock?: number | null
@@ -110,7 +112,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [krSellPrice, setKrSellPrice] = useState('')
     const [usBuyPrice, setUsBuyPrice] = useState('')
     const [usSellPrice, setUsSellPrice] = useState('')
-    const [orderAvailable, setOrderAvailable] = useState(true)
+    const [partnerSaleStatus, setPartnerSaleStatus] = useState<PartnerProductStatus>('VISIBLE')
     const [priceA, setPriceA] = useState('')
     const [priceB, setPriceB] = useState('')
     const [priceC, setPriceC] = useState('')
@@ -215,7 +217,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setHsCode(initialData.hsCode || '')
             setJapanHsCode(initialData.japanHsCode || '')
             setCoupangSku(initialData.coupangSku || '')
-            setOrderAvailable(initialData.wholesaleAvailable !== false)
+            setPartnerSaleStatus(normalizePartnerProductStatus(initialData.partnerSaleStatus, initialData.wholesaleAvailable))
             setImageUrl(initialData.imageUrl || null)
             setHasImageChanged(false)
             setStock(formatNumber(isCopy ? 0 : (initialData.stock ?? 0)))
@@ -261,7 +263,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             setHsCode('')
             setJapanHsCode('')
             setCoupangSku('')
-            setOrderAvailable(true)
+            setPartnerSaleStatus('VISIBLE')
             setImageUrl(null)
             setHasImageChanged(false)
             setStock('0')
@@ -329,7 +331,8 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                 krSellPrice: parseFloat(parseNumber(regionalPrices['C'].KR.retail)) || 0,
                 usBuyPrice: parseFloat(parseNumber(regionalPrices['C'].US.wholesale)) || 0,
                 usSellPrice: parseFloat(parseNumber(regionalPrices['C'].US.retail)) || 0,
-                wholesaleAvailable: orderAvailable,
+                partnerSaleStatus,
+                wholesaleAvailable: partnerSaleStatus === 'VISIBLE',
                 stock: Math.max(0, Math.round(parseFloat(parseNumber(stock)) || 0)),
                 minOrderQuantity: parseInt(parseNumber(minOrderQuantity)) || 1,
                 orderUnit: parseInt(parseNumber(orderUnit)) || 1,
@@ -371,7 +374,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     setHsCode('')
                     setJapanHsCode('')
                     setCoupangSku('')
-                    setOrderAvailable(true)
+                    setPartnerSaleStatus('VISIBLE')
                     setImageUrl(null)
                     setHasImageChanged(false)
                     setStock('0')
@@ -600,14 +603,15 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                         <legend className="px-2 text-xs font-bold text-gray-700">발주 설정 (Order Settings)</legend>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">발주 상태</label>
+                                <label className="text-[11px] font-bold text-gray-600">파트너 노출 상태</label>
                                 <select
-                                    value={orderAvailable ? 'AVAILABLE' : 'UNAVAILABLE'}
-                                    onChange={e => setOrderAvailable(e.target.value === 'AVAILABLE')}
-                                    className={`w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-bold ${orderAvailable ? 'text-emerald-700' : 'text-red-600'}`}
+                                    value={partnerSaleStatus}
+                                    onChange={e => setPartnerSaleStatus(e.target.value as PartnerProductStatus)}
+                                    className={`w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-bold ${partnerSaleStatus === 'VISIBLE' ? 'text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'text-amber-700' : 'text-slate-500'}`}
                                 >
-                                    <option value="AVAILABLE">발주 가능</option>
-                                    <option value="UNAVAILABLE">발주 불가능</option>
+                                    <option value="VISIBLE">노출</option>
+                                    <option value="HIDDEN">비노출</option>
+                                    <option value="SOLD_OUT">품절</option>
                                 </select>
                             </div>
                             <div className="space-y-1">

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
+import { getPartnerProductStatusWrite } from "@/lib/partnerProductStatus"
 import {
     getProductStockActorId,
     normalizeProductStock,
@@ -45,6 +46,7 @@ const productResponseSelect = {
     usSellPrice: true,
     regionalPrices: true,
     wholesaleAvailable: true,
+    partnerSaleStatus: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -65,6 +67,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
         }
 
+        const partnerStatus = Object.prototype.hasOwnProperty.call(body, 'partnerSaleStatus')
+            ? getPartnerProductStatusWrite(body.partnerSaleStatus)
+            : typeof body.wholesaleAvailable === 'boolean'
+                ? getPartnerProductStatusWrite(body.wholesaleAvailable ? 'VISIBLE' : 'HIDDEN')
+                : {}
         const updateData: any = {
             name: String(name).trim(),
             nameJP: body.nameJP ? String(body.nameJP).trim() : null,
@@ -96,9 +103,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             krSellPrice: (body.krSellPrice !== null && body.krSellPrice !== undefined && body.krSellPrice !== "") ? Number(body.krSellPrice) : 0,
             usBuyPrice: (body.usBuyPrice !== null && body.usBuyPrice !== undefined && body.usBuyPrice !== "") ? Number(body.usBuyPrice) : 0,
             usSellPrice: (body.usSellPrice !== null && body.usSellPrice !== undefined && body.usSellPrice !== "") ? Number(body.usSellPrice) : 0,
-            wholesaleAvailable: typeof body.wholesaleAvailable === 'boolean'
-                ? body.wholesaleAvailable
-                : undefined,
+            ...partnerStatus,
             priceA: (body.priceA !== null && body.priceA !== undefined && body.priceA !== "") ? Number(body.priceA) : null,
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,
             priceC: (body.priceC !== null && body.priceC !== undefined && body.priceC !== "") ? Number(body.priceC) : null,
@@ -152,6 +157,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         const { id } = await context.params
         const body = await request.json()
         const patchData = { ...body }
+
+        if (Object.prototype.hasOwnProperty.call(body, 'partnerSaleStatus')) {
+            Object.assign(patchData, getPartnerProductStatusWrite(body.partnerSaleStatus))
+        } else if (typeof body.wholesaleAvailable === 'boolean') {
+            Object.assign(patchData, getPartnerProductStatusWrite(body.wholesaleAvailable ? 'VISIBLE' : 'HIDDEN'))
+        }
 
         if (Object.prototype.hasOwnProperty.call(body, 'imageUrl')) {
             patchData.imageUrl = await normalizeIncomingProductImage(body.imageUrl)
