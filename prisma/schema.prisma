@@ -107,6 +107,22 @@ model PartnerProfile {
   user                    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
+model PartnerNotice {
+  id            String   @id @default(uuid())
+  title         String
+  content       String
+  tone          String   @default("INFO")
+  isActive      Boolean  @default(true)
+  startsAt      DateTime?
+  endsAt        DateTime?
+  createdByName String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([isActive, startsAt, endsAt])
+  @@index([updatedAt])
+}
+
 model Product {
   id                   String                @id @default(uuid())
   productNumber        Int                   @unique @default(autoincrement())

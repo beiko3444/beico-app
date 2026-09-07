@@ -5,6 +5,7 @@ import { redirect } from "next/navigation"
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
+import PartnerNoticePopup, { type PartnerNoticePopupItem } from '@/components/PartnerNoticePopup'
 
 export default async function OrderLayout({
     children,
@@ -21,6 +22,7 @@ export default async function OrderLayout({
     let businessNameJP = session.user.name || session.user.email || "Partner"
 
     let country = ""
+    let activeNotices: PartnerNoticePopupItem[] = []
 
     if (session?.user?.id) {
         const user = await prisma.user.findUnique({
@@ -30,11 +32,42 @@ export default async function OrderLayout({
                 country: true,
                 partnerProfile: { select: { businessName: true } },
             },
-        }) as any
+        })
         if (user) {
             businessName = user.partnerProfile?.businessName || user.name || "Partner"
             businessNameJP = user.name || businessName
             country = user.country || ""
+        }
+    }
+
+    if (session.user.role === 'PARTNER') {
+        try {
+            const now = new Date()
+            const notices = await prisma.partnerNotice.findMany({
+                where: {
+                    isActive: true,
+                    AND: [
+                        { OR: [{ startsAt: null }, { startsAt: { lte: now } }] },
+                        { OR: [{ endsAt: null }, { endsAt: { gte: now } }] },
+                    ],
+                },
+                orderBy: { updatedAt: 'desc' },
+                take: 5,
+                select: {
+                    id: true,
+                    title: true,
+                    content: true,
+                    tone: true,
+                    updatedAt: true,
+                },
+            })
+
+            activeNotices = notices.map((notice) => ({
+                ...notice,
+                updatedAt: notice.updatedAt.toISOString(),
+            }))
+        } catch (error) {
+            console.error('Failed to load partner notice:', error)
         }
     }
 
@@ -76,6 +109,7 @@ export default async function OrderLayout({
             <main className="ux-page mx-auto max-w-[1440px] px-3 pb-24 pt-4 sm:px-5 sm:pb-10 lg:px-7">
                 {children}
             </main>
+            <PartnerNoticePopup notices={activeNotices} />
             <div className="sm:hidden">
                 <UserNavbar />
             </div>

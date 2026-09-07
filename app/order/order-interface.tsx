@@ -199,28 +199,59 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                     const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : 0;
 
                     return (
-                        <div key={product.id} className={`bg-white dark:bg-[#1e1e1e] rounded-lg overflow-hidden shadow-lg shadow-gray-300/50 dark:shadow-none border flex flex-col h-full transition-all duration-300 relative ${isSoldOut ? 'border-red-200' : 'border-gray-100 dark:border-[#2a2a2a]'}`}>
+                        <div
+                            key={product.id}
+                            data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'}
+                            className={`rounded-lg overflow-hidden border flex flex-col h-full transition-all duration-300 relative ${isSoldOut
+                                ? 'border-2 border-rose-300 bg-slate-50 shadow-none dark:border-rose-900/80 dark:bg-[#1a1818]'
+                                : 'border-gray-100 bg-white shadow-lg shadow-gray-300/50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none'
+                                }`}
+                        >
+                            {isSoldOut && (
+                                <div
+                                    role="status"
+                                    aria-label="품절 상품"
+                                    className="absolute inset-x-0 top-0 z-10 flex h-9 items-center justify-end gap-2 bg-rose-600 px-4 text-white dark:bg-rose-800"
+                                >
+                                    <span className="text-xs font-black tracking-wide">품절 · 品切れ</span>
+                                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-black tracking-[0.16em]">SOLD OUT</span>
+                                </div>
+                            )}
                             {/* Product Index Number */}
-                            <div className="absolute top-2 left-3 text-[10px] font-bold text-gray-600 dark:text-gray-400 font-inter">
+                            <div className={`absolute left-3 top-2 z-20 text-[10px] font-bold font-inter ${isSoldOut ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'}`}>
                                 {String(index + 1).padStart(3, '0')}
                             </div>
-                            <div className="px-8 pt-8 flex-1">
+                            <div className={`px-8 flex-1 ${isSoldOut ? 'pt-14' : 'pt-8'}`}>
                                 <div className="flex gap-6 mb-6">
                                     {/* Image Container */}
-                                    <div className="w-[120px] h-[120px] bg-[#f1f3f5] dark:bg-[#2a2a2a] rounded-xl flex-shrink-0 p-1 flex items-center justify-center relative overflow-hidden">
+                                    <div className={`w-[120px] h-[120px] rounded-xl flex-shrink-0 p-1 flex items-center justify-center relative overflow-hidden ${isSoldOut
+                                        ? 'bg-slate-200 ring-2 ring-rose-200 dark:bg-[#2a2525] dark:ring-rose-900/70'
+                                        : 'bg-[#f1f3f5] dark:bg-[#2a2a2a]'
+                                        }`}>
                                         {product.imageUrl ? (
-                                            <img src={product.imageUrl} alt={product.name} className="max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110" />
+                                            <img
+                                                src={product.imageUrl}
+                                                alt={product.name}
+                                                className={`max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110 ${isSoldOut ? 'grayscale opacity-40' : ''}`}
+                                            />
                                         ) : (
                                             <div className="text-xs text-gray-300 dark:text-gray-500 font-bold uppercase tracking-widest">No Image</div>
+                                        )}
+                                        {isSoldOut && (
+                                            <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/25 dark:bg-black/20">
+                                                <span className="-rotate-12 rounded border-2 border-rose-600 bg-white/90 px-3 py-1 text-[11px] font-black tracking-[0.14em] text-rose-700 shadow-sm dark:bg-[#211b1b]/90 dark:text-rose-300">
+                                                    SOLD OUT
+                                                </span>
+                                            </div>
                                         )}
                                     </div>
 
                                     {/* Header Info */}
                                     <div className="min-w-0 flex-1 pt-1 space-y-1">
-                                        <h3 className="text-lg font-black text-black dark:text-white leading-tight truncate tracking-tight">
+                                        <h3 className={`text-lg font-black leading-tight truncate tracking-tight ${isSoldOut ? 'text-slate-500 dark:text-slate-400' : 'text-black dark:text-white'}`}>
                                             {product.nameJP || product.name}
                                         </h3>
-                                        <p className="text-[13px] font-medium text-black dark:text-white uppercase tracking-normal truncate">
+                                        <p className={`text-[13px] font-medium uppercase tracking-normal truncate ${isSoldOut ? 'text-slate-400 dark:text-slate-500' : 'text-black dark:text-white'}`}>
                                             {product.nameEN || product.name}
                                         </p>
                                         <div className="flex items-center gap-2">
@@ -325,13 +356,13 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
 
                                     {/* Order Availability & Margin */}
                                     <div className="grid grid-cols-2">
-                                        <div className="py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a]">
+                                        <div className={`py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a] ${isSoldOut ? 'bg-rose-50 dark:bg-rose-950/20' : ''}`}>
                                             <div className="flex flex-col mb-0.5">
                                                 <span className="text-[11px] font-black text-black dark:text-white leading-tight">注文状態</span>
                                                 <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Order Status</span>
                                             </div>
-                                            <p className={`text-[18px] font-black leading-none text-right ${isSoldOut ? 'text-red-600' : 'text-emerald-600'}`}>
-                                                {isSoldOut ? '品切れ' : '注文可能'}
+                                            <p className={`text-[18px] font-black leading-none text-right ${isSoldOut ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-600'}`}>
+                                                {isSoldOut ? '품절 · 品切れ' : '注文可能'}
                                             </p>
                                         </div>
                                         <div className="py-1.5 px-4">
@@ -357,8 +388,9 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
 
                                 <div className="flex flex-col items-end gap-2">
                                     {isSoldOut ? (
-                                        <div className="flex h-10 min-w-[142px] items-center justify-center rounded-md border border-red-200 bg-red-50 px-5 text-sm font-black text-red-700">
-                                            品切れ / SOLD OUT
+                                        <div className="min-w-[170px] rounded-lg border-2 border-rose-300 bg-rose-50 px-5 py-2.5 text-center text-rose-700 dark:border-rose-900/80 dark:bg-rose-950/20 dark:text-rose-300">
+                                            <p className="text-sm font-black leading-tight">품절 · 品切れ</p>
+                                            <p className="mt-1 text-[9px] font-black tracking-[0.14em]">SOLD OUT · 주문 불가</p>
                                         </div>
                                     ) : (
                                     <div className={`flex items-center border rounded-md overflow-hidden shadow-sm dark:shadow-none transition-all duration-300 ${qty === 0
