@@ -5,6 +5,7 @@ import { authOptions } from "@/lib/auth"
 import { sendOrderNotification } from "@/lib/notification"
 import { getProductImageUrl } from "@/lib/product-image-url"
 import { sendNewOrderAdminPush } from "@/lib/adminPush"
+import { isPartnerProductOrderable } from '@/lib/partnerProductStatus'
 
 const getCountryKey = (country?: string | null) => {
     if (country === 'Korea') return 'KR'
@@ -75,7 +76,7 @@ export async function POST(request: Request) {
                 if (!product) {
                     throw new Error(`Product ${item.productId} not found`)
                 }
-                if (!product.wholesaleAvailable) {
+                if (!isPartnerProductOrderable(product.partnerSaleStatus, product.wholesaleAvailable)) {
                     throw new Error(`현재 발주 불가능한 상품입니다: ${product.name}`)
                 }
                 const { minimumQuantity, orderUnit } = resolveOrderRules(product, gradeKey, countryKey)

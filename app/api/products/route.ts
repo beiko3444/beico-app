@@ -2,6 +2,7 @@ import { NextResponse } from "next/server"
 import { revalidatePath } from "next/cache"
 import { prisma } from "@/lib/prisma"
 import { normalizeIncomingProductImage } from "@/lib/product-image-storage"
+import { getPartnerProductStatusWrite } from "@/lib/partnerProductStatus"
 import {
     getProductStockActorId,
     normalizeProductStock,
@@ -44,6 +45,7 @@ const productListSelect = {
     usSellPrice: true,
     regionalPrices: true,
     wholesaleAvailable: true,
+    partnerSaleStatus: true,
     createdAt: true,
     updatedAt: true,
 } as const
@@ -85,6 +87,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
         }
 
+        const partnerStatus = getPartnerProductStatusWrite(
+            Object.prototype.hasOwnProperty.call(body, 'partnerSaleStatus')
+                ? body.partnerSaleStatus
+                : body.wholesaleAvailable === false ? 'HIDDEN' : 'VISIBLE',
+        )
         const productData: any = {
             name: String(name).trim(),
             nameJP: nameJP ? String(nameJP).trim() : null,
@@ -111,7 +118,7 @@ export async function POST(request: Request) {
             krSellPrice: (body.krSellPrice !== null && body.krSellPrice !== undefined && body.krSellPrice !== "") ? Number(body.krSellPrice) : 0,
             usBuyPrice: (body.usBuyPrice !== null && body.usBuyPrice !== undefined && body.usBuyPrice !== "") ? Number(body.usBuyPrice) : 0,
             usSellPrice: (body.usSellPrice !== null && body.usSellPrice !== undefined && body.usSellPrice !== "") ? Number(body.usSellPrice) : 0,
-            wholesaleAvailable: body.wholesaleAvailable !== false,
+            ...partnerStatus,
             imageUrl,
             priceA: (body.priceA !== null && body.priceA !== undefined && body.priceA !== "") ? Number(body.priceA) : null,
             priceB: (body.priceB !== null && body.priceB !== undefined && body.priceB !== "") ? Number(body.priceB) : null,

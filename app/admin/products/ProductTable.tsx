@@ -29,6 +29,7 @@ import {
     type ProductTableColumnKey,
 } from '@/lib/productTableColumns'
 import { getNaverProductUrl } from '@/lib/naverProductLinks.mjs'
+import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const FIXED_PRODUCT_TABLE_WIDTH = 40 + 68 + 78 + 72 + 360
@@ -156,10 +157,10 @@ interface ProductRowProps {
     onMoqChange: (id: string, val: string) => void
     modifiedOrderUnit: string | undefined
     onOrderUnitChange: (id: string, val: string) => void
-    onToggleOrderAvailability: (id: string) => void
+    onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => void
 }
 
-const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, modifiedUsdCost, onForeignCostChange, cnyRateAvailable, usdRateAvailable, onOpenContextMenu, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onToggleOrderAvailability }: ProductRowProps) {
+const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, modifiedUsdCost, onForeignCostChange, cnyRateAvailable, usdRateAvailable, onOpenContextMenu, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onPartnerSaleStatusChange }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -187,6 +188,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     const retailMargin = retailNumber > 0 ? ((retailNumber - wholesaleNumber) / retailNumber) * 100 : 0
     const visibleGroupName = normalizeGroupName(product.groupName)
     const ungrouped = product.autoGroupingDisabled === true
+    const partnerSaleStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
     const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
     const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
     const stockStatus = stockNumber <= 0
@@ -245,13 +247,17 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
             case 'availability':
                 return (
                     <td key={column} className={cellClass}>
-                        <button
-                            type="button"
-                            onClick={() => onToggleOrderAvailability(product.id)}
-                            className={`rounded-md border px-2.5 py-1.5 text-[12px] font-black transition ${product.wholesaleAvailable !== false ? 'border-green-200 bg-green-50 text-green-700' : 'border-red-200 bg-red-50 text-red-600'}`}
+                        <select
+                            value={partnerSaleStatus}
+                            onClick={(event) => event.stopPropagation()}
+                            onChange={(event) => onPartnerSaleStatusChange(product.id, event.target.value as PartnerProductStatus)}
+                            className={`h-9 min-w-[82px] rounded-md border px-2 text-[12px] font-black outline-none transition focus:ring-2 focus:ring-blue-200 ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
+                            aria-label={`${product.name} 파트너 노출 상태`}
                         >
-                            {product.wholesaleAvailable !== false ? '발주 가능' : '발주 불가능'}
-                        </button>
+                            <option value="VISIBLE">노출</option>
+                            <option value="HIDDEN">비노출</option>
+                            <option value="SOLD_OUT">품절</option>
+                        </select>
                     </td>
                 )
             case 'moq':
@@ -453,7 +459,7 @@ interface ProductMobileCardProps {
     onMoqChange: (id: string, val: string) => void
     modifiedOrderUnit: string | undefined
     onOrderUnitChange: (id: string, val: string) => void
-    onToggleOrderAvailability: (id: string) => void
+    onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => void
 }
 
 const ProductMobileCard = memo(function ProductMobileCard({
@@ -484,7 +490,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
     onMoqChange,
     modifiedOrderUnit,
     onOrderUnitChange,
-    onToggleOrderAvailability,
+    onPartnerSaleStatusChange,
 }: ProductMobileCardProps) {
     const legacyWholesale = {
         A: product.priceA,
@@ -513,6 +519,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
         : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
             ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
             : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
+    const partnerSaleStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
     const ungrouped = product.autoGroupingDisabled === true
     const fieldLabelClass = 'mb-1 block text-[10px] font-black text-slate-500'
     const fieldInputClass = 'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-right text-[14px] font-black tabular-nums text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
@@ -572,13 +579,16 @@ const ProductMobileCard = memo(function ProductMobileCard({
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 border-t border-slate-100 bg-slate-50/70 p-3">
                 <div className="min-w-0">
                     <span className={fieldLabelClass}>발주 상태</span>
-                    <button
-                        type="button"
-                        onClick={() => onToggleOrderAvailability(product.id)}
-                        className={`flex h-10 w-full items-center justify-center rounded-lg border px-2 text-[12px] font-black transition ${product.wholesaleAvailable !== false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-600'}`}
+                    <select
+                        value={partnerSaleStatus}
+                        onChange={(event) => onPartnerSaleStatusChange(product.id, event.target.value as PartnerProductStatus)}
+                        className={`h-10 w-full rounded-lg border px-2 text-center text-[12px] font-black outline-none transition ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
+                        aria-label={`${product.name} 파트너 판매 상태`}
                     >
-                        {product.wholesaleAvailable !== false ? '발주 가능' : '발주 불가능'}
-                    </button>
+                        <option value="VISIBLE">노출</option>
+                        <option value="HIDDEN">비노출</option>
+                        <option value="SOLD_OUT">품절</option>
+                    </select>
                 </div>
                 <div className="min-w-0">
                     <div className="mb-1 flex items-center justify-between gap-2">
@@ -681,7 +691,7 @@ type ProductGroupView = {
 }
 
 type ProductViewMode = 'group' | 'sku'
-type ProductAvailabilityFilter = 'all' | 'available' | 'unavailable'
+type ProductAvailabilityFilter = 'all' | 'visible' | 'hidden' | 'soldOut'
 type ProductStockFilter = 'all' | 'stocked' | 'empty'
 
 const getProductStock = (product: ProductTableProduct) => Math.max(0, Number(product.stock) || 0)
@@ -711,7 +721,9 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
 }) {
     const representative = group.products[0]
     const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
-    const availableCount = group.products.filter(product => product.wholesaleAvailable !== false).length
+    const availableCount = group.products.filter(product => (
+        normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable) === 'VISIBLE'
+    )).length
     const naverProductUrl = getNaverProductUrl(
         group.name,
         group.products.flatMap(product => [product.name, product.nameJP, product.nameEN]),
@@ -748,7 +760,7 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
                         <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[9px] font-black text-blue-700">{group.products.length} SKU</span>
                     </span>
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-black">
-                        <span className="text-emerald-700">발주 가능 {availableCount}</span>
+                        <span className="text-emerald-700">파트너 노출 {availableCount}</span>
                         <span className="text-slate-500">재고 합계 {formatInteger(totalStock)}</span>
                     </span>
                 </button>
@@ -1175,8 +1187,10 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         return products.filter(product => {
             if (classifyProductCatalogCategory(product) !== activeCategory) return false
             if (query && !getProductSearchText(product).includes(query)) return false
-            if (availabilityFilter === 'available' && product.wholesaleAvailable === false) return false
-            if (availabilityFilter === 'unavailable' && product.wholesaleAvailable !== false) return false
+            const partnerStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
+            if (availabilityFilter === 'visible' && partnerStatus !== 'VISIBLE') return false
+            if (availabilityFilter === 'hidden' && partnerStatus !== 'HIDDEN') return false
+            if (availabilityFilter === 'soldOut' && partnerStatus !== 'SOLD_OUT') return false
             if (stockFilter === 'stocked' && getProductStock(product) <= 0) return false
             if (stockFilter === 'empty' && getProductStock(product) > 0) return false
             return true
@@ -1585,23 +1599,30 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         ensureProductChecked(id)
     }, [activeGrade, ensureProductChecked])
 
-    const handleToggleOrderAvailability = useCallback(async (id: string) => {
+    const handlePartnerSaleStatusChange = useCallback(async (id: string, status: PartnerProductStatus) => {
         const product = products.find(p => p.id === id)
         if (!product) return
-        const newValue = product.wholesaleAvailable === false ? true : false
+        const previousStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
+        if (status === previousStatus) return
+        setProducts(prev => prev.map(p => p.id === id ? {
+            ...p,
+            partnerSaleStatus: status,
+            wholesaleAvailable: status === 'VISIBLE',
+        } : p))
         try {
             const res = await fetch(`/api/products/${id}`, {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ wholesaleAvailable: newValue })
+                body: JSON.stringify({ partnerSaleStatus: status })
             })
-            if (res.ok) {
-                setProducts(prev => prev.map(p => p.id === id ? { ...p, wholesaleAvailable: newValue } : p))
-            } else {
-                alert('변경 실패')
-            }
+            if (!res.ok) throw new Error('변경 실패')
         } catch {
-            alert('오류 발생')
+            setProducts(prev => prev.map(p => p.id === id ? {
+                ...p,
+                partnerSaleStatus: product.partnerSaleStatus,
+                wholesaleAvailable: product.wholesaleAvailable,
+            } : p))
+            alert('파트너 노출 상태를 변경하지 못했습니다.')
         }
     }, [products])
 
@@ -1786,7 +1807,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             onMoqChange={handleMoqChange}
             modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
             onOrderUnitChange={handleOrderUnitChange}
-            onToggleOrderAvailability={handleToggleOrderAvailability}
+            onPartnerSaleStatusChange={handlePartnerSaleStatusChange}
         />
     )
 
@@ -1873,11 +1894,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             value={availabilityFilter}
                             onChange={(event) => setAvailabilityFilter(event.target.value as ProductAvailabilityFilter)}
                             className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none sm:flex-none"
-                            title="발주 상태 필터"
+                            title="파트너 노출 상태 필터"
                         >
-                            <option value="all">발주 상태 전체</option>
-                            <option value="available">발주 가능</option>
-                            <option value="unavailable">발주 불가능</option>
+                            <option value="all">파트너 상태 전체</option>
+                            <option value="visible">노출</option>
+                            <option value="hidden">비노출</option>
+                            <option value="soldOut">품절</option>
                         </select>
                         <div
                             className={`flex h-10 w-full items-center justify-center gap-2 overflow-x-auto rounded-xl border px-3 text-[10px] font-black sm:w-auto sm:justify-start sm:text-[11px] ${cnyRateError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-100 bg-red-50 text-red-800'}`}
@@ -2128,7 +2150,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                     onMoqChange={handleMoqChange}
                                     modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
                                     onOrderUnitChange={handleOrderUnitChange}
-                                    onToggleOrderAvailability={handleToggleOrderAvailability}
+                                    onPartnerSaleStatusChange={handlePartnerSaleStatusChange}
                                 />
                             ))}
                         </tbody>
@@ -2213,7 +2235,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                                 onMoqChange={handleMoqChange}
                                                 modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
                                                 onOrderUnitChange={handleOrderUnitChange}
-                                                onToggleOrderAvailability={handleToggleOrderAvailability}
+                                                onPartnerSaleStatusChange={handlePartnerSaleStatusChange}
                                             />
                                         ))}
                                     </tbody>

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { isPartnerProductOrderable } from '@/lib/partnerProductStatus'
 import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
@@ -119,9 +120,9 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 for (const item of orderItems) {
                     const product = await tx.product.findUnique({
                         where: { id: item.productId },
-                        select: { name: true, wholesaleAvailable: true },
+                        select: { name: true, wholesaleAvailable: true, partnerSaleStatus: true },
                     })
-                    if (!product?.wholesaleAvailable) {
+                    if (!product || !isPartnerProductOrderable(product.partnerSaleStatus, product.wholesaleAvailable)) {
                         throw new Error(`현재 발주 불가능한 상품이 포함되어 있습니다: ${product?.name || item.productId}`)
                     }
                 }

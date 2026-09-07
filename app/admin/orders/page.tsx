@@ -92,7 +92,12 @@ export default async function OrdersPage() {
             orderBy: { name: 'asc' },
         }),
         prisma.product.findMany({
-            where: { wholesaleAvailable: true },
+            where: {
+                OR: [
+                    { partnerSaleStatus: 'VISIBLE' },
+                    { partnerSaleStatus: null, wholesaleAvailable: true },
+                ],
+            },
             select: {
                 id: true,
                 name: true,

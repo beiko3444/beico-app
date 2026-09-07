@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import OrderInterface from "./order-interface"
 import { getProductImageUrl } from "@/lib/product-image-url"
+import { normalizePartnerProductStatus } from '@/lib/partnerProductStatus'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +56,13 @@ export default async function NewOrderPage() {
     }
 
     const products = await prisma.product.findMany({
-        where: { wholesaleAvailable: true },
+        where: {
+            OR: [
+                { partnerSaleStatus: 'VISIBLE' },
+                { partnerSaleStatus: 'SOLD_OUT' },
+                { partnerSaleStatus: null, wholesaleAvailable: true },
+            ],
+        },
         orderBy: { sortOrder: 'asc' },
         select: {
             id: true,
@@ -81,6 +88,8 @@ export default async function NewOrderPage() {
             usBuyPrice: true,
             usSellPrice: true,
             regionalPrices: true,
+            wholesaleAvailable: true,
+            partnerSaleStatus: true,
             updatedAt: true,
         },
     })
@@ -169,6 +178,7 @@ export default async function NewOrderPage() {
             usBuyPrice: usBuy,
             usSellPrice: usSell,
             appliedGrade: gradeToUse,
+            partnerSaleStatus: normalizePartnerProductStatus(p.partnerSaleStatus, p.wholesaleAvailable),
             country: user?.country || null
         }
     })

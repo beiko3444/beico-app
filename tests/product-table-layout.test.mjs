@@ -8,7 +8,7 @@ import {
 } from '../lib/productTableColumns.ts'
 
 test('uses the approved business columns by default', () => {
-    assert.deepEqual(DEFAULT_PRODUCT_TABLE_COLUMNS, ['stock', 'safetyStock', 'stockStatus', 'cnyCost', 'cost', 'wholesale', 'retail'])
+    assert.deepEqual(DEFAULT_PRODUCT_TABLE_COLUMNS, ['stock', 'safetyStock', 'stockStatus', 'availability', 'cnyCost', 'cost', 'wholesale', 'retail'])
 })
 
 test('normalizes saved columns and removes duplicates or unknown values', () => {

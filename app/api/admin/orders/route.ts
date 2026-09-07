@@ -6,6 +6,7 @@ import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import { resolvePartnerOrderTerms } from '@/lib/partnerOrderPricing'
 import { prisma } from '@/lib/prisma'
 import { requireAdminSession } from '@/lib/requireAdmin'
+import { isPartnerProductOrderable } from '@/lib/partnerProductStatus'
 
 type DraftItem = {
   productId: string
@@ -24,6 +25,7 @@ const productPricingSelect = {
   orderUnit: true,
   regionalPrices: true,
   wholesaleAvailable: true,
+  partnerSaleStatus: true,
 } as const
 
 export async function POST(request: Request) {
@@ -77,7 +79,7 @@ export async function POST(request: Request) {
         if (!product) {
           throw new AdminOrderError('선택한 상품 중 존재하지 않는 상품이 있습니다.')
         }
-        if (!product.wholesaleAvailable) {
+        if (!isPartnerProductOrderable(product.partnerSaleStatus, product.wholesaleAvailable)) {
           throw new AdminOrderError(`현재 발주 불가능한 상품입니다: ${product.name}`)
         }
 
