@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-export default function ChangePasswordForm() {
+export default function ChangePasswordForm({ isKorean = false }: { isKorean?: boolean }) {
     const [currentPassword, setCurrentPassword] = useState('')
     const [newPassword, setNewPassword] = useState('')
     const [confirmPassword, setConfirmPassword] = useState('')
@@ -14,12 +14,12 @@ export default function ChangePasswordForm() {
         setMessage({ type: '', text: '' })
 
         if (newPassword !== confirmPassword) {
-            setMessage({ type: 'error', text: '新しいパスワード가一致しません。' })
+            setMessage({ type: 'error', text: isKorean ? '새 비밀번호가 일치하지 않습니다.' : '新しいパスワードが一致しません。' })
             return
         }
 
         if (newPassword.length < 6) {
-            setMessage({ type: 'error', text: '新しいパスワードは少なくとも6文字以上である必要があります。' })
+            setMessage({ type: 'error', text: isKorean ? '새 비밀번호는 6자 이상이어야 합니다.' : '新しいパスワードは少なくとも6文字以上である必要があります。' })
             return
         }
 
@@ -35,15 +35,15 @@ export default function ChangePasswordForm() {
             const data = await res.json()
 
             if (res.ok) {
-                setMessage({ type: 'success', text: 'パスワードが正常に変更されました。' })
+                setMessage({ type: 'success', text: isKorean ? '비밀번호가 변경되었습니다.' : 'パスワードが正常に変更されました。' })
                 setCurrentPassword('')
                 setNewPassword('')
                 setConfirmPassword('')
             } else {
-                setMessage({ type: 'error', text: data.error === 'Invalid current password' ? '現在のパスワードが正しくありません。' : (data.error || 'パスワードの変更に失敗しました。') })
+                setMessage({ type: 'error', text: data.error === 'Invalid current password' ? (isKorean ? '현재 비밀번호가 올바르지 않습니다.' : '現在のパスワードが正しくありません。') : (isKorean ? '비밀번호 변경에 실패했습니다.' : (data.error || 'パスワードの変更に失敗しました。')) })
             }
-        } catch (error) {
-            setMessage({ type: 'error', text: 'エラーが発生しました。' })
+        } catch {
+            setMessage({ type: 'error', text: isKorean ? '오류가 발생했습니다.' : 'エラーが発生しました。' })
         } finally {
             setLoading(false)
         }
@@ -57,26 +57,26 @@ export default function ChangePasswordForm() {
                     const target = e.target as HTMLElement;
                     if (target.tagName === 'INPUT') {
                         e.preventDefault();
-                        handleSubmit(e as any);
+                        e.currentTarget.requestSubmit();
                     }
                 }
             }}
             className="space-y-6"
         >
             <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">現在のパスワード / Current Password</label>
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">{isKorean ? '현재 비밀번호' : '現在のパスワード / Current Password'}</label>
                 <input
                     type="password"
                     required
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
                     className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
-                    placeholder="現在のパスワードを入力してください。"
+                    placeholder={isKorean ? '현재 비밀번호를 입력해주세요.' : '現在のパスワードを入力してください。'}
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">新しいパスワード / New Password</label>
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">{isKorean ? '새 비밀번호' : '新しいパスワード / New Password'}</label>
                 <input
                     type="password"
                     required
@@ -84,12 +84,12 @@ export default function ChangePasswordForm() {
                     onChange={(e) => setNewPassword(e.target.value)}
                     className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     minLength={6}
-                    placeholder="新しいパスワード（6文字以上）"
+                    placeholder={isKorean ? '새 비밀번호(6자 이상)' : '新しいパスワード（6文字以上）'}
                 />
             </div>
 
             <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">パスワード確認 / Confirm Password</label>
+                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">{isKorean ? '새 비밀번호 확인' : 'パスワード確認 / Confirm Password'}</label>
                 <input
                     type="password"
                     required
@@ -97,7 +97,7 @@ export default function ChangePasswordForm() {
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     minLength={6}
-                    placeholder="新しいパスワードをもう一度入力してください。"
+                    placeholder={isKorean ? '새 비밀번호를 다시 입력해주세요.' : '新しいパスワードをもう一度入力してください。'}
                 />
             </div>
 
@@ -112,7 +112,7 @@ export default function ChangePasswordForm() {
                 disabled={loading}
                 className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center font-bold text-[15px] tracking-wide disabled:opacity-70 mt-2"
             >
-                {loading ? 'Processing...' : 'パスワード変更 / Change Password'}
+                {loading ? (isKorean ? '변경 중...' : 'Processing...') : (isKorean ? '비밀번호 변경' : 'パスワード変更 / Change Password')}
             </button>
         </form>
     )

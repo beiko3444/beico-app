@@ -31,12 +31,24 @@ const safeText = (value: unknown, fallback = '') => {
     return typeof value === 'string' && value.trim() ? value : fallback
 }
 
+type RegionalPriceCell = {
+    wholesale?: unknown
+    retail?: unknown
+    moq?: unknown
+    orderUnit?: unknown
+}
+
+type RegionalGradePrices = {
+    KR?: RegionalPriceCell
+    JP?: RegionalPriceCell
+    US?: RegionalPriceCell
+}
+
 export default async function NewOrderPage() {
     const session = await getServerSession(authOptions)
 
     // Fetch User Info
     let userGrade = 'C'
-    let userName = ''
     const user = session?.user?.id ? await prisma.user.findUnique({
         where: { id: session.user.id },
         select: {
@@ -52,7 +64,6 @@ export default async function NewOrderPage() {
 
     if (user) {
         userGrade = user?.partnerProfile?.grade || 'C'
-        userName = user?.name || ''
     }
 
     const products = await prisma.product.findMany({
@@ -98,7 +109,7 @@ export default async function NewOrderPage() {
     const productsWithTieredPrice = products.map(p => {
         let finalPrice = safeNonNegativeNumber(p.sellPrice);
 
-        let regional = (p as any).regionalPrices as any;
+        const regional = p.regionalPrices as Record<string, RegionalGradePrices> | null;
         const validGrades = ['A', 'B', 'C', 'D'];
         let gradeToUse = userGrade.toUpperCase();
         if (!validGrades.includes(gradeToUse)) gradeToUse = 'C';
@@ -109,7 +120,7 @@ export default async function NewOrderPage() {
         let currentMoq = safePositiveInt(p.minOrderQuantity, 1);
         let currentOrderUnit = safePositiveInt(p.orderUnit, 1);
 
-        const parsePrices = (gradeData: any) => {
+        const parsePrices = (gradeData: RegionalGradePrices | undefined) => {
             krBuy = safeNonNegativeNumber(gradeData?.KR?.wholesale);
             krSell = safeNonNegativeNumber(gradeData?.KR?.retail);
             jpBuy = safeNonNegativeNumber(gradeData?.JP?.wholesale);
@@ -183,17 +194,5 @@ export default async function NewOrderPage() {
         }
     })
 
-    return (
-        <div className="ux-page-stack">
-            <div className="flex flex-col justify-between gap-2 sm:flex-row sm:items-end">
-                <div className="text-left">
-                    <h1 className="ux-page-title">
-                        商品リスト
-                    </h1>
-                    <p className="ux-helper mt-1">商品を選択して数量を入力してください。</p>
-                </div>
-            </div>
-            <OrderInterface products={productsWithTieredPrice} />
-        </div>
-    )
+    return <OrderInterface products={productsWithTieredPrice} isKorean={user?.country === 'Korea'} />
 }

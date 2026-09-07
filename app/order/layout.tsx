@@ -5,8 +5,8 @@ import { redirect } from "next/navigation"
 import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
-import PartnerNoticePopup, { type PartnerNoticePopupItem } from '@/components/PartnerNoticePopup'
-import PartnerNoticeBoard from '@/components/PartnerNoticeBoard'
+import PartnerNoticeBoard, { type PartnerNoticeBoardItem } from '@/components/PartnerNoticeBoard'
+import { LogOut } from 'lucide-react'
 
 export default async function OrderLayout({
     children,
@@ -23,7 +23,7 @@ export default async function OrderLayout({
     let businessNameJP = session.user.name || session.user.email || "Partner"
 
     let country = ""
-    let activeNotices: PartnerNoticePopupItem[] = []
+    let activeNotices: PartnerNoticeBoardItem[] = []
 
     if (session?.user?.id) {
         const user = await prisma.user.findUnique({
@@ -73,47 +73,48 @@ export default async function OrderLayout({
     }
 
     const countryDisplay =
-        country === 'Korea' ? '🇰🇷 韓国 KR' :
+        country === 'Korea' ? '🇰🇷 대한민국 KR' :
             country === 'Japan' ? '🇯🇵 日本 JP' :
                 country === 'USA' ? '🇺🇸 米国 US' :
                     country === 'China' ? '🇨🇳 中国 CN' :
                         country === 'Turkey' ? '🇹🇷 Türkiye TR' :
                             country === 'Indonesia' ? '🇮🇩 ID' :
                                 country
+    const isKorean = country === 'Korea'
 
     return (
         <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)]">
-            <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--card)]/95 shadow-[0_1px_2px_rgba(16,24,40,0.06)] backdrop-blur">
-                <div className="mx-auto flex h-16 max-w-[1440px] items-center gap-3 px-3 sm:px-5 lg:px-7">
+            <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[var(--card)]/95 shadow-[0_2px_10px_rgba(16,24,40,0.05)] backdrop-blur">
+                <div className="mx-auto flex h-[72px] max-w-[1440px] items-center gap-3 px-3 sm:h-[78px] sm:px-5 lg:px-7">
                     <Link href="/order" className="flex shrink-0 items-center no-underline" aria-label="주문 홈">
-                        <img src="/logo.png" alt="BEIKO BAIT" className="h-auto w-[62px] object-contain" />
+                        <img src="/logo.png" alt="BEIKO BAIT" className="h-auto w-[68px] object-contain sm:w-[84px]" />
                     </Link>
 
                     <div className="hidden min-w-0 flex-1 items-center justify-center sm:flex">
-                        <UserNavbar />
+                        <UserNavbar isKorean={isKorean} />
                     </div>
 
-                    <div className="ml-auto flex min-w-0 items-center gap-2 sm:ml-0">
-                        <div className="min-w-0 text-right">
-                            <div className="max-w-[170px] truncate text-[12px] font-extrabold text-[var(--foreground)]">{businessNameJP}</div>
+                    <div className="ml-auto flex min-w-0 items-center gap-2 sm:ml-0 sm:gap-3">
+                        <div className="min-w-0 text-right leading-tight">
+                            <div className="max-w-[128px] truncate text-[11px] font-extrabold text-[var(--foreground)] sm:max-w-[170px] sm:text-[12px]">{businessNameJP}</div>
                             {(countryDisplay || country) ? (
-                                <div className="mt-0.5 text-[10px] font-semibold text-[var(--muted-foreground)]">{countryDisplay || country}</div>
+                                <div className="mt-1 text-[9px] font-semibold text-[var(--muted-foreground)] sm:text-[10px]">{countryDisplay || country}</div>
                             ) : null}
                         </div>
-                        <LogoutButton className="rounded-md border border-[var(--border-strong)] bg-[var(--card)] text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)]">
-                            <span className="hidden md:inline">ログアウト</span>
+                        <LogoutButton className="h-10 rounded-xl border border-[var(--border-strong)] bg-[var(--card)] px-3 text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)] sm:h-12 sm:px-5">
+                            <LogOut size={17} className="md:hidden" />
+                            <span className="hidden md:inline">{isKorean ? '로그아웃' : 'ログアウト'}</span>
                         </LogoutButton>
                     </div>
                 </div>
             </header>
 
-            <main className="ux-page mx-auto max-w-[1440px] px-3 pb-24 pt-4 sm:px-5 sm:pb-10 lg:px-7">
-                <PartnerNoticeBoard notices={activeNotices} />
+            <main className="ux-page mx-auto max-w-[1440px] px-3 pb-24 pt-5 sm:px-5 sm:pb-10 sm:pt-7 lg:px-7">
+                <PartnerNoticeBoard notices={activeNotices} isKorean={isKorean} />
                 {children}
             </main>
-            <PartnerNoticePopup notices={activeNotices} />
             <div className="sm:hidden">
-                <UserNavbar />
+                <UserNavbar isKorean={isKorean} />
             </div>
         </div>
     )

@@ -171,7 +171,7 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
               <Megaphone size={19} />
             </div>
             <div>
-              <h1 className="text-xl font-black text-slate-950 dark:text-white">파트너 팝업 공지</h1>
+              <h1 className="text-xl font-black text-slate-950 dark:text-white">파트너 공지</h1>
               <p className="mt-0.5 text-xs font-medium text-slate-500">현재 파트너에게 노출 중인 공지 {liveCount}개</p>
             </div>
           </div>
@@ -189,7 +189,7 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
         <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-20 text-center dark:border-[#333] dark:bg-[#1e1e1e]">
           <Megaphone className="mx-auto text-slate-300" size={38} />
           <p className="mt-4 text-base font-black text-slate-700 dark:text-slate-200">등록된 공지가 없습니다.</p>
-          <p className="mt-1 text-sm text-slate-400">새 공지를 등록하면 파트너 주문 화면에 팝업으로 표시됩니다.</p>
+          <p className="mt-1 text-sm text-slate-400">새 공지를 등록하면 파트너 상품 목록 상단의 공지사항 영역에 표시됩니다.</p>
         </div>
       ) : (
         <div className="grid gap-4 xl:grid-cols-2">

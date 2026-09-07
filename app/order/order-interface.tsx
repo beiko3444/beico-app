@@ -3,7 +3,7 @@
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
-import { Minus, Plus, ArrowRight } from 'lucide-react'
+import { Minus, Plus, ArrowRight, Search, PackageSearch, CircleAlert } from 'lucide-react'
 import { isPartnerProductOrderable, normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 
 type Product = {
@@ -116,14 +116,108 @@ const normalizeProduct = (product: Product): SafeProduct | null => {
     }
 }
 
-export default function OrderInterface({ products }: { products?: Product[] | null }) {
+export default function OrderInterface({ products, isKorean = false }: { products?: Product[] | null; isKorean?: boolean }) {
     const router = useRouter()
     const [quantities, setQuantities] = useState<Record<string, number>>({})
     const [showSummary, setShowSummary] = useState(false)
+    const [searchQuery, setSearchQuery] = useState('')
+    const [statusFilter, setStatusFilter] = useState<'ALL' | 'AVAILABLE' | 'SOLD_OUT'>('ALL')
     const safeProducts = useMemo(
         () => (Array.isArray(products) ? products.map(normalizeProduct).filter((product): product is SafeProduct => Boolean(product)) : []),
         [products],
     )
+    const copy = isKorean ? {
+        productList: '상품 목록',
+        productListHelper: '원하는 상품을 검색하고 수량을 입력해 주세요.',
+        searchPlaceholder: '상품명 · 상품코드 · 바코드 검색',
+        allProducts: '전체 상품',
+        availableOnly: '주문 가능',
+        soldOutOnly: '품절 상품',
+        noResults: '검색 조건에 맞는 상품이 없습니다.',
+        resultCount: '개 상품',
+        productCode: '상품코드:',
+        noImage: '이미지 없음',
+        noBarcode: '바코드 없음',
+        soldOut: '품절',
+        soldOutSub: '주문 불가',
+        wholesaleKr: '도매 가격',
+        retailKr: '권장 판매가',
+        krPriceSub: '한국 기준',
+        orderStatus: '주문 상태',
+        orderStatusSub: '발주 가능 여부',
+        available: '주문 가능',
+        margin: '마진율',
+        marginSub: '예상 마진',
+        minimumOrder: '최소 주문 수량',
+        minimumOrderSub: '최소 수량',
+        orderUnit: '주문 단위',
+        totalExcludingTax: '합계 금액 (부가세 별도)',
+        totalExcludingTaxSub: '상품 합계',
+        orderNow: '주문하기',
+        orderNowSub: '선택 상품 주문',
+        summaryTitle: '주문 내용 확인',
+        summarySub: '최종 주문 확인',
+        shipping: '배송비',
+        supply: '공급가액',
+        tax: '부가세 (10%)',
+        total: '총 결제금액',
+        confirmOrder: '주문 확정',
+        soldOutNotice: '현재 품절된 상품입니다. 재입고 일정은 공지사항으로 안내됩니다.',
+        soldOutOrderDisabled: '품절 상품은 주문할 수 없습니다.',
+    } : {
+        productList: '商品リスト',
+        productListHelper: 'ご希望の商品を検索して数量を入力してください。',
+        searchPlaceholder: '商品名・商品コード・バーコードで検索',
+        allProducts: '全商品',
+        availableOnly: '注文可能',
+        soldOutOnly: '品切れ',
+        noResults: '検索条件に一致する商品がありません。',
+        resultCount: '商品',
+        productCode: 'Product Code:',
+        noImage: 'No Image',
+        noBarcode: 'No Barcode',
+        soldOut: '品切れ',
+        soldOutSub: 'SOLD OUT',
+        wholesaleKr: '卸売価格 韓国',
+        retailKr: '小売価格 韓国',
+        krPriceSub: 'KOREA',
+        orderStatus: '注文状態',
+        orderStatusSub: 'Order Status',
+        available: '注文可能',
+        margin: 'マージン',
+        marginSub: 'Margin%',
+        minimumOrder: '最小注文数量',
+        minimumOrderSub: 'Min Order',
+        orderUnit: 'Order Unit',
+        totalExcludingTax: '合計金額 (税抜)',
+        totalExcludingTaxSub: 'Total (Excl. Tax)',
+        orderNow: '今すぐ注文する',
+        orderNowSub: 'ORDER NOW',
+        summaryTitle: '注文内容の確認',
+        summarySub: 'Order Summary',
+        shipping: '配送料 (Shipping)',
+        supply: '供給価額 (Supply)',
+        tax: '消費税 (10%)',
+        total: '合計金額',
+        confirmOrder: '注文を確定する',
+        soldOutNotice: '現在品切れです。再入荷時期はお知らせにてご案内します。',
+        soldOutOrderDisabled: '品切れ商品のため注文できません。',
+    }
+    const displayProductName = (product: SafeProduct) => isKorean ? product.name : (product.nameJP || product.name)
+    const filteredProducts = useMemo(() => {
+        const normalizedQuery = searchQuery.trim().toLocaleLowerCase()
+
+        return safeProducts.filter((product) => {
+            const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
+            if (statusFilter === 'AVAILABLE' && isSoldOut) return false
+            if (statusFilter === 'SOLD_OUT' && !isSoldOut) return false
+            if (!normalizedQuery) return true
+
+            return [product.name, product.nameJP, product.nameEN, product.productCode, product.barcode]
+                .filter(Boolean)
+                .some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))
+        })
+    }, [safeProducts, searchQuery, statusFilter])
 
     const handleQuantityChange = (productId: string, value: string | number) => {
         const qty = safeNonNegativeInt(value)
@@ -143,10 +237,14 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                 const qty = safeNonNegativeInt(quantities[p.id]);
                 return qty > 0 && qty < p.minOrderQuantity;
             })
-            .map(p => `- ${p.name}: 주문 ${formatNumber(quantities[p.id])}개 / 최소 ${formatNumber(p.minOrderQuantity)}개`);
+            .map(p => isKorean
+                ? `- ${displayProductName(p)}: 주문 ${formatNumber(quantities[p.id])}개 / 최소 ${formatNumber(p.minOrderQuantity)}개`
+                : `- ${displayProductName(p)}: 注文 ${formatNumber(quantities[p.id])}個 / 最小 ${formatNumber(p.minOrderQuantity)}個`);
 
         if (minimumViolations.length > 0) {
-            alert(`최소 주문 수량이 미달된 상품이 있습니다:\n\n${minimumViolations.join('\n')}\n\n최소 주문 수량 이상으로 주문해 주세요.`);
+            alert(isKorean
+                ? `최소 주문 수량이 미달된 상품이 있습니다:\n\n${minimumViolations.join('\n')}\n\n최소 주문 수량 이상으로 주문해 주세요.`
+                : `最小注文数量に満たない商品があります:\n\n${minimumViolations.join('\n')}\n\n最小注文数量以上を入力してください。`);
             return;
         }
 
@@ -157,10 +255,14 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                 const orderUnit = p.orderUnit;
                 return qty > 0 && qty % orderUnit !== 0;
             })
-            .map(p => `- ${p.name}: 주문 ${formatNumber(quantities[p.id])}개 / 주문 단위 ${formatNumber(p.orderUnit)}개`);
+            .map(p => isKorean
+                ? `- ${displayProductName(p)}: 주문 ${formatNumber(quantities[p.id])}개 / 주문 단위 ${formatNumber(p.orderUnit)}개`
+                : `- ${displayProductName(p)}: 注文 ${formatNumber(quantities[p.id])}個 / 注文単位 ${formatNumber(p.orderUnit)}個`);
 
         if (unitViolations.length > 0) {
-            alert(`주문 단위에 맞지 않는 상품이 있습니다:\n\n${unitViolations.join('\n')}\n\n설정된 주문 단위의 배수로 주문해 주세요.`);
+            alert(isKorean
+                ? `주문 단위에 맞지 않는 상품이 있습니다:\n\n${unitViolations.join('\n')}\n\n설정된 주문 단위의 배수로 주문해 주세요.`
+                : `注文単位に合わない商品があります:\n\n${unitViolations.join('\n')}\n\n設定された注文単位の倍数を入力してください。`);
             return;
         }
         setShowSummary(true);
@@ -188,257 +290,196 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
 
 
     return (
-        <div className="pb-32 space-y-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                {safeProducts.map((product, index) => {
-                    const qty = safeNonNegativeInt(quantities[product.id])
-                    const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
-                    const orderUnit = product.orderUnit
-                    const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice;
-                    const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice;
-                    const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : 0;
+        <div className="space-y-6 pb-32">
+            <section aria-labelledby="partner-product-list-title" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <h1 id="partner-product-list-title" className="text-2xl font-black text-slate-950 sm:text-3xl dark:text-white">{copy.productList}</h1>
+                    <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{copy.productListHelper}</p>
+                </div>
+                <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                    <label className="relative block min-w-0 flex-1 lg:w-[360px]">
+                        <span className="sr-only">{copy.searchPlaceholder}</span>
+                        <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+                        <input
+                            type="search"
+                            value={searchQuery}
+                            onChange={(event) => setSearchQuery(event.target.value)}
+                            placeholder={copy.searchPlaceholder}
+                            className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-semibold text-slate-900 shadow-sm placeholder:font-medium dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                        />
+                    </label>
+                    <select
+                        aria-label={isKorean ? '상품 상태 필터' : '商品状態フィルター'}
+                        value={statusFilter}
+                        onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'AVAILABLE' | 'SOLD_OUT')}
+                        className="h-12 min-w-[150px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                    >
+                        <option value="ALL">{copy.allProducts}</option>
+                        <option value="AVAILABLE">{copy.availableOnly}</option>
+                        <option value="SOLD_OUT">{copy.soldOutOnly}</option>
+                    </select>
+                </div>
+            </section>
 
-                    return (
-                        <div
-                            key={product.id}
-                            data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'}
-                            className={`rounded-lg overflow-hidden border flex flex-col h-full transition-all duration-300 relative ${isSoldOut
-                                ? 'border-2 border-rose-300 bg-slate-50 shadow-none dark:border-rose-900/80 dark:bg-[#1a1818]'
-                                : 'border-gray-100 bg-white shadow-lg shadow-gray-300/50 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none'
-                                }`}
-                        >
-                            {isSoldOut && (
-                                <div
-                                    role="status"
-                                    aria-label="품절 상품"
-                                    className="absolute inset-x-0 top-0 z-10 flex h-9 items-center justify-end gap-2 bg-rose-600 px-4 text-white dark:bg-rose-800"
-                                >
-                                    <span className="text-xs font-black tracking-wide">품절 · 品切れ</span>
-                                    <span className="rounded-full bg-white/20 px-2 py-0.5 text-[9px] font-black tracking-[0.16em]">SOLD OUT</span>
-                                </div>
-                            )}
-                            {/* Product Index Number */}
-                            <div className={`absolute left-3 top-2 z-20 text-[10px] font-bold font-inter ${isSoldOut ? 'text-white/90' : 'text-gray-600 dark:text-gray-400'}`}>
-                                {String(index + 1).padStart(3, '0')}
-                            </div>
-                            <div className={`px-8 flex-1 ${isSoldOut ? 'pt-14' : 'pt-8'}`}>
-                                <div className="flex gap-6 mb-6">
-                                    {/* Image Container */}
-                                    <div className={`w-[120px] h-[120px] rounded-xl flex-shrink-0 p-1 flex items-center justify-center relative overflow-hidden ${isSoldOut
-                                        ? 'bg-slate-200 ring-2 ring-rose-200 dark:bg-[#2a2525] dark:ring-rose-900/70'
-                                        : 'bg-[#f1f3f5] dark:bg-[#2a2a2a]'
-                                        }`}>
-                                        {product.imageUrl ? (
-                                            <img
-                                                src={product.imageUrl}
-                                                alt={product.name}
-                                                className={`max-h-full max-w-full object-contain mix-blend-multiply transition-transform group-hover:scale-110 ${isSoldOut ? 'grayscale opacity-40' : ''}`}
-                                            />
-                                        ) : (
-                                            <div className="text-xs text-gray-300 dark:text-gray-500 font-bold uppercase tracking-widest">No Image</div>
-                                        )}
-                                        {isSoldOut && (
-                                            <div aria-hidden="true" className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/25 dark:bg-black/20">
-                                                <span className="-rotate-12 rounded border-2 border-rose-600 bg-white/90 px-3 py-1 text-[11px] font-black tracking-[0.14em] text-rose-700 shadow-sm dark:bg-[#211b1b]/90 dark:text-rose-300">
-                                                    SOLD OUT
-                                                </span>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Header Info */}
-                                    <div className="min-w-0 flex-1 pt-1 space-y-1">
-                                        <h3 className={`text-lg font-black leading-tight truncate tracking-tight ${isSoldOut ? 'text-slate-500 dark:text-slate-400' : 'text-black dark:text-white'}`}>
-                                            {product.nameJP || product.name}
-                                        </h3>
-                                        <p className={`text-[13px] font-medium uppercase tracking-normal truncate ${isSoldOut ? 'text-slate-400 dark:text-slate-500' : 'text-black dark:text-white'}`}>
-                                            {product.nameEN || product.name}
-                                        </p>
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-[11px] font-bold text-black dark:text-white uppercase tracking-normal">Product Code:</span>
-                                            <span className="text-[11px] font-medium text-black dark:text-white uppercase tracking-tighter font-inter">{product.productCode || '-'}</span>
-                                        </div>
-
-                                        {/* Barcode Section with Download Buttons */}
-                                        {product.barcode ? (
-                                            <div className="pt-0.5">
-                                                <BarcodeDisplay
-                                                    value={product.barcode}
-                                                    width={0.8}
-                                                    height={24}
-                                                    displayValue={false}
-                                                    containerClassName="gap-3 mb-1"
-                                                    buttonClassName="px-2 py-0.5 bg-gray-50 dark:bg-[#1a1a1a] text-[9px] font-medium text-gray-400 dark:text-gray-500 rounded-md hover:bg-[#e34219] hover:text-white hover:border-[#e34219] border border-gray-200 dark:border-[#2a2a2a] transition-all uppercase"
-                                                />
-                                                <p className="text-[10px] font-medium text-black dark:text-white font-inter mt-1 tracking-widest">{product.barcode}</p>
-                                            </div>
-                                        ) : (
-                                            <div className="pt-0.5">
-                                                <span className="text-[9px] font-bold text-gray-300 dark:text-gray-500 uppercase tracking-widest">No Barcode</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* Info Grid - Conditional Display by Country */}
-                                <div className="bg-[#f1f3f5] dark:bg-[#2a2a2a] rounded-md overflow-hidden mb-4 border border-gray-300 dark:border-[#3a3a3a] dark:border-[#3a3a3a]">
-                                    {/* US Pricing - Shown for "Other" countries or non-Korea/Japan */}
-                                    {(!product.country || (product.country !== 'Korea' && product.country !== 'Japan')) && (
-                                        <div className="grid grid-cols-2 border-b border-gray-300 dark:border-[#3a3a3a]">
-                                            <div className="py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a]">
-                                                <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black dark:text-white leading-tight">卸売価格 米国</span>
-                                                    <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">wholesale US</span>
-                                                </div>
-                                                <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">$</span>{formatNumber(product.usBuyPrice, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </p>
-                                            </div>
-                                            <div className="py-1.5 px-4">
-                                                <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black dark:text-white leading-tight">小売価格 米国</span>
-                                                    <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Retail Price US</span>
-                                                </div>
-                                                <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">$</span>{formatNumber(product.usSellPrice, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* JP Pricing - Shown only for JP users */}
-                                    {product.country === 'Japan' && (
-                                        <div className="grid grid-cols-2 border-b border-gray-300 dark:border-[#3a3a3a]">
-                                            <div className="py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a]">
-                                                <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black dark:text-white leading-tight">卸売価格 日本</span>
-                                                    <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">wholesale JP</span>
-                                                </div>
-                                                <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">¥</span>{formatNumber(product.jpBuyPrice)}
-                                                </p>
-                                            </div>
-                                            <div className="py-1.5 px-4">
-                                                <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black dark:text-white leading-tight">小売価格 日本</span>
-                                                    <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Retail Price JP</span>
-                                                </div>
-                                                <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.85em] mr-0.5">¥</span>{formatNumber(product.jpSellPrice)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* KR Pricing - Shown only for KR users */}
-                                    {product.country === 'Korea' && (
-                                        <div className="grid grid-cols-2 border-b border-gray-300 dark:border-[#3a3a3a]">
-                                            <div className="py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a]">
-                                                <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black dark:text-white leading-tight">卸売価格 韓国</span>
-                                                    <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">wholesale KR</span>
-                                                </div>
-                                                <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.7em] mr-0.5">₩</span>{formatNumber(product.krBuyPrice)}
-                                                </p>
-                                            </div>
-                                            <div className="py-1.5 px-4">
-                                                <div className="flex flex-col mb-0.5">
-                                                    <span className="text-[11px] font-black text-black dark:text-white leading-tight">小売가격 韓国</span>
-                                                    <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Retail Price KR</span>
-                                                </div>
-                                                <p className="text-[22px] font-medium text-gray-900 dark:text-white leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                    <span className="text-[0.7em] mr-0.5">₩</span>{formatNumber(product.krSellPrice)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Order Availability & Margin */}
-                                    <div className="grid grid-cols-2">
-                                        <div className={`py-1.5 px-4 border-r border-gray-300 dark:border-[#3a3a3a] ${isSoldOut ? 'bg-rose-50 dark:bg-rose-950/20' : ''}`}>
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black dark:text-white leading-tight">注文状態</span>
-                                                <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Order Status</span>
-                                            </div>
-                                            <p className={`text-[18px] font-black leading-none text-right ${isSoldOut ? 'text-rose-700 dark:text-rose-400' : 'text-emerald-600'}`}>
-                                                {isSoldOut ? '품절 · 品切れ' : '注文可能'}
-                                            </p>
-                                        </div>
-                                        <div className="py-1.5 px-4">
-                                            <div className="flex flex-col mb-0.5">
-                                                <span className="text-[11px] font-black text-black dark:text-white leading-tight">マージン</span>
-                                                <span className="text-[8px] font-bold text-black dark:text-white uppercase tracking-widest leading-none">Margin%</span>
-                                            </div>
-                                            <p className="text-[22px] font-medium text-[#e34219] leading-none tabular-nums font-inter tracking-tighter text-right">
-                                                {marginPercent}%
-                                            </p>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Order Control Area */}
-                            <div className="px-8 pb-8 flex items-center justify-between gap-6 pt-0">
-                                <div className="flex flex-col">
-                                    <span className="text-[11px] font-black text-[#e34219] uppercase tracking-widest leading-tight">最小注文数量</span>
-                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Min Order: {formatNumber(product.minOrderQuantity)}ea</span>
-                                    <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500 uppercase tracking-widest leading-none mt-1">Order Unit: {formatNumber(orderUnit)}ea</span>
-                                </div>
-
-                                <div className="flex flex-col items-end gap-2">
-                                    {isSoldOut ? (
-                                        <div className="min-w-[170px] rounded-lg border-2 border-rose-300 bg-rose-50 px-5 py-2.5 text-center text-rose-700 dark:border-rose-900/80 dark:bg-rose-950/20 dark:text-rose-300">
-                                            <p className="text-sm font-black leading-tight">품절 · 品切れ</p>
-                                            <p className="mt-1 text-[9px] font-black tracking-[0.14em]">SOLD OUT · 주문 불가</p>
-                                        </div>
-                                    ) : (
-                                    <div className={`flex items-center border rounded-md overflow-hidden shadow-sm dark:shadow-none transition-all duration-300 ${qty === 0
-                                        ? 'bg-white dark:bg-[#1e1e1e] border-gray-200 dark:border-[#2a2a2a]'
-                                        : qty < product.minOrderQuantity
-                                            ? 'bg-[#fff5f5] dark:bg-[#2a1a1a] border-[#e34219]'
-                                            : 'bg-[#fff7f3] dark:bg-[#2a1a1a] border-[#e34219]'
-                                        }`}>
-                                        <button
-                                            onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))}
-                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
-                                                ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
-                                                : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                }`}
-                                        >
-                                            <Minus size={14} strokeWidth={2.5} />
-                                        </button>
-                                        <input
-                                            type="text"
-                                            value={formatNumber(qty)}
-                                            onChange={(e) => {
-                                                const val = e.target.value.replace(/,/g, '')
-                                                if (/^\d*$/.test(val)) {
-                                                    handleQuantityChange(product.id, val)
-                                                }
-                                            }}
-                                            className={`w-16 h-9 text-center font-bold text-lg bg-transparent outline-none font-inter ${qty === 0
-                                                ? 'text-[#1e293b] dark:text-white'
-                                                : 'text-[#e34219]'
-                                                }`}
-                                        />
-                                        <button
-                                            onClick={() => handleQuantityChange(product.id, qty + orderUnit)}
-                                            className={`w-9 h-9 flex items-center justify-center transition-colors ${qty === 0
-                                                ? 'text-black dark:text-white hover:bg-gray-50 dark:hover:bg-[#252525]'
-                                                : 'text-[#e34219] hover:bg-[#ffebeb] dark:hover:bg-[#3a1a1a]'
-                                                }`}
-                                        >
-                                            <Plus size={14} strokeWidth={2.5} />
-                                        </button>
-                                    </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    )
-                })}
+            <div className="flex items-center justify-between border-b border-slate-200 pb-3 text-xs font-bold text-slate-400 dark:border-slate-800">
+                <span>{filteredProducts.length.toLocaleString()} {copy.resultCount}</span>
+                {searchQuery || statusFilter !== 'ALL' ? (
+                    <button
+                        type="button"
+                        onClick={() => {
+                            setSearchQuery('')
+                            setStatusFilter('ALL')
+                        }}
+                        className="text-[#d9361b] hover:text-[#b92c16]"
+                    >
+                        {isKorean ? '검색 조건 초기화' : '検索条件をリセット'}
+                    </button>
+                ) : null}
             </div>
+
+            {filteredProducts.length === 0 ? (
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center dark:border-slate-700 dark:bg-slate-900">
+                    <PackageSearch size={34} className="text-slate-300 dark:text-slate-600" />
+                    <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">{copy.noResults}</p>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                    {filteredProducts.map((product, index) => {
+                        const qty = safeNonNegativeInt(quantities[product.id])
+                        const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
+                        const orderUnit = product.orderUnit
+                        const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice
+                        const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice
+                        const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : '0.0'
+                        const priceSymbol = product.country === 'Korea' ? '₩' : product.country === 'Japan' ? '¥' : '$'
+                        const priceOptions = product.country !== 'Korea' && product.country !== 'Japan'
+                            ? { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                            : undefined
+                        const wholesaleLabel = product.country === 'Korea' ? copy.wholesaleKr : product.country === 'Japan' ? '卸売価格 日本' : '卸売価格 米国'
+                        const retailLabel = product.country === 'Korea' ? copy.retailKr : product.country === 'Japan' ? '小売価格 日本' : '小売価格 米国'
+                        const regionLabel = product.country === 'Korea' ? copy.krPriceSub : product.country === 'Japan' ? 'JAPAN' : 'UNITED STATES'
+
+                        return (
+                            <article
+                                key={product.id}
+                                data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'}
+                                className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_14px_36px_rgba(15,23,42,0.10)] dark:bg-slate-900 ${isSoldOut ? 'border-rose-200 dark:border-rose-900/80' : 'border-slate-200 dark:border-slate-800'}`}
+                            >
+                                <div className="flex flex-1 flex-col p-4 sm:p-5">
+                                    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
+                                        <div className="flex min-h-[142px] items-center justify-center overflow-hidden rounded-xl bg-slate-100 p-2 sm:min-h-[184px] dark:bg-slate-800">
+                                            {product.imageUrl ? (
+                                                <img src={product.imageUrl} alt={product.name} className="max-h-[168px] max-w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03] dark:mix-blend-normal" />
+                                            ) : (
+                                                <span className="text-center text-[10px] font-bold text-slate-400">{copy.noImage}</span>
+                                            )}
+                                        </div>
+
+                                        <div className="min-w-0">
+                                            <div className="flex items-start justify-between gap-2">
+                                                <span
+                                                    role="status"
+                                                    aria-label={isSoldOut ? (isKorean ? '품절 상품' : '品切れ商品') : (isKorean ? '주문 가능 상품' : '注文可能商品')}
+                                                    className={`inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-[11px] font-black ${isSoldOut ? 'bg-rose-500 text-white' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900'}`}
+                                                >
+                                                    {isSoldOut ? `${copy.soldOut} · ${copy.soldOutSub}` : copy.available}
+                                                </span>
+                                                <span className="pt-1 text-[10px] font-bold tabular-nums text-slate-300 dark:text-slate-600">{String(index + 1).padStart(3, '0')}</span>
+                                            </div>
+                                            <h2 className="mt-3 line-clamp-2 text-base font-black leading-snug text-slate-950 sm:text-lg dark:text-white">{displayProductName(product)}</h2>
+                                            {!isKorean ? <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-400">{product.nameEN || product.name}</p> : null}
+                                            <p className="mt-3 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                                {copy.productCode} <span className="font-mono text-slate-800 dark:text-slate-200">{product.productCode || '-'}</span>
+                                            </p>
+
+                                            {product.barcode ? (
+                                                <div className="mt-2 max-w-full overflow-hidden">
+                                                    <BarcodeDisplay
+                                                        value={product.barcode}
+                                                        width={0.8}
+                                                        height={25}
+                                                        displayValue={false}
+                                                        containerClassName="gap-2 mb-1"
+                                                        buttonClassName="rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-bold text-slate-500 transition-colors hover:border-[#d9361b] hover:bg-[#d9361b] hover:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                                                    />
+                                                    <p className="mt-1 font-mono text-[10px] font-semibold text-slate-500">{product.barcode}</p>
+                                                </div>
+                                            ) : (
+                                                <p className="mt-3 text-[10px] font-bold text-slate-300 dark:text-slate-600">{copy.noBarcode}</p>
+                                            )}
+                                        </div>
+                                    </div>
+
+                                    {isSoldOut ? (
+                                        <div className="mt-4 flex items-start gap-2 rounded-xl bg-rose-50 px-4 py-3 text-xs font-semibold leading-5 text-rose-700 dark:bg-rose-950/25 dark:text-rose-300">
+                                            <CircleAlert size={17} className="mt-0.5 shrink-0" />
+                                            <span>{copy.soldOutNotice}</span>
+                                        </div>
+                                    ) : null}
+
+                                    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/70">
+                                        <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-700">
+                                            <div className="border-r border-slate-200 px-4 py-3 dark:border-slate-700">
+                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{wholesaleLabel}</p>
+                                                <p className="text-[9px] font-bold text-slate-400">{regionLabel}</p>
+                                                <p className="mt-2 text-right text-xl font-black tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayWholesale, priceOptions)}</p>
+                                            </div>
+                                            <div className="px-4 py-3">
+                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{retailLabel}</p>
+                                                <p className="text-[9px] font-bold text-slate-400">{regionLabel}</p>
+                                                <p className="mt-2 text-right text-xl font-black tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayRetail, priceOptions)}</p>
+                                            </div>
+                                        </div>
+                                        <div className="grid grid-cols-2">
+                                            <div className={`border-r border-slate-200 px-4 py-3 dark:border-slate-700 ${isSoldOut ? 'bg-rose-50/70 dark:bg-rose-950/20' : ''}`}>
+                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{copy.orderStatus}</p>
+                                                <p className="text-[9px] font-bold text-slate-400">{copy.orderStatusSub}</p>
+                                                <p className={`mt-2 text-right text-lg font-black ${isSoldOut ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{isSoldOut ? copy.soldOut : copy.available}</p>
+                                            </div>
+                                            <div className="px-4 py-3">
+                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{copy.margin}</p>
+                                                <p className="text-[9px] font-bold text-slate-400">{copy.marginSub}</p>
+                                                <p className="mt-2 text-right text-xl font-black tabular-nums text-[#e34219]">{marginPercent}%</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex flex-col gap-4 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-slate-800 dark:bg-slate-900">
+                                    <div>
+                                        <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{copy.minimumOrder}</p>
+                                        <p className="mt-1 text-[10px] font-semibold text-slate-400">{copy.minimumOrderSub}: {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : 'EA'} · {copy.orderUnit}: {formatNumber(orderUnit)}{isKorean ? '개' : 'EA'}</p>
+                                    </div>
+
+                                    {isSoldOut ? (
+                                        <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-xs font-bold text-slate-500 sm:min-w-[220px] dark:bg-slate-800 dark:text-slate-400">{copy.soldOutOrderDisabled}</div>
+                                    ) : (
+                                        <div className={`flex h-12 items-center overflow-hidden rounded-xl border shadow-sm ${qty === 0 ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900' : 'border-[#e34219] bg-[#fff7f3] dark:bg-[#2a1a1a]'}`}>
+                                            <button type="button" aria-label={isKorean ? '수량 줄이기' : '数量を減らす'} onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))} className="flex h-full w-11 items-center justify-center text-slate-700 hover:bg-slate-50 dark:text-white dark:hover:bg-slate-800">
+                                                <Minus size={16} strokeWidth={2.5} />
+                                            </button>
+                                            <input
+                                                aria-label={isKorean ? `${displayProductName(product)} 주문 수량` : `${displayProductName(product)} 注文数量`}
+                                                inputMode="numeric"
+                                                type="text"
+                                                value={formatNumber(qty)}
+                                                onChange={(event) => {
+                                                    const value = event.target.value.replace(/,/g, '')
+                                                    if (/^\d*$/.test(value)) handleQuantityChange(product.id, value)
+                                                }}
+                                                className={`h-full w-20 border-x border-y-0 border-slate-200 bg-transparent text-center text-lg font-black outline-none dark:border-slate-700 ${qty > 0 ? 'text-[#e34219]' : 'text-slate-900 dark:text-white'}`}
+                                            />
+                                            <button type="button" aria-label={isKorean ? '수량 늘리기' : '数量を増やす'} onClick={() => handleQuantityChange(product.id, qty + orderUnit)} className="flex h-full w-11 items-center justify-center text-slate-700 hover:bg-slate-50 dark:text-white dark:hover:bg-slate-800">
+                                                <Plus size={16} strokeWidth={2.5} />
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            </article>
+                        )
+                    })}
+                </div>
+            )}
 
             {/* Sticky Footer */}
             {hasItems && (
@@ -446,8 +487,8 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                     <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
                         <div className="text-right flex flex-col items-end">
                             <div className="flex flex-col items-end mb-1 text-gray-400 dark:text-gray-500 gap-0.5">
-                                <span className="text-[10px] font-black leading-tight">合計金額 (税抜)</span>
-                                <span className="text-[8px] font-bold uppercase tracking-widest leading-none">Total (Excl. Tax)</span>
+                                <span className="text-[10px] font-black leading-tight">{copy.totalExcludingTax}</span>
+                                <span className="text-[8px] font-bold uppercase tracking-widest leading-none">{copy.totalExcludingTaxSub}</span>
                             </div>
                             <p className="text-4xl font-medium text-[#111827] dark:text-white leading-none font-inter tracking-tighter">
                                 <span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(productTotal, isUSD)}
@@ -459,8 +500,8 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                             className="h-14 px-10 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-end md:justify-center gap-3 font-bold text-[15px] tracking-wide group w-full md:w-auto"
                         >
                             <div className="flex flex-col items-end md:items-start leading-none">
-                                <span className="text-lg">今すぐ注文する</span>
-                                <span className="text-[9px] opacity-70 font-bold tracking-[0.2em] -mt-0.5">ORDER NOW</span>
+                                <span className="text-lg">{copy.orderNow}</span>
+                                <span className="text-[9px] opacity-70 font-bold tracking-[0.2em] -mt-0.5">{copy.orderNowSub}</span>
                             </div>
                             <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
                         </button>
@@ -479,17 +520,17 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                 ✕
                             </button>
 
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">注文内容の確認</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-medium uppercase tracking-widest">Order Summary</p>
+                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{copy.summaryTitle}</h3>
+                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-medium uppercase tracking-widest">{copy.summarySub}</p>
 
                             <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
                                 {safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-[#2a2a2a]">
                                         <div>
-                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{p.nameJP || p.name}</p>
+                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{displayProductName(p)}</p>
                                             <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                                                {p.nameEN && <span className="mr-1">{p.nameEN}</span>}
-                                                <span>× {formatNumber(quantities[p.id])}</span>
+                                                {!isKorean && p.nameEN ? <span className="mr-1">{p.nameEN}</span> : null}
+                                                <span>{isKorean ? `수량 ${formatNumber(quantities[p.id])}개` : `× ${formatNumber(quantities[p.id])}`}</span>
                                             </p>
                                         </div>
                                         <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(p.sellPrice * safeNonNegativeInt(quantities[p.id]), isUSD)}</span>
@@ -497,7 +538,7 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                 ))}
                                 {shippingFee > 0 && (
                                     <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 dark:border-[#2a2a2a] mt-2">
-                                        <span className="text-sm font-bold text-gray-600 dark:text-gray-400">配送料 (Shipping)</span>
+                                        <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{copy.shipping}</span>
                                         <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(shippingFee, isUSD)}</span>
                                     </div>
                                 )}
@@ -505,17 +546,17 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
 
                             <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-2xl p-6 space-y-3 mb-8">
                                 <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                    <span>供給価額 (Supply)</span>
+                                    <span>{copy.supply}</span>
                                     <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatMoney(supplyTotal, isUSD)}</span>
                                 </div>
                                 {!isUSD && (
                                     <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                        <span>消費税 (10%)</span>
+                                        <span>{copy.tax}</span>
                                         <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatNumber(vat)}</span>
                                     </div>
                                 )}
                                 <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 dark:border-[#2a2a2a] mt-2">
-                                    <span className="font-bold text-lg text-gray-900 dark:text-white">合計金額</span>
+                                    <span className="font-bold text-lg text-gray-900 dark:text-white">{copy.total}</span>
                                     <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(totalAmount, isUSD)}</span>
                                 </div>
                             </div>
@@ -538,22 +579,22 @@ export default function OrderInterface({ products }: { products?: Product[] | nu
                                         })
 
                                         if (res.ok) {
-                                            alert("ご注文ありがとうございます！\nThank you for your order!");
+                                            alert(isKorean ? '주문이 접수되었습니다. 감사합니다!' : 'ご注文ありがとうございます！');
                                             setShowSummary(false);
                                             setQuantities({});
                                             router.push('/order/history');
                                         } else {
                                             const errorData = await res.json();
-                                            alert(`Order Failed: ${errorData.error}`);
+                                            alert(`${isKorean ? '주문 실패' : '注文に失敗しました'}: ${errorData.error}`);
                                         }
                                     } catch (e) {
                                         console.error(e)
-                                        alert("Error occurred.");
+                                        alert(isKorean ? '주문 처리 중 오류가 발생했습니다.' : 'エラーが発生しました。');
                                     }
                                 }}
                                 className="w-full bg-[#111827] dark:bg-white text-white dark:text-[#111827] py-4 rounded-xl font-bold text-lg hover:bg-black dark:hover:bg-gray-200 transition-colors shadow-xl dark:shadow-none"
                             >
-                                注文を確定する
+                                {copy.confirmOrder}
                             </button>
                         </div>
                     </div>
