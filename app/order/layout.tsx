@@ -6,6 +6,7 @@ import Link from 'next/link'
 import LogoutButton from '@/components/LogoutButton'
 import UserNavbar from '@/components/UserNavbar'
 import PartnerNoticePopup, { type PartnerNoticePopupItem } from '@/components/PartnerNoticePopup'
+import PartnerNoticeBoard from '@/components/PartnerNoticeBoard'
 
 export default async function OrderLayout({
     children,
@@ -107,6 +108,7 @@ export default async function OrderLayout({
             </header>
 
             <main className="ux-page mx-auto max-w-[1440px] px-3 pb-24 pt-4 sm:px-5 sm:pb-10 lg:px-7">
+                <PartnerNoticeBoard notices={activeNotices} />
                 {children}
             </main>
             <PartnerNoticePopup notices={activeNotices} />

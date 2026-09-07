@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BellRing, CalendarClock, Edit3, Info, Megaphone, Plus, Power, Trash2, X } from 'lucide-react'
+import Link from 'next/link'
+import { AlertTriangle, ArrowLeft, BellRing, CalendarClock, Edit3, Info, Megaphone, Plus, Power, Trash2, X } from 'lucide-react'
 
 export type PartnerNoticeItem = {
   id: string
@@ -161,7 +162,10 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
   return (
     <div className="space-y-5">
       <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-        <div>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/partners" aria-label="파트너 관리로 돌아가기" className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-[#333] dark:text-slate-300">
+            <ArrowLeft size={17} />
+          </Link>
           <div className="flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-orange-50 text-[#d9361b]">
               <Megaphone size={19} />

@@ -7,6 +7,7 @@ import DeletePartnerButton from '@/components/DeletePartnerButton'
 import Link from 'next/link'
 import ApproveUserButton from '@/components/ApproveUserButton'
 import PartnerTrashbin from '@/components/PartnerTrashbin'
+import { Megaphone } from 'lucide-react'
 
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
@@ -89,6 +90,13 @@ export default async function PartnersPage() {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <Link
+                            href="/admin/notices"
+                            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 text-xs font-black text-[#d9361b] transition hover:border-orange-300 hover:bg-orange-100"
+                        >
+                            <Megaphone size={15} />
+                            파트너 공지
+                        </Link>
                         <PartnerTrashbin deletedPartners={mappedDeletedPartners} />
                         <PartnerForm />
                     </div>
