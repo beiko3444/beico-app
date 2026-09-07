@@ -425,6 +425,252 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     )
 })
 
+interface ProductMobileCardProps {
+    product: ProductTableProduct
+    displayName?: string
+    groupOrder: number
+    activeGrade: ProductGrade
+    checked: boolean
+    onToggleCheck: (id: string) => void
+    onDelete: (productId: string) => void
+    onUngroup: (productId: string) => void
+    onRestoreAutoGroup: (productId: string) => void
+    modifiedCost: string | undefined
+    onCostChange: (id: string, val: string) => void
+    modifiedCnyCost: string | undefined
+    modifiedUsdCost: string | undefined
+    onForeignCostChange: (id: string, currency: PurchaseCurrency, val: string) => void
+    onPurchaseCurrencyChange: (id: string, currency: PurchaseCurrency) => void
+    cnyRateAvailable: boolean
+    usdRateAvailable: boolean
+    modifiedWholesale: string | undefined
+    onWholesaleChange: (id: string, val: string) => void
+    modifiedRetail: string | undefined
+    onRetailChange: (id: string, val: string) => void
+    modifiedStock: string | undefined
+    onStockChange: (id: string, val: string) => void
+    modifiedMoq: string | undefined
+    onMoqChange: (id: string, val: string) => void
+    modifiedOrderUnit: string | undefined
+    onOrderUnitChange: (id: string, val: string) => void
+    onToggleOrderAvailability: (id: string) => void
+}
+
+const ProductMobileCard = memo(function ProductMobileCard({
+    product,
+    displayName,
+    groupOrder,
+    activeGrade,
+    checked,
+    onToggleCheck,
+    onDelete,
+    onUngroup,
+    onRestoreAutoGroup,
+    modifiedCost,
+    onCostChange,
+    modifiedCnyCost,
+    modifiedUsdCost,
+    onForeignCostChange,
+    onPurchaseCurrencyChange,
+    cnyRateAvailable,
+    usdRateAvailable,
+    modifiedWholesale,
+    onWholesaleChange,
+    modifiedRetail,
+    onRetailChange,
+    modifiedStock,
+    onStockChange,
+    modifiedMoq,
+    onMoqChange,
+    modifiedOrderUnit,
+    onOrderUnitChange,
+    onToggleOrderAvailability,
+}: ProductMobileCardProps) {
+    const legacyWholesale = {
+        A: product.priceA,
+        B: product.priceB,
+        C: product.priceC ?? product.sellPrice,
+        D: product.priceD,
+    }[activeGrade] ?? product.sellPrice
+    const costValue = modifiedCost !== undefined
+        ? modifiedCost
+        : readProductGradePriceValue(product.regionalPrices, activeGrade, 'cost', product.buyPrice || 0)
+    const purchaseCurrency = getPurchaseCurrency(product)
+    const purchaseRateAvailable = purchaseCurrency === 'USD' ? usdRateAvailable : cnyRateAvailable
+    const foreignCostValue = purchaseCurrency === 'USD'
+        ? modifiedUsdCost !== undefined ? modifiedUsdCost : product.usdPurchasePrice || ''
+        : modifiedCnyCost !== undefined ? modifiedCnyCost : product.cnyBuyPrice || ''
+    const wholesaleValue = modifiedWholesale !== undefined
+        ? modifiedWholesale
+        : readProductGradePriceValue(product.regionalPrices, activeGrade, 'wholesale', legacyWholesale || 0)
+    const retailValue = modifiedRetail !== undefined
+        ? modifiedRetail
+        : readProductGradePriceValue(product.regionalPrices, activeGrade, 'retail', product.onlinePrice || 0)
+    const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
+    const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
+    const stockStatus = stockNumber <= 0
+        ? { label: '품절', className: 'border-red-200 bg-red-50 text-red-700' }
+        : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
+            ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
+            : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
+    const ungrouped = product.autoGroupingDisabled === true
+    const fieldLabelClass = 'mb-1 block text-[10px] font-black text-slate-500'
+    const fieldInputClass = 'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-right text-[14px] font-black tabular-nums text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
+
+    return (
+        <article
+            id={`mobile-product-row-${product.id}`}
+            className={`overflow-hidden rounded-2xl border shadow-sm transition ${checked ? 'border-blue-300 bg-blue-50/40 ring-2 ring-blue-100' : ungrouped ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'}`}
+        >
+            <div className="flex items-start gap-3 p-3">
+                <label className="flex min-h-12 shrink-0 items-center" aria-label={`${product.name} 선택`}>
+                    <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggleCheck(product.id)}
+                        className="h-5 w-5 cursor-pointer accent-blue-600"
+                    />
+                </label>
+                <ProductForm
+                    initialData={product}
+                    trigger={(
+                        <div className="flex h-14 w-14 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                            {product.imageUrl ? (
+                                <img src={product.imageUrl} alt={product.name} loading="lazy" className="h-full w-full object-cover" />
+                            ) : (
+                                <span className="text-[9px] font-black text-slate-300">IMG</span>
+                            )}
+                        </div>
+                    )}
+                />
+                <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="flex min-w-0 items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <h3 className="line-clamp-2 text-[14px] font-black leading-5 text-slate-950">{displayName || product.name}</h3>
+                                {ungrouped ? <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">단일 SKU</span> : null}
+                            </div>
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-slate-500">
+                                <span>상품 #{formatInteger(product.productNumber)}</span>
+                                <span>그룹 순서 {groupOrder}</span>
+                                {product.productCode ? <span className="font-mono">{String(product.productCode).toUpperCase()}</span> : null}
+                            </div>
+                        </div>
+                        <ProductForm
+                            initialData={product}
+                            trigger={(
+                                <button type="button" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-700" aria-label={`${product.name} 상품 수정`}>
+                                    <Pencil size={15} />
+                                </button>
+                            )}
+                        />
+                    </div>
+                    {product.nameJP ? <div className="mt-1 truncate text-[11px] font-semibold text-slate-400">{product.nameJP}</div> : null}
+                </div>
+            </div>
+
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 border-t border-slate-100 bg-slate-50/70 p-3">
+                <div className="min-w-0">
+                    <span className={fieldLabelClass}>발주 상태</span>
+                    <button
+                        type="button"
+                        onClick={() => onToggleOrderAvailability(product.id)}
+                        className={`flex h-10 w-full items-center justify-center rounded-lg border px-2 text-[12px] font-black transition ${product.wholesaleAvailable !== false ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-red-200 bg-red-50 text-red-600'}`}
+                    >
+                        {product.wholesaleAvailable !== false ? '발주 가능' : '발주 불가능'}
+                    </button>
+                </div>
+                <div className="min-w-0">
+                    <div className="mb-1 flex items-center justify-between gap-2">
+                        <span className="text-[10px] font-black text-slate-500">현재고</span>
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-black ${stockStatus.className}`}>{stockStatus.label}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <input
+                            type="text"
+                            inputMode="numeric"
+                            value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
+                            onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
+                            className="h-10 min-w-0 flex-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-right text-[15px] font-black tabular-nums text-emerald-900 outline-none focus:border-emerald-600 focus:bg-white"
+                            aria-label={`${product.name} 현재고`}
+                        />
+                        <ProductStockHistoryModal productId={product.id} productName={product.name} compact />
+                    </div>
+                </div>
+            </div>
+
+            <details className="group/mobile border-t border-slate-100">
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 text-[12px] font-black text-slate-800 [&::-webkit-details-marker]:hidden">
+                    <span>{activeGrade}등급 가격·발주 설정</span>
+                    <ChevronDown size={16} className="shrink-0 text-blue-600 transition-transform group-open/mobile:rotate-180" />
+                </summary>
+                <div className="grid grid-cols-2 gap-2 border-t border-slate-100 bg-white p-3">
+                    <label className="col-span-2 min-w-0">
+                        <span className={fieldLabelClass}>외화 매입가</span>
+                        <div className="flex gap-2">
+                            <select
+                                value={purchaseCurrency}
+                                onChange={(event) => onPurchaseCurrencyChange(product.id, event.target.value as PurchaseCurrency)}
+                                className="h-10 w-[82px] shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[12px] font-black text-slate-700 outline-none focus:border-blue-500"
+                                aria-label={`${product.name} 매입 통화`}
+                            >
+                                <option value="CNY">CN¥</option>
+                                <option value="USD">US$</option>
+                            </select>
+                            <input
+                                type="text"
+                                inputMode="decimal"
+                                value={formatNumberInput(foreignCostValue)}
+                                onChange={(event) => onForeignCostChange(product.id, purchaseCurrency, normalizeNumericDraft(event.target.value, true))}
+                                disabled={!purchaseRateAvailable}
+                                className={`${fieldInputClass} min-w-0 disabled:cursor-not-allowed disabled:opacity-50`}
+                                aria-label={`${product.name} 외화 매입가`}
+                            />
+                        </div>
+                    </label>
+                    <label className="min-w-0">
+                        <span className={fieldLabelClass}>한화 매입가</span>
+                        <input type="text" inputMode="decimal" value={formatNumberInput(costValue)} onChange={(event) => onCostChange(product.id, normalizeNumericDraft(event.target.value, true))} className={fieldInputClass} />
+                    </label>
+                    <label className="min-w-0">
+                        <span className={fieldLabelClass}>도매가</span>
+                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className={`${fieldInputClass} border-blue-200 bg-blue-50 text-blue-800`} />
+                    </label>
+                    <label className="min-w-0">
+                        <span className={fieldLabelClass}>판매가</span>
+                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className={`${fieldInputClass} border-emerald-200 bg-emerald-50 text-emerald-800`} />
+                    </label>
+                    <label className="min-w-0">
+                        <span className={fieldLabelClass}>안전재고</span>
+                        <div className="flex h-10 items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-[14px] font-black tabular-nums text-slate-600">{safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}</div>
+                    </label>
+                    <label className="min-w-0">
+                        <span className={fieldLabelClass}>최소수량</span>
+                        <input type="text" inputMode="numeric" value={modifiedMoq !== undefined ? formatNumberInput(modifiedMoq) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1))} onChange={(event) => onMoqChange(product.id, normalizeNumericDraft(event.target.value))} className={fieldInputClass} />
+                    </label>
+                    <label className="min-w-0">
+                        <span className={fieldLabelClass}>주문단위</span>
+                        <input type="text" inputMode="numeric" value={modifiedOrderUnit !== undefined ? formatNumberInput(modifiedOrderUnit) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))} onChange={(event) => onOrderUnitChange(product.id, normalizeNumericDraft(event.target.value))} className={fieldInputClass} />
+                    </label>
+                </div>
+            </details>
+
+            <details className="group/manage border-t border-slate-100">
+                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-[11px] font-black text-slate-500 [&::-webkit-details-marker]:hidden">
+                    <span>상품 관리</span>
+                    <ChevronDown size={15} className="transition-transform group-open/manage:rotate-180" />
+                </summary>
+                <div className="grid grid-cols-2 gap-2 border-t border-slate-100 bg-slate-50 p-3">
+                    <ProductForm initialData={product} trigger={<button type="button" className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-[11px] font-black text-slate-700"><Pencil size={14} />상품 수정</button>} />
+                    <ProductForm initialData={product} isCopy trigger={<button type="button" className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 text-[11px] font-black text-blue-700"><Copy size={14} />복사 등록</button>} />
+                    <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 text-[11px] font-black text-amber-700">{ungrouped ? <RotateCcw size={14} /> : <Unlink size={14} />}{ungrouped ? '자동 그룹 복귀' : '그룹 해제'}</button>
+                    <button type="button" onClick={() => onDelete(product.id)} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 text-[11px] font-black text-red-600"><Trash2 size={14} />삭제</button>
+                </div>
+            </details>
+        </article>
+    )
+})
+
 type ProductGroupView = {
     key: string
     name: string
@@ -449,6 +695,78 @@ const getProductSearchText = (product: ProductTableProduct) => [
     product.hsCode,
     product.japanHsCode,
 ].filter(Boolean).join(' ').toLocaleLowerCase('ko-KR')
+
+const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
+    group,
+    expanded,
+    checkedCount,
+    onToggle,
+    onToggleCheck,
+}: {
+    group: ProductGroupView
+    expanded: boolean
+    checkedCount: number
+    onToggle: () => void
+    onToggleCheck: () => void
+}) {
+    const representative = group.products[0]
+    const totalStock = group.products.reduce((sum, product) => sum + getProductStock(product), 0)
+    const availableCount = group.products.filter(product => product.wholesaleAvailable !== false).length
+    const naverProductUrl = getNaverProductUrl(
+        group.name,
+        group.products.flatMap(product => [product.name, product.nameJP, product.nameEN]),
+    )
+
+    return (
+        <div className="overflow-hidden rounded-2xl border border-blue-100 bg-blue-50 shadow-sm">
+            <div className="flex items-start gap-2.5 p-3">
+                <label className="flex min-h-11 shrink-0 items-center" aria-label={`${group.name} 그룹 전체 선택`}>
+                    <input
+                        type="checkbox"
+                        checked={group.products.length > 0 && checkedCount === group.products.length}
+                        onChange={onToggleCheck}
+                        className="h-5 w-5 cursor-pointer accent-blue-600"
+                    />
+                </label>
+                <button
+                    type="button"
+                    onClick={onToggle}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 shadow-sm"
+                    aria-expanded={expanded}
+                    aria-label={`${group.name} SKU 목록 ${expanded ? '접기' : '펼치기'}`}
+                >
+                    {expanded ? <ChevronDown size={17} /> : <ChevronRight size={17} />}
+                </button>
+                {representative?.imageUrl ? (
+                    <img src={representative.imageUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-slate-200 bg-white object-cover" />
+                ) : (
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-300"><Layers size={17} /></div>
+                )}
+                <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
+                    <span className="flex min-w-0 flex-wrap items-center gap-1.5">
+                        <span className="line-clamp-2 text-[13px] font-black leading-5 text-slate-950">{group.name}</span>
+                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[9px] font-black text-blue-700">{group.products.length} SKU</span>
+                    </span>
+                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-black">
+                        <span className="text-emerald-700">발주 가능 {availableCount}</span>
+                        <span className="text-slate-500">재고 합계 {formatInteger(totalStock)}</span>
+                    </span>
+                </button>
+                {naverProductUrl ? (
+                    <a
+                        href={naverProductUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700"
+                        aria-label={`${group.name} 네이버 상품 열기`}
+                    >
+                        <ExternalLink size={15} />
+                    </a>
+                ) : null}
+            </div>
+        </div>
+    )
+})
 
 const ProductGroupHeader = memo(function ProductGroupHeader({
     group,
@@ -725,7 +1043,16 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const [columnsHydrated, setColumnsHydrated] = useState(false)
     const [columnSettingsOpen, setColumnSettingsOpen] = useState(false)
     const columnSettingsRef = useRef<HTMLDivElement>(null)
+    const [isCompactViewport, setIsCompactViewport] = useState(false)
     const router = useRouter()
+
+    useEffect(() => {
+        const compactViewport = window.matchMedia('(max-width: 1023px)')
+        const syncCompactViewport = () => setIsCompactViewport(compactViewport.matches)
+        syncCompactViewport()
+        compactViewport.addEventListener('change', syncCompactViewport)
+        return () => compactViewport.removeEventListener('change', syncCompactViewport)
+    }, [])
 
     const loadCnyRate = useCallback(async () => {
         setIsCnyRateLoading(true)
@@ -1065,7 +1392,10 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         setSelectedGroupKey(`single:${productId}`)
         void patchProductGroups([{ id: productId, groupName: null, autoGroupingDisabled: true }])
         window.setTimeout(() => {
-            document.getElementById(`product-row-${productId}`)?.scrollIntoView({
+            const rowId = window.matchMedia('(max-width: 1023px)').matches
+                ? `mobile-product-row-${productId}`
+                : `product-row-${productId}`
+            document.getElementById(rowId)?.scrollIntoView({
                 behavior: 'smooth',
                 block: 'center',
             })
@@ -1426,6 +1756,40 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         }
     }
 
+    const renderMobileProductCard = (product: ProductTableProduct, groupOrder: number, displayName?: string) => (
+        <ProductMobileCard
+            key={product.id}
+            product={product}
+            displayName={displayName}
+            groupOrder={groupOrder}
+            activeGrade={activeGrade}
+            checked={checkedIds.has(product.id)}
+            onToggleCheck={handleToggleCheck}
+            onDelete={handleDelete}
+            onUngroup={handleUngroupProduct}
+            onRestoreAutoGroup={handleRestoreAutoGroup}
+            modifiedCost={modifiedCosts[draftKey(activeGrade, product.id)]}
+            onCostChange={handleCostChange}
+            modifiedCnyCost={modifiedCnyCosts[draftKey(activeGrade, product.id)]}
+            modifiedUsdCost={modifiedUsdCosts[draftKey(activeGrade, product.id)]}
+            onForeignCostChange={handleForeignCostChange}
+            onPurchaseCurrencyChange={(id, currency) => void handlePurchaseCurrencyChange(id, currency)}
+            cnyRateAvailable={Boolean(cnyKrwRate)}
+            usdRateAvailable={Boolean(usdKrwRate)}
+            modifiedWholesale={modifiedWholesales[draftKey(activeGrade, product.id)]}
+            onWholesaleChange={handleWholesaleChange}
+            modifiedRetail={modifiedRetails[draftKey(activeGrade, product.id)]}
+            onRetailChange={handleRetailChange}
+            modifiedStock={modifiedStocks[product.id]}
+            onStockChange={handleStockChange}
+            modifiedMoq={modifiedMoqs[draftKey(activeGrade, product.id)]}
+            onMoqChange={handleMoqChange}
+            modifiedOrderUnit={modifiedOrderUnits[draftKey(activeGrade, product.id)]}
+            onOrderUnitChange={handleOrderUnitChange}
+            onToggleOrderAvailability={handleToggleOrderAvailability}
+        />
+    )
+
     return (
         <div
             className="ux-panel w-full overflow-hidden"
@@ -1456,7 +1820,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         ))}
                     </nav>
 
-                    <div className="shrink-0 self-end xl:self-auto"><ProductForm /></div>
+                    <div className="w-full shrink-0 self-end sm:w-auto xl:self-auto">
+                        <ProductForm trigger={<button type="button" className="h-10 w-full rounded-xl bg-[#d9361b] px-5 text-xs font-black text-white shadow-sm transition hover:brightness-110 sm:w-auto">＋ 새 상품 추가</button>} />
+                    </div>
                 </div>
             </header>
 
@@ -1496,15 +1862,25 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         <select
                             value={stockFilter}
                             onChange={(event) => setStockFilter(event.target.value as ProductStockFilter)}
-                            className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none sm:flex-none"
                             title="재고 필터"
                         >
                             <option value="all">재고 상태 전체</option>
                             <option value="stocked">재고 있음</option>
                             <option value="empty">재고 없음</option>
                         </select>
+                        <select
+                            value={availabilityFilter}
+                            onChange={(event) => setAvailabilityFilter(event.target.value as ProductAvailabilityFilter)}
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none sm:flex-none"
+                            title="발주 상태 필터"
+                        >
+                            <option value="all">발주 상태 전체</option>
+                            <option value="available">발주 가능</option>
+                            <option value="unavailable">발주 불가능</option>
+                        </select>
                         <div
-                            className={`flex h-10 items-center gap-2 rounded-xl border px-3 text-[11px] font-black ${cnyRateError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-100 bg-red-50 text-red-800'}`}
+                            className={`flex h-10 w-full items-center justify-center gap-2 overflow-x-auto rounded-xl border px-3 text-[10px] font-black sm:w-auto sm:justify-start sm:text-[11px] ${cnyRateError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-100 bg-red-50 text-red-800'}`}
                             title={cnyRateUpdatedAt ? `환율 갱신: ${new Date(cnyRateUpdatedAt).toLocaleString('ko-KR')}` : '매입 통화 환율'}
                         >
                             <span className="text-red-600">CN¥ 1</span>
@@ -1539,8 +1915,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         ) : null}
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        <div ref={columnSettingsRef} className="relative">
+                    <div className="grid w-full grid-cols-2 items-center gap-2 lg:flex lg:w-auto lg:flex-wrap">
+                        <div ref={columnSettingsRef} className="relative hidden lg:block">
                             <button
                                 type="button"
                                 onClick={() => setColumnSettingsOpen(open => !open)}
@@ -1592,17 +1968,91 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 </div>
             </div>
             {checkedIds.size > 0 && (
-                <div className="flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-3 py-2">
-                    <span className="text-xs font-bold text-blue-800">{checkedIds.size}개 상품 선택됨</span>
+                <div className={isCompactViewport
+                    ? 'fixed inset-x-3 bottom-4 z-[80] flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-white/95 p-3 shadow-2xl backdrop-blur-xl'
+                    : 'flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-3 py-2'}
+                >
+                    <span className="text-xs font-black text-blue-800">{checkedIds.size}개 상품 선택됨</span>
                     <button
                         onClick={handleSaveChanges}
                         disabled={isSaving}
-                        className="bg-blue-600 text-white px-4 py-1.5 rounded-lg text-xs font-bold shadow-sm hover:bg-blue-700 transition disabled:opacity-50"
+                        className="min-h-10 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
                     >
-                        {isSaving ? '저장 중...' : '수정사항 저장하기'}
+                        {isSaving ? '저장 중...' : '수정사항 저장'}
                     </button>
                 </div>
             )}
+            {isCompactViewport ? (
+                <div className="bg-slate-100/70 px-3 py-3 pb-24" data-testid="product-mobile-cards">
+                    <div className="mb-3 flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                        <label className="flex min-h-8 cursor-pointer items-center gap-2 text-[12px] font-black text-slate-700">
+                            <input
+                                type="checkbox"
+                                onChange={handleToggleAll}
+                                checked={visibleProductIds.length > 0 && checkedVisibleCount === visibleProductIds.length}
+                                className="h-5 w-5 cursor-pointer accent-blue-600"
+                            />
+                            현재 목록 전체 선택
+                        </label>
+                        <div className="flex shrink-0 items-center gap-1.5">
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">{formatInteger(filteredProducts.length)}개</span>
+                            <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-700">{activeGrade}등급</span>
+                        </div>
+                    </div>
+
+                    {filteredProducts.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center text-[13px] font-bold text-slate-500">조건에 맞는 상품이 없습니다.</div>
+                    ) : viewMode === 'sku' ? (
+                        <div className="space-y-3">
+                            {filteredProducts.map(product => renderMobileProductCard(
+                                product,
+                                groupOrderByProductId.get(product.id) ?? 1,
+                            ))}
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            {productGroups.map((group, groupIndex) => {
+                                const expanded = !group.isNamed || !collapsedGroupKeys.has(group.key)
+                                const checkedCount = group.products.filter(product => checkedIds.has(product.id)).length
+                                return (
+                                    <Fragment key={group.key}>
+                                        {groupIndex === firstManuallyUngroupedIndex ? (
+                                            <div className="rounded-xl border border-amber-200 bg-amber-100 px-3 py-2.5">
+                                                <div className="flex items-center gap-2 text-[12px] font-black text-amber-950"><Unlink size={14} />단일 SKU</div>
+                                                <div className="mt-0.5 text-[10px] font-bold text-amber-700">그룹에서 분리한 상품 {formatInteger(manuallyUngroupedCount)}개</div>
+                                            </div>
+                                        ) : null}
+                                        {group.isNamed ? (
+                                            <ProductMobileGroupHeader
+                                                group={group}
+                                                expanded={expanded}
+                                                checkedCount={checkedCount}
+                                                onToggle={() => toggleGroup(group.key)}
+                                                onToggleCheck={() => handleToggleGroupCheck(group.products.map(product => product.id))}
+                                            />
+                                        ) : null}
+                                        {expanded ? (
+                                            <div className="space-y-2">
+                                                {group.products.map((product, groupOrder) => renderMobileProductCard(
+                                                    product,
+                                                    groupOrder + 1,
+                                                    group.isNamed
+                                                        ? getGroupedSkuLabel({
+                                                            productName: product.name,
+                                                            groupName: group.name,
+                                                            productCode: product.productCode,
+                                                        })
+                                                        : product.name,
+                                                ))}
+                                            </div>
+                                        ) : null}
+                                    </Fragment>
+                                )
+                            })}
+                        </div>
+                    )}
+                </div>
+            ) : (
             <div className={`grid min-h-[520px] ${selectedGroup ? 'xl:grid-cols-[minmax(0,1fr)_310px]' : ''}`}>
                 <div className="min-w-0">
                     <div className="max-h-[calc(100vh-190px)] w-full overflow-auto pb-2" data-testid="product-table-scroll">
@@ -1782,7 +2232,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 />
             ) : null}
             </div>
-            {productContextMenu && contextMenuProduct ? (
+            )}
+            {!isCompactViewport && productContextMenu && contextMenuProduct ? (
                 <div
                     role="menu"
                     aria-label={`${contextMenuProduct.name} 빠른 메뉴`}

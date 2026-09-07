@@ -3,9 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import BarcodeDisplay from '@/components/BarcodeDisplay'
 
 type ExchangeRates = { USD: number, JPY: number, CNY: number }
+type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string, orderUnit: string }
+type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice }
+type ProductGrade = 'A' | 'B' | 'C' | 'D'
+type ProductCountry = keyof GradePricing
+type RegionalPriceSource = Partial<Record<ProductGrade, Partial<Record<ProductCountry, Partial<CountryPrice>>>>>
 
 let cachedExchangeRates: ExchangeRates | null = null
 let pendingExchangeRates: Promise<ExchangeRates | null> | null = null
@@ -71,7 +75,7 @@ export type Product = {
     priceD?: number | null
     wholesaleAvailable?: boolean
     imageUrl?: string | null
-    regionalPrices?: any
+    regionalPrices?: unknown
     stock?: number | null
     safetyStock?: number | null
     minOrderQuantity: number
@@ -101,20 +105,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const [hsCode, setHsCode] = useState('')
     const [japanHsCode, setJapanHsCode] = useState('')
     const [coupangSku, setCoupangSku] = useState('')
-    const [buyPrice, setBuyPrice] = useState('')
-    const [sellPrice, setSellPrice] = useState('')
-    const [onlinePrice, setOnlinePrice] = useState('')
-    const [jpBuyPrice, setJpBuyPrice] = useState('')
-    const [jpSellPrice, setJpSellPrice] = useState('')
-    const [krBuyPrice, setKrBuyPrice] = useState('')
-    const [krSellPrice, setKrSellPrice] = useState('')
-    const [usBuyPrice, setUsBuyPrice] = useState('')
-    const [usSellPrice, setUsSellPrice] = useState('')
     const [orderAvailable, setOrderAvailable] = useState(true)
-    const [priceA, setPriceA] = useState('')
-    const [priceB, setPriceB] = useState('')
-    const [priceC, setPriceC] = useState('')
-    const [priceD, setPriceD] = useState('')
     const [imageUrl, setImageUrl] = useState<string | null>(null)
     const [stock, setStock] = useState('0')
     const [minOrderQuantity, setMinOrderQuantity] = useState('1')
@@ -140,8 +131,6 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
         }
     }, [isOpen]);
 
-    type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string, orderUnit: string };
-    type GradePricing = { KR: CountryPrice, JP: CountryPrice, US: CountryPrice };
     const defaultGradePricing = (): GradePricing => ({
         KR: { cost: '', wholesale: '', retail: '', moq: '1', orderUnit: '1' },
         JP: { cost: '', wholesale: '', retail: '', moq: '1', orderUnit: '1' },
@@ -183,12 +172,15 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
         return val.replace(/,/g, "");
     };
 
-    const normalizeRegionalPrices = (source: any, fallbackOrderUnit: number | string = 1) => {
+    const normalizeRegionalPrices = (source: unknown, fallbackOrderUnit: number | string = 1) => {
         const next = createDefaultRegionalPrices();
+        const priceSource = source && typeof source === 'object'
+            ? source as RegionalPriceSource
+            : {};
 
         (['A', 'B', 'C', 'D'] as const).forEach(grade => {
             (['KR', 'JP', 'US'] as const).forEach(country => {
-                const current = source?.[grade]?.[country] || {};
+                const current = priceSource[grade]?.[country] || {};
                 next[grade][country] = {
                     cost: formatNumber(current.cost || ''),
                     wholesale: formatNumber(current.wholesale || ''),
@@ -407,14 +399,14 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     }
 
     const modalContent = (
-        <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-black/40 p-0 sm:p-4">
             <div
-                className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-5xl shadow-md animate-in fade-in duration-100 max-h-[95vh] overflow-y-auto relative"
+                className="relative h-[100dvh] max-h-[100dvh] w-full max-w-5xl animate-in overflow-y-auto bg-[#f0f0f0] shadow-md fade-in duration-100 sm:h-auto sm:max-h-[95vh] sm:border-2 sm:border-[#808080]"
                 onClick={(e) => e.stopPropagation()}
             >
                 {/* Classic Windows-style Header */}
                 <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none sticky top-0 z-10">
-                    <h3 className="text-sm font-bold tracking-tight">
+                    <h3 className="truncate pr-3 text-sm font-bold tracking-tight">
                         {isCopy ? 'Product Management - Copy & Register Product' : initialData ? 'Product Management - Edit Product' : 'Product Management - New Product Registration'}
                     </h3>
                     <button
@@ -432,14 +424,14 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                             const target = e.target as HTMLElement;
                             if (target.tagName === 'INPUT' && (target as HTMLInputElement).type !== 'file') {
                                 e.preventDefault();
-                                handleSubmit(e as any);
+                                e.currentTarget.requestSubmit();
                             }
                         }
                     }}
-                    className="p-6 space-y-6"
+                    className="space-y-4 p-3 pb-24 [&_input:not([type='file'])]:min-h-10 [&_select]:min-h-10 sm:space-y-6 sm:p-6 sm:pb-6"
                 >
                     {/* Basic Info Group */}
-                    <fieldset className="border border-gray-400 p-4 pt-2">
+                    <fieldset className="border border-gray-400 p-3 pt-2 sm:p-4 sm:pt-2">
                         <legend className="px-2 text-xs font-bold text-gray-700">기본 정보 (General Info)</legend>
 
                         {/* Image Upload Row */}
@@ -489,7 +481,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                             <div className="space-y-1">
                                 <label className="text-[11px] font-bold text-gray-600">상품명 (국문)</label>
                                 <input
@@ -596,7 +588,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     </fieldset>
 
                     {/* Order Settings Group */}
-                    <fieldset className="border border-gray-400 p-4 pt-2">
+                    <fieldset className="border border-gray-400 p-3 pt-2 sm:p-4 sm:pt-2">
                         <legend className="px-2 text-xs font-bold text-gray-700">발주 설정 (Order Settings)</legend>
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div className="space-y-1">
@@ -636,25 +628,25 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     </fieldset>
 
                     {/* Regional Pricing Group */}
-                    <fieldset className="border border-gray-400 p-4 pt-2 mb-4">
+                    <fieldset className="mb-4 border border-gray-400 p-3 pt-2 sm:p-4 sm:pt-2">
                         <legend className="px-2 text-xs font-bold text-gray-700">지역별 & 등급별 단가 설정 (Regional & Tier Pricing)</legend>
 
                         {/* Grade Tabs & Real-time Exchange Rates */}
-                        <div className="flex gap-2 mb-4 items-center flex-wrap">
-                            <div className="flex gap-2">
+                        <div className="mb-4 flex flex-wrap items-center gap-2">
+                            <div className="grid w-full grid-cols-4 gap-1.5 sm:flex sm:w-auto sm:gap-2">
                                 {['A', 'B', 'C', 'D'].map(grade => (
                                     <button
                                         key={grade}
                                         type="button"
                                         onClick={() => setActiveGradeTab(grade)}
-                                        className={`px-4 py-1.5 text-xs font-bold border ${activeGradeTab === grade ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
+                                        className={`min-w-0 px-2 py-2 text-xs font-bold border sm:px-4 sm:py-1.5 ${activeGradeTab === grade ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
                                     >
                                         {grade} 등급
                                     </button>
                                 ))}
                             </div>
                             {exchangeRates && (
-                                <div className="ml-auto flex items-center gap-3 text-[11px] bg-[#fff8e7] border border-[#ffcc00] px-3 py-1 rounded-sm shadow-sm border-b-2 border-r-2">
+                                <div className="flex w-full items-center justify-center gap-2 overflow-x-auto rounded-sm border border-[#ffcc00] border-b-2 border-r-2 bg-[#fff8e7] px-2 py-1.5 text-[10px] shadow-sm sm:ml-auto sm:w-auto sm:justify-start sm:gap-3 sm:px-3 sm:py-1 sm:text-[11px]">
                                     <span className="font-bold text-gray-700">🔴 실시간 환율:</span>
                                     <span className="text-blue-700 font-bold">🇺🇸 ${Number(exchangeRates.USD).toFixed(0)}</span>
                                     <span className="text-red-600 font-bold">🇯🇵(100¥) ₩{Number(exchangeRates.JPY * 100).toFixed(0)}</span>
@@ -677,11 +669,11 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                 const wholesalerMargin = wholesaleNum === 0 && retailNum === 0 ? 0 : retailNum > 0 ? ((retailNum - wholesaleNum) / retailNum * 100).toFixed(1) : 0;
 
                                 return (
-                                    <div key={country} className="border border-gray-200 p-3 bg-gray-50 relative">
+                                    <div key={country} className="relative border border-gray-200 bg-gray-50 p-2 sm:p-3">
                                         <div className="absolute top-0 left-0 bg-gray-200 text-gray-700 text-[10px] font-black px-2 py-0.5 border-b border-r border-gray-300">
                                             {labels[country]}
                                         </div>
-                                        <div className="grid grid-cols-7 gap-3 mt-4">
+                                        <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3 xl:grid-cols-7">
                                             <div className="space-y-1">
                                                 <label className="text-[10px] font-bold text-gray-600 block h-[15px]">매입단가</label>
                                                 <div className="relative">
@@ -805,18 +797,18 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                         </div>
                     </fieldset>
 
-                    <div className="flex gap-2 justify-end pt-4">
+                    <div className="sticky bottom-0 z-10 -mx-3 -mb-24 flex justify-end gap-2 border-t border-gray-300 bg-[#f0f0f0]/95 px-3 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.12)] backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-4 sm:shadow-none">
                         <button
                             type="button"
                             onClick={() => setIsOpen(false)}
-                            className="px-4 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none"
+                            className="min-h-11 flex-1 bg-[#c0c0c0] px-4 py-2 text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none sm:min-h-0 sm:flex-none sm:py-1.5"
                         >
                             CANCEL
                         </button>
                         <button
                             type="submit"
                             disabled={loading}
-                            className="px-8 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none disabled:opacity-50"
+                            className="min-h-11 flex-[2] bg-[#c0c0c0] px-8 py-2 text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none disabled:opacity-50 sm:min-h-0 sm:flex-none sm:py-1.5"
                         >
                             {loading ? 'WAIT...' : isCopy ? 'SAVE COPY' : initialData ? 'UPDATE' : 'SAVE ITEM'}
                         </button>
