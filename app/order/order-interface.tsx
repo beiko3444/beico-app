@@ -162,7 +162,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
         tax: '부가세 (10%)',
         total: '총 결제금액',
         confirmOrder: '주문 확정',
-        soldOutNotice: '현재 품절된 상품입니다. 재입고 일정은 공지사항으로 안내됩니다.',
+        soldOutNotice: '현재 품절되어 주문할 수 없습니다.',
         soldOutOrderDisabled: '품절 상품은 주문할 수 없습니다.',
     } : {
         productList: '商品リスト',
@@ -366,29 +366,29 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                 className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_14px_36px_rgba(15,23,42,0.10)] dark:bg-slate-900 ${isSoldOut ? 'border-rose-200 dark:border-rose-900/80' : 'border-slate-200 dark:border-slate-800'}`}
                             >
                                 <div className="flex flex-1 flex-col p-4 sm:p-5">
-                                    <div className="grid grid-cols-[112px_minmax(0,1fr)] gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
+                                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
                                         <div className="flex min-h-[142px] items-center justify-center overflow-hidden rounded-xl bg-slate-100 p-2 sm:min-h-[184px] dark:bg-slate-800">
                                             {product.imageUrl ? (
                                                 <img src={product.imageUrl} alt={product.name} className="max-h-[168px] max-w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03] dark:mix-blend-normal" />
                                             ) : (
-                                                <span className="text-center text-[10px] font-bold text-slate-400">{copy.noImage}</span>
+                                                <span className="text-center text-sm font-bold text-slate-400">{copy.noImage}</span>
                                             )}
                                         </div>
 
                                         <div className="min-w-0">
-                                            <div className="flex items-start justify-between gap-2">
+                                            <div className="flex flex-wrap items-start justify-between gap-2">
                                                 <span
                                                     role="status"
                                                     aria-label={isSoldOut ? (isKorean ? '품절 상품' : '品切れ商品') : (isKorean ? '주문 가능 상품' : '注文可能商品')}
-                                                    className={`inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-[11px] font-black ${isSoldOut ? 'bg-rose-500 text-white' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900'}`}
+                                                    className={`inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-sm font-black ${isSoldOut ? 'bg-rose-500 text-white' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900'}`}
                                                 >
-                                                    {isSoldOut ? `${copy.soldOut} · ${copy.soldOutSub}` : copy.available}
+                                                    {isSoldOut ? copy.soldOut : copy.available}
                                                 </span>
-                                                <span className="pt-1 text-[10px] font-bold tabular-nums text-slate-300 dark:text-slate-600">{String(index + 1).padStart(3, '0')}</span>
+                                                <span className="pt-1 text-sm font-bold tabular-nums text-slate-300 dark:text-slate-600">{String(index + 1).padStart(3, '0')}</span>
                                             </div>
-                                            <h2 className="mt-3 line-clamp-2 text-base font-black leading-snug text-slate-950 sm:text-lg dark:text-white">{displayProductName(product)}</h2>
+                                            <h2 className="mt-3 break-words text-lg font-bold leading-snug text-slate-950 sm:text-2xl dark:text-white">{displayProductName(product)}</h2>
                                             {!isKorean ? <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-400">{product.nameEN || product.name}</p> : null}
-                                            <p className="mt-3 text-[11px] font-bold text-slate-500 dark:text-slate-400">
+                                            <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">
                                                 {copy.productCode} <span className="font-mono text-slate-800 dark:text-slate-200">{product.productCode || '-'}</span>
                                             </p>
 
@@ -400,18 +400,18 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                                         height={25}
                                                         displayValue={false}
                                                         containerClassName="gap-2 mb-1"
-                                                        buttonClassName="rounded-md border border-slate-200 bg-white px-2 py-1 text-[9px] font-bold text-slate-500 transition-colors hover:border-[#d9361b] hover:bg-[#d9361b] hover:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                                                        buttonClassName="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-bold text-slate-500 transition-colors hover:border-[#d9361b] hover:bg-[#d9361b] hover:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
                                                     />
-                                                    <p className="mt-1 font-mono text-[10px] font-semibold text-slate-500">{product.barcode}</p>
+                                                    <p className="mt-1 font-mono text-sm font-semibold text-slate-500">{product.barcode}</p>
                                                 </div>
                                             ) : (
-                                                <p className="mt-3 text-[10px] font-bold text-slate-300 dark:text-slate-600">{copy.noBarcode}</p>
+                                                <p className="mt-3 text-sm font-bold text-slate-300 dark:text-slate-600">{copy.noBarcode}</p>
                                             )}
                                         </div>
                                     </div>
 
                                     {isSoldOut ? (
-                                        <div className="mt-4 flex items-start gap-2 rounded-xl bg-rose-50 px-4 py-3 text-xs font-semibold leading-5 text-rose-700 dark:bg-rose-950/25 dark:text-rose-300">
+                                        <div className="mt-4 flex items-start gap-2 rounded-xl bg-rose-50 px-4 py-3 text-base font-medium leading-6 text-rose-700 dark:bg-rose-950/25 dark:text-rose-300">
                                             <CircleAlert size={17} className="mt-0.5 shrink-0" />
                                             <span>{copy.soldOutNotice}</span>
                                         </div>
@@ -420,39 +420,39 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                     <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/70">
                                         <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-700">
                                             <div className="border-r border-slate-200 px-4 py-3 dark:border-slate-700">
-                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{wholesaleLabel}</p>
-                                                <p className="text-[9px] font-bold text-slate-400">{regionLabel}</p>
-                                                <p className="mt-2 text-right text-xl font-black tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayWholesale, priceOptions)}</p>
+                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{wholesaleLabel}</p>
+                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{regionLabel}</p>}
+                                                <p className="mt-2 text-right text-2xl font-bold tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayWholesale, priceOptions)}</p>
                                             </div>
                                             <div className="px-4 py-3">
-                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{retailLabel}</p>
-                                                <p className="text-[9px] font-bold text-slate-400">{regionLabel}</p>
-                                                <p className="mt-2 text-right text-xl font-black tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayRetail, priceOptions)}</p>
+                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{retailLabel}</p>
+                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{regionLabel}</p>}
+                                                <p className="mt-2 text-right text-2xl font-bold tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayRetail, priceOptions)}</p>
                                             </div>
                                         </div>
                                         <div className="grid grid-cols-2">
                                             <div className={`border-r border-slate-200 px-4 py-3 dark:border-slate-700 ${isSoldOut ? 'bg-rose-50/70 dark:bg-rose-950/20' : ''}`}>
-                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{copy.orderStatus}</p>
-                                                <p className="text-[9px] font-bold text-slate-400">{copy.orderStatusSub}</p>
+                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{copy.orderStatus}</p>
+                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{copy.orderStatusSub}</p>}
                                                 <p className={`mt-2 text-right text-lg font-black ${isSoldOut ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{isSoldOut ? copy.soldOut : copy.available}</p>
                                             </div>
                                             <div className="px-4 py-3">
-                                                <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{copy.margin}</p>
-                                                <p className="text-[9px] font-bold text-slate-400">{copy.marginSub}</p>
-                                                <p className="mt-2 text-right text-xl font-black tabular-nums text-[#e34219]">{marginPercent}%</p>
+                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{copy.margin}</p>
+                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{copy.marginSub}</p>}
+                                                <p className="mt-2 text-right text-2xl font-bold tabular-nums text-[#e34219]">{marginPercent}%</p>
                                             </div>
                                         </div>
                                     </div>
                                 </div>
 
-                                <div className="flex flex-col gap-4 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 dark:border-slate-800 dark:bg-slate-900">
+                                <div className="flex flex-col gap-4 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5 dark:border-slate-800 dark:bg-slate-900">
                                     <div>
-                                        <p className="text-[11px] font-black text-slate-700 dark:text-slate-200">{copy.minimumOrder}</p>
-                                        <p className="mt-1 text-[10px] font-semibold text-slate-400">{copy.minimumOrderSub}: {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : 'EA'} · {copy.orderUnit}: {formatNumber(orderUnit)}{isKorean ? '개' : 'EA'}</p>
+                                        <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{copy.minimumOrder}</p>
+                                        <p className="mt-1 text-sm font-medium leading-6 text-slate-600">{copy.minimumOrderSub}: {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : 'EA'} · {copy.orderUnit}: {formatNumber(orderUnit)}{isKorean ? '개' : 'EA'}</p>
                                     </div>
 
                                     {isSoldOut ? (
-                                        <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-xs font-bold text-slate-500 sm:min-w-[220px] dark:bg-slate-800 dark:text-slate-400">{copy.soldOutOrderDisabled}</div>
+                                        <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-medium text-slate-600 sm:min-w-[220px] dark:bg-slate-800 dark:text-slate-400">{copy.soldOutOrderDisabled}</div>
                                     ) : (
                                         <div className={`flex h-12 items-center overflow-hidden rounded-xl border shadow-sm ${qty === 0 ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900' : 'border-[#e34219] bg-[#fff7f3] dark:bg-[#2a1a1a]'}`}>
                                             <button type="button" aria-label={isKorean ? '수량 줄이기' : '数量を減らす'} onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))} className="flex h-full w-11 items-center justify-center text-slate-700 hover:bg-slate-50 dark:text-white dark:hover:bg-slate-800">
@@ -483,12 +483,12 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
             {/* Sticky Footer */}
             {hasItems && (
-                <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-[#1e1e1e]/95 backdrop-blur-xl border-t border-gray-200 dark:border-[#2a2a2a] p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none animate-in slide-in-from-bottom duration-300">
+                <div className="fixed bottom-[calc(68px+env(safe-area-inset-bottom))] sm:bottom-0 left-0 right-0 bg-white/95 dark:bg-[#1e1e1e]/95 backdrop-blur-xl border-t border-gray-200 dark:border-[#2a2a2a] p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none animate-in slide-in-from-bottom duration-300">
                     <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
                         <div className="text-right flex flex-col items-end">
                             <div className="flex flex-col items-end mb-1 text-gray-400 dark:text-gray-500 gap-0.5">
-                                <span className="text-[10px] font-black leading-tight">{copy.totalExcludingTax}</span>
-                                <span className="text-[8px] font-bold uppercase tracking-widest leading-none">{copy.totalExcludingTaxSub}</span>
+                                <span className="text-sm font-black leading-tight">{copy.totalExcludingTax}</span>
+                                <span className="text-xs font-bold uppercase tracking-widest leading-none">{copy.totalExcludingTaxSub}</span>
                             </div>
                             <p className="text-4xl font-medium text-[#111827] dark:text-white leading-none font-inter tracking-tighter">
                                 <span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(productTotal, isUSD)}
@@ -501,7 +501,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
                         >
                             <div className="flex flex-col items-end md:items-start leading-none">
                                 <span className="text-lg">{copy.orderNow}</span>
-                                <span className="text-[9px] opacity-70 font-bold tracking-[0.2em] -mt-0.5">{copy.orderNowSub}</span>
+                                <span className="text-sm opacity-70 font-bold tracking-[0.2em] -mt-0.5">{copy.orderNowSub}</span>
                             </div>
                             <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
                         </button>
@@ -528,7 +528,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-[#2a2a2a]">
                                         <div>
                                             <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{displayProductName(p)}</p>
-                                            <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
+                                            <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
                                                 {!isKorean && p.nameEN ? <span className="mr-1">{p.nameEN}</span> : null}
                                                 <span>{isKorean ? `수량 ${formatNumber(quantities[p.id])}개` : `× ${formatNumber(quantities[p.id])}`}</span>
                                             </p>

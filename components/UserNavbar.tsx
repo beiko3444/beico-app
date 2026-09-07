@@ -40,10 +40,10 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
                     >
                         {isActive ? <span className="absolute inset-x-4 top-0 h-0.5 rounded-b bg-[#E43D20] sm:hidden" /> : null}
                         <Icon size={21} strokeWidth={isActive ? 2.5 : 2} />
-                        <span className="text-[11px] font-extrabold leading-none sm:text-[13px]">
+                        <span className="text-sm font-semibold leading-none sm:text-base">
                             {item.label}
                         </span>
-                        <span className="hidden text-[9px] font-semibold leading-none lg:inline">
+                        <span className={isKorean ? "hidden" : "hidden text-sm font-medium leading-none lg:inline"}>
                             {item.subLabel}
                         </span>
                     </Link>

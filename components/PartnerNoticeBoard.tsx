@@ -60,19 +60,19 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
                   </span>
                   <div>
                     <p className="text-base font-black text-[#d9361b]">{isKorean ? '공지사항' : 'お知らせ'}</p>
-                    <p className="mt-0.5 text-[10px] font-bold tracking-[0.12em] text-slate-400">{isKorean ? '파트너 안내' : 'PARTNER NOTICE'}</p>
+                    <p className="mt-0.5 text-sm font-bold tracking-[0.12em] text-slate-400">{isKorean ? '파트너 안내' : 'PARTNER NOTICE'}</p>
                   </div>
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-[10px] font-black ${tone.badge}`}>{isKorean ? notice.tone === 'URGENT' ? '긴급' : notice.tone === 'IMPORTANT' ? '중요' : '일반' : tone.label}</span>
-                    <p className="truncate text-base font-black text-slate-900 dark:text-white sm:text-lg">{notice.title}</p>
+                    <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-sm font-black ${tone.badge}`}>{isKorean ? notice.tone === 'URGENT' ? '긴급' : notice.tone === 'IMPORTANT' ? '중요' : '일반' : tone.label}</span>
+                    <p className="break-words text-lg font-bold text-slate-900 dark:text-white sm:text-xl">{notice.title}</p>
                   </div>
-                  <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-xs font-medium leading-5 text-slate-500 dark:text-slate-400">{notice.content}</p>
+                  <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-base font-normal leading-7 text-slate-600 dark:text-slate-400">{notice.content}</p>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 text-xs font-bold text-slate-400 sm:flex-col sm:items-end">
+                <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-400 sm:flex-col sm:items-end">
                   <time dateTime={notice.updatedAt}>{formatNoticeDate(notice.updatedAt, isKorean)}</time>
                   <span className="flex items-center gap-1 text-slate-700 dark:text-slate-200">
                     {isKorean ? '자세히 보기' : '詳細を見る'}
@@ -80,7 +80,7 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
                   </span>
                 </div>
               </summary>
-              <div className={`mx-4 mb-5 whitespace-pre-wrap break-words rounded-xl border px-5 py-4 text-sm font-medium leading-7 text-slate-700 sm:ml-[210px] sm:mr-6 dark:border-[#383838] dark:bg-[#252525] dark:text-slate-200 ${tone.panel}`}>
+              <div className={`mx-4 mb-5 whitespace-pre-wrap break-words rounded-xl border px-5 py-4 text-base font-normal leading-7 text-slate-700 sm:ml-[210px] sm:mr-6 dark:border-[#383838] dark:bg-[#252525] dark:text-slate-200 ${tone.panel}`}>
                 {notice.content}
               </div>
             </details>
