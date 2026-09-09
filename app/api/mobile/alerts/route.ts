@@ -28,7 +28,7 @@ export async function GET(request: Request) {
   const since = parseSince(url.searchParams.get('since'))
   const where = since ? { createdAt: { gt: since } } : { createdAt: { gt: new Date(Date.now() - 10 * 60 * 1000) } }
 
-  const [orders, messages, deposits] = await Promise.all([
+  const [orders, deposits] = await Promise.all([
     prisma.order.findMany({
       where,
       orderBy: { createdAt: 'desc' },
@@ -46,18 +46,6 @@ export async function GET(request: Request) {
           },
         },
         _count: { select: { items: true } },
-      },
-    }),
-    prisma.mobileMessage.findMany({
-      where,
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-      select: {
-        id: true,
-        sender: true,
-        senderName: true,
-        body: true,
-        createdAt: true,
       },
     }),
     prisma.depositSms.findMany({
@@ -87,14 +75,6 @@ export async function GET(request: Request) {
         createdAt: order.createdAt.toISOString(),
       }
     }),
-    ...messages.map((message) => ({
-      id: `message:${message.id}`,
-      type: 'mobile_message' as const,
-      title: '새 문자 수신',
-      body: `${message.senderName || message.sender || '알 수 없음'} · ${compact(message.body)}`,
-      url: '/admin/mobile-messages',
-      createdAt: message.createdAt.toISOString(),
-    })),
     ...deposits.map((deposit) => ({
       id: `deposit:${deposit.id}`,
       type: 'deposit_sms' as const,

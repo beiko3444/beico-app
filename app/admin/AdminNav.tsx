@@ -6,7 +6,6 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BarChart3,
   Boxes,
   Clock3,
   CreditCard,
@@ -15,11 +14,9 @@ import {
   FileText,
   Globe2,
   Handshake,
-  Inbox,
   LayoutGrid,
   LogOut,
   Menu,
-  MessageSquareText,
   Package,
   PackagePlus,
   PlugZap,
@@ -28,7 +25,6 @@ import {
   ShoppingCart,
   Star,
   StickyNote,
-  ThermometerSun,
   Warehouse,
   X,
 } from 'lucide-react'
@@ -192,7 +188,6 @@ export default function AdminNav({
     { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
     { name: '상품관리', path: '/admin/products', icon: Package },
     { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
-    { name: '온습도', path: '/admin/environment', icon: ThermometerSun },
     { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
     { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
     { name: '파트너관리', path: '/admin/partners', icon: Handshake },
@@ -201,9 +196,6 @@ export default function AdminNav({
     { name: '카드사용내역', path: '/admin/card-usage', icon: CreditCard },
     { name: '메모', path: '/admin/memos', icon: StickyNote },
     { name: '마인드보드', path: '/admin/mindboard', icon: LayoutGrid },
-    { name: '수신문자함', path: '/admin/mobile-messages', icon: Inbox },
-    { name: '문자발송서비스', path: '/admin/sms', icon: MessageSquareText },
-    { name: '통계', path: '/admin/statistics', icon: BarChart3 },
     { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
     { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
     { name: 'PI발급', path: '/admin/proforma', icon: FileText },
@@ -273,7 +265,7 @@ export default function AdminNav({
 
   const handleSendPickupSms = async () => {
     if (!fromNumber) {
-      alert('발신번호를 찾지 못했습니다. 문자발송서비스에서 발신번호를 먼저 확인해 주세요.')
+      alert('발신번호를 찾지 못했습니다. 등록된 발신번호 설정을 확인해 주세요.')
       return
     }
     const pickupCount = Number.parseInt(shipmentCount, 10)
