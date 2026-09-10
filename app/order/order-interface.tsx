@@ -17,7 +17,6 @@ type Product = {
     nameEN?: string | null
     minOrderQuantity?: number | string | null
     orderUnit?: number | string | null
-    appliedGrade?: string
     onlinePrice?: number | string | null
     jpBuyPrice?: number | string | null
     jpSellPrice?: number | string | null
@@ -40,7 +39,6 @@ type SafeProduct = {
     nameEN: string | null
     minOrderQuantity: number
     orderUnit: number
-    appliedGrade?: string
     onlinePrice: number
     jpBuyPrice: number
     jpSellPrice: number
@@ -103,7 +101,6 @@ const normalizeProduct = (product: Product): SafeProduct | null => {
         nameEN: safeText(product.nameEN) || null,
         minOrderQuantity: safePositiveInt(product.minOrderQuantity, 1),
         orderUnit: safePositiveInt(product.orderUnit, 1),
-        appliedGrade: safeText(product.appliedGrade) || undefined,
         onlinePrice: safeNonNegativeNumber(product.onlinePrice),
         jpBuyPrice: safeNonNegativeNumber(product.jpBuyPrice),
         jpSellPrice: safeNonNegativeNumber(product.jpSellPrice),

@@ -11,7 +11,7 @@ export default async function ProfilePage() {
     const user = await prisma.user.findUnique({
         where: { id: session.user.id },
         select: { name: true, username: true, country: true, role: true, status: true,
-            partnerProfile: { select: { contact: true, email: true, fax: true, address: true, businessName: true, representativeName: true, businessRegNumber: true, grade: true } } },
+            partnerProfile: { select: { contact: true, email: true, fax: true, address: true, businessName: true, representativeName: true, businessRegNumber: true } } },
     })
     if (!user) redirect('/login')
     const isKorean = user.country === 'Korea'
@@ -22,7 +22,6 @@ export default async function ProfilePage() {
         [isKorean ? '대표자명' : '代表者名', profile?.representativeName],
         [isKorean ? '사업자등록번호' : '事業者登録番号', profile?.businessRegNumber],
         [isKorean ? '거래 국가' : '取引国', user.country],
-        [isKorean ? '거래 등급' : '取引ランク', profile?.grade],
     ]
     return <div className="mx-auto max-w-4xl space-y-6 pb-16">
         <header>

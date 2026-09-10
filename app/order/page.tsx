@@ -188,7 +188,6 @@ export default async function NewOrderPage() {
             krSellPrice: krSell,
             usBuyPrice: usBuy,
             usSellPrice: usSell,
-            appliedGrade: gradeToUse,
             partnerSaleStatus: normalizePartnerProductStatus(p.partnerSaleStatus, p.wholesaleAvailable),
             country: user?.country || null
         }
