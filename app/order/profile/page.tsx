@@ -1,94 +1,47 @@
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
-import { redirect } from "next/navigation"
-import { prisma } from "@/lib/prisma"
-import ChangePasswordForm from "@/components/ChangePasswordForm"
-import LogoutButton from "@/components/LogoutButton"
-import { User, History, LogOut } from 'lucide-react'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
+import { redirect } from 'next/navigation'
+import { prisma } from '@/lib/prisma'
+import ChangePasswordForm from '@/components/ChangePasswordForm'
+import PartnerProfileForm from '@/components/PartnerProfileForm'
 
 export default async function ProfilePage() {
     const session = await getServerSession(authOptions)
-    if (!session) redirect('/login')
-
-    let country = session.user.country || ''
-
-    if (session?.user?.id) {
-        const user = await prisma.user.findUnique({
-            where: { id: session.user.id },
-            select: {
-                country: true,
-            },
-        })
-        if (user) {
-            country = user.country || country
-        }
-    }
-
-    const isKorean = country === 'Korea'
-    const role = session.user.role === 'ADMIN'
-        ? (isKorean ? '관리자' : '管理者 / Admin')
-        : (isKorean ? '파트너' : 'パートナー / Partner')
-
-    return (
-        <div className="max-w-[400px] mx-auto space-y-4 pb-20 pt-1.5">
-            {/* Account Info Section */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2 ml-1">
-                    <div className="w-5 h-5 flex items-center justify-center text-gray-400">
-                        <User size={16} className="stroke-[2.5]" />
-                    </div>
-                    <h2 className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight">{isKorean ? '계정 정보' : 'アカウント情報 / Account Info'}</h2>
-                </div>
-
-                <div className="flex flex-col gap-3">
-                    {/* Name Field Style Card */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight ml-1">{isKorean ? '이름' : '氏名 / Name'}</label>
-                        <div className="w-full h-12 px-4 bg-[#f9f9f9] dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center shadow-sm dark:shadow-none text-[14px] font-medium text-gray-800 dark:text-gray-400">
-                            {session.user.name}
-                        </div>
-                    </div>
-
-                    {/* Email Field Style Card */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight ml-1">{isKorean ? '사용자 아이디' : 'ユーザーID / User ID'}</label>
-                        <div className="w-full h-12 px-4 bg-[#f9f9f9] dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center shadow-sm dark:shadow-none text-[14px] font-medium text-gray-800 dark:text-gray-400">
-                            {session.user.email}
-                        </div>
-                    </div>
-
-                    {/* Status Field Style Card */}
-                    <div className="flex flex-col gap-1.5">
-                        <label className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight ml-1">{isKorean ? '계정 권한' : '権限 / Status'}</label>
-                        <div className="w-full h-12 px-4 bg-[#f9f9f9] dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-lg flex items-center shadow-sm dark:shadow-none text-[14px] font-bold text-[#e34219]">
-                            {role}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Separator */}
-            <div className="border-t border-gray-100 dark:border-[#2a2a2a] w-full"></div>
-
-            {/* Password Change Section */}
-            <div className="space-y-3">
-                <div className="flex items-center gap-2 ml-1">
-                    <div className="w-5 h-5 flex items-center justify-center text-gray-400">
-                        <History size={16} className="stroke-[2.5]" />
-                    </div>
-                    <h2 className="text-[12px] font-semibold text-[#1e293b] dark:text-white tracking-tight">{isKorean ? '비밀번호 변경' : 'パスワード変更 / Password Change'}</h2>
-                </div>
-
-                <ChangePasswordForm isKorean={isKorean} />
-            </div>
-
-            {/* Footer / Logout */}
-            <div className="flex flex-col items-center gap-4 py-2">
-                <LogoutButton className="text-gray-400 hover:text-[#e34219] transition-colors flex items-center gap-2 group">
-                    <LogOut size={16} className="group-hover:-translate-x-1 transition-transform" />
-                    <span className="text-[11px] font-bold tracking-tight">{isKorean ? '로그아웃' : 'ログアウト / Logout'}</span>
-                </LogoutButton>
-            </div>
-        </div>
-    )
+    if (!session?.user?.id) redirect('/login')
+    const user = await prisma.user.findUnique({
+        where: { id: session.user.id },
+        select: { name: true, username: true, country: true, role: true, status: true,
+            partnerProfile: { select: { contact: true, email: true, fax: true, address: true, businessName: true, representativeName: true, businessRegNumber: true, grade: true } } },
+    })
+    if (!user) redirect('/login')
+    const isKorean = user.country === 'Korea'
+    const profile = user.partnerProfile
+    const accountFields = [
+        [isKorean ? '로그인 아이디' : 'ログインID', user.username],
+        [isKorean ? '업체명' : '会社名', profile?.businessName],
+        [isKorean ? '대표자명' : '代表者名', profile?.representativeName],
+        [isKorean ? '사업자등록번호' : '事業者登録番号', profile?.businessRegNumber],
+        [isKorean ? '거래 국가' : '取引国', user.country],
+        [isKorean ? '거래 등급' : '取引ランク', profile?.grade],
+    ]
+    return <div className="mx-auto max-w-4xl space-y-6 pb-16">
+        <header>
+            <h1 className="text-3xl font-bold">{isKorean ? '내 정보' : 'マイページ'}</h1>
+            <p className="mt-2 text-base text-[var(--muted-foreground)]">{isKorean ? '연락처와 주소를 최신 정보로 관리해 주세요.' : '連絡先と住所を最新の情報に更新してください。'}</p>
+        </header>
+        {user.role === 'PARTNER' && user.status === 'APPROVED' && <PartnerProfileForm isKorean={isKorean} initial={{
+            name: user.name, contact: profile?.contact || '', email: profile?.email || '', fax: profile?.fax || '', address: profile?.address || '',
+        }} />}
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-7">
+            <h2 className="text-xl font-bold">{isKorean ? '계정 및 사업자 정보' : 'アカウント・事業者情報'}</h2>
+            <p className="mt-2 text-sm text-[var(--muted-foreground)]">{isKorean ? '아래 정보의 변경은 관리자에게 요청해 주세요. 연락용 이메일을 바꿔도 로그인 아이디는 유지됩니다.' : '以下の情報の変更は管理者にご依頼ください。連絡先メールを変更してもログインIDは変わりません。'}</p>
+            <dl className="mt-5 grid gap-5 sm:grid-cols-2">
+                {accountFields.map(([label, value]) => <div key={label}><dt className="text-sm text-[var(--muted-foreground)]">{label}</dt><dd className="mt-1 break-words text-base font-semibold">{value || '—'}</dd></div>)}
+            </dl>
+        </section>
+        <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-7">
+            <h2 className="mb-5 text-xl font-bold">{isKorean ? '비밀번호 변경' : 'パスワード変更'}</h2>
+            <div className="max-w-lg"><ChangePasswordForm isKorean={isKorean} /></div>
+        </section>
+    </div>
 }
