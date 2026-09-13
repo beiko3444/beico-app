@@ -45,6 +45,7 @@ import type {
   SmartInventoryMasterRow,
 } from '@/lib/smartInventoryClient'
 import { externalProductHref } from '@/lib/smartInventoryLinks.mjs'
+import { resolveInventoryRowSyncedAt } from '@/lib/smartInventoryDates'
 import ProductInventoryHistoryModal from './ProductInventoryHistoryModal'
 
 type FilterMode = 'all' | 'empty' | 'inbound' | 'unlinked' | 'linked'
@@ -323,7 +324,7 @@ function SortableMasterRow({
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600">{formatNumber(row.totalInboundPending)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(row.stockCost)}</td>
       <td className="px-3 py-2"><LinkedProducts links={row.linked} /></td>
-      <td className="px-3 py-2 text-[12px] font-bold text-slate-500">{formatDateTime(row.updatedAt || row.linked[0]?.syncedAt)}</td>
+      <td className="px-3 py-2 text-[12px] font-bold text-slate-500">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
     </tr>
   )
 }
@@ -378,7 +379,7 @@ function MasterTable({
               <th className="w-[90px] px-3 py-3 text-right">입고대기</th>
               <th className="w-[130px] px-3 py-3 text-right">재고가치</th>
               <th className="w-[310px] px-3 py-3">연결상태</th>
-              <th className="w-[125px] px-3 py-3">갱신</th>
+              <th className="w-[125px] px-3 py-3">재고 갱신</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
