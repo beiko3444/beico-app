@@ -62,6 +62,7 @@ function SidebarProductImage({ src, alt }: { src: string | null; alt: string }) 
 
 function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   const [favoriteRows, setFavoriteRows] = useState<SmartInventoryMasterRow[]>([])
+  const [coupangStale, setCoupangStale] = useState(false)
   const [loading, setLoading] = useState(false)
 
   const applyRows = useCallback((ids: number[], rows: SmartInventoryMasterRow[]) => {
@@ -86,6 +87,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
       const payload: SmartInventoryDashboardPayload = await response.json()
       if (!response.ok || !Array.isArray(payload.rows)) throw new Error('failed')
 
+      setCoupangStale(payload.channelHealth?.coupang?.status === 'stale')
       applyRows(ids, payload.rows)
     } catch {
       setFavoriteRows([])
@@ -154,10 +156,10 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
                       </td>
                       <td className="w-[34%] overflow-hidden whitespace-nowrap px-1 text-left text-red-700">
                         <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-red-600 px-1 text-[10px] font-black leading-none text-white">C</span>
-                        <span>{formatSidebarStock(row.coupangStock)}</span>
+                        <span>{coupangStale ? '오류' : formatSidebarStock(row.coupangStock)}</span>
                       </td>
                       <td className="w-[28%] overflow-hidden whitespace-nowrap pl-1 text-right text-[12px] font-black text-slate-950">
-                        {formatSidebarStock(row.totalStock)}
+                        {coupangStale ? '-' : formatSidebarStock(row.totalStock)}
                       </td>
                     </tr>
                   </tbody>

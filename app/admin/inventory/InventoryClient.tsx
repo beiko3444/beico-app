@@ -162,15 +162,19 @@ function StatCard({
 function InventoryStockSub({
   naver,
   coupang,
+  coupangStale = false,
 }: {
   naver: number | null | undefined
   coupang: number | null | undefined
+  coupangStale?: boolean
 }) {
   return (
     <span>
       <span className="text-emerald-600">네이버 {formatNumber(naver)}</span>
       <span className="mx-1 text-slate-300">/</span>
-      <span className="text-red-600">쿠팡 {formatNumber(coupang)}</span>
+      <span className={coupangStale ? 'text-red-700' : 'text-red-600'}>
+        쿠팡 {coupangStale ? '연동 오류' : formatNumber(coupang)}
+      </span>
     </span>
   )
 }
@@ -242,12 +246,14 @@ function SortableMasterRow({
   favorite,
   onToggleFavorite,
   onSelect,
+  coupangStale,
 }: {
   row: SmartInventoryMasterRow
   rank: number
   favorite: boolean
   onToggleFavorite: (id: number) => void
   onSelect: (row: SmartInventoryMasterRow) => void
+  coupangStale: boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: row.id })
   const dragHandleStyle = {
@@ -319,10 +325,12 @@ function SortableMasterRow({
       </td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-emerald-600">{formatNumber(row.naverStock)}</td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-red-600">{formatNumber(row.coupangStock)}</td>
-      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-slate-950">{formatNumber(row.totalStock)}</td>
+      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-red-600">
+        {coupangStale ? <span title="쿠팡 API 인증 오류로 현재 재고를 확인할 수 없습니다.">연동 오류</span> : formatNumber(row.coupangStock)}
+      </td>
+      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-slate-950">{coupangStale ? '-' : formatNumber(row.totalStock)}</td>
       <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600">{formatNumber(row.totalInboundPending)}</td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(row.stockCost)}</td>
+      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{coupangStale ? '-' : formatMoney(row.stockCost)}</td>
       <td className="px-3 py-2"><LinkedProducts links={row.linked} /></td>
       <td className="px-3 py-2 text-[12px] font-bold text-slate-500">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
     </tr>
@@ -336,6 +344,7 @@ function MasterTable({
   onToggleFavorite,
   onReorder,
   onSelect,
+  coupangStale,
 }: {
   rows: SmartInventoryMasterRow[]
   allRows: SmartInventoryMasterRow[]
@@ -343,6 +352,7 @@ function MasterTable({
   onToggleFavorite: (id: number) => void
   onReorder: (nextOrder: number[]) => void
   onSelect: (row: SmartInventoryMasterRow) => void
+  coupangStale: boolean
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -393,6 +403,7 @@ function MasterTable({
                     favorite={favoriteIds.includes(row.id)}
                     onToggleFavorite={onToggleFavorite}
                     onSelect={onSelect}
+                    coupangStale={coupangStale}
                   />
                 ))}
               </SortableContext>
@@ -410,7 +421,7 @@ function MasterTable({
   )
 }
 
-function UnlinkedTable({ rows }: { rows: SmartInventoryChannelRow[] }) {
+function UnlinkedTable({ rows, coupangStale }: { rows: SmartInventoryChannelRow[]; coupangStale: boolean }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-[#E5EAF2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
       <table className="w-[900px] table-fixed border-collapse text-left text-[13px]">
@@ -464,7 +475,9 @@ function UnlinkedTable({ rows }: { rows: SmartInventoryChannelRow[] }) {
                     </div>
                   </div>
                 </td>
-                <td className={`px-3 py-2 text-right font-black tabular-nums ${stockTone(row.stock)}`}>{formatNumber(row.stock)}</td>
+                <td className={`px-3 py-2 text-right font-black tabular-nums ${stockTone(row.stock)}`}>
+                  {row.channel === 'coupang' && coupangStale ? '연동 오류' : formatNumber(row.stock)}
+                </td>
                 <td className="px-3 py-2 text-right font-black tabular-nums text-slate-900">{formatNumber(row.todaySales)}</td>
                 <td className="px-3 py-2 text-right font-black tabular-nums text-slate-900">{formatMoney(row.price)}</td>
                 <td className="px-3 py-2 text-[12px] font-bold text-slate-500">{formatDateTime(row.syncedAt)}</td>
@@ -641,6 +654,7 @@ export default function InventoryClient() {
 
   const activeRowsCount = tableMode === 'masters' ? filteredMasters.length : filteredUnlinkedRows.length
   const healthStatus = String(data?.health?.status || '')
+  const coupangStale = data?.channelHealth?.coupang?.status === 'stale'
   const cacheLabel = data?.cache?.hit
     ? `캐시 표시 중${data.cache.refreshing ? ' / 갱신 중' : ''}`
     : data?.cache?.cachedAt
@@ -660,8 +674,8 @@ export default function InventoryClient() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E5EAF2] bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm">
-              <span className={`h-2 w-2 rounded-full ${healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-              <span>{healthStatus ? '마스틱 연결됨' : '마스틱 상태 확인'}</span>
+              <span className={`h-2 w-2 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              <span>{coupangStale ? '쿠팡 갱신 중단' : healthStatus ? '마스틱 연결됨' : '마스틱 상태 확인'}</span>
             </div>
             <div className="inline-flex h-10 items-center rounded-lg border border-[#E5EAF2] bg-white px-3 text-[12px] font-black text-slate-500 shadow-sm">
               {cacheLabel}
@@ -708,13 +722,13 @@ export default function InventoryClient() {
         <StatCard
           icon={<Database size={20} />}
           label="총 재고"
-          value={formatNumber(data?.summary.totalStock || 0)}
-          sub={<InventoryStockSub naver={data?.summary.naverStock || 0} coupang={data?.summary.coupangStock || 0} />}
+          value={coupangStale ? '확인 불가' : formatNumber(data?.summary.totalStock || 0)}
+          sub={<InventoryStockSub naver={data?.summary.naverStock || 0} coupang={data?.summary.coupangStock || 0} coupangStale={coupangStale} />}
           tone="blue"
         />
         <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="입고 예정 상품 수" tone="orange" />
         <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub="연결되지 않은 상품 수" tone="red" />
-        <StatCard icon={<WalletCards size={20} />} label="재고가치" value={formatMoney(data?.summary.stockCost || 0)} sub="총 재고 기준 금액" tone="green" />
+        <StatCard icon={<WalletCards size={20} />} label="재고가치" value={coupangStale ? '확인 불가' : formatMoney(data?.summary.stockCost || 0)} sub="총 재고 기준 금액" tone="green" />
       </div>
 
       <div className="flex flex-col gap-3 rounded-xl border border-[#E5EAF2] bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.05)] xl:flex-row xl:items-center xl:justify-between">
@@ -774,9 +788,10 @@ export default function InventoryClient() {
           onToggleFavorite={handleToggleFavorite}
           onReorder={handleReorder}
           onSelect={setSelectedHistoryProduct}
+          coupangStale={coupangStale}
         />
       ) : (
-        <UnlinkedTable rows={filteredUnlinkedRows} />
+        <UnlinkedTable rows={filteredUnlinkedRows} coupangStale={coupangStale} />
       )}
       {selectedHistoryProduct ? (
         <ProductInventoryHistoryModal

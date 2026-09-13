@@ -1,3 +1,9 @@
+import {
+  inventorySyncFailure,
+  resolveInventoryChannelHealth,
+  type InventoryChannelHealth,
+} from '@/lib/smartInventoryHealth'
+
 export type SmartInventoryChannel = 'naver' | 'coupang'
 
 export type SmartInventoryLinkedProduct = {
@@ -70,6 +76,7 @@ export type SmartInventoryDashboardPayload = {
   monitorUrl: string | null
   monitorSource: 'env' | 'gist' | null
   health: Record<string, unknown> | null
+  channelHealth: Record<SmartInventoryChannel, InventoryChannelHealth>
   rows: SmartInventoryMasterRow[]
   channels: Record<SmartInventoryChannel, SmartInventoryChannelRow[]>
   unlinked: Record<SmartInventoryChannel, number>
@@ -473,6 +480,27 @@ function finalizeMaster(master: SmartInventoryMasterRow) {
   master.todayRevenue = todayRevenue || null
 }
 
+function excludeStaleCoupangMetrics(rows: SmartInventoryMasterRow[]) {
+  for (const row of rows) {
+    row.coupangStock = null
+    row.coupangSales = null
+    row.coupangTodaySales = null
+    row.totalStock = row.naverStock
+    row.totalSales = row.naverSales
+    row.totalTodaySales = row.naverTodaySales
+    row.stockCost = row.unitCost !== null && row.naverStock !== null
+      ? row.unitCost * row.naverStock
+      : null
+
+    let todayRevenue = 0
+    for (const link of row.linked) {
+      if (link.channel !== 'naver' || link.todaySales === null || link.price === null) continue
+      todayRevenue += link.todaySales * link.price
+    }
+    row.todayRevenue = todayRevenue || null
+  }
+}
+
 function addInboundPending(rows: SmartInventoryMasterRow[], summaries: RawRecord[]) {
   const pendingByMasterChannel = new Map<string, number>()
   for (const summary of summaries) {
@@ -522,6 +550,15 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
     naver: rawArray(inventoryPayload, 'naver').map((row, index) => normalizeChannelRow('naver', row, index + 1)),
     coupang: rawArray(inventoryPayload, 'coupang').map((row, index) => normalizeChannelRow('coupang', row, index + 1)),
   }
+  const channelHealth = {
+    naver: resolveInventoryChannelHealth(healthResult, 'naver'),
+    coupang: resolveInventoryChannelHealth(healthResult, 'coupang'),
+  }
+  if (channelHealth.coupang.status === 'stale') {
+    warnings.push(
+      `쿠팡 재고 수집이 ${channelHealth.coupang.lastUpdatedAt} 이후 중단되었습니다. 오래된 값은 현재 재고와 합계에서 제외합니다.`,
+    )
+  }
   const masterRows = rawArray(mastersResult, 'masters').map(makeEmptyMaster).filter((row): row is SmartInventoryMasterRow => row !== null)
   const masterById = new Map(masterRows.map((row) => [row.id, row]))
   const rawLinks = rawArray(linksResult, 'links').map(normalizeLink).filter((link): link is RawMasterLink => link !== null)
@@ -556,6 +593,7 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
   }
 
   for (const row of masterRows) finalizeMaster(row)
+  if (channelHealth.coupang.status === 'stale') excludeStaleCoupangMetrics(masterRows)
 
   const inboundItems = rawArray(inboundsResult, 'items')
   const inboundSummaries = rawArray(inboundsResult, 'summaries')
@@ -573,6 +611,7 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
     monitorUrl: base.url,
     monitorSource: base.source,
     health: healthResult,
+    channelHealth,
     rows: sortedRows,
     channels,
     unlinked,
@@ -629,6 +668,10 @@ async function fetchSmartInventoryDashboardLive(): Promise<SmartInventoryDashboa
       monitorUrl: null,
       monitorSource: null,
       health: null,
+      channelHealth: {
+        naver: resolveInventoryChannelHealth(null, 'naver'),
+        coupang: resolveInventoryChannelHealth(null, 'coupang'),
+      },
       rows: [],
       channels: { naver: [], coupang: [] },
       unlinked: { naver: 0, coupang: 0 },
@@ -751,6 +794,8 @@ export async function syncSmartInventory(): Promise<{ result: Record<string, unk
     { method: 'POST' },
     requestTimeoutMs(120000),
   )
+  const failure = inventorySyncFailure(result)
+  if (failure) throw new Error(failure)
   const dashboard = await refreshDashboardCache()
   return { result, dashboard }
 }

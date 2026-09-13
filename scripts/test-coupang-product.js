@@ -4,8 +4,8 @@ const { HttpsProxyAgent } = require("https-proxy-agent");
 
 require("dotenv").config();
 
-const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY || "316ac83a-78d0-48e3-a8fe-41b744bd90fe";
-const SECRET_KEY = process.env.COUPANG_SECRET_KEY || "75b0b84b0b70cace39e295cdf1eaf224e524c607";
+const ACCESS_KEY = process.env.COUPANG_ACCESS_KEY || "";
+const SECRET_KEY = process.env.COUPANG_SECRET_KEY || "";
 const VENDOR_ID = process.env.COUPANG_VENDOR_ID || "A00534715";
 
 function generateHmacAuthHeader(method, path, query = "") {
