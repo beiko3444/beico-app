@@ -746,7 +746,7 @@ export default function InventoryClient() {
   const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, index) => pageNumberStart + index)
 
   return (
-    <div className="space-y-4 pb-6">
+    <div className="mx-auto w-full max-w-[1540px] space-y-4 pb-6">
       <header className="sticky top-[56px] z-40 -mx-3 border-b border-[#E5EAF2] bg-[#F6F8FB]/95 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5 lg:top-0 lg:-mx-6 lg:px-6">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
           <div className="min-w-0">
@@ -818,7 +818,7 @@ export default function InventoryClient() {
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-[#DDE3EC] bg-white p-2 shadow-[0_1px_3px_rgba(15,23,42,0.05)] xl:flex-row xl:items-center">
-        <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-3 focus-within:border-[#2563EB]">
+        <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-3 focus-within:border-[#2563EB] xl:max-w-[620px]">
           <Search size={17} className="shrink-0 text-slate-400" />
           <input
             value={query}
