@@ -21,10 +21,12 @@ import {
   AlertCircle,
   AlertTriangle,
   Boxes,
+  ChevronLeft,
+  ChevronRight,
   Database,
+  Download,
   ExternalLink,
   GripVertical,
-  Link2,
   Loader2,
   PackageCheck,
   RefreshCw,
@@ -63,6 +65,8 @@ const filterOptions: Array<{ value: FilterMode; label: string }> = [
   { value: 'unlinked', label: '미연결' },
   { value: 'linked', label: '연결상품 있음' },
 ]
+
+const pageSizeOptions = [20, 50, 100] as const
 
 const restrictToVerticalDrag: Modifier = ({ transform }) => ({
   ...transform,
@@ -144,19 +148,22 @@ function StatCard({
             : 'bg-slate-100 text-[#07122F]'
 
   return (
-    <div className="min-h-[116px] rounded-xl border border-[#E5EAF2] bg-white p-5 shadow-[0_8px_20px_rgba(15,23,42,0.06)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[13px] font-extrabold text-slate-600">{label}</div>
-          <div className="mt-2 text-[25px] font-black leading-none tracking-tight text-[#101828]">{value}</div>
-        </div>
-        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${iconClass}`}>
-          {icon}
-        </span>
+    <div className="flex min-w-[205px] flex-1 items-center gap-3 border-r border-slate-200 px-5 py-4 last:border-r-0">
+      <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${iconClass}`}>
+        {icon}
+      </span>
+      <div className="min-w-0">
+        <div className="text-[12px] font-extrabold text-slate-500">{label}</div>
+        <div className="mt-0.5 truncate text-[24px] font-black leading-tight text-[#101828]">{value}</div>
+        <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{sub}</div>
       </div>
-      <div className="mt-3 truncate text-[12px] font-bold text-slate-500">{sub}</div>
     </div>
   )
+}
+
+function csvCell(value: string | number | null | undefined) {
+  const text = value === null || value === undefined ? '' : String(value)
+  return `"${text.replaceAll('"', '""')}"`
 }
 
 function InventoryStockSub({
@@ -183,7 +190,7 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
   const [failed, setFailed] = useState(false)
   if (!src || failed) {
     return (
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 text-slate-300">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300">
         <Boxes size={18} />
       </div>
     )
@@ -193,7 +200,7 @@ function ProductImage({ src, alt }: { src: string | null; alt: string }) {
     <img
       src={src}
       alt={alt}
-      className="h-12 w-12 shrink-0 rounded-lg border border-slate-200 bg-white object-cover"
+      className="h-11 w-11 shrink-0 rounded-md border border-slate-200 bg-white object-cover shadow-sm"
       onError={() => setFailed(true)}
     />
   )
@@ -272,7 +279,7 @@ function SortableMasterRow({
         opacity: isDragging ? 0.6 : 1,
         zIndex: isDragging ? 50 : 'auto',
       }}
-      className="h-16 bg-white hover:bg-slate-50"
+      className="h-[68px] bg-white transition-colors hover:bg-[#F8FAFC]"
     >
       <td className="px-3 py-2">
         <div className="flex items-center gap-2">
@@ -323,16 +330,16 @@ function SortableMasterRow({
           </button>
         </div>
       </td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-emerald-600">{formatNumber(row.naverStock)}</td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-red-600">
+      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
+      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-emerald-600">{formatNumber(row.naverStock)}</td>
+      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-red-600">
         {coupangStale ? <span title="쿠팡 API 인증 오류로 현재 재고를 확인할 수 없습니다.">연동 오류</span> : formatNumber(row.coupangStock)}
       </td>
-      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-slate-950">{coupangStale ? '-' : formatNumber(row.totalStock)}</td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600">{formatNumber(row.totalInboundPending)}</td>
-      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{coupangStale ? '-' : formatMoney(row.stockCost)}</td>
+      <td className="px-3 py-2 text-right text-[15px] font-black tabular-nums text-slate-950">{coupangStale ? '-' : formatNumber(row.totalStock)}</td>
+      <td className="hidden px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600 xl:table-cell">{formatNumber(row.totalInboundPending)}</td>
+      <td className="hidden px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900 2xl:table-cell">{coupangStale ? '-' : formatMoney(row.stockCost)}</td>
       <td className="px-3 py-2"><LinkedProducts links={row.linked} /></td>
-      <td className="px-3 py-2 text-[12px] font-bold text-slate-500">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
+      <td className="hidden px-3 py-2 text-[12px] font-bold text-slate-500 2xl:table-cell">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
     </tr>
   )
 }
@@ -340,6 +347,7 @@ function SortableMasterRow({
 function MasterTable({
   rows,
   allRows,
+  rankOffset,
   favoriteIds,
   onToggleFavorite,
   onReorder,
@@ -348,6 +356,7 @@ function MasterTable({
 }: {
   rows: SmartInventoryMasterRow[]
   allRows: SmartInventoryMasterRow[]
+  rankOffset: number
   favoriteIds: number[]
   onToggleFavorite: (id: number) => void
   onReorder: (nextOrder: number[]) => void
@@ -375,21 +384,21 @@ function MasterTable({
   }
 
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#E5EAF2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+    <div className="max-h-[calc(100dvh-310px)] min-h-[360px] overflow-auto rounded-lg border border-[#DDE3EC] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalDrag]} onDragEnd={handleDragEnd}>
-        <table className="w-[1360px] table-fixed border-collapse text-left text-[13px]">
-          <thead className="border-b border-[#E5EAF2] bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
+        <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-[13px]">
+          <thead className="sticky top-0 z-20 border-b border-[#18243A] bg-[#101828] text-[12px] font-black text-white shadow-sm">
             <tr>
-              <th className="w-[86px] px-3 py-3">순번</th>
-              <th className="w-[330px] px-3 py-3">상품</th>
-              <th className="w-[105px] px-3 py-3 text-right">판매가</th>
-              <th className="w-[84px] px-3 py-3 text-right text-emerald-600">네이버</th>
-              <th className="w-[84px] px-3 py-3 text-right text-red-600">쿠팡</th>
-              <th className="w-[90px] px-3 py-3 text-right">총재고</th>
-              <th className="w-[90px] px-3 py-3 text-right">입고대기</th>
-              <th className="w-[130px] px-3 py-3 text-right">재고가치</th>
-              <th className="w-[310px] px-3 py-3">연결상태</th>
-              <th className="w-[125px] px-3 py-3">재고 갱신</th>
+              <th className="w-[88px] px-3 py-3">순번</th>
+              <th className="w-[310px] px-3 py-3">상품</th>
+              <th className="w-[100px] px-3 py-3 text-right">판매가</th>
+              <th className="w-[78px] px-3 py-3 text-right text-emerald-300">네이버</th>
+              <th className="w-[78px] px-3 py-3 text-right text-red-300">쿠팡</th>
+              <th className="w-[82px] px-3 py-3 text-right">총재고</th>
+              <th className="hidden w-[90px] px-3 py-3 text-right xl:table-cell">입고대기</th>
+              <th className="hidden w-[125px] px-3 py-3 text-right 2xl:table-cell">재고가치</th>
+              <th className="w-[250px] px-3 py-3">연결상태</th>
+              <th className="hidden w-[120px] px-3 py-3 2xl:table-cell">최근갱신</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -399,7 +408,7 @@ function MasterTable({
                   <SortableMasterRow
                     key={row.id}
                     row={row}
-                    rank={index + 1}
+                    rank={rankOffset + index + 1}
                     favorite={favoriteIds.includes(row.id)}
                     onToggleFavorite={onToggleFavorite}
                     onSelect={onSelect}
@@ -421,11 +430,11 @@ function MasterTable({
   )
 }
 
-function UnlinkedTable({ rows, coupangStale }: { rows: SmartInventoryChannelRow[]; coupangStale: boolean }) {
+function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventoryChannelRow[]; rankOffset: number; coupangStale: boolean }) {
   return (
-    <div className="overflow-x-auto rounded-xl border border-[#E5EAF2] bg-white shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
-      <table className="w-[900px] table-fixed border-collapse text-left text-[13px]">
-        <thead className="border-b border-[#E5EAF2] bg-slate-50 text-[11px] font-black uppercase tracking-wide text-slate-500">
+    <div className="max-h-[calc(100dvh-310px)] min-h-[360px] overflow-auto rounded-lg border border-[#DDE3EC] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]">
+      <table className="w-full min-w-[900px] table-fixed border-collapse text-left text-[13px]">
+        <thead className="sticky top-0 z-20 border-b border-[#18243A] bg-[#101828] text-[12px] font-black text-white shadow-sm">
           <tr>
             <th className="w-[70px] px-3 py-3 text-right">순번</th>
             <th className="w-[90px] px-3 py-3">채널</th>
@@ -440,7 +449,7 @@ function UnlinkedTable({ rows, coupangStale }: { rows: SmartInventoryChannelRow[
           {rows.length ? (
             rows.map((row, index) => (
               <tr key={`${row.channel}:${row.identityKey}`} className="h-16 bg-white hover:bg-slate-50">
-                <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-500">{index + 1}</td>
+                <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-500">{rankOffset + index + 1}</td>
                 <td className="px-3 py-2">
                   <span className={`inline-flex rounded-md border px-2 py-1 text-[11px] font-black ${
                     row.channel === 'naver'
@@ -504,6 +513,8 @@ export default function InventoryClient() {
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState<FilterMode>('all')
   const [tableMode, setTableMode] = useState<TableMode>('masters')
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<(typeof pageSizeOptions)[number]>(20)
   const [masterOrder, setMasterOrder] = useState<number[]>([])
   const [favoriteIds, setFavoriteIds] = useState<number[]>([])
   const [selectedHistoryProduct, setSelectedHistoryProduct] = useState<SmartInventoryMasterRow | null>(null)
@@ -653,6 +664,18 @@ export default function InventoryClient() {
   }, [data?.unlinkedRows.coupang, data?.unlinkedRows.naver, normalizedQuery])
 
   const activeRowsCount = tableMode === 'masters' ? filteredMasters.length : filteredUnlinkedRows.length
+  const totalPages = Math.max(1, Math.ceil(activeRowsCount / pageSize))
+  const safePage = Math.min(page, totalPages)
+  const pageOffset = (safePage - 1) * pageSize
+  const pagedMasters = filteredMasters.slice(pageOffset, pageOffset + pageSize)
+  const pagedUnlinkedRows = filteredUnlinkedRows.slice(pageOffset, pageOffset + pageSize)
+  const filterCounts = useMemo<Record<FilterMode, number>>(() => ({
+    all: orderedMasters.length,
+    empty: orderedMasters.filter((row) => (row.totalStock ?? 0) <= 0).length,
+    inbound: orderedMasters.filter((row) => (row.totalInboundPending ?? 0) > 0).length,
+    unlinked: orderedMasters.filter((row) => row.linkCount === 0).length,
+    linked: orderedMasters.filter((row) => row.linkCount > 0).length,
+  }), [orderedMasters])
   const healthStatus = String(data?.health?.status || '')
   const coupangStale = data?.channelHealth?.coupang?.status === 'stale'
   const cacheLabel = data?.cache?.hit
@@ -661,46 +684,107 @@ export default function InventoryClient() {
       ? '최신 조회'
       : '조회 대기'
 
+  useEffect(() => {
+    setPage(1)
+  }, [filter, normalizedQuery, pageSize, tableMode])
+
+  useEffect(() => {
+    if (page > totalPages) setPage(totalPages)
+  }, [page, totalPages])
+
+  useEffect(() => {
+    const handleKeyboardPage = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (target?.closest('input, textarea, select, button, [contenteditable="true"]')) return
+      if (event.key === 'ArrowLeft') setPage((current) => Math.max(1, current - 1))
+      if (event.key === 'ArrowRight') setPage((current) => Math.min(totalPages, current + 1))
+    }
+    window.addEventListener('keydown', handleKeyboardPage)
+    return () => window.removeEventListener('keydown', handleKeyboardPage)
+  }, [totalPages])
+
+  const handleDownload = () => {
+    const lines = tableMode === 'masters'
+      ? [
+          ['순번', '상품명', '판매가', '네이버', '쿠팡', '총재고', '입고대기', '재고가치', '최근갱신'],
+          ...filteredMasters.map((row, index) => [
+            index + 1,
+            row.name,
+            representativePrice(row),
+            row.naverStock,
+            coupangStale ? '' : row.coupangStock,
+            coupangStale ? '' : row.totalStock,
+            row.totalInboundPending,
+            coupangStale ? '' : row.stockCost,
+            resolveInventoryRowSyncedAt(row),
+          ]),
+        ]
+      : [
+          ['순번', '채널', '상품명', '상품키', '재고', '판매가', '수집시각'],
+          ...filteredUnlinkedRows.map((row, index) => [
+            index + 1,
+            channelLabel[row.channel],
+            row.name,
+            row.identityKey,
+            row.channel === 'coupang' && coupangStale ? '' : row.stock,
+            row.price,
+            row.syncedAt,
+          ]),
+        ]
+    const csv = `\uFEFF${lines.map((line) => line.map(csvCell).join(',')).join('\r\n')}`
+    const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+    const anchor = document.createElement('a')
+    anchor.href = url
+    anchor.download = `재고관리_${new Date().toISOString().slice(0, 10)}.csv`
+    document.body.appendChild(anchor)
+    anchor.click()
+    anchor.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const pageNumberStart = Math.min(Math.max(1, safePage - 2), Math.max(1, totalPages - 4))
+  const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, index) => pageNumberStart + index)
+
   return (
-    <div className="space-y-5">
-      <div className="sticky top-0 z-40 -mx-4 border-b border-[#E5EAF2] bg-[#F6F8FB]/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+    <div className="space-y-4 pb-6">
+      <header className="sticky top-[56px] z-40 -mx-3 border-b border-[#E5EAF2] bg-[#F6F8FB]/95 px-3 py-3 backdrop-blur sm:-mx-5 sm:px-5 lg:top-0 lg:-mx-6 lg:px-6">
         <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div className="flex items-end gap-4">
-            <div>
-              <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#EF3B2D]">Smart Inventory</div>
-              <h1 className="mt-1 text-[26px] font-black tracking-tight text-[#101828]">재고관리</h1>
+          <div className="min-w-0">
+            <div className="flex items-baseline gap-3">
+              <h1 className="text-[25px] font-black leading-none text-[#101828]">재고관리</h1>
+              <span className="rounded-md bg-slate-200 px-2 py-1 text-[11px] font-black text-slate-600">
+                {formatNumber(data?.summary.masterCount || 0)}개
+              </span>
             </div>
-            <p className="mb-1 hidden text-[13px] font-bold text-slate-500 md:block">등록된 상품의 재고 현황을 확인하고 관리합니다.</p>
+            <p className="mt-1.5 text-[12px] font-bold text-slate-500">채널별 재고, 입고 예정 수량과 재고가치를 한곳에서 확인합니다.</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E5EAF2] bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm">
+            <div className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-3 text-[11px] font-black text-slate-600 shadow-sm">
               <span className={`h-2 w-2 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-              <span>{coupangStale ? '쿠팡 갱신 중단' : healthStatus ? '마스틱 연결됨' : '마스틱 상태 확인'}</span>
-            </div>
-            <div className="inline-flex h-10 items-center rounded-lg border border-[#E5EAF2] bg-white px-3 text-[12px] font-black text-slate-500 shadow-sm">
-              {cacheLabel}
+              <span>{coupangStale ? '쿠팡 연동 오류' : healthStatus ? '수집기 연결됨' : '연결 확인 중'}</span>
+              <span className="hidden border-l border-slate-200 pl-2 text-slate-400 sm:inline">{cacheLabel}</span>
             </div>
             <button
               type="button"
               onClick={() => loadDashboard(true)}
               disabled={loading || syncing}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#E5EAF2] bg-white px-3 text-[12px] font-black text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3EC] bg-white text-slate-600 shadow-sm hover:bg-slate-50 disabled:opacity-60"
+              title="화면 데이터 새로고침"
             >
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <RefreshCw size={15} />}
-              새로고침
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
             </button>
             <button
               type="button"
               onClick={handleSync}
               disabled={loading || syncing || data?.configured === false}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#EF3B2D] bg-[#EF3B2D] px-4 text-[12px] font-black text-white shadow-sm transition hover:bg-[#d83326] disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#E43D20] px-4 text-[12px] font-black text-white shadow-sm hover:bg-[#C9331B] disabled:opacity-60"
             >
               {syncing ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
-              마스틱 동기화
+              재고 동기화
             </button>
           </div>
         </div>
-      </div>
+      </header>
 
       {error ? (
         <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-bold text-red-700">
@@ -717,31 +801,33 @@ export default function InventoryClient() {
         </div>
       ) : null}
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
-        <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(data?.summary.masterCount || 0)} sub="등록된 전체 상품 수" />
-        <StatCard
-          icon={<Database size={20} />}
-          label="총 재고"
-          value={coupangStale ? '확인 불가' : formatNumber(data?.summary.totalStock || 0)}
-          sub={<InventoryStockSub naver={data?.summary.naverStock || 0} coupang={data?.summary.coupangStock || 0} coupangStale={coupangStale} />}
-          tone="blue"
-        />
-        <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="입고 예정 상품 수" tone="orange" />
-        <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub="연결되지 않은 상품 수" tone="red" />
-        <StatCard icon={<WalletCards size={20} />} label="재고가치" value={coupangStale ? '확인 불가' : formatMoney(data?.summary.stockCost || 0)} sub="총 재고 기준 금액" tone="green" />
-      </div>
+      <section className="overflow-x-auto rounded-lg border border-[#DDE3EC] bg-white shadow-[0_1px_3px_rgba(15,23,42,0.06)]" aria-label="재고 요약">
+        <div className="flex min-w-[1030px]">
+          <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(data?.summary.masterCount || 0)} sub="등록된 관리 상품" />
+          <StatCard
+            icon={<Database size={20} />}
+            label="총 재고"
+            value={coupangStale ? '확인 불가' : formatNumber(data?.summary.totalStock || 0)}
+            sub={<InventoryStockSub naver={data?.summary.naverStock || 0} coupang={data?.summary.coupangStock || 0} coupangStale={coupangStale} />}
+            tone="blue"
+          />
+          <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="입고 예정 수량" tone="orange" />
+          <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub="채널 연결 필요" tone="red" />
+          <StatCard icon={<WalletCards size={20} />} label="재고가치" value={coupangStale ? '확인 불가' : formatMoney(data?.summary.stockCost || 0)} sub="현재 재고 원가 기준" tone="green" />
+        </div>
+      </section>
 
-      <div className="flex flex-col gap-3 rounded-xl border border-[#E5EAF2] bg-white p-2 shadow-[0_8px_20px_rgba(15,23,42,0.05)] xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-lg border border-[#E5EAF2] bg-white px-3">
+      <section className="flex flex-col gap-2 rounded-lg border border-[#DDE3EC] bg-white p-2 shadow-[0_1px_3px_rgba(15,23,42,0.05)] xl:flex-row xl:items-center">
+        <div className="flex min-w-[240px] flex-1 items-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-3 focus-within:border-[#2563EB]">
           <Search size={17} className="shrink-0 text-slate-400" />
           <input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="상품명, 링크상품, 키워드 검색"
-            className="h-11 min-w-0 flex-1 bg-transparent text-[13px] font-bold text-slate-900 outline-none placeholder:text-slate-400"
+            className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] font-bold text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
           />
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-1 overflow-x-auto pb-0.5 xl:pb-0">
           {filterOptions.map((option) => (
             <button
               key={option.value}
@@ -751,29 +837,30 @@ export default function InventoryClient() {
                 if (option.value !== 'unlinked') setTableMode('masters')
                 if (option.value === 'unlinked') setTableMode('unlinked')
               }}
-              className={`h-10 rounded-lg border px-4 text-[12px] font-black transition ${
+              className={`inline-flex h-10 shrink-0 items-center gap-2 rounded-lg border px-3 text-[12px] font-black transition ${
                 filter === option.value
-                  ? 'border-[#07122F] bg-[#07122F] text-white shadow-sm'
+                  ? 'border-[#2563EB] bg-[#2563EB] text-white shadow-sm'
                   : 'border-[#E5EAF2] bg-white text-slate-600 hover:bg-slate-50'
               }`}
             >
               {option.label}
+              <span className={`rounded px-1.5 py-0.5 text-[10px] ${filter === option.value ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                {formatNumber(filterCounts[option.value])}
+              </span>
             </button>
           ))}
-          <button
-            type="button"
-            onClick={() => setTableMode('unlinked')}
-            className={`h-10 rounded-lg border px-4 text-[12px] font-black transition ${
-              tableMode === 'unlinked'
-                ? 'border-[#EF3B2D] bg-[#EF3B2D] text-white shadow-sm'
-                : 'border-[#E5EAF2] bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            미연결
-          </button>
-          <div className="px-2 text-[12px] font-black text-slate-500">{loading ? '불러오는 중' : `${formatNumber(activeRowsCount)}건`}</div>
         </div>
-      </div>
+        <div className="hidden h-7 w-px bg-slate-200 xl:block" />
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={!activeRowsCount}
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#DDE3EC] bg-white px-3 text-[12px] font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+        >
+          <Download size={15} className="text-emerald-600" />
+          CSV 다운로드
+        </button>
+      </section>
 
       {loading && !data ? (
         <div className="flex h-64 items-center justify-center rounded-xl border border-[#E5EAF2] bg-white text-[13px] font-black text-slate-500 shadow-sm">
@@ -782,8 +869,9 @@ export default function InventoryClient() {
         </div>
       ) : tableMode === 'masters' ? (
         <MasterTable
-          rows={filteredMasters}
+          rows={pagedMasters}
           allRows={orderedMasters}
+          rankOffset={pageOffset}
           favoriteIds={favoriteIds}
           onToggleFavorite={handleToggleFavorite}
           onReorder={handleReorder}
@@ -791,8 +879,64 @@ export default function InventoryClient() {
           coupangStale={coupangStale}
         />
       ) : (
-        <UnlinkedTable rows={filteredUnlinkedRows} coupangStale={coupangStale} />
+        <UnlinkedTable rows={pagedUnlinkedRows} rankOffset={pageOffset} coupangStale={coupangStale} />
       )}
+
+      {!loading && data ? (
+        <footer className="flex flex-col gap-3 rounded-lg border border-[#DDE3EC] bg-white px-4 py-3 text-[12px] font-bold text-slate-500 shadow-sm sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span>
+              총 <strong className="text-slate-900">{formatNumber(activeRowsCount)}</strong>개 중{' '}
+              {activeRowsCount ? formatNumber(pageOffset + 1) : 0}-{formatNumber(Math.min(pageOffset + pageSize, activeRowsCount))} 표시
+            </span>
+            <label className="inline-flex items-center gap-2">
+              <span className="sr-only">페이지당 표시 수</span>
+              <select
+                value={pageSize}
+                onChange={(event) => setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])}
+                className="h-9 rounded-lg border border-[#DDE3EC] bg-white px-3 text-[12px] font-black text-slate-700"
+              >
+                {pageSizeOptions.map((size) => <option key={size} value={size}>{size}개씩 보기</option>)}
+              </select>
+            </label>
+          </div>
+          <nav className="flex items-center gap-1" aria-label="재고 목록 페이지">
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.max(1, current - 1))}
+              disabled={safePage <= 1}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3EC] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35"
+              title="이전 페이지 (왼쪽 방향키)"
+            >
+              <ChevronLeft size={16} />
+            </button>
+            {pageNumbers.map((pageNumber) => (
+              <button
+                key={pageNumber}
+                type="button"
+                onClick={() => setPage(pageNumber)}
+                className={`inline-flex h-9 min-w-9 items-center justify-center rounded-lg border px-2 text-[12px] font-black ${
+                  pageNumber === safePage
+                    ? 'border-[#2563EB] bg-[#2563EB] text-white'
+                    : 'border-[#DDE3EC] bg-white text-slate-600 hover:bg-slate-50'
+                }`}
+                aria-current={pageNumber === safePage ? 'page' : undefined}
+              >
+                {pageNumber}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+              disabled={safePage >= totalPages}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#DDE3EC] bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-35"
+              title="다음 페이지 (오른쪽 방향키)"
+            >
+              <ChevronRight size={16} />
+            </button>
+          </nav>
+        </footer>
+      ) : null}
       {selectedHistoryProduct ? (
         <ProductInventoryHistoryModal
           product={selectedHistoryProduct}
