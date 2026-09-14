@@ -337,7 +337,7 @@ export default function ElectricityClient() {
     }, [selectedYear, selectedMonth])
 
     useEffect(() => {
-        if (activeTab !== 'payment') return
+        if (activeTab !== 'payment' && !isInvoiceOpen) return
         let cancelled = false
 
         const fetchMonthlyLandlordTotals = async () => {
@@ -346,6 +346,8 @@ export default function ElectricityClient() {
                 if (!cancelled) setMonthlyLandlordTotals(cachedTotals)
                 return
             }
+
+            if (!cancelled) setMonthlyLandlordTotals({})
 
             try {
                 const res = await fetch(`/api/admin/electricity/monthly-summary?year=${selectedYear}`)
@@ -370,7 +372,7 @@ export default function ElectricityClient() {
         return () => {
             cancelled = true
         }
-    }, [activeTab, selectedYear])
+    }, [activeTab, isInvoiceOpen, selectedYear])
 
     useEffect(() => {
         const fetchMonthlyBillStatuses = async () => {
@@ -397,9 +399,11 @@ export default function ElectricityClient() {
     }, [selectedYear])
 
     useEffect(() => {
-        if (activeTab !== 'payment') return
+        if (activeTab !== 'payment' && !isInvoiceOpen) return
 
         const fetchRentPayments = async () => {
+            setRentPaidDates({})
+            setPaymentChecklist({})
             try {
                 const res = await fetch(`/api/admin/electricity/rent-payment?year=${selectedYear}`, { cache: 'no-store' })
                 if (!res.ok) return
@@ -421,7 +425,7 @@ export default function ElectricityClient() {
         }
 
         fetchRentPayments()
-    }, [activeTab, selectedYear])
+    }, [activeTab, isInvoiceOpen, monthKey, selectedYear])
 
     const savePaymentChecklistStatus = async (year: number, month: number, status: RentPaymentChecklistStatus) => {
         try {
@@ -859,6 +863,20 @@ export default function ElectricityClient() {
         return `${Number(m)}월 ${Number(d)}일`
     }
 
+    const formatInvoiceHistoryDate = (year: number, month: number, value?: string | null) => {
+        const fallbackDay = year === 2025 && month === 12 ? 18 : 14
+        const fallback = `${year}-${String(month).padStart(2, '0')}-${String(fallbackDay).padStart(2, '0')}`
+        const [dateYear, dateMonth, dateDay] = (value || fallback).slice(0, 10).split('-')
+
+        if (!dateYear || !dateMonth || !dateDay) return value || fallback
+        return `${dateYear}. ${dateMonth}. ${dateDay}.`
+    }
+
+    const formatInvoiceMonthEndDate = (year: number, month: number) => {
+        const lastDay = new Date(year, month, 0).getDate()
+        return `${year}. ${String(month).padStart(2, '0')}. ${String(lastDay).padStart(2, '0')}.`
+    }
+
     const getRentPaymentInfo = (year: number, month: number) => {
         const nextMonth = month === 12 ? 1 : month + 1;
         const nextYear = month === 12 ? year + 1 : year;
@@ -928,6 +946,22 @@ export default function ElectricityClient() {
         total: paymentSummary.unpaidElectricityTotal,
         months: paymentSummary.unpaidElectricityMonths,
     }
+
+    const invoiceMissingTaxRows = monthlyPaymentRows.filter(row => row.missingTaxInvoice)
+    const invoiceUnpaidElectricityRows = monthlyPaymentRows.filter(row => (
+        row.month !== selectedMonth
+        && row.missingElectricityPayment
+        && typeof row.landlordElectricityAmount === 'number'
+        && row.landlordElectricityAmount > 0
+    ))
+    const invoiceMissingTaxTotal = invoiceMissingTaxRows.reduce((sum, row) => sum + row.rentAmount, 0)
+    const invoiceUnpaidElectricityTotal = invoiceUnpaidElectricityRows.reduce(
+        (sum, row) => sum + (typeof row.landlordElectricityAmount === 'number' ? row.landlordElectricityAmount : 0),
+        0,
+    )
+    const invoicePayableTotal = landlordTotal + invoiceUnpaidElectricityTotal
+    const invoiceHistoryRowCount = invoiceMissingTaxRows.length + invoiceUnpaidElectricityRows.length
+    const invoiceUsesDenseLayout = invoiceHistoryRowCount > 10
 
     return (
         <div id="electricity-main" className="mx-auto w-full max-w-[1280px] space-y-5 font-sans pb-20 print:pb-0 print:space-y-0">
@@ -1746,7 +1780,7 @@ export default function ElectricityClient() {
                                 const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}일`;
 
                                 return (
-                                    <div className="p-[10mm] bg-white flex flex-col w-[210mm] mx-auto text-black font-sans" id="invoice-content">
+                                    <div className="h-[297mm] overflow-hidden bg-white p-[7mm] flex flex-col w-[210mm] mx-auto text-black font-sans" id="invoice-content">
                                         {/* Title Section */}
                                         <div className="text-center mb-2">
                                             <h1 className="text-[14px] font-bold tracking-[0.2em] border-b border-black pb-0.5 inline-block px-8">{selectedMonth}월 전기요금 청구 명세서</h1>
@@ -1820,13 +1854,13 @@ export default function ElectricityClient() {
                                                 <tbody>
                                                     <tr>
                                                         <td className="border border-black p-1">
-                                                            <div className="h-48 print:h-[180px] bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+                                                            <div className={`${invoiceUsesDenseLayout ? 'h-20 print:h-[72px]' : 'h-28 print:h-[104px]'} bg-white flex items-center justify-center overflow-hidden border border-gray-100`}>
                                                                 {prevMonthPhoto ? <img src={prevMonthPhoto} className="w-full h-full object-contain" alt="prev" /> : "사진 없음"}
                                                             </div>
                                                             <div className="text-center mt-1 font-bold text-[11px]">전월 지침: {landlordData.prevMeter.toLocaleString()} kWh</div>
                                                         </td>
                                                         <td className="border border-black p-1">
-                                                            <div className="h-48 print:h-[180px] bg-white flex items-center justify-center overflow-hidden border border-gray-100">
+                                                            <div className={`${invoiceUsesDenseLayout ? 'h-20 print:h-[72px]' : 'h-28 print:h-[104px]'} bg-white flex items-center justify-center overflow-hidden border border-gray-100`}>
                                                                 {landlordData.photo ? <img src={landlordData.photo} className="w-full h-full object-contain" alt="curr" /> : "사진 없음"}
                                                             </div>
                                                             <div className="text-center mt-1 font-bold text-[11px]">당월 지침: {landlordData.currMeter.toLocaleString()} kWh</div>
@@ -1845,7 +1879,7 @@ export default function ElectricityClient() {
                                         </div>
 
                                         {/* Breakdown Table */}
-                                        <div className="flex-1">
+                                        <div className="mb-1">
                                             <div className="text-[10px] font-bold mb-0.5">2. 사용 요금 세부 산출 내역</div>
                                             <table className="w-full border-collapse border border-black text-[10px] text-right">
                                                 <thead>
@@ -1911,26 +1945,107 @@ export default function ElectricityClient() {
                                                         <td className="border border-black p-0.5">{beicoTotal.toLocaleString()} 원</td>
                                                         <td className="border border-black p-0.5 text-[10px] bg-gray-200">{landlordTotal.toLocaleString()} 원</td>
                                                     </tr>
-                                                    <tr className="bg-gray-200 font-black border-t-2 border-black">
-                                                        <td colSpan={3} className="border border-black p-1 text-center text-[10px]">최종 청구 금액 (납부하실 금액)</td>
-                                                        <td className="border border-black p-1 text-sm text-right">{landlordTotal.toLocaleString()}원</td>
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div className="mb-1">
+                                            <div className="text-[10px] font-bold mb-0.5">3. 전기요금 총합</div>
+                                            <table className="w-full border-collapse border border-black text-[9px]">
+                                                <tbody>
+                                                    <tr>
+                                                        <td className="border border-black px-2 py-0.5 font-bold bg-gray-50">당월 청구금액</td>
+                                                        <td className="border border-black px-2 py-0.5 text-right font-bold">{landlordTotal.toLocaleString()}원</td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="border border-black px-2 py-0.5 font-bold bg-gray-50">미납금액</td>
+                                                        <td className="border border-black px-2 py-0.5 text-right font-bold text-red-600">{invoiceUnpaidElectricityTotal.toLocaleString()}원</td>
+                                                    </tr>
+                                                    <tr className="bg-gray-100">
+                                                        <td className="border border-black px-2 py-0.5 font-black">총 납부금액</td>
+                                                        <td className="border border-black px-2 py-0.5 text-right text-[12px] font-black text-red-600">{invoicePayableTotal.toLocaleString()}원</td>
                                                     </tr>
                                                 </tbody>
                                             </table>
                                         </div>
 
-                                        <div className="mt-1 text-center border-t border-gray-100 pt-1">
-                                            <p className="text-[9px] font-medium text-gray-500 italic">위와 같이 전력 사용 요금을 청구합니다.</p>
+                                        <div className="mb-1">
+                                            <div className="text-[10px] font-bold mb-0.5">4. 세금계산서 미발행 내역</div>
+                                            <table className={`w-full border-collapse border border-black ${invoiceUsesDenseLayout ? 'text-[7px]' : 'text-[8px]'}`}>
+                                                <thead>
+                                                    <tr className="bg-gray-50 text-center">
+                                                        <th className="border border-black px-1 py-px">청구월</th>
+                                                        <th className="border border-black px-1 py-px">발행예정일</th>
+                                                        <th className="border border-black px-1 py-px">기준금액</th>
+                                                        <th className="border border-black px-1 py-px">상태</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {invoiceMissingTaxRows.length > 0 ? (
+                                                        <>
+                                                            {invoiceMissingTaxRows.map(row => (
+                                                                <tr key={`invoice-tax-${selectedYear}-${row.month}`} className="text-center">
+                                                                    <td className="border border-black px-1 py-px">{selectedYear}년 {row.month}월</td>
+                                                                    <td className="border border-black px-1 py-px">{formatInvoiceHistoryDate(selectedYear, row.month, rentPaidDates[row.month])}</td>
+                                                                    <td className="border border-black px-1 py-px text-right">{row.rentAmount.toLocaleString()}원</td>
+                                                                    <td className="border border-black px-1 py-px font-bold text-red-600">미발행</td>
+                                                                </tr>
+                                                            ))}
+                                                            <tr className="bg-gray-100 font-black">
+                                                                <td className="border border-black px-1 py-px text-center">합계</td>
+                                                                <td className="border border-black px-1 py-px" />
+                                                                <td className="border border-black px-1 py-px text-right">{invoiceMissingTaxTotal.toLocaleString()}원</td>
+                                                                <td className="border border-black px-1 py-px text-center text-red-600">미발행 {invoiceMissingTaxRows.length}건</td>
+                                                            </tr>
+                                                        </>
+                                                    ) : (
+                                                        <tr>
+                                                            <td colSpan={4} className="border border-black px-2 py-1 text-center text-gray-500">세금계산서 미발행 내역이 없습니다.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                            <p className="mt-0.5 text-center text-[7px] text-gray-500">※ 세금계산서 미발행 금액은 발행 관리용 정보이며 총 납부금액에 합산하지 않습니다.</p>
                                         </div>
 
-                                        {invoiceRemarks && invoiceRemarks.trim() !== '' && (
-                                            <div className="mt-2 p-2 bg-gray-50 border border-gray-200 rounded-lg text-left">
-                                                <div className="text-[10px] font-bold text-gray-800 mb-1">※ 비고</div>
-                                                <div className="text-[9px] text-gray-600 whitespace-pre-wrap leading-relaxed">
-                                                    {invoiceRemarks}
-                                                </div>
+                                        <div className="mb-1">
+                                            <div className="text-[10px] font-bold mb-0.5">5. 미납 내역</div>
+                                            <table className={`w-full border-collapse border border-black ${invoiceUsesDenseLayout ? 'text-[7px]' : 'text-[8px]'}`}>
+                                                <thead>
+                                                    <tr className="bg-gray-50 text-center">
+                                                        <th className="border border-black px-1 py-px">청구월</th>
+                                                        <th className="border border-black px-1 py-px">납부기한</th>
+                                                        <th className="border border-black px-1 py-px">미납금액</th>
+                                                        <th className="border border-black px-1 py-px">상태</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {invoiceUnpaidElectricityRows.length > 0 ? invoiceUnpaidElectricityRows.map(row => (
+                                                        <tr key={`invoice-unpaid-${selectedYear}-${row.month}`} className="text-center">
+                                                            <td className="border border-black px-1 py-px">{selectedYear}년 {row.month}월분</td>
+                                                            <td className="border border-black px-1 py-px">{formatInvoiceMonthEndDate(selectedYear, row.month)}</td>
+                                                            <td className="border border-black px-1 py-px text-right font-bold text-red-600">
+                                                                {(typeof row.landlordElectricityAmount === 'number' ? row.landlordElectricityAmount : 0).toLocaleString()}원
+                                                            </td>
+                                                            <td className="border border-black px-1 py-px font-bold text-red-600">미납</td>
+                                                        </tr>
+                                                    )) : (
+                                                        <tr>
+                                                            <td colSpan={4} className="border border-black px-2 py-1 text-center text-gray-500">이전 미납 내역이 없습니다.</td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+
+                                        <div>
+                                            <div className="text-[10px] font-bold mb-0.5">6. 비고 메시지</div>
+                                            <div className="min-h-[30px] border border-black px-2 py-1 text-[8px] leading-relaxed whitespace-pre-wrap">
+                                                {invoiceRemarks.trim() || '\u00a0'}
                                             </div>
-                                        )}
+                                        </div>
+
+                                        <p className="mt-1 text-center text-[7px] font-medium text-gray-500 italic">위와 같이 전력 사용 요금을 청구합니다. 미납금액은 발급 시점 기준이며 납부 처리 시 실제 금액과 다를 수 있습니다.</p>
                                     </div>
                                 );
                             })()}
@@ -1977,7 +2092,7 @@ export default function ElectricityClient() {
                                     width: 210mm !important;
                                     height: 297mm !important;
                                     margin: 0 !important;
-                                    padding: 8mm !important;
+                                    padding: 7mm !important;
                                     background: white !important;
                                     z-index: 99999 !important;
                                     box-sizing: border-box !important;
@@ -1989,6 +2104,7 @@ export default function ElectricityClient() {
                                 .bg-gray-50 { background-color: #f9fafb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 .bg-gray-100 { background-color: #f3f4f6 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                                 .bg-gray-200 { background-color: #e5e7eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                                #invoice-content .text-red-600 { color: #dc2626 !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
                             }
                         `}</style>
                     </div>
