@@ -158,8 +158,11 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
                         <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-red-600 px-1 text-[10px] font-black leading-none text-white">C</span>
                         <span>{coupangStale ? '오류' : formatSidebarStock(row.coupangStock)}</span>
                       </td>
-                      <td className="w-[28%] overflow-hidden whitespace-nowrap pl-1 text-right text-[12px] font-black text-slate-950">
-                        {coupangStale ? '-' : formatSidebarStock(row.totalStock)}
+                      <td
+                        className="w-[28%] overflow-hidden whitespace-nowrap pl-1 text-right text-[12px] font-black text-slate-950"
+                        title="상품관리 현재고"
+                      >
+                        {formatSidebarStock(row.productStock)}
                       </td>
                     </tr>
                   </tbody>

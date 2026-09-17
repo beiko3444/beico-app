@@ -30,6 +30,7 @@ export type SmartInventoryMasterRow = {
   naverStock: number | null
   coupangStock: number | null
   totalStock: number | null
+  productStock: number | null
   stockCost: number | null
   naverTodaySales: number | null
   coupangTodaySales: number | null
@@ -374,6 +375,7 @@ function makeEmptyMaster(row: RawRecord): SmartInventoryMasterRow | null {
     naverStock: null,
     coupangStock: null,
     totalStock: null,
+    productStock: null,
     stockCost: null,
     naverTodaySales: null,
     coupangTodaySales: null,

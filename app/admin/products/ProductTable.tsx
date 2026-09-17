@@ -134,6 +134,7 @@ interface ProductRowProps {
     onDragStartProduct: (productId: string) => void
     onDragEndProduct: () => void
     onGroupOrderChange: (productId: string, newOrder: number) => void
+    onImageClick: (imageUrl: string, productName: string) => void
     onDelete: (productId: string) => void
     onUngroup: (productId: string) => void
     onRestoreAutoGroup: (productId: string) => void
@@ -160,7 +161,7 @@ interface ProductRowProps {
     onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => void
 }
 
-const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, modifiedUsdCost, onForeignCostChange, cnyRateAvailable, usdRateAvailable, onOpenContextMenu, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onPartnerSaleStatusChange }: ProductRowProps) {
+const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onImageClick, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, modifiedUsdCost, onForeignCostChange, cnyRateAvailable, usdRateAvailable, onOpenContextMenu, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onPartnerSaleStatusChange }: ProductRowProps) {
     const legacyWholesale = {
         A: product.priceA,
         B: product.priceB,
@@ -390,20 +391,23 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 </div>
             </td>
             <td className={cellClass}>
-                <ProductForm
-                    initialData={product}
-                    trigger={
-                        <div className="mx-auto flex h-12 w-12 cursor-pointer items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition-all hover:border-blue-400 group-hover:shadow-md">
-                            {product.imageUrl ? (
-                                <img src={product.imageUrl} alt={product.name} loading="lazy" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="text-center">
-                                    <span className="text-[8px] font-bold text-gray-300">Img</span>
-                                </div>
-                            )}
-                        </div>
-                    }
-                />
+                {product.imageUrl ? (
+                    <button
+                        type="button"
+                        onClick={(event) => {
+                            event.stopPropagation()
+                            onImageClick(product.imageUrl as string, product.name)
+                        }}
+                        className="mx-auto flex h-12 w-12 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition-all hover:border-blue-400 group-hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300"
+                        aria-label={`${product.name} 이미지 크게 보기`}
+                    >
+                        <img src={product.imageUrl} alt={product.name} loading="lazy" className="h-full w-full object-cover pointer-events-none" />
+                    </button>
+                ) : (
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                        <span className="text-[8px] font-bold text-gray-300">Img</span>
+                    </div>
+                )}
             </td>
             <td className={`${cellClass} text-left`}>
                 <ProductForm
@@ -1025,6 +1029,7 @@ function ProductSummaryPanel({
 
 export default function ProductTable({ initialProducts }: { initialProducts: ProductTableProduct[] }) {
     const [products, setProducts] = useState(initialProducts)
+    const [previewImage, setPreviewImage] = useState<{ imageUrl: string, productName: string } | null>(null)
     const activeGrade: ProductGrade = 'C'
     const [activeCategory, setActiveCategory] = useState<ProductCatalogCategory>('soft')
     const [cnyKrwRate, setCnyKrwRate] = useState<number | null>(null)
@@ -1057,6 +1062,20 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const columnSettingsRef = useRef<HTMLDivElement>(null)
     const [isCompactViewport, setIsCompactViewport] = useState(false)
     const router = useRouter()
+
+    useEffect(() => {
+        if (!previewImage) return
+        const previousOverflow = document.body.style.overflow
+        const closeOnEscape = (event: KeyboardEvent) => {
+            if (event.key === 'Escape') setPreviewImage(null)
+        }
+        document.body.style.overflow = 'hidden'
+        window.addEventListener('keydown', closeOnEscape)
+        return () => {
+            document.body.style.overflow = previousOverflow
+            window.removeEventListener('keydown', closeOnEscape)
+        }
+    }, [previewImage])
 
     useEffect(() => {
         const compactViewport = window.matchMedia('(max-width: 1023px)')
@@ -2127,6 +2146,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                     onDragStartProduct={setDraggingProductId}
                                     onDragEndProduct={() => setDraggingProductId(null)}
                                     onGroupOrderChange={handleGroupOrderChange}
+                                    onImageClick={(imageUrl, productName) => setPreviewImage({ imageUrl, productName })}
                                     onDelete={handleDelete}
                                     onUngroup={handleUngroupProduct}
                                     onRestoreAutoGroup={handleRestoreAutoGroup}
@@ -2212,6 +2232,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                                 onDragStartProduct={setDraggingProductId}
                                                 onDragEndProduct={() => setDraggingProductId(null)}
                                                 onGroupOrderChange={handleGroupOrderChange}
+                                                onImageClick={(imageUrl, productName) => setPreviewImage({ imageUrl, productName })}
                                                 onDelete={handleDelete}
                                                 onUngroup={handleUngroupProduct}
                                                 onRestoreAutoGroup={handleRestoreAutoGroup}
@@ -2255,6 +2276,22 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             ) : null}
             </div>
             )}
+            {previewImage ? (
+                <div
+                    className="fixed inset-0 z-[200] flex cursor-zoom-out items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
+                    onClick={() => setPreviewImage(null)}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={`${previewImage.productName} 이미지 미리보기`}
+                >
+                    <img
+                        src={previewImage.imageUrl}
+                        alt={previewImage.productName}
+                        onClick={(event) => event.stopPropagation()}
+                        className="max-h-[90vh] max-w-[92vw] cursor-default select-none rounded-2xl bg-white object-contain shadow-2xl"
+                    />
+                </div>
+            ) : null}
             {!isCompactViewport && productContextMenu && contextMenuProduct ? (
                 <div
                     role="menu"
