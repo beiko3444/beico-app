@@ -1060,20 +1060,23 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const [columnsHydrated, setColumnsHydrated] = useState(false)
     const [columnSettingsOpen, setColumnSettingsOpen] = useState(false)
     const columnSettingsRef = useRef<HTMLDivElement>(null)
+    const imagePreviewRef = useRef<HTMLDivElement>(null)
     const [isCompactViewport, setIsCompactViewport] = useState(false)
     const router = useRouter()
 
     useEffect(() => {
         if (!previewImage) return
-        const previousOverflow = document.body.style.overflow
         const closeOnEscape = (event: KeyboardEvent) => {
             if (event.key === 'Escape') setPreviewImage(null)
         }
-        document.body.style.overflow = 'hidden'
+        const closeOnOutsideClick = (event: PointerEvent) => {
+            if (!imagePreviewRef.current?.contains(event.target as Node)) setPreviewImage(null)
+        }
         window.addEventListener('keydown', closeOnEscape)
+        window.addEventListener('pointerdown', closeOnOutsideClick)
         return () => {
-            document.body.style.overflow = previousOverflow
             window.removeEventListener('keydown', closeOnEscape)
+            window.removeEventListener('pointerdown', closeOnOutsideClick)
         }
     }, [previewImage])
 
@@ -2278,18 +2281,29 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             )}
             {previewImage ? (
                 <div
-                    className="fixed inset-0 z-[200] flex cursor-zoom-out items-center justify-center bg-black/80 p-4 backdrop-blur-sm"
-                    onClick={() => setPreviewImage(null)}
+                    ref={imagePreviewRef}
+                    className="fixed right-3 top-20 z-[200] w-[min(420px,calc(100vw-24px))] overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_20px_55px_rgba(15,23,42,0.24)] lg:right-6 lg:top-24"
                     role="dialog"
-                    aria-modal="true"
                     aria-label={`${previewImage.productName} 이미지 미리보기`}
                 >
-                    <img
-                        src={previewImage.imageUrl}
-                        alt={previewImage.productName}
-                        onClick={(event) => event.stopPropagation()}
-                        className="max-h-[90vh] max-w-[92vw] cursor-default select-none rounded-2xl bg-white object-contain shadow-2xl"
-                    />
+                    <div className="mb-2 flex items-center justify-between gap-3 px-1">
+                        <div className="min-w-0 truncate text-[13px] font-black text-slate-800">{previewImage.productName}</div>
+                        <button
+                            type="button"
+                            onClick={() => setPreviewImage(null)}
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                            aria-label="이미지 미리보기 닫기"
+                        >
+                            <X size={15} />
+                        </button>
+                    </div>
+                    <div className="flex max-h-[65vh] min-h-52 items-center justify-center overflow-hidden rounded-xl bg-slate-50">
+                        <img
+                            src={previewImage.imageUrl}
+                            alt={previewImage.productName}
+                            className="max-h-[65vh] w-full select-none object-contain"
+                        />
+                    </div>
                 </div>
             ) : null}
             {!isCompactViewport && productContextMenu && contextMenuProduct ? (
