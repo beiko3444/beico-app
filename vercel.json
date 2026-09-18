@@ -5,5 +5,8 @@
       "path": "/api/admin/inventory/favorite-push",
       "schedule": "50 14 * * *"
     }
+  ],
+  "regions": [
+    "iad1"
   ]
 }
