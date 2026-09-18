@@ -14,6 +14,8 @@ import {
 } from 'recharts'
 import { BarChart3, CalendarDays, Clock3, Loader2, PackageSearch, X } from 'lucide-react'
 import type { SmartInventoryMasterRow } from '@/lib/smartInventoryClient'
+import { buttonClass } from '@/components/ui/Button'
+import Tabs from '@/components/ui/Tabs'
 
 type HistoryPoint = {
   date: string
@@ -130,10 +132,10 @@ function Metric({
   description: string
 }) {
   return (
-    <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
       <div className="text-[11px] font-black text-slate-500">{label}</div>
-      <div className="mt-1 text-[20px] font-black tracking-tight text-slate-950">{value}</div>
-      <div className="mt-1 truncate text-[10px] font-bold text-slate-400" title={description}>{description}</div>
+      <div className="mt-1 break-words text-[20px] font-black tracking-tight text-slate-900">{value}</div>
+      <div className="mt-1 truncate text-[11px] font-bold text-slate-500" title={description}>{description}</div>
     </div>
   )
 }
@@ -211,12 +213,12 @@ export default function ProductInventoryHistoryModal({
         if (event.currentTarget === event.target) onClose()
       }}
     >
-      <div className="max-h-[94vh] w-full max-w-[1280px] overflow-y-auto rounded-2xl border border-white/60 bg-[#F6F8FB] shadow-2xl">
+      <div className="max-h-[94vh] w-full max-w-[1280px] overflow-y-auto rounded-2xl border border-slate-200 bg-slate-50 shadow-2xl">
         <div className="sticky top-0 z-10 flex items-center justify-between gap-4 border-b border-slate-200 bg-white/95 px-5 py-4 backdrop-blur sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <ProductThumb src={product.imageUrl} name={product.name} />
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#EF3B2D]">Inventory History</div>
+              <div className="text-[11px] font-bold text-slate-500">재고차감 이력</div>
               <h2 className="mt-1 truncate text-[21px] font-black tracking-tight text-slate-950" title={product.name}>
                 {product.name}
               </h2>
@@ -228,7 +230,7 @@ export default function ProductInventoryHistoryModal({
           <button
             type="button"
             onClick={onClose}
-            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50 hover:text-slate-950"
+            className={buttonClass('secondary', 'md', 'w-10 px-0')}
             aria-label="상품 재고차감 그래프 닫기"
           >
             <X size={19} />
@@ -236,24 +238,14 @@ export default function ProductInventoryHistoryModal({
         </div>
 
         <div className="space-y-5 p-4 sm:p-6">
-          <div className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {rangeOptions.map((option) => (
-                <button
-                  key={option.days}
-                  type="button"
-                  onClick={() => setDays(option.days)}
-                  className={`h-9 rounded-lg border px-4 text-[12px] font-black transition ${
-                    days === option.days
-                      ? 'border-[#07122F] bg-[#07122F] text-white'
-                      : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                  }`}
-                >
-                  {option.label}
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+            <Tabs
+              aria-label="조회 기간"
+              items={rangeOptions.map((option) => ({ key: String(option.days), label: option.label }))}
+              value={String(days)}
+              onChange={(value) => setDays(Number(value))}
+            />
+            <div className="flex flex-wrap items-center gap-2">
               <CalendarDays size={16} className="text-slate-400" />
               <span className="text-[12px] font-black text-slate-500">하루 그래프 날짜</span>
               <input
@@ -262,7 +254,8 @@ export default function ProductInventoryHistoryModal({
                 min={data?.range.startDate}
                 max={data?.range.endDate}
                 onChange={(event) => setSelectedDate(event.target.value)}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-800 outline-none focus:border-[#EF3B2D]"
+                aria-label="하루 그래프 날짜"
+                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-800 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
               />
             </div>
           </div>
@@ -272,8 +265,8 @@ export default function ProductInventoryHistoryModal({
           ) : null}
 
           {loading && !data ? (
-            <div className="flex h-[360px] items-center justify-center rounded-xl border border-slate-200 bg-white text-[13px] font-black text-slate-500">
-              <Loader2 size={20} className="mr-2 animate-spin text-[#EF3B2D]" />
+            <div className="flex h-[360px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-black text-slate-500">
+              <Loader2 size={20} className="mr-2 animate-spin text-brand-orange" />
               상품 재고차감 이력을 계산하는 중입니다.
             </div>
           ) : data ? (
@@ -294,9 +287,9 @@ export default function ProductInventoryHistoryModal({
               </div>
 
               <div className="grid gap-5 xl:grid-cols-2">
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                   <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-50 text-[#EF3B2D]">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-orange-soft text-brand-orange">
                       <BarChart3 size={20} />
                     </span>
                     <div>
@@ -325,7 +318,7 @@ export default function ProductInventoryHistoryModal({
                   </div>
                 </section>
 
-                <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
+                <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                   <div className="flex items-start gap-3">
                     <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
                       <Clock3 size={20} />
@@ -361,7 +354,7 @@ export default function ProductInventoryHistoryModal({
                 </section>
               </div>
 
-              <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-500">
+              <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-500">
                 <span className="font-black text-slate-700">연결 기준</span>
                 <span className="ml-2">
                   {data.linked.length

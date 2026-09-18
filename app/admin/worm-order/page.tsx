@@ -3,6 +3,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
 import Tesseract from 'tesseract.js'
+import { Paperclip } from 'lucide-react'
+import Button, { buttonClass } from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 import { extractLatestAutomationStep, resolveRemittanceStageFromStep } from '@/lib/remittanceProgress'
 import {
     bestTrustedAwbCandidate,
@@ -530,6 +535,22 @@ function normalizeCustomsBlNo(input: string) {
         .toUpperCase()
 }
 
+/** Presentation only: split a raw error string into a one-line Korean summary and technical details for a <details> toggle. */
+const splitErrorForDisplay = (message: string, fallback: string) => {
+    const raw = (message || '').trim()
+    if (!raw) return { summary: fallback, details: '' }
+    const markers = [' [diagnostic:', ' [debug:', ' (Install deps', 'steps=', 'url=', 'lastSteps=', 'runtimeUnavailable']
+    let cut = -1
+    for (const marker of markers) {
+        const index = raw.indexOf(marker)
+        if (index >= 0 && (cut === -1 || index < cut)) cut = index
+    }
+    if (cut === -1) return { summary: raw, details: '' }
+    const summary = raw.slice(0, cut).trim()
+    const details = raw.slice(cut).trim()
+    return { summary: summary || fallback, details }
+}
+
 const formatRemittanceAutomationError = (message: string) => {
     const normalized = message.replace(/\s+/g, ' ').trim()
     if (!normalized) return '송금 자동화 중 오류가 발생했습니다.'
@@ -583,7 +604,7 @@ function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
 }
 
 function getPipelinePhaseClass(tone: PipelinePhaseDefinition['tone']) {
-    if (tone === 'red') return 'border-[#ffd7cc] bg-[#fff7f3] text-[#d9361b]'
+    if (tone === 'red') return 'border-[#ffd7cc] bg-[#fff7f3] text-brand-orange'
     if (tone === 'amber') return 'border-amber-200 bg-amber-50 text-amber-800'
     if (tone === 'sky') return 'border-sky-200 bg-sky-50 text-sky-800'
     if (tone === 'emerald') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
@@ -4159,7 +4180,7 @@ export default function WormOrderPage() {
             parsedAmount = manualTransferAmountUsd
         } else {
             if (!autoTransferAmountUsd || autoTransferAmountUsd <= 0) {
-                setRemittanceError('매칭된 인보이스의 토탈어마운트가 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
+                setRemittanceError('매칭된 인보이스의 총액이 없습니다. 인보이스 메일을 먼저 매칭해주세요.')
                 return
             }
             if (!matchedInvoiceEmail) {
@@ -4856,25 +4877,19 @@ export default function WormOrderPage() {
     const showCustomsTools = true
     const showCargoCustomsMailTools = true
     const workflowFlowPanel = (
-        <aside className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <aside className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#e34219]">Process</p>
-                        <h2 className="mt-1 text-base font-black text-slate-950">프로세스 리스트</h2>
+                    <div className="min-w-0">
+                        <h2 className="text-[13px] font-bold text-slate-900">프로세스 리스트</h2>
                         <p className="mt-1 text-xs font-bold text-slate-500">
                             {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                         </p>
                     </div>
                     {activeStepDefinition && (
-                        <button
-                            type="button"
-                            onClick={() => handlePipelineStepAction(activeStepDefinition)}
-                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#e34219] px-3 text-xs font-black text-white shadow-sm hover:bg-[#cd3b17]"
-                        >
-                            {activeStepDefinition.id}
-                            이동
-                        </button>
+                        <Button variant="secondary" size="sm" onClick={() => handlePipelineStepAction(activeStepDefinition)}>
+                            {activeStepDefinition.id}단계로 이동
+                        </Button>
                     )}
                 </div>
 
@@ -4882,10 +4897,10 @@ export default function WormOrderPage() {
                     {phaseProgressSummaries.map((phase) => (
                         <div
                             key={phase.id}
-                            className={`rounded-md border px-2 py-2 text-center ${getPipelinePhaseClass(phase.tone)} ${phase.active ? 'ring-2 ring-[#e34219]/20' : ''}`}
+                            className={`rounded-md border px-2 py-2 text-center ${getPipelinePhaseClass(phase.tone)} ${phase.active ? 'ring-2 ring-brand-orange/20' : ''}`}
                         >
-                            <p className="truncate text-[10px] font-black">{phase.label}</p>
-                            <p className="mt-1 text-[10px] font-bold opacity-75">{phase.done}/{phase.total}</p>
+                            <p className="truncate text-[11px] font-black">{phase.label}</p>
+                            <p className="mt-1 text-[11px] font-bold opacity-75">{phase.done}/{phase.total}</p>
                         </div>
                     ))}
                 </div>
@@ -4915,7 +4930,7 @@ export default function WormOrderPage() {
                                 runtimeStatus === 'done'
                                     ? 'bg-emerald-500 text-white'
                                     : isCurrent
-                                        ? 'bg-[#e34219] text-white'
+                                        ? 'bg-brand-orange text-white'
                                         : 'bg-slate-200 text-slate-600'
                             }`}>
                                 {step.id}
@@ -4923,7 +4938,7 @@ export default function WormOrderPage() {
                             <span className="min-w-0">
                                 <span className={`block text-sm font-black leading-tight ${
                                     isCurrent
-                                        ? 'text-[#d9361b]'
+                                        ? 'text-brand-orange'
                                         : runtimeStatus === 'done'
                                             ? 'text-emerald-700'
                                             : 'text-slate-800'
@@ -4934,10 +4949,10 @@ export default function WormOrderPage() {
                                     {step.summary}
                                 </span>
                                 <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[11px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
                                         {getPipelineModeLabel(step.mode)}
                                     </span>
-                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
                                         {isNext && runtimeStatus !== 'done' ? '다음 단계' : getPipelineRuntimeLabel(runtimeStatus)}
                                     </span>
                                 </span>
@@ -4950,51 +4965,49 @@ export default function WormOrderPage() {
     )
 
     return (
-        <div className="mx-auto flex max-w-[1840px] flex-col gap-4 px-3 pb-10 md:px-5 xl:px-7">
-            <header className="rounded-lg border border-slate-200 bg-white p-4 text-slate-900 shadow-sm md:p-5">
-                <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div className="space-y-1">
-                        <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#e34219]">Worm Import Pipeline</p>
-                        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-slate-900">지렁이 수입 자동화 파이프라인</h1>
-                        <p className="text-sm text-slate-600 font-medium">중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다.</p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 md:flex">
-                        <button
-                            type="button"
+        <div className="mx-auto flex min-w-0 max-w-[1840px] flex-col gap-4 px-3 pb-10 md:px-5 xl:px-7">
+            <PageHeader
+                title="지렁이 발주"
+                description="중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다."
+                actions={
+                    <>
+                        <Button
+                            variant="secondary"
                             onClick={() => setOrderListOpen(true)}
-                            className="inline-flex h-11 min-w-0 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-black text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 md:max-w-[260px]"
+                            className="min-w-0 max-w-[260px]"
+                            aria-label="발주 선택"
+                            icon={<Package size={16} className="shrink-0" />}
                         >
-                            <Package size={16} className="shrink-0" />
                             <span className="truncate">{activeOrderNumberText}</span>
-                            <ChevronDown size={14} className="shrink-0 text-slate-400" />
-                        </button>
-                        <button
-                            type="button"
+                            <ChevronDown size={14} className="shrink-0 text-slate-500" />
+                        </Button>
+                        <Button
+                            variant="primary"
                             onClick={handleStartNewOrder}
-                            disabled={creatingOrder}
-                            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#e34219] px-4 text-sm font-black text-white shadow-sm transition hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60"
+                            loading={creatingOrder}
+                            icon={<Plus size={16} />}
                         >
-                            {creatingOrder ? <Loader2 size={15} className="animate-spin" /> : <Plus size={16} />}
                             {creatingOrder ? '생성중...' : '새 발주'}
-                        </button>
-                    </div>
-                </div>
+                        </Button>
+                    </>
+                }
+            />
 
+            <section className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 {orderCreateNotice && (
-                    <p className="mt-3 text-xs font-semibold text-emerald-700">
+                    <p className="mb-2 px-3 text-xs font-semibold text-emerald-700">
                         {orderCreateNotice}
                     </p>
                 )}
                 {orderCreateError && (
-                    <p className="mt-3 text-xs font-semibold text-rose-600">
+                    <p className="mb-2 px-3 text-xs font-semibold text-rose-600">
                         {orderCreateError}
                     </p>
                 )}
-
-                <div className="mt-4 flex items-center gap-2">
+                <div className="mb-2 flex items-center gap-2 px-3 pt-1">
                     <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#f5d5cc]">
                         <div
-                            className="h-full bg-[#e34219] rounded-full transition-all duration-500"
+                            className="h-full bg-brand-orange rounded-full transition-all duration-500"
                             style={{ width: `${Math.round((doneStepCount / PIPELINE_STEP_DEFINITIONS.length) * 100)}%` }}
                         />
                     </div>
@@ -5002,31 +5015,28 @@ export default function WormOrderPage() {
                         {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                     </span>
                 </div>
-            </header>
-
-            <section className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
                 <div className="grid gap-0 sm:grid-cols-2 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
-                    <div className="border-b border-slate-100 px-3 py-3 sm:border-r md:border-b-0">
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#e34219]">Active Order</p>
-                        <p className="mt-1 text-lg font-black text-slate-950">{activeOrderNumberText}</p>
+                    <div className="min-w-0 border-b border-slate-100 px-3 py-3 sm:border-r md:border-b-0">
+                        <p className="text-[11px] font-bold text-slate-600">현재 발주</p>
+                        <p className="mt-1 truncate text-lg font-black text-slate-950">{activeOrderNumberText}</p>
                         <p className="text-xs font-semibold text-slate-500">{activeOrderDateText}</p>
                     </div>
-                    <div className="border-b border-slate-100 px-3 py-3 md:border-b-0 md:border-r">
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">현재 상태</p>
-                        <p className="mt-1 text-lg font-black text-slate-950">{activeOrderStatusText}</p>
+                    <div className="min-w-0 border-b border-slate-100 px-3 py-3 md:border-b-0 md:border-r">
+                        <p className="text-[11px] font-bold text-slate-600">현재 상태</p>
+                        <p className="mt-1 truncate text-lg font-black text-slate-950">{activeOrderStatusText}</p>
                         <p className="text-xs font-semibold text-slate-500">발주 {filteredWormOrderList.length}건 표시중</p>
                     </div>
-                    <div className="border-b border-slate-100 px-3 py-3 sm:border-b-0 sm:border-r">
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">다음 액션</p>
-                        <p className="mt-1 line-clamp-1 text-lg font-black text-[#d9361b]">{nextActionText}</p>
+                    <div className="min-w-0 border-b border-slate-100 px-3 py-3 sm:border-b-0 sm:border-r">
+                        <p className="text-[11px] font-bold text-slate-600">다음 액션</p>
+                        <p className="mt-1 line-clamp-1 text-lg font-black text-brand-orange">{nextActionText}</p>
                         <p className="text-xs font-semibold text-slate-500">{activeStepDefinition?.summary || '완료 상태를 확인하세요.'}</p>
                     </div>
-                    <div className="px-3 py-3">
-                        <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">발주 수량</p>
+                    <div className="min-w-0 px-3 py-3">
+                        <p className="text-[11px] font-bold text-slate-600">발주 수량</p>
                         <p className="mt-1 text-lg font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')} boxes</p>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {wormTypeTotals.map((wormType) => (
-                                <span key={wormType.id} className={`inline-flex h-6 items-center rounded-full px-2 text-[10px] font-black ${wormType.cardTagClass}`}>
+                                <span key={wormType.id} className={`inline-flex h-6 items-center rounded-full px-2 text-[11px] font-black ${wormType.cardTagClass}`}>
                                     {wormType.label} {wormType.total}
                                 </span>
                             ))}
@@ -5052,19 +5062,18 @@ export default function WormOrderPage() {
                         <p className="mt-1 text-sm font-medium text-slate-500 dark:text-gray-400">작업할 발주를 선택하세요.</p>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button
-                            type="button"
+                        <Button
+                            variant="secondary"
                             onClick={() => { void fetchWormOrders() }}
-                            disabled={wormOrderListLoading}
-                            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                            loading={wormOrderListLoading}
+                            icon={<ScanSearch size={15} />}
                         >
-                            {wormOrderListLoading ? <Loader2 size={15} className="animate-spin" /> : <ScanSearch size={15} />}
                             새로고침
-                        </button>
+                        </Button>
                         <button
                             type="button"
                             onClick={() => setOrderListOpen(false)}
-                            className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50"
+                            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50"
                             aria-label="닫기"
                         >
                             <X size={18} />
@@ -5083,8 +5092,8 @@ export default function WormOrderPage() {
                                     onClick={() => setSelectedWormOrderYearMonth(group.value)}
                                     className={`inline-flex h-9 items-center gap-2 rounded-full border px-3 text-xs font-black transition ${
                                         selected
-                                            ? 'border-[#e34219] bg-[#e34219] text-white shadow-sm'
-                                            : 'border-slate-200 bg-white text-slate-600 hover:border-[#ffd7cc] hover:bg-[#fff7f3] hover:text-[#d9361b] dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
+                                            ? 'border-brand-orange bg-brand-orange text-white shadow-sm'
+                                            : 'border-slate-200 bg-white text-slate-600 hover:border-[#ffd7cc] hover:bg-[#fff7f3] hover:text-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300'
                                     }`}
                                 >
                                     <span>{group.year}년 {Number(group.month)}월</span>
@@ -5095,21 +5104,32 @@ export default function WormOrderPage() {
                     </div>
                 )}
 
-                {wormOrderListError && (
-                    <p className="mt-3 whitespace-pre-wrap text-xs font-semibold text-red-600">{wormOrderListError}</p>
-                )}
+                {wormOrderListError && (() => {
+                    const { summary, details } = splitErrorForDisplay(wormOrderListError, '발주 목록을 불러오지 못했습니다.')
+                    return (
+                        <div className="mt-3 space-y-1">
+                            <p className="whitespace-pre-wrap text-xs font-semibold text-red-600">{summary}</p>
+                            {details ? (
+                                <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                                    <summary className="cursor-pointer font-bold text-slate-700">자세히</summary>
+                                    <p className="mt-1 whitespace-pre-wrap break-all">{details}</p>
+                                </details>
+                            ) : null}
+                        </div>
+                    )
+                })()}
 
-                <div className="mt-5 overflow-x-auto rounded-lg border border-slate-200 dark:border-[#2a2a2a]">
-                    <table className="w-full min-w-[760px] table-fixed text-sm">
-                        <thead className="bg-slate-50/80 text-slate-700 dark:bg-[#1a1a1a] dark:text-gray-300">
+                <div className="mt-5 overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
+                    <table className="w-full min-w-[900px] table-fixed text-sm">
+                        <thead className="ux-thead">
                             <tr>
-                                <th className="w-9 px-2 py-5" />
-                                <th className="w-[15%] px-2 py-5 text-left font-black">발주일</th>
-                                <th className="w-[26%] px-2 py-5 text-left font-black">상태</th>
-                                <th className="w-[14%] px-2 py-5 text-right font-black">송금액</th>
-                                <th className="w-[18%] px-2 py-5 text-right font-black">송금 한화</th>
-                                <th className="w-[14%] px-2 py-5 text-right font-black">환율</th>
-                                <th className="w-[8%] px-2 py-5 text-right font-black">관리</th>
+                                <th className="w-9 px-2 py-3" />
+                                <th className="w-[13%] px-2 py-3 text-left whitespace-nowrap">발주일</th>
+                                <th className="w-[22%] px-2 py-3 text-left whitespace-nowrap">상태</th>
+                                <th className="w-[12%] px-2 py-3 text-right whitespace-nowrap">송금액</th>
+                                <th className="w-[15%] px-2 py-3 text-right whitespace-nowrap">송금 한화</th>
+                                <th className="w-[13%] px-2 py-3 text-right whitespace-nowrap">환율</th>
+                                <th className="w-[260px] min-w-[260px] px-2 py-3 text-right whitespace-nowrap">관리</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -5134,7 +5154,7 @@ export default function WormOrderPage() {
                                         key={order.id}
                                         onClick={() => handleSelectWormOrder(order)}
                                         className={`cursor-pointer border-t border-slate-200 transition-colors dark:border-[#2a2a2a] ${
-                                            isActiveOrder ? 'bg-blue-50/60 dark:bg-[#252525]' : 'bg-white hover:bg-slate-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
+                                            isActiveOrder ? 'bg-brand-orange-soft dark:bg-[#252525]' : 'bg-white hover:bg-slate-50 dark:bg-[#1e1e1e] dark:hover:bg-[#252525]'
                                         }`}
                                     >
                                         <td className="px-2 py-6 text-center text-slate-500 dark:text-gray-400">
@@ -5177,58 +5197,51 @@ export default function WormOrderPage() {
                                         <td className="whitespace-nowrap px-2 py-6 text-right text-sm font-black text-slate-950 dark:text-white">
                                             {exchangeRateText}
                                         </td>
-                                        <td className="px-2 py-6 text-right">
-                                            <div className="flex flex-col items-end gap-1.5">
+                                        <td className="min-w-[260px] px-2 py-6 text-right">
+                                            <div className="flex justify-end gap-1.5">
                                                 {!remittanceSummaryComplete && (
                                                     <>
-                                                        <button
-                                                            type="button"
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
                                                             onClick={(event) => {
                                                                 event.stopPropagation()
                                                                 void handleImportRemittanceHistory(order)
                                                             }}
-                                                            disabled={importingWormOrderId === order.id}
-                                                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-sky-200 bg-sky-50 px-2 text-[10px] font-black text-sky-700 hover:bg-sky-100 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            loading={importingWormOrderId === order.id}
+                                                            icon={<ScanSearch size={13} />}
                                                             aria-label={`${order.orderNumber} 송금정보 가져오기`}
                                                             title="모인 비즈플러스 거래내역에서 자동으로 가져옵니다"
                                                         >
-                                                            {importingWormOrderId === order.id ? (
-                                                                <Loader2 size={13} className="animate-spin" />
-                                                            ) : (
-                                                                <ScanSearch size={13} />
-                                                            )}
-                                                        </button>
-                                                        <button
-                                                            type="button"
+                                                            자동
+                                                        </Button>
+                                                        <Button
+                                                            variant="secondary"
+                                                            size="sm"
                                                             onClick={(event) => {
                                                                 event.stopPropagation()
                                                                 openManualRemittanceModal(order)
                                                             }}
-                                                            className="inline-flex h-7 items-center rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-700 hover:bg-slate-50"
                                                             aria-label={`${order.orderNumber} 송금정보 직접 입력`}
                                                             title="송금 금액·수수료·환율을 직접 입력해 저장합니다"
                                                         >
                                                             직접 입력
-                                                        </button>
+                                                        </Button>
                                                     </>
                                                 )}
-                                                <button
-                                                    type="button"
+                                                <Button
+                                                    variant="danger"
+                                                    size="sm"
                                                     onClick={(event) => {
                                                         event.stopPropagation()
                                                         void handleDeleteWormOrder(order)
                                                     }}
-                                                    disabled={deletingWormOrderId === order.id}
-                                                    className="inline-flex h-8 items-center gap-1 rounded-lg border border-rose-200 bg-white px-2 text-[11px] font-black text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    loading={deletingWormOrderId === order.id}
+                                                    icon={<Trash2 size={13} />}
                                                     aria-label={`${order.orderNumber} 삭제`}
                                                 >
-                                                    {deletingWormOrderId === order.id ? (
-                                                        <Loader2 size={13} className="animate-spin" />
-                                                    ) : (
-                                                        <Trash2 size={13} />
-                                                    )}
                                                     삭제
-                                                </button>
+                                                </Button>
                                             </div>
                                         </td>
                                     </tr>
@@ -5236,10 +5249,12 @@ export default function WormOrderPage() {
                             })}
                             {!wormOrderListLoading && filteredWormOrderList.length === 0 && (
                                 <tr>
-                                    <td colSpan={7} className="px-4 py-10 text-center text-sm font-semibold text-slate-500 dark:text-gray-400">
-                                        {wormOrderList.length === 0
-                                            ? '저장된 발주가 없습니다. 상단의 `+ 새 발주 시작` 버튼으로 생성해 주세요.'
-                                            : `${selectedWormOrderMonthLabel} 발주가 없습니다.`}
+                                    <td colSpan={7} className="p-3">
+                                        <EmptyState
+                                            compact
+                                            title={wormOrderList.length === 0 ? '저장된 발주가 없습니다' : `${selectedWormOrderMonthLabel} 발주가 없습니다`}
+                                            description={wormOrderList.length === 0 ? '상단의 새 발주 버튼으로 생성해 주세요.' : undefined}
+                                        />
                                     </td>
                                 </tr>
                             )}
@@ -5254,8 +5269,8 @@ export default function WormOrderPage() {
             )}
 
             <div className="flex min-w-0 flex-col gap-4 md:col-start-2 md:row-start-1">
-                <div className="-mx-1 overflow-x-auto pb-1 md:hidden">
-                    <div className="flex min-w-max gap-2 px-1">
+                <div className="min-w-0 overflow-x-auto pb-1 md:hidden">
+                    <div className="flex min-w-max gap-2">
                         {PIPELINE_STEP_DEFINITIONS.map((step) => {
                             const runtimeStatus = pipelineStatusMap[step.id]
                             const selected = step.id === selectedPipelineStepId
@@ -5264,35 +5279,36 @@ export default function WormOrderPage() {
                                     key={`mobile-step-${step.id}`}
                                     type="button"
                                     onClick={() => handlePipelineStepAction(step)}
-                                    className={`inline-flex h-10 min-w-10 items-center justify-center rounded-lg border px-3 text-xs font-black ${
+                                    className={`inline-flex h-9 items-center justify-center gap-1 whitespace-nowrap rounded-xl border px-3 text-xs font-bold ${
                                         selected
-                                            ? 'border-[#e34219] bg-[#e34219] text-white'
+                                            ? 'border-brand-orange bg-brand-orange text-white'
                                             : runtimeStatus === 'done'
                                                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                                                 : 'border-slate-200 bg-white text-slate-600'
                                     }`}
                                     aria-label={`${step.id}단계 ${step.title}`}
                                 >
-                                    {step.id}
+                                    <span>{step.id}</span>
+                                    <span>{step.title.slice(0, 2)}</span>
                                 </button>
                             )
                         })}
                     </div>
                 </div>
 
-                <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
+                <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
-                            <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-[#e34219] text-sm font-black text-white">
+                            <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-brand-orange text-sm font-black text-white">
                                 {selectedStepDefinition.id}
                             </span>
                             <div className="min-w-0">
                                 <div className="flex flex-wrap items-center gap-2">
                                     <h2 className="text-lg font-black text-slate-950">{selectedStepDefinition.title}</h2>
-                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] font-bold ${getPipelineModeBadgeClass(selectedStepDefinition.mode)}`}>
+                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-bold ${getPipelineModeBadgeClass(selectedStepDefinition.mode)}`}>
                                         {getPipelineModeLabel(selectedStepDefinition.mode)}
                                     </span>
-                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[selectedStepDefinition.id])}`}>
+                                    <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[selectedStepDefinition.id])}`}>
                                         {getPipelineRuntimeLabel(pipelineStatusMap[selectedStepDefinition.id])}
                                     </span>
                                 </div>
@@ -5304,7 +5320,7 @@ export default function WormOrderPage() {
                     <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
                         {selectedStepDefinition.details.map((detail) => (
                             <span key={detail} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-[#e34219]" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-brand-orange" />
                                 {detail}
                             </span>
                         ))}
@@ -5319,7 +5335,7 @@ export default function WormOrderPage() {
                         key={`manual-step-${step.id}`}
                         id={`worm-pipeline-step-${step.id}`}
                         style={{ order: step.id * 10 }}
-                        className="scroll-mt-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+                        className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
                     >
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex min-w-0 items-start gap-3">
@@ -5329,12 +5345,12 @@ export default function WormOrderPage() {
                                 <div>
                                     <div className="flex flex-wrap items-center gap-2">
                                         <p className="text-sm font-black text-slate-900">{step.title}</p>
-                                        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[10px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[step.id])}`}>
+                                        <span className={`inline-flex h-6 items-center rounded-md border px-2 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(pipelineStatusMap[step.id])}`}>
                                             {getPipelineRuntimeLabel(pipelineStatusMap[step.id])}
                                         </span>
                                     </div>
                                     <p className="mt-1 text-xs font-medium text-slate-500">{step.summary}</p>
-                                    <p className="mt-2 text-[11px] font-bold text-slate-400">담당 · {step.owner}</p>
+                                    <p className="mt-2 text-[11px] font-bold text-slate-500">담당 · {step.owner}</p>
                                 </div>
                             </div>
                             <button
@@ -5344,7 +5360,7 @@ export default function WormOrderPage() {
                                 className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
                                     pipelineStatusMap[step.id] === 'done'
                                         ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                        : 'bg-[#e34219] text-white hover:bg-[#cd3b17]'
+                                        : 'bg-brand-orange text-white hover:bg-brand-orange-hover'
                                 }`}
                             >
                                 {manualStepSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
@@ -5354,7 +5370,7 @@ export default function WormOrderPage() {
                         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
                             {step.details.map((detail) => (
                                 <span key={detail} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-[#e34219]" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-brand-orange" />
                                     {detail}
                                 </span>
                             ))}
@@ -5373,12 +5389,12 @@ export default function WormOrderPage() {
                             <h2 className="text-lg font-black text-[#1f2937] dark:text-white">발주서 작성</h2>
                             <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">사이즈별 수량을 입력하고 발주 메시지를 생성합니다.</p>
                         </div>
-                        <Sparkles size={18} className="text-[#e34219]" />
+                        <Sparkles size={18} className="text-brand-orange" />
                     </div>
 
                     <div className="p-4 md:p-6 space-y-6">
                         <section className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a]/60 p-4 md:p-5">
-                            <p className="text-[11px] font-black text-slate-600 dark:text-gray-400 uppercase tracking-[0.2em]">납품 예정일</p>
+                            <p className="text-[13px] font-bold text-slate-800 dark:text-gray-300">납품 예정일</p>
 
                             <div className="mt-3 flex items-center justify-between">
                                 <button
@@ -5399,7 +5415,7 @@ export default function WormOrderPage() {
                                     <p className="text-sm font-black text-slate-900 dark:text-white">{calendarMonthLabel}</p>
                                     {calendarMonthPriceInfo && (
                                         <span
-                                            className={`inline-flex max-w-[168px] items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-black leading-none ${getCalendarPriceBadgeClass(calendarMonthPriceInfo.colorType)}`}
+                                            className={`inline-flex max-w-[168px] items-center justify-center rounded-full px-2 py-0.5 text-[11px] font-black leading-none ${getCalendarPriceBadgeClass(calendarMonthPriceInfo.colorType)}`}
                                             title={calendarMonthPriceInfo.memo}
                                         >
                                             {calendarMonthPriceInfo.priceStatus}
@@ -5512,11 +5528,11 @@ export default function WormOrderPage() {
                                             title={cellTooltip}
                                             className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
                                                 isSelected
-                                                    ? 'bg-[#e34219] text-white'
+                                                    ? 'bg-brand-orange text-white'
                                                     : dayCell.isCurrentMonth
                                                         ? `${cellBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
-                                            } ${monthPriceTintClass} ${hasOrderOnDate ? 'border-2 border-[#e34219] shadow-[inset_0_0_0_1px_rgba(227,66,25,0.18)]' : ''} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                            } ${monthPriceTintClass} ${hasOrderOnDate ? 'border-2 border-brand-orange shadow-[inset_0_0_0_1px_rgba(227,66,25,0.18)]' : ''} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
                                             <div className="flex h-full flex-col">
                                                 <div className="flex items-center gap-1">
@@ -5603,7 +5619,7 @@ export default function WormOrderPage() {
                                 <div className="mt-2 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                     <div className="flex items-center justify-between gap-2">
                                         <p className="text-[11px] font-black text-slate-700 dark:text-gray-300">월별 가격 추이</p>
-                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-black ${getCalendarPriceBadgeClass(selectedDatePriceInfo.colorType)}`}>
+                                        <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-black ${getCalendarPriceBadgeClass(selectedDatePriceInfo.colorType)}`}>
                                             {selectedDatePriceInfo.priceStatus}
                                         </span>
                                     </div>
@@ -5623,7 +5639,7 @@ export default function WormOrderPage() {
                         <div className="space-y-5">
                             <div className="grid gap-3 md:grid-cols-3">
                                 <div className="rounded-2xl border border-[#ffd7cc] bg-[#fff7f3] px-4 py-3">
-                                    <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#e34219]">총 발주</p>
+                                    <p className="text-[11px] font-bold text-brand-orange">총 발주</p>
                                     <p className="mt-1 text-2xl font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')}</p>
                                     <p className="text-xs font-semibold text-slate-500">boxes</p>
                                 </div>
@@ -5636,7 +5652,7 @@ export default function WormOrderPage() {
                                                 : 'border-red-200 bg-red-50'
                                         }`}
                                     >
-                                        <p className={`text-[11px] font-black uppercase tracking-[0.18em] ${
+                                        <p className={`text-[11px] font-bold ${
                                             wormType.id === 'blue' ? 'text-emerald-700' : 'text-red-700'
                                         }`}>
                                             {wormType.label}
@@ -5728,13 +5744,13 @@ export default function WormOrderPage() {
                             </div>
 
                             {validationError && (
-                                <p className="text-sm font-semibold text-[#e34219]">{validationError}</p>
+                                <p className="text-sm font-semibold text-brand-orange">{validationError}</p>
                             )}
 
                             <button
                                 type="button"
                                 onClick={handleGenerate}
-                                className="h-11 w-full md:w-auto md:min-w-[220px] bg-[#e34219] hover:bg-[#cd3b17] text-white rounded-lg font-bold text-sm tracking-wide px-6"
+                                className={buttonClass('primary', 'md', 'w-full px-6 md:w-auto md:min-w-[220px]')}
                             >
                                 발주 메시지 생성
                             </button>
@@ -5750,7 +5766,7 @@ export default function WormOrderPage() {
                                 <button
                                     type="button"
                                     onClick={handleCopy}
-                                    className="inline-flex items-center gap-2 h-9 px-4 border border-gray-300 dark:border-[#2a2a2a] rounded-lg font-semibold text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-[#252525]"
+                                    className={buttonClass('secondary', 'md', 'dark:border-[#2a2a2a] dark:text-gray-300 dark:hover:bg-[#252525]')}
                                 >
                                     <Copy size={15} />
                                     {copied ? '복사 완료' : '메시지 복사'}
@@ -5775,7 +5791,7 @@ export default function WormOrderPage() {
                     </div>
                 )}
 
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f8fafc] dark:bg-[#1a1a1a] flex items-center justify-between mt-[2px]">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f8fafc] dark:bg-[#1a1a1a] flex flex-wrap items-center justify-between gap-3 mt-[2px]">
                     <div>
                         <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Mail size={18} className="text-slate-500 dark:text-gray-400" />
@@ -5792,16 +5808,16 @@ export default function WormOrderPage() {
                             </p>
                         )}
                     </div>
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={() => { void fetchEmails(true) }}
-                        disabled={loadingEmails}
-                        className="h-9 px-4 bg-slate-800 text-white rounded-lg text-sm font-bold shadow hover:bg-slate-700 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
+                        loading={loadingEmails}
                     >
-                        {loadingEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingEmails ? '스캔 중...' : matchedInvoiceEmail ? '새 메일 찾기' : '메일 스캔'}</span>
-                    </button>
+                        {loadingEmails ? '스캔 중...' : matchedInvoiceEmail ? '새 메일 찾기' : '메일 스캔'}
+                    </Button>
                 </div>
-                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
+                <div className="flex flex-col md:flex-row min-h-[160px] border-t border-gray-100 dark:border-[#2a2a2a]">
                     {/* 좌측 리스트 패널 */}
                     <div className="w-full md:w-[35%] bg-white dark:bg-[#1e1e1e] border-r border-gray-100 dark:border-[#2a2a2a] overflow-y-auto max-h-[600px] relative">
                         {emailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{emailError}</div>}
@@ -5819,9 +5835,13 @@ export default function WormOrderPage() {
                             </div>
                         )}
 
-                        {hasFetched && !loadingEmails && emails.length === 0 && !emailError && (
-                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-[#1a1a1a]/50 mt-10">
-                                현재 발주에서 매칭 가능한 `invoice/payment` 메일이 없습니다.
+                        {!loadingEmails && emails.length === 0 && !emailError && (
+                            <div className="p-3">
+                                <EmptyState
+                                    compact
+                                    title="매칭된 메일이 없습니다"
+                                    description={hasFetched ? '현재 발주에서 매칭 가능한 invoice/payment 메일이 없습니다.' : '메일 스캔을 눌러 최근 메일을 불러오세요.'}
+                                />
                             </div>
                         )}
 
@@ -5852,7 +5872,7 @@ export default function WormOrderPage() {
                                                     <span className={`text-[11px] font-bold ${isMatched ? 'text-emerald-700' : isSelected ? 'text-orange-500' : 'text-gray-400'}`}>
                                                         {formatSafeDate(email.date)}
                                                     </span>
-                                                    {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                                    {email.hasAttachments && <Paperclip size={12} className="text-slate-500" aria-label="첨부파일 있음" />}
                                                 </div>
                                                 <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                                                     {index + 1}. {email.subject}
@@ -5866,13 +5886,13 @@ export default function WormOrderPage() {
                                                         void handleMatchEmailToActiveOrder(email)
                                                     }}
                                                     disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id || matchingEmailUid === email.uid}
-                                                    className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
+                                                    className={`inline-flex h-6 items-center rounded-md px-2.5 text-[11px] font-bold tracking-wide transition-colors ${
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
                                                             : matchingEmailUid === email.uid
                                                                 ? 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-progress'
                                                                 : activeWormOrder?.id
-                                                                    ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
+                                                                    ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer'
                                                                     : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
                                                 >
@@ -5883,7 +5903,7 @@ export default function WormOrderPage() {
                                                             : '매칭하기'}
                                                 </button>
                                                 {email.matchedOrderNumber && (
-                                                    <span className="text-[10px] font-semibold text-emerald-700">
+                                                    <span className="text-[11px] font-semibold text-emerald-700">
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
@@ -5895,7 +5915,7 @@ export default function WormOrderPage() {
                                                             void handleUnmatchEmail(email)
                                                         }}
                                                         disabled={unmatchingEmailUid === email.uid}
-                                                        className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
+                                                        className={`inline-flex h-6 items-center rounded-md px-2 text-[11px] font-bold tracking-wide transition-colors ${
                                                             unmatchingEmailUid === email.uid
                                                                 ? 'bg-slate-100 text-slate-400 cursor-progress'
                                                                 : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
@@ -5906,15 +5926,15 @@ export default function WormOrderPage() {
                                                 )}
                                             </div>
                                             {email.matchedOrderId && (
-                                                <div className="mt-1.5 space-y-1 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5 text-[10px]">
+                                                <div className="mt-1.5 space-y-1 rounded-md border border-emerald-100 bg-emerald-50/60 px-2.5 py-1.5 text-[11px]">
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <span className="font-semibold text-emerald-700">유닛프라이스</span>
+                                                        <span className="font-semibold text-emerald-700">단가</span>
                                                         <span className="font-bold text-emerald-900">
                                                             {formatUsdAmount(email.invoiceUnitPriceUsd)} · {formatKrwAmount(email.invoiceUnitPriceKrw)}
                                                         </span>
                                                     </div>
                                                     <div className="flex items-center justify-between gap-2">
-                                                        <span className="font-semibold text-emerald-700">토탈어마운트</span>
+                                                        <span className="font-semibold text-emerald-700">총액</span>
                                                         <span className="font-bold text-emerald-900">
                                                             {formatUsdAmount(email.invoiceTotalAmountUsd)} · {formatKrwAmount(email.invoiceTotalAmountKrw)}
                                                         </span>
@@ -5936,11 +5956,11 @@ export default function WormOrderPage() {
                                                             event.stopPropagation()
                                                             handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
                                                         }}
-                                                        className="inline-flex h-6 items-center rounded-md bg-[#e34219] px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-[#cd3b17] transition-colors"
+                                                        className={buttonClass('secondary', 'sm', 'h-7 px-2.5 text-[11px]')}
                                                     >
-                                                        조회하기
+                                                        통관조회
                                                     </button>
-                                                    <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
+                                                    <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>
                                                         AWB {email.awbNumber}
                                                     </p>
                                                 </div>
@@ -5955,9 +5975,11 @@ export default function WormOrderPage() {
                     {/* 우측 본문 렌더링 패널 */}
                     <div className="w-full md:w-[65%] bg-gray-50/30 dark:bg-[#1a1a1a]/30 flex flex-col">
                         {!selectedEmailUid ? (
-                            <div className="flex-1 flex items-center justify-center p-10 text-[13px] text-gray-400 font-medium">
-                                {emails.length > 0 ? "좌측에서 메일을 선택하시면 내용이 표시됩니다." : ""}
-                            </div>
+                            emails.length > 0 ? (
+                                <div className="flex-1 flex items-center justify-center p-6 text-[13px] text-slate-500 font-medium">
+                                    좌측에서 메일을 선택하시면 내용이 표시됩니다.
+                                </div>
+                            ) : null
                         ) : (() => {
                             const selectedEmailBase = emails.find(e => e.uid === selectedEmailUid)
                             const selectedEmailIndex = emails.findIndex((email) => email.uid === selectedEmailUid)
@@ -6023,12 +6045,12 @@ export default function WormOrderPage() {
                                                     <a
                                                         key={att.index}
                                                         href={`/api/admin/worm-order/emails/attachment?uid=${selectedEmail.uid}&index=${att.index}`}
-                                                        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-[#e34219] bg-[#fff7f3] hover:bg-[#ffeadd] px-3 py-1.5 rounded-lg border border-[#ffeadd] transition-colors"
+                                                        className={buttonClass('secondary', 'sm')}
                                                         title="새 탭에서 열거나 다운로드하려면 클릭하세요"
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                     >
-                                                        📎 {att.filename} <span className="font-normal text-[10px] text-orange-400 opacity-80 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
+                                                        <Paperclip size={12} /> {att.filename} <span className="font-normal text-[11px] text-slate-500 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
                                                     </a>
                                                 ))}
                                             </div>
@@ -6057,7 +6079,7 @@ export default function WormOrderPage() {
                     </div>
                 )}
 
-                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0f5ff] dark:bg-[#1a1a1a] flex items-center justify-between mt-[2px]">
+                <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f8fafc] dark:bg-[#1a1a1a] flex flex-wrap items-center justify-between gap-3 mt-[2px]">
                     <div>
                         <h2 className="text-lg font-black text-[#1f2937] dark:text-white flex items-center gap-2">
                             <Package size={18} className="text-blue-500" />
@@ -6068,16 +6090,16 @@ export default function WormOrderPage() {
                             documents 메일을 이 발주에 매칭하고 AWB를 추출합니다.
                         </p>
                     </div>
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={fetchDocumentEmails}
-                        disabled={loadingDocEmails}
-                        className="h-9 px-4 bg-blue-700 text-white rounded-lg text-sm font-bold shadow hover:bg-blue-600 disabled:opacity-50 flex items-center gap-2 cursor-pointer transition-colors relative overflow-hidden"
+                        loading={loadingDocEmails}
                     >
-                        {loadingDocEmails && <Loader2 size={14} className="animate-spin relative z-10" />}
-                        <span className="relative z-10">{loadingDocEmails ? '스캔 중...' : matchedAwbEmail ? '새 메일 찾기' : '메일 스캔'}</span>
-                    </button>
+                        {loadingDocEmails ? '스캔 중...' : matchedAwbEmail ? '새 메일 찾기' : '메일 스캔'}
+                    </Button>
                 </div>
-                <div className="flex flex-col md:flex-row min-h-[500px] border-t border-gray-100 dark:border-[#2a2a2a]">
+                <div className="flex flex-col md:flex-row min-h-[160px] border-t border-gray-100 dark:border-[#2a2a2a]">
                     {/* 좌측 리스트 패널 */}
                     <div className="w-full md:w-[35%] bg-white dark:bg-[#1e1e1e] border-r border-gray-100 dark:border-[#2a2a2a] overflow-y-auto max-h-[600px] relative">
                         {docEmailError && <div className="p-4 text-sm text-red-500 font-medium text-center">{docEmailError}</div>}
@@ -6095,9 +6117,13 @@ export default function WormOrderPage() {
                             </div>
                         )}
 
-                        {docHasFetched && !loadingDocEmails && docEmails.length === 0 && !docEmailError && (
-                            <div className="p-10 text-center text-[13px] font-medium text-gray-500 dark:text-gray-400 bg-gray-50/50 dark:bg-[#1a1a1a]/50 mt-10">
-                                &apos;documents&apos; 제목 메일이 없습니다.
+                        {!loadingDocEmails && docEmails.length === 0 && !docEmailError && (
+                            <div className="p-3">
+                                <EmptyState
+                                    compact
+                                    title="매칭된 메일이 없습니다"
+                                    description={docHasFetched ? "'documents' 제목 메일이 없습니다." : '메일 스캔을 눌러 최근 메일을 불러오세요.'}
+                                />
                             </div>
                         )}
 
@@ -6128,7 +6154,7 @@ export default function WormOrderPage() {
                                                     <span className={`text-[11px] font-bold ${isMatched ? 'text-blue-700' : isSelected ? 'text-blue-500' : 'text-gray-400'}`}>
                                                         {formatSafeDate(email.date)}
                                                     </span>
-                                                    {email.hasAttachments && <span className="text-[11px]">📎</span>}
+                                                    {email.hasAttachments && <Paperclip size={12} className="text-slate-500" aria-label="첨부파일 있음" />}
                                                 </div>
                                                 <h3 className={`text-[14px] font-bold leading-snug line-clamp-2 ${isMatched || isSelected ? 'text-gray-900' : 'text-gray-600'}`}>
                                                     {index + 1}. {email.subject}
@@ -6143,13 +6169,13 @@ export default function WormOrderPage() {
                                                         void handleMatchDocEmailToOrder(email)
                                                     }}
                                                     disabled={email.matchedOrderId === activeWormOrder?.id || !activeWormOrder?.id || matchingDocEmailUid === email.uid}
-                                                    className={`inline-flex h-6 items-center rounded-md px-2.5 text-[10px] font-bold tracking-wide transition-colors ${
+                                                    className={`inline-flex h-6 items-center rounded-md px-2.5 text-[11px] font-bold tracking-wide transition-colors ${
                                                         email.matchedOrderId === activeWormOrder?.id
                                                             ? 'bg-emerald-100 text-emerald-700 border border-emerald-200 cursor-default'
                                                             : matchingDocEmailUid === email.uid
                                                                 ? 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-progress'
                                                                 : activeWormOrder?.id
-                                                                    ? 'bg-slate-800 text-white hover:bg-slate-700 cursor-pointer'
+                                                                    ? 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 cursor-pointer'
                                                                     : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-500 dark:text-gray-400 border border-slate-200 dark:border-[#2a2a2a] cursor-not-allowed'
                                                     }`}
                                                 >
@@ -6160,7 +6186,7 @@ export default function WormOrderPage() {
                                                             : '매칭하기'}
                                                 </button>
                                                 {email.matchedOrderNumber && (
-                                                    <span className="text-[10px] font-semibold text-emerald-700">
+                                                    <span className="text-[11px] font-semibold text-emerald-700">
                                                         {email.matchedOrderNumber}
                                                     </span>
                                                 )}
@@ -6172,7 +6198,7 @@ export default function WormOrderPage() {
                                                             void handleUnmatchDocEmail(email)
                                                         }}
                                                         disabled={unmatchingDocEmailUid === email.uid}
-                                                        className={`inline-flex h-6 items-center rounded-md px-2 text-[10px] font-bold tracking-wide transition-colors ${
+                                                        className={`inline-flex h-6 items-center rounded-md px-2 text-[11px] font-bold tracking-wide transition-colors ${
                                                             unmatchingDocEmailUid === email.uid
                                                                 ? 'bg-slate-100 text-slate-400 cursor-progress'
                                                                 : 'bg-rose-50 text-rose-600 border border-rose-200 hover:bg-rose-100 cursor-pointer'
@@ -6190,11 +6216,11 @@ export default function WormOrderPage() {
                                                             event.stopPropagation()
                                                             handleCustomsProgressSearch(email.awbNumber || '', { scrollIntoView: true })
                                                         }}
-                                                        className="inline-flex h-6 items-center rounded-md bg-blue-600 px-2.5 text-[10px] font-bold tracking-wide text-white hover:bg-blue-700 transition-colors"
+                                                        className={buttonClass('secondary', 'sm', 'h-7 px-2.5 text-[11px]')}
                                                     >
                                                         통관조회
                                                     </button>
-                                                    <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-blue-700' : 'text-slate-400'}`}>
+                                                    <p className={`text-[11px] font-semibold tracking-wide ${isSelected ? 'text-slate-900' : 'text-slate-500'}`}>
                                                         AWB {email.awbNumber}
                                                     </p>
                                                 </div>
@@ -6209,9 +6235,11 @@ export default function WormOrderPage() {
                     {/* 우측 본문 렌더링 패널 */}
                     <div className="w-full md:w-[65%] bg-gray-50/30 dark:bg-[#1a1a1a]/30 flex flex-col">
                         {!selectedDocEmailUid ? (
-                            <div className="flex-1 flex items-center justify-center p-10 text-[13px] text-gray-400 font-medium">
-                                {docEmails.length > 0 ? '좌측에서 메일을 선택하시면 내용이 표시됩니다.' : ''}
-                            </div>
+                            docEmails.length > 0 ? (
+                                <div className="flex-1 flex items-center justify-center p-6 text-[13px] text-slate-500 font-medium">
+                                    좌측에서 메일을 선택하시면 내용이 표시됩니다.
+                                </div>
+                            ) : null
                         ) : (() => {
                             const selectedDocBase = docEmails.find(e => e.uid === selectedDocEmailUid)
                             const selectedDocDetail = selectedDocEmailUid ? docEmailDetails[selectedDocEmailUid] : null
@@ -6246,7 +6274,7 @@ export default function WormOrderPage() {
                                             <button
                                                 onClick={handleRunDocAwbOcr}
                                                 disabled={loadingDocEmailDetail || awbLoading || selectedDoc.skmIndices.length === 0}
-                                                className="h-11 px-4 rounded-lg bg-slate-950 text-white text-[12px] font-bold disabled:opacity-50"
+                                                className={buttonClass('primary', 'md')}
                                             >
                                                 {awbLoading ? '분석 중...' : '빠른 AWB 인식'}
                                             </button>
@@ -6281,7 +6309,7 @@ export default function WormOrderPage() {
                                                         <button
                                                             type="button"
                                                             onClick={cancelAwbOcr}
-                                                            className="ml-auto inline-flex h-9 items-center gap-1 rounded-lg border border-blue-200 bg-white px-3 text-[11px] font-bold text-blue-700"
+                                                            className={buttonClass('secondary', 'sm', 'ml-auto')}
                                                         >
                                                             <X size={13} />
                                                             중지
@@ -6290,7 +6318,7 @@ export default function WormOrderPage() {
                                                 )}
                                                 {awbNumber && !awbLoading && (
                                                     <>
-                                                        <div className="text-[11px] font-bold text-blue-600 uppercase tracking-wider flex items-center gap-1.5">
+                                                        <div className="text-[11px] font-bold text-blue-700 flex items-center gap-1.5">
                                                             <Sparkles size={14} className="text-blue-500" />
                                                             Air Waybill 추출 완료 (OCR)
                                                         </div>
@@ -6303,7 +6331,7 @@ export default function WormOrderPage() {
                                                                         window.setTimeout(() => setAwbCopied(false), 1800)
                                                                     })
                                                                 }}
-                                                                className="h-11 px-4 bg-blue-600 text-white font-bold text-[13px] rounded-lg hover:bg-blue-700 transition flex items-center justify-center gap-1.5 shrink-0"
+                                                                className={buttonClass('secondary', 'sm')}
                                                             >
                                                                 <Copy size={14} />
                                                                 {awbCopied ? '복사됨' : '복사'}
@@ -6322,8 +6350,8 @@ export default function WormOrderPage() {
                                                                     setAwbError('')
                                                                     persistAwbCache(selectedDoc.uid, candidate.value, selectedDoc)
                                                                 }}
-                                                                className="h-10 px-3 rounded-md border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-[11px] font-bold text-slate-700 hover:border-blue-300 hover:text-blue-700 transition-colors"
-                                                                title={`source: ${candidate.source}, score: ${candidate.score}`}
+                                                                className={buttonClass('secondary', 'sm', 'dark:border-[#2a2a2a] dark:bg-[#1e1e1e]')}
+                                                                title="이 번호로 선택"
                                                             >
                                                                 {candidate.value}
                                                             </button>
@@ -6349,7 +6377,7 @@ export default function WormOrderPage() {
                                                             type="button"
                                                             onClick={() => { void handleRunPreciseDocAwbOcr() }}
                                                             disabled={selectedDoc.skmIndices.length === 0}
-                                                            className="inline-flex h-11 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-4 text-[12px] font-bold text-slate-700 disabled:opacity-50"
+                                                            className={buttonClass('secondary', 'md')}
                                                         >
                                                             <ScanSearch size={14} />
                                                             정밀 재스캔
@@ -6364,13 +6392,13 @@ export default function WormOrderPage() {
                                                                 if (event.key === 'Enter') void handleSaveManualAwb()
                                                             }}
                                                             placeholder="AWB 11자리 직접 입력"
-                                                            className="h-11 min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-blue-500"
+                                                            className="h-10 min-w-0 rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold text-slate-900 outline-none focus:border-brand-orange"
                                                         />
                                                         <button
                                                             type="button"
                                                             onClick={() => { void handleSaveManualAwb() }}
                                                             disabled={!awbManualInput.trim()}
-                                                            className="h-11 rounded-lg bg-slate-900 px-4 text-[12px] font-bold text-white disabled:opacity-40"
+                                                            className={buttonClass('primary', 'md')}
                                                         >
                                                             저장
                                                         </button>
@@ -6386,12 +6414,12 @@ export default function WormOrderPage() {
                                                     <a
                                                         key={att.index}
                                                         href={`/api/admin/worm-order/emails/attachment?uid=${selectedDoc.uid}&index=${att.index}`}
-                                                        className="inline-flex items-center gap-1.5 text-[12px] font-bold text-blue-600 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-100 transition-colors"
+                                                        className={buttonClass('secondary', 'sm')}
                                                         title="새 탭에서 열거나 다운로드하려면 클릭하세요"
                                                         target="_blank"
                                                         rel="noopener noreferrer"
                                                     >
-                                                        📎 {att.filename} <span className="font-normal text-[10px] text-blue-400 opacity-80 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
+                                                        <Paperclip size={12} /> {att.filename} <span className="font-normal text-[11px] text-slate-500 ml-0.5">({Math.round(att.size / 1024)}KB)</span>
                                                     </a>
                                                 ))}
                                             </div>
@@ -6429,38 +6457,23 @@ export default function WormOrderPage() {
                             </p>
                         )}
                     </div>
-                    <Send size={18} className="text-[#e34219] mt-1" />
+                    <Send size={18} className="text-brand-orange mt-1" />
                 </div>
 
-                <div className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] p-1 grid grid-cols-2 gap-1 bg-slate-50 dark:bg-[#1a1a1a]">
-                    <button
-                        type="button"
-                        onClick={() => setUseManualRemittanceInput(false)}
-                        className={`h-9 rounded-lg text-[12px] font-bold transition-colors ${
-                            !useManualRemittanceInput
-                                ? 'bg-[#111827] text-white'
-                                : 'bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400'
-                        }`}
-                    >
-                        자동 연동
-                    </button>
-                    <button
-                        type="button"
-                        onClick={() => setUseManualRemittanceInput(true)}
-                        className={`h-9 rounded-lg text-[12px] font-bold transition-colors ${
-                            useManualRemittanceInput
-                                ? 'bg-[#111827] text-white'
-                                : 'bg-white dark:bg-[#1e1e1e] text-slate-600 dark:text-gray-400'
-                        }`}
-                    >
-                        수동 입력
-                    </button>
-                </div>
+                <Tabs
+                    aria-label="송금 입력 방식"
+                    items={[
+                        { key: 'auto', label: '자동 연동' },
+                        { key: 'manual', label: '수동 입력' },
+                    ]}
+                    value={useManualRemittanceInput ? 'manual' : 'auto'}
+                    onChange={(key) => setUseManualRemittanceInput(key === 'manual')}
+                />
 
                 {!useManualRemittanceInput ? (
                     matchedInvoiceEmail ? (
                         <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-2">
-                            <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">인보이스 자동 연동</p>
+                            <p className="text-[13px] font-bold text-emerald-800">인보이스 자동 연동</p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                                 <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                     <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">송금 금액 (USD)</p>
@@ -6481,7 +6494,7 @@ export default function WormOrderPage() {
                     )
                 ) : (
                     <div className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a] p-4 space-y-3">
-                        <p className="text-[11px] font-bold text-slate-700 dark:text-gray-300 uppercase tracking-[0.16em]">수동 송금 입력</p>
+                        <p className="text-[13px] font-bold text-slate-800 dark:text-gray-300">수동 송금 입력</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                             <div className="space-y-1">
                                 <label className="text-[11px] font-semibold text-slate-600 dark:text-gray-400">송금 금액 (USD)</label>
@@ -6491,7 +6504,7 @@ export default function WormOrderPage() {
                                     value={transferAmountUsd}
                                     onChange={(event) => setTransferAmountUsd(event.target.value)}
                                     placeholder="예: 5800.00"
-                                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-[#e34219]"
+                                    className="h-10 w-full rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 text-sm font-semibold text-slate-900 dark:text-white outline-none focus:border-brand-orange"
                                 />
                             </div>
                             <div className="space-y-1">
@@ -6503,7 +6516,7 @@ export default function WormOrderPage() {
                                         const nextFile = event.target.files?.[0] || null
                                         setInvoicePdf(nextFile)
                                     }}
-                                    className="block w-full text-[12px] file:mr-2 file:h-9 file:rounded-lg file:border-0 file:bg-[#111827] file:px-3 file:text-xs file:font-bold file:text-white hover:file:bg-black"
+                                    className="block w-full text-[12px] file:mr-2 file:h-9 file:rounded-lg file:border-0 file:bg-brand-orange file:px-3 file:text-xs file:font-bold file:text-white hover:file:bg-brand-orange-hover"
                                 />
                                 {invoicePdf && (
                                     <p className="text-[11px] font-semibold text-slate-600 dark:text-gray-400 truncate">
@@ -6536,14 +6549,14 @@ export default function WormOrderPage() {
                     <p className="text-[11px] text-gray-500 leading-relaxed">
                         {useManualRemittanceInput
                             ? '수동 입력한 송금 금액(USD)과 PDF로 모인 자동 송금 신청을 실행합니다.'
-                            : '매칭된 인보이스의 토탈어마운트(USD)와 PDF 첨부파일로 자동 송금 신청합니다.'}
+                            : '매칭된 인보이스의 총액(USD)과 PDF 첨부파일로 자동 송금 신청합니다.'}
                     </p>
                     <div className="flex items-center gap-2 w-full md:w-auto">
                         <button
                             type="button"
                             onClick={handleRemittanceApply}
                             disabled={remittanceRunDisabled}
-                            className="h-11 px-6 bg-[#111827] hover:bg-black text-white rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 w-full md:w-auto"
+                            className={buttonClass(activeWormOrderRecord ? 'primary' : 'secondary', 'md', 'w-full px-6 md:w-auto')}
                         >
                             {!activeWormOrderRecord ? (
                                 '발주선택'
@@ -6572,7 +6585,7 @@ export default function WormOrderPage() {
                                 type="button"
                                 onClick={handleCancelRemittance}
                                 disabled={remittanceCancelling}
-                                className="h-11 px-5 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg font-bold text-sm tracking-wide disabled:opacity-60 disabled:cursor-not-allowed inline-flex items-center justify-center gap-2 shrink-0"
+                                className={buttonClass('danger', 'md')}
                             >
                                 {remittanceCancelling ? (
                                     <>
@@ -6611,7 +6624,7 @@ export default function WormOrderPage() {
                         <div className="h-2 w-full rounded-full bg-slate-200 dark:bg-[#2a2a2a] overflow-hidden">
                             <div
                                 className={`h-full transition-all duration-500 ${
-                                    remittanceError ? 'bg-red-500' : remittanceSuccess ? 'bg-emerald-500' : 'bg-[#e34219]'
+                                    remittanceError ? 'bg-red-500' : remittanceSuccess ? 'bg-emerald-500' : 'bg-brand-orange'
                                 }`}
                                 style={{ width: `${Math.max(0, Math.min(100, remittanceProgress))}%` }}
                             />
@@ -6619,9 +6632,20 @@ export default function WormOrderPage() {
                     </div>
                 )}
 
-                {remittanceError && (
-                    <p className="text-sm font-semibold text-[#e34219]">{remittanceError}</p>
-                )}
+                {remittanceError && (() => {
+                    const { summary, details } = splitErrorForDisplay(remittanceError, '송금 자동화 중 오류가 발생했습니다.')
+                    return (
+                        <div className="space-y-1">
+                            <p className="text-sm font-semibold text-red-600">{summary}</p>
+                            {details ? (
+                                <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                                    <summary className="cursor-pointer font-bold text-slate-700">자세히</summary>
+                                    <p className="mt-1 whitespace-pre-wrap break-all">{details}</p>
+                                </details>
+                            ) : null}
+                        </div>
+                    )
+                })()}
                 {isRemittanceLocked && (
                     <p className="text-sm font-semibold text-amber-700">
                         보호 잠금 활성화: {remittanceLockRemainingText} 후 재시도 가능합니다.
@@ -6637,7 +6661,7 @@ export default function WormOrderPage() {
                 )}
                 {effectiveRemittancePricingSummary && (
                     <div className="rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 space-y-3">
-                        <p className="text-[11px] font-bold text-emerald-700 uppercase tracking-[0.16em]">송금 확정 정보</p>
+                        <p className="text-[13px] font-bold text-emerald-800">송금 확정 정보</p>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
                             <div className="rounded-lg border border-emerald-100 bg-white dark:bg-[#1e1e1e] px-3 py-2">
                                 <p className="text-[11px] text-slate-500 dark:text-gray-400 font-semibold">최종 수취금액</p>
@@ -6678,7 +6702,7 @@ export default function WormOrderPage() {
                             B/L 번호만 입력하면 MBL/HBL + 현재/최근/다음 연도를 자동으로 시도해 조회합니다. (하이픈/공백은 자동 제거)
                         </p>
                     </div>
-                    <Search size={18} className="text-[#e34219] mt-1" />
+                    <Search size={18} className="text-brand-orange mt-1" />
                 </div>
 
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-4">
@@ -6733,7 +6757,7 @@ export default function WormOrderPage() {
                         <button
                             type="button"
                             onClick={() => setBlNumberQuery(autoBlNumber)}
-                            className="h-7 px-3 rounded-md bg-blue-600 text-white text-[11px] font-bold hover:bg-blue-700 transition-colors shrink-0"
+                            className={buttonClass('secondary', 'sm')}
                         >
                             번호 불러오기
                         </button>
@@ -6756,7 +6780,7 @@ export default function WormOrderPage() {
                         type="button"
                         onClick={() => handleCustomsProgressSearch()}
                         disabled={customsProgressLoading}
-                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#e34219] px-6 text-sm font-bold tracking-wide text-white hover:bg-[#cd3b17] disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
+                        className="inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-brand-orange px-6 text-sm font-bold tracking-wide text-white hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-60 md:w-auto"
                     >
                         {customsProgressLoading ? (
                             <>
@@ -6770,7 +6794,7 @@ export default function WormOrderPage() {
                 </div>
 
                 {customsProgressError && (
-                    <p className="text-sm font-semibold text-[#e34219]">{customsProgressError}</p>
+                    <p className="text-sm font-semibold text-brand-orange">{customsProgressError}</p>
                 )}
 
                 {customsProgressResult && (
@@ -6782,7 +6806,7 @@ export default function WormOrderPage() {
                                 {customsProgressResult.query.kind}
                                 {customsProgressResult.query.blYy ? ` / ${customsProgressResult.query.blYy}` : ''}
                             </span>
-                            <span><span className="font-bold text-gray-800">결과건수(tCnt):</span> {customsProgressResult.tCnt}</span>
+                            <span><span className="font-bold text-gray-800">결과건수:</span> {customsProgressResult.tCnt}</span>
                         </div>
 
                         {customsProgressResult.ntceInfo && (
@@ -6819,14 +6843,14 @@ export default function WormOrderPage() {
                                     강조된 행은 관리자나 관세사가 직접 챙겨야 하는 단계이며, 각 행에 처리주체를 함께 표시합니다.
                                 </p>
                                 <div className="overflow-x-auto">
-                                    <table className="min-w-full text-xs">
-                                        <thead>
-                                            <tr className="bg-gray-100 text-gray-700">
-                                                <th className="text-left px-2 py-2 font-bold">처리일시</th>
-                                                <th className="text-left px-2 py-2 font-bold">처리구분</th>
-                                                <th className="text-left px-2 py-2 font-bold">반출입내용</th>
-                                                <th className="text-left px-2 py-2 font-bold">신고번호</th>
-                                                <th className="text-left px-2 py-2 font-bold">장치장</th>
+                                    <table className="w-full min-w-[640px] text-xs">
+                                        <thead className="ux-thead">
+                                            <tr>
+                                                <th className="text-left px-2 py-2 whitespace-nowrap">처리일시</th>
+                                                <th className="text-left px-2 py-2 whitespace-nowrap">처리구분</th>
+                                                <th className="text-left px-2 py-2 whitespace-nowrap">반출입내용</th>
+                                                <th className="text-left px-2 py-2 whitespace-nowrap">신고번호</th>
+                                                <th className="text-left px-2 py-2 whitespace-nowrap">장치장</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -6844,7 +6868,7 @@ export default function WormOrderPage() {
                                                                 <span>{row.cargTrcnRelaBsopTpcd || '-'}</span>
                                                                 {adminStep && (
                                                                     <>
-                                                                        <span className={`inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[10px] font-bold ${adminStep.badgeClassName}`}>
+                                                                        <span className={`inline-flex w-fit items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${adminStep.badgeClassName}`}>
                                                                             {adminStep.label}
                                                                         </span>
                                                                         <span className="text-[11px] font-medium text-slate-600 dark:text-gray-400">
@@ -6907,13 +6931,13 @@ export default function WormOrderPage() {
                                                 <FileText size={15} className={attachment.isPdf ? 'mt-0.5 text-red-500' : 'mt-0.5 text-sky-600'} />
                                                 <div className="min-w-0 flex-1">
                                                     <div className="flex items-center gap-1.5">
-                                                        <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-black text-slate-600">
+                                                        <span className="shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-black text-slate-600">
                                                             {attachment.sourceLabel}
                                                         </span>
                                                         <p className="min-w-0 truncate text-[12px] font-black text-slate-900">{attachment.filename}</p>
                                                     </div>
                                                     <p className="mt-1 truncate text-[11px] font-semibold text-slate-500">{attachment.subject}</p>
-                                                    <p className="mt-0.5 text-[10px] font-bold text-slate-400">
+                                                    <p className="mt-0.5 text-[11px] font-bold text-slate-400">
                                                         {attachment.contentType || 'application/octet-stream'} · {formatAttachmentFileSize(attachment.size)}
                                                     </p>
                                                 </div>
@@ -6921,7 +6945,7 @@ export default function WormOrderPage() {
                                                     href={attachment.href}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="shrink-0 rounded-lg bg-sky-600 px-2.5 py-1.5 text-[11px] font-black text-white hover:bg-sky-500"
+                                                    className={buttonClass('secondary', 'sm')}
                                                 >
                                                     열기
                                                 </a>
@@ -6941,13 +6965,13 @@ export default function WormOrderPage() {
                             </div>
                         ) : (
                             <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 text-[12px] font-semibold text-emerald-700 space-y-1">
-                                <p>매칭 완료: 인보이스 UID {matchedInvoiceEmail?.uid} / AWB UID {matchedAwbUid}</p>
+                                <p>매칭 완료: 인보이스 메일과 AWB 메일이 현재 발주에 연결되었습니다.</p>
                                 <p>두 메일의 첨부파일을 모두 포함해서 발송합니다.</p>
                             </div>
                         )}
 
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">수신 이메일</label>
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400">수신 이메일</label>
                             <input
                                 type="email"
                                 value={forwardEmail}
@@ -6959,7 +6983,7 @@ export default function WormOrderPage() {
                         </div>
 
                         <div className="space-y-1.5">
-                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400 uppercase tracking-wider">통관 진행일</label>
+                            <label className="text-[11px] font-bold text-slate-600 dark:text-gray-400">통관 진행일</label>
                             <div className="flex items-center gap-2">
                                 <input
                                     type="date"
@@ -6970,7 +6994,7 @@ export default function WormOrderPage() {
                                 <button
                                     type="button"
                                     onClick={() => setCustomsForwardDate(todayKstYmd)}
-                                    className="h-10 px-3 rounded-lg border border-gray-300 text-xs font-bold text-slate-700 hover:bg-slate-50"
+                                    className={buttonClass('secondary', 'md')}
                                 >
                                     오늘
                                 </button>
@@ -6979,7 +7003,7 @@ export default function WormOrderPage() {
                         </div>
 
                         <div className="space-y-2 rounded-xl border border-slate-200 bg-slate-50/70 px-4 py-3">
-                            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.12em]">발송 메일 미리보기</p>
+                            <p className="text-[13px] font-bold text-slate-800">발송 메일 미리보기</p>
                             <p className="text-sm font-bold text-slate-800">제목: {customsForwardSubject}</p>
                             <pre className="whitespace-pre-wrap text-[12px] leading-relaxed text-slate-700 font-medium">{customsForwardBody}</pre>
                         </div>
@@ -6989,17 +7013,17 @@ export default function WormOrderPage() {
                                 type="button"
                                 onClick={() => { void handleForwardEmail() }}
                                 disabled={forwarding || !isCustomsForwardReady || !forwardEmail.trim()}
-                                className="h-10 px-5 rounded-xl font-bold text-sm bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center gap-2"
+                                className={buttonClass('primary', 'md')}
                             >
                                 {forwarding ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
                                 {forwarding ? '발송 중...' : '발송하기'}
                             </button>
                             {forwardSuccess && <p className="text-sm font-semibold text-emerald-600">{forwardSuccess}</p>}
-                            {forwardError && <p className="text-sm font-semibold text-[#e34219]">{forwardError}</p>}
+                            {forwardError && <p className="text-sm font-semibold text-brand-orange">{forwardError}</p>}
                         </div>
 
                         <div className="space-y-2 rounded-xl border border-slate-200 bg-white px-4 py-3">
-                            <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-[0.12em]">최근 발송 이력</p>
+                            <p className="text-[13px] font-bold text-slate-800">최근 발송 이력</p>
                             {forwardLogsLoading ? (
                                 <p className="text-[12px] font-medium text-slate-500">발송 이력을 불러오는 중입니다.</p>
                             ) : forwardLogs.length > 0 ? (
@@ -7018,7 +7042,7 @@ export default function WormOrderPage() {
                             ) : (
                                 <p className="text-[12px] font-medium text-slate-500">저장된 발송 이력이 없습니다.</p>
                             )}
-                            {forwardLogsError && <p className="text-[12px] font-semibold text-[#e34219]">{forwardLogsError}</p>}
+                            {forwardLogsError && <p className="text-[12px] font-semibold text-brand-orange">{forwardLogsError}</p>}
                         </div>
                     </div>
                 </div>
@@ -7072,13 +7096,13 @@ export default function WormOrderPage() {
                                         type="button"
                                         onClick={() => { void handlePickRemittanceCandidate(candidate) }}
                                         disabled={disabled}
-                                        className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-sky-300 hover:bg-sky-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
+                                        className="w-full text-left rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-brand-orange hover:bg-brand-orange-soft disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-3"
                                     >
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
                                                 <span>{candidate.dateText || '날짜 미상'}</span>
                                                 {candidate.statusText && (
-                                                    <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
+                                                    <span className="inline-flex items-center rounded-md bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[11px] font-bold text-emerald-700">
                                                         {candidate.statusText}
                                                     </span>
                                                 )}
@@ -7099,9 +7123,20 @@ export default function WormOrderPage() {
                                     </button>
                                 )
                             })}
-                            {remittanceCandidateError && (
-                                <p className="text-xs font-semibold text-rose-600 mt-2">{remittanceCandidateError}</p>
-                            )}
+                            {remittanceCandidateError && (() => {
+                                const { summary, details } = splitErrorForDisplay(remittanceCandidateError, '송금 정보를 가져오지 못했습니다.')
+                                return (
+                                    <div className="mt-2 space-y-1">
+                                        <p className="text-xs font-semibold text-rose-600">{summary}</p>
+                                        {details ? (
+                                            <details className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-slate-600">
+                                                <summary className="cursor-pointer font-bold text-slate-700">자세히</summary>
+                                                <p className="mt-1 whitespace-pre-wrap break-all">{details}</p>
+                                            </details>
+                                        ) : null}
+                                    </div>
+                                )
+                            })()}
                         </div>
                         <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-500">
                             <span>거래 ID 가 없는 후보는 클릭할 수 없습니다 — 직접 입력으로 저장해 주세요.</span>
@@ -7115,7 +7150,7 @@ export default function WormOrderPage() {
                                     if (remittanceCandidatesOrder) openManualRemittanceModal(remittanceCandidatesOrder)
                                 }}
                                 disabled={Boolean(remittanceCandidatePicking)}
-                                className="h-8 px-3 rounded-lg border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                                className={buttonClass('secondary', 'sm')}
                             >
                                 직접 입력으로 전환
                             </button>
@@ -7149,7 +7184,7 @@ export default function WormOrderPage() {
                         </div>
                         <div className="px-5 py-4 space-y-3">
                             <div className="space-y-1">
-                                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">신청시각</label>
+                                <label className="text-[11px] font-bold text-slate-600">신청시각</label>
                                 <input
                                     type="datetime-local"
                                     value={manualRemittanceForm.appliedAt}
@@ -7159,7 +7194,7 @@ export default function WormOrderPage() {
                             </div>
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 송금액 (USD)</label>
+                                    <label className="text-[11px] font-bold text-slate-600">총 송금액 (USD)</label>
                                     <input
                                         type="text"
                                         inputMode="decimal"
@@ -7170,7 +7205,7 @@ export default function WormOrderPage() {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">환율 (1 USD =)</label>
+                                    <label className="text-[11px] font-bold text-slate-600">환율 (1 USD =)</label>
                                     <input
                                         type="text"
                                         inputMode="decimal"
@@ -7181,7 +7216,7 @@ export default function WormOrderPage() {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 송금 한화 (KRW)</label>
+                                    <label className="text-[11px] font-bold text-slate-600">총 송금 한화 (KRW)</label>
                                     <input
                                         type="text"
                                         inputMode="numeric"
@@ -7192,7 +7227,7 @@ export default function WormOrderPage() {
                                     />
                                 </div>
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">총 수수료 (KRW)</label>
+                                    <label className="text-[11px] font-bold text-slate-600">총 수수료 (KRW)</label>
                                     <input
                                         type="text"
                                         inputMode="numeric"
@@ -7213,7 +7248,7 @@ export default function WormOrderPage() {
                                 type="button"
                                 onClick={() => { if (!manualRemittanceSaving) setManualRemittanceOrder(null) }}
                                 disabled={manualRemittanceSaving}
-                                className="h-9 px-4 rounded-lg border border-slate-200 text-xs font-bold text-slate-600 hover:bg-slate-50 disabled:opacity-60"
+                                className={buttonClass('secondary', 'sm')}
                             >
                                 취소
                             </button>
@@ -7221,7 +7256,7 @@ export default function WormOrderPage() {
                                 type="button"
                                 onClick={() => { void handleSaveManualRemittance() }}
                                 disabled={manualRemittanceSaving}
-                                className="h-9 px-4 rounded-lg bg-slate-900 text-white text-xs font-bold hover:bg-black disabled:opacity-60 inline-flex items-center gap-1.5"
+                                className={buttonClass('primary', 'sm')}
                             >
                                 {manualRemittanceSaving && <Loader2 size={13} className="animate-spin" />}
                                 저장

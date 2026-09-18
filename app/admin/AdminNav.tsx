@@ -126,7 +126,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
           <Star size={14} className="text-amber-500" fill="currentColor" />
           즐겨찾기 재고
         </div>
-        <Link href="/admin/inventory" prefetch={false} onClick={onNavigate} className="text-[10px] font-black text-[#EF3B1D] no-underline">
+        <Link href="/admin/inventory" prefetch={false} onClick={onNavigate} className="text-[10px] font-black text-brand-orange no-underline">
           열기
         </Link>
       </div>
@@ -219,6 +219,12 @@ export default function AdminNav({
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
+  }, [pathname])
+
+  // Keep the active menu item visible when the 16-item list overflows the sidebar height.
+  useEffect(() => {
+    const el = document.querySelector<HTMLElement>('#admin-desktop-sidebar [data-active="true"]')
+    el?.scrollIntoView({ block: 'nearest' })
   }, [pathname])
 
   useEffect(() => {
@@ -319,19 +325,20 @@ export default function AdminNav({
             key={item.path}
             href={item.path}
             prefetch={false}
+            data-active={active ? 'true' : undefined}
             onClick={() => setIsMobileMenuOpen(false)}
-            className={`group relative flex ${mobile ? 'min-h-12' : 'h-11 min-h-11'} min-w-0 items-center justify-between rounded-md border px-3 text-[13px] font-bold tracking-normal no-underline transition-colors duration-150 ${
+            className={`group relative flex ${mobile ? 'min-h-12' : 'h-10 min-h-10'} min-w-0 items-center justify-between rounded-md border px-3 text-[13px] font-bold tracking-normal no-underline transition-colors duration-150 ${
               active
-                ? 'border-[#FFD5CC] bg-[#FFF3EF] text-[#D9341A]'
+                ? 'border-[#FFD5CC] bg-[#FFF3EF] text-brand-orange'
                 : 'border-transparent bg-transparent text-[#344054] hover:border-[#E5E9EF] hover:bg-[#F4F6F8] hover:text-[#172033]'
             }`}
             style={{ color: active ? '#D9341A' : '#344054' }}
           >
-            {active ? <span className="absolute left-0 top-2.5 h-6 w-1 rounded-r-full bg-[#EF3B1D]" /> : null}
+            {active ? <span className="absolute left-0 top-2.5 h-6 w-1 rounded-r-full bg-brand-orange" /> : null}
             <span className="flex min-w-0 items-center gap-2.5">
               <span
                 className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
-                  active ? 'bg-[#E43D20] text-white' : 'bg-transparent text-[#98A2B3] group-hover:bg-white group-hover:text-[#667085]'
+                  active ? 'bg-brand-orange text-white' : 'bg-transparent text-[#98A2B3] group-hover:bg-white group-hover:text-[#667085]'
                 }`}
               >
                 <Icon size={15} strokeWidth={2.3} />
@@ -341,7 +348,7 @@ export default function AdminNav({
             {alertCountByPath[item.path] > 0 ? (
               <span
                 className={`ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
-                  active ? 'bg-[#EF3B1D] text-white' : 'bg-[#EF3B1D] text-white'
+                  active ? 'bg-brand-orange text-white' : 'bg-brand-orange text-white'
                 }`}
                 aria-label={`${alertCountByPath[item.path]}건 알림`}
               >
@@ -368,7 +375,7 @@ export default function AdminNav({
       </div>
       <div className="mb-3 mt-4 h-px shrink-0 bg-[#E5E9EF]" />
 
-      <nav className="ux-scrollbar flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-3" aria-label="관리자 메뉴">{renderNavItems()}</nav>
+      <nav className="ux-scrollbar ux-nav-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-7" aria-label="관리자 메뉴">{renderNavItems()}</nav>
 
       <FavoriteInventoryPanel />
 
@@ -381,16 +388,16 @@ export default function AdminNav({
             inputMode="numeric"
             value={shipmentCount}
             onChange={(event) => setShipmentCount(event.target.value)}
-            className="h-6 w-9 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold leading-none text-[#EF3B1D] outline-none"
+            className="h-6 w-9 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold leading-none text-brand-orange outline-none"
             aria-label="발송 건수"
           />
-          <span className="shrink-0 text-[11px] font-bold leading-none text-[#EF3B1D]">건</span>
+          <span className="shrink-0 text-[11px] font-bold leading-none text-brand-orange">건</span>
         </div>
         <button
           type="button"
           onClick={handleSendPickupSms}
           disabled={sendingSms || loadingFromNumber}
-          className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[12px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-brand-orange px-3 text-[12px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
         >
           {sendingSms ? '요청중' : '발송'}
         </button>
@@ -413,7 +420,7 @@ export default function AdminNav({
     <>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[14px] font-black leading-none text-[#EF3B1D]">관리자 메뉴</div>
+          <div className="text-[14px] font-black leading-none text-brand-orange">관리자 메뉴</div>
           <div className="mt-1 truncate text-[12px] font-extrabold text-[#111827]">{activeItem?.name || '관리자'}</div>
         </div>
         <button
@@ -433,14 +440,14 @@ export default function AdminNav({
       <div className="mt-4 border-t border-[#E5E7EB] pt-3">
         <div className="flex items-center justify-between gap-2">
           <div className="shrink-0 text-[12px] font-extrabold leading-none text-[#111827]">집하 문자</div>
-          <div className="flex min-w-0 items-center justify-end gap-1 text-[12px] font-bold leading-none text-[#EF3B1D]">
+          <div className="flex min-w-0 items-center justify-end gap-1 text-[12px] font-bold leading-none text-brand-orange">
             <input
               type="number"
               min={1}
               inputMode="numeric"
               value={shipmentCount}
               onChange={(event) => setShipmentCount(event.target.value)}
-              className="h-7 w-10 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold text-[#EF3B1D] outline-none"
+              className="h-7 w-10 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold text-brand-orange outline-none"
               aria-label="발송 건수"
             />
             <span className="shrink-0">건</span>
@@ -448,7 +455,7 @@ export default function AdminNav({
               type="button"
               onClick={handleSendPickupSms}
               disabled={sendingSms || loadingFromNumber}
-              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-[#EF3B1D] px-3 text-[12px] font-extrabold text-white transition hover:bg-[#D92F16] disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-brand-orange px-3 text-[12px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {sendingSms ? '요청중' : '발송'}
             </button>

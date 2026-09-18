@@ -5,6 +5,10 @@ import { useTheme } from '@/components/ThemeProvider'
 import { Calendar, CheckCircle2, ChevronDown, Circle, CreditCard, GripVertical, HelpCircle, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 import type { CategoryMeta } from '@/lib/cardCategory'
+import Button, { buttonClass } from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 
 /* ═══════════════════ Types ═══════════════════ */
 type CoupangPurchaseItemDetail = {
@@ -351,7 +355,7 @@ const LIGHT_TOKENS = {
   warningBorder: '#F5E6B8',
   error: '#C53030',
   errorBg: '#FFF5F5',
-  accent: '#1A1A1A',
+  accent: 'var(--brand-accent)',
   reviewDoneBg: '#F2F8F0',
   reviewDoneBorder: '#D4EDD2',
   reviewPendingBg: '#FFF7F1',
@@ -377,7 +381,7 @@ const DARK_TOKENS = {
   warningBorder: '#3a3018',
   error: '#f87171',
   errorBg: '#2a1515',
-  accent: '#d9361b',
+  accent: 'var(--brand-accent)',
   reviewDoneBg: '#14291a',
   reviewDoneBorder: '#1a3a22',
   reviewPendingBg: '#2a1f18',
@@ -1200,25 +1204,61 @@ export default function CardUsageClient() {
   }
 
   return (
-    <div className="cu-root" style={{ maxWidth: 960, margin: '0 auto', padding: '1rem', fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
-      {(viewMode === 'list' || viewMode === 'table') && showShortcutDock && shortcutCategories.length > 0 && (
-        <div
+    <div className="cu-root min-w-0" style={{ fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
+      {/* ════════ Header ════════ */}
+      <PageHeader
+        title="카드사용내역"
+        description={`최근 동기화: ${formatSyncTime(data?.summary?.lastSyncedAt || null)}`}
+        actions={(
+          <>
+            <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11px]" style={{ color: T.textTertiary }}>
+              <input type="checkbox" checked={refreshBeforeFetch} onChange={e => setRefreshBeforeFetch(e.target.checked)} style={{ accentColor: T.accent }} />
+              즉시조회
+            </label>
+            <Button
+              type="button"
+              variant="primary"
+              onClick={handleSync}
+              loading={syncing}
+              icon={<RefreshCw size={14} />}
+            >
+              바로빌 동기화
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={handleLotteSync}
+              loading={lotteSyncing}
+              icon={<CreditCard size={14} />}
+              title="이미 로그인된 롯데카드 디버그 브라우저에서 이용내역을 직접 수집"
+            >
+              롯데카드 동기화
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => { setCoupangError(''); setCoupangModalOpen(true) }}
+              loading={coupangSyncing}
+              icon={<RefreshCw size={14} />}
+              title="쿠팡 로그인하여 구매내역 가져오기 + 카드결제와 자동매칭"
+            >
+              쿠팡 매칭
+            </Button>
+          </>
+        )}
+      />
+
+      {(viewMode === 'list' || viewMode === 'table') && shortcutCategories.length > 0 && (
+        <details
+          open={showShortcutDock}
+          className="mb-4 rounded-2xl"
           style={{
-            position: 'fixed',
-            left: 276,
-            top: '50%',
-            transform: 'translateY(-50%)',
-            width: 214,
-            borderRadius: 12,
             border: `1px solid ${T.border}`,
             background: T.surface,
-            boxShadow: '0 10px 24px rgba(0,0,0,0.08)',
-            padding: '10px',
-            zIndex: 60,
-            backdropFilter: 'blur(4px)',
+            padding: '10px 12px',
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
             <span
               style={{
                 width: 28,
@@ -1235,16 +1275,16 @@ export default function CardUsageClient() {
             >
               <HelpCircle size={15} />
             </span>
-            <div style={{ minWidth: 0 }}>
-              <p style={{ margin: 0, fontSize: 12, fontWeight: 800, color: T.text }}>
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: T.text }}>
                 단축키 팁
-              </p>
-              <p style={{ margin: '2px 0 0', fontSize: 10, color: T.textTertiary }}>
-                거래 선택 후 숫자키
-              </p>
-            </div>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 9 }}>
+              </span>
+              <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: T.textTertiary }}>
+                거래 선택 후 숫자키 1~6 · 눌러서 펼치기/접기
+              </span>
+            </span>
+          </summary>
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
             {shortcutCategories.map((cat, idx) => (
               <div
                 key={cat.code}
@@ -1265,98 +1305,32 @@ export default function CardUsageClient() {
                 onDragEnd={() => setDraggedCatIdx(null)}
                 title="드래그해서 단축키 순서 변경"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: '16px 24px 18px 1fr',
+                  display: 'inline-grid',
+                  gridTemplateColumns: '16px 28px 18px auto',
                   alignItems: 'center',
                   gap: 6,
                   background: cat.bgColor,
                   border: `1px solid ${T.borderLight}`,
                   borderRadius: 8,
-                  padding: '5px 7px',
+                  padding: '5px 8px',
                   cursor: draggedCatIdx === idx ? 'grabbing' : 'grab',
                   opacity: draggedCatIdx === idx ? 0.55 : 1,
                 }}
               >
                 <GripVertical size={13} style={{ color: T.textTertiary }} />
-                <span style={{ fontSize: 11, fontWeight: 900, color: T.text, textAlign: 'center' }}>{idx + 1}번</span>
+                <span style={{ fontSize: 11, fontWeight: 900, color: T.text, textAlign: 'center', whiteSpace: 'nowrap' }}>{idx + 1}번</span>
                 <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
-                <span style={{ fontSize: 11, color: T.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                <span style={{ fontSize: 11, color: T.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
                   {cat.label}
                 </span>
               </div>
             ))}
           </div>
-          <p style={{ margin: '8px 0 0', fontSize: 10, color: T.textTertiary, lineHeight: 1.4 }}>
-            위아래로 드래그하면 1~6번 순서가 바뀝니다.
+          <p style={{ margin: '8px 0 0', fontSize: 11, color: T.textTertiary, lineHeight: 1.4 }}>
+            드래그하면 1~6번 순서가 바뀝니다. · 선택: {selectedItem?.useStoreName || '-'}
           </p>
-          <p style={{ margin: '8px 0 0', fontSize: 10, color: T.textTertiary, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            선택: {selectedItem?.useStoreName || '-'}
-          </p>
-        </div>
+        </details>
       )}
-
-      {/* ════════ Header ════════ */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 20 }}>
-        <div>
-          <h1 style={{ fontSize: 20, fontWeight: 600, color: T.text, margin: 0, lineHeight: 1.3 }}>카드사용내역</h1>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: '4px 0 0' }}>
-            최근 동기화: {formatSyncTime(data?.summary?.lastSyncedAt || null)}
-          </p>
-        </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11, color: T.textTertiary, cursor: 'pointer' }}>
-            <input type="checkbox" checked={refreshBeforeFetch} onChange={e => setRefreshBeforeFetch(e.target.checked)} style={{ accentColor: T.accent }} />
-            즉시조회
-          </label>
-          <button
-            type="button"
-            onClick={handleSync}
-            disabled={syncing}
-            style={{
-              height: 40, padding: '0 18px', borderRadius: 10,
-              background: T.accent, color: '#fff', fontSize: 13, fontWeight: 600,
-              border: 'none', cursor: syncing ? 'wait' : 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              opacity: syncing ? 0.7 : 1, transition: 'opacity .2s',
-            }}
-          >
-            {syncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            바로빌 동기화
-          </button>
-          <button
-            type="button"
-            onClick={handleLotteSync}
-            disabled={lotteSyncing}
-            style={{
-              height: 40, padding: '0 14px', borderRadius: 10,
-              background: '#0F766E', color: '#fff', fontSize: 13, fontWeight: 600,
-              border: 'none', cursor: lotteSyncing ? 'wait' : 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              opacity: lotteSyncing ? 0.7 : 1, transition: 'opacity .2s',
-            }}
-            title="\uC774\uBBF8 \uB85C\uADF8\uC778\uB41C \uB86F\uB370\uCE74\uB4DC \uB514\uBC84\uADF8 \uBE0C\uB77C\uC6B0\uC800\uC5D0\uC11C \uC774\uC6A9\uB0B4\uC5ED\uC744 \uC9C1\uC811 \uC218\uC9D1"
-          >
-            {lotteSyncing ? <Loader2 size={14} className="animate-spin" /> : <CreditCard size={14} />}
-            {'\uB86F\uB370 \uC9C1\uC811'}
-          </button>
-          <button
-            type="button"
-            onClick={() => { setCoupangError(''); setCoupangModalOpen(true) }}
-            disabled={coupangSyncing}
-            style={{
-              height: 40, padding: '0 14px', borderRadius: 10,
-              background: '#FF4444', color: '#fff', fontSize: 13, fontWeight: 600,
-              border: 'none', cursor: coupangSyncing ? 'wait' : 'pointer',
-              display: 'inline-flex', alignItems: 'center', gap: 7,
-              opacity: coupangSyncing ? 0.7 : 1, transition: 'opacity .2s',
-            }}
-            title="쿠팡 로그인하여 구매내역 가져오기 + 카드결제와 자동매칭"
-          >
-            {coupangSyncing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-            쿠팡 매칭
-          </button>
-        </div>
-      </div>
 
       {/* Coupang status bar */}
       {(coupangMessage || coupangError) && (
@@ -1450,48 +1424,33 @@ export default function CardUsageClient() {
             {coupangError && (
               <div style={{ fontSize: 12, color: T.error, marginBottom: 12 }}>{coupangError}</div>
             )}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-              <button
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
                 type="button"
+                variant="secondary"
                 onClick={() => setCoupangModalOpen(false)}
                 disabled={coupangSyncing}
-                style={{
-                  height: 36, padding: '0 14px', borderRadius: 8,
-                  background: 'transparent', border: `1px solid ${T.border}`,
-                  color: T.text, fontSize: 13, fontWeight: 500,
-                  cursor: coupangSyncing ? 'wait' : 'pointer',
-                }}
-              >취소</button>
-              <button
+              >취소</Button>
+              <Button
                 type="button"
+                variant="primary"
                 onClick={handleCoupangSync}
                 disabled={coupangSyncing || !coupangLoginId.trim() || !coupangPassword}
-                style={{
-                  height: 36, padding: '0 16px', borderRadius: 8,
-                  background: (!coupangLoginId.trim() || !coupangPassword) ? T.borderLight : '#FF4444',
-                  border: 'none', color: '#fff',
-                  fontSize: 13, fontWeight: 600,
-                  cursor: coupangSyncing
-                    ? 'wait'
-                    : (!coupangLoginId.trim() || !coupangPassword) ? 'not-allowed' : 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 6,
-                  opacity: (!coupangLoginId.trim() || !coupangPassword) ? 0.6 : 1,
-                }}
+                loading={coupangSyncing}
               >
-                {coupangSyncing && <Loader2 size={13} className="animate-spin" />}
                 로그인 + 동기화
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       )}
 
       {/* ════════ Metric Cards ════════ */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 16 }}>
+      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
         {/* 이번 달 총 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>이번 달 총 지출</p>
-          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
+          <p style={{ fontSize: 22, fontWeight: 900, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
             {totalAmount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
           </p>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>
@@ -1500,14 +1459,14 @@ export default function CardUsageClient() {
         </div>
 
         {/* 거래 건수 */}
-        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>거래 건수</p>
-          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 8px', lineHeight: 1.2 }}>
+          <p style={{ fontSize: 22, fontWeight: 900, color: T.text, margin: '6px 0 8px', lineHeight: 1.2 }}>
             {totalCount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>건</span>
           </p>
-          <div style={{ display: 'flex', gap: 6 }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             <span style={{
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
               background: T.successBg, color: T.success, border: `1px solid ${T.successBorder}`,
             }}>금액확인 {amountResolvedCount}건</span>
             {amountMissingCount > 0 && (
@@ -1520,9 +1479,9 @@ export default function CardUsageClient() {
         </div>
 
         {/* 일평균 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>일평균 지출</p>
-          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
+          <p style={{ fontSize: 22, fontWeight: 900, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
             {dailyAvg.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
           </p>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>{daysInRange}일 기준</p>
@@ -1704,12 +1663,7 @@ export default function CardUsageClient() {
               <button
                 type="button"
                 onClick={handleAddCategory}
-                style={{
-                  height: 36, padding: '0 14px', borderRadius: 10,
-                  background: T.accent, color: '#fff', fontSize: 12, fontWeight: 600,
-                  border: 'none', cursor: 'pointer',
-                  display: 'inline-flex', alignItems: 'center', gap: 4,
-                }}
+                className={buttonClass('primary', 'sm', 'h-9')}
               >
                 <Plus size={12} />
                 추가
@@ -1907,35 +1861,32 @@ export default function CardUsageClient() {
         </div>
 
         {/* Search button */}
-        <button
+        <Button
           type="button"
+          variant="secondary"
           onClick={handleSearch}
-          disabled={loading}
-          style={{
-            ...flatInputStyle, background: T.accent, color: '#fff', border: 'none',
-            cursor: loading ? 'wait' : 'pointer', fontWeight: 600,
-            display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-            minWidth: 72, paddingLeft: 16, paddingRight: 16,
-          }}
+          loading={loading}
+          icon={<Search size={14} />}
+          className="min-w-[72px]"
+          style={{ height: 42 }}
         >
-          {loading ? <Loader2 size={14} className="animate-spin" /> : <Search size={14} />}
           조회
-        </button>
+        </Button>
       </div>
 
       {/* ════════ Unified search bar ════════ */}
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         background: T.surface,
-        border: `1px solid ${searchQuery.trim() ? '#2563EB' : T.border}`,
+        border: `1px solid ${searchQuery.trim() ? T.accent : T.border}`,
         borderRadius: 12,
         padding: '0 14px',
         height: 44,
         marginBottom: 14,
         transition: 'border-color .15s',
-        boxShadow: searchQuery.trim() ? '0 0 0 3px rgba(37,99,235,0.08)' : 'none',
+        boxShadow: searchQuery.trim() ? '0 0 0 3px rgba(228,61,32,0.10)' : 'none',
       }}>
-        <Search size={15} style={{ color: searchQuery.trim() ? '#2563EB' : T.textTertiary, flexShrink: 0, transition: 'color .15s' }} />
+        <Search size={15} style={{ color: searchQuery.trim() ? T.accent : T.textTertiary, flexShrink: 0, transition: 'color .15s' }} />
         <input
           type="text"
           value={searchQuery}
@@ -1952,12 +1903,13 @@ export default function CardUsageClient() {
             onClick={() => setSearchQuery('')}
             style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex', alignItems: 'center', color: T.textTertiary }}
             title="검색어 초기화"
+            aria-label="검색어 초기화"
           >
             <X size={14} />
           </button>
         )}
         {searchQuery.trim() && (
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#2563EB', whiteSpace: 'nowrap', paddingLeft: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 600, color: T.accent, whiteSpace: 'nowrap', paddingLeft: 4 }}>
             {filteredItems.length}건 매칭
           </span>
         )}
@@ -1982,7 +1934,7 @@ export default function CardUsageClient() {
               style={{
                 width: `${reviewProgress}%`,
                 height: '100%',
-                background: reviewProgress >= 100 ? T.success : '#F05A28',
+                background: reviewProgress >= 100 ? T.success : T.accent,
                 transition: 'width .2s ease',
               }}
             />
@@ -1994,9 +1946,9 @@ export default function CardUsageClient() {
       )}
 
       {/* ════════ Section header ════════ */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500 }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500, whiteSpace: 'nowrap' }}>
             거래내역 {sortedItems.length.toLocaleString()}건
           </span>
           {reviewMode && (
@@ -2015,87 +1967,58 @@ export default function CardUsageClient() {
             </span>
           )}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-            {(['table', 'list', 'calendar'] as const).map(mode => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setViewMode(mode)}
-                style={{
-                  padding: '5px 10px',
-                  fontSize: 12,
-                  fontWeight: 600,
-                  border: 'none',
-                  cursor: 'pointer',
-                  background: viewMode === mode ? T.accent : T.surface,
-                  color: viewMode === mode ? '#fff' : T.textSecondary,
-                  transition: 'all .15s',
-                }}
-              >
-                {mode === 'table' ? '테이블' : mode === 'list' ? '카드' : '캘린더'}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Tabs
+            aria-label="보기 방식"
+            items={[
+              { key: 'table', label: '테이블' },
+              { key: 'list', label: '카드' },
+              { key: 'calendar', label: '캘린더' },
+            ]}
+            value={viewMode}
+            onChange={(mode) => setViewMode(mode)}
+          />
           <button
             type="button"
+            aria-pressed={reviewMode}
             onClick={() => {
               setReviewMode(prev => {
                 if (prev) setReviewOnlyPending(false)
                 return !prev
               })
             }}
-            style={{
-              height: 30,
-              padding: '0 12px',
-              borderRadius: 8,
-              fontSize: 12,
-              fontWeight: 700,
-              border: `1px solid ${reviewMode ? T.accent : T.border}`,
-              background: reviewMode ? T.accent : T.surface,
-              color: reviewMode ? '#fff' : T.textSecondary,
-              cursor: 'pointer',
-            }}
+            className={`inline-flex h-9 items-center whitespace-nowrap rounded-xl border px-3.5 text-[13px] font-bold transition-colors ${
+              reviewMode
+                ? 'border-brand-orange bg-brand-orange-soft text-brand-orange'
+                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+            }`}
           >
-            리뷰 모드 {reviewMode ? 'ON' : 'OFF'}
+            리뷰 모드 {reviewMode ? '켜짐' : '꺼짐'}
           </button>
           {reviewMode && (
             <button
               type="button"
+              aria-pressed={reviewOnlyPending}
               onClick={() => setReviewOnlyPending(prev => !prev)}
-              style={{
-                height: 30,
-                padding: '0 12px',
-                borderRadius: 8,
-                fontSize: 12,
-                fontWeight: 600,
-                border: `1px solid ${reviewOnlyPending ? T.warningBorder : T.border}`,
-                background: reviewOnlyPending ? T.warningBg : T.surface,
-                color: reviewOnlyPending ? T.warning : T.textSecondary,
-                cursor: 'pointer',
-              }}
-          >
+              className={`inline-flex h-9 items-center whitespace-nowrap rounded-xl border px-3.5 text-[13px] font-bold transition-colors ${
+                reviewOnlyPending
+                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
+            >
               미리뷰만 보기
             </button>
           )}
           {(viewMode === 'list' || viewMode === 'table') && (
-            <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${T.border}` }}>
-            {(['date', 'amount'] as const).map(mode => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => handleSortClick(mode)}
-                style={{
-                  padding: '5px 14px', fontSize: 12, fontWeight: 600, border: 'none', cursor: 'pointer',
-                  background: sortField === mode ? T.accent : T.surface,
-                  color: sortField === mode ? '#fff' : T.textSecondary,
-                  transition: 'all .15s',
-                }}
-              >
-                {mode === 'date' ? '날짜순' : '금액순'} {sortField === mode ? (sortOrder === 'desc' ? '↓' : '↑') : ''}
-              </button>
-            ))}
-            </div>
+            <Tabs
+              aria-label="정렬"
+              items={[
+                { key: 'date', label: `날짜순${sortField === 'date' ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}` },
+                { key: 'amount', label: `금액순${sortField === 'amount' ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}` },
+              ]}
+              value={sortField}
+              onChange={(mode) => handleSortClick(mode)}
+            />
           )}
         </div>
       </div>
@@ -2114,9 +2037,7 @@ export default function CardUsageClient() {
         </div>
       ) : viewMode === 'calendar' ? (
         calendarData.months.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '48px 0', color: T.textTertiary, fontSize: 14 }}>
-            조회된 카드 사용내역이 없습니다.
-          </div>
+          <EmptyState compact title="조회된 카드 사용내역이 없습니다." description="조회 기간이나 필터를 바꿔 보세요." />
         ) : (
           <div style={{ ...cardStyle, padding: '14px 14px 6px' }}>
             <p style={{ margin: '0 0 12px', fontSize: 12, color: T.textTertiary }}>
@@ -2200,9 +2121,7 @@ export default function CardUsageClient() {
           </div>
         )
       ) : groupedItems.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: '48px 0', color: T.textTertiary, fontSize: 14 }}>
-          조회된 카드 사용내역이 없습니다.
-        </div>
+        <EmptyState compact title="조회된 카드 사용내역이 없습니다." description="조회 기간이나 필터를 바꿔 보세요." />
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {groupedItems.map(group => (

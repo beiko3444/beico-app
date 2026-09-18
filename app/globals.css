@@ -7,6 +7,9 @@
   --color-brand-light-blue: #3b82f6;
   --color-brand-grey: #f4f6f8;
   --color-brand-orange: #e43d20;
+  --color-brand-orange-hover: #c9331b;
+  --color-brand-orange-soft: #fff3ef;
+  --color-brand-ink: #101828;
 
   --font-sans: "SF Pro Text", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Hiragino Sans", "Yu Gothic", "Noto Sans CJK KR", "Noto Sans CJK JP", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
   --font-noto: var(--font-noto-sans-jp);
@@ -313,9 +316,27 @@ textarea::placeholder {
 }
 
 .ux-page {
-  width: 100%;
   min-width: 0;
   color: var(--foreground);
+}
+
+/* Shared admin table header — one style across all admin tables. */
+.ux-thead th {
+  background: var(--color-brand-ink);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+  padding: 10px 12px;
+}
+.ux-thead th:first-child { border-top-left-radius: 10px; }
+.ux-thead th:last-child { border-top-right-radius: 10px; }
+
+/* Sidebar nav: fade hint when the list overflows. */
+.ux-nav-scroll {
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
 }
 
 .ux-page-stack {

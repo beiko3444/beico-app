@@ -234,7 +234,7 @@ export default function MobileMessagesChatClient({
           />
         </div>
         <div className="flex gap-2">
-          <button type="submit" className="h-12 rounded-lg bg-slate-950 px-5 text-sm font-black text-white">
+          <button type="submit" className="h-12 rounded-xl bg-brand-orange hover:bg-brand-orange-hover px-5 text-sm font-black text-white">
             검색
           </button>
           {initialQuery ? (

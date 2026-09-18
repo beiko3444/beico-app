@@ -156,7 +156,7 @@ export default function ProductSalesTrend({
         </div>
         <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-500">
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-slate-300" /> {bucketLabel} 매출</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#e34219]" /> 판매수량</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-brand-orange" /> 판매수량</span>
           <span>주문 {orderCount.toLocaleString('ko-KR')}건</span>
         </div>
       </div>

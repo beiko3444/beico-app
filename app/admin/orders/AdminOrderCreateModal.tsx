@@ -2,10 +2,16 @@
 
 import { useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Minus, Plus, Search, ShoppingCart, X } from 'lucide-react'
+import { Minus, Plus, Search, X } from 'lucide-react'
 
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import { resolvePartnerOrderTerms, type PartnerOrderPricingProduct } from '@/lib/partnerOrderPricing'
+import Button from '@/components/ui/Button'
+import EmptyState from '@/components/ui/EmptyState'
+
+const fieldClass =
+  'w-full rounded-xl border border-slate-200 bg-white font-bold text-slate-900 transition ' +
+  'focus:border-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
 
 export type AdminOrderPartnerOption = {
   id: string
@@ -147,24 +153,25 @@ export default function AdminOrderCreateModal({
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm md:p-6" onMouseDown={handleClose}>
-      <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
-          <div>
-            <div className="flex items-center gap-2 text-blue-600">
-              <ShoppingCart className="h-5 w-5" />
-              <span className="text-[12px] font-black uppercase tracking-wider">Admin Order</span>
-            </div>
-            <h2 className="mt-2 text-[24px] font-black tracking-tight text-slate-950">업체 발주서 생성</h2>
+      <div className="flex max-h-[94vh] w-full min-w-0 max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5">
+          <div className="min-w-0">
+            <h2 className="text-[20px] font-black tracking-tight text-slate-900">업체 발주서 생성</h2>
             <p className="mt-1 text-[13px] text-slate-500">업체를 선택하면 해당 국가와 등급에 맞는 발주 단가가 적용됩니다.</p>
           </div>
-          <button type="button" onClick={handleClose} className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50" aria-label="발주 생성 창 닫기">
+          <button
+            type="button"
+            onClick={handleClose}
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+            aria-label="닫기"
+          >
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-6 py-5">
+        <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_240px]">
-            <label className="block">
+            <label className="block min-w-0">
               <span className="mb-2 block text-[12px] font-black text-slate-600">발주 업체</span>
               <select
                 value={partnerId}
@@ -172,7 +179,7 @@ export default function AdminOrderCreateModal({
                   setPartnerId(event.target.value)
                   setQuantities({})
                 }}
-                className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 outline-none transition focus:border-blue-500"
+                className={`h-11 px-4 text-[14px] ${fieldClass}`}
               >
                 <option value="">업체를 선택해 주세요</option>
                 {partners.map((partner) => (
@@ -182,12 +189,12 @@ export default function AdminOrderCreateModal({
                 ))}
               </select>
             </label>
-            <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
-              <div className="text-[11px] font-bold text-blue-500">선택 업체 정보</div>
-              <div className="mt-1 text-[14px] font-black text-blue-900">
+            <div className="min-w-0 rounded-xl border border-orange-200 bg-brand-orange-soft px-4 py-3">
+              <div className="text-[11px] font-bold text-slate-500">선택 업체 정보</div>
+              <div className="mt-1 truncate text-[14px] font-black text-slate-900">
                 {selectedPartner ? (selectedPartner.partnerProfile?.representativeName || selectedPartner.name) : '-'}
               </div>
-              <div className="mt-1 text-[11px] font-bold text-blue-600">
+              <div className="mt-1 text-[11px] font-bold text-slate-600">
                 {selectedPartner ? `${selectedPartner.country || '국가 미설정'} · ${selectedPartner.partnerProfile?.grade || 'C'}등급` : '업체를 먼저 선택하세요'}
               </div>
             </div>
@@ -196,68 +203,73 @@ export default function AdminOrderCreateModal({
           {selectedPartner ? (
             <>
               <div className="relative mt-5">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
                 <input
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="상품명 또는 상품코드 검색"
-                  className="h-11 w-full rounded-xl border border-slate-200 pl-11 pr-4 text-[13px] font-bold text-slate-900 outline-none focus:border-blue-500"
+                  className={`h-10 pl-11 pr-4 text-[13px] ${fieldClass}`}
                 />
               </div>
 
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
-                <div className="hidden grid-cols-[minmax(0,1fr)_120px_150px_160px] bg-slate-50 px-5 py-3 text-[11px] font-black text-slate-500 md:grid">
-                  <span>상품</span><span className="text-right">적용 단가</span><span className="text-center">발주 조건</span><span className="text-center">수량</span>
+                <div className="hidden grid-cols-[minmax(0,1fr)_120px_150px_160px] bg-brand-ink px-5 py-2.5 text-[12px] font-bold text-white md:grid">
+                  <span className="whitespace-nowrap">상품</span><span className="whitespace-nowrap text-right">적용 단가</span><span className="whitespace-nowrap text-center">발주 조건</span><span className="whitespace-nowrap text-center">수량</span>
                 </div>
                 <div className="max-h-[390px] divide-y divide-slate-100 overflow-y-auto">
                   {filteredProducts.length > 0 ? filteredProducts.map((product) => {
                     const quantity = quantities[product.id] || 0
                     const invalid = quantity > 0 && (quantity < product.terms.minimumQuantity || quantity % product.terms.orderUnit !== 0)
                     return (
-                      <div key={product.id} className={`grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_120px_150px_160px] md:items-center ${quantity > 0 ? 'bg-blue-50/40' : 'bg-white'}`}>
+                      <div key={product.id} className={`grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_120px_150px_160px] md:items-center ${quantity > 0 ? 'bg-orange-50/50' : 'bg-white'}`}>
                         <div className="min-w-0">
                           <div className="truncate text-[14px] font-black text-slate-900">{product.name}</div>
-                          <div className="mt-1 text-[11px] font-bold text-slate-400">{product.productCode || '상품코드 없음'}</div>
+                          <div className="mt-1 text-[11px] font-bold text-slate-500">{product.productCode || '상품코드 없음'}</div>
                         </div>
-                        <div className="text-left text-[14px] font-black text-blue-700 md:text-right">{formatCurrency(product.terms.unitPrice)}</div>
+                        <div className="whitespace-nowrap text-left text-[14px] font-black text-slate-900 md:text-right">{formatCurrency(product.terms.unitPrice)}</div>
                         <div className="text-left text-[11px] font-bold text-slate-500 md:text-center">
                           최소 {product.terms.minimumQuantity.toLocaleString('ko-KR')} · 단위 {product.terms.orderUnit.toLocaleString('ko-KR')}
                         </div>
                         <div>
                           <div className={`flex h-10 items-center overflow-hidden rounded-xl border ${invalid ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
-                            <button type="button" onClick={() => stepQuantity(product, -1)} className="flex h-full w-10 items-center justify-center text-slate-500 hover:bg-slate-50"><Minus className="h-4 w-4" /></button>
-                            <input type="number" min="0" value={quantity || ''} onChange={(event) => setQuantity(product.id, Number(event.target.value))} placeholder="0" className="min-w-0 flex-1 bg-transparent text-center text-[14px] font-black text-slate-900 outline-none" />
-                            <button type="button" onClick={() => stepQuantity(product, 1)} className="flex h-full w-10 items-center justify-center text-blue-600 hover:bg-blue-50"><Plus className="h-4 w-4" /></button>
+                            <button type="button" onClick={() => stepQuantity(product, -1)} aria-label="수량 감소" className="flex h-full w-10 items-center justify-center text-slate-500 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40"><Minus className="h-4 w-4" /></button>
+                            <input type="number" min="0" value={quantity || ''} onChange={(event) => setQuantity(product.id, Number(event.target.value))} placeholder="0" aria-label="수량" className="min-w-0 flex-1 bg-transparent text-center text-[14px] font-black text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40" />
+                            <button type="button" onClick={() => stepQuantity(product, 1)} aria-label="수량 증가" className="flex h-full w-10 items-center justify-center text-brand-orange hover:bg-orange-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40"><Plus className="h-4 w-4" /></button>
                           </div>
-                          {invalid ? <div className="mt-1 text-center text-[10px] font-bold text-red-500">발주 조건을 확인하세요</div> : null}
+                          {invalid ? <div className="mt-1 text-center text-[11px] font-bold text-red-500">발주 조건을 확인하세요</div> : null}
                         </div>
                       </div>
                     )
                   }) : (
-                    <div className="px-5 py-12 text-center text-[13px] font-bold text-slate-400">검색 결과가 없습니다.</div>
+                    <div className="p-4">
+                      <EmptyState compact title="검색 결과가 없습니다." />
+                    </div>
                   )}
                 </div>
               </div>
             </>
           ) : (
-            <div className="mt-5 rounded-2xl border border-dashed border-slate-300 px-6 py-16 text-center text-[14px] font-bold text-slate-400">
-              발주할 업체를 선택하면 상품 목록과 적용 단가가 표시됩니다.
-            </div>
+            <EmptyState className="mt-5" title="발주할 업체를 선택하면 상품 목록과 적용 단가가 표시됩니다." />
           )}
         </div>
 
-        <div className="border-t border-slate-200 bg-slate-50 px-6 py-5">
+        <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 sm:py-5">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="grid grid-cols-3 gap-5 text-[12px]">
+            <div className="grid grid-cols-3 gap-4 text-[12px]">
               <AmountSummary label="상품 공급가" value={formatCurrency(amount.productSupplyPrice)} />
               <AmountSummary label="배송비" value={formatCurrency(amount.shippingFee)} />
               <AmountSummary label="부가세 포함 합계" value={formatCurrency(amount.finalAmount)} highlight />
             </div>
-            <div className="flex gap-2">
-              <button type="button" onClick={handleClose} disabled={submitting} className="h-12 rounded-xl border border-slate-300 bg-white px-5 text-[13px] font-black text-slate-600 disabled:opacity-50">취소</button>
-              <button type="button" onClick={handleSubmit} disabled={submitting || !selectedPartner || selectedItems.length === 0} className="h-12 rounded-xl bg-blue-600 px-7 text-[13px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50">
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="secondary" onClick={handleClose} disabled={submitting}>취소</Button>
+              <Button
+                variant="primary"
+                onClick={handleSubmit}
+                disabled={!selectedPartner || selectedItems.length === 0}
+                loading={submitting}
+              >
                 {submitting ? '발주서 생성 중...' : `${selectedItems.length}개 상품 발주서 생성`}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
@@ -268,9 +280,9 @@ export default function AdminOrderCreateModal({
 
 function AmountSummary({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div>
-      <div className="font-bold text-slate-400">{label}</div>
-      <div className={`mt-1 whitespace-nowrap font-black ${highlight ? 'text-[18px] text-blue-700' : 'text-[14px] text-slate-800'}`}>{value}</div>
+    <div className="min-w-0">
+      <div className="whitespace-nowrap font-bold text-slate-500">{label}</div>
+      <div className={`mt-1 whitespace-nowrap font-black ${highlight ? 'text-[18px] text-brand-orange' : 'text-[14px] text-slate-900'}`}>{value}</div>
     </div>
   )
 }

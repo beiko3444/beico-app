@@ -2,6 +2,10 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Save, Trash2 } from 'lucide-react'
+import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 import {
   getExportCountryCurrency,
   normalizeExportCountry,
@@ -518,10 +522,10 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-slate-500">
+      <span className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-slate-600">
         <span>{label}</span>
         {later ? (
-          <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[9px] font-black tracking-normal text-sky-700">
+          <span className="rounded-full border border-sky-200 bg-sky-50 px-1.5 py-0.5 text-[11px] font-bold text-sky-700">
             EMS 후 입력 가능
           </span>
         ) : null}
@@ -539,15 +543,15 @@ function isMissingRequired(value: string | number | null | undefined) {
 function inputToneClass({ later = false, missing = false }: { later?: boolean; missing?: boolean } = {}) {
   if (missing) return 'border-red-400 bg-red-50 text-red-950 focus:border-red-500 focus:ring-red-500/20'
   if (later) return 'border-sky-300 bg-sky-50 text-sky-950 focus:border-sky-500 focus:ring-sky-500/20'
-  return 'border-slate-200 bg-white text-slate-900 focus:border-[#EF3B2D] focus:ring-[#EF3B2D]/15'
+  return 'border-slate-200 bg-white text-slate-900 focus:border-brand-orange focus:ring-brand-orange/15'
 }
 
 function textInputClass(options?: { later?: boolean; missing?: boolean }) {
-  return `h-10 w-full rounded-lg border px-3 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
+  return `h-10 w-full rounded-xl border px-3 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
 }
 
 function textAreaClass(options?: { later?: boolean; missing?: boolean }) {
-  return `min-h-20 w-full resize-y rounded-lg border px-3 py-2 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
+  return `min-h-20 w-full resize-y rounded-xl border px-3 py-2 text-[13px] font-bold outline-none transition focus:ring-2 ${inputToneClass(options)}`
 }
 
 function DocumentPreview({
@@ -695,7 +699,7 @@ function UnipassGuideTable({ sections }: { sections: GuideSection[] }) {
                 <h3 className="text-[14px] font-black text-[#17365d]">{section.title}</h3>
                 <p className="mt-0.5 text-[11px] font-bold text-[#65758a]">{section.description}</p>
               </div>
-              <span className="rounded-sm border border-[#b7c1cd] bg-white px-2 py-1 text-[10px] font-black text-[#52657a]">
+              <span className="rounded-sm border border-[#b7c1cd] bg-white px-2 py-1 text-[11px] font-black text-[#52657a]">
                 {section.fields.length} items
               </span>
             </div>
@@ -723,26 +727,27 @@ function UnipassGuideTable({ sections }: { sections: GuideSection[] }) {
                             <td className="border border-[#c9d2dc] bg-white p-1.5 align-top">
                               <button
                                 type="button"
-                                onClick={() => copyValue(field.value)}
-                                className={`group flex min-h-10 w-full items-start justify-between gap-2 rounded-sm border px-2 py-1.5 text-left shadow-inner transition hover:border-[#2b6cb0] ${
+                                onClick={needsCheck ? undefined : () => copyValue(field.value)}
+                                disabled={needsCheck}
+                                className={`group flex min-h-10 w-full items-start justify-between gap-2 rounded-sm border px-2 py-1.5 text-left shadow-inner transition ${
                                   needsCheck
-                                    ? 'border-[#e6cf82] bg-[#fffaf0]'
-                                    : 'border-[#bfc8d2] bg-[#fbfdff]'
+                                    ? 'cursor-default border-[#e6cf82] bg-[#fffaf0]'
+                                    : 'border-[#bfc8d2] bg-[#fbfdff] hover:border-[#2b6cb0]'
                                 }`}
-                                title={`${field.label} 복사`}
+                                title={needsCheck ? `${field.label}: 확인 후 직접 입력` : `${field.label} 복사`}
                               >
                                 <span className="min-w-0 flex-1">
                                   <span className="block whitespace-pre-wrap break-words text-[12px] font-black leading-5 text-[#111827]">{field.value}</span>
-                                  <span className="mt-1 block text-[10px] font-bold leading-4 text-[#718096]">
+                                  <span className="mt-1 block text-[11px] font-bold leading-4 text-[#718096]">
                                     {field.source} · {field.note}
                                   </span>
                                 </span>
-                                <span className={`mt-0.5 inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 text-[10px] font-black ${
+                                <span className={`mt-0.5 inline-flex h-5 shrink-0 items-center gap-1 rounded-sm border px-1.5 text-[11px] font-black ${
                                   needsCheck
                                     ? 'border-[#e2bd46] bg-[#fff3bf] text-[#7a5200]'
                                     : 'border-[#a7d8c2] bg-[#e8fff3] text-[#047857]'
                                 }`}>
-                                  <Copy size={11} />
+                                  {needsCheck ? null : <Copy size={11} />}
                                   {needsCheck ? '확인' : '복사'}
                                 </span>
                               </button>
@@ -815,8 +820,10 @@ function UnipassValue({ field }: { field: UnipassField }) {
   return (
     <button
       type="button"
-      onClick={() => copyUnipassValue(field.value, field.later)}
-      className={`flex min-h-[23px] w-full items-center gap-1 rounded-none border px-1.5 text-left text-[12px] font-normal ${
+      onClick={needsCheck ? undefined : () => copyUnipassValue(field.value, field.later)}
+      disabled={needsCheck}
+      aria-label={needsCheck ? `${field.label}: 확인 필요` : `${field.label} 복사`}
+      className={`flex min-h-[23px] w-full items-center gap-1 rounded-none border px-1.5 text-left text-[12px] font-normal disabled:cursor-default ${
         field.muted
           ? 'border-[#d5d9df] bg-[#e9eaec] text-[#67707d]'
           : canFillLater
@@ -827,14 +834,14 @@ function UnipassValue({ field }: { field: UnipassField }) {
             ? 'border-[#d8bd68] bg-[#fff8dd] text-[#8a5a00]'
             : 'border-[#c7cdd5] bg-white text-[#111827]'
       }`}
-      title={`${field.label} 복사`}
+      title={needsCheck ? `${field.label}: 확인 후 직접 입력` : `${field.label} 복사`}
     >
       <span className="min-w-0 flex-1 truncate">{value}</span>
       {field.suffix ? <span className="shrink-0 text-[11px] text-[#59677a]">{field.suffix}</span> : null}
-      {field.later ? <span className="shrink-0 rounded-[1px] border border-sky-200 bg-sky-50 px-1 text-[10px] text-sky-700">나중입력</span> : null}
-      {field.lookup ? <span className="shrink-0 rounded-[1px] border border-[#b7c1d0] bg-[#edf2f9] px-1 text-[10px] text-[#3466b7]">조회</span> : null}
-      {field.select ? <span className="shrink-0 text-[10px] text-[#59677a]">▼</span> : null}
-      <Copy size={10} className="shrink-0 text-[#6a7890]" />
+      {field.later ? <span className="shrink-0 rounded-[1px] border border-sky-200 bg-sky-50 px-1 text-[11px] text-sky-700">나중입력</span> : null}
+      {field.lookup ? <span className="shrink-0 rounded-[1px] border border-[#b7c1d0] bg-[#edf2f9] px-1 text-[11px] text-[#3466b7]">조회</span> : null}
+      {field.select ? <span className="shrink-0 text-[11px] text-[#59677a]">▼</span> : null}
+      {needsCheck ? null : <Copy size={10} className="shrink-0 text-[#6a7890]" />}
     </button>
   )
 }
@@ -845,7 +852,7 @@ function UnipassFieldCell({ field }: { field: UnipassField }) {
       <th className="border border-[#d8d8d8] bg-[#f2f2f2] px-2 py-1 text-right align-middle text-[12px] font-normal text-[#333333]">
         {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
         {field.label}
-        {field.later ? <span className="ml-1 text-[10px] font-black text-sky-700">(나중)</span> : null}
+        {field.later ? <span className="ml-1 text-[11px] font-black text-sky-700">(나중)</span> : null}
       </th>
       <td className="border border-[#d8d8d8] bg-white px-1 py-[3px] align-middle">
         <UnipassValue field={field} />
@@ -862,7 +869,7 @@ function UnipassRow({ fields }: { fields: UnipassField[] }) {
         <th className="w-[142px] border border-[#d8d8d8] bg-[#f2f2f2] px-2 py-1 text-right align-middle text-[12px] font-normal text-[#333333]">
           {field.required ? <span className="mr-0.5 text-[#d22f27]">*</span> : null}
           {field.label}
-          {field.later ? <span className="ml-1 text-[10px] font-black text-sky-700">(나중)</span> : null}
+          {field.later ? <span className="ml-1 text-[11px] font-black text-sky-700">(나중)</span> : null}
         </th>
         <td colSpan={3} className="border border-[#d8d8d8] bg-white px-1 py-[3px] align-middle">
           <UnipassValue field={field} />
@@ -901,13 +908,9 @@ function UnipassSection({ title, children }: { title: string; children: React.Re
 function UnipassDeclarationForm({
   form,
   items,
-  onSaveDraft,
-  isSavingDraft,
 }: {
   form: ExportDocumentForm
   items: ExportLineItem[]
-  onSaveDraft: () => void
-  isSavingDraft: boolean
 }) {
   const [activeDeclarationTab, setActiveDeclarationTab] = useState<UnipassDeclarationTab>('common1')
   const declarationItems = getDeclarationItems(items)
@@ -953,7 +956,7 @@ function UnipassDeclarationForm({
       </div>
 
       <div className="border-b border-[#d8d8d8] bg-[#eef7ff] px-2 py-2 text-[12px] font-bold text-[#1d5f95]">
-        <span className="mr-2 rounded-[2px] border border-sky-200 bg-white px-1.5 py-0.5 text-[10px] font-black">나중입력</span>
+        <span className="mr-2 rounded-[2px] border border-sky-200 bg-white px-1.5 py-0.5 text-[11px] font-black">나중입력</span>
         EMS 접수 후 송장번호, 특송업체, 신고세관 정보가 확정되면 채워도 되는 항목입니다.
       </div>
 
@@ -1140,20 +1143,12 @@ function UnipassDeclarationForm({
           </>
         ) : null}
 
-        <div className="mt-8 flex items-center justify-between border-t border-[#c8cdd4] pt-3">
-          <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">목록</button>
-          <div className="flex items-center gap-2">
-            <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">미리보기</button>
-            <button
-              type="button"
-              onClick={onSaveDraft}
-              disabled={isSavingDraft}
-              className="h-8 rounded-[2px] border border-[#1f55b5] bg-[#1f55b5] px-4 text-[12px] font-black text-white disabled:cursor-wait disabled:opacity-60"
-            >
-              {isSavingDraft ? '저장 중' : '임시저장'}
-            </button>
-            <button type="button" className="h-8 rounded-[2px] border border-[#aeb5bf] bg-[#f4f4f4] px-4 text-[12px] font-black text-[#4b5563]">일괄저장</button>
-            <button type="button" className="h-8 rounded-[2px] border border-[#6b7280] bg-[#6b7280] px-4 text-[12px] font-black text-white">전송</button>
+        <div className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-[#c8cdd4] pt-3">
+          <Button variant="secondary" size="sm" disabled title="준비 중">목록</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="secondary" size="sm" disabled title="준비 중">미리보기</Button>
+            <Button variant="secondary" size="sm" disabled title="준비 중">일괄저장</Button>
+            <Button variant="secondary" size="sm" disabled title="준비 중">전송</Button>
           </div>
         </div>
       </div>
@@ -1470,100 +1465,69 @@ export default function ExportDeclarationClient({
   }
 
   return (
-    <div className="space-y-5">
-      <div className="sticky top-0 z-40 -mx-4 border-b border-slate-200 bg-[#F7F7F8]/95 px-4 py-4 backdrop-blur sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#EF3B2D]">Export Documents</div>
-            <h1 className="mt-1 text-[26px] font-black tracking-tight text-slate-950">수출신고</h1>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => printDocuments('commercial')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 shadow-sm hover:bg-slate-50">
-              <FileText size={15} />
-              Commercial Invoice 인쇄
-            </button>
-            <button type="button" onClick={() => printDocuments('packing')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 shadow-sm hover:bg-slate-50">
-              <PackageCheck size={15} />
-              Packing List 인쇄
-            </button>
-            <button type="button" onClick={() => printDocuments('both')} className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#EF3B2D] bg-[#EF3B2D] px-4 text-[12px] font-black text-white shadow-sm hover:bg-[#d83326]">
-              <Printer size={15} />
-              두 문서 연속 인쇄
-            </button>
-            <button
-              type="button"
-              onClick={createDeclaration}
-              disabled={isCreating}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-slate-950 bg-slate-950 px-4 text-[12px] font-black text-white shadow-sm hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              <Save size={15} />
-              {isCreating ? '생성 중' : '신청서 생성'}
-            </button>
-            <button
-              type="button"
-              onClick={saveDraftDeclaration}
-              disabled={isUpdatingDeclaration}
-              className="inline-flex h-10 items-center gap-2 rounded-lg border border-[#1f55b5] bg-[#1f55b5] px-4 text-[12px] font-black text-white shadow-sm hover:bg-[#17438e] disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <Save size={15} />
-              {isUpdatingDeclaration ? '저장 중' : '임시저장'}
-            </button>
-            <button type="button" onClick={resetForm} className="inline-flex h-10 items-center rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-600 shadow-sm hover:bg-slate-50">
+    <div className="min-w-0 space-y-5">
+      <PageHeader
+        title="수출신고"
+        description="Commercial Invoice와 Packing List를 작성하고 유니패스 수출신고 입력값을 준비합니다."
+        count={savedDeclarations.length}
+        actions={
+          <>
+            <Button variant="ghost" onClick={resetForm}>
               초기화
-            </button>
-          </div>
-        </div>
+            </Button>
+            <Button variant="secondary" icon={<FileText size={15} />} onClick={() => printDocuments('commercial')}>
+              Commercial Invoice 인쇄
+            </Button>
+            <Button variant="secondary" icon={<PackageCheck size={15} />} onClick={() => printDocuments('packing')}>
+              Packing List 인쇄
+            </Button>
+            <Button variant="secondary" icon={<Printer size={15} />} onClick={() => printDocuments('both')}>
+              두 문서 연속 인쇄
+            </Button>
+            <Button variant="secondary" icon={<Save size={15} />} onClick={saveDraftDeclaration} loading={isUpdatingDeclaration}>
+              {isUpdatingDeclaration ? '저장 중' : '임시저장'}
+            </Button>
+            <Button variant="primary" icon={<Plus size={15} />} onClick={createDeclaration} loading={isCreating}>
+              {isCreating ? '생성 중' : '신청서 생성'}
+            </Button>
+          </>
+        }
+      />
+
+      <div className="flex flex-wrap items-center gap-3">
+        <Tabs
+          aria-label="수출신고 작업"
+          items={[
+            { key: 'list', label: '신청서 목록', count: savedDeclarations.length },
+            { key: 'documents', label: 'PI / Packing List' },
+            { key: 'unipass', label: '전자상거래 수출신고서' },
+          ]}
+          value={activeWorkTab}
+          onChange={(key) => {
+            if (key !== 'list' && !selectedDeclarationId) return
+            setActiveWorkTab(key)
+          }}
+        />
+        {!selectedDeclarationId ? (
+          <span className="text-[12px] font-bold text-slate-500">신청서를 선택하면 작성 탭이 열립니다.</span>
+        ) : null}
       </div>
 
-      <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-sm">
-        <div className="flex flex-wrap gap-2">
-          <button
-            type="button"
-            onClick={() => setActiveWorkTab('list')}
-            className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
-              activeWorkTab === 'list' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            신청서 목록
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveWorkTab('documents')}
-            disabled={!selectedDeclarationId}
-            className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
-              activeWorkTab === 'documents' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
-            } disabled:cursor-not-allowed disabled:opacity-40`}
-          >
-            PI / Packing List
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveWorkTab('unipass')}
-            disabled={!selectedDeclarationId}
-            className={`h-10 rounded-lg px-5 text-[13px] font-black transition ${
-              activeWorkTab === 'unipass' ? 'bg-slate-950 text-white' : 'text-slate-600 hover:bg-slate-50'
-            } disabled:cursor-not-allowed disabled:opacity-40`}
-          >
-            전자상거래 수출신고서
-          </button>
-        </div>
-      </div>
-
-      <section className={activeWorkTab === 'list' ? 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm' : 'hidden'}>
+      <section className={activeWorkTab === 'list' ? 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm' : 'hidden'}>
         <div className="mb-3 flex items-center justify-between gap-3">
           <div>
-            <h2 className="text-sm font-black text-slate-950">신청서 목록</h2>
-            <p className="mt-1 text-[12px] font-bold text-slate-500">신청서를 선택하면 하단 작성 화면이 열립니다.</p>
+            <h2 className="text-[13px] font-bold text-slate-900">신청서 목록</h2>
+            <p className="mt-1 text-[12px] text-slate-500">신청서를 선택하면 작성 탭이 열립니다.</p>
           </div>
-          <span className="text-[12px] font-bold text-slate-500">최근 {savedDeclarations.length}건</span>
+          <span className="whitespace-nowrap text-[12px] font-bold text-slate-500">최근 {savedDeclarations.length}건</span>
         </div>
         {savedDeclarations.length ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {savedDeclarations.slice(0, 30).map((row) => (
               <div
                 key={row.id}
-                className={`rounded-lg border bg-slate-50 p-3 transition ${
-                  selectedDeclarationId === row.id ? 'border-[#1f55b5] bg-sky-50 ring-2 ring-sky-100' : 'border-slate-200'
+                className={`min-w-0 rounded-2xl border bg-slate-50 p-3 transition ${
+                  selectedDeclarationId === row.id ? 'border-brand-orange bg-brand-orange-soft ring-2 ring-brand-orange/15' : 'border-slate-200'
                 }`}
               >
                 <button
@@ -1574,55 +1538,47 @@ export default function ExportDeclarationClient({
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="truncate text-[12px] font-black text-slate-950">{row.invoiceNo}</span>
-                    <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-slate-500">{row.status}</span>
+                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600">{row.status}</span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-[11px] font-bold text-slate-500">
+                  <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 text-[11px] font-bold text-slate-500">
                     <span>{formatSavedDate(row.createdAt)}</span>
-                    <span>{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
+                    <span className="text-slate-900">{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
                   </div>
                 </button>
-                <button
-                  type="button"
+                <Button
+                  variant="danger"
+                  size="sm"
+                  icon={<Trash2 size={13} />}
+                  className="mt-3 w-full"
                   onClick={() => deleteDeclaration(row.id)}
-                  disabled={deletingDeclarationId === row.id}
-                  className="mt-3 inline-flex h-8 w-full items-center justify-center gap-1.5 rounded-md border border-red-100 bg-white text-[11px] font-black text-red-600 hover:bg-red-50 disabled:cursor-wait disabled:opacity-50"
+                  loading={deletingDeclarationId === row.id}
                 >
-                  <Trash2 size={13} />
                   {deletingDeclarationId === row.id ? '삭제 중' : '삭제'}
-                </button>
+                </Button>
               </div>
             ))}
           </div>
         ) : (
-          <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-[12px] font-bold text-slate-500">
-            아직 생성된 신청서가 없습니다. 상단의 신청서 생성 버튼으로 새 신청서를 먼저 만드세요.
-          </div>
+          <EmptyState
+            compact
+            title="아직 생성된 신청서가 없습니다"
+            description="상단의 신청서 생성 버튼으로 새 신청서를 먼저 만드세요."
+          />
         )}
       </section>
 
       <div className="space-y-5">
-        <div className={activeWorkTab === 'documents' && selectedDeclarationId ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(520px,0.74fr)] xl:items-start' : 'hidden'}>
+        <div className={activeWorkTab === 'documents' && selectedDeclarationId ? 'grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,0.74fr)] xl:items-start' : 'hidden'}>
           <div className="flex min-w-0 flex-col gap-5">
-          <section className="order-2 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="order-2 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <FileSpreadsheet size={17} className="text-slate-500" />
-                <h2 className="text-sm font-black text-slate-950">PI / Packing List 작성</h2>
+                <h2 className="text-[13px] font-bold text-slate-900">PI / Packing List 작성</h2>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${selectedDeclarationId ? 'bg-sky-50 text-sky-700' : 'bg-red-50 text-red-700'}`}>
-                  {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신규 임시저장 가능'}
-                </span>
-                <button
-                  type="button"
-                  onClick={saveDraftDeclaration}
-                  disabled={isUpdatingDeclaration}
-                  className="inline-flex h-9 items-center gap-2 rounded-lg border border-[#1f55b5] bg-[#1f55b5] px-3 text-[12px] font-black text-white shadow-sm hover:bg-[#17438e] disabled:cursor-wait disabled:opacity-60"
-                >
-                  <Save size={14} />
-                  {isUpdatingDeclaration ? '저장 중' : '임시저장'}
-                </button>
-              </div>
+              <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${selectedDeclarationId ? 'bg-brand-orange-soft text-brand-orange' : 'bg-red-50 text-red-700'}`}>
+                {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신규 임시저장 가능'}
+              </span>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Invoice No. / 송장번호">
@@ -1679,33 +1635,35 @@ export default function ExportDeclarationClient({
             </div>
           </section>
 
-          <section className="order-1 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="order-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h2 className="text-sm font-black text-slate-950">상품 / 포장 정보</h2>
-                <p className="mt-1 text-[12px] font-bold text-slate-500">관리 상품을 선택하거나 직접 입력 행으로 작성합니다.</p>
+                <h2 className="text-[13px] font-bold text-slate-900">상품 / 포장 정보</h2>
+                <p className="mt-1 text-[12px] text-slate-500">관리 상품을 선택하거나 직접 입력 행으로 작성합니다.</p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setCountryMenuOpen((open) => !open)}
-                    className="flex h-9 items-center gap-2 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-black text-slate-700 hover:bg-slate-50"
+                    aria-haspopup="menu"
+                    aria-expanded={countryMenuOpen}
+                    className="flex h-8 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-2.5 text-xs font-bold text-slate-700 hover:border-slate-300 hover:bg-slate-50"
                   >
                     <span className="text-[11px] text-slate-500">수출국</span>
                     <ExportCountryFlag country={selectedExportCountry} />
                     <span className="text-slate-950">{selectedCountryOption.label}</span>
-                    <span className="text-[10px] text-slate-400">▼</span>
+                    <span className="text-[11px] text-slate-500">▼</span>
                   </button>
                   {countryMenuOpen ? (
-                    <div className="absolute left-0 top-10 z-50 min-w-[150px] overflow-hidden rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
+                    <div className="absolute left-0 top-10 z-50 min-w-[150px] overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
                       {exportCountryOptions.map((option) => (
                         <button
                           key={option.value}
                           type="button"
                           onClick={() => changeExportCountry(option.value)}
-                          className={`flex h-9 w-full items-center gap-2 px-3 text-left text-[12px] font-black ${
-                            selectedExportCountry === option.value ? 'bg-slate-950 text-white' : 'text-slate-700 hover:bg-slate-50'
+                          className={`flex h-9 w-full items-center gap-2 px-3 text-left text-[12px] font-bold ${
+                            selectedExportCountry === option.value ? 'bg-brand-orange-soft text-brand-orange' : 'text-slate-700 hover:bg-slate-50'
                           }`}
                         >
                           <ExportCountryFlag country={option.value} />
@@ -1724,30 +1682,29 @@ export default function ExportDeclarationClient({
                       ? '환율 조회 실패'
                       : '환율 조회 중'}
                 </span>
-                <button type="button" onClick={addItem} className="inline-flex h-9 items-center gap-2 rounded-lg bg-slate-950 px-3 text-[12px] font-black text-white hover:bg-slate-800">
-                  <Plus size={15} />
+                <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addItem}>
                   행 추가
-                </button>
+                </Button>
               </div>
             </div>
-            <div className="overflow-x-auto rounded-lg border border-slate-200">
-              <table className="w-[1380px] table-fixed text-[12px]">
-                <thead className="bg-slate-50 text-[11px] font-black text-slate-500">
+            <div className="overflow-x-auto rounded-xl border border-slate-200">
+              <table className="w-full min-w-[1380px] table-fixed text-[12px]">
+                <thead className="ux-thead">
                   <tr>
-                    <th className="w-[160px] px-2 py-2 text-left">관리상품</th>
-                    <th className="w-[210px] px-2 py-2 text-left">상품명</th>
-                    <th className="w-[210px] px-2 py-2 text-left">영문명</th>
-                    <th className="w-[110px] px-2 py-2 text-left">Model<br /><span className="text-[10px] text-slate-400">모델</span></th>
-                    <th className="w-[110px] px-2 py-2 text-left">HS Code<br /><span className="text-[10px] text-slate-400">세번부호</span></th>
-                    <th className="w-[90px] px-2 py-2 text-left">Origin<br /><span className="text-[10px] text-slate-400">원산지</span></th>
-                    <th className="w-[80px] px-2 py-2 text-right">Qty<br /><span className="text-[10px] text-slate-400">수량</span></th>
-                    <th className="w-[110px] px-2 py-2 text-right">Unit<br /><span className="text-[10px] text-slate-400">단가</span></th>
-                    <th className="w-[110px] px-2 py-2 text-right">Amount<br /><span className="text-[10px] text-slate-400">금액</span></th>
-                    <th className="w-[80px] px-2 py-2 text-right">Carton<br /><span className="text-[10px] text-slate-400">박스수</span></th>
-                    <th className="w-[95px] px-2 py-2 text-right">Net KG<br /><span className="text-[10px] text-slate-400">순중량</span></th>
-                    <th className="w-[95px] px-2 py-2 text-right">Gross KG<br /><span className="text-[10px] text-slate-400">총중량</span></th>
-                    <th className="w-[85px] px-2 py-2 text-right">CBM<br /><span className="text-[10px] text-slate-400">부피</span></th>
-                    <th className="w-[130px] px-2 py-2 text-left">규격<br /><span className="text-[10px] text-slate-400">cm</span></th>
+                    <th className="w-[160px] px-2 py-2 text-left whitespace-nowrap">관리상품</th>
+                    <th className="w-[210px] px-2 py-2 text-left whitespace-nowrap">상품명</th>
+                    <th className="w-[210px] px-2 py-2 text-left whitespace-nowrap">영문명</th>
+                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">모델 <span className="text-[11px] font-medium text-white/70">Model</span></th>
+                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">세번부호 <span className="text-[11px] font-medium text-white/70">HS Code</span></th>
+                    <th className="w-[90px] px-2 py-2 text-left whitespace-nowrap">원산지</th>
+                    <th className="w-[80px] px-2 py-2 text-right whitespace-nowrap">수량</th>
+                    <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">단가</th>
+                    <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">금액</th>
+                    <th className="w-[80px] px-2 py-2 text-right whitespace-nowrap">박스수</th>
+                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">순중량 <span className="text-[11px] font-medium text-white/70">KG</span></th>
+                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">총중량 <span className="text-[11px] font-medium text-white/70">KG</span></th>
+                    <th className="w-[85px] px-2 py-2 text-right whitespace-nowrap">부피 <span className="text-[11px] font-medium text-white/70">CBM</span></th>
+                    <th className="w-[130px] px-2 py-2 text-left whitespace-nowrap">규격 <span className="text-[11px] font-medium text-white/70">cm</span></th>
                     <th className="w-[54px] px-2 py-2" />
                   </tr>
                 </thead>
@@ -1776,7 +1733,7 @@ export default function ExportDeclarationClient({
                       <td className="px-2 py-2"><input type="number" min={0} step="0.001" className={`${textInputClass()} text-right`} value={item.cbm} onChange={(event) => updateItem(item.id, { cbm: parseNumberInput(event.target.value) })} /></td>
                       <td className="px-2 py-2"><input className={textInputClass()} value={item.dimension} onChange={(event) => updateDimension(item.id, event.target.value)} placeholder="50x40x30cm" /></td>
                       <td className="px-2 py-2 text-center">
-                        <button type="button" onClick={() => removeItem(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-400 hover:bg-red-50 hover:text-red-600" title="행 삭제">
+                        <button type="button" onClick={() => removeItem(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-50" title="행 삭제" aria-label="행 삭제">
                           <Trash2 size={15} />
                         </button>
                       </td>
@@ -1788,30 +1745,27 @@ export default function ExportDeclarationClient({
           </section>
           </div>
 
-          <section className="min-w-0 rounded-xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-28 xl:max-h-[calc(100vh-8rem)] xl:overflow-auto">
-            <div className="mb-3 flex items-center gap-2">
-              <button type="button" onClick={() => setPreviewMode('commercial')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'commercial' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
-                Commercial Invoice
-              </button>
-              <button type="button" onClick={() => setPreviewMode('packing')} className={`h-9 rounded-lg px-3 text-[12px] font-black ${previewMode === 'packing' ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}>
-                Packing List
-              </button>
-            </div>
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+            <Tabs
+              aria-label="미리보기 문서"
+              className="mb-3"
+              items={[
+                { key: 'commercial', label: 'Commercial Invoice' },
+                { key: 'packing', label: 'Packing List' },
+              ]}
+              value={previewMode}
+              onChange={setPreviewMode}
+            />
             <DocumentPreview form={form} items={previewItems} mode={previewMode} />
           </section>
         </div>
 
-        <section className={activeWorkTab === 'unipass' && selectedDeclarationId ? 'min-w-0 max-w-[1360px] rounded-xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
+        <section className={activeWorkTab === 'unipass' && selectedDeclarationId ? 'min-w-0 max-w-[1360px] rounded-2xl border border-slate-200 bg-white p-3 shadow-sm' : 'hidden'}>
           <div className="mb-2 flex items-center gap-2 px-1">
-            <ListChecks size={17} className="text-[#2f66b2]" />
-            <h2 className="text-sm font-black text-slate-950">전자상거래 수출신고서 자동입력</h2>
+            <ListChecks size={17} className="text-slate-500" />
+            <h2 className="text-[13px] font-bold text-slate-900">전자상거래 수출신고서 자동입력</h2>
           </div>
-          <UnipassDeclarationForm
-            form={form}
-            items={items}
-            onSaveDraft={saveDraftDeclaration}
-            isSavingDraft={isUpdatingDeclaration}
-          />
+          <UnipassDeclarationForm form={form} items={items} />
         </section>
       </div>
     </div>

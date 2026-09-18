@@ -3,7 +3,10 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import { ImagePlus, Plus, X } from 'lucide-react'
 import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
+import Button, { buttonClass } from '@/components/ui/Button'
+import Tabs from '@/components/ui/Tabs'
 
 type ExchangeRates = { USD: number, JPY: number, CNY: number }
 type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string, orderUnit: string }
@@ -387,36 +390,32 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
         }
     }
 
-    if (!isOpen) {
-        return (
-            <div onClick={() => setIsOpen(true)}>
-                {trigger || (
-                    <button
-                        className="bg-[#d9361b] text-white px-5 py-2 rounded-lg font-bold hover:brightness-110 transition-all shadow-md hover:shadow-lg text-xs"
-                    >
-                        ＋ 새 상품 추가
-                    </button>
-                )}
-            </div>
-        )
-    }
+    const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
+    const numberInputClass = `${inputClass} text-right font-bold tabular-nums`
+    const priceInputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white pl-7 pr-2 text-right text-xs font-bold tabular-nums text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
+    const labelClass = 'text-[11px] font-bold text-slate-600'
+    const conversionClass = 'mt-0.5 text-right text-[11px] font-bold leading-tight text-slate-500'
+    const modalTitle = isCopy ? '상품 복사 등록' : initialData ? '상품 수정' : '상품 등록'
+    const submitLabel = loading ? '저장 중…' : isCopy ? '복사 저장' : '저장'
 
     const modalContent = (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-black/40 p-0 sm:p-4">
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-slate-950/45 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={modalTitle}>
             <div
-                className="relative h-[100dvh] max-h-[100dvh] w-full max-w-5xl animate-in overflow-y-auto bg-[#f0f0f0] shadow-md fade-in duration-100 sm:h-auto sm:max-h-[95vh] sm:border-2 sm:border-[#808080]"
+                className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[95vh] sm:rounded-2xl sm:border sm:border-slate-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                {/* Classic Windows-style Header */}
-                <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none sticky top-0 z-10">
-                    <h3 className="truncate pr-3 text-sm font-bold tracking-tight">
-                        {isCopy ? 'Product Management - Copy & Register Product' : initialData ? 'Product Management - Edit Product' : 'Product Management - New Product Registration'}
-                    </h3>
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+                    <div className="min-w-0">
+                        <h3 className="truncate text-lg font-black text-slate-950">{modalTitle}</h3>
+                        {initialData ? <p className="truncate text-[11px] font-bold text-slate-500">{initialData.name}</p> : null}
+                    </div>
                     <button
+                        type="button"
                         onClick={() => setIsOpen(false)}
-                        className="bg-[#c0c0c0] text-black w-5 h-5 flex items-center justify-center text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none"
+                        className={buttonClass('ghost', 'sm', 'h-9 w-9 px-0')}
+                        aria-label="닫기"
                     >
-                        ✕
+                        <X size={18} />
                     </button>
                 </div>
 
@@ -431,391 +430,384 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                             }
                         }
                     }}
-                    className="space-y-4 p-3 pb-24 [&_input:not([type='file'])]:min-h-10 [&_select]:min-h-10 sm:space-y-6 sm:p-6 sm:pb-6"
+                    className="flex min-h-0 flex-1 flex-col [&_input:not([type='file'])]:min-h-10 [&_select]:min-h-10"
                 >
-                    {/* Basic Info Group */}
-                    <fieldset className="border border-gray-400 p-3 pt-2 sm:p-4 sm:pt-2">
-                        <legend className="px-2 text-xs font-bold text-gray-700">기본 정보 (General Info)</legend>
+                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
+                        <section className="rounded-2xl border border-slate-200 p-4">
+                            <h4 className="mb-3 text-[13px] font-black text-slate-900">기본 정보</h4>
 
-                        {/* Image Upload Row */}
-                        <div className="flex gap-4 mb-4 items-start">
-                            <div
-                                className="w-20 h-20 bg-white border border-gray-400 flex items-center justify-center shrink-0 cursor-pointer relative group"
-                                onClick={() => document.getElementById('image-upload-input')?.click()}
-                            >
-                                {imageUrl ? (
-                                    <>
-                                        <img src={imageUrl} alt="Preview" className="w-full h-full object-contain" />
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                setHasImageChanged(true)
-                                                setImageUrl(null)
-                                            }}
-                                            className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow-md opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity"
-                                        >
-                                            ✕
-                                        </button>
-                                    </>
-                                ) : (
-                                    <div className="flex flex-col items-center">
-                                        <span className="text-[10px] text-gray-400">Click to</span>
-                                        <span className="text-[10px] text-gray-400">Upload</span>
+                            <div className="mb-4 flex items-start gap-4">
+                                <div
+                                    className="group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
+                                    onClick={() => document.getElementById('image-upload-input')?.click()}
+                                >
+                                    {imageUrl ? (
+                                        <>
+                                            <img src={imageUrl} alt="상품 이미지 미리보기" className="h-full w-full object-contain" />
+                                            <button
+                                                type="button"
+                                                onClick={(e) => {
+                                                    e.stopPropagation()
+                                                    setHasImageChanged(true)
+                                                    setImageUrl(null)
+                                                }}
+                                                className={buttonClass('danger', 'sm', 'absolute right-1 top-1 h-6 w-6 rounded-full px-0 opacity-100 transition-opacity md:opacity-0 group-hover:opacity-100')}
+                                                aria-label="이미지 삭제"
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        </>
+                                    ) : (
+                                        <div className="flex flex-col items-center gap-1 text-slate-400">
+                                            <ImagePlus size={18} />
+                                            <span className="text-[11px] font-bold">이미지 업로드</span>
+                                        </div>
+                                    )}
+                                </div>
+                                <div className="flex-1">
+                                    <label className={`${labelClass} mb-1 block`}>상품 이미지 선택</label>
+                                    <input
+                                        id="image-upload-input"
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={handleImageChange}
+                                        className="hidden"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => document.getElementById('image-upload-input')?.click()}
+                                        className={buttonClass('secondary', 'sm')}
+                                    >
+                                        파일 선택
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                                <div className="space-y-1">
+                                    <label className={labelClass}>상품명 (국문)</label>
+                                    <input
+                                        type="text"
+                                        value={name}
+                                        onChange={e => setName(e.target.value)}
+                                        className={inputClass}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>상품명 (일문)</label>
+                                    <input
+                                        type="text"
+                                        value={nameJP}
+                                        onChange={e => setNameJP(e.target.value)}
+                                        className={inputClass}
+                                        placeholder="일본어 상품명"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>상품명 (영문)</label>
+                                    <input
+                                        type="text"
+                                        value={nameEN}
+                                        onChange={e => setNameEN(e.target.value)}
+                                        className={inputClass}
+                                        placeholder="영문 상품명"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>상품 코드 (SKU)</label>
+                                    <input
+                                        type="text"
+                                        value={productCode}
+                                        onChange={e => setProductCode(normalizeProductCode(e.target.value))}
+                                        className={`${inputClass} font-mono uppercase`}
+                                        placeholder="예: QB-V3-01"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>상품 그룹명</label>
+                                    <input
+                                        type="text"
+                                        value={groupName}
+                                        onChange={e => setGroupName(e.target.value)}
+                                        className={inputClass}
+                                        placeholder="예: 퀵베이트 V3"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>관리용 재고</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={stock}
+                                        onChange={e => setStock(formatNumber(e.target.value))}
+                                        className={`${numberInputClass} font-black`}
+                                        placeholder="도매 발주와 무관"
+                                    />
+                                    <p className="text-[11px] font-bold text-slate-500">관리자가 보는 내부 재고입니다. 파트너 발주 가능 여부와 별도로 관리됩니다.</p>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>HS Code / 세번부호</label>
+                                    <input
+                                        type="text"
+                                        value={hsCode}
+                                        onChange={e => setHsCode(normalizeHsCode(e.target.value))}
+                                        className={`${inputClass} font-mono`}
+                                        placeholder="예: 9507.90"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>Japan HS Code / 일본세번</label>
+                                    <input
+                                        type="text"
+                                        value={japanHsCode}
+                                        onChange={e => setJapanHsCode(normalizeHsCode(e.target.value))}
+                                        className={`${inputClass} font-mono`}
+                                        placeholder="예: 9507.90"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>바코드 번호</label>
+                                    <input
+                                        type="text"
+                                        value={barcode}
+                                        onChange={e => setBarcode(e.target.value)}
+                                        className={`${inputClass} font-mono`}
+                                        placeholder="바코드 번호"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>쿠팡 연동 바코드 (선택)</label>
+                                    <input
+                                        type="text"
+                                        value={coupangSku}
+                                        onChange={e => setCoupangSku(e.target.value)}
+                                        className={`${inputClass} font-bold`}
+                                        placeholder="쿠팡 판매자상품코드 (숫자)"
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-slate-200 p-4">
+                            <h4 className="mb-3 text-[13px] font-black text-slate-900">발주 설정</h4>
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                                <div className="space-y-1">
+                                    <label className={labelClass}>파트너 노출 상태</label>
+                                    <select
+                                        value={partnerSaleStatus}
+                                        onChange={e => setPartnerSaleStatus(e.target.value as PartnerProductStatus)}
+                                        className={`${inputClass} font-bold ${partnerSaleStatus === 'VISIBLE' ? 'text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'text-amber-700' : 'text-slate-500'}`}
+                                    >
+                                        <option value="VISIBLE">노출</option>
+                                        <option value="HIDDEN">비노출</option>
+                                        <option value="SOLD_OUT">품절</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>최소 주문량</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={minOrderQuantity}
+                                        onChange={e => setMinOrderQuantity(formatNumber(e.target.value))}
+                                        className={numberInputClass}
+                                        required
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>주문 단위</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={orderUnit}
+                                        onChange={e => setOrderUnit(formatNumber(e.target.value))}
+                                        className={numberInputClass}
+                                        required
+                                    />
+                                </div>
+                            </div>
+                        </section>
+
+                        <section className="rounded-2xl border border-slate-200 p-4">
+                            <h4 className="mb-3 text-[13px] font-black text-slate-900">지역별·등급별 단가</h4>
+
+                            <div className="mb-4 flex flex-wrap items-center gap-2">
+                                <Tabs
+                                    aria-label="가격 등급"
+                                    items={['A', 'B', 'C', 'D'].map(grade => ({ key: grade, label: `${grade} 등급` }))}
+                                    value={activeGradeTab}
+                                    onChange={setActiveGradeTab}
+                                />
+                                {exchangeRates && (
+                                    <div className="flex w-full flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-bold text-slate-600 sm:ml-auto sm:w-auto">
+                                        <span>실시간 환율</span>
+                                        <span className="inline-flex items-center gap-1">
+                                            <span className="rounded-full bg-slate-200 px-1.5 py-0.5 font-black text-slate-600">USD</span>
+                                            <span className="font-black tabular-nums text-slate-900">₩{Number(exchangeRates.USD).toFixed(0)}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                            <span className="rounded-full bg-slate-200 px-1.5 py-0.5 font-black text-slate-600">JPY 100¥</span>
+                                            <span className="font-black tabular-nums text-slate-900">₩{Number(exchangeRates.JPY * 100).toFixed(0)}</span>
+                                        </span>
+                                        <span className="inline-flex items-center gap-1">
+                                            <span className="rounded-full bg-slate-200 px-1.5 py-0.5 font-black text-slate-600">CNY</span>
+                                            <span className="font-black tabular-nums text-slate-900">₩{Number(exchangeRates.CNY).toFixed(0)}</span>
+                                        </span>
                                     </div>
                                 )}
                             </div>
-                            <div className="flex-1">
-                                <label className="block text-[11px] font-bold text-gray-600 mb-1">상품 이미지 선택</label>
-                                <input
-                                    id="image-upload-input"
-                                    type="file"
-                                    accept="image/*"
-                                    onChange={handleImageChange}
-                                    className="hidden"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => document.getElementById('image-upload-input')?.click()}
-                                    className="text-[11px] bg-white border border-gray-300 px-3 py-1 hover:bg-gray-50 flex items-center gap-1 border-r-2 border-b-2 border-gray-500 active:border-none"
-                                >
-                                    파일 선택 (Search...)
-                                </button>
-                            </div>
-                        </div>
 
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">상품명 (국문)</label>
-                                <input
-                                    type="text"
-                                    value={name}
-                                    onChange={e => setName(e.target.value)}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">상품명 (일문)</label>
-                                <input
-                                    type="text"
-                                    value={nameJP}
-                                    onChange={e => setNameJP(e.target.value)}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
-                                    placeholder="JAPANESE NAME"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">상품명 (영문)</label>
-                                <input
-                                    type="text"
-                                    value={nameEN}
-                                    onChange={e => setNameEN(e.target.value)}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
-                                    placeholder="ENGLISH NAME"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">상품 코드 (SKU)</label>
-                                <input
-                                    type="text"
-                                    value={productCode}
-                                    onChange={e => setProductCode(normalizeProductCode(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono uppercase"
-                                    placeholder="ITEM CODE"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">상품 그룹명</label>
-                                <input
-                                    type="text"
-                                    value={groupName}
-                                    onChange={e => setGroupName(e.target.value)}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm"
-                                    placeholder="예: 퀵베이트 V3"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-emerald-700">관리용 재고</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={stock}
-                                    onChange={e => setStock(formatNumber(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-emerald-50/60 border border-emerald-200 outline-none focus:border-emerald-600 text-sm text-right font-black text-emerald-700"
-                                    placeholder="도매 발주와 무관"
-                                />
-                                <p className="text-[10px] font-bold text-gray-500">관리자가 보는 내부 재고입니다. 파트너 발주 가능 여부와 별도로 관리됩니다.</p>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">HS Code / 세번부호</label>
-                                <input
-                                    type="text"
-                                    value={hsCode}
-                                    onChange={e => setHsCode(normalizeHsCode(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
-                                    placeholder="예: 9507.90"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">Japan HS Code / 일본세번</label>
-                                <input
-                                    type="text"
-                                    value={japanHsCode}
-                                    onChange={e => setJapanHsCode(normalizeHsCode(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
-                                    placeholder="예: 9507.90"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">바코드 번호</label>
-                                <input
-                                    type="text"
-                                    value={barcode}
-                                    onChange={e => setBarcode(e.target.value)}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-mono"
-                                    placeholder="BARCODE"
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-orange-600">쿠팡 연동 바코드 (선택)</label>
-                                <input
-                                    type="text"
-                                    value={coupangSku}
-                                    onChange={e => setCoupangSku(e.target.value)}
-                                    className="w-full px-2 py-1.5 bg-orange-50/50 border border-orange-200 outline-none focus:border-orange-500 text-sm font-bold text-orange-900"
-                                    placeholder="쿠팡 판매자상품코드 (숫자)"
-                                />
-                            </div>
-                        </div>
-                    </fieldset>
+                            <div className="space-y-4">
+                                {(['KR', 'JP', 'US'] as const).map(country => {
+                                    const labels: Record<string, string> = { KR: '한국 (KR)', JP: '일본 (JP)', US: '미국 (US)' };
+                                    const prefix: Record<string, string> = { KR: '₩ ', JP: '¥ ', US: '$ ' };
+                                    const curPrices = regionalPrices[activeGradeTab][country];
 
-                    {/* Order Settings Group */}
-                    <fieldset className="border border-gray-400 p-3 pt-2 sm:p-4 sm:pt-2">
-                        <legend className="px-2 text-xs font-bold text-gray-700">발주 설정 (Order Settings)</legend>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">파트너 노출 상태</label>
-                                <select
-                                    value={partnerSaleStatus}
-                                    onChange={e => setPartnerSaleStatus(e.target.value as PartnerProductStatus)}
-                                    className={`w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-bold ${partnerSaleStatus === 'VISIBLE' ? 'text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'text-amber-700' : 'text-slate-500'}`}
-                                >
-                                    <option value="VISIBLE">노출</option>
-                                    <option value="HIDDEN">비노출</option>
-                                    <option value="SOLD_OUT">품절</option>
-                                </select>
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">최소 주문량</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={minOrderQuantity}
-                                    onChange={e => setMinOrderQuantity(formatNumber(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-blue-700"
-                                    required
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[11px] font-bold text-gray-600">주문 단위</label>
-                                <input
-                                    type="text"
-                                    inputMode="numeric"
-                                    value={orderUnit}
-                                    onChange={e => setOrderUnit(formatNumber(e.target.value))}
-                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-bold text-emerald-700"
-                                    required
-                                />
-                            </div>
-                        </div>
-                    </fieldset>
+                                    const costNum = parseFloat(parseNumber(curPrices.cost)) || 0;
+                                    const wholesaleNum = parseFloat(parseNumber(curPrices.wholesale)) || 0;
+                                    const retailNum = parseFloat(parseNumber(curPrices.retail)) || 0;
 
-                    {/* Regional Pricing Group */}
-                    <fieldset className="mb-4 border border-gray-400 p-3 pt-2 sm:p-4 sm:pt-2">
-                        <legend className="px-2 text-xs font-bold text-gray-700">지역별 & 등급별 단가 설정 (Regional & Tier Pricing)</legend>
+                                    const beicoMargin = costNum === 0 && wholesaleNum === 0 ? 0 : wholesaleNum > 0 ? ((wholesaleNum - costNum) / wholesaleNum * 100).toFixed(1) : 0;
+                                    const wholesalerMargin = wholesaleNum === 0 && retailNum === 0 ? 0 : retailNum > 0 ? ((retailNum - wholesaleNum) / retailNum * 100).toFixed(1) : 0;
 
-                        {/* Grade Tabs & Real-time Exchange Rates */}
-                        <div className="mb-4 flex flex-wrap items-center gap-2">
-                            <div className="grid w-full grid-cols-4 gap-1.5 sm:flex sm:w-auto sm:gap-2">
-                                {['A', 'B', 'C', 'D'].map(grade => (
-                                    <button
-                                        key={grade}
-                                        type="button"
-                                        onClick={() => setActiveGradeTab(grade)}
-                                        className={`min-w-0 px-2 py-2 text-xs font-bold border sm:px-4 sm:py-1.5 ${activeGradeTab === grade ? 'bg-blue-600 text-white border-blue-600 shadow-inner' : 'bg-gray-100 text-gray-600 border-gray-300 hover:bg-gray-200'}`}
-                                    >
-                                        {grade} 등급
-                                    </button>
-                                ))}
-                            </div>
-                            {exchangeRates && (
-                                <div className="flex w-full items-center justify-center gap-2 overflow-x-auto rounded-sm border border-[#ffcc00] border-b-2 border-r-2 bg-[#fff8e7] px-2 py-1.5 text-[10px] shadow-sm sm:ml-auto sm:w-auto sm:justify-start sm:gap-3 sm:px-3 sm:py-1 sm:text-[11px]">
-                                    <span className="font-bold text-gray-700">🔴 실시간 환율:</span>
-                                    <span className="text-blue-700 font-bold">🇺🇸 ${Number(exchangeRates.USD).toFixed(0)}</span>
-                                    <span className="text-red-600 font-bold">🇯🇵(100¥) ₩{Number(exchangeRates.JPY * 100).toFixed(0)}</span>
-                                    <span className="text-red-700 font-bold">🇨🇳 ¥{Number(exchangeRates.CNY).toFixed(0)}</span>
-                                </div>
-                            )}
-                        </div>
+                                    return (
+                                        <div key={country} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                                            <div className="mb-2 inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-700">
+                                                {labels[country]}
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3 xl:grid-cols-7">
+                                                <div className="space-y-1">
+                                                    <label className={`${labelClass} block h-[15px]`}>매입단가</label>
+                                                    <div className="relative">
+                                                        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">{prefix[country]}</span>
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            value={curPrices.cost}
+                                                            onChange={e => setRegionalPrices(prev => ({
+                                                                ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], cost: formatNumber(e.target.value) } }
+                                                            }))}
+                                                            className={priceInputClass}
+                                                        />
+                                                    </div>
+                                                    {country !== 'KR' && exchangeRates && curPrices.cost && (
+                                                        <div className={conversionClass}>
+                                                            ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                        </div>
+                                                    )}
+                                                    {country === 'KR' && exchangeRates && curPrices.cost && (
+                                                        <div className={conversionClass}>
+                                                            <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) / exchangeRates.JPY))}</div>
+                                                            <div>≈ ${((parseFloat(parseNumber(curPrices.cost)) || 0) / exchangeRates.USD).toFixed(2)}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                        <div className="space-y-6">
-                            {(['KR', 'JP', 'US'] as const).map(country => {
-                                const labels: Record<string, string> = { KR: '한국 (KR)', JP: '일본 (JP)', US: '미국 (US)' };
-                                const prefix: Record<string, string> = { KR: '₩ ', JP: '¥ ', US: '$ ' };
-                                const curPrices = regionalPrices[activeGradeTab][country];
+                                                <div className="space-y-1">
+                                                    <label className={`${labelClass} block h-[15px]`}>도매가</label>
+                                                    <div className="relative">
+                                                        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">{prefix[country]}</span>
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            value={curPrices.wholesale}
+                                                            onChange={e => setRegionalPrices(prev => ({
+                                                                ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], wholesale: formatNumber(e.target.value) } }
+                                                            }))}
+                                                            className={priceInputClass}
+                                                        />
+                                                    </div>
+                                                    {country !== 'KR' && exchangeRates && curPrices.wholesale && (
+                                                        <div className={conversionClass}>
+                                                            ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                        </div>
+                                                    )}
+                                                    {country === 'KR' && exchangeRates && curPrices.wholesale && (
+                                                        <div className={conversionClass}>
+                                                            <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) / exchangeRates.JPY))}</div>
+                                                            <div>≈ ${((parseFloat(parseNumber(curPrices.wholesale)) || 0) / exchangeRates.USD).toFixed(2)}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                const costNum = parseFloat(parseNumber(curPrices.cost)) || 0;
-                                const wholesaleNum = parseFloat(parseNumber(curPrices.wholesale)) || 0;
-                                const retailNum = parseFloat(parseNumber(curPrices.retail)) || 0;
+                                                <div className="space-y-1">
+                                                    <label className={`${labelClass} block h-[15px]`}>판매가</label>
+                                                    <div className="relative">
+                                                        <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-xs text-slate-400">{prefix[country]}</span>
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            value={curPrices.retail}
+                                                            onChange={e => setRegionalPrices(prev => ({
+                                                                ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], retail: formatNumber(e.target.value) } }
+                                                            }))}
+                                                            className={priceInputClass}
+                                                        />
+                                                    </div>
+                                                    {country !== 'KR' && exchangeRates && curPrices.retail && (
+                                                        <div className={conversionClass}>
+                                                            ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
+                                                        </div>
+                                                    )}
+                                                    {country === 'KR' && exchangeRates && curPrices.retail && (
+                                                        <div className={conversionClass}>
+                                                            <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) / exchangeRates.JPY))}</div>
+                                                            <div>≈ ${((parseFloat(parseNumber(curPrices.retail)) || 0) / exchangeRates.USD).toFixed(2)}</div>
+                                                        </div>
+                                                    )}
+                                                </div>
 
-                                const beicoMargin = costNum === 0 && wholesaleNum === 0 ? 0 : wholesaleNum > 0 ? ((wholesaleNum - costNum) / wholesaleNum * 100).toFixed(1) : 0;
-                                const wholesalerMargin = wholesaleNum === 0 && retailNum === 0 ? 0 : retailNum > 0 ? ((retailNum - wholesaleNum) / retailNum * 100).toFixed(1) : 0;
-
-                                return (
-                                    <div key={country} className="relative border border-gray-200 bg-gray-50 p-2 sm:p-3">
-                                        <div className="absolute top-0 left-0 bg-gray-200 text-gray-700 text-[10px] font-black px-2 py-0.5 border-b border-r border-gray-300">
-                                            {labels[country]}
-                                        </div>
-                                        <div className="mt-5 grid grid-cols-2 gap-2 sm:mt-4 sm:grid-cols-3 sm:gap-3 xl:grid-cols-7">
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-gray-600 block h-[15px]">매입단가</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
+                                                <div className="space-y-1">
+                                                    <label className={`${labelClass} block h-[15px]`}>최소수량 (MOQ)</label>
                                                     <input
                                                         type="text"
                                                         inputMode="numeric"
-                                                        value={curPrices.cost}
+                                                        value={curPrices.moq}
                                                         onChange={e => setRegionalPrices(prev => ({
-                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], cost: formatNumber(e.target.value) } }
+                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], moq: formatNumber(e.target.value) } }
                                                         }))}
-                                                        className="w-full pl-6 pr-2 py-1.5 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right"
+                                                        className={`${numberInputClass} px-2 text-xs`}
                                                     />
                                                 </div>
-                                                {country !== 'KR' && exchangeRates && curPrices.cost && (
-                                                    <div className="text-[10px] text-gray-500 font-bold mt-0.5 text-right tracking-tighter">
-                                                        ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
-                                                    </div>
-                                                )}
-                                                {country === 'KR' && exchangeRates && curPrices.cost && (
-                                                    <div className="text-[9px] text-gray-400 font-bold mt-0.5 text-right tracking-tighter leading-tight">
-                                                        <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.cost)) || 0) / exchangeRates.JPY))}</div>
-                                                        <div>≈ ${((parseFloat(parseNumber(curPrices.cost)) || 0) / exchangeRates.USD).toFixed(2)}</div>
-                                                    </div>
-                                                )}
-                                            </div>
 
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-red-700 block h-[15px]">도매가</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
+                                                <div className="space-y-1">
+                                                    <label className={`${labelClass} block h-[15px]`}>주문단위</label>
                                                     <input
                                                         type="text"
                                                         inputMode="numeric"
-                                                        value={curPrices.wholesale}
+                                                        value={curPrices.orderUnit}
                                                         onChange={e => setRegionalPrices(prev => ({
-                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], wholesale: formatNumber(e.target.value) } }
+                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], orderUnit: formatNumber(e.target.value) } }
                                                         }))}
-                                                        className="w-full pl-6 pr-2 py-1.5 bg-[#fff8f8] border border-red-300 outline-none focus:border-red-600 text-xs text-right font-bold text-red-700"
+                                                        className={`${numberInputClass} px-2 text-xs`}
                                                     />
                                                 </div>
-                                                {country !== 'KR' && exchangeRates && curPrices.wholesale && (
-                                                    <div className="text-[10px] text-red-400 font-bold mt-0.5 text-right tracking-tighter">
-                                                        ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
-                                                    </div>
-                                                )}
-                                                {country === 'KR' && exchangeRates && curPrices.wholesale && (
-                                                    <div className="text-[9px] text-red-400 font-bold mt-0.5 text-right tracking-tighter leading-tight">
-                                                        <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.wholesale)) || 0) / exchangeRates.JPY))}</div>
-                                                        <div>≈ ${((parseFloat(parseNumber(curPrices.wholesale)) || 0) / exchangeRates.USD).toFixed(2)}</div>
-                                                    </div>
-                                                )}
-                                            </div>
 
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-blue-700 block h-[15px]">판매가</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-2 text-gray-400 text-xs top-1.5">{prefix[country]}</span>
-                                                    <input
-                                                        type="text"
-                                                        inputMode="numeric"
-                                                        value={curPrices.retail}
-                                                        onChange={e => setRegionalPrices(prev => ({
-                                                            ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], retail: formatNumber(e.target.value) } }
-                                                        }))}
-                                                        className="w-full pl-6 pr-2 py-1.5 bg-[#f8faff] border border-blue-300 outline-none focus:border-blue-600 text-xs text-right font-bold text-blue-700"
-                                                    />
+                                                <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-slate-100 p-1.5 text-right">
+                                                    <label className="mb-0.5 block text-[11px] font-bold text-slate-500">베이코 마진율</label>
+                                                    <span className={`text-xs font-black ${Number(beicoMargin) < 0 ? 'text-red-500' : 'text-slate-900'}`}>{beicoMargin}%</span>
                                                 </div>
-                                                {country !== 'KR' && exchangeRates && curPrices.retail && (
-                                                    <div className="text-[10px] text-blue-400 font-bold mt-0.5 text-right tracking-tighter">
-                                                        ≈ {formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) * (country === 'US' ? exchangeRates.USD : exchangeRates.JPY)))}원
-                                                    </div>
-                                                )}
-                                                {country === 'KR' && exchangeRates && curPrices.retail && (
-                                                    <div className="text-[9px] text-blue-400 font-bold mt-0.5 text-right tracking-tighter leading-tight">
-                                                        <div>≈ ¥{formatNumber(Math.round((parseFloat(parseNumber(curPrices.retail)) || 0) / exchangeRates.JPY))}</div>
-                                                        <div>≈ ${((parseFloat(parseNumber(curPrices.retail)) || 0) / exchangeRates.USD).toFixed(2)}</div>
-                                                    </div>
-                                                )}
-                                            </div>
 
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-gray-600 block h-[15px]">최소수량 (MOQ)</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    value={curPrices.moq}
-                                                    onChange={e => setRegionalPrices(prev => ({
-                                                        ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], moq: formatNumber(e.target.value) } }
-                                                    }))}
-                                                    className="w-full px-2 py-1.5 bg-[#f8f8f8] border border-gray-300 outline-none focus:border-gray-500 text-xs text-right font-bold"
-                                                />
-                                            </div>
-
-                                            <div className="space-y-1">
-                                                <label className="text-[10px] font-bold text-emerald-700 block h-[15px]">주문단위</label>
-                                                <input
-                                                    type="text"
-                                                    inputMode="numeric"
-                                                    value={curPrices.orderUnit}
-                                                    onChange={e => setRegionalPrices(prev => ({
-                                                        ...prev, [activeGradeTab]: { ...prev[activeGradeTab], [country]: { ...prev[activeGradeTab][country], orderUnit: formatNumber(e.target.value) } }
-                                                    }))}
-                                                    className="w-full px-2 py-1.5 bg-[#f4fff8] border border-emerald-200 outline-none focus:border-emerald-600 text-xs text-right font-bold text-emerald-700"
-                                                />
-                                            </div>
-
-                                            <div className="space-y-1 bg-gray-100 p-1.5 border border-gray-200 text-right flex flex-col justify-center">
-                                                <label className="text-[9px] font-bold text-gray-500 block mb-0.5">베이코 마진율</label>
-                                                <span className={`text-xs font-black ${Number(beicoMargin) < 0 ? 'text-red-500' : 'text-gray-800'}`}>{beicoMargin}%</span>
-                                            </div>
-
-                                            <div className="space-y-1 bg-gray-100 p-1.5 border border-gray-200 text-right flex flex-col justify-center">
-                                                <label className="text-[9px] font-bold text-gray-500 block mb-0.5">도매상 마진율</label>
-                                                <span className={`text-xs font-black ${Number(wholesalerMargin) < 0 ? 'text-red-500' : 'text-gray-800'}`}>{wholesalerMargin}%</span>
+                                                <div className="flex flex-col justify-center rounded-xl border border-slate-200 bg-slate-100 p-1.5 text-right">
+                                                    <label className="mb-0.5 block text-[11px] font-bold text-slate-500">도매상 마진율</label>
+                                                    <span className={`text-xs font-black ${Number(wholesalerMargin) < 0 ? 'text-red-500' : 'text-slate-900'}`}>{wholesalerMargin}%</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </fieldset>
+                                    );
+                                })}
+                            </div>
+                        </section>
+                    </div>
 
-                    <div className="sticky bottom-0 z-10 -mx-3 -mb-24 flex justify-end gap-2 border-t border-gray-300 bg-[#f0f0f0]/95 px-3 py-3 shadow-[0_-8px_20px_rgba(15,23,42,0.12)] backdrop-blur sm:static sm:mx-0 sm:mb-0 sm:border-0 sm:bg-transparent sm:px-0 sm:pt-4 sm:shadow-none">
-                        <button
-                            type="button"
-                            onClick={() => setIsOpen(false)}
-                            className="min-h-11 flex-1 bg-[#c0c0c0] px-4 py-2 text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none sm:min-h-0 sm:flex-none sm:py-1.5"
-                        >
-                            CANCEL
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading}
-                            className="min-h-11 flex-[2] bg-[#c0c0c0] px-8 py-2 text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none disabled:opacity-50 sm:min-h-0 sm:flex-none sm:py-1.5"
-                        >
-                            {loading ? 'WAIT...' : isCopy ? 'SAVE COPY' : initialData ? 'UPDATE' : 'SAVE ITEM'}
-                        </button>
+                    <div className="sticky bottom-0 z-10 flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-4 py-3 sm:px-6">
+                        <Button variant="secondary" onClick={() => setIsOpen(false)} className="flex-1 sm:flex-none">
+                            취소
+                        </Button>
+                        <Button type="submit" variant="primary" loading={loading} className="flex-[2] sm:flex-none">
+                            {submitLabel}
+                        </Button>
                     </div>
                 </form>
             </div>
@@ -827,11 +819,9 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
             {isOpen ? null : (
                 <div onClick={() => setIsOpen(true)}>
                     {trigger || (
-                        <button
-                            className="bg-[#d9361b] text-white px-5 py-2 rounded-lg font-bold hover:brightness-110 transition-all shadow-md hover:shadow-lg text-xs"
-                        >
-                            ＋ 새 상품 추가
-                        </button>
+                        <Button variant="primary" icon={<Plus size={15} />}>
+                            새 상품 추가
+                        </Button>
                     )}
                 </div>
             )}

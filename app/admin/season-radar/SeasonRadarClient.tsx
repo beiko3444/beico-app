@@ -20,6 +20,15 @@ import {
   MousePointerClick,
   TrendingUp,
 } from 'lucide-react'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+
+const BRAND = '#e43d20'
+const BRAND_SOFT = '#fff3ef'
+const AXIS_TEXT = '#64748b'
+const AXIS_LINE = '#cbd5e1'
+const GRID_LINE = '#e2e8f0'
+const MUTED_BUBBLE = '#94a3b8'
 
 type RegionCount = [string, number]
 type MonthRecord = { total: number; regions: RegionCount[] }
@@ -145,12 +154,12 @@ function geometryPath(topology: TopologyData, geometry: TopologyGeometry) {
 
 function PeakBand({ start, end }: { start: number; end: number }) {
   if (start <= end) {
-    return <ReferenceArea x1={start} x2={end} fill="#DCEFE9" fillOpacity={0.42} strokeOpacity={0} />
+    return <ReferenceArea x1={start} x2={end} fill={BRAND_SOFT} fillOpacity={0.9} strokeOpacity={0} />
   }
   return (
     <>
-      <ReferenceArea x1={start} x2={12} fill="#DCEFE9" fillOpacity={0.42} strokeOpacity={0} />
-      <ReferenceArea x1={1} x2={end} fill="#DCEFE9" fillOpacity={0.42} strokeOpacity={0} />
+      <ReferenceArea x1={start} x2={12} fill={BRAND_SOFT} fillOpacity={0.9} strokeOpacity={0} />
+      <ReferenceArea x1={1} x2={end} fill={BRAND_SOFT} fillOpacity={0.9} strokeOpacity={0} />
     </>
   )
 }
@@ -159,9 +168,9 @@ function ChartTooltip({ active, payload }: { active?: boolean; payload?: Array<{
   if (!active || !payload?.length) return null
   const item = payload[0].payload
   return (
-    <div className="rounded-md border border-slate-200 bg-white px-3 py-2 shadow-lg">
+    <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 shadow-lg">
       <div className="text-[11px] font-black text-slate-500">{item.month}월 조황 언급</div>
-      <div className="mt-0.5 text-[17px] font-black tabular-nums text-slate-950">{formatCount(item.value)}건</div>
+      <div className="mt-0.5 text-[17px] font-black tabular-nums text-slate-900">{formatCount(item.value)}건</div>
     </div>
   )
 }
@@ -171,21 +180,19 @@ function MetricCard({
   value,
   detail,
   icon,
-  accent = false,
 }: {
   label: string
   value: string
   detail: string
   icon: React.ReactNode
-  accent?: boolean
 }) {
   return (
-    <div className={`min-w-0 rounded-lg border px-4 py-3 ${accent ? 'border-[#CBE5DD] bg-[#ECF7F3]' : 'border-slate-200 bg-white'}`}>
+    <div className="min-w-0 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="flex items-center justify-between gap-2 text-[11px] font-black text-slate-500">
-        <span>{label}</span>
-        <span className={accent ? 'text-[#08776A]' : 'text-slate-400'}>{icon}</span>
+        <span className="break-keep">{label}</span>
+        <span className="text-slate-400">{icon}</span>
       </div>
-      <div className="mt-1 truncate text-[22px] font-black tabular-nums text-slate-950">{value}</div>
+      <div className="mt-1 truncate text-[22px] font-black tabular-nums text-slate-900">{value}</div>
       <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">{detail}</div>
     </div>
   )
@@ -229,8 +236,8 @@ function KoreaActivityMap({
             <path
               key={province.key}
               d={province.path}
-              fill="#E7EFEC"
-              stroke="#91A59E"
+              fill="#f1f5f9"
+              stroke={MUTED_BUBBLE}
               strokeWidth="1.2"
               vectorEffect="non-scaling-stroke"
             />
@@ -240,6 +247,8 @@ function KoreaActivityMap({
           {mappableRegions.map(([region, value], index) => {
             const [x, y] = projectPoint(coordinates[region])
             const isSelected = selectedRegion === region
+            const isTop = index === 0
+            const highlighted = isSelected || isTop
             const radius = 11 + Math.sqrt(value / maxValue) * 28
             const showLabel = index < 4 || isSelected
             return (
@@ -252,21 +261,21 @@ function KoreaActivityMap({
                 onKeyDown={(event) => {
                   if (event.key === 'Enter' || event.key === ' ') onSelectRegion(region)
                 }}
-                className="cursor-pointer outline-none"
+                className="cursor-pointer"
               >
                 <circle
                   cx={x}
                   cy={y}
                   r={radius}
-                  fill={isSelected ? '#E4774D' : '#159485'}
-                  fillOpacity={isSelected ? 0.96 : 0.82}
-                  stroke={isSelected ? '#FFFFFF' : '#F7FBF9'}
+                  fill={highlighted ? BRAND : MUTED_BUBBLE}
+                  fillOpacity={highlighted ? 0.96 : 0.8}
+                  stroke="#FFFFFF"
                   strokeWidth={isSelected ? 4 : 2}
                 />
                 {showLabel ? (
                   <text x={x} y={y - 2} textAnchor="middle" className="pointer-events-none fill-white text-[12px] font-black">
                     <tspan x={x}>{shortRegionName(region)}</tspan>
-                    <tspan x={x} dy="14" className="text-[10px] font-bold">{formatCount(value)}</tspan>
+                    <tspan x={x} dy="14" className="text-[11px] font-bold">{formatCount(value)}</tspan>
                   </text>
                 ) : null}
               </g>
@@ -275,7 +284,7 @@ function KoreaActivityMap({
         </g>
       </svg>
       {!topology ? (
-        <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-slate-400">지도를 불러오는 중</div>
+        <div className="absolute inset-0 flex items-center justify-center text-[13px] font-bold text-slate-500">지도를 불러오는 중</div>
       ) : null}
     </div>
   )
@@ -336,45 +345,41 @@ export default function SeasonRadarClient() {
 
   if (loadError) {
     return (
-      <div className="rounded-lg border border-rose-200 bg-rose-50 px-5 py-8 text-center text-[14px] font-bold text-rose-700">
+      <div className="rounded-2xl border border-rose-200 bg-rose-50 px-5 py-8 text-center text-[14px] font-bold text-rose-700">
         {loadError}
       </div>
     )
   }
 
   return (
-    <div className="min-h-[calc(100vh-100px)] bg-[#F4F7F5] text-[#172B26]">
-      <section className="border-b border-[#D4E0DB] bg-white px-4 py-5 sm:px-6">
-        <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-end">
-          <div>
-            <div className="flex items-center gap-2 text-[11px] font-black text-[#08776A]">
-              <Fish size={15} />
-              조황 인사이트
-            </div>
-            <h1 className="mt-1 text-[26px] font-black leading-tight text-[#172B26] sm:text-[32px]">어종별 시즌레이더</h1>
-            <p className="mt-1 text-[13px] font-bold text-[#65766F]">월별 수요 흐름과 출조 지역을 함께 확인합니다.</p>
-          </div>
-          <label className="block w-full lg:w-[260px]">
-            <span className="mb-1.5 block text-[11px] font-black text-[#65766F]">분석 어종</span>
+    <div className="min-w-0 text-slate-900">
+      <PageHeader
+        title="시즌레이더"
+        description="어종별 월별 수요 흐름과 출조 지역을 함께 확인합니다."
+        actions={(
+          <label className="flex min-w-0 items-center gap-2">
+            <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-black text-slate-600">
+              <Fish size={14} className="text-brand-orange" />
+              분석 어종
+            </span>
             <select
               value={selectedFish}
               onChange={(event) => handleFishChange(event.target.value)}
-              className="h-11 w-full rounded-md border border-[#B8C9C2] bg-white px-3 text-[15px] font-black text-[#172B26] shadow-sm"
+              className="h-10 w-full min-w-[140px] rounded-xl border border-slate-200 bg-white px-3 text-[14px] font-black text-slate-900 shadow-sm focus:border-brand-orange sm:w-[200px]"
             >
               {FISH_ORDER.map((fish) => <option key={fish}>{fish}</option>)}
             </select>
           </label>
-        </div>
-      </section>
+        )}
+      />
 
-      <div className="space-y-4 p-3 sm:p-5 lg:p-6">
+      <div className="space-y-4">
         <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <MetricCard
             label="피크 시즌"
             value={`${season.start}월-${season.end}월`}
             detail={`평균 ${formatCount(Math.round(season.average))}건 이상`}
             icon={<CalendarRange size={16} />}
-            accent
           />
           <MetricCard
             label="최고 활발 월"
@@ -396,13 +401,13 @@ export default function SeasonRadarClient() {
           />
         </section>
 
-        <section className="rounded-lg border border-[#D4E0DB] bg-white shadow-sm">
-          <div className="flex flex-col justify-between gap-2 border-b border-[#E3EBE7] px-4 py-3 sm:flex-row sm:items-center sm:px-5">
-            <div>
-              <h2 className="text-[16px] font-black text-[#172B26]">{selectedFish} 월별 조황 추세</h2>
-              <p className="mt-0.5 text-[11px] font-bold text-[#65766F]">연두색 구간은 평균 이상이 이어지는 시즌, 주황색 선은 최고점입니다.</p>
+        <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+            <div className="min-w-0">
+              <h2 className="text-[16px] font-black text-slate-900 break-keep">{selectedFish} 월별 조황 추세</h2>
+              <p className="mt-0.5 text-[11px] font-bold text-slate-500">연한 주황 구간은 평균 이상이 이어지는 시즌, 진한 주황 선은 최고점입니다.</p>
             </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-black text-[#65766F]">
+            <div className="flex items-center gap-1.5 whitespace-nowrap text-[11px] font-black text-slate-500">
               <MousePointerClick size={14} />
               월을 누르면 지도가 바뀝니다
             </div>
@@ -417,7 +422,7 @@ export default function SeasonRadarClient() {
                   if (month >= 1 && month <= 12) setSelectedMonth(month)
                 }}
               >
-                <CartesianGrid vertical={false} stroke="#DFE8E4" />
+                <CartesianGrid vertical={false} stroke={GRID_LINE} />
                 <PeakBand start={season.start} end={season.end} />
                 <XAxis
                   dataKey="month"
@@ -425,38 +430,38 @@ export default function SeasonRadarClient() {
                   domain={[1, 12]}
                   ticks={MONTHS}
                   tickFormatter={(month) => `${month}월`}
-                  tick={{ fontSize: 10, fontWeight: 800, fill: '#65766F' }}
+                  tick={{ fontSize: 11, fontWeight: 800, fill: AXIS_TEXT }}
                   tickLine={false}
-                  axisLine={{ stroke: '#AFC0B9' }}
+                  axisLine={{ stroke: AXIS_LINE }}
                 />
                 <YAxis
                   width={58}
                   tickFormatter={(value) => value >= 1000 ? `${Math.round(value / 1000)}k` : String(value)}
-                  tick={{ fontSize: 10, fontWeight: 800, fill: '#65766F' }}
+                  tick={{ fontSize: 11, fontWeight: 800, fill: AXIS_TEXT }}
                   tickLine={false}
                   axisLine={false}
                 />
-                <Tooltip content={<ChartTooltip />} cursor={{ stroke: '#9EB3AB', strokeDasharray: '4 4' }} />
+                <Tooltip content={<ChartTooltip />} cursor={{ stroke: MUTED_BUBBLE, strokeDasharray: '4 4' }} />
                 <ReferenceLine
                   x={season.start}
-                  stroke="#198D7D"
+                  stroke={MUTED_BUBBLE}
                   strokeDasharray="4 4"
-                  label={{ value: '시작', position: 'insideTopLeft', fill: '#08776A', fontSize: 10, fontWeight: 900 }}
+                  label={{ value: '시작', position: 'insideTopLeft', fill: AXIS_TEXT, fontSize: 11, fontWeight: 900 }}
                 />
                 <ReferenceLine
                   x={season.end}
-                  stroke="#198D7D"
+                  stroke={MUTED_BUBBLE}
                   strokeDasharray="4 4"
-                  label={{ value: '끝', position: 'insideTopRight', fill: '#08776A', fontSize: 10, fontWeight: 900 }}
+                  label={{ value: '끝', position: 'insideTopRight', fill: AXIS_TEXT, fontSize: 11, fontWeight: 900 }}
                 />
-                <ReferenceLine x={season.peak} stroke="#E4774D" strokeWidth={2} />
+                <ReferenceLine x={season.peak} stroke={BRAND} strokeWidth={2} />
                 <Line
                   type="monotone"
                   dataKey="value"
-                  stroke="#08776A"
+                  stroke={BRAND}
                   strokeWidth={3}
                   isAnimationActive={false}
-                  activeDot={{ r: 7, fill: '#E4774D', stroke: '#FFFFFF', strokeWidth: 3, cursor: 'pointer' }}
+                  activeDot={{ r: 7, fill: BRAND, stroke: '#FFFFFF', strokeWidth: 3, cursor: 'pointer' }}
                   dot={(props) => {
                     const month = Number(props.payload?.month)
                     const active = month === selectedMonth
@@ -466,8 +471,8 @@ export default function SeasonRadarClient() {
                         cx={props.cx}
                         cy={props.cy}
                         r={active ? 6 : 4}
-                        fill={active ? '#E4774D' : '#08776A'}
-                        stroke="#FFFFFF"
+                        fill={active ? BRAND : '#FFFFFF'}
+                        stroke={BRAND}
                         strokeWidth={2}
                         className="cursor-pointer"
                         onClick={(event) => {
@@ -481,28 +486,23 @@ export default function SeasonRadarClient() {
               </LineChart>
             </ResponsiveContainer>
           </div>
-          <div className="grid grid-cols-6 gap-1 border-t border-[#E3EBE7] px-3 py-3 sm:grid-cols-12 sm:px-5">
-            {MONTHS.map((month) => (
-              <button
-                key={month}
-                type="button"
-                onClick={() => setSelectedMonth(month)}
-                aria-pressed={selectedMonth === month}
-                className={`h-8 rounded-md text-[11px] font-black transition ${selectedMonth === month ? 'bg-[#08776A] text-white' : 'bg-[#F0F5F3] text-[#53665F] hover:bg-[#DFEBE6]'}`}
-              >
-                {month}월
-              </button>
-            ))}
+          <div className="border-t border-slate-100 px-3 py-3 sm:px-5">
+            <Tabs
+              aria-label="월 선택"
+              items={MONTHS.map((month) => ({ key: String(month), label: `${month}월` }))}
+              value={String(selectedMonth)}
+              onChange={(key) => setSelectedMonth(Number(key))}
+            />
           </div>
         </section>
 
-        <section className="grid overflow-hidden rounded-lg border border-[#D4E0DB] bg-white shadow-sm xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
-          <div className="border-b border-[#E3EBE7] xl:border-b-0 xl:border-r">
-            <div className="flex flex-col justify-between gap-1 border-b border-[#E3EBE7] px-4 py-3 sm:flex-row sm:items-center sm:px-5">
-              <h2 className="text-[16px] font-black text-[#172B26]">{selectedFish} · {selectedMonth}월 활발 지역</h2>
-              <span className="text-[11px] font-bold text-[#65766F]">원 크기 = 지역별 조황 언급 수</span>
+        <section className="grid min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:grid-cols-[minmax(0,1.55fr)_minmax(300px,0.75fr)]">
+          <div className="min-w-0 border-b border-slate-100 xl:border-b-0 xl:border-r">
+            <div className="flex flex-col justify-between gap-1 border-b border-slate-100 px-4 py-3 sm:flex-row sm:items-center sm:px-5">
+              <h2 className="text-[16px] font-black text-slate-900 break-keep">{selectedFish} · {selectedMonth}월 활발 지역</h2>
+              <span className="whitespace-nowrap text-[11px] font-bold text-slate-500">원 크기 = 지역별 조황 언급 수</span>
             </div>
-            <div className="bg-[#F8FBFA] p-3 sm:p-5">
+            <div className="bg-slate-50 p-3 sm:p-5">
               <KoreaActivityMap
                 topology={topology}
                 coordinates={coordinates}
@@ -514,26 +514,26 @@ export default function SeasonRadarClient() {
           </div>
 
           <aside className="min-w-0 bg-white">
-            <div className="border-b border-[#E3EBE7] px-4 py-3 sm:px-5">
-              <div className="text-[11px] font-black text-[#08776A]">{selectedFish} · {selectedMonth}월</div>
-              <div className="mt-1 text-[22px] font-black text-[#172B26]">{selectedRegion ? shortRegionName(selectedRegion) : '지역 없음'}</div>
-              <div className="mt-0.5 text-[12px] font-bold text-[#65766F]">
+            <div className="border-b border-slate-100 px-4 py-3 sm:px-5">
+              <div className="text-[11px] font-black text-brand-orange">{selectedFish} · {selectedMonth}월</div>
+              <div className="mt-1 text-[22px] font-black text-slate-900 break-keep">{selectedRegion ? shortRegionName(selectedRegion) : '지역 없음'}</div>
+              <div className="mt-0.5 text-[12px] font-bold text-slate-500">
                 월 전체 {formatCount(selectedRecord.total)}건
               </div>
             </div>
-            <ol className="divide-y divide-[#E8EFEC] px-3 py-2 sm:px-4">
+            <ol className="divide-y divide-slate-100 px-3 py-2 sm:px-4">
               {selectedRecord.regions.map(([region, value], index) => (
                 <li key={region}>
                   <button
                     type="button"
                     onClick={() => setSelectedRegion(region)}
-                    className={`flex min-h-12 w-full items-center gap-3 rounded-md px-3 py-2 text-left transition ${selectedRegion === region ? 'bg-[#E8F4F0]' : 'hover:bg-slate-50'}`}
+                    className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 py-2 text-left transition ${selectedRegion === region ? 'bg-brand-orange-soft' : 'hover:bg-slate-50'}`}
                   >
-                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${index === 0 ? 'bg-[#E4774D] text-white' : 'bg-slate-100 text-slate-500'}`}>
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-black ${index === 0 ? 'bg-brand-orange text-white' : 'bg-slate-100 text-slate-500'}`}>
                       {index + 1}
                     </span>
-                    <span className="min-w-0 flex-1 truncate text-[13px] font-black text-[#263B35]">{region}</span>
-                    <span className="shrink-0 text-[13px] font-black tabular-nums text-[#08776A]">{formatCount(value)}건</span>
+                    <span className="min-w-0 flex-1 truncate text-[13px] font-black text-slate-800">{region}</span>
+                    <span className="shrink-0 text-[13px] font-black tabular-nums text-slate-900">{formatCount(value)}건</span>
                   </button>
                 </li>
               ))}
@@ -541,7 +541,7 @@ export default function SeasonRadarClient() {
           </aside>
         </section>
 
-        <footer className="px-1 pb-2 text-[10px] font-bold leading-5 text-[#71817B]">
+        <footer className="px-1 pb-2 text-[11px] font-bold leading-5 text-slate-500">
           선상24 전체 조황 게시글의 어종 언급 빈도를 월·지역별로 집계했습니다. 게시글 활동도이며 실제 어획량과 다를 수 있습니다. 지도 경계: KOSTAT 2018, 위치: OpenStreetMap.
         </footer>
       </div>

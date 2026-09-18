@@ -7,7 +7,26 @@ import DeletePartnerButton from '@/components/DeletePartnerButton'
 import Link from 'next/link'
 import ApproveUserButton from '@/components/ApproveUserButton'
 import PartnerTrashbin from '@/components/PartnerTrashbin'
+import PageHeader from '@/components/ui/PageHeader'
+import EmptyState from '@/components/ui/EmptyState'
+import { buttonClass } from '@/components/ui/buttonClass'
 import { Megaphone } from 'lucide-react'
+
+const COUNTRY_LABELS: Record<string, string> = {
+    Korea: '한국',
+    Japan: '일본',
+    USA: '미국',
+    China: '중국',
+    Turkey: '투르키예',
+    Indonesia: '인도네시아',
+}
+
+function gradeBadgeClass(grade?: string | null) {
+    if (grade === 'A') return 'border-red-100 bg-red-50 text-red-600'
+    if (grade === 'B') return 'border-orange-200 bg-brand-orange-soft text-brand-orange'
+    if (grade === 'C') return 'border-emerald-100 bg-emerald-50 text-emerald-600'
+    return 'border-slate-200 bg-slate-50 text-slate-600'
+}
 
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
@@ -75,106 +94,81 @@ export default async function PartnersPage() {
     const mappedDeletedPartners = mapPartnerDocuments(deletedPartners)
 
     return (
-
-        <div className="space-y-6">
-            {/* Sticky Header */}
-            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#252525] rounded-full text-gray-400 dark:text-gray-500 hover:text-[#d9361b] transition-all" title="Dashboard">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                            </Link>
-                            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">파트너 관리</h1>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Link
-                            href="/admin/notices"
-                            className="inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border border-orange-200 bg-orange-50 px-3 text-xs font-black text-[#d9361b] transition hover:border-orange-300 hover:bg-orange-100"
-                        >
+        <div className="min-w-0 space-y-5">
+            <PageHeader
+                title="파트너관리"
+                count={mappedActivePartners.length}
+                description="파트너 계정을 등록·수정하고 가입 승인과 등급을 관리합니다."
+                actions={(
+                    <>
+                        <Link href="/admin/notices" className={buttonClass('secondary', 'md')}>
                             <Megaphone size={15} />
                             파트너 공지
                         </Link>
                         <PartnerTrashbin deletedPartners={mappedDeletedPartners} />
                         <PartnerForm />
-                    </div>
-                </div>
-            </div>
+                    </>
+                )}
+            />
 
-            <div className="glass-panel rounded-2xl shadow-sm dark:shadow-none bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] overflow-x-auto">
-                <table className="table-auto min-w-full border-collapse text-xs">
-                    <thead className="bg-[#d9361b] text-white h-8">
+            <div className="min-w-0 overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:bg-[#1e1e1e] dark:border-[#2a2a2a]">
+                <table className="w-full min-w-[960px] table-auto border-collapse text-xs">
+                    <thead className="ux-thead">
                         <tr>
-                            <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap w-12">No</th>
-                            <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">상호명</th>
-                            <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap w-16">등급</th>
-                            <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap">사업자번호</th>
-                            <th className="px-3 py-1.5 text-center font-bold border-r border-white/20 whitespace-nowrap w-20">국가</th>
-                            <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">주소</th>
-                            <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">연락처</th>
-                            <th className="px-3 py-1.5 text-left font-bold border-r border-white/20 whitespace-nowrap">이메일</th>
-                            <th className="px-3 py-1.5 text-center font-bold whitespace-nowrap w-24">관리</th>
+                            <th className="w-12 text-center">No</th>
+                            <th className="text-left">상호명</th>
+                            <th className="w-16 text-center">등급</th>
+                            <th className="text-center">사업자번호</th>
+                            <th className="w-24 text-center">국가</th>
+                            <th className="text-left">주소</th>
+                            <th className="text-left">연락처</th>
+                            <th className="text-left">이메일</th>
+                            <th className="min-w-[150px] text-center">관리</th>
                         </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
+                    <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
                         {mappedActivePartners.length === 0 ? (
                             <tr>
-                                <td colSpan={9} className="px-6 py-12 text-center text-gray-500 dark:text-gray-400 font-medium">
-                                    등록된 파트너가 없습니다. 새 파트너 계정을 생성해주세요.
+                                <td colSpan={9} className="p-4">
+                                    <EmptyState compact title="등록된 파트너가 없습니다." />
                                 </td>
                             </tr>
                         ) : (
                             mappedActivePartners.map((partner, index) => (
-                                <tr key={partner.id} className="hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group even:bg-gray-50/50 dark:even:bg-[#1a1a1a]">
-                                    <td className="px-3 py-1.5 text-center font-bold text-gray-400 dark:text-gray-500">{mappedActivePartners.length - index}</td>
-                                    <td className="px-3 py-1.5 text-left">
+                                <tr key={partner.id} className="group transition-colors hover:bg-slate-50 dark:hover:bg-blue-900/20">
+                                    <td className="whitespace-nowrap px-3 py-2 text-center font-bold text-slate-500 dark:text-gray-500">{mappedActivePartners.length - index}</td>
+                                    <td className="min-w-[180px] px-3 py-2 text-left">
                                         <PartnerForm
                                             initialData={partner}
                                             trigger={
-                                                <button className="text-left hover:underline decoration-gray-400 dark:decoration-gray-500 underline-offset-4">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="font-bold text-gray-900 dark:text-white group-hover:text-[var(--color-brand-blue)] transition-colors text-sm">{partner.name}</div>
+                                                <button type="button" className="text-left underline-offset-4 decoration-slate-400 hover:underline dark:decoration-gray-500">
+                                                    <div className="flex items-center gap-2 whitespace-nowrap">
+                                                        <div className="text-sm font-bold text-slate-900 transition-colors group-hover:text-brand-orange dark:text-white">{partner.name}</div>
                                                         {partner.role === 'ADMIN' && (
-                                                            <span className="px-1 py-0.5 bg-gray-900 text-white text-[8px] font-black rounded uppercase">Admin</span>
+                                                            <span className="inline-flex h-5 items-center whitespace-nowrap rounded-full bg-brand-ink px-2 text-[11px] font-bold text-white">관리자</span>
                                                         )}
                                                     </div>
-                                                    <div className="text-[10px] text-gray-400 dark:text-gray-500">담당자: {partner.partnerProfile?.representativeName || '-'}</div>
+                                                    <div className="mt-0.5 text-[11px] text-slate-500 dark:text-gray-500">담당자: {partner.partnerProfile?.representativeName || '-'}</div>
                                                 </button>
                                             }
                                         />
                                     </td>
-                                    <td className="px-3 py-1.5 text-center">
-                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${partner.partnerProfile?.grade === 'A' ? 'bg-red-50 text-red-600 border border-red-100' :
-                                            partner.partnerProfile?.grade === 'B' ? 'bg-orange-50 text-orange-600 border border-orange-100' :
-                                                partner.partnerProfile?.grade === 'C' ? 'bg-green-50 text-green-600 border border-green-100' :
-                                                    'bg-gray-50 text-gray-500 border border-gray-100'
-                                            }`}>
+                                    <td className="px-3 py-2 text-center">
+                                        <span className={`inline-flex h-6 items-center whitespace-nowrap rounded-full border px-2.5 text-[11px] font-bold ${gradeBadgeClass(partner.partnerProfile?.grade)}`}>
                                             {partner.partnerProfile?.grade || 'C'}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-1.5 text-center text-gray-600 dark:text-gray-400 font-mono tracking-tight">{partner.partnerProfile?.businessRegNumber || '-'}</td>
-                                    <td className="px-3 py-1.5 text-center">
-                                        <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold ${partner.country === 'Korea' ? 'bg-blue-50 text-blue-600 border border-blue-100' :
-                                            partner.country === 'Japan' ? 'bg-red-50 text-red-600 border border-red-100' :
-                                                partner.country === 'USA' ? 'bg-indigo-50 text-indigo-600 border border-indigo-100' :
-                                                    'bg-gray-50 text-gray-500 border border-gray-100'
-                                            }`}>
-                                            {partner.country === 'Korea' ? '🇰🇷 한국' :
-                                                partner.country === 'Japan' ? '🇯🇵 일본' :
-                                                    partner.country === 'USA' ? '🇺🇸 미국' :
-                                                        partner.country === 'China' ? '🇨🇳 중국' :
-                                                            partner.country === 'Turkey' ? '🇹🇷 투르키예' :
-                                                                partner.country === 'Indonesia' ? '🇮🇩 인도네시아' :
-                                                                    partner.country || '-'}
+                                    <td className="whitespace-nowrap px-3 py-2 text-center text-slate-600 dark:text-gray-400">{partner.partnerProfile?.businessRegNumber || '-'}</td>
+                                    <td className="px-3 py-2 text-center">
+                                        <span className="inline-flex h-6 items-center whitespace-nowrap rounded-full border border-slate-200 bg-slate-50 px-2.5 text-[11px] font-bold text-slate-600">
+                                            {(partner.country && COUNTRY_LABELS[partner.country]) || partner.country || '-'}
                                         </span>
                                     </td>
-                                    <td className="px-3 py-1.5 text-left text-gray-600 dark:text-gray-400 truncate max-w-[200px]" title={partner.partnerProfile?.address || ''}>{partner.partnerProfile?.address || '-'}</td>
-                                    <td className="px-3 py-1.5 text-left text-gray-700 dark:text-gray-400 font-medium">{partner.partnerProfile?.contact || '-'}</td>
-                                    <td className="px-3 py-1.5 text-left text-gray-500 dark:text-gray-400 font-mono text-[10px]">{partner.partnerProfile?.email || '-'}</td>
-                                    <td className="px-3 py-1.5 text-center">
-                                        <div className="flex items-center justify-center gap-1">
+                                    <td className="max-w-[220px] truncate px-3 py-2 text-left text-slate-600 dark:text-gray-400" title={partner.partnerProfile?.address || ''}>{partner.partnerProfile?.address || '-'}</td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-left font-medium text-slate-700 dark:text-gray-400">{partner.partnerProfile?.contact || '-'}</td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-left text-[12px] text-slate-600 dark:text-gray-400">{partner.partnerProfile?.email || '-'}</td>
+                                    <td className="px-3 py-2 text-center">
+                                        <div className="flex items-center justify-center gap-1.5">
                                             <ApproveUserButton userId={partner.id} currentStatus={partner.status} />
                                             <DeletePartnerButton partnerId={partner.id} size="sm" />
                                         </div>

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@/components/ui/Button'
 
 export default function ApproveUserButton({ userId, currentStatus }: { userId: string, currentStatus: string }) {
     const router = useRouter()
@@ -36,18 +37,14 @@ export default function ApproveUserButton({ userId, currentStatus }: { userId: s
     }
 
     return (
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
             {currentStatus === 'PENDING' && (
-                <button
-                    onClick={() => updateStatus('APPROVED')}
-                    disabled={loading}
-                    className="bg-green-600 text-white px-2 py-1 rounded text-[10px] font-bold hover:bg-green-700 shadow-sm transition-colors"
-                >
+                <Button variant="primary" size="sm" onClick={() => updateStatus('APPROVED')} loading={loading}>
                     승인하기
-                </button>
+                </Button>
             )}
             {currentStatus === 'REJECTED' && (
-                <span className="text-[10px] text-red-500 font-bold">거절됨</span>
+                <span className="whitespace-nowrap text-[11px] font-bold text-red-500">거절됨</span>
             )}
         </div>
     )

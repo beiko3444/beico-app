@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Button from '@/components/ui/Button'
 
 export default function DeletePartnerButton({ partnerId, size = 'md' }: { partnerId: string, size?: 'sm' | 'md' }) {
     const router = useRouter()
@@ -29,25 +30,9 @@ export default function DeletePartnerButton({ partnerId, size = 'md' }: { partne
         }
     }
 
-    if (size === 'sm') {
-        return (
-            <button
-                onClick={handleDelete}
-                disabled={loading}
-                className="bg-red-50 text-red-600 px-2 py-1 rounded-md text-[10px] hover:bg-red-100 font-bold transition-colors border border-red-100"
-            >
-                {loading ? '...' : '삭제'}
-            </button>
-        )
-    }
-
     return (
-        <button
-            onClick={handleDelete}
-            disabled={loading}
-            className="text-red-500 hover:text-red-700 font-medium ml-4 text-xs"
-        >
-            {loading ? '삭제중...' : '삭제'}
-        </button>
+        <Button variant="danger" size={size} onClick={handleDelete} loading={loading}>
+            {loading ? '삭제 중...' : '삭제'}
+        </Button>
     )
 }

@@ -1,5 +1,6 @@
 'use client'
 
+import { buttonClass } from '@/components/ui/buttonClass'
 import { useState, useTransition, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { CheckCircle2, Circle, Trash2, ChevronUp, ChevronDown, X, Trophy, Zap } from 'lucide-react'
@@ -153,37 +154,37 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
 
     return (
         <div className="flex flex-col gap-6 font-sans">
-            <div className="rounded-3xl border border-gray-900 bg-gray-950 p-5 text-white shadow-sm dark:border-[#2a2a2a]">
+            <div className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900 shadow-sm dark:border-[#2a2a2a]">
                 <div className="flex flex-wrap items-center justify-between gap-4">
                     <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-400 text-gray-950 shadow-sm">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-brand-orange-soft text-brand-orange">
                             <Trophy className="h-6 w-6" />
                         </div>
                         <div>
                             <div className="flex items-center gap-2">
                                 <h2 className="text-lg font-black tracking-tight">업무 레벨 {taskLevel.level}</h2>
                                 {levelFeedback && (
-                                    <span className={`rounded-full px-2 py-1 text-[10px] font-black leading-none ${levelFeedback === 'level' ? 'bg-amber-300 text-gray-950' : 'bg-emerald-400 text-gray-950'}`}>
-                                        {levelFeedback === 'level' ? 'LEVEL UP' : `+${XP_PER_COMPLETED_TASK} XP`}
+                                    <span className={`rounded-full px-2 py-1 text-[11px] font-black leading-none ${levelFeedback === 'level' ? 'bg-brand-orange text-white' : 'bg-emerald-100 text-emerald-700'}`}>
+                                        {levelFeedback === 'level' ? '레벨 업' : `+${XP_PER_COMPLETED_TASK} 경험치`}
                                     </span>
                                 )}
                             </div>
-                            <p className="mt-1 text-[11px] font-bold text-gray-400">완료 {taskLevel.completedCount}건 · 누적 {taskLevel.totalXp} XP · 1건 완료 = {XP_PER_COMPLETED_TASK} XP</p>
+                            <p className="mt-1 text-[11px] font-bold text-slate-500">완료 {taskLevel.completedCount}건 · 누적 {taskLevel.totalXp} 경험치 · 1건 완료 = {XP_PER_COMPLETED_TASK} 경험치</p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 rounded-2xl bg-white/10 px-3 py-2 text-[11px] font-black text-gray-200">
-                        <Zap className="h-4 w-4 text-amber-300" />
-                        다음 레벨까지 {taskLevel.nextLevelXp} XP
+                    <div className="flex items-center gap-2 rounded-xl bg-slate-100 px-3 py-2 text-[11px] font-black text-slate-700">
+                        <Zap className="h-4 w-4 text-brand-orange" />
+                        다음 레벨까지 {taskLevel.nextLevelXp} 경험치
                     </div>
                 </div>
                 <div className="mt-5">
-                    <div className="mb-2 flex items-center justify-between text-[10px] font-black text-gray-400">
-                        <span>EXP</span>
+                    <div className="mb-2 flex items-center justify-between text-[11px] font-black text-slate-500">
+                        <span>경험치</span>
                         <span>{taskLevel.progressXp}/{XP_PER_LEVEL}</span>
                     </div>
-                    <div className="h-3 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-3 overflow-hidden rounded-full bg-slate-100">
                         <div
-                            className="h-full rounded-full bg-gradient-to-r from-emerald-400 via-amber-300 to-orange-400 transition-all duration-500"
+                            className="h-full rounded-full bg-brand-orange transition-all duration-500"
                             style={{ width: `${taskLevel.progressPercent}%` }}
                         />
                     </div>
@@ -241,7 +242,7 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                                 }}
                                 onClick={() => setSelectedDate(date)}
                                 className={`min-h-[100px] p-1.5 border-r border-b border-gray-100 dark:border-[#2a2a2a] transition-all flex flex-col group relative
-                                    ${current ? (isToday ? 'bg-yellow-200 dark:bg-yellow-900/30' : isWeekend ? 'bg-gray-50 dark:bg-[#1a1a1a]' : 'bg-white dark:bg-[#1e1e1e]') : 'bg-gray-50/20 dark:bg-[#1a1a1a]/50 text-gray-300 dark:text-gray-500'}
+                                    ${current ? (isToday ? 'bg-brand-orange-soft dark:bg-yellow-900/30' : isWeekend ? 'bg-gray-50 dark:bg-[#1a1a1a]' : 'bg-white dark:bg-[#1e1e1e]') : 'bg-gray-50/20 dark:bg-[#1a1a1a]/50 text-gray-300 dark:text-gray-500'}
                                     ${isSelected ? 'bg-indigo-50/30 dark:bg-indigo-900/20' : 'hover:bg-gray-800 hover:text-white dark:hover:bg-[#252525]'}
                                 `}
                             >
@@ -286,13 +287,13 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
             <div className="bg-white dark:bg-[#1e1e1e] rounded-3xl p-6 shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] flex flex-col gap-4">
                 <div className="flex justify-between items-center">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-black text-white rounded-xl flex items-center justify-center text-lg font-black">{selectedDate.getDate()}</div>
+                        <div className="w-10 h-10 bg-brand-orange text-white rounded-xl flex items-center justify-center text-lg font-black">{selectedDate.getDate()}</div>
                         <div>
                             <h3 className="text-sm font-black text-gray-900 dark:text-white leading-none">{selectedDate.getMonth() + 1}월 일정</h3>
-                            <p className="text-[9px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest mt-1">Agenda</p>
+                            <p className="text-[11px] font-bold text-slate-500 mt-1">선택한 날짜의 업무</p>
                         </div>
                     </div>
-                    <button onClick={() => router.push('/admin/tasks')} className="text-[10px] font-black text-indigo-500 hover:underline">상세보기</button>
+                    <button type="button" onClick={() => router.push('/admin/tasks')} className="text-[11px] font-black text-brand-orange hover:underline">상세보기</button>
                 </div>
 
                 <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 scrollbar-hide">
@@ -312,8 +313,9 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                 </div>
 
                 <button
+                    type="button"
                     onClick={() => { setEditingTask(null); setIsModalOpen(true); }}
-                    className="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md"
+                    className={buttonClass('primary', 'md', 'self-end')}
                 >
                     + 새 업무 등록
                 </button>
@@ -337,23 +339,23 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
 
             {/* Modal - Consistent with TasksClient */}
             {isModalOpen && mounted && createPortal(
-                <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100000] flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
-                    <div className="bg-white dark:bg-[#1e1e1e] rounded-[2rem] w-full max-w-md overflow-hidden flex flex-col shadow-2xl dark:shadow-none" onClick={e => e.stopPropagation()}>
-                        <div className="bg-gray-50 dark:bg-[#1a1a1a] p-6 border-b border-gray-100 dark:border-[#2a2a2a] flex justify-between items-center">
-                            <h3 className="text-xl font-black text-gray-900 dark:text-white tracking-tighter">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
-                            <button onClick={() => setIsModalOpen(false)} className="text-gray-400 dark:text-gray-500"><X className="w-5 h-5" /></button>
+                <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-[100] flex items-center justify-center p-4" onClick={() => setIsModalOpen(false)}>
+                    <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl w-full max-w-md overflow-hidden flex flex-col shadow-2xl dark:shadow-none" onClick={e => e.stopPropagation()}>
+                        <div className="p-5 border-b border-slate-100 dark:border-[#2a2a2a] flex justify-between items-center">
+                            <h3 className="text-base font-black text-gray-900 dark:text-white">{editingTask ? '업무 수정' : '새 업무 등록'}</h3>
+                            <button type="button" onClick={() => setIsModalOpen(false)} aria-label="닫기" className="inline-flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100"><X className="w-4 h-4" /></button>
                         </div>
-                        <form action={handleSaveTask} className="p-6 space-y-4">
+                        <form action={handleSaveTask} className="p-5 space-y-4">
                             <input type="hidden" name="date" value={selectedDate.toISOString()} />
                             <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">업무 제목</label>
-                                <input name="title" required defaultValue={editingTask?.title || ''} placeholder="무엇을 해야 하나요?" className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-xl px-4 py-3 text-sm font-black text-gray-900 dark:text-white focus:ring-2 focus:ring-black outline-none transition-all" />
+                                <label className="text-[11px] font-bold text-slate-500">업무 제목</label>
+                                <input name="title" required defaultValue={editingTask?.title || ''} placeholder="무엇을 해야 하나요?" className="w-full bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#2a2a2a] rounded-xl px-4 py-3 text-sm font-bold text-gray-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 transition-all" />
                             </div>
                             <div className="space-y-1">
-                                <label className="text-[9px] font-black text-gray-400 dark:text-gray-500 uppercase tracking-widest">상세 내용</label>
-                                <textarea name="description" defaultValue={editingTask?.description || ''} placeholder="업무에 대한 상세 내용을 입력하세요..." className="w-full bg-gray-50 dark:bg-[#1a1a1a] border border-gray-100 dark:border-[#2a2a2a] rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white focus:ring-2 focus:ring-black outline-none transition-all min-h-[100px] resize-none" />
+                                <label className="text-[11px] font-bold text-slate-500">상세 내용</label>
+                                <textarea name="description" defaultValue={editingTask?.description || ''} placeholder="업무에 대한 상세 내용을 입력하세요..." className="w-full bg-white dark:bg-[#1a1a1a] border border-slate-200 dark:border-[#2a2a2a] rounded-xl px-4 py-3 text-sm font-medium text-gray-900 dark:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 transition-all min-h-[100px] resize-none" />
                             </div>
-                            <button type="submit" disabled={isPending} className="w-full py-4 bg-black text-white rounded-xl font-black text-xs uppercase tracking-widest">
+                            <button type="submit" disabled={isPending} className={buttonClass('primary', 'md', 'w-full')}>
                                 {isPending ? '저장 중...' : '일정 저장하기'}
                             </button>
                         </form>

@@ -446,13 +446,13 @@ export default function SmsClient() {
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4">
         <div>
-          <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">SMS Forwarder</p>
+          <p className="text-[11px] font-bold text-brand-orange uppercase tracking-[0.2em]">SMS Forwarder</p>
           <h1 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자발송서비스</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             010-8119-3313 휴대폰의 문자 포워더 앱을 통해 발송합니다.
           </p>
         </div>
-        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-[#e34219] shadow-sm dark:shadow-none">
+        <div className="hidden md:flex items-center justify-center w-12 h-12 rounded-2xl bg-[#fff4ef] text-brand-orange shadow-sm dark:shadow-none">
           <MessageSquareText size={22} />
         </div>
       </div>
@@ -469,7 +469,7 @@ export default function SmsClient() {
                   id="fromNumber"
                   value={fromNumber}
                   onChange={(event) => setFromNumber(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange"
                   required
                   disabled={loading || fromNumbers.length === 0}
                 >
@@ -491,7 +491,7 @@ export default function SmsClient() {
                     id="savedRecipient"
                     value={selectedRecipientId}
                     onChange={(event) => setSelectedRecipientId(event.target.value)}
-                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                    className="flex-1 h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange"
                   >
                     <option value="">수신자를 선택하세요</option>
                     {recipients.map((item) => (
@@ -520,7 +520,7 @@ export default function SmsClient() {
                   type="text"
                   value={toName}
                   onChange={(event) => setToName(event.target.value)}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange"
                   placeholder="수신자 이름"
                   required
                 />
@@ -536,7 +536,7 @@ export default function SmsClient() {
                   inputMode="numeric"
                   value={toNumber}
                   onChange={(event) => setToNumber(formatPhoneNumber(event.target.value))}
-                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                  className="w-full h-12 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange"
                   placeholder="010-0000-0000"
                   required
                 />
@@ -566,7 +566,7 @@ export default function SmsClient() {
                 id="contents"
                 value={contents}
                 onChange={(event) => setContents(event.target.value)}
-                className="w-full min-h-[220px] px-4 py-4 rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm leading-6 text-gray-900 dark:text-white outline-none focus:border-[#e34219] resize-y"
+                className="w-full min-h-[220px] px-4 py-4 rounded-2xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm leading-6 text-gray-900 dark:text-white outline-none focus:border-brand-orange resize-y"
                 placeholder="발송할 문자를 입력하세요."
                 required
               />
@@ -609,7 +609,7 @@ export default function SmsClient() {
                     value={sendAt}
                     onChange={(event) => setSendAt(event.target.value)}
                     disabled={isForwarderProvider}
-                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed dark:disabled:bg-[#151515]"
+                    className="w-full h-12 pl-10 pr-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed dark:disabled:bg-[#151515]"
                   />
                 </div>
                 {isForwarderProvider && (
@@ -632,7 +632,7 @@ export default function SmsClient() {
               <button
                 type="submit"
                 disabled={loading || submitting}
-                className="w-full h-12 rounded-xl bg-[#e34219] hover:bg-[#cf3b16] text-white font-black text-sm tracking-wide inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                className="w-full h-12 rounded-xl bg-brand-orange hover:bg-[#cf3b16] text-white font-black text-sm tracking-wide inline-flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {submitting ? (
                   <>
@@ -679,7 +679,7 @@ export default function SmsClient() {
       <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Mobile Outbox</p>
+            <p className="text-[11px] font-bold text-brand-orange uppercase tracking-[0.2em]">Mobile Outbox</p>
             <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">휴대폰 발송 대기열</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               안드로이드 폰 앱이 이 목록을 가져가 실제 SMS로 발송하고 결과를 저장합니다.
@@ -749,7 +749,7 @@ export default function SmsClient() {
 
       <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-5">
         <div>
-          <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Recipients</p>
+          <p className="text-[11px] font-bold text-brand-orange uppercase tracking-[0.2em]">Recipients</p>
           <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">저장된 수신자</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             등록한 수신자를 저장해두고 문자 발송 시 바로 불러올 수 있습니다.
@@ -795,7 +795,7 @@ export default function SmsClient() {
 
       <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
         <div>
-          <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">Saved Send List</p>
+          <p className="text-[11px] font-bold text-brand-orange uppercase tracking-[0.2em]">Saved Send List</p>
           <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">저장된 발송리스트</h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
             발송 버튼을 누를 때마다 언제 누구에게 보냈는지 로컬에 저장됩니다.
@@ -855,7 +855,7 @@ export default function SmsClient() {
       <section className="bg-white dark:bg-[#1e1e1e] rounded-[28px] border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 md:p-8 space-y-6">
         <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
           <div>
-            <p className="text-[11px] font-bold text-[#e34219] uppercase tracking-[0.2em]">History</p>
+            <p className="text-[11px] font-bold text-brand-orange uppercase tracking-[0.2em]">History</p>
             <h2 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">문자 발송내역</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
               문자 포워더 발송 요청과 저장된 발송리스트를 확인합니다.
@@ -872,7 +872,7 @@ export default function SmsClient() {
                 type="date"
                 value={historyFromDate}
                 onChange={(event) => setHistoryFromDate(event.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange"
               />
             </div>
 
@@ -885,7 +885,7 @@ export default function SmsClient() {
                 type="date"
                 value={historyToDate}
                 onChange={(event) => setHistoryToDate(event.target.value)}
-                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-[#e34219]"
+                className="h-11 px-4 rounded-xl border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] text-sm font-bold text-gray-900 dark:text-white outline-none focus:border-brand-orange"
               />
             </div>
 

@@ -3,6 +3,8 @@
 import { Check, Clock3, Pencil, RefreshCw, X } from 'lucide-react'
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
+import { buttonClass } from '@/components/ui/Button'
+import EmptyState from '@/components/ui/EmptyState'
 
 type StockHistoryRow = {
   id: string
@@ -127,7 +129,7 @@ export default function ProductStockHistoryModal({
   }
 
   const modal = isOpen ? (
-    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-black/45 p-0 sm:p-4" onClick={() => setIsOpen(false)}>
+    <div className="fixed inset-0 z-[100000] flex items-center justify-center bg-slate-950/45 p-0 sm:p-4" onClick={() => setIsOpen(false)}>
       <section
         role="dialog"
         aria-modal="true"
@@ -137,19 +139,19 @@ export default function ProductStockHistoryModal({
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2 text-sm font-black text-emerald-700">
-              <Clock3 size={16} /> 관리용 재고 변경 이력
+            <div className="flex items-center gap-2 text-[11px] font-bold text-slate-500">
+              <Clock3 size={14} /> 관리용 재고 변경 이력
             </div>
             <h2 className="mt-1 truncate text-lg font-black text-slate-950">{payload?.product.name || productName}</h2>
             <p className="mt-1 text-xs font-bold text-slate-500">
-              현재 재고 <span className="text-emerald-700">{formatNumber(payload?.product.stock ?? 0)}개</span> · 최신순 최대 200건
+              현재 재고 <span className="font-black text-slate-900">{formatNumber(payload?.product.stock ?? 0)}개</span> · 최신순 최대 200건
             </p>
           </div>
           <div className="flex items-center gap-1">
             <button
               type="button"
               onClick={() => void loadHistory()}
-              className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-100"
+              className={buttonClass('secondary', 'sm', 'w-8 px-0')}
               aria-label="관리용 재고 이력 새로고침"
             >
               <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
@@ -157,7 +159,7 @@ export default function ProductStockHistoryModal({
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="rounded-lg border border-slate-200 bg-white p-2 text-slate-500 hover:bg-slate-100"
+              className={buttonClass('secondary', 'sm', 'w-8 px-0')}
               aria-label="관리용 재고 이력 닫기"
             >
               <X size={16} />
@@ -178,7 +180,7 @@ export default function ProductStockHistoryModal({
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>
           ) : payload?.history.length ? (
             <div className="overflow-hidden rounded-xl border border-slate-200 text-sm">
-              <div className="hidden grid-cols-[1.1fr_1fr_.55fr_1.6fr] bg-slate-100 px-3 py-2 text-xs font-black text-slate-600 sm:grid">
+              <div className="hidden grid-cols-[1.1fr_1fr_.55fr_1.6fr] bg-brand-ink px-3 py-2.5 text-[12px] font-bold text-white sm:grid">
                 <div>수정 시각</div>
                 <div className="text-center">수량 변경</div>
                 <div className="text-center">증감</div>
@@ -192,22 +194,22 @@ export default function ProductStockHistoryModal({
                   return (
                     <div key={row.id} className="grid gap-3 p-3 hover:bg-slate-50 sm:grid-cols-[1.1fr_1fr_.55fr_1.6fr] sm:items-start sm:gap-2">
                       <div className="text-xs font-bold text-slate-600">
-                        <div className="mb-1 text-[10px] font-black text-slate-400 sm:hidden">수정 시각</div>
+                        <div className="mb-1 text-[11px] font-black text-slate-500 sm:hidden">수정 시각</div>
                         {formatDateTime(row.createdAt)}
-                        <div className="mt-1 text-[11px] font-medium text-slate-400">{actor}</div>
+                        <div className="mt-1 text-[11px] font-medium text-slate-500">{actor}</div>
                       </div>
                       <div className="flex items-center justify-between gap-3 sm:block sm:text-center">
-                        <span className="text-[10px] font-black text-slate-400 sm:hidden">수량 변경</span>
-                        <span className="font-black tabular-nums text-slate-800">{formatNumber(row.previousStock)} → {formatNumber(row.newStock)}</span>
+                        <span className="text-[11px] font-black text-slate-500 sm:hidden">수량 변경</span>
+                        <span className="font-black tabular-nums text-slate-900">{formatNumber(row.previousStock)} → {formatNumber(row.newStock)}</span>
                       </div>
                       <div className="flex items-center justify-between gap-3 sm:block sm:text-center">
-                        <span className="text-[10px] font-black text-slate-400 sm:hidden">증감</span>
+                        <span className="text-[11px] font-black text-slate-500 sm:hidden">증감</span>
                         <span className={`inline-flex min-w-14 justify-center rounded-full px-2 py-1 font-black tabular-nums ${row.delta > 0 ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
                           {row.delta > 0 ? '+' : ''}{formatNumber(row.delta)}
                         </span>
                       </div>
                       <div className="min-w-0">
-                        <div className="mb-1 text-[10px] font-black text-slate-400 sm:hidden">수정내역</div>
+                        <div className="mb-1 text-[11px] font-black text-slate-500 sm:hidden">수정내역</div>
                         {editing ? (
                           <div className="space-y-2">
                             <div className="flex flex-wrap gap-1">
@@ -216,7 +218,7 @@ export default function ProductStockHistoryModal({
                                   key={preset}
                                   type="button"
                                   onClick={() => setDraftNote(preset)}
-                                  className="rounded-full border border-blue-200 bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 hover:bg-blue-100"
+                                  className={buttonClass('secondary', 'sm', 'h-7 rounded-full px-2.5 text-[11px]')}
                                 >
                                   {preset.trim()}
                                 </button>
@@ -228,14 +230,14 @@ export default function ProductStockHistoryModal({
                               maxLength={200}
                               rows={2}
                               placeholder="예: 쿠팡 출고, 도매처: 우리낚시, 고객: 홍길동"
-                              className="w-full resize-none rounded-lg border border-blue-300 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-100"
+                              className="w-full resize-none rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-800 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
                               autoFocus
                             />
                             <div className="flex items-center justify-between gap-2">
-                              <span className="text-[10px] font-bold tabular-nums text-slate-400">{draftNote.length}/200</span>
+                              <span className="text-[11px] font-bold tabular-nums text-slate-500">{draftNote.length}/200</span>
                               <div className="flex gap-1.5">
-                                <button type="button" onClick={cancelEditingNote} disabled={savingHistoryId === row.id} className="inline-flex h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-600 disabled:opacity-50"><X size={12} />취소</button>
-                                <button type="button" onClick={() => void saveHistoryNote(row.id)} disabled={savingHistoryId === row.id} className="inline-flex h-8 items-center gap-1 rounded-lg bg-blue-600 px-2.5 text-[10px] font-black text-white disabled:opacity-50"><Check size={12} />{savingHistoryId === row.id ? '저장 중' : '저장'}</button>
+                                <button type="button" onClick={cancelEditingNote} disabled={savingHistoryId === row.id} className={buttonClass('secondary', 'sm')}><X size={12} />취소</button>
+                                <button type="button" onClick={() => void saveHistoryNote(row.id)} disabled={savingHistoryId === row.id} className={buttonClass('primary', 'sm')}><Check size={12} />{savingHistoryId === row.id ? '저장 중' : '저장'}</button>
                               </div>
                             </div>
                           </div>
@@ -243,12 +245,12 @@ export default function ProductStockHistoryModal({
                           <div className="flex items-start justify-between gap-2">
                             <div className="min-w-0 text-xs font-bold text-slate-700">
                               <div className="break-words">{row.note || sourceLabel}</div>
-                              {row.note && row.note !== sourceLabel ? <div className="mt-1 text-[10px] font-medium text-slate-400">{sourceLabel}</div> : null}
+                              {row.note && row.note !== sourceLabel ? <div className="mt-1 text-[11px] font-medium text-slate-500">{sourceLabel}</div> : null}
                             </div>
                             <button
                               type="button"
                               onClick={() => startEditingNote(row)}
-                              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-600 hover:border-blue-300 hover:bg-blue-50"
+                              className={buttonClass('secondary', 'sm', 'w-8 px-0')}
                               aria-label={`${formatDateTime(row.createdAt)} 수정내역 편집`}
                               title="수정내역 편집"
                             >
@@ -263,10 +265,12 @@ export default function ProductStockHistoryModal({
               </div>
             </div>
           ) : (
-            <div className="rounded-xl border border-dashed border-slate-300 py-12 text-center">
-              <div className="text-sm font-black text-slate-600">저장된 변경 이력이 없습니다.</div>
-              <p className="mt-1 text-xs font-medium text-slate-400">앞으로 관리용 재고가 실제로 변경될 때마다 이곳에 누적됩니다.</p>
-            </div>
+            <EmptyState
+              compact
+              icon={<Clock3 size={20} />}
+              title="저장된 변경 이력이 없습니다."
+              description="앞으로 관리용 재고가 실제로 변경될 때마다 이곳에 누적됩니다."
+            />
           )}
         </div>
       </section>
@@ -279,8 +283,8 @@ export default function ProductStockHistoryModal({
         type="button"
         onClick={openHistory}
         className={compact
-          ? 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-emerald-700'
-          : 'mt-1 inline-flex items-center gap-1 text-[9px] font-black text-emerald-700 hover:text-emerald-900'}
+          ? buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500')
+          : 'mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-md text-[11px] font-black text-slate-600 hover:text-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'}
         aria-label={`${productName} 관리용 재고 이력 보기`}
         title="재고 이력"
       >

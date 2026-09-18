@@ -1,6 +1,12 @@
 'use client'
 
+import { ImageIcon } from 'lucide-react'
+
 import { useMemo, useState } from 'react'
+import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 
 export type PartnerOption = {
     id: string
@@ -653,63 +659,42 @@ ${rowsHtml}
     }
 
     return (
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
+            <PageHeader
+                title="PI발급"
+                description="상품을 선택해 Proforma Invoice를 발행하고, 발급된 PI를 인쇄합니다."
+                count={issuedInvoices.length}
+                actions={
+                    <>
+                        {leftTab === 'write' ? (
+                            <Button variant="ghost" onClick={resetDraft}>
+                                초기화
+                            </Button>
+                        ) : null}
+                        <Button variant="secondary" onClick={handlePrint}>
+                            출력 (PDF 저장/인쇄)
+                        </Button>
+                        {leftTab === 'write' ? (
+                            <Button variant="primary" onClick={handleIssue} loading={isIssuing}>
+                                {isIssuing ? '발행 중...' : '발행하기'}
+                            </Button>
+                        ) : null}
+                    </>
+                }
+            />
 
-            <div className="grid grid-cols-1 xl:grid-cols-[minmax(480px,1fr)_210mm] gap-8 items-start">
-                <div className="pi-no-print space-y-6 xl:max-w-none">
-                    <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4">
-                        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                            <div>
-                                <h2 className="text-base font-black text-gray-900 dark:text-white">P.I발급 관리</h2>
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">좌측 탭에서 제품리스트 작성/발급리스트 관리를 분리했습니다.</p>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button
-                                    type="button"
-                                    onClick={handlePrint}
-                                    className="px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 transition-all"
-                                >
-                                    출력 (PDF 저장/인쇄)
-                                </button>
-                                <span className="text-[11px] text-gray-500 dark:text-gray-400">인쇄창에서 머리글/바닥글 해제 시 날짜/URL 표시가 사라집니다.</span>
-                                {leftTab === 'write' && (
-                                    <>
-                                        <button
-                                            type="button"
-                                            onClick={resetDraft}
-                                            className="px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] transition-all"
-                                        >
-                                            초기화
-                                        </button>
-                                        <button
-                                            type="button"
-                                            onClick={handleIssue}
-                                            disabled={isIssuing}
-                                            className="px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 disabled:opacity-50 transition-all"
-                                        >
-                                            {isIssuing ? '발행 중...' : '발행하기'}
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="inline-flex rounded-xl border border-gray-200 dark:border-[#2a2a2a] p-1 bg-gray-50 dark:bg-[#1a1a1a]">
-                            <button
-                                type="button"
-                                onClick={() => setLeftTab('write')}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'write' ? 'bg-[#e53b19] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-                            >
-                                PI 작성
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setLeftTab('issued')}
-                                className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'issued' ? 'bg-[#e53b19] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-                            >
-                                PI 발급리스트
-                            </button>
-                        </div>
+            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_210mm] gap-8 items-start">
+                <div className="pi-no-print min-w-0 space-y-6">
+                    <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4 min-w-0">
+                        <Tabs
+                            aria-label="PI 작업"
+                            items={[
+                                { key: 'write', label: 'PI 작성' },
+                                { key: 'issued', label: 'PI 발급리스트', count: issuedInvoices.length },
+                            ]}
+                            value={leftTab}
+                            onChange={setLeftTab}
+                        />
 
                         {leftTab === 'write' ? (
                             <div className="space-y-4">
@@ -722,7 +707,7 @@ ${rowsHtml}
                                             setActiveIssuedId(null)
                                             setLeftTab('write')
                                         }}
-                                        className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-bold dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]"
+                                        className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-bold dark:text-white focus:ring-brand-orange focus:border-brand-orange"
                                     >
                                         <option value="">업체를 선택하세요</option>
                                         {partners.map((partner) => (
@@ -731,30 +716,30 @@ ${rowsHtml}
                                             </option>
                                         ))}
                                     </select>
-                                    <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">단가는 상품관리 DB의 `usBuyPrice`를 그대로 불러옵니다.</p>
+                                    <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">단가는 상품관리의 미국 매입가(USD)를 사용합니다.</p>
                                     <div className="mt-3">
-                                        <label className="text-xs font-bold text-gray-700 dark:text-gray-400">Production time</label>
+                                        <label className="text-xs font-bold text-gray-700 dark:text-gray-400">생산 소요기간</label>
                                         <input
                                             type="text"
                                             value={draftProductionTime}
                                             onChange={(event) => setDraftProductionTime(event.target.value)}
-                                            className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-medium dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]"
+                                            className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-medium dark:text-white focus:ring-brand-orange focus:border-brand-orange"
                                             placeholder="e.g. 3-5 days after receiving the deposit"
                                         />
                                     </div>
                                 </div>
 
                                 <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
-                                    <table className="w-full text-sm">
-                                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] text-gray-600 dark:text-gray-400">
+                                    <table className="w-full min-w-[560px] text-sm">
+                                        <thead className="ux-thead">
                                             <tr>
-                                                <th className="px-3 py-2 text-center">선택</th>
-                                                <th className="px-3 py-2 text-center">이미지</th>
-                                                <th className="px-3 py-2 text-left">상품</th>
-                                                <th className="px-3 py-2 text-center">재고</th>
-                                                <th className="px-3 py-2 text-center">단가</th>
-                                                <th className="px-3 py-2 text-center">수량</th>
-                                                <th className="px-3 py-2 text-center">금액</th>
+                                                <th className="px-3 py-2 text-center w-10 whitespace-nowrap">선택</th>
+                                                <th className="px-3 py-2 text-center w-16 whitespace-nowrap">이미지</th>
+                                                <th className="px-3 py-2 text-left min-w-[180px] whitespace-nowrap">상품</th>
+                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">재고</th>
+                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">단가</th>
+                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">수량</th>
+                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">금액</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
@@ -762,13 +747,13 @@ ${rowsHtml}
                                                 const rowState = draftState[product.id] || { checked: false, quantity: 1 }
                                                 const amount = rowState.quantity * Number(product.usBuyPrice || 0)
                                                 return (
-                                                    <tr key={product.id} className={rowState.checked ? 'bg-[#e53b19]/5' : 'bg-white dark:bg-[#1e1e1e]'}>
+                                                    <tr key={product.id} className={rowState.checked ? 'bg-brand-orange/5' : 'bg-white dark:bg-[#1e1e1e]'}>
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
                                                                 checked={rowState.checked}
                                                                 onChange={() => toggleProduct(product.id)}
-                                                                className="h-4 w-4 accent-[#e53b19]"
+                                                                className="h-4 w-4 accent-brand-orange"
                                                             />
                                                         </td>
                                                         <td className="px-3 py-2 text-center">
@@ -776,17 +761,17 @@ ${rowsHtml}
                                                                 {product.imageUrl ? (
                                                                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
                                                                 ) : (
-                                                                    <span className="text-[10px] text-gray-300 font-black">IMG</span>
+                                                                    <ImageIcon size={16} className="text-slate-300" aria-hidden="true" />
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-2">
-                                                            <div className="font-bold text-gray-900 dark:text-white">{product.nameJP || product.name}</div>
-                                                            <div className="text-[11px] text-gray-500 dark:text-gray-400">{product.nameEN || product.name}</div>
-                                                            <div className="text-[10px] text-gray-400 dark:text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
+                                                        <td className="px-3 py-2 min-w-[180px]">
+                                                            <div className="font-bold text-gray-900 dark:text-white break-keep">{product.nameJP || product.name}</div>
+                                                            <div className="text-[11px] text-gray-500 dark:text-gray-400 break-keep">{product.nameEN || product.name}</div>
+                                                            <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
                                                         </td>
-                                                        <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400">{product.stock.toLocaleString()}</td>
-                                                        <td className="px-3 py-2 text-right font-bold text-gray-900 dark:text-white">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
+                                                        <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{product.stock.toLocaleString()}</td>
+                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="number"
@@ -795,10 +780,10 @@ ${rowsHtml}
                                                                 onChange={(event) => updateQuantity(product.id, event.target.value)}
                                                                 onFocus={(event) => event.currentTarget.select()}
                                                                 onClick={(event) => event.currentTarget.select()}
-                                                                className="w-20 border border-gray-200 dark:border-[#2a2a2a] rounded-lg px-2 py-1 text-center font-bold bg-white dark:bg-[#1e1e1e] dark:text-white"
+                                                                className="w-20 border border-gray-200 dark:border-[#2a2a2a] rounded-xl px-2 py-1 text-center font-bold bg-white dark:bg-[#1e1e1e] dark:text-white"
                                                             />
                                                         </td>
-                                                        <td className="px-3 py-2 text-right font-bold text-[#e53b19]">
+                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">
                                                             {rowState.checked ? usdFormatter.format(amount) : '-'}
                                                         </td>
                                                     </tr>
@@ -811,46 +796,48 @@ ${rowsHtml}
                         ) : (
                             <div className="space-y-3">
                                 <div>
-                                    <h3 className="text-sm font-black text-gray-900 dark:text-white">PI 발급리스트</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">발급된 PI를 선택하면 우측 인쇄 미리보기에 즉시 반영됩니다.</p>
+                                    <h3 className="text-[13px] font-bold text-gray-900 dark:text-white">PI 발급리스트</h3>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">발급된 PI를 선택하면 인쇄 미리보기에 즉시 반영됩니다.</p>
                                 </div>
                                 <div className="max-h-[620px] overflow-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
-                                    <table className="w-full text-xs">
-                                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-gray-600 dark:text-gray-400 border-b border-gray-100 dark:border-[#2a2a2a]">
+                                    <table className="w-full min-w-[420px] text-xs">
+                                        <thead className="ux-thead">
                                             <tr>
-                                                <th className="px-3 py-2 text-left">날짜</th>
-                                                <th className="px-3 py-2 text-left">업체명</th>
-                                                <th className="px-3 py-2 text-center">총가격</th>
-                                                <th className="px-3 py-2 text-center">관리</th>
+                                                <th className="px-3 py-2 text-left whitespace-nowrap">날짜</th>
+                                                <th className="px-3 py-2 text-left whitespace-nowrap">업체명</th>
+                                                <th className="px-3 py-2 text-center whitespace-nowrap">총가격</th>
+                                                <th className="px-3 py-2 text-center whitespace-nowrap">관리</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
                                             {issuedInvoices.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={4} className="px-3 py-8 text-center text-gray-400 dark:text-gray-400">발급된 PI가 없습니다.</td>
+                                                    <td colSpan={4} className="p-3">
+                                                        <EmptyState compact title="발급된 PI가 없습니다" description="PI 작성 탭에서 상품을 선택하고 발행하세요." />
+                                                    </td>
                                                 </tr>
                                             ) : (
                                                 issuedInvoices.map((invoice) => (
                                                     <tr
                                                         key={invoice.id}
-                                                        className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] ${activeIssuedId === invoice.id ? 'bg-[#e53b19]/5' : ''}`}
+                                                        className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] ${activeIssuedId === invoice.id ? 'bg-brand-orange/5' : ''}`}
                                                         onClick={() => setActiveIssuedId(invoice.id)}
                                                     >
                                                         <td className="px-3 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
                                                         <td className="px-3 py-2 font-bold text-gray-900 dark:text-white">{invoice.partnerName}</td>
-                                                        <td className="px-3 py-2 text-right font-bold text-[#e53b19]">{usdFormatter.format(invoice.totalUsd)}</td>
+                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">{usdFormatter.format(invoice.totalUsd)}</td>
                                                         <td className="px-3 py-2 text-center">
-                                                            <button
-                                                                type="button"
+                                                            <Button
+                                                                variant="danger"
+                                                                size="sm"
                                                                 onClick={(event) => {
                                                                     event.stopPropagation()
                                                                     void handleDeleteIssued(invoice.id)
                                                                 }}
-                                                                disabled={deletingInvoiceId === invoice.id}
-                                                                className="px-2 py-1 rounded-md text-[11px] font-bold text-red-600 hover:bg-red-50 disabled:opacity-50"
+                                                                loading={deletingInvoiceId === invoice.id}
                                                             >
                                                                 {deletingInvoiceId === invoice.id ? '삭제중...' : '삭제'}
-                                                            </button>
+                                                            </Button>
                                                         </td>
                                                     </tr>
                                                 ))
@@ -865,13 +852,16 @@ ${rowsHtml}
 
                 <section
                     id="pi-print-sheet"
-                    className="bg-[#f6f3f1] border border-gray-200 dark:border-[#2a2a2a] shadow-lg dark:shadow-none p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] xl:sticky xl:top-24 xl:w-[210mm] xl:max-w-none xl:min-w-[210mm] xl:h-[297mm] xl:min-h-[297mm] xl:aspect-auto"
+                    className="bg-[#f6f3f1] border border-gray-200 dark:border-[#2a2a2a] shadow-lg dark:shadow-none p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] 2xl:sticky 2xl:top-24 2xl:w-[210mm] 2xl:max-w-none 2xl:min-w-[210mm] 2xl:h-[297mm] 2xl:min-h-[297mm] 2xl:aspect-auto"
                 >
-                    <div className="pi-no-print mb-3 text-xs font-black text-[#e53b19] tracking-wide">실시간 인쇄 미리보기</div>
+                    <div className="pi-no-print mb-3">
+                        <div className="text-[13px] font-bold text-slate-900">인쇄 미리보기</div>
+                        <p className="mt-0.5 text-[11px] text-slate-500">인쇄창에서 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다.</p>
+                    </div>
 
                     <div className="pi-inner-content bg-white border border-gray-300 p-3">
-                        <div className="h-1 w-full bg-[#e53b19] mb-2" />
-                        <div className="border-b-2 border-[#e53b19] pb-2">
+                        <div className="h-1 w-full bg-brand-orange mb-2" />
+                        <div className="border-b-2 border-brand-orange pb-2">
                             <div className="text-center">
                                 <h1 className="text-2xl leading-none font-black tracking-tight text-[#1f2340]">beiko Inc.</h1>
                                 <p className="mt-1 text-[11px]">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
@@ -879,7 +869,7 @@ ${rowsHtml}
                             </div>
                         </div>
 
-                        <h2 className="text-center text-xl font-black text-[#e53b19] mt-2 mb-2">Proforma Invoice</h2>
+                        <h2 className="text-center text-xl font-black text-brand-orange mt-2 mb-2">Proforma Invoice</h2>
 
                         <table className="w-full border-collapse border border-gray-900 text-[11px]">
                             <tbody>
@@ -929,11 +919,11 @@ ${rowsHtml}
                                     <th className="border border-gray-900 px-1.5 py-1">Product Name</th>
                                     <th className="border border-gray-900 px-1.5 py-1">Model</th>
                                     <th className="border border-gray-900 px-1.5 py-1">
-                                        Unit price <span className="text-[#e53b19]">FOB</span>
+                                        Unit price <span className="text-brand-orange">FOB</span>
                                     </th>
                                     <th className="border border-gray-900 px-1.5 py-1">Qty</th>
                                     <th className="border border-gray-900 px-1.5 py-1">
-                                        Total price <span className="text-[#e53b19]">FOB</span>
+                                        Total price <span className="text-brand-orange">FOB</span>
                                     </th>
                                 </tr>
                             </thead>
@@ -980,7 +970,7 @@ ${rowsHtml}
                                 <p className="mt-1">4. Production time: {previewInvoice.productionTime || DEFAULT_PRODUCTION_TIME}</p>
                                 <p className="mt-1">5. Validity Period: quotation valid for 30 days from invoice date</p>
                                 <div className="mt-3">
-                                    <p className="text-[#e53b19] font-black text-base leading-none">Bank details:</p>
+                                    <p className="text-brand-orange font-black text-base leading-none">Bank details:</p>
                                     <p className="mt-1">Payment currency: USD</p>
                                     <p>BENEFICIARY ACCOUNT NO.: 656-045236-01-013</p>
                                     <p>SWIFT CODE (BIC): IBKOKRSEXXX</p>

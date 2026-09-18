@@ -1,8 +1,11 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import Link from 'next/link'
 import { createPortal } from 'react-dom'
+import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 import {
     LineChart,
     Line,
@@ -17,7 +20,7 @@ import {
     ComposedChart,
     LabelList
 } from 'recharts'
-import { TrendingUp, Package, DollarSign, Calculator, ChevronRight, Activity } from 'lucide-react'
+import { TrendingUp, Package, DollarSign, Calculator, ChevronRight, Activity, Plus, X } from 'lucide-react'
 
 type ProductionBatch = {
     id: string
@@ -317,69 +320,48 @@ export default function ProductionClient() {
     )
 
     return (
-        <div className="space-y-6">
-            {/* Sticky Header with Title and Category Tabs */}
-            <div className="sticky top-0 z-40 bg-white/80 dark:bg-[#1e1e1e]/80 backdrop-blur-xl pt-2 pb-2 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 border-b border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none transition-all duration-300">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                    <div className="flex items-center gap-4">
-                        <div className="flex items-center gap-3">
-                            <Link href="/admin" className="p-1.5 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] rounded-full text-gray-400 dark:text-gray-400 hover:text-[#d9361b] transition-all" title="Dashboard">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
-                            </Link>
-                            <h1 className="text-lg font-black text-gray-900 dark:text-white tracking-tight">생산 관리</h1>
-                        </div>
+        <div className="min-w-0 space-y-6">
+            <PageHeader
+                title="생산관리"
+                description="카테고리별 생산 기록과 원가·마진을 관리합니다."
+                count={batches.length}
+                actions={
+                    <Button
+                        variant="primary"
+                        icon={<Plus size={15} />}
+                        onClick={() => {
+                            setIsEditing(null)
+                            setFormData({
+                                productionDate: new Date().toISOString().split('T')[0],
+                                rawMaterialCost: '',
+                                depositDollar: '',
+                                electricityCost: '30000',
+                                packagingCost: '200',
+                                warehouseCost: '20350',
+                                shippingCost: '',
+                                customsFee: '33000',
+                                customsDuty: '',
+                                vat: '',
+                                quantity: '',
+                                memo: ''
+                            })
+                            setIsCreating(true)
+                        }}
+                    >
+                        생산 기록
+                    </Button>
+                }
+            />
 
-                        <div className="h-4 w-px bg-gray-200 dark:bg-[#2a2a2a]"></div>
+            {/* Category Tabs */}
+            <Tabs
+                aria-label="생산 카테고리"
+                items={CATEGORIES.map(cat => ({ key: cat, label: cat }))}
+                value={activeTab}
+                onChange={setActiveTab}
+            />
 
-                        {/* Category Tabs */}
-                        <div className="flex bg-gray-100/50 dark:bg-[#1a1a1a] p-1 rounded-lg overflow-x-auto scrollbar-hide">
-                            {CATEGORIES.map(cat => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setActiveTab(cat)}
-                                    className={`px-3 py-1 rounded-md text-[11px] font-bold whitespace-nowrap transition-all ${activeTab === cat
-                                        ? 'bg-white dark:bg-[#1e1e1e] text-[var(--color-brand-blue)] shadow-sm dark:shadow-none'
-                                        : 'text-gray-400 dark:text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
-                                        }`}
-                                >
-                                    {cat}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {/* Action Bar */}
-            <div className="flex justify-between items-center bg-white dark:bg-[#1e1e1e] p-4 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none">
-                <div className="flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-[var(--color-brand-blue)]"></span>
-                    <span className="font-bold text-gray-700 dark:text-gray-400">{activeTab} 생산일지</span>
-                </div>
-                <button
-                    onClick={() => {
-                        setIsEditing(null)
-                        setFormData({
-                            productionDate: new Date().toISOString().split('T')[0],
-                            rawMaterialCost: '',
-                            depositDollar: '',
-                            electricityCost: '30000',
-                            packagingCost: '200',
-                            warehouseCost: '20350',
-                            shippingCost: '',
-                            customsFee: '33000',
-                            customsDuty: '',
-                            vat: '',
-                            quantity: '',
-                            memo: ''
-                        })
-                        setIsCreating(true)
-                    }}
-                    className="bg-[#d9361b] text-white px-5 py-2 rounded-lg font-bold hover:brightness-110 transition-all shadow-md hover:shadow-lg text-xs"
-                >
-                    ＋ 생산 기록
-                </button>
-            </div>
+            <h2 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">{activeTab} 생산일지</h2>
 
             {/* Statistics Dashboard */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -416,10 +398,10 @@ export default function ProductionClient() {
                             : '0%'
                     }
                 ].map((stat, idx) => (
-                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] p-5 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-1 transition-transform hover:scale-[1.02]">
-                        <span className="text-[10px] font-black text-gray-400 dark:text-gray-400 uppercase tracking-wider">{stat.label}</span>
+                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] p-5 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-1 min-w-0">
+                        <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400">{stat.label}</span>
                         <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-black text-gray-900 dark:text-white">{stat.value}</span>
+                            <span className="text-xl font-black text-slate-900 dark:text-white truncate">{stat.value}</span>
                         </div>
                     </div>
                 ))}
@@ -429,7 +411,7 @@ export default function ProductionClient() {
             {!loading && batches.length > 0 && (
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Total Production Cost Trend */}
-                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4 min-w-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
@@ -462,7 +444,7 @@ export default function ProductionClient() {
                     </div>
 
                     {/* Production Quantity Trend */}
-                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4 min-w-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
@@ -491,7 +473,7 @@ export default function ProductionClient() {
                     </div>
 
                     {/* Unit Cost Trend */}
-                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-3xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4">
+                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4 min-w-0">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
                                 <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
@@ -526,44 +508,44 @@ export default function ProductionClient() {
             <div className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl overflow-x-auto shadow-sm dark:shadow-none pb-16">
                 <div className="min-w-[800px]">
                     <table className="w-full text-xs text-left">
-                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] text-black dark:text-white font-black uppercase border-b border-gray-100 dark:border-[#2a2a2a]">
+                        <thead className="ux-thead">
                             <tr>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('productionDate')}>
+                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('productionDate')}>
                                     No {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('productionDate')}>
+                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('productionDate')}>
                                     생산날짜 {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
                                     총 생산비용 {sortConfig?.key === 'totalCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('quantity')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('quantity')}>
                                     생산수량 {sortConfig?.key === 'quantity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('unitCost')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('unitCost')}>
                                     단가 {sortConfig?.key === 'unitCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('salesPrice')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('salesPrice')}>
                                     도매가 {sortConfig?.key === 'salesPrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('wMargin')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('wMargin')}>
                                     도매마진 {sortConfig?.key === 'wMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('wholesalePrice')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('wholesalePrice')}>
                                     판매가 {sortConfig?.key === 'wholesalePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-gray-100 dark:hover:bg-[#252525] border-r border-gray-200 dark:border-[#2a2a2a]" onClick={() => handleSort('rMargin')}>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('rMargin')}>
                                     소매마진 {sortConfig?.key === 'rMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap border-r border-gray-200 dark:border-[#2a2a2a]">메모</th>
+                                <th className="px-4 py-1.5 text-center whitespace-nowrap">메모</th>
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap">관리</th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {loading ? (
-                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400 dark:text-gray-400">로딩 중...</td></tr>
+                                <tr><td colSpan={11} className="px-4 py-10 text-center text-[12px] font-bold text-slate-500 dark:text-gray-400">로딩 중...</td></tr>
                             ) : sortedBatches.length === 0 ? (
-                                <tr><td colSpan={11} className="px-4 py-10 text-center text-gray-400 dark:text-gray-400">기록이 없습니다.</td></tr>
+                                <tr><td colSpan={11} className="p-3"><EmptyState compact title="생산 기록이 없습니다" description="생산 기록 버튼을 눌러 첫 기록을 등록하세요." /></td></tr>
                             ) : (
                                 sortedBatches.map((batch, idx) => {
                                     const totalCost = batch.rawMaterialCost
@@ -579,7 +561,7 @@ export default function ProductionClient() {
                                     const rMarginRate = batch.wholesalePrice ? (((batch.wholesalePrice - (batch.unitCost || 0)) / batch.wholesalePrice) * 100).toFixed(1) : '0';
 
                                     return (
-                                        <tr key={batch.id} className="hover:bg-blue-50 dark:hover:bg-[#252525] transition-colors group even:bg-gray-100/70 dark:even:bg-[#1a1a1a] hover:relative hover:z-50">
+                                        <tr key={batch.id} className="hover:bg-brand-orange-soft dark:hover:bg-[#252525] transition-colors group even:bg-slate-50 dark:even:bg-[#1a1a1a] hover:relative hover:z-50">
                                             <td className="px-4 py-1.5 text-center text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {idx + 1}
                                             </td>
@@ -594,11 +576,11 @@ export default function ProductionClient() {
                                                     {totalCost.toLocaleString()}
                                                 </span>
                                                 {/* Tooltip for Cost Breakdown */}
-                                                <div className="absolute opacity-0 group-hover/cost:opacity-100 z-[60] bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white p-3 rounded-lg text-[10px] pointer-events-none transition-opacity shadow-xl">
+                                                <div className="absolute opacity-0 group-hover/cost:opacity-100 z-[60] bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-gray-900 text-white p-3 rounded-lg text-[11px] pointer-events-none transition-opacity shadow-xl">
                                                     <div className="flex justify-between mb-1">
                                                         <span>해외송금금액:</span>
                                                         <span>{batch.rawMaterialCost.toLocaleString()}
-                                                            {batch.depositDollar && <span className='text-[9px] text-gray-400 ml-1'>(${batch.depositDollar})</span>}
+                                                            {batch.depositDollar && <span className='text-[11px] text-gray-400 ml-1'>(${batch.depositDollar})</span>}
                                                         </span>
                                                     </div>
                                                     <div className="flex justify-between mb-1">
@@ -647,21 +629,21 @@ export default function ProductionClient() {
                                             </td>
                                             <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.salesPrice.toLocaleString()}</td>
                                             <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(wMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
+                                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${Number(wMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
                                                     {wMarginRate}%
                                                 </span>
                                             </td>
                                             <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.wholesalePrice.toLocaleString()}</td>
                                             <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
-                                                <span className={`text-[10px] px-1.5 py-0.5 rounded ${Number(rMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
+                                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${Number(rMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
                                                     {rMarginRate}%
                                                 </span>
                                             </td>
                                             <td className="px-4 py-1.5 text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]" title={batch.memo || ''}>{batch.memo || '-'}</td>
                                             <td className="px-4 py-1.5 text-center">
                                                 <div className="flex items-center justify-center gap-2 transition-opacity">
-                                                    <button onClick={() => handleEdit(batch)} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 font-bold text-[10px] border border-gray-200 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] px-2 py-1 rounded shadow-sm dark:shadow-none transition-colors">수정</button>
-                                                    <button onClick={() => handleDelete(batch.id)} className="text-red-500 hover:text-red-700 font-bold text-[10px] border border-red-100 dark:border-red-900/50 bg-red-50 dark:bg-red-900/30 px-2 py-1 rounded shadow-sm dark:shadow-none">삭제</button>
+                                                    <Button variant="secondary" size="sm" onClick={() => handleEdit(batch)}>수정</Button>
+                                                    <Button variant="danger" size="sm" onClick={() => handleDelete(batch.id)}>삭제</Button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -678,40 +660,44 @@ export default function ProductionClient() {
                 isCreating && mounted && createPortal(
                     <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden">
                         <div
-                            className="bg-[#f0f0f0] border-2 border-[#808080] w-full max-w-lg shadow-md animate-in fade-in duration-100 relative"
+                            className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-xl animate-in fade-in duration-100 relative overflow-hidden"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="production-record-modal-title"
                             onClick={(e) => e.stopPropagation()}
                         >
-                            {/* Classic Windows-style Header */}
-                            <div className="bg-[#000080] text-white px-3 py-2 flex justify-between items-center select-none">
-                                <h3 className="text-xs font-bold tracking-tight">
-                                    {isEditing ? `Production Record Entry - ID:${isEditing.id.slice(-6).toUpperCase()}` : 'New Production Record Entry'}
+                            <div className="px-5 py-4 flex justify-between items-center border-b border-slate-100">
+                                <h3 id="production-record-modal-title" className="text-base font-black tracking-tight text-slate-900">
+                                    {isEditing ? '생산 기록 수정' : '생산 기록 등록'}
                                 </h3>
                                 <button
+                                    type="button"
                                     onClick={() => setIsCreating(false)}
-                                    className="bg-[#c0c0c0] text-black w-5 h-5 flex items-center justify-center text-xs border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none"
+                                    aria-label="닫기"
+                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
                                 >
-                                    ✕
+                                    <X size={16} />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[85vh] overflow-y-auto scrollbar-hide">
+                            <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto scrollbar-hide">
                                 {/* Schedule Info */}
-                                <fieldset className="border border-gray-400 p-4 pt-2">
-                                    <legend className="px-2 text-xs font-bold text-gray-700">일정 및 생산 구분 (Schedule & Category)</legend>
+                                <fieldset className="rounded-2xl border border-slate-200 p-4">
+                                    <legend className="px-2 text-[13px] font-bold text-slate-800">일정 및 생산 구분</legend>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-gray-600 uppercase">Production Date</label>
+                                            <label className="text-[11px] font-bold text-slate-600">생산일</label>
                                             <input
                                                 type="date"
                                                 required
-                                                className="w-full px-2 py-1 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm font-bold"
+                                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm font-bold"
                                                 value={formData.productionDate}
                                                 onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-gray-600 uppercase">Category</label>
-                                            <div className="w-full px-2 py-1.5 bg-gray-100 border border-gray-400 text-sm font-bold text-gray-700">
+                                            <label className="text-[11px] font-bold text-slate-600">생산 구분</label>
+                                            <div className="w-full h-9 px-3 flex items-center bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700">
                                                 {activeTab}
                                             </div>
                                         </div>
@@ -719,26 +705,26 @@ export default function ProductionClient() {
                                 </fieldset>
 
                                 {/* Cost Details */}
-                                <fieldset className="border border-gray-400 p-4 pt-2">
-                                    <legend className="px-2 text-xs font-bold text-gray-700">비용 상세 (Cost Details)</legend>
+                                <fieldset className="rounded-2xl border border-slate-200 p-4">
+                                    <legend className="px-2 text-[13px] font-bold text-slate-800">비용 상세</legend>
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
                                             <div className="space-y-1">
-                                                <label className="text-[11px] font-bold text-gray-600">해외송금금액 (Remittance Amount)</label>
+                                                <label className="text-[11px] font-bold text-slate-600">해외송금금액 (원)</label>
                                                 <input
                                                     type="text"
                                                     required
-                                                    className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-sm text-right font-mono"
+                                                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm text-right tabular-nums"
                                                     value={formatNumber(formData.rawMaterialCost)}
                                                     onChange={e => setFormData({ ...formData, rawMaterialCost: parseNumber(e.target.value) })}
                                                 />
                                             </div>
                                             <div className="space-y-1">
-                                                <label className="text-[11px] font-bold text-gray-400">송금액 ($ USD)</label>
+                                                <label className="text-[11px] font-bold text-slate-600">송금액 (USD)</label>
                                                 <input
                                                     type="text"
                                                     placeholder="0.00"
-                                                    className="w-full px-2 py-1.5 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right font-mono text-gray-500"
+                                                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm text-right tabular-nums"
                                                     value={formData.depositDollar}
                                                     onChange={e => setFormData({ ...formData, depositDollar: e.target.value })}
                                                 />
@@ -756,18 +742,18 @@ export default function ProductionClient() {
                                                 { label: '부가세', key: 'vat', small: 'VAT' }
                                             ].map((field) => (
                                                 <div key={field.key} className="space-y-1">
-                                                    <label className="text-[10px] font-bold text-gray-500">{field.label}</label>
+                                                    <label className="text-[11px] font-bold text-slate-600">{field.label}</label>
                                                     <input
                                                         type="text"
-                                                        className="w-full px-1.5 py-1 bg-white border border-gray-300 outline-none focus:border-blue-600 text-xs text-right font-mono"
+                                                        className="w-full h-9 px-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-xs text-right tabular-nums"
                                                         value={formatNumber(formData[field.key as keyof typeof formData])}
                                                         onChange={e => setFormData({ ...formData, [field.key]: parseNumber(e.target.value) })}
                                                     />
                                                 </div>
                                             ))}
                                             <div className="space-y-1 col-start-2">
-                                                <label className="text-[10px] font-bold text-emerald-600">환율 (해외송금금액/USD)</label>
-                                                <div className="w-full px-1.5 py-1 bg-emerald-50 border border-emerald-200 text-xs text-right font-mono text-emerald-700">
+                                                <label className="text-[11px] font-bold text-slate-600">환율 (해외송금금액/USD)</label>
+                                                <div className="w-full h-9 px-2.5 flex items-center justify-end bg-slate-50 border border-slate-200 rounded-xl text-xs text-right tabular-nums font-bold text-slate-900">
                                                     {remittanceExchangeRate !== null
                                                         ? `1 USD = ₩${remittanceExchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                                                         : '-'}
@@ -778,22 +764,22 @@ export default function ProductionClient() {
                                 </fieldset>
 
                                 {/* Production Result */}
-                                <fieldset className="border border-gray-400 p-4 pt-2 bg-white/30">
-                                    <legend className="px-2 text-xs font-bold text-gray-700">생산 결과 (Production Result)</legend>
+                                <fieldset className="rounded-2xl border border-slate-200 p-4">
+                                    <legend className="px-2 text-[13px] font-bold text-slate-800">생산 결과</legend>
                                     <div className="grid grid-cols-2 gap-6">
                                         <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-blue-700">생산 수량 (Total Qty)</label>
+                                            <label className="text-[11px] font-bold text-slate-600">생산 수량</label>
                                             <input
                                                 type="text"
                                                 required
-                                                className="w-full px-2 py-1.5 bg-[#f0f9ff] border border-blue-300 outline-none focus:border-blue-600 text-sm text-right font-black text-blue-900"
+                                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm text-right font-black text-slate-900 tabular-nums"
                                                 value={formatNumber(formData.quantity)}
                                                 onChange={e => setFormData({ ...formData, quantity: parseNumber(e.target.value) })}
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-gray-500">산출 단가 (Unit Cost)</label>
-                                            <div className="w-full px-2 py-1.5 bg-gray-100 border border-gray-400 text-sm text-right font-black text-gray-900">
+                                            <label className="text-[11px] font-bold text-slate-600">산출 단가</label>
+                                            <div className="w-full h-9 px-3 flex items-center justify-end bg-slate-50 border border-slate-200 rounded-xl text-sm text-right font-black text-slate-900 tabular-nums">
                                                 {(
                                                     ((Number(parseNumber(formData.rawMaterialCost)) || 0) +
                                                         (Number(parseNumber(formData.electricityCost)) || 0) +
@@ -810,43 +796,36 @@ export default function ProductionClient() {
                                     </div>
 
                                     {/* Pricing Ref */}
-                                    <div className="mt-4 grid grid-cols-2 gap-4 pointer-events-none opacity-60">
-                                        <div className="text-[10px] space-y-0.5">
-                                            <span className="block font-bold text-gray-400">REFERENCE: WHOLESALE</span>
-                                            <span className="block font-black text-gray-700">{currentPriceInfo.salesPrice.toLocaleString()}원</span>
+                                    <div className="mt-4 grid grid-cols-2 gap-4">
+                                        <div className="text-[11px] space-y-0.5">
+                                            <span className="block font-bold text-slate-500">참고 도매가</span>
+                                            <span className="block font-black text-slate-900">{currentPriceInfo.salesPrice.toLocaleString()}원</span>
                                         </div>
-                                        <div className="text-[10px] space-y-0.5 text-right">
-                                            <span className="block font-bold text-gray-400">REFERENCE: RETAIL</span>
-                                            <span className="block font-black text-gray-700">{currentPriceInfo.wholesalePrice.toLocaleString()}원</span>
+                                        <div className="text-[11px] space-y-0.5 text-right">
+                                            <span className="block font-bold text-slate-500">참고 판매가</span>
+                                            <span className="block font-black text-slate-900">{currentPriceInfo.wholesalePrice.toLocaleString()}원</span>
                                         </div>
                                     </div>
                                 </fieldset>
 
                                 {/* Memo */}
                                 <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-gray-600">특이사항 (Memo)</label>
+                                    <label className="text-[11px] font-bold text-slate-600">특이사항</label>
                                     <textarea
-                                        className="w-full px-2 py-1.5 bg-white border border-gray-400 outline-none focus:border-blue-600 text-xs h-16 resize-none"
-                                        placeholder="Production notes..."
+                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-xs h-16 resize-none"
+                                        placeholder="생산 관련 메모를 입력하세요"
                                         value={formData.memo || ''}
                                         onChange={e => setFormData({ ...formData, memo: e.target.value })}
                                     />
                                 </div>
 
-                                <div className="flex gap-2 justify-end pt-4">
-                                    <button
-                                        type="button"
-                                        onClick={() => setIsCreating(false)}
-                                        className="px-4 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none focus:outline-none"
-                                    >
-                                        CANCEL
-                                    </button>
-                                    <button
-                                        type="submit"
-                                        className="px-10 py-1.5 text-xs bg-[#c0c0c0] border-r border-b border-black border-l-[#ffffff] border-t-[#ffffff] active:border-none font-bold focus:outline-none"
-                                    >
-                                        {isEditing ? 'UPDATE RECORD' : 'SAVE RECORD'}
-                                    </button>
+                                <div className="flex gap-2 justify-end pt-2">
+                                    <Button variant="secondary" onClick={() => setIsCreating(false)}>
+                                        취소
+                                    </Button>
+                                    <Button variant="primary" type="submit">
+                                        {isEditing ? '수정 저장' : '저장'}
+                                    </Button>
                                 </div>
                             </form>
                         </div>

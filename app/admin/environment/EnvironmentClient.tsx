@@ -251,11 +251,11 @@ export default function EnvironmentClient() {
     <div className="mx-auto w-full max-w-[1280px] space-y-5 pb-16">
       <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:p-6">
         <div className="flex items-start gap-4">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-[#EF3B2D]">
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-orange-50 text-brand-orange">
             <ThermometerSun size={25} />
           </span>
           <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-[#EF3B2D]">SmartThings Climate</div>
+            <div className="text-[11px] font-black uppercase tracking-[0.18em] text-brand-orange">SmartThings Climate</div>
             <h1 className="mt-1 text-[25px] font-black tracking-tight text-slate-950">온습도 관리</h1>
             <p className="mt-1 text-[12px] font-bold text-slate-500">
               외부 H200의 T310·T315 값을 SmartThings에서 받아 라즈베리파이 DB에 저장합니다.
@@ -291,7 +291,7 @@ export default function EnvironmentClient() {
 
       {loading && !data ? (
         <div className="flex h-[320px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-black text-slate-500">
-          <Loader2 size={20} className="mr-2 animate-spin text-[#EF3B2D]" />
+          <Loader2 size={20} className="mr-2 animate-spin text-brand-orange" />
           온습도 정보를 불러오는 중입니다.
         </div>
       ) : data ? (
@@ -366,7 +366,7 @@ export default function EnvironmentClient() {
                         onClick={() => setSelectedSensorId(sensor.id)}
                         className={`rounded-2xl border bg-white p-5 text-left shadow-sm transition ${
                           selectedSensorId === sensor.id
-                            ? 'border-[#EF3B2D] ring-2 ring-[#EF3B2D]/10'
+                            ? 'border-brand-orange ring-2 ring-brand-orange/10'
                             : 'border-slate-200 hover:border-slate-300'
                         }`}
                       >
@@ -376,7 +376,7 @@ export default function EnvironmentClient() {
                         </div>
                         <div className="mt-4 grid grid-cols-3 gap-2">
                           <div>
-                            <ThermometerSun size={17} className="text-[#EF3B2D]" />
+                            <ThermometerSun size={17} className="text-brand-orange" />
                             <div className="mt-1 text-[20px] font-black text-slate-950">{formatValue(sensor.lastTemperature, '℃')}</div>
                             <div className="text-[10px] font-bold text-slate-400">온도</div>
                           </div>

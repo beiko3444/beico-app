@@ -4,9 +4,12 @@ import { type DragEvent, useMemo, useRef, useState } from 'react'
 import {
   Archive,
   ArchiveRestore,
+  Copy,
   Download,
   Edit3,
   ExternalLink,
+  Eye,
+  EyeOff,
   FileText,
   Link as LinkIcon,
   Lock,
@@ -21,6 +24,10 @@ import {
   User,
   X,
 } from 'lucide-react'
+import Button, { buttonClass } from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 
 export type AdminMemoAttachmentItem = {
   id: string
@@ -117,6 +124,20 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
   const [category, setCategory] = useState('전체')
   const [showArchived, setShowArchived] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [showFormPassword, setShowFormPassword] = useState(false)
+  const [revealedPasswordIds, setRevealedPasswordIds] = useState<string[]>([])
+
+  const togglePasswordReveal = (memoId: string) => {
+    setRevealedPasswordIds((prev) => (prev.includes(memoId) ? prev.filter((id) => id !== memoId) : [...prev, memoId]))
+  }
+
+  const copyPassword = async (value: string) => {
+    try {
+      await navigator.clipboard.writeText(value)
+    } catch {
+      alert('클립보드에 복사하지 못했습니다.')
+    }
+  }
 
   const activeMemos = useMemo(() => {
     const normalized = query.trim().toLowerCase()
@@ -279,51 +300,44 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
   }
 
   return (
-    <div className="min-h-screen bg-[#F6F8FB] px-4 py-5 text-slate-950 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-[1680px] space-y-4">
-        <header className="flex flex-col gap-3 border-b border-slate-200 pb-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-[11px] font-black uppercase tracking-[0.22em] text-[#EF3B1D]">Admin Notes</div>
-            <h1 className="mt-1 text-[26px] font-black tracking-tight">메모</h1>
-            <p className="mt-1 text-sm font-bold text-slate-500">업무 중 필요한 내용을 빠르게 기록하고 다시 찾습니다.</p>
-          </div>
-          <button
-            type="button"
-            onClick={resetForm}
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-full bg-slate-950 px-5 text-sm font-black text-white shadow-sm transition hover:bg-slate-800"
-          >
-            <Plus size={16} />
-            새 메모
-          </button>
-        </header>
+    <div className="min-w-0 text-slate-950">
+      <div className="min-w-0 space-y-4">
+        <PageHeader
+          title="메모"
+          description="업무 중 필요한 내용을 빠르게 기록하고 다시 찾습니다."
+          actions={(
+            <Button type="button" variant="primary" onClick={resetForm} icon={<Plus size={16} />}>
+              새 메모
+            </Button>
+          )}
+        />
 
-        <section className="grid gap-3 md:grid-cols-3">
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+        <section className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div className="text-xs font-black text-slate-500">활성 메모</div>
-            <div className="mt-1 text-2xl font-black">{activeCount.toLocaleString('ko-KR')}</div>
+            <div className="mt-1 text-2xl font-black text-slate-900">{activeCount.toLocaleString('ko-KR')}</div>
           </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
-            <div className="text-xs font-black text-emerald-700">고정 메모</div>
-            <div className="mt-1 text-2xl font-black text-emerald-900">{pinnedCount.toLocaleString('ko-KR')}</div>
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+            <div className="text-xs font-black text-slate-500">고정 메모</div>
+            <div className="mt-1 text-2xl font-black text-slate-900">{pinnedCount.toLocaleString('ko-KR')}</div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-sm">
+          <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <div className="text-xs font-black text-slate-500">보관 메모</div>
-            <div className="mt-1 text-2xl font-black">{archivedCount.toLocaleString('ko-KR')}</div>
+            <div className="mt-1 text-2xl font-black text-slate-900">{archivedCount.toLocaleString('ko-KR')}</div>
           </div>
         </section>
 
-        <div className="grid gap-4 xl:grid-cols-[420px_minmax(0,1fr)]">
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex items-center justify-between">
+        <div className="grid min-w-0 grid-cols-1 gap-4 lg:grid-cols-[360px_minmax(0,1fr)]">
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <div className="mb-4 flex items-center justify-between gap-2">
               <h2 className="flex items-center gap-2 text-sm font-black">
                 <StickyNote size={17} />
                 {form.id ? '메모 수정' : '메모 작성'}
               </h2>
               {form.id ? (
-                <button type="button" onClick={resetForm} className="inline-flex items-center gap-1 text-xs font-black text-slate-500 hover:text-slate-950">
-                  <X size={14} />
+                <Button type="button" variant="ghost" size="sm" onClick={resetForm} icon={<X size={14} />}>
                   취소
-                </button>
+                </Button>
               ) : null}
             </div>
 
@@ -333,7 +347,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 <input
                   value={form.title}
                   onChange={(event) => setForm((prev) => ({ ...prev, title: event.target.value }))}
-                  className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold outline-none transition focus:border-brand-orange"
                   placeholder="예: 수출 신고 확인사항"
                 />
               </label>
@@ -344,7 +358,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   <input
                     value={form.category}
                     onChange={(event) => setForm((prev) => ({ ...prev, category: event.target.value || '일반' }))}
-                    className="h-11 w-full rounded-md border border-slate-300 bg-white px-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                    className="h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm font-bold outline-none transition focus:border-brand-orange"
                     placeholder="일반"
                   />
                 </label>
@@ -352,7 +366,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   <button
                     type="button"
                     onClick={() => setForm((prev) => ({ ...prev, pinned: !prev.pinned }))}
-                    className={`flex h-11 w-full items-center justify-center gap-2 rounded-md border text-sm font-black transition ${form.pinned ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-300 bg-white text-slate-600'}`}
+                    className={`flex h-11 w-full items-center justify-center gap-2 whitespace-nowrap rounded-xl border text-sm font-black transition ${form.pinned ? 'border-amber-300 bg-amber-50 text-amber-800' : 'border-slate-300 bg-white text-slate-600'}`}
                   >
                     {form.pinned ? <Pin size={16} /> : <PinOff size={16} />}
                     상단고정
@@ -368,7 +382,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                       key={color.value}
                       type="button"
                       onClick={() => setForm((prev) => ({ ...prev, color: color.value }))}
-                      className={`h-10 rounded-md border text-xs font-black transition ${form.color === color.value ? color.active : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
+                      className={`h-10 whitespace-nowrap rounded-xl border text-xs font-black transition ${form.color === color.value ? color.active : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50'}`}
                     >
                       <span className={`mr-1 inline-block h-2.5 w-2.5 rounded-full ${color.dot}`} />
                       {color.label}
@@ -384,7 +398,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   <input
                     value={form.siteUrl}
                     onChange={(event) => setForm((prev) => ({ ...prev, siteUrl: event.target.value }))}
-                    className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                    className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-brand-orange"
                     placeholder="https://example.com"
                   />
                 </div>
@@ -398,7 +412,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                     <input
                       value={form.username}
                       onChange={(event) => setForm((prev) => ({ ...prev, username: event.target.value }))}
-                      className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                      className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-brand-orange"
                       placeholder="아이디"
                     />
                   </div>
@@ -408,11 +422,21 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   <div className="relative">
                     <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                     <input
+                      type={showFormPassword ? 'text' : 'password'}
+                      autoComplete="off"
                       value={form.password}
                       onChange={(event) => setForm((prev) => ({ ...prev, password: event.target.value }))}
-                      className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                      className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-10 text-sm font-bold outline-none transition focus:border-brand-orange"
                       placeholder="패스워드"
                     />
+                    <button
+                      type="button"
+                      onClick={() => setShowFormPassword((prev) => !prev)}
+                      aria-label={showFormPassword ? '패스워드 숨기기' : '패스워드 표시'}
+                      className="absolute right-2 top-1/2 -translate-y-1/2 rounded-lg p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
+                    >
+                      {showFormPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                    </button>
                   </div>
                 </label>
               </div>
@@ -422,7 +446,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 <textarea
                   value={form.content}
                   onChange={(event) => setForm((prev) => ({ ...prev, content: event.target.value }))}
-                  className="min-h-[240px] w-full resize-y rounded-md border border-slate-300 bg-white px-3 py-3 text-sm font-bold leading-6 outline-none transition focus:border-slate-950"
+                  className="min-h-[200px] w-full resize-y rounded-xl border border-slate-300 bg-white px-3 py-3 text-sm font-bold leading-6 outline-none transition focus:border-brand-orange"
                   placeholder="메모 내용을 입력하세요."
                 />
               </label>
@@ -447,21 +471,21 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   }
                 }}
                 onDrop={handleAttachmentDrop}
-                className={`rounded-md border border-dashed p-3 transition ${
+                className={`rounded-xl border border-dashed p-3 transition ${
                   isDraggingFiles
-                    ? 'border-blue-500 bg-blue-50 ring-2 ring-blue-100'
+                    ? 'border-brand-orange bg-brand-orange-soft ring-2 ring-brand-orange/15'
                     : 'border-slate-300 bg-slate-50'
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-xs font-black text-slate-700">첨부 문서</div>
                     <div className="mt-1 text-[11px] font-bold text-slate-500">사업자등록증, PDF, JPG 등 회사 업무서류</div>
                   </div>
                   <button
                     type="button"
                     onClick={() => fileInputRef.current?.click()}
-                    className="inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-slate-300 bg-white px-3 text-xs font-black text-slate-700 transition hover:bg-slate-100"
+                    className={buttonClass('secondary', 'sm')}
                   >
                     <Paperclip size={14} />
                     파일 추가
@@ -477,9 +501,9 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 />
                 <div
                   onClick={() => fileInputRef.current?.click()}
-                  className={`mt-3 cursor-pointer rounded-md border border-dashed px-3 py-4 text-center text-xs font-black transition ${
+                  className={`mt-3 cursor-pointer rounded-xl border border-dashed px-3 py-4 text-center text-xs font-black transition ${
                     isDraggingFiles
-                      ? 'border-blue-400 bg-white text-blue-700'
+                      ? 'border-brand-orange bg-white text-brand-orange'
                       : 'border-slate-200 bg-white text-slate-500 hover:border-slate-400 hover:text-slate-700'
                   }`}
                 >
@@ -488,11 +512,11 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 {newAttachments.length > 0 && (
                   <div className="mt-3 space-y-1.5">
                     {newAttachments.map((file) => (
-                      <div key={getFileKey(file)} className="flex items-center gap-2 rounded-md border border-blue-200 bg-blue-50 px-2.5 py-2 text-xs">
-                        <Paperclip size={14} className="shrink-0 text-blue-600" />
+                      <div key={getFileKey(file)} className="flex items-center gap-2 rounded-xl border border-brand-orange/30 bg-brand-orange-soft px-2.5 py-2 text-xs">
+                        <Paperclip size={14} className="shrink-0 text-brand-orange" />
                         <span className="min-w-0 flex-1 truncate font-black text-slate-700">{file.name}</span>
                         <span className="shrink-0 font-bold text-slate-500">{formatFileSize(file.size)}</span>
-                        <span className="shrink-0 font-black text-blue-700">신규</span>
+                        <span className="shrink-0 font-black text-brand-orange">신규</span>
                         <button
                           type="button"
                           onClick={() => setNewAttachments((files) => files.filter((item) => getFileKey(item) !== getFileKey(file)))}
@@ -508,13 +532,13 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 {visibleAttachments.length > 0 ? (
                   <div className="mt-3 space-y-1.5">
                     {visibleAttachments.map((attachment) => (
-                      <div key={attachment.id} className="flex items-center gap-2 rounded-md border border-slate-200 bg-white px-2.5 py-2 text-xs">
+                      <div key={attachment.id} className="flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs">
                         <FileText size={14} className="shrink-0 text-slate-500" />
                         <span className="min-w-0 flex-1 truncate font-black text-slate-700">{attachment.fileName}</span>
-                        <span className="shrink-0 font-bold text-slate-400">{formatFileSize(attachment.size)}</span>
+                        <span className="shrink-0 font-bold text-slate-500">{formatFileSize(attachment.size)}</span>
                         <a
                           href={`/api/admin/memos/${editingMemo?.id}/attachments/${attachment.id}`}
-                          className="shrink-0 rounded px-1.5 py-1 font-black text-blue-600 hover:bg-blue-50"
+                          className="shrink-0 whitespace-nowrap rounded-lg px-1.5 py-1 font-black text-brand-orange hover:bg-brand-orange-soft"
                         >
                           다운로드
                         </a>
@@ -530,72 +554,63 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                     ))}
                   </div>
                 ) : editingMemo ? (
-                  <div className="mt-3 rounded-md border border-dashed border-slate-200 bg-white px-3 py-3 text-center text-xs font-bold text-slate-400">
+                  <div className="mt-3 rounded-xl border border-dashed border-slate-200 bg-white px-3 py-3 text-center text-xs font-bold text-slate-500">
                     선택한 기존 첨부가 없습니다.
                   </div>
                 ) : null}
               </div>
 
-              <button
+              <Button
                 type="button"
-                disabled={saving}
+                variant="primary"
+                loading={saving}
                 onClick={saveMemo}
-                className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-md bg-slate-950 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-wait disabled:opacity-50"
+                icon={<Save size={16} />}
+                className="h-12 w-full"
               >
-                <Save size={16} />
                 {saving ? '저장 중' : form.id ? '수정 저장' : '메모 저장'}
-              </button>
+              </Button>
             </div>
           </section>
 
-          <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
             <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
               <div className="relative min-w-0 flex-1">
                 <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                 <input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
-                  className="h-11 w-full rounded-md border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-slate-950"
+                  className="h-11 w-full rounded-xl border border-slate-300 bg-white pl-9 pr-3 text-sm font-bold outline-none transition focus:border-brand-orange"
                   placeholder="제목, 내용, 카테고리 검색"
                 />
               </div>
-              <div className="flex shrink-0 flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => setShowArchived(false)}
-                  className={`h-10 rounded-md px-4 text-xs font-black ${!showArchived ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
-                >
-                  활성
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowArchived(true)}
-                  className={`h-10 rounded-md px-4 text-xs font-black ${showArchived ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600'}`}
-                >
-                  보관함
-                </button>
-              </div>
+              <Tabs
+                aria-label="메모 상태"
+                className="shrink-0"
+                items={[
+                  { key: 'active', label: '활성', count: activeCount },
+                  { key: 'archived', label: '보관함', count: archivedCount },
+                ]}
+                value={showArchived ? 'archived' : 'active'}
+                onChange={(key) => setShowArchived(key === 'archived')}
+              />
             </div>
 
-            <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
-              {categories.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  onClick={() => setCategory(item)}
-                  className={`h-9 shrink-0 rounded-full px-4 text-xs font-black transition ${category === item ? 'bg-slate-950 text-white' : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
-                >
-                  {item}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              aria-label="카테고리"
+              className="mt-3"
+              items={categories.map((item) => ({ key: item, label: item }))}
+              value={category}
+              onChange={setCategory}
+            />
 
-            <div className="mt-4 grid gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+            <div className="mt-4 grid min-w-0 grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
               {activeMemos.length ? (
                 activeMemos.map((memo) => {
                   const color = getColor(memo.color)
+                  const passwordRevealed = revealedPasswordIds.includes(memo.id)
                   return (
-                    <article key={memo.id} className={`rounded-lg border p-4 shadow-sm ${color.card}`}>
+                    <article key={memo.id} className={`min-w-0 rounded-2xl border p-4 shadow-sm ${color.card}`}>
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="flex items-center gap-2">
@@ -603,17 +618,18 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                             <span className="rounded-full bg-white/80 px-2 py-0.5 text-[11px] font-black text-slate-600">{memo.category}</span>
                             {memo.pinned ? <Pin size={13} className="text-amber-600" /> : null}
                           </div>
-                          <h3 className="mt-2 line-clamp-2 text-base font-black leading-6 text-slate-950">{memo.title}</h3>
+                          <h3 className="mt-2 line-clamp-2 text-base font-black leading-6 text-slate-950 break-keep">{memo.title}</h3>
                         </div>
                         <div className="flex shrink-0 gap-1">
-                          <button type="button" onClick={() => editMemo(memo)} className="rounded-md bg-white/80 p-2 text-slate-500 transition hover:text-slate-950" title="수정">
+                          <button type="button" onClick={() => editMemo(memo)} className="rounded-lg bg-white/80 p-2 text-slate-500 transition hover:text-slate-950" title="수정" aria-label="메모 수정">
                             <Edit3 size={15} />
                           </button>
                           <button
                             type="button"
                             onClick={() => patchMemo(memo, { togglePinned: true, pinned: !memo.pinned })}
-                            className="rounded-md bg-white/80 p-2 text-slate-500 transition hover:text-slate-950"
+                            className="rounded-lg bg-white/80 p-2 text-slate-500 transition hover:text-slate-950"
                             title={memo.pinned ? '고정 해제' : '고정'}
+                            aria-label={memo.pinned ? '고정 해제' : '고정'}
                           >
                             {memo.pinned ? <PinOff size={15} /> : <Pin size={15} />}
                           </button>
@@ -623,13 +639,13 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                       <p className="mt-3 whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-700">{memo.content || '-'}</p>
 
                       {(memo.siteUrl || memo.username || memo.password) ? (
-                        <div className="mt-3 grid gap-2 rounded-md bg-white/75 p-3 text-xs font-bold text-slate-700">
+                        <div className="mt-3 grid gap-2 rounded-xl bg-white/75 p-3 text-xs font-bold text-slate-700">
                           {memo.siteUrl ? (
                             <a
                               href={memo.siteUrl}
                               target="_blank"
                               rel="noreferrer"
-                              className="flex min-w-0 items-center gap-2 font-black text-blue-600 hover:underline"
+                              className="flex min-w-0 items-center gap-2 font-black text-brand-orange hover:underline"
                             >
                               <ExternalLink size={14} className="shrink-0" />
                               <span className="truncate">{memo.siteUrl}</span>
@@ -643,8 +659,29 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                           ) : null}
                           {memo.password ? (
                             <div className="flex items-center justify-between gap-3">
-                              <span className="font-black text-slate-500">패스워드</span>
-                              <span className="min-w-0 truncate font-mono font-black text-slate-950">{memo.password}</span>
+                              <span className="shrink-0 font-black text-slate-500">패스워드</span>
+                              <span className="flex min-w-0 items-center gap-1">
+                                <span className="min-w-0 truncate font-mono font-black text-slate-950">
+                                  {passwordRevealed ? memo.password : '••••••••'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => togglePasswordReveal(memo.id)}
+                                  className="shrink-0 whitespace-nowrap rounded-lg px-1.5 py-1 text-[11px] font-black text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+                                  aria-label={passwordRevealed ? '패스워드 숨기기' : '패스워드 표시'}
+                                >
+                                  {passwordRevealed ? '숨김' : '표시'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => copyPassword(memo.password || '')}
+                                  className="inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-lg px-1.5 py-1 text-[11px] font-black text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+                                  aria-label="패스워드 복사"
+                                >
+                                  <Copy size={12} />
+                                  복사
+                                </button>
+                              </span>
                             </div>
                           ) : null}
                         </div>
@@ -656,12 +693,12 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                             <a
                               key={attachment.id}
                               href={`/api/admin/memos/${memo.id}/attachments/${attachment.id}`}
-                              className="flex items-center gap-2 rounded-md bg-white/80 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-white"
+                              className="flex items-center gap-2 rounded-xl bg-white/80 px-2.5 py-2 text-xs font-bold text-slate-700 transition hover:bg-white"
                             >
                               <FileText size={14} className="shrink-0 text-slate-500" />
                               <span className="min-w-0 flex-1 truncate">{attachment.fileName}</span>
-                              <span className="shrink-0 text-slate-400">{formatFileSize(attachment.size)}</span>
-                              <Download size={14} className="shrink-0 text-blue-600" />
+                              <span className="shrink-0 text-slate-500">{formatFileSize(attachment.size)}</span>
+                              <Download size={14} className="shrink-0 text-brand-orange" />
                             </a>
                           ))}
                         </div>
@@ -673,7 +710,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                           <button
                             type="button"
                             onClick={() => patchMemo(memo, { toggleArchived: true, archived: !memo.archived })}
-                            className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1.5 text-slate-600 transition hover:text-slate-950"
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-white/80 px-2 py-1.5 text-slate-600 transition hover:text-slate-950"
                           >
                             {memo.archived ? <ArchiveRestore size={14} /> : <Archive size={14} />}
                             {memo.archived ? '복원' : '보관'}
@@ -681,7 +718,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                           <button
                             type="button"
                             onClick={() => deleteMemo(memo)}
-                            className="inline-flex items-center gap-1 rounded-md bg-white/80 px-2 py-1.5 text-red-600 transition hover:bg-red-50"
+                            className="inline-flex items-center gap-1 whitespace-nowrap rounded-lg bg-white/80 px-2 py-1.5 text-red-600 transition hover:bg-red-50"
                           >
                             <Trash2 size={14} />
                             삭제
@@ -692,12 +729,13 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                   )
                 })
               ) : (
-                <div className="col-span-full rounded-lg border border-dashed border-slate-300 bg-slate-50 px-6 py-14 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-white text-slate-400 shadow-sm">
-                    <StickyNote size={22} />
-                  </div>
-                  <p className="mt-3 text-sm font-black text-slate-700">표시할 메모가 없습니다.</p>
-                </div>
+                <EmptyState
+                  compact
+                  className="col-span-full"
+                  icon={<StickyNote size={20} />}
+                  title="표시할 메모가 없습니다."
+                  description="검색어나 카테고리를 바꾸거나 새 메모를 작성해 보세요."
+                />
               )}
             </div>
           </section>

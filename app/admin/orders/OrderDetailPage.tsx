@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
+import Button from '@/components/ui/Button'
 import {
   AlertTriangle,
   Check,
@@ -15,7 +16,7 @@ import {
   Truck,
 } from 'lucide-react'
 
-type Tone = 'blue' | 'green' | 'orange' | 'red' | 'gray'
+export type Tone = 'blue' | 'green' | 'orange' | 'red' | 'gray'
 
 interface OrderDetailPageProps {
   order?: OrderRecord | null
@@ -166,11 +167,11 @@ const sampleOrderData: NormalizedOrderDetail = {
   rawStatus: 'DEPOSIT_COMPLETED',
 }
 
-function formatCurrency(value: number) {
+export function formatCurrency(value: number) {
   return `${Math.round(value).toLocaleString('ko-KR')}원`
 }
 
-function formatDateTime(value: string | Date | null | undefined) {
+export function formatDateTime(value: string | Date | null | undefined) {
   if (!value) return '-'
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
@@ -204,6 +205,11 @@ function mapStatusMeta(status: string, hasTracking: boolean, taxInvoiceIssued: b
   if (status === 'DEPOSIT_COMPLETED') return { label: '입금확인', tone: 'green' }
   if (status === 'APPROVED' || status === 'PENDING_DEPOSIT' || status === 'PENDING') return { label: '입금대기', tone: 'orange' }
   return { label: '주문접수', tone: 'gray' }
+}
+
+/** Status label/tone for a raw order record — used by the collapsed summary row. */
+export function getOrderStatusMeta(order: OrderRecord): { label: string; tone: Tone } {
+  return mapStatusMeta(order.status, parseTrackingNumbers(order.trackingNumber).length > 0, Boolean(order.taxInvoiceIssued))
 }
 
 function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail {
@@ -274,10 +280,10 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
   }
 }
 
-function toneClasses(tone: Tone) {
+export function toneClasses(tone: Tone) {
   switch (tone) {
     case 'blue':
-      return 'border-blue-200 bg-blue-50 text-blue-700'
+      return 'border-sky-200 bg-sky-50 text-sky-700'
     case 'green':
       return 'border-emerald-200 bg-emerald-50 text-emerald-700'
     case 'orange':
@@ -289,20 +295,9 @@ function toneClasses(tone: Tone) {
   }
 }
 
-function toneAccentClasses(tone: Tone) {
-  switch (tone) {
-    case 'blue':
-      return 'bg-blue-500'
-    case 'green':
-      return 'bg-emerald-500'
-    case 'orange':
-      return 'bg-orange-500'
-    case 'red':
-      return 'bg-red-500'
-    default:
-      return 'bg-slate-400'
-  }
-}
+const inputClass =
+  'h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 transition ' +
+  'focus:border-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
 
 function DetailCard({
   title,
@@ -320,21 +315,19 @@ function DetailCard({
   children: React.ReactNode
 }) {
   return (
-    <section className={`overflow-hidden rounded-2xl border ${
-      muted
-        ? 'border-slate-300 bg-slate-50 shadow-[0_8px_22px_rgba(15,23,42,0.04)]'
-        : 'border-[#E6EAF2] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)]'
+    <section className={`min-w-0 overflow-hidden rounded-2xl border ${
+      muted ? 'border-slate-200 bg-slate-50' : 'border-slate-200 bg-white'
     } ${className}`}>
-      <div className={`flex items-center justify-between gap-3 border-b px-6 py-5 ${
-        muted ? 'border-slate-300 bg-slate-100/70' : 'border-[#E6EAF2]'
+      <div className={`flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5 ${
+        muted ? 'bg-slate-100/70' : ''
       }`}>
-        <div className="flex items-center gap-2">
-          {icon ? <span className="text-[#64748B]">{icon}</span> : null}
-          <h3 className="text-[17px] font-extrabold tracking-tight text-[#0F172A]">{title}</h3>
+        <div className="flex min-w-0 items-center gap-2">
+          {icon ? <span className="shrink-0 text-slate-500">{icon}</span> : null}
+          <h3 className="break-keep text-[15px] font-extrabold tracking-tight text-slate-900">{title}</h3>
         </div>
         {actions}
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-4 sm:p-5">{children}</div>
     </section>
   )
 }
@@ -344,7 +337,8 @@ function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void 
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-slate-300 hover:text-slate-700"
+      aria-label="복사"
+      className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
     >
       {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
     </button>
@@ -353,12 +347,12 @@ function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void 
 
 function SummaryMetric({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`min-w-0 border-slate-200 px-4 py-4 text-center sm:border-l first:sm:border-l-0 ${
-      highlight ? 'bg-blue-50/70' : 'bg-white'
+    <div className={`min-w-0 border-slate-200 px-4 py-3 text-center sm:border-l first:sm:border-l-0 ${
+      highlight ? 'bg-brand-orange-soft' : 'bg-white'
     }`}>
-      <div className="truncate text-[12px] font-bold text-slate-500">{label}</div>
-      <div className={`mt-2 whitespace-nowrap font-black tracking-tight ${
-        highlight ? 'text-[22px] text-blue-600' : 'text-[17px] text-slate-950'
+      <div className="truncate text-[11px] font-bold text-slate-500">{label}</div>
+      <div className={`mt-1.5 whitespace-nowrap font-black tracking-tight ${
+        highlight ? 'text-[20px] text-brand-orange' : 'text-[16px] text-slate-900'
       }`}>
         {value}
       </div>
@@ -382,12 +376,12 @@ function InfoField({
   wide?: boolean
 }) {
   return (
-    <div className={`min-h-[86px] rounded-xl border border-[#E6EAF2] bg-[#F8FAFC] px-4 py-4 ${wide ? 'xl:col-span-2' : ''}`}>
+    <div className={`min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 ${wide ? 'xl:col-span-2' : ''}`}>
       <div className="flex items-center justify-between gap-3">
         <div className="text-[11px] font-bold text-slate-500">{label}</div>
         {copyKey ? <CopyButton copied={copiedField === copyKey} onClick={() => onCopy(copyKey, value)} /> : null}
       </div>
-      <div className="mt-2 break-words text-[15px] font-black leading-6 text-slate-900">{value}</div>
+      <div className="mt-1.5 break-words text-[14px] font-black leading-6 text-slate-900">{value}</div>
     </div>
   )
 }
@@ -447,13 +441,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
     [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
   )
-  const orderAccentClass = isCompletedOrder ? 'bg-slate-500' : toneAccentClasses(currentStatusMeta.tone)
-  const orderShellClass = isCompletedOrder
-    ? 'relative overflow-hidden rounded-[24px] border border-slate-300 bg-slate-100 px-4 py-5 shadow-[0_10px_28px_rgba(15,23,42,0.07)] md:px-6'
-    : 'relative overflow-hidden rounded-[24px] border border-blue-100 bg-white px-4 py-5 shadow-[0_16px_36px_rgba(15,23,42,0.08)] ring-1 ring-blue-50 md:px-6'
-  const summaryCardClass = isCompletedOrder
-    ? 'rounded-2xl border border-slate-300 bg-white/80 p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] lg:p-6'
-    : 'rounded-2xl border border-[#E6EAF2] bg-[#FAFCFF] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] lg:p-6'
   const canIssueDocuments = currentStatus !== 'CANCELED'
   const showCopyToast = (fieldKey: string, value: string) => {
     if (!value || value === '-') return
@@ -576,37 +563,21 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
 
   return (
-    <div
-      className={orderShellClass}
-      style={{
-        ['--page-bg' as string]: '#F5F7FB',
-        ['--card-bg' as string]: '#FFFFFF',
-        ['--card-border' as string]: '#E6EAF2',
-        ['--text-primary' as string]: '#0F172A',
-        ['--text-secondary' as string]: '#475569',
-        ['--text-muted' as string]: '#8492A6',
-        ['--primary' as string]: '#2563EB',
-        ['--primary-dark' as string]: '#1054E8',
-        ['--success' as string]: '#10B981',
-        ['--danger' as string]: '#EF4444',
-      }}
-    >
-      <div className={`absolute inset-y-0 left-0 w-2 ${orderAccentClass}`} aria-hidden="true" />
-      <div className="mx-auto max-w-[1440px] space-y-6">
+    <div className="min-w-0 space-y-5">
       {toastMessage ? (
-        <div className="fixed right-6 top-24 z-50 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-bold text-white shadow-2xl">
+        <div className="fixed right-6 top-24 z-50 rounded-xl bg-brand-ink px-4 py-2 text-[12px] font-bold text-white shadow-2xl">
           {toastMessage}
         </div>
       ) : null}
 
       {deleteModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-red-50 text-red-600">
                 <AlertTriangle className="h-5 w-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h4 className="text-[18px] font-black text-slate-900">주문을 삭제하시겠습니까?</h4>
                 <p className="mt-2 text-[13px] leading-6 text-slate-500">
                   삭제된 주문은 복구할 수 없습니다. 정말 삭제하려면 주문번호 <strong className="text-slate-900">{detail.orderNumber}</strong> 를 입력하세요.
@@ -617,114 +588,81 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               type="text"
               value={deleteConfirmText}
               onChange={(event) => setDeleteConfirmText(event.target.value)}
-              className="mt-5 w-full rounded-xl border border-slate-200 px-4 py-3 text-[14px] font-bold text-slate-900 outline-none transition focus:border-red-400"
+              className={`mt-5 ${inputClass}`}
               placeholder={detail.orderNumber}
             />
-            <div className="mt-5 flex justify-end gap-2">
-              <button
-                type="button"
+            <div className="mt-5 flex flex-wrap justify-end gap-2">
+              <Button
+                variant="secondary"
                 onClick={() => {
                   setDeleteModalOpen(false)
                   setDeleteConfirmText('')
                 }}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
               >
                 취소
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteOrder}
-                disabled={loadingAction === 'delete'}
-                className="rounded-xl bg-red-600 px-4 py-2 text-[13px] font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
-              >
+              </Button>
+              <Button variant="danger" onClick={handleDeleteOrder} loading={loadingAction === 'delete'}>
                 {loadingAction === 'delete' ? '삭제 중...' : '주문 삭제'}
-              </button>
+              </Button>
             </div>
           </div>
         </div>
       ) : null}
 
-      <div className={summaryCardClass}>
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 space-y-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                    isCompletedOrder ? 'bg-slate-200 text-slate-500' : 'bg-[#DCFCEB] text-[#10B981]'
-                  }`}>
-                    <Package className="h-6 w-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className={`break-keep text-[24px] font-black leading-tight tracking-tight md:text-[28px] ${
-                      isCompletedOrder ? 'text-slate-700' : 'text-[#0F172A]'
-                    }`}>{detail.customer.company}</h2>
-                    <div className={`mt-1 whitespace-nowrap text-[18px] font-black tracking-tight md:text-[21px] ${
-                      isCompletedOrder ? 'text-slate-600' : 'text-[#0B63E5]'
-                    }`}>주문 #{detail.orderNumber}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <span className={`inline-flex h-9 items-center rounded-xl border px-4 text-[14px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
-                <span className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-bold text-[#64748B]">
-                  주문일시 {detail.createdAtText}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid overflow-hidden rounded-2xl border border-[#DCE5F0] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] sm:grid-cols-3 xl:grid-cols-5">
-              <SummaryMetric label="상품 공급가" value={formatCurrency(detail.payment.productSupplyPrice)} />
-              <SummaryMetric label="배송비" value={formatCurrency(detail.payment.shippingFee)} />
-              <SummaryMetric label="부가세" value={formatCurrency(detail.payment.vat)} />
-              <SummaryMetric label="수량" value={`${detail.payment.totalQuantity.toLocaleString('ko-KR')}개`} />
-              <SummaryMetric label="최종 결제금액" value={formatCurrency(detail.payment.finalAmount)} highlight />
-            </div>
-          </div>
-
-          <div className="grid content-start gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-            <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
-              <FileText className="h-4 w-4 shrink-0" /> 거래명세표 출력
-            </button>
-            <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-              <ReceiptText className="h-4 w-4 shrink-0" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
-            </button>
-            <button
-              type="button"
-              onClick={handleCompleteOrder}
-              disabled={currentStatus === 'CANCELED' || currentStatus === 'COMPLETED' || loadingAction === 'complete'}
-              className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-[13px] font-extrabold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <CircleCheckBig className="h-4 w-4 shrink-0" /> {currentStatus === 'COMPLETED' ? '주문 마감됨' : loadingAction === 'complete' ? '마감 처리 중...' : '주문 마감 처리'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeleteModalOpen(true)}
-              className="h-12 rounded-xl border border-red-200 bg-[#FFF7F7] px-4 text-[13px] font-extrabold text-red-500 transition hover:bg-red-50"
-            >
-              주문 삭제
-            </button>
-          </div>
-        </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Button variant="secondary" size="sm" icon={<FileText className="h-3.5 w-3.5" />} onClick={handlePrintStatement}>
+          거래명세표 출력
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<ReceiptText className="h-3.5 w-3.5" />}
+          onClick={handleIssueTaxInvoice}
+          disabled={!canIssueDocuments || taxInvoiceIssued}
+          loading={loadingAction === 'tax-invoice'}
+        >
+          {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
+        </Button>
+        <Button
+          variant="primary"
+          size="sm"
+          icon={<CircleCheckBig className="h-3.5 w-3.5" />}
+          onClick={handleCompleteOrder}
+          disabled={currentStatus === 'CANCELED' || currentStatus === 'COMPLETED'}
+          loading={loadingAction === 'complete'}
+        >
+          {currentStatus === 'COMPLETED' ? '주문 마감됨' : loadingAction === 'complete' ? '마감 처리 중...' : '주문 마감 처리'}
+        </Button>
+        <Button variant="danger" size="sm" className="ml-auto" onClick={() => setDeleteModalOpen(true)}>
+          주문 삭제
+        </Button>
       </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-        <div className="min-w-0 space-y-6">
+      <div className="grid overflow-hidden rounded-2xl border border-slate-200 bg-white sm:grid-cols-3 xl:grid-cols-5">
+        <SummaryMetric label="상품 공급가" value={formatCurrency(detail.payment.productSupplyPrice)} />
+        <SummaryMetric label="배송비" value={formatCurrency(detail.payment.shippingFee)} />
+        <SummaryMetric label="부가세" value={formatCurrency(detail.payment.vat)} />
+        <SummaryMetric label="수량" value={`${detail.payment.totalQuantity.toLocaleString('ko-KR')}개`} />
+        <SummaryMetric label="최종 결제금액" value={formatCurrency(detail.payment.finalAmount)} highlight />
+      </div>
+
+      <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <div className="min-w-0 space-y-5">
           <DetailCard
             title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개${detail.payment.shippingFee > 0 ? ', 배송비 포함' : ''})`}
             icon={<Package className="h-4 w-4" />}
             muted={isCompletedOrder}
           >
-            <div className="hidden overflow-x-auto rounded-2xl border border-[#E6EAF2] lg:block">
+            <div className="hidden overflow-x-auto rounded-xl border border-slate-200 lg:block">
               <table className="w-full min-w-[900px] border-collapse">
-                <thead className="bg-slate-50 text-left text-[12px] font-black text-slate-500">
+                <thead className="ux-thead text-left">
                   <tr>
-                    <th className="h-14 min-w-[320px] px-5 py-3">상품 정보</th>
-                    <th className="w-[110px] px-4 py-3 text-right">수량</th>
-                    <th className="w-[130px] px-4 py-3 text-right">단가</th>
-                    <th className="w-[140px] px-4 py-3 text-right">공급가</th>
-                    <th className="w-[130px] px-4 py-3 text-right">부가세</th>
-                    <th className="w-[150px] px-5 py-3 text-right">합계</th>
+                    <th className="min-w-[320px] whitespace-nowrap px-5">상품 정보</th>
+                    <th className="w-[110px] whitespace-nowrap px-4 text-right">수량</th>
+                    <th className="w-[130px] whitespace-nowrap px-4 text-right">단가</th>
+                    <th className="w-[140px] whitespace-nowrap px-4 text-right">공급가</th>
+                    <th className="w-[130px] whitespace-nowrap px-4 text-right">부가세</th>
+                    <th className="w-[150px] whitespace-nowrap px-5 text-right">합계</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -742,8 +680,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <div className="line-clamp-2 break-keep text-[15px] font-black leading-5 text-slate-900">{product.name}</div>
-                            <div className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-[#FFF1E8] text-orange-600'}`}>{product.option}</div>
+                            <div className="line-clamp-2 break-keep text-[14px] font-black leading-5 text-slate-900">{product.name}</div>
+                            <div className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-orange-200 bg-brand-orange-soft text-brand-orange'}`}>{product.option}</div>
                           </div>
                         </div>
                       </td>
@@ -751,7 +689,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                       <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.unitPrice)}</td>
                       <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.supplyPrice)}</td>
                       <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.vat)}</td>
-                      <td className="whitespace-nowrap px-5 py-4 text-right text-[15px] font-black text-slate-950">{formatCurrency(product.total)}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-right text-[14px] font-black text-slate-900">{formatCurrency(product.total)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -760,9 +698,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
             <div className="space-y-3 lg:hidden">
               {productRows.map((product) => (
-                <div key={product.id} className={`rounded-2xl border border-slate-200 p-4 ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
+                <div key={product.id} className={`min-w-0 rounded-2xl border border-slate-200 p-4 ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
                   <div className="flex gap-4">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
                       {product.kind === 'shipping' ? (
                         <Truck className="h-7 w-7 text-slate-400" />
                       ) : product.imageUrl ? (
@@ -772,8 +710,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="break-keep text-[15px] font-black leading-5 text-slate-900">{product.name}</div>
-                      <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-orange-50 text-orange-700'}`}>{product.option}</div>
+                      <div className="break-keep text-[14px] font-black leading-5 text-slate-900">{product.name}</div>
+                      <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-slate-200 bg-slate-50 text-slate-600' : 'border-orange-200 bg-brand-orange-soft text-brand-orange'}`}>{product.option}</div>
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
@@ -787,7 +725,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               ))}
             </div>
 
-            <div className="mt-4 grid gap-3 rounded-xl border border-[#E6EAF2] bg-[#F8FAFC] px-5 py-4 text-[14px] font-black text-slate-900 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="mt-4 grid gap-3 rounded-xl border border-slate-200 bg-slate-50 px-5 py-4 text-[14px] font-black text-slate-900 sm:grid-cols-2 xl:grid-cols-5">
               <div className="flex items-center justify-between gap-3 xl:block">
                 <span className="text-slate-500">총 수량</span>
                 <div className="whitespace-nowrap xl:mt-1">{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</div>
@@ -806,13 +744,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               </div>
               <div className="flex items-center justify-between gap-3 sm:col-span-2 xl:col-span-1 xl:block">
                 <span className="text-slate-500">최종 결제금액</span>
-                <div className="whitespace-nowrap text-[22px] text-[#0B63E5] xl:mt-1">{formatCurrency(detail.payment.finalAmount)}</div>
+                <div className="whitespace-nowrap text-[20px] text-brand-orange xl:mt-1">{formatCurrency(detail.payment.finalAmount)}</div>
               </div>
             </div>
           </DetailCard>
 
           <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} muted={isCompletedOrder}>
-            <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
               {[
                 { label: '거래처', value: detail.customer.company },
                 { label: '사업자번호', value: detail.customer.businessNumber, copyKey: 'business-number' },
@@ -834,13 +772,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </DetailCard>
         </div>
 
-        <aside className="space-y-5 xl:sticky xl:top-24">
+        <aside className="min-w-0 space-y-5">
           <DetailCard
             title="배송 처리"
             icon={<Truck className="h-4 w-4" />}
             muted={isCompletedOrder}
             actions={(
-              <span className={`inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[11px] font-bold ${toneClasses(currentStatusMeta.tone)}`}>
+              <span className={`inline-flex h-7 items-center whitespace-nowrap rounded-full border px-3 text-[11px] font-bold ${toneClasses(currentStatusMeta.tone)}`}>
                 {currentStatusMeta.label}
               </span>
             )}
@@ -851,7 +789,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 <select
                   value={carrier}
                   onChange={(event) => setCarrier(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 outline-none transition focus:border-blue-400"
+                  className={inputClass}
                 >
                   {CARRIER_OPTIONS.map((item) => (
                     <option key={item} value={item}>{item}</option>
@@ -865,22 +803,16 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                   value={trackingNumber}
                   onChange={(event) => setTrackingNumber(event.target.value)}
                   placeholder="숫자와 하이픈만 입력해주세요"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 outline-none transition focus:border-blue-400"
+                  className={inputClass}
                 />
               </div>
 
-              <button
-                type="button"
-                onClick={handleSaveTracking}
-                disabled={loadingAction === 'ship'}
-                className="h-[46px] w-full rounded-xl bg-blue-600 px-4 text-[13px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
-              >
+              <Button variant="primary" className="w-full" onClick={handleSaveTracking} loading={loadingAction === 'ship'}>
                 {loadingAction === 'ship' ? '처리 중...' : '배송 처리'}
-              </button>
+              </Button>
             </div>
           </DetailCard>
         </aside>
-      </div>
       </div>
     </div>
   )

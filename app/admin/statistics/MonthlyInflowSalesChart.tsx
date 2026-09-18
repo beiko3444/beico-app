@@ -70,7 +70,7 @@ export default function MonthlyInflowSalesChart({
                 <div key={point.monthKey} className="min-h-[60px] rounded-xl bg-white px-1 py-2 text-center">
                   <div className="text-[11px] font-black text-slate-700">{point.label}</div>
                   <div className="mt-0.5 text-[10px] font-bold text-blue-700">{formatCompactWon(point.sales)}</div>
-                  <div className="text-[10px] font-bold text-[#e34219]">{point.inflow.toLocaleString('ko-KR')}</div>
+                  <div className="text-[10px] font-bold text-brand-orange">{point.inflow.toLocaleString('ko-KR')}</div>
                 </div>
               ))}
             </div>
@@ -78,7 +78,7 @@ export default function MonthlyInflowSalesChart({
         </div>
         <div className="flex flex-wrap items-center gap-4 border-t border-slate-200 bg-white px-4 py-3 text-[11px] font-bold text-slate-500">
           <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-sm bg-blue-600" /> 순매출</span>
-          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-[#e34219]" /> 유입량</span>
+          <span className="inline-flex items-center gap-1.5"><span className="h-2.5 w-2.5 rounded-full bg-brand-orange" /> 유입량</span>
           <span>피크월 {peak ? `${peak.label} · ${formatWon(peak.sales)}` : '-'}</span>
         </div>
       </div>

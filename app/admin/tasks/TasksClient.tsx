@@ -6,6 +6,9 @@ import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, UserRound } from
 import { createEmployee, deleteEmployee, toggleAttendanceDate, updateEmployee } from './actions'
 import { getKoreanHolidayName } from '@/lib/koreanHolidays'
 import DashboardCalendarWidget from '@/components/DashboardCalendarWidget'
+import Button from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import EmptyState from '@/components/ui/EmptyState'
 
 type AttendanceRecord = {
     id: string
@@ -162,32 +165,37 @@ export default function TasksClient({
     }
 
     return (
-        <div className="space-y-10 font-sans">
-            <section className="space-y-6">
+        <div className="min-w-0 space-y-8 font-sans">
+            <PageHeader
+                title="근태관리"
+                description="업무 일정과 직원별 근무일, 월 지출급여를 한곳에서 관리합니다."
+            />
+
+            <section className="min-w-0 space-y-4">
                 <div>
-                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">업무관리</h1>
-                    <p className="mt-1 text-sm font-medium text-gray-500">업무를 완료하면 경험치가 쌓이고 레벨이 올라갑니다.</p>
+                    <h2 className="text-lg font-black tracking-tight text-slate-900 break-keep">업무관리</h2>
+                    <p className="mt-1 text-[13px] text-slate-500">업무를 완료하면 경험치가 쌓이고 레벨이 올라갑니다.</p>
                 </div>
                 <DashboardCalendarWidget tasks={initialTasks} />
             </section>
 
-            <section className="space-y-6">
-            <div className="flex items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">근태관리</h1>
-                    <p className="mt-1 text-sm font-medium text-gray-500">직원별 근무일을 체크하고 월 지출급여를 계산합니다.</p>
+            <section className="min-w-0 space-y-4">
+            <div className="flex flex-wrap items-end justify-between gap-4">
+                <div className="min-w-0">
+                    <h2 className="text-lg font-black tracking-tight text-slate-900 break-keep">근태 체크</h2>
+                    <p className="mt-1 text-[13px] text-slate-500">직원별 근무일을 체크하고 월 지출급여를 계산합니다.</p>
                 </div>
-                <div className="rounded-2xl bg-gray-900 px-5 py-3 text-right text-white shadow-sm">
-                    <div className="text-[11px] font-black uppercase tracking-widest text-gray-400">총 지출급여</div>
-                    <div className="text-2xl font-black">{formatMoney(monthlyPayroll)}</div>
+                <div className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-right shadow-sm">
+                    <div className="text-[11px] font-black text-slate-500">총 지출급여</div>
+                    <div className="text-2xl font-black text-slate-900">{formatMoney(monthlyPayroll)}</div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-                <aside className="space-y-4">
+            <div className="grid min-w-0 grid-cols-1 gap-6 xl:grid-cols-[360px_minmax(0,1fr)]">
+                <aside className="min-w-0 space-y-4">
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                         <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="text-sm font-black text-gray-900">직원 선택</h2>
+                            <h3 className="text-sm font-black text-gray-900">직원 선택</h3>
                             <UserRound className="w-4 h-4 text-gray-400" />
                         </div>
                         <div className="p-3 space-y-2">
@@ -198,75 +206,69 @@ export default function TasksClient({
                                         key={employee.id}
                                         type="button"
                                         onClick={() => setSelectedEmployeeId(employee.id)}
-                                        className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${selected ? 'border-[#d9361b] bg-red-50' : 'border-gray-100 bg-white hover:bg-gray-50'}`}
+                                        className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${selected ? 'border-brand-orange bg-brand-orange-soft' : 'border-gray-100 bg-white hover:bg-gray-50'}`}
                                     >
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="font-black text-gray-900">{employee.name}</div>
                                             <div className="text-xs font-bold text-gray-500">{formatMoney(employee.hourlyWage)}/h</div>
                                         </div>
-                                        <div className="mt-1 text-xs font-medium text-gray-400">1일근로시간 {employee.dailyHours}시간</div>
+                                        <div className="mt-1 text-xs font-medium text-slate-500">1일근로시간 {employee.dailyHours}시간</div>
                                     </button>
                                 )
                             }) : (
-                                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm font-bold text-gray-400">
-                                    등록된 직원이 없습니다.
-                                </div>
+                                <EmptyState compact icon={<UserRound size={18} />} title="등록된 직원이 없습니다." description="아래에서 직원을 추가해 주세요." />
                             )}
                         </div>
                     </div>
 
                     <form action={handleCreateEmployee} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
                         <div className="flex items-center gap-2">
-                            <Plus className="w-4 h-4 text-[#d9361b]" />
-                            <h2 className="text-sm font-black text-gray-900">직원 추가</h2>
+                            <Plus className="w-4 h-4 text-brand-orange" />
+                            <h3 className="text-sm font-black text-gray-900">직원 추가</h3>
                         </div>
                         <AttendanceInputs />
-                        <button disabled={isPending} className="w-full rounded-xl bg-[#d9361b] py-3 text-sm font-black text-white hover:bg-red-600 disabled:opacity-50">
+                        <Button type="submit" variant="primary" disabled={isPending} className="w-full">
                             직원 추가
-                        </button>
+                        </Button>
                     </form>
 
                     {selectedEmployee && (
                         <form action={handleUpdateEmployee} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                            <h2 className="text-sm font-black text-gray-900">직원 설정</h2>
+                            <h3 className="text-sm font-black text-gray-900">직원 설정</h3>
                             <AttendanceInputs employee={selectedEmployee} />
                             <div className="flex gap-2">
-                                <button disabled={isPending} className="flex-1 rounded-xl bg-gray-900 py-3 text-sm font-black text-white hover:bg-black disabled:opacity-50">
+                                <Button type="submit" variant="secondary" disabled={isPending} className="flex-1">
                                     설정 저장
-                                </button>
-                                <button
+                                </Button>
+                                <Button
                                     type="button"
+                                    variant="danger"
                                     onClick={handleDeleteEmployee}
                                     disabled={isPending}
-                                    className="rounded-xl border border-red-100 px-4 text-red-600 hover:bg-red-50 disabled:opacity-50"
                                     title="직원 삭제"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                                    aria-label="직원 삭제"
+                                    icon={<Trash2 className="w-4 h-4" />}
+                                />
                             </div>
                         </form>
                     )}
                 </aside>
 
-                <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <section className="min-w-0 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
                     <div className="px-6 py-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                            <CalendarDays className="w-5 h-5 text-[#d9361b]" />
+                            <CalendarDays className="w-5 h-5 text-brand-orange" />
                             <div>
-                                <h2 className="text-xl font-black text-gray-900">{currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월</h2>
-                                <p className="text-xs font-bold text-gray-400">근로한 날짜를 달력에서 체크하세요.</p>
+                                <h3 className="text-xl font-black text-gray-900">{currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월</h3>
+                                <p className="text-xs font-bold text-slate-500">근로한 날짜를 달력에서 체크하세요.</p>
                             </div>
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => changeMonth(-1)} className="rounded-xl border border-gray-100 p-2 hover:bg-gray-50">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => setCurrentMonth(new Date())} className="rounded-xl border border-gray-100 px-4 py-2 text-xs font-black text-gray-600 hover:bg-gray-50">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Button type="button" variant="secondary" size="sm" onClick={() => changeMonth(-1)} aria-label="이전 달" icon={<ChevronLeft className="w-4 h-4" />} />
+                            <Button type="button" variant="secondary" size="sm" onClick={() => setCurrentMonth(new Date())}>
                                 이번 달
-                            </button>
-                            <button type="button" onClick={() => changeMonth(1)} className="rounded-xl border border-gray-100 p-2 hover:bg-gray-50">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+                            </Button>
+                            <Button type="button" variant="secondary" size="sm" onClick={() => changeMonth(1)} aria-label="다음 달" icon={<ChevronRight className="w-4 h-4" />} />
                         </div>
                     </div>
 
@@ -285,6 +287,7 @@ export default function TasksClient({
                             const key = dateKey(date)
                             const checked = selectedWorkDates.has(key)
                             const holidayName = getKoreanHolidayName(key)
+                            const isToday = key === dateKey(new Date())
                             const isSunday = date.getDay() === 0
                             const isSaturday = date.getDay() === 6
                             const isWeekend = isSunday || isSaturday
@@ -293,7 +296,7 @@ export default function TasksClient({
                                 : isSaturday
                                     ? 'text-blue-500'
                                     : checked
-                                        ? 'text-[#d9361b]'
+                                        ? 'text-brand-orange'
                                         : 'text-gray-700'
 
                             return (
@@ -304,23 +307,25 @@ export default function TasksClient({
                                     disabled={!selectedEmployee || isPending}
                                     className={`min-h-[112px] border-r border-b p-3 text-left transition-all disabled:cursor-not-allowed ${
                                         checked
-                                            ? 'border-red-100 bg-red-50 hover:bg-red-100'
-                                            : holidayName
-                                                ? 'border-red-100 bg-red-50/50 hover:bg-red-50'
-                                                : isWeekend
-                                                    ? 'border-gray-100 bg-gray-50/70 hover:bg-gray-100'
-                                                    : 'border-gray-100 bg-white hover:bg-gray-50'
+                                            ? 'border-brand-orange/20 bg-brand-orange-soft hover:bg-[#ffe9e2]'
+                                            : isToday
+                                                ? 'border-gray-100 bg-brand-orange-soft/70 hover:bg-brand-orange-soft'
+                                                : holidayName
+                                                    ? 'border-red-100 bg-red-50/50 hover:bg-red-50'
+                                                    : isWeekend
+                                                        ? 'border-gray-100 bg-gray-50/70 hover:bg-gray-100'
+                                                        : 'border-gray-100 bg-white hover:bg-gray-50'
                                     }`}
                                 >
                                     <div className="flex items-start justify-between gap-2">
-                                        <span className={`text-sm font-black ${dayTextClass}`}>{date.getDate()}</span>
-                                        <span className={`h-5 w-5 rounded-full border flex items-center justify-center ${checked ? 'border-[#d9361b] bg-[#d9361b]' : 'border-gray-200 bg-white'}`}>
+                                        <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-sm font-black ${dayTextClass} ${isToday ? 'ring-1 ring-brand-orange' : ''}`}>{date.getDate()}</span>
+                                        <span className={`h-5 w-5 rounded-full border flex items-center justify-center ${checked ? 'border-brand-orange bg-brand-orange' : 'border-gray-200 bg-white'}`}>
                                             {checked && <span className="h-2 w-2 rounded-full bg-white" />}
                                         </span>
                                     </div>
                                     {(holidayName || isWeekend) && (
                                         <div
-                                            className={`mt-2 inline-flex max-w-full rounded-md px-2 py-1 text-[10px] font-black leading-none ${
+                                            className={`mt-2 inline-flex max-w-full rounded-md px-2 py-1 text-[11px] font-black leading-none ${
                                                 holidayName
                                                     ? 'bg-red-100 text-red-700'
                                                     : isSunday
@@ -332,7 +337,7 @@ export default function TasksClient({
                                         </div>
                                     )}
                                     {checked && selectedEmployee && (
-                                        <div className="mt-5 rounded-lg bg-white/80 px-2 py-1.5 text-[11px] font-bold text-red-600">
+                                        <div className="mt-5 rounded-lg bg-white/80 px-2 py-1.5 text-[11px] font-bold text-brand-orange">
                                             {selectedEmployee.dailyHours}h · {formatMoney(selectedEmployee.hourlyWage * selectedEmployee.dailyHours)}
                                         </div>
                                     )}
@@ -346,8 +351,8 @@ export default function TasksClient({
                             {selectedEmployee ? `${selectedEmployee.name} · ${monthlyWorkDays}일 근무 · ${selectedEmployee.dailyHours}시간/일` : '직원을 추가하거나 선택해 주세요.'}
                         </div>
                         <div className="text-right">
-                            <div className="text-xs font-black text-gray-400 uppercase tracking-widest">총 지출급여</div>
-                            <div className="text-3xl font-black text-[#d9361b]">{formatMoney(monthlyPayroll)}</div>
+                            <div className="text-[11px] font-black text-slate-500">총 지출급여</div>
+                            <div className="text-3xl font-black text-slate-900">{formatMoney(monthlyPayroll)}</div>
                         </div>
                     </div>
                 </section>
@@ -361,36 +366,36 @@ function AttendanceInputs({ employee }: { employee?: AttendanceEmployee }) {
     return (
         <div className="space-y-3">
             <label className="block">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">직원명</span>
+                <span className="text-[11px] font-black text-slate-500">직원명</span>
                 <input
                     name="name"
                     required
                     defaultValue={employee?.name || ''}
                     placeholder="직원 이름"
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#d9361b] focus:ring-2 focus:ring-[#d9361b]/10"
+                    className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10"
                 />
             </label>
             <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">시급</span>
+                    <span className="text-[11px] font-black text-slate-500">시급</span>
                     <input
                         name="hourlyWage"
                         required
                         inputMode="numeric"
                         defaultValue={employee?.hourlyWage || ''}
                         placeholder="10000"
-                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#d9361b] focus:ring-2 focus:ring-[#d9361b]/10"
+                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10"
                     />
                 </label>
                 <label className="block">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">1일근로시간</span>
+                    <span className="text-[11px] font-black text-slate-500">1일근로시간</span>
                     <input
                         name="dailyHours"
                         required
                         inputMode="decimal"
                         defaultValue={employee?.dailyHours || ''}
                         placeholder="8"
-                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#d9361b] focus:ring-2 focus:ring-[#d9361b]/10"
+                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-brand-orange focus:ring-2 focus:ring-brand-orange/10"
                     />
                 </label>
             </div>
