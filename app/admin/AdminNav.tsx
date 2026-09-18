@@ -126,7 +126,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
           <Star size={14} className="text-amber-500" fill="currentColor" />
           즐겨찾기 재고
         </div>
-        <Link href="/admin/inventory" prefetch={false} onClick={onNavigate} className="text-[10px] font-black text-brand-orange no-underline">
+        <Link href="/admin/inventory" prefetch={null} onClick={onNavigate} className="text-[10px] font-black text-brand-orange no-underline">
           열기
         </Link>
       </div>
@@ -138,7 +138,7 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
             <Link
               key={row.id}
               href="/admin/inventory"
-              prefetch={false}
+              prefetch={null}
               onClick={onNavigate}
               className="flex items-center gap-2 px-2 py-1.5 text-inherit no-underline transition hover:bg-slate-50"
             >
@@ -324,7 +324,7 @@ export default function AdminNav({
           <Link
             key={item.path}
             href={item.path}
-            prefetch={false}
+            prefetch={null}
             data-active={active ? 'true' : undefined}
             onClick={() => setIsMobileMenuOpen(false)}
             className={`group relative flex ${mobile ? 'min-h-12' : 'h-10 min-h-10'} min-w-0 items-center justify-between rounded-md border px-3 text-[13px] font-bold tracking-normal no-underline transition-colors duration-150 ${

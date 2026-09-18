@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowRight, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Cloud, CloudDrizzle, CloudFog, CloudHail, CloudLightning, CloudRain, CloudRainWind, CloudSnow, CloudSun, Copy, FileText, Loader2, Mail, Minus, Package, Plus, ScanSearch, Search, Send, Sparkles, Sun, Trash2, X } from 'lucide-react'
-import Tesseract from 'tesseract.js'
+import type { Worker as TesseractWorker } from 'tesseract.js'
 import { Paperclip } from 'lucide-react'
 import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
@@ -127,7 +127,6 @@ type CustomsProgressResult = {
 type PipelineMode = 'AUTO' | 'SEMI' | 'MANUAL'
 type PipelineRuntimeStatus = 'done' | 'active' | 'todo'
 type AwbScanMode = 'fast' | 'precise'
-type TesseractWorker = Awaited<ReturnType<typeof Tesseract.createWorker>>
 type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'customs' | 'cargoCustomsMail' | 'none'
 
 type PipelineStepDefinition = {
@@ -2233,15 +2232,16 @@ export default function WormOrderPage() {
         if (awbOcrWorkerPromiseRef.current) return awbOcrWorkerPromiseRef.current
 
         onProgress('문자 인식 엔진을 준비하는 중...')
-        const promise = Tesseract.createWorker('eng', 1, {
+        // tesseract.js is ~300KB+; load it only when OCR is actually requested.
+        const promise = import('tesseract.js').then((mod) => mod.createWorker('eng', 1, {
             logger: (message) => {
                 if (message.status === 'recognizing text' && typeof message.progress === 'number') {
                     awbOcrProgressReporterRef.current(`이미지 문자 인식 중... ${Math.round(message.progress * 100)}%`)
                 }
             },
-        }).then(async (worker) => {
+        })).then(async (worker) => {
             await worker.setParameters({
-                tessedit_pageseg_mode: Tesseract.PSM.SPARSE_TEXT,
+                tessedit_pageseg_mode: '11',
                 preserve_interword_spaces: '1',
                 tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._:/ ',
             } as Parameters<TesseractWorker['setParameters']>[0])
