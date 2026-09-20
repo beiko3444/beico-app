@@ -1,14 +1,11 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, ImageIcon, Layers, Pencil, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Pencil, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import { useRouter } from 'next/navigation'
-import Button, { buttonClass } from '@/components/ui/Button'
-import PageHeader from '@/components/ui/PageHeader'
-import Tabs from '@/components/ui/Tabs'
-import EmptyState from '@/components/ui/EmptyState'
+import Link from 'next/link'
 import {
     PRODUCT_GRADES,
     readProductGradeOrderValue,
@@ -227,7 +224,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                                 inputMode="numeric"
                                 value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
                                 onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
-                                className="h-10 w-[76px] rounded-xl border border-slate-200 bg-white px-2 text-right text-[15px] font-black tabular-nums text-slate-900 transition-colors focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                                className="h-10 w-[76px] rounded-md border border-emerald-400 bg-emerald-50 px-2 text-right text-[15px] font-black text-emerald-900 outline-none transition-colors focus:border-emerald-700 focus:bg-white"
                                 title="관리자용 재고"
                             />
                             <ProductStockHistoryModal productId={product.id} productName={product.name} compact />
@@ -255,7 +252,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                             value={partnerSaleStatus}
                             onClick={(event) => event.stopPropagation()}
                             onChange={(event) => onPartnerSaleStatusChange(product.id, event.target.value as PartnerProductStatus)}
-                            className={`h-9 min-w-[82px] rounded-xl border px-2 text-[12px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
+                            className={`h-9 min-w-[82px] rounded-md border px-2 text-[12px] font-black outline-none transition focus:ring-2 focus:ring-blue-200 ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
                             aria-label={`${product.name} 파트너 노출 상태`}
                         >
                             <option value="VISIBLE">노출</option>
@@ -267,13 +264,13 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
             case 'moq':
                 return (
                     <td key={column} className={cellClass}>
-                        <input type="text" inputMode="numeric" value={modifiedMoq !== undefined ? formatNumberInput(modifiedMoq) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1))} onChange={(event) => onMoqChange(product.id, normalizeNumericDraft(event.target.value))} className="h-9 w-16 rounded-xl border border-slate-200 px-2 text-center text-[13px] font-bold focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40" />
+                        <input type="text" inputMode="numeric" value={modifiedMoq !== undefined ? formatNumberInput(modifiedMoq) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'moq', product.minOrderQuantity || 1))} onChange={(event) => onMoqChange(product.id, normalizeNumericDraft(event.target.value))} className="h-9 w-16 rounded-md border border-slate-300 px-2 text-center text-[13px] font-bold outline-none focus:border-blue-500" />
                     </td>
                 )
             case 'orderUnit':
                 return (
                     <td key={column} className={cellClass}>
-                        <input type="text" inputMode="numeric" value={modifiedOrderUnit !== undefined ? formatNumberInput(modifiedOrderUnit) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))} onChange={(event) => onOrderUnitChange(product.id, normalizeNumericDraft(event.target.value))} className="h-9 w-16 rounded-xl border border-slate-200 px-2 text-center text-[13px] font-bold focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40" />
+                        <input type="text" inputMode="numeric" value={modifiedOrderUnit !== undefined ? formatNumberInput(modifiedOrderUnit) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))} onChange={(event) => onOrderUnitChange(product.id, normalizeNumericDraft(event.target.value))} className="h-9 w-16 rounded-md border border-slate-300 px-2 text-center text-[13px] font-bold outline-none focus:border-blue-500" />
                     </td>
                 )
             case 'cost':
@@ -281,7 +278,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     <td key={column} className={`${cellClass} tabular-nums`}>
                         <div className="relative mx-auto w-[94px]">
                             <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-400">₩</span>
-                            <input type="text" inputMode="decimal" value={formatNumberInput(costValue)} onChange={(event) => onCostChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-6 pr-2 text-right text-[13px] font-black tabular-nums text-slate-900 focus:bg-white focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40" title="환산된 한화 매입가이며 직접 수정할 수도 있습니다." />
+                            <input type="text" inputMode="decimal" value={formatNumberInput(costValue)} onChange={(event) => onCostChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-full rounded-md border border-slate-300 bg-slate-50 pl-6 pr-2 text-right text-[13px] font-black text-slate-800 outline-none focus:border-blue-500 focus:bg-white" title="환산된 한화 매입가이며 직접 수정할 수도 있습니다." />
                         </div>
                     </td>
                 )
@@ -289,7 +286,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
                         <div className="relative mx-auto w-[94px]">
-                            <span className="pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[11px] font-black text-slate-500">
+                            <span className={`pointer-events-none absolute left-2 top-1/2 -translate-y-1/2 text-[10px] font-black ${purchaseCurrency === 'USD' ? 'text-blue-600' : 'text-red-500'}`}>
                                 {purchaseCurrency === 'USD' ? 'US$' : 'CN¥'}
                             </span>
                             <input
@@ -299,7 +296,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                                 placeholder="0"
                                 onChange={(event) => onForeignCostChange(product.id, purchaseCurrency, normalizeNumericDraft(event.target.value, true))}
                                 disabled={!purchaseRateAvailable}
-                                className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-2 text-right text-[13px] font-black tabular-nums text-slate-900 disabled:cursor-not-allowed disabled:opacity-50 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                                className={`h-9 w-full rounded-md border pl-9 pr-2 text-right text-[13px] font-black outline-none focus:bg-white disabled:cursor-not-allowed disabled:opacity-50 ${purchaseCurrency === 'USD' ? 'border-blue-200 bg-blue-50 text-blue-800 focus:border-blue-500' : 'border-red-200 bg-red-50 text-red-800 focus:border-red-500'}`}
                                 title={purchaseRateAvailable ? `${purchaseCurrency} 매입가를 입력하면 한화 매입가가 즉시 계산됩니다. 우클릭으로 통화를 변경할 수 있습니다.` : '환율을 불러온 뒤 입력할 수 있습니다.'}
                             />
                         </div>
@@ -308,20 +305,20 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
             case 'wholesale':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-xl border border-slate-200 bg-white px-2 text-right text-[13px] font-black tabular-nums text-slate-900 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40" />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-md border border-blue-300 bg-blue-50 px-2 text-right text-[13px] font-black text-blue-800 outline-none focus:border-blue-600" />
                     </td>
                 )
             case 'retail':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums`}>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-xl border border-slate-200 bg-white px-2 text-right text-[13px] font-black tabular-nums text-slate-900 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40" />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className="h-9 w-20 rounded-md border border-emerald-300 bg-emerald-50 px-2 text-right text-[13px] font-black text-emerald-800 outline-none focus:border-emerald-600" />
                     </td>
                 )
             case 'margin':
                 return (
                     <td key={column} className={`${cellClass} tabular-nums text-[12px] font-bold`}>
-                        <div className="text-slate-700">도매 {wholesaleMargin.toFixed(1)}%</div>
-                        <div className="text-slate-700">판매 {retailMargin.toFixed(1)}%</div>
+                        <div className="text-blue-600">도매 {wholesaleMargin.toFixed(1)}%</div>
+                        <div className="text-emerald-600">판매 {retailMargin.toFixed(1)}%</div>
                     </td>
                 )
             case 'productCode':
@@ -334,10 +331,10 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 return (
                     <td key={column} className={cellClass}>
                         <div className="flex items-center justify-center gap-1">
-                            <ProductForm initialData={product} trigger={<button type="button" className={buttonClass('secondary', 'sm', 'h-7 w-7 px-0')} title="수정" aria-label={`${product.name} 수정`}><Pencil size={13} /></button>} />
-                            <ProductForm initialData={product} isCopy={true} trigger={<button type="button" className={buttonClass('secondary', 'sm', 'h-7 w-7 px-0')} title="복사" aria-label={`${product.name} 복사 등록`}><Copy size={13} /></button>} />
-                            <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className={buttonClass('secondary', 'sm', 'h-7 w-7 px-0 text-amber-700')} title={ungrouped ? '자동 그룹 복귀' : '그룹 해제'} aria-label={ungrouped ? `${product.name} 자동 그룹 복귀` : `${product.name} 그룹 해제`}>{ungrouped ? <RotateCcw size={13} /> : <Unlink size={13} />}</button>
-                            <button type="button" onClick={() => onDelete(product.id)} className={buttonClass('danger', 'sm', 'h-7 w-7 px-0')} title="삭제" aria-label={`${product.name} 삭제`}><Trash2 size={13} /></button>
+                            <ProductForm initialData={product} trigger={<button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:border-blue-500 hover:text-blue-700" title="수정"><Pencil size={13} /></button>} />
+                            <ProductForm initialData={product} isCopy={true} trigger={<button type="button" className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-blue-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white" title="복사"><Copy size={13} /></button>} />
+                            <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-amber-100 bg-amber-50 text-amber-600 hover:bg-amber-500 hover:text-white" title={ungrouped ? '자동 그룹 복귀' : '그룹 해제'}>{ungrouped ? <RotateCcw size={13} /> : <Unlink size={13} />}</button>
+                            <button type="button" onClick={() => onDelete(product.id)} className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-100 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white" title="삭제"><Trash2 size={13} /></button>
                         </div>
                     </td>
                 )
@@ -352,15 +349,14 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                 event.preventDefault()
                 onOpenContextMenu(product.id, event.clientX, event.clientY)
             }}
-            className={`group h-[68px] border-b border-slate-200 text-[13px] transition-colors hover:bg-slate-50 ${checked ? 'bg-brand-orange-soft' : ungrouped ? 'bg-amber-50/60' : 'bg-white even:bg-slate-50/50'}`}
+            className={`group h-[68px] border-b border-slate-200 text-[13px] transition-colors hover:bg-blue-50/50 ${checked ? 'bg-blue-50/70' : ungrouped ? 'bg-amber-50/60' : 'bg-white even:bg-slate-50/50'}`}
         >
             <td className={cellClass}>
                 <input
                     type="checkbox"
                     checked={checked}
                     onChange={() => onToggleCheck(product.id)}
-                    className="cursor-pointer accent-brand-orange"
-                    aria-label={`${product.name} 선택`}
+                    className="cursor-pointer"
                 />
             </td>
             <td className={`${cellClass} tabular-nums text-[13px] font-black text-slate-800`}>
@@ -376,7 +372,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                         onDragStartProduct(product.id)
                     }}
                     onDragEnd={onDragEndProduct}
-                    className="inline-flex h-6 w-5 cursor-grab items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:cursor-grabbing"
+                    className="inline-flex h-6 w-5 cursor-grab items-center justify-center rounded-md text-slate-300 transition hover:bg-blue-50 hover:text-blue-600 active:cursor-grabbing"
                     title="끌어서 다른 그룹으로 이동"
                 >
                     ⠿
@@ -390,8 +386,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     onKeyDown={(event) => {
                         if (event.key === 'Enter') event.currentTarget.blur()
                     }}
-                    className="h-9 w-10 rounded-xl border border-slate-200 bg-white text-center text-[13px] font-bold transition-colors focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-                    aria-label={`${product.name} 그룹 순서`}
+                    className="h-9 w-10 rounded-md border border-slate-300 bg-white text-center text-[13px] font-bold outline-none transition-colors focus:border-blue-500"
                 />
                 </div>
             </td>
@@ -403,14 +398,14 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                             event.stopPropagation()
                             onImageClick(product.imageUrl as string, product.name)
                         }}
-                        className="mx-auto flex h-12 w-12 cursor-zoom-in items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm transition-all hover:border-brand-orange group-hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                        className="mx-auto flex h-12 w-12 cursor-zoom-in items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm transition-all hover:border-blue-400 group-hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-300"
                         aria-label={`${product.name} 이미지 크게 보기`}
                     >
                         <img src={product.imageUrl} alt={product.name} loading="lazy" className="h-full w-full object-cover pointer-events-none" />
                     </button>
                 ) : (
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 text-slate-300" aria-label="이미지 없음">
-                        <ImageIcon size={16} />
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
+                        <span className="text-[8px] font-bold text-gray-300">Img</span>
                     </div>
                 )}
             </td>
@@ -420,16 +415,16 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
                     trigger={
                         <div className="cursor-pointer text-left" title={product.name}>
                             <div className="flex min-w-0 items-center gap-2">
-                                <div className="truncate text-[14px] font-black text-slate-950 group-hover:text-brand-orange">{displayName || product.name}</div>
+                                <div className="truncate text-[14px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
                                 {ungrouped ? (
-                                    <span className="shrink-0 rounded-full border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[11px] font-black text-amber-800">단일 SKU</span>
+                                    <span className="shrink-0 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">단일 SKU</span>
                                 ) : null}
                             </div>
                             {product.nameJP && (
                                 <div className="mt-0.5 truncate text-[12px] font-semibold text-slate-600">{product.nameJP}</div>
                             )}
                             {visibleGroupName && !displayName && (
-                                <div className="mt-0.5 truncate text-[11px] font-bold text-slate-500">그룹: {visibleGroupName}</div>
+                                <div className="mt-0.5 truncate text-[10px] font-bold text-indigo-500">그룹: {visibleGroupName}</div>
                             )}
                         </div>
                     }
@@ -530,13 +525,13 @@ const ProductMobileCard = memo(function ProductMobileCard({
             : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
     const partnerSaleStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
     const ungrouped = product.autoGroupingDisabled === true
-    const fieldLabelClass = 'mb-1 block text-[11px] font-black text-slate-500'
-    const fieldInputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-right text-[14px] font-black tabular-nums text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
+    const fieldLabelClass = 'mb-1 block text-[10px] font-black text-slate-500'
+    const fieldInputClass = 'h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-right text-[14px] font-black tabular-nums text-slate-800 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100'
 
     return (
         <article
             id={`mobile-product-row-${product.id}`}
-            className={`overflow-hidden rounded-2xl border shadow-sm transition ${checked ? 'border-brand-orange bg-brand-orange-soft ring-2 ring-brand-orange/20' : ungrouped ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'}`}
+            className={`overflow-hidden rounded-2xl border shadow-sm transition ${checked ? 'border-blue-300 bg-blue-50/40 ring-2 ring-blue-100' : ungrouped ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'}`}
         >
             <div className="flex items-start gap-3 p-3">
                 <label className="flex min-h-12 shrink-0 items-center" aria-label={`${product.name} 선택`}>
@@ -544,7 +539,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                         type="checkbox"
                         checked={checked}
                         onChange={() => onToggleCheck(product.id)}
-                        className="h-5 w-5 cursor-pointer accent-brand-orange"
+                        className="h-5 w-5 cursor-pointer accent-blue-600"
                     />
                 </label>
                 <ProductForm
@@ -554,7 +549,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                             {product.imageUrl ? (
                                 <img src={product.imageUrl} alt={product.name} loading="lazy" className="h-full w-full object-cover" />
                             ) : (
-                                <span className="text-slate-300" aria-label="이미지 없음"><ImageIcon size={18} /></span>
+                                <span className="text-[9px] font-black text-slate-300">IMG</span>
                             )}
                         </div>
                     )}
@@ -564,9 +559,9 @@ const ProductMobileCard = memo(function ProductMobileCard({
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
                                 <h3 className="line-clamp-2 text-[14px] font-black leading-5 text-slate-950">{displayName || product.name}</h3>
-                                {ungrouped ? <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-black text-amber-800">단일 SKU</span> : null}
+                                {ungrouped ? <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-black text-amber-800">단일 SKU</span> : null}
                             </div>
-                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-bold text-slate-500">
+                            <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] font-bold text-slate-500">
                                 <span>상품 #{formatInteger(product.productNumber)}</span>
                                 <span>그룹 순서 {groupOrder}</span>
                                 {product.productCode ? <span className="font-mono">{String(product.productCode).toUpperCase()}</span> : null}
@@ -575,13 +570,13 @@ const ProductMobileCard = memo(function ProductMobileCard({
                         <ProductForm
                             initialData={product}
                             trigger={(
-                                <button type="button" className={buttonClass('secondary', 'sm', 'h-9 w-9 px-0')} aria-label={`${product.name} 상품 수정`}>
+                                <button type="button" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-700" aria-label={`${product.name} 상품 수정`}>
                                     <Pencil size={15} />
                                 </button>
                             )}
                         />
                     </div>
-                    {product.nameJP ? <div className="mt-1 truncate text-[11px] font-semibold text-slate-500">{product.nameJP}</div> : null}
+                    {product.nameJP ? <div className="mt-1 truncate text-[11px] font-semibold text-slate-400">{product.nameJP}</div> : null}
                 </div>
             </div>
 
@@ -591,7 +586,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                     <select
                         value={partnerSaleStatus}
                         onChange={(event) => onPartnerSaleStatusChange(product.id, event.target.value as PartnerProductStatus)}
-                        className={`h-10 w-full rounded-xl border px-2 text-center text-[12px] font-black transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
+                        className={`h-10 w-full rounded-lg border px-2 text-center text-[12px] font-black outline-none transition ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
                         aria-label={`${product.name} 파트너 판매 상태`}
                     >
                         <option value="VISIBLE">노출</option>
@@ -601,8 +596,8 @@ const ProductMobileCard = memo(function ProductMobileCard({
                 </div>
                 <div className="min-w-0">
                     <div className="mb-1 flex items-center justify-between gap-2">
-                        <span className="text-[11px] font-black text-slate-500">현재고</span>
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[11px] font-black ${stockStatus.className}`}>{stockStatus.label}</span>
+                        <span className="text-[10px] font-black text-slate-500">현재고</span>
+                        <span className={`rounded-full border px-1.5 py-0.5 text-[9px] font-black ${stockStatus.className}`}>{stockStatus.label}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <input
@@ -610,7 +605,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                             inputMode="numeric"
                             value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
                             onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
-                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-right text-[15px] font-black tabular-nums text-slate-900 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                            className="h-10 min-w-0 flex-1 rounded-lg border border-emerald-300 bg-emerald-50 px-3 text-right text-[15px] font-black tabular-nums text-emerald-900 outline-none focus:border-emerald-600 focus:bg-white"
                             aria-label={`${product.name} 현재고`}
                         />
                         <ProductStockHistoryModal productId={product.id} productName={product.name} compact />
@@ -621,7 +616,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
             <details className="group/mobile border-t border-slate-100">
                 <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 text-[12px] font-black text-slate-800 [&::-webkit-details-marker]:hidden">
                     <span>{activeGrade}등급 가격·발주 설정</span>
-                    <ChevronDown size={16} className="shrink-0 text-slate-500 transition-transform group-open/mobile:rotate-180" />
+                    <ChevronDown size={16} className="shrink-0 text-blue-600 transition-transform group-open/mobile:rotate-180" />
                 </summary>
                 <div className="grid grid-cols-2 gap-2 border-t border-slate-100 bg-white p-3">
                     <label className="col-span-2 min-w-0">
@@ -630,7 +625,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                             <select
                                 value={purchaseCurrency}
                                 onChange={(event) => onPurchaseCurrencyChange(product.id, event.target.value as PurchaseCurrency)}
-                                className="h-10 w-[82px] shrink-0 rounded-xl border border-slate-200 bg-slate-50 px-2 text-[12px] font-black text-slate-700 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                                className="h-10 w-[82px] shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-2 text-[12px] font-black text-slate-700 outline-none focus:border-blue-500"
                                 aria-label={`${product.name} 매입 통화`}
                             >
                                 <option value="CNY">CN¥</option>
@@ -653,15 +648,15 @@ const ProductMobileCard = memo(function ProductMobileCard({
                     </label>
                     <label className="min-w-0">
                         <span className={fieldLabelClass}>도매가</span>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className={fieldInputClass} />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(wholesaleValue)} onChange={(event) => onWholesaleChange(product.id, normalizeNumericDraft(event.target.value, true))} className={`${fieldInputClass} border-blue-200 bg-blue-50 text-blue-800`} />
                     </label>
                     <label className="min-w-0">
                         <span className={fieldLabelClass}>판매가</span>
-                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className={fieldInputClass} />
+                        <input type="text" inputMode="decimal" value={formatNumberInput(retailValue)} onChange={(event) => onRetailChange(product.id, normalizeNumericDraft(event.target.value, true))} className={`${fieldInputClass} border-emerald-200 bg-emerald-50 text-emerald-800`} />
                     </label>
                     <label className="min-w-0">
                         <span className={fieldLabelClass}>안전재고</span>
-                        <div className="flex h-10 items-center justify-end rounded-xl border border-slate-200 bg-slate-50 px-3 text-[14px] font-black tabular-nums text-slate-700">{safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}</div>
+                        <div className="flex h-10 items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-[14px] font-black tabular-nums text-slate-600">{safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}</div>
                     </label>
                     <label className="min-w-0">
                         <span className={fieldLabelClass}>최소수량</span>
@@ -680,10 +675,10 @@ const ProductMobileCard = memo(function ProductMobileCard({
                     <ChevronDown size={15} className="transition-transform group-open/manage:rotate-180" />
                 </summary>
                 <div className="grid grid-cols-2 gap-2 border-t border-slate-100 bg-slate-50 p-3">
-                    <ProductForm initialData={product} trigger={<button type="button" className={buttonClass('secondary', 'md', 'w-full text-[11px]')}><Pencil size={14} />상품 수정</button>} />
-                    <ProductForm initialData={product} isCopy trigger={<button type="button" className={buttonClass('secondary', 'md', 'w-full text-[11px]')}><Copy size={14} />복사 등록</button>} />
-                    <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className={buttonClass('secondary', 'md', 'w-full text-[11px] text-amber-700')}>{ungrouped ? <RotateCcw size={14} /> : <Unlink size={14} />}{ungrouped ? '자동 그룹 복귀' : '그룹 해제'}</button>
-                    <button type="button" onClick={() => onDelete(product.id)} className={buttonClass('danger', 'md', 'w-full text-[11px]')}><Trash2 size={14} />삭제</button>
+                    <ProductForm initialData={product} trigger={<button type="button" className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white text-[11px] font-black text-slate-700"><Pencil size={14} />상품 수정</button>} />
+                    <ProductForm initialData={product} isCopy trigger={<button type="button" className="flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 text-[11px] font-black text-blue-700"><Copy size={14} />복사 등록</button>} />
+                    <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 text-[11px] font-black text-amber-700">{ungrouped ? <RotateCcw size={14} /> : <Unlink size={14} />}{ungrouped ? '자동 그룹 복귀' : '그룹 해제'}</button>
+                    <button type="button" onClick={() => onDelete(product.id)} className="flex h-10 items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 text-[11px] font-black text-red-600"><Trash2 size={14} />삭제</button>
                 </div>
             </details>
         </article>
@@ -739,20 +734,20 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
     )
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50 shadow-sm">
+        <div className="overflow-hidden rounded-2xl border border-blue-100 bg-blue-50 shadow-sm">
             <div className="flex items-start gap-2.5 p-3">
                 <label className="flex min-h-11 shrink-0 items-center" aria-label={`${group.name} 그룹 전체 선택`}>
                     <input
                         type="checkbox"
                         checked={group.products.length > 0 && checkedCount === group.products.length}
                         onChange={onToggleCheck}
-                        className="h-5 w-5 cursor-pointer accent-brand-orange"
+                        className="h-5 w-5 cursor-pointer accent-blue-600"
                     />
                 </label>
                 <button
                     type="button"
                     onClick={onToggle}
-                    className={buttonClass('secondary', 'md', 'w-10 rounded-full px-0')}
+                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 shadow-sm"
                     aria-expanded={expanded}
                     aria-label={`${group.name} SKU 목록 ${expanded ? '접기' : '펼치기'}`}
                 >
@@ -761,16 +756,16 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
                 {representative?.imageUrl ? (
                     <img src={representative.imageUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-slate-200 bg-white object-cover" />
                 ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-300"><Layers size={17} /></div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-300"><Layers size={17} /></div>
                 )}
                 <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
                     <span className="flex min-w-0 flex-wrap items-center gap-1.5">
                         <span className="line-clamp-2 text-[13px] font-black leading-5 text-slate-950">{group.name}</span>
-                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-600">{group.products.length} SKU</span>
+                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[9px] font-black text-blue-700">{group.products.length} SKU</span>
                     </span>
-                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-black">
-                        <span className="text-slate-600">파트너 노출 {availableCount}</span>
-                        <span className="text-slate-600">재고 합계 {formatInteger(totalStock)}</span>
+                    <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[10px] font-black">
+                        <span className="text-emerald-700">파트너 노출 {availableCount}</span>
+                        <span className="text-slate-500">재고 합계 {formatInteger(totalStock)}</span>
                     </span>
                 </button>
                 {naverProductUrl ? (
@@ -778,7 +773,7 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
                         href={naverProductUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className={buttonClass('secondary', 'sm', 'h-9 w-9 px-0 no-underline')}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700"
                         aria-label={`${group.name} 네이버 상품 열기`}
                     >
                         <ExternalLink size={15} />
@@ -839,10 +834,10 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
             }}
             className={`border-y transition-colors ${
                 canDrop
-                    ? 'border-brand-orange bg-brand-orange-soft ring-1 ring-inset ring-brand-orange/40'
+                    ? 'border-blue-300 bg-blue-100/80 ring-1 ring-inset ring-blue-300'
                     : selected
-                        ? 'border-orange-100 bg-brand-orange-soft'
-                        : 'border-slate-200 bg-slate-100 hover:bg-slate-50'
+                        ? 'border-blue-100 bg-blue-50'
+                        : 'border-slate-200 bg-slate-100 hover:bg-blue-50'
             }`}
         >
             <td colSpan={columnCount} className="px-3 py-2.5">
@@ -861,9 +856,8 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                             checked={group.products.length > 0 && checkedCount === group.products.length}
                             onChange={onToggleCheck}
                             onClick={(event) => event.stopPropagation()}
-                            className="cursor-pointer accent-brand-orange"
+                            className="cursor-pointer"
                             title="그룹 SKU 전체 선택"
-                            aria-label={`${group.name} 그룹 SKU 전체 선택`}
                         />
                         <button
                             type="button"
@@ -871,16 +865,15 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                                 event.stopPropagation()
                                 onToggle()
                             }}
-                            className={buttonClass('secondary', 'sm', 'w-8 rounded-full px-0')}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 shadow-sm transition hover:bg-blue-50"
                             title={expanded ? '그룹 접기' : '그룹 펼치기'}
-                            aria-label={expanded ? `${group.name} 그룹 접기` : `${group.name} 그룹 펼치기`}
                         >
                             {expanded ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                         </button>
                         {representative?.imageUrl ? (
                             <img src={representative.imageUrl} alt={group.name} loading="lazy" className="h-9 w-9 rounded-md border border-slate-200 bg-white object-cover shadow-sm" />
                         ) : (
-                            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-300">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-blue-300">
                                 <Layers size={15} />
                             </div>
                         )}
@@ -894,29 +887,29 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                                         rel="noreferrer"
                                         onClick={(event) => event.stopPropagation()}
                                         onKeyDown={(event) => event.stopPropagation()}
-                                        className={buttonClass('secondary', 'sm', 'h-6 w-6 px-0 no-underline')}
+                                        className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md border border-emerald-200 bg-white text-emerald-700 transition hover:border-emerald-500 hover:bg-emerald-50"
                                         title="네이버 스마트스토어 상품 보기"
                                         aria-label={`${group.name} 네이버 상품 열기`}
                                     >
                                         <ExternalLink size={13} />
                                     </a>
                                 ) : null}
-                                <span className="rounded-full bg-white px-2 py-0.5 text-[11px] font-black text-slate-600 shadow-sm">{group.products.length} SKU</span>
-                                <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-black text-slate-600">{group.source}</span>
+                                <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-blue-600 shadow-sm">{group.products.length} SKU</span>
+                                <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-black text-blue-600">{group.source}</span>
                             </div>
-                            <div className="mt-0.5 text-[11px] font-bold text-slate-500">
+                            <div className="mt-0.5 text-[10px] font-bold text-blue-500">
                                 {canDrop ? '여기에 놓으면 이 그룹으로 이동합니다.' : '화살표로 SKU 목록을 접고 펼칩니다.'}
                             </div>
                         </div>
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
-                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-right shadow-sm">
-                            <div className="text-[11px] font-black text-slate-500">재고 부족 SKU</div>
-                            <div className={`text-[12px] font-black tabular-nums ${lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'}`}>{formatInteger(lowStockCount)}</div>
+                        <div className="rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right shadow-sm">
+                            <div className="text-[9px] font-black text-amber-700">재고 부족 SKU</div>
+                            <div className={`text-[12px] font-black tabular-nums ${lowStockCount > 0 ? 'text-amber-700' : 'text-emerald-700'}`}>{formatInteger(lowStockCount)}</div>
                         </div>
-                        <div className="rounded-xl border border-slate-200 bg-white px-3 py-1 text-right shadow-sm">
-                            <div className="text-[11px] font-black text-slate-500">관리용 재고 합계</div>
-                            <div className="text-[13px] font-black tabular-nums text-slate-900">{formatInteger(totalStock)}</div>
+                        <div className="rounded-lg border border-emerald-200 bg-white px-3 py-1 text-right shadow-sm">
+                            <div className="text-[9px] font-black text-emerald-600">관리용 재고 합계</div>
+                            <div className="text-[13px] font-black tabular-nums text-emerald-700">{formatInteger(totalStock)}</div>
                         </div>
                     </div>
                 </div>
@@ -952,28 +945,28 @@ function ProductSummaryPanel({
     return (
         <aside className="border-t border-slate-200 bg-slate-50 p-3 xl:border-l xl:border-t-0" aria-label="선택한 상품 요약">
             <div className="sticky top-20 space-y-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
                         <div className="flex min-w-0 items-center gap-2">
                             {representative?.imageUrl ? (
                                 <img src={representative.imageUrl} alt={group.name} loading="lazy" className="h-11 w-11 rounded-lg border border-slate-200 object-cover" />
                             ) : (
-                                <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-300">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-300">
                                     <Layers size={18} />
                                 </div>
                             )}
                             <div className="min-w-0">
                                 <div className="truncate text-[12px] font-black text-slate-950">{group.name}</div>
                                 <div className="mt-1 flex items-center gap-1">
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-600">{group.products.length} SKU</span>
-                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-500">{group.source}</span>
+                                    <span className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-black text-blue-700">{group.products.length} SKU</span>
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black text-slate-500">{group.source}</span>
                                 </div>
                             </div>
                         </div>
                         <button
                             type="button"
                             onClick={onClose}
-                            className={buttonClass('secondary', 'sm', 'w-8 px-0')}
+                            className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900"
                             title="요약 닫기"
                             aria-label="선택한 상품 요약 닫기"
                         >
@@ -982,29 +975,29 @@ function ProductSummaryPanel({
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="mb-2 text-[11px] font-black text-slate-900">재고 요약</div>
                     <div className="divide-y divide-slate-100 text-[11px]">
                         <div className="flex items-center justify-between py-1.5">
                             <span className="font-bold text-slate-500">재고 합계</span>
-                            <span className="font-black tabular-nums text-slate-900">{formatInteger(totalStock)}</span>
+                            <span className="font-black tabular-nums text-emerald-700">{formatInteger(totalStock)}</span>
                         </div>
                         <div className="flex items-center justify-between py-1.5">
                             <span className="font-bold text-slate-500">SKU 수</span>
-                            <span className="font-black tabular-nums text-slate-900">{formatInteger(group.products.length)}</span>
+                            <span className="font-black tabular-nums text-slate-800">{formatInteger(group.products.length)}</span>
                         </div>
                         <div className="flex items-center justify-between py-1.5">
                             <span className="font-bold text-slate-500">평균 매입가</span>
-                            <span className="font-black tabular-nums text-slate-900">{formatInteger(Math.round(averageCost))}원</span>
+                            <span className="font-black tabular-nums text-slate-800">{formatInteger(Math.round(averageCost))}원</span>
                         </div>
                         <div className="flex items-center justify-between py-1.5">
                             <span className="font-bold text-slate-500">평균 판매가</span>
-                            <span className="font-black tabular-nums text-slate-900">{formatInteger(Math.round(averageRetail))}원</span>
+                            <span className="font-black tabular-nums text-blue-700">{formatInteger(Math.round(averageRetail))}원</span>
                         </div>
                     </div>
                 </div>
 
-                <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+                <div className="rounded-xl border border-slate-200 bg-white p-3 shadow-sm">
                     <div className="mb-2 text-[11px] font-black text-slate-900">SKU 미리보기</div>
                     <div className="space-y-2">
                         {group.products.slice(0, 6).map(product => (
@@ -1019,10 +1012,10 @@ function ProductSummaryPanel({
                                             })
                                             : product.name}
                                     </div>
-                                    <div className="truncate font-mono text-[11px] text-slate-500">{product.barcode || '-'}</div>
+                                    <div className="truncate font-mono text-[10px] text-slate-400">{product.barcode || '-'}</div>
                                 </div>
-                                <div className="shrink-0 text-right text-[11px] tabular-nums">
-                                    <div className="font-black text-slate-900">재고 {formatInteger(getProductStock(product))}</div>
+                                <div className="shrink-0 text-right text-[10px] tabular-nums">
+                                    <div className="font-black text-emerald-700">재고 {formatInteger(getProductStock(product))}</div>
                                     <div className="text-slate-500">매입 {formatInteger(readProductGradePriceValue(product.regionalPrices, activeGrade, 'cost', product.buyPrice || 0))} / 판매 {formatInteger(readProductGradePriceValue(product.regionalPrices, activeGrade, 'retail', product.onlinePrice || 0))}</div>
                                 </div>
                             </div>
@@ -1843,38 +1836,59 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     return (
         <div
             className="ux-panel w-full overflow-hidden"
-            style={{ maxWidth: productTableWidth + (selectedGroup ? 310 : 0) }}
+            style={{ maxWidth: productTableWidth + (selectedGroup ? 310 : 0) + 24 }}
         >
-            <div className="border-b border-slate-200 bg-white px-4 pt-4 sm:px-6 lg:px-8">
-                <PageHeader
-                    title="상품관리"
-                    count={`전체 ${formatInteger(products.length)}개`}
-                    description={`${PRODUCT_CATALOG_CATEGORY_LABELS[activeCategory]} ${formatInteger(filteredProducts.length)}개 표시`}
-                    actions={<ProductForm trigger={<Button variant="primary" icon={<Plus size={15} />}>새 상품 추가</Button>} />}
-                />
-                <Tabs
-                    aria-label="상품 분류"
-                    className="pb-3"
-                    items={PRODUCT_CATALOG_CATEGORIES.map(category => ({
-                        key: category,
-                        label: PRODUCT_CATALOG_CATEGORY_LABELS[category],
-                        count: categoryCounts[category],
-                    }))}
-                    value={activeCategory}
-                    onChange={handleCategoryChange}
-                />
-            </div>
+            <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-xl sm:px-6 lg:px-8">
+                <div className="flex min-h-14 flex-col gap-2 xl:flex-row xl:items-center">
+                    <div className="flex shrink-0 items-center gap-2">
+                        <Link href="/admin" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50" title="관리자 홈">
+                            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+                        </Link>
+                        <h1 className="whitespace-nowrap text-lg font-black text-slate-950">상품 관리</h1>
+                        <span className="whitespace-nowrap rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">전체 {formatInteger(products.length)}개</span>
+                        <span className="hidden whitespace-nowrap rounded-full bg-blue-50 px-2 py-1 text-[10px] font-black text-blue-700 2xl:inline">{PRODUCT_CATALOG_CATEGORY_LABELS[activeCategory]} {formatInteger(filteredProducts.length)}개 표시</span>
+                    </div>
+
+                    <nav className="grid min-w-0 flex-1 grid-cols-2 gap-1 rounded-lg bg-slate-50 p-1 sm:grid-cols-4 xl:mx-4" aria-label="상품 분류">
+                        {PRODUCT_CATALOG_CATEGORIES.map(category => (
+                            <button
+                                key={category}
+                                type="button"
+                                onClick={() => handleCategoryChange(category)}
+                                className={`flex h-9 min-w-0 items-center justify-center gap-2 rounded-md px-2 text-[11px] font-black transition ${activeCategory === category ? 'bg-blue-700 text-white shadow-sm' : 'text-slate-600 hover:bg-white hover:text-slate-950'}`}
+                            >
+                                <span className="truncate">{PRODUCT_CATALOG_CATEGORY_LABELS[category]}</span>
+                                <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[9px] tabular-nums ${activeCategory === category ? 'bg-white/20 text-white' : 'bg-white text-slate-500'}`}>{formatInteger(categoryCounts[category])}</span>
+                            </button>
+                        ))}
+                    </nav>
+
+                    <div className="w-full shrink-0 self-end sm:w-auto xl:self-auto">
+                        <ProductForm trigger={<button type="button" className="h-10 w-full rounded-xl bg-[#d9361b] px-5 text-xs font-black text-white shadow-sm transition hover:brightness-110 sm:w-auto">＋ 새 상품 추가</button>} />
+                    </div>
+                </div>
+            </header>
 
             <div className="border-b border-slate-100 bg-white px-3 py-2 sm:px-6">
                 <div className="flex flex-col gap-2 2xl:flex-row 2xl:items-center 2xl:justify-between">
-                    <div className="flex min-w-0 flex-wrap items-center gap-2">
-                        <Tabs
-                            aria-label="보기 방식"
-                            items={[{ key: 'group', label: '그룹' }, { key: 'sku', label: 'SKU' }] as Array<{ key: ProductViewMode; label: string }>}
-                            value={viewMode}
-                            onChange={setViewMode}
-                        />
-                        <label className="flex h-10 w-full min-w-0 max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[12px] text-slate-500 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/40 sm:w-[360px]">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1">
+                            {(['group', 'sku'] as ProductViewMode[]).map(mode => (
+                                <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => setViewMode(mode)}
+                                    className={`h-8 rounded-lg px-3 text-[11px] font-black transition ${
+                                        viewMode === mode
+                                            ? 'bg-slate-950 text-white shadow-sm'
+                                            : 'text-slate-500 hover:bg-white hover:text-slate-900'
+                                    }`}
+                                >
+                                    {mode === 'group' ? '그룹' : 'SKU'}
+                                </button>
+                            ))}
+                        </div>
+                        <label className="flex h-10 w-full min-w-[260px] max-w-md items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-[12px] text-slate-500 focus-within:border-blue-400 sm:w-[360px]">
                             <Search size={15} className="shrink-0 text-slate-400" />
                             <input
                                 value={productQuery}
@@ -1883,7 +1897,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                 className="min-w-0 flex-1 bg-transparent text-[12px] font-bold text-slate-700 outline-none placeholder:text-slate-400"
                             />
                             {productQuery ? (
-                                <button type="button" onClick={() => setProductQuery('')} className="text-slate-400 hover:text-slate-700" title="검색어 지우기" aria-label="검색어 지우기">
+                                <button type="button" onClick={() => setProductQuery('')} className="text-slate-400 hover:text-slate-700" title="검색어 지우기">
                                     <X size={14} />
                                 </button>
                             ) : null}
@@ -1891,9 +1905,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         <select
                             value={stockFilter}
                             onChange={(event) => setStockFilter(event.target.value as ProductStockFilter)}
-                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 sm:flex-none"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none sm:flex-none"
                             title="재고 필터"
-                            aria-label="재고 필터"
                         >
                             <option value="all">재고 상태 전체</option>
                             <option value="stocked">재고 있음</option>
@@ -1902,9 +1915,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         <select
                             value={availabilityFilter}
                             onChange={(event) => setAvailabilityFilter(event.target.value as ProductAvailabilityFilter)}
-                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 sm:flex-none"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 outline-none sm:flex-none"
                             title="파트너 노출 상태 필터"
-                            aria-label="파트너 노출 상태 필터"
                         >
                             <option value="all">파트너 상태 전체</option>
                             <option value="visible">노출</option>
@@ -1912,27 +1924,26 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <option value="soldOut">품절</option>
                         </select>
                         <div
-                            className={`flex h-10 w-full flex-wrap items-center justify-center gap-x-2 rounded-xl border px-3 text-[11px] font-black sm:w-auto sm:justify-start ${cnyRateError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-slate-200 bg-slate-50 text-slate-600'}`}
+                            className={`flex h-10 w-full items-center justify-center gap-2 overflow-x-auto rounded-xl border px-3 text-[10px] font-black sm:w-auto sm:justify-start sm:text-[11px] ${cnyRateError ? 'border-amber-200 bg-amber-50 text-amber-800' : 'border-red-100 bg-red-50 text-red-800'}`}
                             title={cnyRateUpdatedAt ? `환율 갱신: ${new Date(cnyRateUpdatedAt).toLocaleString('ko-KR')}` : '매입 통화 환율'}
                         >
-                            <span className="text-slate-500">CN¥ 1</span>
+                            <span className="text-red-600">CN¥ 1</span>
                             <span className="text-slate-400">=</span>
-                            <span className="tabular-nums text-slate-900">
+                            <span className="tabular-nums">
                                 {cnyKrwRate ? `₩${cnyKrwRate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}` : isCnyRateLoading ? '불러오는 중' : '조회 실패'}
                             </span>
                             <span className="h-4 border-l border-slate-200" />
-                            <span className="text-slate-500">US$ 1</span>
+                            <span className="text-blue-600">US$ 1</span>
                             <span className="text-slate-400">=</span>
-                            <span className="tabular-nums text-slate-900">
+                            <span className="tabular-nums">
                                 {usdKrwRate ? `₩${usdKrwRate.toLocaleString('ko-KR', { maximumFractionDigits: 2 })}` : isCnyRateLoading ? '불러오는 중' : '조회 실패'}
                             </span>
                             <button
                                 type="button"
                                 onClick={() => void loadCnyRate()}
                                 disabled={isCnyRateLoading}
-                                className={buttonClass('ghost', 'sm', 'h-6 w-6 px-0 text-slate-500')}
+                                className="inline-flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-white hover:text-red-600 disabled:opacity-50"
                                 title="환율 새로고침"
-                                aria-label="환율 새로고침"
                             >
                                 <RefreshCw size={13} className={isCnyRateLoading ? 'animate-spin' : ''} />
                             </button>
@@ -1941,7 +1952,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <button
                                 type="button"
                                 onClick={resetFilters}
-                                className={buttonClass('secondary', 'md')}
+                                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-500 transition hover:bg-slate-50 hover:text-slate-900"
                             >
                                 필터 초기화
                             </button>
@@ -1953,26 +1964,26 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <button
                                 type="button"
                                 onClick={() => setColumnSettingsOpen(open => !open)}
-                                className={buttonClass('secondary', 'sm', columnSettingsOpen ? 'border-slate-300 bg-slate-100' : '')}
+                                className={`inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-[11px] font-black transition ${columnSettingsOpen ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'}`}
                                 aria-expanded={columnSettingsOpen}
                             >
                                 <SlidersHorizontal size={14} />
                                 표시 열 설정
                             </button>
                             {columnSettingsOpen ? (
-                                <div className="absolute left-0 top-11 z-50 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+                                <div className="absolute left-0 top-11 z-50 w-64 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl">
                                     <div className="border-b border-slate-100 px-4 py-3 text-[12px] font-black text-slate-950">표시할 열</div>
                                     <div className="max-h-[420px] overflow-y-auto p-2">
                                         {['상품번호', '그룹순서', '이미지', '상품명'].map(label => (
                                             <div key={label} className="flex items-center justify-between rounded-md px-2 py-1.5 text-[11px] font-bold text-slate-500">
-                                                <label className="flex items-center gap-2"><input type="checkbox" checked readOnly className="accent-brand-orange" />{label}</label>
-                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black">고정</span>
+                                                <label className="flex items-center gap-2"><input type="checkbox" checked readOnly className="accent-blue-600" />{label}</label>
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-black">고정</span>
                                             </div>
                                         ))}
                                         <div className="my-1 border-t border-slate-100" />
                                         {PRODUCT_TABLE_COLUMN_OPTIONS.map(option => (
                                             <label key={option.key} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50">
-                                                <input type="checkbox" checked={visibleColumns.includes(option.key)} onChange={() => toggleVisibleColumn(option.key)} className="accent-brand-orange" />
+                                                <input type="checkbox" checked={visibleColumns.includes(option.key)} onChange={() => toggleVisibleColumn(option.key)} className="accent-blue-600" />
                                                 {option.label}
                                             </label>
                                         ))}
@@ -1985,7 +1996,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             type="button"
                             onClick={handleExpandAllGroups}
                             disabled={namedGroupKeys.length === 0 || collapsedNamedGroupCount === 0}
-                            className={buttonClass('secondary', 'sm')}
+                            className="h-9 rounded-xl border border-blue-100 bg-blue-50 px-3 text-[11px] font-black text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             전체 펼치기
                         </button>
@@ -1993,7 +2004,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             type="button"
                             onClick={handleCollapseAllGroups}
                             disabled={namedGroupKeys.length === 0 || collapsedNamedGroupCount === namedGroupKeys.length}
-                            className={buttonClass('secondary', 'sm')}
+                            className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             전체 접기
                         </button>
@@ -2002,15 +2013,14 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             </div>
             {checkedIds.size > 0 && (
                 <div className={isCompactViewport
-                    ? 'fixed inset-x-3 bottom-4 z-[80] flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-white/95 p-3 shadow-2xl backdrop-blur-xl'
-                    : 'flex items-center justify-between gap-3 border-b border-orange-100 bg-brand-orange-soft px-3 py-2'}
+                    ? 'fixed inset-x-3 bottom-4 z-[80] flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-white/95 p-3 shadow-2xl backdrop-blur-xl'
+                    : 'flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-3 py-2'}
                 >
-                    <span className="text-xs font-black text-slate-800">{checkedIds.size}개 상품 선택됨</span>
+                    <span className="text-xs font-black text-blue-800">{checkedIds.size}개 상품 선택됨</span>
                     <button
-                        type="button"
                         onClick={handleSaveChanges}
                         disabled={isSaving}
-                        className={buttonClass('primary', 'md')}
+                        className="min-h-10 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-700 disabled:opacity-50"
                     >
                         {isSaving ? '저장 중...' : '수정사항 저장'}
                     </button>
@@ -2024,18 +2034,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                 type="checkbox"
                                 onChange={handleToggleAll}
                                 checked={visibleProductIds.length > 0 && checkedVisibleCount === visibleProductIds.length}
-                                className="h-5 w-5 cursor-pointer accent-brand-orange"
+                                className="h-5 w-5 cursor-pointer accent-blue-600"
                             />
                             현재 목록 전체 선택
                         </label>
                         <div className="flex shrink-0 items-center gap-1.5">
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">{formatInteger(filteredProducts.length)}개</span>
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-black text-slate-600">{activeGrade}등급</span>
+                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[10px] font-black text-slate-600">{formatInteger(filteredProducts.length)}개</span>
+                            <span className="rounded-full bg-blue-100 px-2 py-1 text-[10px] font-black text-blue-700">{activeGrade}등급</span>
                         </div>
                     </div>
 
                     {filteredProducts.length === 0 ? (
-                        <EmptyState title="조건에 맞는 상품이 없습니다." description="검색어나 필터를 바꿔 다시 확인해 보세요." />
+                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-14 text-center text-[13px] font-bold text-slate-500">조건에 맞는 상품이 없습니다.</div>
                     ) : viewMode === 'sku' ? (
                         <div className="space-y-3">
                             {filteredProducts.map(product => renderMobileProductCard(
@@ -2053,7 +2063,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                         {groupIndex === firstManuallyUngroupedIndex ? (
                                             <div className="rounded-xl border border-amber-200 bg-amber-100 px-3 py-2.5">
                                                 <div className="flex items-center gap-2 text-[12px] font-black text-amber-950"><Unlink size={14} />단일 SKU</div>
-                                                <div className="mt-0.5 text-[11px] font-bold text-amber-700">그룹에서 분리한 상품 {formatInteger(manuallyUngroupedCount)}개</div>
+                                                <div className="mt-0.5 text-[10px] font-bold text-amber-700">그룹에서 분리한 상품 {formatInteger(manuallyUngroupedCount)}개</div>
                                             </div>
                                         ) : null}
                                         {group.isNamed ? (
@@ -2099,36 +2109,35 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         <col className="w-[360px]" />
                         {visibleColumnOptions.map(option => <col key={option.key} style={{ width: option.width }} />)}
                     </colgroup>
-                    <thead className="ux-thead sticky top-0 z-30 shadow-[0_2px_5px_rgba(15,23,42,0.25)]">
+                    <thead className="sticky top-0 z-30 bg-slate-900 text-white shadow-[0_2px_5px_rgba(15,23,42,0.25)]">
                         <tr>
-                            <th className="w-8 whitespace-nowrap text-center">
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap w-8">
                                 <input
                                     type="checkbox"
                                     onChange={handleToggleAll}
                                     checked={visibleProductIds.length > 0 && checkedVisibleCount === visibleProductIds.length}
-                                    className="cursor-pointer accent-brand-orange"
-                                    aria-label="현재 목록 전체 선택"
+                                    className="cursor-pointer"
                                 />
                             </th>
-                            <th className="whitespace-nowrap text-center">번호</th>
-                            <th className="whitespace-nowrap text-center">순서</th>
-                            <th className="whitespace-nowrap text-center">이미지</th>
-                            <th className="whitespace-nowrap text-left">상품명</th>
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">번호</th>
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">순서</th>
+                            <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">이미지</th>
+                            <th className="px-3 py-3 text-left text-[12px] font-black whitespace-nowrap">상품명</th>
                             {visibleColumnOptions.map(option => (
-                                <th key={option.key} className="whitespace-nowrap text-center">{option.label === '재고' ? '현재고' : option.label}</th>
+                                <th key={option.key} className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">{option.label === '재고' ? '현재고' : option.label}</th>
                             ))}
                         </tr>
                     </thead>
                     {filteredProducts.length === 0 ? (
-                        <tbody>
+                        <tbody className="divide-y divide-gray-100">
                             <tr>
-                                <td colSpan={productTableColumnCount} className="p-4">
-                                    <EmptyState compact title="조건에 맞는 상품이 없습니다." description="검색어나 필터를 바꿔 다시 확인해 보세요." />
+                                <td colSpan={productTableColumnCount} className="px-6 py-12 text-center text-gray-500">
+                                    조건에 맞는 상품이 없습니다.
                                 </td>
                             </tr>
                         </tbody>
                     ) : viewMode === 'sku' ? (
-                        <tbody className="divide-y divide-slate-100">
+                        <tbody className="divide-y divide-gray-100">
                             {filteredProducts.map((product) => (
                                 <ProductRow
                                     key={product.id}
@@ -2184,7 +2193,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                                         </span>
                                                         <div>
                                                             <div className="text-[13px] font-black text-amber-950">단일 SKU</div>
-                                                            <div className="text-[11px] font-bold text-amber-700">그룹에서 분리한 상품 {formatInteger(manuallyUngroupedCount)}개</div>
+                                                            <div className="text-[10px] font-bold text-amber-700">그룹에서 분리한 상품 {formatInteger(manuallyUngroupedCount)}개</div>
                                                         </div>
                                                     </div>
                                                 </td>
@@ -2207,7 +2216,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                             />
                                         </tbody>
                                     ) : null}
-                                    <tbody className="divide-y divide-slate-100" hidden={group.isNamed && !expanded}>
+                                    <tbody className="divide-y divide-gray-100" hidden={group.isNamed && !expanded}>
                                         {group.products.map((product, groupIndex) => (
                                             <ProductRow
                                                 key={product.id}
@@ -2282,7 +2291,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                         <button
                             type="button"
                             onClick={() => setPreviewImage(null)}
-                            className={buttonClass('secondary', 'sm', 'h-7 w-7 rounded-full px-0')}
+                            className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900"
                             aria-label="이미지 미리보기 닫기"
                         >
                             <X size={15} />
@@ -2302,12 +2311,12 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     role="menu"
                     aria-label={`${contextMenuProduct.name} 빠른 메뉴`}
                     onPointerDown={(event) => event.stopPropagation()}
-                    className="fixed z-[100] w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl"
+                    className="fixed z-[100] w-60 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
                     style={{ left: productContextMenu.x, top: productContextMenu.y }}
                 >
                     <div className="border-b border-slate-100 px-3 py-2.5">
                         <div className="truncate text-[12px] font-black text-slate-950">{contextMenuProduct.name}</div>
-                        <div className="mt-0.5 text-[11px] font-bold text-slate-500">매입 통화 선택</div>
+                        <div className="mt-0.5 text-[10px] font-bold text-slate-500">매입 통화 선택</div>
                     </div>
                     <div className="p-1.5">
                         {(['CNY', 'USD'] as PurchaseCurrency[]).map(currency => {
@@ -2319,7 +2328,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                     role="menuitemradio"
                                     aria-checked={active}
                                     onClick={() => void handlePurchaseCurrencyChange(contextMenuProduct.id, currency)}
-                                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[12px] font-black transition ${active ? 'bg-brand-orange-soft text-brand-orange' : 'text-slate-700 hover:bg-slate-50'}`}
+                                    className={`flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-[12px] font-black transition ${active ? 'bg-blue-50 text-blue-800' : 'text-slate-700 hover:bg-slate-50'}`}
                                 >
                                     <span>{currency === 'CNY' ? '중국 위안 (CNY)' : '미국 달러 (USD)'}</span>
                                     {active ? <Check size={15} /> : null}
