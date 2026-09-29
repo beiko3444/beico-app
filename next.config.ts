@@ -20,6 +20,8 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ['playwright-core', '@sparticuz/chromium', '@napi-rs/canvas', 'pdf-parse', 'pdfjs-dist'],
   outputFileTracingIncludes: {
     '/api/admin/worm-order/remittance': ['./node_modules/@sparticuz/chromium/**/*'],
+    '/api/admin/cargo-delivery/fax': ['./node_modules/@sparticuz/chromium/**/*', './public/seal.png'],
+    '/api/admin/cargo-delivery/pdf': ['./node_modules/@sparticuz/chromium/**/*', './public/seal.png'],
     '/api/admin/worm-order/emails/match': [
       './node_modules/pdf-parse/**/*',
       './node_modules/pdfjs-dist/**/*',

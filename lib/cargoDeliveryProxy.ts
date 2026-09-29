@@ -94,3 +94,65 @@ export const toProxyRecord = (row: CargoProxyRow): CargoProxyRecord => ({
     principalBusinessNo: row.principalBusinessNo,
     createdAt: row.createdAt.toISOString(),
 })
+
+export type CargoFaxRecipientRecord = {
+    id: string
+    name: string
+    faxNumber: string
+}
+
+export type CargoFaxLogRecord = {
+    id: string
+    proxyId: string | null
+    documentNo: string
+    toName: string
+    toNumber: string
+    fromNumber: string
+    fileName: string
+    sendKey: string | null
+    sendState: number | null
+    sendStateLabel: string
+    sendResult: string | null
+    sendPageCount: number | null
+    successPageCount: number | null
+    error: string | null
+    createdAt: string
+    updatedAt: string
+}
+
+type CargoFaxLogRow = {
+    id: string
+    proxyId: string | null
+    documentNo: string
+    toName: string
+    toNumber: string
+    fromNumber: string
+    fileName: string
+    sendKey: string | null
+    sendState: number | null
+    sendResult: string | null
+    sendPageCount: number | null
+    successPageCount: number | null
+    error: string | null
+    createdAt: Date
+    updatedAt: Date
+}
+
+export const toFaxLogRecord = (row: CargoFaxLogRow, describeState: (state: number | null) => string): CargoFaxLogRecord => ({
+    id: row.id,
+    proxyId: row.proxyId,
+    documentNo: row.documentNo,
+    toName: row.toName,
+    toNumber: row.toNumber,
+    fromNumber: row.fromNumber,
+    fileName: row.fileName,
+    sendKey: row.sendKey,
+    sendState: row.sendState,
+    sendStateLabel: row.error ? '오류' : describeState(row.sendState),
+    sendResult: row.sendResult,
+    sendPageCount: row.sendPageCount,
+    successPageCount: row.successPageCount,
+    error: row.error,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+})

@@ -2,12 +2,16 @@
 
 import { useMemo, useRef, useState } from 'react'
 import { Pencil, Plus, Printer, Trash2, UserRoundCheck, X } from 'lucide-react'
+import { ProxySheet } from './ProxySheet'
+import FaxPanel from './FaxPanel'
 import {
     CARGO_PROXY_DEFAULT_CARGO_NAME,
     CARGO_PROXY_PRINCIPAL,
     formatProxyDate,
     toDateInputValue,
     type CargoDriverRecord,
+    type CargoFaxLogRecord,
+    type CargoFaxRecipientRecord,
     type CargoProxyDocument,
     type CargoProxyRecord,
 } from '@/lib/cargoDeliveryProxy'
@@ -16,6 +20,8 @@ type Props = {
     initialDrivers: CargoDriverRecord[]
     initialProxies: CargoProxyRecord[]
     recentAwbNumbers: string[]
+    initialFaxRecipients: CargoFaxRecipientRecord[]
+    initialFaxLogs: CargoFaxLogRecord[]
 }
 
 type DraftState = Omit<CargoProxyDocument, 'documentNo'> & { driverId: string }
@@ -45,92 +51,7 @@ const primaryButtonClass =
 const secondaryButtonClass =
     'px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] disabled:opacity-50 transition-all'
 
-const SHEET_FONT = '"Batang", "바탕", "BatangChe", "Noto Serif KR", "Nanum Myeongjo", "Apple Myungjo", serif'
-
-const sheetStyles = {
-    sheet: {
-        width: '210mm',
-        minHeight: '297mm',
-        padding: '28mm 22mm 24mm',
-        background: '#ffffff',
-        color: '#111111',
-        fontFamily: SHEET_FONT,
-        fontSize: '14px',
-        lineHeight: 1.8,
-        boxSizing: 'border-box',
-        position: 'relative',
-        wordBreak: 'keep-all',
-    },
-    title: { fontSize: '26px', fontWeight: 900, margin: '0 0 22px', letterSpacing: '-0.5px', lineHeight: 1.3 },
-    block: { margin: '18px 0 0' },
-    indent: { paddingLeft: '10px' },
-    sealRow: { margin: '18px 0 0', position: 'relative', display: 'inline-block', paddingRight: '70px' },
-    seal: {
-        position: 'absolute',
-        right: '0',
-        top: '50%',
-        height: '64px',
-        width: '64px',
-        transform: 'translateY(-50%)',
-        objectFit: 'contain',
-        opacity: 0.85,
-    },
-    docNo: { position: 'absolute', right: '22mm', bottom: '12mm', fontSize: '10px', color: '#888888', fontFamily: 'sans-serif' },
-} as const
-
-/** 인쇄용 시트. 인라인 스타일만 사용해서 outerHTML 그대로 iframe에 복사해 인쇄한다. */
-export function ProxySheet({ doc }: { doc: CargoProxyDocument }) {
-    const dash = (value: string) => (value.trim().length > 0 ? value : ' ')
-    return (
-        <div className="cargo-proxy-sheet" style={sheetStyles.sheet}>
-            <h1 style={sheetStyles.title}>수입화물 인도 위임장</h1>
-
-            <p style={{ margin: 0 }}>위임인(수입자) 정보를 아래와 같이 명시합니다.</p>
-
-            <p style={sheetStyles.block}>
-                위임인 이름: {dash(doc.principalName)}<br />
-                위임인 주소: {dash(doc.principalAddress)}<br />
-                위임인 전화번호: {dash(doc.principalPhone)}<br />
-                사업자등록번호: {dash(doc.principalBusinessNo)}
-            </p>
-
-            <p style={sheetStyles.block}>아래 수입화물의 인도를 대리인에게 위임합니다.</p>
-
-            <p style={sheetStyles.block}>
-                화물 정보:<br />
-                <span style={sheetStyles.indent}>- B/L 번호(또는 AWB 번호): {dash(doc.blNumber)}</span><br />
-                <span style={sheetStyles.indent}>- 화물명: {dash(doc.cargoName)}</span><br />
-                <span style={sheetStyles.indent}>- 수량: {dash(doc.quantityText)}</span>
-            </p>
-
-            <p style={sheetStyles.block}>
-                대리인 정보:<br />
-                <span style={sheetStyles.indent}>- 대리인 이름: {dash(doc.driverName)}</span><br />
-                <span style={sheetStyles.indent}>- 대리인 연락처: {dash(doc.driverPhone)}</span><br />
-                <span style={sheetStyles.indent}>- 대리인 차량정보: {dash(doc.driverVehicle)}</span>
-            </p>
-
-            <p style={sheetStyles.block}>
-                위임인의 서명 및 확인:<br />
-                <span style={sheetStyles.indent}>
-                    본인은 상기 화물의 인도 절차를 위임합니다. 대리인이 위임장의 조건에 따라 화물을 수령할 수 있도록 허가합니다.
-                </span>
-            </p>
-
-            <div style={sheetStyles.sealRow}>
-                날짜: {formatProxyDate(doc.issueDate)}<br />
-                위임인 서명: {dash(doc.principalName)}
-                <img src="/seal.png" alt="인감" style={sheetStyles.seal} />
-            </div>
-
-            <p style={{ margin: '24px 0 0' }}>본 위임장은 화물 인도 과정에서만 사용되며, 그 외 용도로 사용할 수 없습니다.</p>
-
-            {doc.documentNo && <div style={sheetStyles.docNo}>문서번호 {doc.documentNo}</div>}
-        </div>
-    )
-}
-
-export default function CargoDeliveryClient({ initialDrivers, initialProxies, recentAwbNumbers }: Props) {
+export default function CargoDeliveryClient({ initialDrivers, initialProxies, recentAwbNumbers, initialFaxRecipients, initialFaxLogs }: Props) {
     const [drivers, setDrivers] = useState<CargoDriverRecord[]>(initialDrivers)
     const [driverForm, setDriverForm] = useState(EMPTY_DRIVER_FORM)
     const [editingDriverId, setEditingDriverId] = useState<string | null>(null)
@@ -145,6 +66,9 @@ export default function CargoDeliveryClient({ initialDrivers, initialProxies, re
     const [leftTab, setLeftTab] = useState<'write' | 'issued'>('write')
     const [activeProxyId, setActiveProxyId] = useState<string | null>(null)
     const [deletingProxyId, setDeletingProxyId] = useState<string | null>(null)
+
+    const [faxRecipients, setFaxRecipients] = useState<CargoFaxRecipientRecord[]>(initialFaxRecipients)
+    const [faxLogs, setFaxLogs] = useState<CargoFaxLogRecord[]>(initialFaxLogs)
 
     const sheetRef = useRef<HTMLDivElement>(null)
 
@@ -559,6 +483,7 @@ html, body { margin: 0; padding: 0; background: #fff; width: 210mm; }
                             </div>
                         </div>
                     ) : (
+                        <div className="space-y-4">
                         <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
                             <table className="w-full text-sm">
                                 <thead className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] text-gray-600 dark:text-gray-400 text-xs">
@@ -616,6 +541,16 @@ html, body { margin: 0; padding: 0; background: #fff; width: 210mm; }
                                     })}
                                 </tbody>
                             </table>
+                        </div>
+                        {activeProxy && (
+                            <FaxPanel
+                                proxy={activeProxy}
+                                recipients={faxRecipients}
+                                logs={faxLogs}
+                                onRecipientsChange={setFaxRecipients}
+                                onLogsChange={setFaxLogs}
+                            />
+                        )}
                         </div>
                     )}
                 </section>

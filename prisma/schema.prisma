@@ -946,6 +946,39 @@ model CargoDeliveryProxy {
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
   driver              CargoDeliveryDriver? @relation(fields: [driverId], references: [id], onDelete: SetNull)
+  faxLogs             CargoDeliveryFaxLog[]
 
   @@index([issueDate])
+}
+
+model CargoFaxRecipient {
+  id        String   @id @default(uuid())
+  name      String
+  faxNumber String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([createdAt])
+}
+
+model CargoDeliveryFaxLog {
+  id               String              @id @default(uuid())
+  proxyId          String?
+  documentNo       String
+  toName           String
+  toNumber         String
+  fromNumber       String
+  fileName         String
+  sendKey          String?
+  sendState        Int?
+  sendResult       String?
+  sendPageCount    Int?
+  successPageCount Int?
+  error            String?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  proxy            CargoDeliveryProxy? @relation(fields: [proxyId], references: [id], onDelete: SetNull)
+
+  @@index([proxyId])
+  @@index([createdAt])
 }

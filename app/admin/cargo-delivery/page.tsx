@@ -3,7 +3,15 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import Link from "next/link"
-import { toProxyRecord, type CargoDriverRecord, type CargoProxyRecord } from "@/lib/cargoDeliveryProxy"
+import {
+    toFaxLogRecord,
+    toProxyRecord,
+    type CargoDriverRecord,
+    type CargoFaxLogRecord,
+    type CargoFaxRecipientRecord,
+    type CargoProxyRecord,
+} from "@/lib/cargoDeliveryProxy"
+import { describeBarobillFaxState } from "@/lib/barobillFax"
 import CargoDeliveryClient from "./CargoDeliveryClient"
 
 export const dynamic = 'force-dynamic'
@@ -17,8 +25,10 @@ export default async function CargoDeliveryPage() {
     let drivers: CargoDriverRecord[] = []
     let proxies: CargoProxyRecord[] = []
     let recentAwbNumbers: string[] = []
+    let faxRecipients: CargoFaxRecipientRecord[] = []
+    let faxLogs: CargoFaxLogRecord[] = []
     try {
-        const [driverRows, proxyRows, awbRows] = await Promise.all([
+        const [driverRows, proxyRows, awbRows, recipientRows, faxRows] = await Promise.all([
             prisma.cargoDeliveryDriver.findMany({
                 orderBy: { createdAt: 'asc' },
                 select: { id: true, name: true, phone: true, vehicleNo: true },
@@ -33,10 +43,20 @@ export default async function CargoDeliveryPage() {
                 take: 40,
                 select: { awbNumber: true },
             }),
+            prisma.cargoFaxRecipient.findMany({
+                orderBy: { createdAt: 'asc' },
+                select: { id: true, name: true, faxNumber: true },
+            }),
+            prisma.cargoDeliveryFaxLog.findMany({
+                orderBy: { createdAt: 'desc' },
+                take: 200,
+            }),
         ])
         drivers = driverRows
         proxies = proxyRows.map(toProxyRecord)
         recentAwbNumbers = Array.from(new Set(awbRows.map((row) => row.awbNumber.trim()).filter(Boolean))).slice(0, 20)
+        faxRecipients = recipientRows
+        faxLogs = faxRows.map((row) => toFaxLogRecord(row, describeBarobillFaxState))
     } catch (error) {
         console.error('Failed to load cargo delivery page data:', error)
     }
@@ -57,6 +77,8 @@ export default async function CargoDeliveryPage() {
                     initialDrivers={drivers}
                     initialProxies={proxies}
                     recentAwbNumbers={recentAwbNumbers}
+                    initialFaxRecipients={faxRecipients}
+                    initialFaxLogs={faxLogs}
                 />
             </div>
         </div>
