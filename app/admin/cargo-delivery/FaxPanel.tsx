@@ -39,16 +39,24 @@ const formatDateTime = (iso: string) => {
     return date.toLocaleString('ko-KR', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
+// 바로빌 SendState: 0~2 진행중, 3 전송완료(결과코드 802만 성공), 4 예약취소, 5 변환실패, 6 전송실패, 7 부분성공, 8 용량초과
 const stateBadgeClass = (log: CargoFaxLogRecord) => {
-    if (log.error) return 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+    const failed = 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+    const success = 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
+    const pending = 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
+    if (log.error) return failed
     switch (log.sendState) {
-        case 2:
-            return 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-400'
         case 3:
+            return !log.sendResult || log.sendResult === '802' ? success : failed
+        case 7:
+            return pending
         case 4:
-            return 'bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400'
+        case 5:
+        case 6:
+        case 8:
+            return failed
         default:
-            return 'bg-amber-50 text-amber-600 dark:bg-amber-500/10 dark:text-amber-400'
+            return pending
     }
 }
 
@@ -351,7 +359,7 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                                         {log.error
                                             ? log.error
                                             : [
-                                                  log.sendResult,
+                                                  log.sendResultLabel || null,
                                                   log.sendPageCount !== null ? `${log.successPageCount ?? 0}/${log.sendPageCount}장` : null,
                                               ].filter(Boolean).join(' · ') || '-'}
                                     </td>

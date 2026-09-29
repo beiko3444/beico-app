@@ -11,7 +11,7 @@ import {
     type CargoFaxRecipientRecord,
     type CargoProxyRecord,
 } from "@/lib/cargoDeliveryProxy"
-import { describeBarobillFaxState } from "@/lib/barobillFax"
+import { describeBarobillFaxLog, describeBarobillFaxResult } from "@/lib/barobillFax"
 import CargoDeliveryClient from "./CargoDeliveryClient"
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +56,7 @@ export default async function CargoDeliveryPage() {
         proxies = proxyRows.map(toProxyRecord)
         recentAwbNumbers = Array.from(new Set(awbRows.map((row) => row.awbNumber.trim()).filter(Boolean))).slice(0, 20)
         faxRecipients = recipientRows
-        faxLogs = faxRows.map((row) => toFaxLogRecord(row, describeBarobillFaxState))
+        faxLogs = faxRows.map((row) => toFaxLogRecord(row, { state: describeBarobillFaxLog, result: describeBarobillFaxResult }))
     } catch (error) {
         console.error('Failed to load cargo delivery page data:', error)
     }

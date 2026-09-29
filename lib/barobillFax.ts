@@ -1,18 +1,21 @@
 import { Client as FtpClient } from 'basic-ftp'
 import { Readable } from 'stream'
 
-// 바로빌 팩스 API. 파일을 바로빌 FTP에 올린 뒤 SendFaxFromFTP로 전송하는 구조.
+// 바로빌 팩스 API. 파일을 바로빌 FTP(root)에 올린 뒤 SendFaxFromFTP로 전송하는 구조.
+// 문서: https://dev.barobill.co.kr/docs/guides/팩스-전송하기 , /docs/references/팩스전송-API
+//  - FTP: ftp.barobill.co.kr:9030 (Passive), 계정 = 바로빌 회원 아이디/비밀번호, root 경로에 업로드
+//  - 전송 성공 시 FTP에 올린 파일은 바로빌이 삭제
 const SOAP_URL = 'https://ws.baroservice.com/FAX.asmx'
 
 function getConfig() {
   const senderId = process.env.BAROBILL_FAX_SENDER_ID || process.env.BAROBILL_CONTACT_ID || ''
   return {
     CERTKEY: process.env.BAROBILL_CERTKEY || '',
-    CORP_NUM: process.env.BAROBILL_CORP_NUM || '',
+    CORP_NUM: (process.env.BAROBILL_CORP_NUM || '').replace(/-/g, ''),
     SENDER_ID: senderId,
     DEFAULT_FROM: process.env.BAROBILL_FAX_FROM || '',
-    FTP_HOST: process.env.BAROBILL_FAX_FTP_HOST || 'ftp.baroservice.com',
-    FTP_PORT: Number(process.env.BAROBILL_FAX_FTP_PORT || 21),
+    FTP_HOST: process.env.BAROBILL_FAX_FTP_HOST || 'ftp.barobill.co.kr',
+    FTP_PORT: Number(process.env.BAROBILL_FAX_FTP_PORT || 9030),
     FTP_USER: process.env.BAROBILL_FAX_FTP_USER || senderId,
     FTP_PASSWORD: process.env.BAROBILL_FAX_FTP_PASSWORD || '',
     FTP_DIR: process.env.BAROBILL_FAX_FTP_DIR || '',
@@ -166,6 +169,7 @@ export async function uploadBarobillFaxFile(fileName: string, data: Buffer) {
       password: config.FTP_PASSWORD,
       secure: config.FTP_SECURE,
     })
+    // 바로빌은 FTP root 업로드를 요구한다. FTP_DIR은 별도 안내가 있을 때만 사용.
     if (config.FTP_DIR) {
       await client.ensureDir(config.FTP_DIR)
     }
@@ -229,6 +233,7 @@ export async function sendBarobillFaxFromFtp(params: SendBarobillFaxParams) {
     `
   )
 
+  // 성공: 숫자가 아닌 접수번호 문자열 / 실패: 음수 오류코드 문자열
   const result = extractFirstTag(xml, 'SendFaxFromFTPResult')
   if (!result) {
     throw new Error('Barobill FAX response did not include SendFaxFromFTPResult.')
@@ -266,8 +271,9 @@ const readInt = (value: string) => {
 
 export async function getBarobillFaxMessage(sendKey: string): Promise<BarobillFaxMessage> {
   const config = ensureConfig()
+  // GetFaxMessage는 구버전. 문서가 권장하는 GetFaxMessageEx2 사용 (필드는 상위 호환)
   const xml = await callSoapAction(
-    'GetFaxMessage',
+    'GetFaxMessageEx2',
     `
       <CERTKEY>${escapeXml(config.CERTKEY)}</CERTKEY>
       <CorpNum>${escapeXml(config.CORP_NUM)}</CorpNum>
@@ -275,7 +281,13 @@ export async function getBarobillFaxMessage(sendKey: string): Promise<BarobillFa
     `
   )
 
-  const block = extractFirstTag(xml, 'GetFaxMessageResult') ? xml : xml
+  const block = xml
+  const sendState = readInt(extractFirstTag(block, 'SendState'))
+  if (sendState !== null && sendState < 0) {
+    const message = await getBarobillFaxErrorMessage(sendState).catch(() => `Error code ${sendState}`)
+    throw new Error(`[Barobill FAX] 상태 조회 실패 (${sendState}): ${message}`)
+  }
+
   return {
     sendKey: extractFirstTag(block, 'SendKey') || sendKey,
     sendFileName: extractFirstTag(block, 'SendFileName'),
@@ -291,24 +303,63 @@ export async function getBarobillFaxMessage(sendKey: string): Promise<BarobillFa
   }
 }
 
-/** 바로빌 전송상태 코드 라벨 (SMS API와 같은 체계로 가정) */
+/** 팩스 전송결과 코드 (SendResult) — 바로빌 "팩스 전송결과 테이블" */
+export const BAROBILL_FAX_RESULT_LABELS: Record<string, string> = {
+  '101': '파일변환실패 (환불)',
+  '103': '파일용량초과 (환불)',
+  '801': '부분완료 (부분환불)',
+  '802': '완료',
+  '803': '통화중 (재전송시도)',
+  '804': '잘못된 수신번호 (환불)',
+  '805': '응답없음 (환불)',
+  '807': '수신거부 (환불)',
+  '808': '알수없는 오류 (환불)',
+}
+
+export const BAROBILL_FAX_SUCCESS_RESULT = '802'
+
+export function describeBarobillFaxResult(result: string | null | undefined) {
+  if (!result) return ''
+  return BAROBILL_FAX_RESULT_LABELS[result] ?? `결과코드 ${result}`
+}
+
+/** 바로빌 팩스 전송상태 코드 (SendState) 라벨 */
 export function describeBarobillFaxState(state: number | null | undefined) {
   switch (state) {
     case 0:
-      return '대기'
+      return '변환 대기중'
     case 1:
-      return '전송중'
+      return '파일 변환중'
     case 2:
-      return '성공'
+      return '전송중'
     case 3:
-      return '실패'
+      return '전송완료'
     case 4:
-      return '취소'
+      return '예약취소'
+    case 5:
+      return '파일변환실패'
+    case 6:
+      return '전송실패'
+    case 7:
+      return '부분성공'
+    case 8:
+      return '파일용량초과'
     default:
       return state === null || state === undefined ? '확인중' : `상태 ${state}`
   }
 }
 
 export function isBarobillFaxFinalState(state: number | null | undefined) {
-  return state === 2 || state === 3 || state === 4
+  return state !== null && state !== undefined && state >= 3
+}
+
+/** 전송완료(3)이면서 결과코드 802 인 경우만 성공 */
+export function isBarobillFaxSuccess(state: number | null | undefined, result: string | null | undefined) {
+  return state === 3 && (result === BAROBILL_FAX_SUCCESS_RESULT || !result)
+}
+
+/** 화면 표시용 상태 라벨: 전송완료(3)라도 결과코드가 802가 아니면 실패로 표시 */
+export function describeBarobillFaxLog(state: number | null | undefined, result: string | null | undefined) {
+  if (state === 3 && result && result !== BAROBILL_FAX_SUCCESS_RESULT) return '전송실패'
+  return describeBarobillFaxState(state)
 }

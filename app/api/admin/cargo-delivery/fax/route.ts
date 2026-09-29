@@ -6,7 +6,8 @@ import { toFaxLogRecord, toProxyRecord } from "@/lib/cargoDeliveryProxy"
 import { renderCargoProxyPdf } from "@/lib/cargoDeliveryProxyPdf"
 import {
     checkBarobillFaxFtp,
-    describeBarobillFaxState,
+    describeBarobillFaxLog,
+    describeBarobillFaxResult,
     getBarobillFaxFromNumbers,
     getBarobillFaxMessage,
     isBarobillFaxFinalState,
@@ -23,7 +24,8 @@ export const maxDuration = 120
 const readText = (value: unknown) => (typeof value === 'string' ? value.trim() : '')
 const getErrorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
-const serialize = (row: Parameters<typeof toFaxLogRecord>[0]) => toFaxLogRecord(row, describeBarobillFaxState)
+const serialize = (row: Parameters<typeof toFaxLogRecord>[0]) =>
+    toFaxLogRecord(row, { state: describeBarobillFaxLog, result: describeBarobillFaxResult })
 
 /** 아직 최종 상태가 아닌 전송건은 바로빌에서 상태를 다시 읽어 갱신 */
 const refreshPendingLogs = async (rows: Parameters<typeof toFaxLogRecord>[0][]) => {
@@ -145,7 +147,8 @@ export async function POST(request: Request) {
             toNumber,
             receiveCorp: toName || '',
             receiveName: toName || '',
-            refKey: log.id,
+            // RefKey는 바로빌이 더 이상 권장하지 않음 (빈 문자열 권장). 우리 쪽 추적은 sendKey로 한다.
+            refKey: '',
         })
 
         const updated = await prisma.cargoDeliveryFaxLog.update({

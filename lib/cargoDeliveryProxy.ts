@@ -50,6 +50,13 @@ export const formatProxyDate = (dateInput: string) => {
     return `${match[1]}.${match[2]}.${match[3]}`
 }
 
+/** 2026-09-29 -> 2026년 09월 29일 */
+export const formatProxyDateKorean = (dateInput: string) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(dateInput)
+    if (!match) return dateInput
+    return `${match[1]}년 ${match[2]}월 ${match[3]}일`
+}
+
 /** 2026-09-29 (YYYY-MM-DD, 로컬 날짜) -> Date (정오 기준, 타임존 밀림 방지) */
 export const parseDateInput = (dateInput: string) => {
     const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput)
@@ -113,6 +120,7 @@ export type CargoFaxLogRecord = {
     sendState: number | null
     sendStateLabel: string
     sendResult: string | null
+    sendResultLabel: string
     sendPageCount: number | null
     successPageCount: number | null
     error: string | null
@@ -138,7 +146,12 @@ type CargoFaxLogRow = {
     updatedAt: Date
 }
 
-export const toFaxLogRecord = (row: CargoFaxLogRow, describeState: (state: number | null) => string): CargoFaxLogRecord => ({
+export type CargoFaxLogDescriber = {
+    state: (state: number | null, result: string | null) => string
+    result: (result: string | null) => string
+}
+
+export const toFaxLogRecord = (row: CargoFaxLogRow, describe: CargoFaxLogDescriber): CargoFaxLogRecord => ({
     id: row.id,
     proxyId: row.proxyId,
     documentNo: row.documentNo,
@@ -148,8 +161,9 @@ export const toFaxLogRecord = (row: CargoFaxLogRow, describeState: (state: numbe
     fileName: row.fileName,
     sendKey: row.sendKey,
     sendState: row.sendState,
-    sendStateLabel: row.error ? '오류' : describeState(row.sendState),
+    sendStateLabel: row.error ? '오류' : describe.state(row.sendState, row.sendResult),
     sendResult: row.sendResult,
+    sendResultLabel: describe.result(row.sendResult),
     sendPageCount: row.sendPageCount,
     successPageCount: row.successPageCount,
     error: row.error,
