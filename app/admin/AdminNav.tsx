@@ -25,6 +25,7 @@ import {
   ShoppingCart,
   Star,
   StickyNote,
+  Truck,
   Warehouse,
   X,
 } from 'lucide-react'
@@ -203,6 +204,7 @@ export default function AdminNav({
     { name: '마인드보드', path: '/admin/mindboard', icon: LayoutGrid },
     { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
     { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
+    { name: '인도 위임장', path: '/admin/cargo-delivery', icon: Truck },
     { name: 'PI발급', path: '/admin/proforma', icon: FileText },
     { name: '수출신고', path: '/admin/export-declaration', icon: Ship },
     { name: '전력관리', path: '/admin/electricity', icon: PlugZap },
