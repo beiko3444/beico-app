@@ -166,11 +166,11 @@ const sampleOrderData: NormalizedOrderDetail = {
   rawStatus: 'DEPOSIT_COMPLETED',
 }
 
-function formatCurrency(value: number) {
+export function formatCurrency(value: number) {
   return `${Math.round(value).toLocaleString('ko-KR')}원`
 }
 
-function formatDateTime(value: string | Date | null | undefined) {
+export function formatDateTime(value: string | Date | null | undefined) {
   if (!value) return '-'
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
@@ -204,6 +204,11 @@ function mapStatusMeta(status: string, hasTracking: boolean, taxInvoiceIssued: b
   if (status === 'DEPOSIT_COMPLETED') return { label: '입금확인', tone: 'green' }
   if (status === 'APPROVED' || status === 'PENDING_DEPOSIT' || status === 'PENDING') return { label: '입금대기', tone: 'orange' }
   return { label: '주문접수', tone: 'gray' }
+}
+
+/** Status label/tone for a raw order record — used by the collapsed summary row. */
+export function getOrderStatusMeta(order: OrderRecord): { label: string; tone: Tone } {
+  return mapStatusMeta(order.status, parseTrackingNumbers(order.trackingNumber).length > 0, Boolean(order.taxInvoiceIssued))
 }
 
 function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail {
@@ -274,7 +279,7 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
   }
 }
 
-function toneClasses(tone: Tone) {
+export function toneClasses(tone: Tone) {
   switch (tone) {
     case 'blue':
       return 'border-blue-200 bg-blue-50 text-blue-700'
