@@ -684,6 +684,8 @@ export default function InventoryClient() {
     linked: orderedMasters.filter((row) => row.linkCount > 0).length,
   }), [orderedMasters])
   const healthStatus = String(data?.health?.status || '')
+  const monitorUnavailable = data?.configured === false || (!data && !loading)
+  const summary = data?.configured ? data.summary : null
   const coupangStale = data?.channelHealth?.coupang?.status === 'stale'
   const cacheLabel = data?.cache?.hit
     ? `캐시 표시 중${data.cache.refreshing ? ' / 갱신 중' : ''}`
@@ -757,13 +759,13 @@ export default function InventoryClient() {
     <div className="mx-auto w-full min-w-0 max-w-[1540px] space-y-4 pb-6">
       <PageHeader
         title="재고관리"
-        count={`${formatNumber(data?.summary.masterCount || 0)}개`}
+        count={summary ? `${formatNumber(summary.masterCount)}개` : undefined}
         description="채널별 재고, 입고 예정 수량과 재고가치를 한곳에서 확인합니다."
         actions={(
           <>
             <div className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600">
               <span className={`h-2 w-2 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-              <span>{coupangStale ? '쿠팡 연동 오류' : healthStatus ? '수집기 연결됨' : '연결 확인 중'}</span>
+              <span>{monitorUnavailable ? '수집기 연결 실패' : coupangStale ? '쿠팡 연동 오류' : healthStatus ? '수집기 연결됨' : '연결 확인 중'}</span>
               <span className="hidden border-l border-slate-200 pl-2 text-slate-500 sm:inline">{cacheLabel}</span>
             </div>
             <button
@@ -806,17 +808,17 @@ export default function InventoryClient() {
 
       <section aria-label="재고 요약">
         <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(data?.summary.masterCount || 0)} sub="등록된 관리 상품" />
+          <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(summary?.masterCount)} sub="등록된 관리 상품" />
           <StatCard
             icon={<Database size={20} />}
             label="총 재고"
-            value={coupangStale ? '확인 불가' : formatNumber(data?.summary.totalStock || 0)}
-            sub={<InventoryStockSub naver={data?.summary.naverStock || 0} coupang={data?.summary.coupangStock || 0} coupangStale={coupangStale} />}
+            value={monitorUnavailable || coupangStale ? '확인 불가' : formatNumber(summary?.totalStock)}
+            sub={<InventoryStockSub naver={summary?.naverStock} coupang={summary?.coupangStock} coupangStale={coupangStale} />}
             tone="blue"
           />
-          <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(data?.summary.totalInboundPending || 0)} sub="입고 예정 수량" tone="orange" />
-          <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(data?.summary.unlinkedProducts || 0)} sub="채널 연결 필요" tone="red" />
-          <StatCard icon={<WalletCards size={20} />} label="재고가치" value={coupangStale ? '확인 불가' : formatMoney(data?.summary.stockCost || 0)} sub="현재 재고 원가 기준" tone="green" />
+          <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(summary?.totalInboundPending)} sub="입고 예정 수량" tone="orange" />
+          <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(summary?.unlinkedProducts)} sub="채널 연결 필요" tone="red" />
+          <StatCard icon={<WalletCards size={20} />} label="재고가치" value={monitorUnavailable || coupangStale ? '확인 불가' : formatMoney(summary?.stockCost)} sub="현재 재고 원가 기준" tone="green" />
         </div>
       </section>
 

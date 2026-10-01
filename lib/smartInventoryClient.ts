@@ -186,6 +186,7 @@ function normalizeBaseUrl(value: string | null | undefined): string | null {
   if (!text) return null
   try {
     const parsed = new URL(text)
+    if (!['http:', 'https:'].includes(parsed.protocol)) return null
     return parsed.toString().replace(/\/+$/, '')
   } catch {
     return null
@@ -205,29 +206,44 @@ async function resolveMonitorUrlFromGist(gistRawUrl: string, timeoutMs: number):
   const rawUrl = normalizeBaseUrl(gistRawUrl)
   if (!rawUrl) return null
 
-  const url = new URL(rawUrl)
-  if (url.hostname === 'gist.githubusercontent.com' && url.pathname.endsWith('/raw/monitor.json')) {
-    url.pathname = url.pathname.slice(0, -'/monitor.json'.length)
-  }
-  url.searchParams.set('t', String(Date.now()))
+  const raw = new URL(rawUrl)
+  raw.searchParams.set('t', String(Date.now()))
+  const sources = [raw]
+  const gistId = raw.hostname === 'gist.githubusercontent.com'
+    ? raw.pathname.match(/^\/[^/]+\/([a-f0-9]+)\/raw(?:\/|$)/i)?.[1]
+    : null
+  if (gistId) sources.push(new URL(`https://api.github.com/gists/${gistId}`))
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), timeoutMs)
-  try {
-    const response = await fetch(url.toString(), {
-      cache: 'no-store',
-      headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
-      signal: controller.signal,
-    })
-    if (!response.ok) return null
-    const payload = await response.json().catch(() => null)
-    if (!payload || typeof payload !== 'object') return null
-    return normalizeBaseUrl((payload as RawRecord).url as string | undefined)
-  } catch {
-    return null
-  } finally {
-    clearTimeout(timer)
+  // Keep the configured filename; GitHub's API is independent of the raw CDN.
+  for (const url of sources) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
+    try {
+      const response = await fetch(url.toString(), {
+        cache: 'no-store',
+        headers: { Accept: 'application/json', 'Cache-Control': 'no-cache' },
+        signal: controller.signal,
+      })
+      if (!response.ok) continue
+      const payload = await response.json().catch(() => null)
+      if (!payload || typeof payload !== 'object') continue
+      let value = payload as RawRecord
+      if (url.hostname === 'api.github.com') {
+        const filename = raw.pathname.split('/raw/')[1] || 'monitor.json'
+        const files = value.files as Record<string, { content?: string; truncated?: boolean }> | undefined
+        const file = files?.[filename]
+        if (!file?.content || file.truncated) continue
+        value = JSON.parse(file.content) as RawRecord
+      }
+      const monitorUrl = normalizeBaseUrl(typeof value?.url === 'string' ? value.url : null)
+      if (monitorUrl) return monitorUrl
+    } catch {
+      // Try the next independent discovery source after a transient failure.
+    } finally {
+      clearTimeout(timer)
+    }
   }
+  return null
 }
 
 function addMonitorCandidate(candidates: MonitorBase[], url: string | null, source: MonitorCandidateSource, warnings: string[] = []) {
@@ -643,7 +659,7 @@ async function buildDashboard(base: MonitorBase): Promise<SmartInventoryDashboar
 }
 
 function isHardMonitorFailure(payload: SmartInventoryDashboardPayload): boolean {
-  if (!payload.configured || !payload.monitorUrl) return false
+  if (!payload.configured || !payload.monitorUrl) return true
 
   const hasNoMonitorData =
     payload.rows.length === 0 &&
