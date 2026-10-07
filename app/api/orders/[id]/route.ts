@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { sendEmail } from "@/lib/email"
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
+import { applyOrderQuantityChanges, OrderQuantityError, parseOrderQuantityChanges } from '@/lib/orderQuantity'
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
     console.log("PATCH request received")
@@ -21,11 +22,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         } catch (e) {
             return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
         }
-        const { status, trackingNumber, courier, taxInvoiceIssued, adminDepositConfirmedAt, depositConfirmedAt, shippingFeeOverride } = body
-        if (shippingFeeOverride !== undefined) {
+        const { status, trackingNumber, courier, taxInvoiceIssued, adminDepositConfirmedAt, depositConfirmedAt, shippingFeeOverride, items } = body
+        const financialEdit = shippingFeeOverride !== undefined || items !== undefined
+        if (financialEdit) {
             if (session.user.role !== 'ADMIN') {
                 return NextResponse.json({ error: "Forbidden" }, { status: 403 })
             }
+        }
+        const quantityChanges = items === undefined ? undefined : parseOrderQuantityChanges(items)
+        if (shippingFeeOverride !== undefined) {
             if (shippingFeeOverride !== null && (!Number.isSafeInteger(shippingFeeOverride) || shippingFeeOverride < 0 || shippingFeeOverride > 100000000)) {
                 return NextResponse.json({ error: '배송비는 0 이상 1억 원 이하의 정수로 입력해 주세요.' }, { status: 400 })
             }
@@ -55,6 +60,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 },
                 items: {
                     select: {
+                        id: true,
                         productId: true,
                         quantity: true,
                         price: true,
@@ -109,12 +115,10 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
 
         const updateData: any = {}
-        if (shippingFeeOverride !== undefined) {
+        if (financialEdit) {
             if (order.taxInvoiceIssued) {
-                return NextResponse.json({ error: '세금계산서가 발급된 주문은 배송비를 변경할 수 없습니다. 계산서를 취소한 뒤 수정해 주세요.' }, { status: 409 })
+                return NextResponse.json({ error: '세금계산서가 발급된 주문은 수량이나 배송비를 변경할 수 없습니다. 계산서를 취소한 뒤 수정해 주세요.' }, { status: 409 })
             }
-            updateData.shippingFeeOverride = shippingFeeOverride
-            updateData.total = calculateOrderFinalAmount(order.items, shippingFeeOverride).finalAmount
         }
         const preserveCompletedStatus = order.status === 'COMPLETED'
             && Boolean(status)
@@ -129,6 +133,32 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
         // Transaction keeps status checks and the update consistent.
         const result = await prisma.$transaction(async (tx: any) => {
+            if (financialEdit) {
+                // Re-read amounts inside the transaction to keep quantities, shipping and total in sync.
+                const currentOrder = await tx.order.findUnique({
+                    where: { id },
+                    select: { taxInvoiceIssued: true, shippingFeeOverride: true, items: {
+                        select: { id: true, quantity: true, price: true },
+                    } },
+                })
+                if (!currentOrder || currentOrder.taxInvoiceIssued) {
+                    const error = new Error('주문 정보가 변경되었습니다. 새로고침 후 다시 시도해 주세요.')
+                    Object.assign(error, { status: 409 })
+                    throw error
+                }
+                const nextItems = quantityChanges
+                    ? applyOrderQuantityChanges(currentOrder.items, quantityChanges)
+                    : currentOrder.items
+                const nextShippingFee = shippingFeeOverride !== undefined
+                    ? shippingFeeOverride : currentOrder.shippingFeeOverride
+                if (shippingFeeOverride !== undefined) updateData.shippingFeeOverride = shippingFeeOverride
+                if (quantityChanges) {
+                    updateData.items = { update: quantityChanges.map((item) => ({
+                        where: { id: item.id }, data: { quantity: item.quantity },
+                    })) }
+                }
+                updateData.total = calculateOrderFinalAmount(nextItems, nextShippingFee).finalAmount
+            }
             // A canceled order can only be reactivated while all of its products
             // remain available for ordering.
             if (order.status === 'CANCELED' && status === 'PENDING') {
@@ -173,7 +203,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 data: updateData
             })
             return updatedOrder
-        })
+        }, financialEdit ? { isolationLevel: 'Serializable' } : undefined)
 
         if (session.user.role !== 'ADMIN' && status === 'DEPOSIT_COMPLETED' && order.status !== 'DEPOSIT_COMPLETED') {
             try {
@@ -253,6 +283,12 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
     } catch (error: any) {
         console.error("API Error:", error)
+        if (error instanceof OrderQuantityError) {
+            return NextResponse.json({ error: error.message }, { status: 400 })
+        }
+        if (error.status === 409 || error.code === 'P2034') {
+            return NextResponse.json({ error: '주문 정보가 변경되었습니다. 새로고침 후 다시 시도해 주세요.' }, { status: 409 })
+        }
         return NextResponse.json({ error: error.message || "Failed to update order" }, { status: 500 })
     }
 }

@@ -434,6 +434,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const [shippingFeeInput, setShippingFeeInput] = useState('')
   const [editingShippingFee, setEditingShippingFee] = useState(false)
+  const [editingQuantityId, setEditingQuantityId] = useState<string | null>(null)
+  const [quantityInput, setQuantityInput] = useState('')
 
   useEffect(() => {
     setCurrentStatus(detail.rawStatus)
@@ -508,6 +510,68 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     } finally {
       setLoadingAction(null)
     }
+  }
+
+  const handleQuantitySave = async () => {
+    const quantity = Number(quantityInput)
+    if (!quantityInput.trim() || !Number.isSafeInteger(quantity) || quantity < 1 || quantity > 1000000) {
+      alert('수량은 1 이상 1,000,000 이하의 정수로 입력해 주세요.')
+      return
+    }
+    if (!editingQuantityId || loadingAction) return
+    setLoadingAction('quantity')
+    try {
+      await patchOrder({ items: [{ id: editingQuantityId, quantity }] })
+      setEditingQuantityId(null)
+      setToastMessage('수량과 주문금액을 수정했습니다.')
+      router.refresh()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '수량 수정에 실패했습니다.')
+    } finally {
+      setLoadingAction(null)
+    }
+  }
+
+  const renderQuantity = (product: ProductLineItem) => {
+    if (product.kind === 'shipping') return '1건'
+    if (editingQuantityId === product.id && !taxInvoiceIssued) {
+      return (
+        <div className="space-y-2">
+          <div className="flex items-center justify-end gap-1">
+            <input type="number" min="1" max="1000000" step="1"
+              aria-label={`${product.name} 주문 수량`}
+              className="h-9 w-24 rounded-lg border border-slate-300 bg-white px-2 text-right text-sm"
+              value={quantityInput} disabled={Boolean(loadingAction)}
+              onChange={(event) => setQuantityInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') void handleQuantitySave()
+                if (event.key === 'Escape' && !loadingAction) setEditingQuantityId(null)
+              }} />
+            <span>개</span>
+          </div>
+          <div className="flex justify-end gap-2 text-xs">
+            <button type="button" disabled={Boolean(loadingAction)} onClick={() => void handleQuantitySave()}
+              className="rounded-md bg-slate-950 px-2 py-1 text-white disabled:opacity-50">
+              {loadingAction === 'quantity' ? '저장 중…' : '저장'}
+            </button>
+            <button type="button" disabled={Boolean(loadingAction)} onClick={() => setEditingQuantityId(null)}
+              className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-50">취소</button>
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div>
+        <span>{product.quantity.toLocaleString('ko-KR')}개</span>
+        {order && !taxInvoiceIssued ? (
+          <button type="button" aria-label={`${product.name} 수량 수정`} disabled={Boolean(loadingAction)}
+            className="ml-2 text-xs font-bold text-blue-600 disabled:opacity-50" onClick={() => {
+              setEditingQuantityId(product.id)
+              setQuantityInput(String(product.quantity))
+            }}>수정</button>
+        ) : null}
+      </div>
+    )
   }
 
   const handleSaveTracking = async () => {
@@ -742,12 +806,17 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             icon={<Package className="h-4 w-4" />}
             muted={isCompletedOrder}
           >
+            <p className="mb-3 text-xs leading-5 text-slate-500">
+              {taxInvoiceIssued
+                ? '세금계산서를 취소한 뒤 수량과 배송비를 수정할 수 있습니다.'
+                : '품목별 수량 옆의 수정 버튼으로 변경하세요. 단가는 유지되며 상품금액·부가세·총액과 자동 배송비가 다시 계산됩니다. 직접 지정한 배송비는 유지됩니다.'}
+            </p>
             <div className="hidden overflow-x-auto rounded-2xl border border-[#E6EAF2] lg:block">
               <table className="w-full min-w-[900px] border-collapse">
                 <thead className="bg-slate-50 text-left text-[12px] font-black text-slate-500">
                   <tr>
                     <th className="h-14 min-w-[320px] px-5 py-3">상품 정보</th>
-                    <th className="w-[110px] px-4 py-3 text-right">수량</th>
+                    <th className="min-w-[150px] px-4 py-3 text-right">수량</th>
                     <th className="w-[130px] px-4 py-3 text-right">단가</th>
                     <th className="w-[140px] px-4 py-3 text-right">공급가</th>
                     <th className="w-[130px] px-4 py-3 text-right">부가세</th>
@@ -774,7 +843,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{product.kind === 'shipping' ? '1건' : `${product.quantity.toLocaleString('ko-KR')}개`}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{renderQuantity(product)}</td>
                       <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.unitPrice)}</td>
                       <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.supplyPrice)}</td>
                       <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.vat)}</td>
@@ -804,7 +873,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                     </div>
                   </div>
                   <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">수량</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{product.kind === 'shipping' ? '1건' : `${product.quantity.toLocaleString('ko-KR')}개`}</div></div>
+                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">수량</span><div className="mt-1 font-bold text-slate-900">{renderQuantity(product)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">단가</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.unitPrice)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">공급가</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.supplyPrice)}</div></div>
                     <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">부가세</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.vat)}</div></div>
@@ -834,7 +903,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                   {order?.shippingFeeOverride != null ? '관리자 지정 · VAT 별도' : '자동 책정 · VAT 별도'}
                 </div>
                 {!taxInvoiceIssued && !editingShippingFee ? (
-                  <button type="button" className="mt-2 text-xs font-bold text-blue-600" onClick={() => {
+                  <button type="button" disabled={Boolean(loadingAction)} className="mt-2 text-xs font-bold text-blue-600 disabled:opacity-50" onClick={() => {
                     setShippingFeeInput(String(detail.payment.shippingFee))
                     setEditingShippingFee(true)
                   }}>배송비 수정</button>
@@ -845,9 +914,9 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                       className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
                       value={shippingFeeInput} onChange={(event) => setShippingFeeInput(event.target.value)} />
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <button type="button" disabled={loadingAction === 'shippingFee'} onClick={() => void handleShippingFee()}
+                      <button type="button" disabled={Boolean(loadingAction)} onClick={() => void handleShippingFee()}
                         className="rounded-md bg-slate-950 px-2 py-1 text-white disabled:opacity-50">저장</button>
-                      <button type="button" disabled={loadingAction === 'shippingFee'} onClick={() => void handleShippingFee(true)}
+                      <button type="button" disabled={Boolean(loadingAction)} onClick={() => void handleShippingFee(true)}
                         className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-50">자동 책정</button>
                       <button type="button" onClick={() => setEditingShippingFee(false)}>취소</button>
                     </div>
