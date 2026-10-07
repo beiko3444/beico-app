@@ -34,6 +34,7 @@ interface OrderProductRecord {
 
 export interface OrderRecord {
   id: string
+  shippingFeeOverride?: number | null
   orderNumber?: string | null
   createdAt: string | Date
   status: string
@@ -235,7 +236,7 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
     }
   })
 
-  const payment = calculateOrderFinalAmount(order.items || [])
+  const payment = calculateOrderFinalAmount(order.items || [], order.shippingFeeOverride)
   const statusMeta = mapStatusMeta(order.status, trackingNumbers.length > 0, Boolean(order.taxInvoiceIssued))
 
   return {
@@ -431,6 +432,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   const [loadingAction, setLoadingAction] = useState<string | null>(null)
   const [deleteModalOpen, setDeleteModalOpen] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [shippingFeeInput, setShippingFeeInput] = useState('')
+  const [editingShippingFee, setEditingShippingFee] = useState(false)
 
   useEffect(() => {
     setCurrentStatus(detail.rawStatus)
@@ -486,6 +489,25 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
     if (!trackingNumber.trim()) return '송장번호를 입력해야 합니다.'
     if (!/^[0-9-]+$/.test(trackingNumber.trim())) return '송장번호는 숫자와 하이픈만 입력할 수 있습니다.'
     return null
+  }
+
+  const handleShippingFee = async (reset = false) => {
+    const fee = reset ? null : Number(shippingFeeInput)
+    if (!reset && (!shippingFeeInput.trim() || !Number.isSafeInteger(fee) || Number(fee) < 0 || Number(fee) > 100000000)) {
+      alert('배송비는 0 이상 1억 원 이하의 정수로 입력해 주세요.')
+      return
+    }
+    setLoadingAction('shippingFee')
+    try {
+      await patchOrder({ shippingFeeOverride: fee })
+      setEditingShippingFee(false)
+      setToastMessage(reset ? '자동 배송비로 복원했습니다.' : '배송비를 수정했습니다.')
+      router.refresh()
+    } catch (error) {
+      alert(error instanceof Error ? error.message : '배송비 수정에 실패했습니다.')
+    } finally {
+      setLoadingAction(null)
+    }
   }
 
   const handleSaveTracking = async () => {
@@ -808,6 +830,29 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               <div className="flex items-center justify-between gap-3 xl:block">
                 <span className="text-slate-500">배송비</span>
                 <div className="whitespace-nowrap xl:mt-1">{formatCurrency(detail.payment.shippingFee)}</div>
+                <div className="mt-1 text-[10px] font-medium text-slate-500">
+                  {order?.shippingFeeOverride != null ? '관리자 지정 · VAT 별도' : '자동 책정 · VAT 별도'}
+                </div>
+                {!taxInvoiceIssued && !editingShippingFee ? (
+                  <button type="button" className="mt-2 text-xs font-bold text-blue-600" onClick={() => {
+                    setShippingFeeInput(String(detail.payment.shippingFee))
+                    setEditingShippingFee(true)
+                  }}>배송비 수정</button>
+                ) : null}
+                {editingShippingFee ? (
+                  <div className="mt-2 space-y-2">
+                    <input aria-label="배송비 (VAT 별도)" type="number" min="0" max="100000000" step="1"
+                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                      value={shippingFeeInput} onChange={(event) => setShippingFeeInput(event.target.value)} />
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <button type="button" disabled={loadingAction === 'shippingFee'} onClick={() => void handleShippingFee()}
+                        className="rounded-md bg-slate-950 px-2 py-1 text-white disabled:opacity-50">저장</button>
+                      <button type="button" disabled={loadingAction === 'shippingFee'} onClick={() => void handleShippingFee(true)}
+                        className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-50">자동 책정</button>
+                      <button type="button" onClick={() => setEditingShippingFee(false)}>취소</button>
+                    </div>
+                  </div>
+                ) : null}
               </div>
               <div className="flex items-center justify-between gap-3 sm:col-span-2 xl:col-span-1 xl:block">
                 <span className="text-slate-500">최종 결제금액</span>

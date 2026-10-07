@@ -16,6 +16,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             id: true,
             userId: true,
             orderNumber: true,
+            shippingFeeOverride: true,
             createdAt: true,
             user: {
                 select: {
@@ -79,7 +80,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     // Calculate Totals based on items + shipping fee logic
     const productTotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
     const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-    const shippingFee = totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0;
+    const shippingFee = order.shippingFeeOverride ?? (totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0);
 
     const supplyTotal = productTotal + shippingFee
     const taxTotal = Math.round(supplyTotal * 0.1)
@@ -257,8 +258,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                                         <span className="font-bold text-[10px] block">送料</span>
                                         <span className="text-[9px] text-gray-600 block">배송비 (Shipping)</span>
                                     </td>
-                                    <td className="border-x border-black py-0.5 font-inter">{Math.ceil(totalQuantity / 100)}</td>
-                                    <td className="border-x border-black py-0.5 px-1 text-right font-inter">3,000</td>
+                                    <td className="border-x border-black py-0.5 font-inter">1</td>
+                                    <td className="border-x border-black py-0.5 px-1 text-right font-inter">{shippingFee.toLocaleString()}</td>
                                     <td className="border-x border-black py-0.5 px-1 text-right font-inter">{shippingFee.toLocaleString()}</td>
                                     <td className="border-x border-black py-0.5 px-1 text-right font-inter">{Math.round(shippingFee * 0.1).toLocaleString()}</td>
                                     <td className="border-x border-black py-0.5 px-1 text-right font-bold bg-gray-50/30 font-inter">{Math.round(shippingFee * 1.1).toLocaleString()}</td>

@@ -174,6 +174,7 @@ export async function GET(request: Request) {
                 orderNumber: true,
                 userId: true,
                 total: true,
+                shippingFeeOverride: true,
                 createdAt: true,
                 status: true,
                 trackingNumber: true,

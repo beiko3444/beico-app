@@ -232,7 +232,7 @@ export function buildTaxInvoiceParams(order: any): IssueTaxInvoiceParams {
   });
 
   const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-  const shippingFee = totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0;
+  const shippingFee = order.shippingFeeOverride ?? (totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0);
 
   if (shippingFee > 0) {
     const shippingTax = Math.round(shippingFee * 0.1);

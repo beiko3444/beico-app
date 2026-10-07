@@ -18,6 +18,7 @@ export default async function OrderHistoryPage() {
             id: true,
             orderNumber: true,
             total: true,
+            shippingFeeOverride: true,
             createdAt: true,
             status: true,
             trackingNumber: true,

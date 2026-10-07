@@ -26,6 +26,7 @@ export async function POST(req: Request) {
         id: true,
         orderNumber: true,
         taxInvoiceIssued: true,
+        shippingFeeOverride: true,
         user: {
           select: {
             name: true,

@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/lib/auth"
 import { sendEmail } from "@/lib/email"
+import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
     console.log("PATCH request received")
@@ -20,7 +21,15 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         } catch (e) {
             return NextResponse.json({ error: "Invalid JSON" }, { status: 400 })
         }
-        const { status, trackingNumber, courier, taxInvoiceIssued, adminDepositConfirmedAt, depositConfirmedAt } = body
+        const { status, trackingNumber, courier, taxInvoiceIssued, adminDepositConfirmedAt, depositConfirmedAt, shippingFeeOverride } = body
+        if (shippingFeeOverride !== undefined) {
+            if (session.user.role !== 'ADMIN') {
+                return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+            }
+            if (shippingFeeOverride !== null && (!Number.isSafeInteger(shippingFeeOverride) || shippingFeeOverride < 0 || shippingFeeOverride > 100000000)) {
+                return NextResponse.json({ error: '배송비는 0 이상 1억 원 이하의 정수로 입력해 주세요.' }, { status: 400 })
+            }
+        }
 
         // Validation
         if (status) {
@@ -37,6 +46,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 userId: true,
                 orderNumber: true,
                 status: true,
+                shippingFeeOverride: true,
+                taxInvoiceIssued: true,
                 user: {
                     select: {
                         name: true,
@@ -98,6 +109,13 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
         }
 
         const updateData: any = {}
+        if (shippingFeeOverride !== undefined) {
+            if (order.taxInvoiceIssued) {
+                return NextResponse.json({ error: '세금계산서가 발급된 주문은 배송비를 변경할 수 없습니다. 계산서를 취소한 뒤 수정해 주세요.' }, { status: 409 })
+            }
+            updateData.shippingFeeOverride = shippingFeeOverride
+            updateData.total = calculateOrderFinalAmount(order.items, shippingFeeOverride).finalAmount
+        }
         const preserveCompletedStatus = order.status === 'COMPLETED'
             && Boolean(status)
             && status !== 'COMPLETED'
@@ -162,7 +180,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
                 // Calculate Totals using the same logic as AdminOrderCard
                 const productSupplyTotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
                 const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
-                const shippingFee = totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0;
+                const shippingFee = calculateOrderFinalAmount(order.items, order.shippingFeeOverride).shippingFee;
                 const grandSupply = productSupplyTotal + shippingFee;
                 const grandVat = Math.round(grandSupply * 0.1);
                 const totalAmount = grandSupply + grandVat;

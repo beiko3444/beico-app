@@ -189,6 +189,7 @@ model Order {
   id                      String       @id @default(uuid())
   userId                  String
   total                   Float
+  shippingFeeOverride     Int?
   createdAt               DateTime     @default(now())
   status                  String       @default("PENDING")
   trackingNumber          String?

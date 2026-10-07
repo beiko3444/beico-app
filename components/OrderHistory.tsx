@@ -23,6 +23,7 @@ type OrderHistoryItem = {
 }
 
 type OrderHistoryRow = {
+    shippingFeeOverride?: number | null
     id?: string | null
     orderNumber?: string | null
     createdAt?: string | Date | null
@@ -159,7 +160,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                 const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
                 const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
 
-                const shippingFee = isUSD ? 0 : Math.ceil(totalQuantity / 100) * 3000;
+                const shippingFee = isUSD ? 0 : (safeOrder.shippingFeeOverride ?? Math.ceil(totalQuantity / 100) * 3000);
 
                 const supplyPrice = productSum + shippingFee;
                 const vat = isUSD ? 0 : Math.round(supplyPrice * 0.1);

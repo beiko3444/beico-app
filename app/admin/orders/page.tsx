@@ -12,6 +12,7 @@ const orderListSelect = {
     orderNumber: true,
     userId: true,
     total: true,
+    shippingFeeOverride: true,
     createdAt: true,
     status: true,
     trackingNumber: true,

@@ -106,6 +106,7 @@ export async function processDepositSms(
       status: true,
       depositConfirmedAt: true,
       adminDepositConfirmedAt: true,
+      shippingFeeOverride: true,
       items: { select: { quantity: true, price: true } },
       user: {
         select: {
@@ -125,7 +126,7 @@ export async function processDepositSms(
   const amountMatchedOrders = candidateOrders
     .map((order) => ({
       ...order,
-      calculatedAmount: calculateOrderFinalAmount(order.items).finalAmount,
+      calculatedAmount: calculateOrderFinalAmount(order.items, order.shippingFeeOverride).finalAmount,
     }))
     .filter((order) =>
       order.calculatedAmount === amount &&

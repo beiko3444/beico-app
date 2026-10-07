@@ -69,7 +69,7 @@ export default function OrdersClient({
   const monthlySalesSummary = useMemo(() => {
     const revenueOrders = monthlyOrders.filter((order) => order.status !== 'CANCELED')
     const total = revenueOrders.reduce((sum, order) => {
-      return sum + calculateOrderFinalAmount(order.items || []).finalAmount
+      return sum + calculateOrderFinalAmount(order.items || [], order.shippingFeeOverride).finalAmount
     }, 0)
 
     return {
