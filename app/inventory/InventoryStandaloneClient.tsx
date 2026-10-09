@@ -12,7 +12,6 @@ import {
   Trash2,
   X,
   Delete,
-  Languages,
 } from 'lucide-react'
 
 type InboundItem = {
@@ -312,15 +311,6 @@ export default function InventoryStandaloneClient() {
             </div>
 
             <div className="flex items-center gap-2">
-              <a
-                href="/translator"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex h-11 items-center justify-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm"
-              >
-                <Languages size={19} />
-                번역기
-              </a>
               <button
                 type="button"
                 onClick={() => {

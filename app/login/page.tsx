@@ -4,7 +4,7 @@ import Image from 'next/image'
 import { useState, useEffect } from 'react'
 import { signIn } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { User, Lock, Eye, EyeOff, ArrowRight } from 'lucide-react'
+import { User, Lock, Eye, EyeOff, ArrowRight, Languages } from 'lucide-react'
 import Link from 'next/link'
 import ThemeToggle from '@/components/ThemeToggle'
 
@@ -95,11 +95,15 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen bg-[#f9f9f9] dark:bg-[#111111] flex flex-col items-center justify-center p-4 font-sans text-[#333] dark:text-gray-200 relative">
             {/* Theme toggle */}
-            <div className="absolute top-6 right-6">
+            <div className="absolute top-6 right-6 flex items-center gap-2">
+                <a href="/translator" target="_blank" rel="noopener noreferrer" className="inline-flex h-10 items-center gap-2 rounded-full border border-gray-200 bg-white px-4 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 dark:border-gray-700 dark:bg-[#2a2a2a] dark:text-gray-200" aria-label="번역기 열기">
+                    <Languages size={18} />
+                    번역기
+                </a>
                 <ThemeToggle className="bg-gray-100 dark:bg-[#2a2a2a] hover:bg-gray-200 dark:hover:bg-[#333]" />
             </div>
             {/* Real-time Japanese Clock */}
-            <div className="absolute top-8 text-[11px] font-bold text-gray-800 dark:text-gray-400 tracking-widest" suppressHydrationWarning>
+            <div className="absolute top-20 text-[11px] font-bold text-gray-800 dark:text-gray-400 tracking-widest" suppressHydrationWarning>
                 {time ? formatJapaneseDate(time) : ''}
             </div>
 

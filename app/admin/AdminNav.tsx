@@ -15,6 +15,7 @@ import {
   Globe2,
   Handshake,
   LayoutGrid,
+  Languages,
   LogOut,
   Menu,
   Package,
@@ -194,6 +195,7 @@ export default function AdminNav({
     { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
     { name: '상품관리', path: '/admin/products', icon: Package },
     { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
+    { name: '번역기', path: '/translator', icon: Languages },
     { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
     { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
     { name: '파트너관리', path: '/admin/partners', icon: Handshake },
@@ -326,7 +328,9 @@ export default function AdminNav({
           <Link
             key={item.path}
             href={item.path}
-            prefetch={null}
+            prefetch={item.path === '/translator' ? false : null}
+            target={item.path === '/translator' ? '_blank' : undefined}
+            rel={item.path === '/translator' ? 'noopener noreferrer' : undefined}
             data-active={active ? 'true' : undefined}
             onClick={() => setIsMobileMenuOpen(false)}
             className={`group relative flex ${mobile ? 'min-h-12' : 'h-10 min-h-10'} min-w-0 items-center justify-between rounded-md border px-3 text-[13px] font-bold tracking-normal no-underline transition-colors duration-150 ${
@@ -500,7 +504,9 @@ export default function AdminNav({
           />
           <div className="mt-0.5 truncate text-[11px] font-bold text-[#172033]">{activeItem?.name || '관리자'}</div>
         </div>
-        <div className="h-10 w-10" aria-hidden="true" />
+        <a href="/translator" target="_blank" rel="noopener noreferrer" aria-label="번역기 열기" title="번역기" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#D0D5DD] bg-white text-[#344054] transition-colors hover:bg-[#F4F6F8]">
+          <Languages size={20} />
+        </a>
       </header>
 
       {isMobileMenuOpen ? (

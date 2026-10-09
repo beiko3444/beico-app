@@ -28,7 +28,6 @@ import {
   ExternalLink,
   GripVertical,
   Loader2,
-  Languages,
   PackageCheck,
   RefreshCw,
   Search,
@@ -764,10 +763,6 @@ export default function InventoryClient() {
         description="채널별 재고, 입고 예정 수량과 재고가치를 한곳에서 확인합니다."
         actions={(
           <>
-            <a href="/translator" target="_blank" rel="noopener noreferrer" className={buttonClass('secondary', 'md')}>
-              <Languages size={16} />
-              번역기
-            </a>
             <div className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600">
               <span className={`h-2 w-2 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               <span>{monitorUnavailable ? '수집기 연결 실패' : coupangStale ? '쿠팡 연동 오류' : healthStatus ? '수집기 연결됨' : '연결 확인 중'}</span>

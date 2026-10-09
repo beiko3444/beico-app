@@ -1,13 +1,10 @@
 import { NextResponse } from 'next/server'
-import { getAdminSession } from '@/lib/admin-session'
 import { resolveTranslatorUrl, translatorLoginToken } from '@/lib/translatorPortal'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET(request: Request) {
-  const session = await getAdminSession()
-  if (!session) return NextResponse.redirect(new URL('/login', request.url), 303)
+export async function GET() {
   const secret = process.env.TRANSLATOR_SHARED_SECRET?.trim()
   if (!secret) {
     return NextResponse.json({ error: '번역기 연결을 준비 중입니다. 잠시 후 다시 시도해 주세요.' }, {
