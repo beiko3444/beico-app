@@ -2,18 +2,20 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ShoppingCart, History, User } from 'lucide-react'
+import { ShoppingCart, History, User, Languages } from 'lucide-react'
 
 const JAPANESE_NAV_ITEMS = [
     { href: '/order', label: '注文', subLabel: 'Order', icon: ShoppingCart },
     { href: '/order/history', label: '履歴', subLabel: 'History', icon: History },
     { href: '/order/profile', label: 'マイページ', subLabel: 'My Page', icon: User },
+    { href: '/translator', label: '翻訳', subLabel: 'Translator', icon: Languages },
 ]
 
 const KOREAN_NAV_ITEMS = [
     { href: '/order', label: '주문', subLabel: '상품 주문', icon: ShoppingCart },
     { href: '/order/history', label: '주문내역', subLabel: '진행 현황', icon: History },
     { href: '/order/profile', label: '내 정보', subLabel: '계정 관리', icon: User },
+    { href: '/translator', label: '번역기', subLabel: '바로 번역', icon: Languages },
 ]
 
 export default function UserNavbar({ isKorean = false }: { isKorean?: boolean }) {
@@ -21,7 +23,7 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
     const navItems = isKorean ? KOREAN_NAV_ITEMS : JAPANESE_NAV_ITEMS
 
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-[100] grid min-h-[68px] grid-cols-3 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] sm:static sm:flex sm:min-h-0 sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label="파트너 메뉴">
+        <nav className="fixed inset-x-0 bottom-0 z-[100] grid min-h-[68px] grid-cols-4 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] sm:static sm:flex sm:min-h-0 sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label="파트너 메뉴">
             {navItems.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
                 const Icon = item.icon
@@ -30,6 +32,9 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
                     <Link
                         key={item.href}
                         href={item.href}
+                        prefetch={item.href === '/translator' ? false : undefined}
+                        target={item.href === '/translator' ? '_blank' : undefined}
+                        rel={item.href === '/translator' ? 'noopener noreferrer' : undefined}
                         style={{ color: 'inherit' }}
                         aria-current={isActive ? 'page' : undefined}
                         className={`group relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-3 text-center no-underline transition-colors sm:min-h-12 sm:min-w-[118px] sm:flex-row sm:gap-2.5 sm:px-4 ${
