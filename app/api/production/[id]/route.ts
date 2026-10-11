@@ -1,6 +1,7 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { resolveProductionProduct } from '@/lib/productionProduct'
 
 export async function PUT(request: Request, context: { params: Promise<{ id: string }> }) {
     try {
@@ -20,10 +21,11 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
             vat,
             quantity,
             unitCost,
-            salesPrice,
-            wholesalePrice,
             memo
         } = body
+
+        const pricing = await resolveProductionProduct(category, body.productId)
+        if (!pricing) return NextResponse.json({ error: '가격을 가져올 생산 상품을 선택해 주세요.' }, { status: 400 })
 
         const log = await prisma.productionBatch.update({
             where: { id },
@@ -41,8 +43,7 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
                 vat: Math.round(Number(vat || 0)),
                 quantity: Math.round(Number(quantity || 0)),
                 unitCost: unitCost ? Number(unitCost) : null,
-                salesPrice: Math.round(Number(salesPrice || 0)),
-                wholesalePrice: Math.round(Number(wholesalePrice || 0)),
+                ...pricing,
                 memo
             }
         })

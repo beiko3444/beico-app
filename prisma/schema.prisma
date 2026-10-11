@@ -214,6 +214,7 @@ model OrderItem {
 }
 
 model ProductionBatch {
+  productId       String?
   id              String   @id @default(uuid())
   category        String
   productionDate  DateTime

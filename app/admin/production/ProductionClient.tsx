@@ -1,11 +1,12 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import { getProductionPrices, getProductionProducts, selectProductionProduct, productionMargin, PRODUCTION_CATEGORIES, type ProductionPriceProduct } from '@/lib/productionPricing'
 import {
     LineChart,
     Line,
@@ -24,6 +25,7 @@ import { TrendingUp, Package, DollarSign, Calculator, ChevronRight, Activity, Pl
 
 type ProductionBatch = {
     id: string
+    productId?: string | null
     category: string
     productionDate: string
     rawMaterialCost: number
@@ -37,22 +39,16 @@ type ProductionBatch = {
     vat?: number
     quantity: number
     unitCost: number | null
-    salesPrice: number
-    wholesalePrice: number
+    salesPrice: number | null
+    wholesalePrice: number | null
+    priceProductName?: string | null
     memo: string | null
     createdAt: string
 }
 
-type Product = {
-    id: string
-    name: string
-    nameJP?: string
-    sellPrice: number
-    onlinePrice?: number | null
-    priceC?: number | null
-}
+type Product = ProductionPriceProduct
 
-const CATEGORIES = ['청갯지렁이', '홍갯지렁이', '혼무시', '멍게', '번데기']
+const CATEGORIES = [...PRODUCTION_CATEGORIES]
 
 export default function ProductionClient() {
     const [activeTab, setActiveTab] = useState(CATEGORIES[0]) // Default to 청갯지렁이
@@ -67,7 +63,15 @@ export default function ProductionClient() {
 
     const [batches, setBatches] = useState<ProductionBatch[]>([])
     const [products, setProducts] = useState<Product[]>([])
+    const [selectedProductId, setSelectedProductId] = useState('')
+    const [priceLoading, setPriceLoading] = useState(true)
+    const [priceError, setPriceError] = useState('')
     const [loading, setLoading] = useState(true)
+    const [batchError, setBatchError] = useState('')
+    const [saving, setSaving] = useState(false)
+    const savingRef = useRef(false)
+    const productRequestRef = useRef(0)
+    const batchRequestRef = useRef(0)
     const [isEditing, setIsEditing] = useState<ProductionBatch | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'productionDate', direction: 'desc' })
@@ -96,11 +100,11 @@ export default function ProductionClient() {
             aVal = a.rawMaterialCost + a.electricityCost + a.packagingCost + (a.warehouseCost || 0) + (a.shippingCost || 0) + (a.customsFee || 0) + (a.customsDuty || 0) + (a.vat || 0)
             bVal = b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)
         } else if (key === 'wMargin') {
-            aVal = a.salesPrice ? (a.salesPrice - (a.unitCost || 0)) / a.salesPrice : 0
-            bVal = b.salesPrice ? (b.salesPrice - (b.unitCost || 0)) / b.salesPrice : 0
+            aVal = productionMargin(a.salesPrice, a.unitCost)
+            bVal = productionMargin(b.salesPrice, b.unitCost)
         } else if (key === 'rMargin') {
-            aVal = a.wholesalePrice ? (a.wholesalePrice - (a.unitCost || 0)) / a.wholesalePrice : 0
-            bVal = b.wholesalePrice ? (b.wholesalePrice - (b.unitCost || 0)) / b.wholesalePrice : 0
+            aVal = productionMargin(a.wholesalePrice, a.unitCost)
+            bVal = productionMargin(b.wholesalePrice, b.unitCost)
         } else {
             aVal = a[key as keyof ProductionBatch]
             bVal = b[key as keyof ProductionBatch]
@@ -131,40 +135,63 @@ export default function ProductionClient() {
     })
 
     // Fetch Batches
-    const fetchBatches = async () => {
+    const fetchBatches = useCallback(async () => {
+        const requestId = ++batchRequestRef.current
         setLoading(true)
+        setBatchError('')
         try {
-            const res = await fetch(`/api/production?category=${activeTab}`)
+            const res = await fetch(`/api/production?category=${encodeURIComponent(activeTab)}`, { cache: 'no-store' })
+            if (!res.ok) throw new Error('생산 기록 조회 실패')
             const data = await res.json()
-            setBatches(data)
+            if (!Array.isArray(data)) throw new Error('생산 기록 응답 오류')
+            if (requestId === batchRequestRef.current) setBatches(data)
         } catch (error) {
             console.error(error)
+            if (requestId === batchRequestRef.current) {
+                setBatches([])
+                setBatchError('생산 기록을 불러오지 못했습니다.')
+            }
         } finally {
-            setLoading(false)
+            if (requestId === batchRequestRef.current) setLoading(false)
         }
-    }
+    }, [activeTab])
 
     // Fetch Products (for pricing)
-    const fetchProducts = async () => {
+    const fetchProducts = useCallback(async () => {
+        const requestId = ++productRequestRef.current
+        setPriceLoading(true)
+        setPriceError('')
         try {
-            const res = await fetch('/api/products') // Assuming this returns all products
+            const res = await fetch('/api/production/products', { cache: 'no-store' })
+            if (!res.ok) throw new Error('상품 가격 조회 실패')
             const data = await res.json()
-            setProducts(data)
+            if (!Array.isArray(data)) throw new Error('상품 가격 응답 오류')
+            if (requestId === productRequestRef.current) setProducts(data)
         } catch (error) {
             console.error("Failed to fetch products for pricing", error)
+            if (requestId === productRequestRef.current) setPriceError('상품 가격을 불러오지 못했습니다.')
+        } finally {
+            if (requestId === productRequestRef.current) setPriceLoading(false)
         }
-    }
-
-    useEffect(() => {
-        fetchProducts()
     }, [])
 
     useEffect(() => {
+        fetchProducts()
+    }, [fetchProducts])
+
+    useEffect(() => {
         fetchBatches()
-    }, [activeTab])
+        setSelectedProductId('')
+    }, [fetchBatches])
+
+    useEffect(() => {
+        if (isCreating) fetchProducts()
+    }, [isCreating, fetchProducts])
 
     const handleEdit = (batch: ProductionBatch) => {
+        if (batch.category !== activeTab) return
         setIsEditing(batch)
+        setSelectedProductId(batch.productId || '')
         setFormData({
             productionDate: batch.productionDate ? new Date(batch.productionDate).toISOString().split('T')[0] : '',
             rawMaterialCost: String(batch.rawMaterialCost),
@@ -188,35 +215,25 @@ export default function ProductionClient() {
         fetchBatches()
     }
 
-    // Find linked product for pricing
+    const priceProducts = getProductionProducts(products, activeTab)
+    const selectedProduct = selectProductionProduct(products, activeTab, selectedProductId)
+
     const getProductPricing = () => {
-        if (!products || products.length === 0) return { salesPrice: 0, wholesalePrice: 0, exists: false }
-
-        const cleanTab = activeTab.replaceAll(' ', '').toLowerCase()
-
-        // Exact match or partial match
-        const product = products.find(p => {
-            const cleanName = p.name.replaceAll(' ', '').toLowerCase()
-            const cleanJP = (p.nameJP || '').replaceAll(' ', '').toLowerCase()
-            return cleanName.includes(cleanTab) || cleanJP.includes(cleanTab) || cleanTab.includes(cleanName)
-        })
-
         return {
-            salesPrice: product ? product.sellPrice : 0, // Wholesale
-            wholesalePrice: product ? (product.onlinePrice || 0) : 0, // Retail
-            exists: !!product,
-            productName: product?.name
+            ...(selectedProduct ? getProductionPrices(selectedProduct) : { salesPrice: 0, wholesalePrice: 0 }),
+            exists: !!selectedProduct,
+            productName: selectedProduct?.name,
         }
     }
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        if (savingRef.current) return
 
         const priceInfo = getProductPricing()
-        if (!priceInfo.exists) {
-            if (!confirm(`'${activeTab}' 상품 정보를 찾을 수 없습니다. 판매가/도매가가 0원으로 저장됩니다. 진행하시겠습니까?`)) {
-                return
-            }
+        if (priceLoading || priceError || !priceInfo.exists) {
+            alert(priceError || '가격을 가져올 생산 상품을 선택해 주세요.')
+            return
         }
 
         const url = isEditing ? `/api/production/${isEditing.id}` : '/api/production'
@@ -237,10 +254,8 @@ export default function ProductionClient() {
         const totalSum = raw + elec + pack + warehouse + shipping + customs + duty + vat
         const calculatedUnitCost = qty > 0 ? Math.round(totalSum / qty) : 0
 
-        // Ensure we use the latest pricing info
-        const finalPriceInfo = getProductPricing()
-
         const body = {
+            productId: selectedProduct?.id,
             category: activeTab,
             productionDate: formData.productionDate,
             rawMaterialCost: raw,
@@ -254,43 +269,51 @@ export default function ProductionClient() {
             vat: vat,
             quantity: qty,
             unitCost: calculatedUnitCost,
-            salesPrice: finalPriceInfo.salesPrice,
-            wholesalePrice: finalPriceInfo.wholesalePrice,
             memo: formData.memo
         }
 
-        const res = await fetch(url, {
-            method,
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(body)
-        })
-
-        if (res.ok) {
-            setIsCreating(false)
-            setIsEditing(null)
-            setFormData({
-                productionDate: new Date().toISOString().split('T')[0],
-                rawMaterialCost: '',
-                depositDollar: '',
-                electricityCost: '30000',
-                packagingCost: '200',
-                warehouseCost: '20350',
-                shippingCost: '',
-                customsFee: '33000',
-                customsDuty: '',
-                vat: '',
-                quantity: '',
-                memo: ''
+        savingRef.current = true
+        setSaving(true)
+        try {
+            const res = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body)
             })
-            fetchBatches()
-        } else {
-            const errData = await res.json().catch(() => ({ error: '알 수 없는 서버 오류' }))
-            const errMsg = errData.details ? `${errData.error}\n정보: ${errData.details}` : errData.error
-            alert(`저장에 실패했습니다: ${errMsg}`)
+
+            if (res.ok) {
+                setIsCreating(false)
+                setIsEditing(null)
+                setFormData({
+                    productionDate: new Date().toISOString().split('T')[0],
+                    rawMaterialCost: '',
+                    depositDollar: '',
+                    electricityCost: '30000',
+                    packagingCost: '200',
+                    warehouseCost: '20350',
+                    shippingCost: '',
+                    customsFee: '33000',
+                    customsDuty: '',
+                    vat: '',
+                    quantity: '',
+                    memo: ''
+                })
+                fetchBatches()
+            } else {
+                const errData = await res.json().catch(() => ({ error: '알 수 없는 서버 오류' }))
+                const errMsg = errData.details ? `${errData.error}\n정보: ${errData.details}` : errData.error
+                alert(`저장에 실패했습니다: ${errMsg}`)
+            }
+        } catch {
+            alert('저장에 실패했습니다. 연결 상태를 확인한 뒤 다시 시도해 주세요.')
+        } finally {
+            savingRef.current = false
+            setSaving(false)
         }
     }
 
     const currentPriceInfo = getProductPricing()
+    const wholesaleMargins = batches.map(batch => productionMargin(batch.salesPrice, batch.unitCost)).filter((margin): margin is number => margin !== null)
     const overseasRemittanceAmount = Number(parseNumber(formData.rawMaterialCost)) || 0
     const usdAmount = Number(parseDecimal(formData.depositDollar)) || 0
     const remittanceExchangeRate = usdAmount > 0 ? overseasRemittanceAmount / usdAmount : null
@@ -331,6 +354,7 @@ export default function ProductionClient() {
                         icon={<Plus size={15} />}
                         onClick={() => {
                             setIsEditing(null)
+                            setSelectedProductId('')
                             setFormData({
                                 productionDate: new Date().toISOString().split('T')[0],
                                 rawMaterialCost: '',
@@ -358,7 +382,15 @@ export default function ProductionClient() {
                 aria-label="생산 카테고리"
                 items={CATEGORIES.map(cat => ({ key: cat, label: cat }))}
                 value={activeTab}
-                onChange={setActiveTab}
+                onChange={category => {
+                    ++batchRequestRef.current
+                    setLoading(true)
+                    setBatches([])
+                    setIsCreating(false)
+                    setIsEditing(null)
+                    setSelectedProductId('')
+                    setActiveTab(category)
+                }}
             />
 
             <h2 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">{activeTab} 생산일지</h2>
@@ -390,12 +422,9 @@ export default function ProductionClient() {
                     },
                     {
                         label: '평균 마진율',
-                        value: batches.length > 0
-                            ? (batches.reduce((acc, b) => {
-                                const margin = b.salesPrice > 0 ? ((b.salesPrice - (b.unitCost || 0)) / b.salesPrice) * 100 : 0
-                                return acc + margin
-                            }, 0) / batches.length).toFixed(1) + '%'
-                            : '0%'
+                        value: wholesaleMargins.length > 0
+                            ? (wholesaleMargins.reduce((sum, margin) => sum + margin, 0) / wholesaleMargins.length).toFixed(1) + '%'
+                            : '-'
                     }
                 ].map((stat, idx) => (
                     <div key={idx} className="bg-white dark:bg-[#1e1e1e] p-5 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-1 min-w-0">
@@ -532,7 +561,7 @@ export default function ProductionClient() {
                                     도매마진 {sortConfig?.key === 'wMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('wholesalePrice')}>
-                                    판매가 {sortConfig?.key === 'wholesalePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+                                    소매가 {sortConfig?.key === 'wholesalePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
                                 <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('rMargin')}>
                                     소매마진 {sortConfig?.key === 'rMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
@@ -544,6 +573,8 @@ export default function ProductionClient() {
                         <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
                             {loading ? (
                                 <tr><td colSpan={11} className="px-4 py-10 text-center text-[12px] font-bold text-slate-500 dark:text-gray-400">로딩 중...</td></tr>
+                            ) : batchError ? (
+                                <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-red-600" role="alert">{batchError} <button type="button" className="underline" onClick={fetchBatches}>다시 불러오기</button></td></tr>
                             ) : sortedBatches.length === 0 ? (
                                 <tr><td colSpan={11} className="p-3"><EmptyState compact title="생산 기록이 없습니다" description="생산 기록 버튼을 눌러 첫 기록을 등록하세요." /></td></tr>
                             ) : (
@@ -556,9 +587,8 @@ export default function ProductionClient() {
                                         + (batch.customsFee || 0)
                                         + (batch.customsDuty || 0)
                                         + (batch.vat || 0)
-                                    // Swapped back to match corrected data mapping
-                                    const wMarginRate = batch.salesPrice ? (((batch.salesPrice - (batch.unitCost || 0)) / batch.salesPrice) * 100).toFixed(1) : '0';
-                                    const rMarginRate = batch.wholesalePrice ? (((batch.wholesalePrice - (batch.unitCost || 0)) / batch.wholesalePrice) * 100).toFixed(1) : '0';
+                                    const wMarginRate = productionMargin(batch.salesPrice, batch.unitCost)
+                                    const rMarginRate = productionMargin(batch.wholesalePrice, batch.unitCost)
 
                                     return (
                                         <tr key={batch.id} className="hover:bg-brand-orange-soft dark:hover:bg-[#252525] transition-colors group even:bg-slate-50 dark:even:bg-[#1a1a1a] hover:relative hover:z-50">
@@ -627,16 +657,16 @@ export default function ProductionClient() {
                                             <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {batch.unitCost ? batch.unitCost.toLocaleString() : '-'}
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.salesPrice.toLocaleString()}</td>
+                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.salesPrice?.toLocaleString() ?? '상품 연결 필요'}</td>
                                             <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${Number(wMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
-                                                    {wMarginRate}%
+                                                    {wMarginRate === null ? '-' : `${wMarginRate.toFixed(1)}%`}
                                                 </span>
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.wholesalePrice.toLocaleString()}</td>
+                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.wholesalePrice?.toLocaleString() ?? '-'}</td>
                                             <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${Number(rMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
-                                                    {rMarginRate}%
+                                                    {rMarginRate === null ? '-' : `${rMarginRate.toFixed(1)}%`}
                                                 </span>
                                             </td>
                                             <td className="px-4 py-1.5 text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]" title={batch.memo || ''}>{batch.memo || '-'}</td>
@@ -795,15 +825,24 @@ export default function ProductionClient() {
                                         </div>
                                     </div>
 
-                                    {/* Pricing Ref */}
+                                    {/* Current product prices */}
+                                    <div className="mt-4 space-y-1">
+                                        <label htmlFor="production-price-product" className="text-[11px] font-bold text-slate-600">가격 기준 상품</label>
+                                        <select id="production-price-product" required disabled={priceLoading || saving} value={selectedProduct?.id || ''} onChange={event => setSelectedProductId(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-brand-orange">
+                                            <option value="">{priceLoading ? '상품 가격 불러오는 중…' : '생산 상품을 선택하세요'}</option>
+                                            {priceProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
+                                        </select>
+                                        {priceError ? <p role="alert" className="text-xs text-red-600">{priceError} <button type="button" onClick={fetchProducts} className="underline">다시 불러오기</button></p> : !priceLoading && priceProducts.length === 0 ? <p className="text-xs text-slate-500">해당 생산 구분의 상품을 상품관리에 등록해 주세요.</p> : null}
+                                        {!priceLoading && !priceError && selectedProductId && !selectedProduct ? <p role="alert" className="text-xs text-red-600">연결된 상품을 찾을 수 없습니다. 가격 기준 상품을 다시 선택해 주세요.</p> : null}
+                                    </div>
                                     <div className="mt-4 grid grid-cols-2 gap-4">
                                         <div className="text-[11px] space-y-0.5">
-                                            <span className="block font-bold text-slate-500">참고 도매가</span>
-                                            <span className="block font-black text-slate-900">{currentPriceInfo.salesPrice.toLocaleString()}원</span>
+                                            <span className="block font-bold text-slate-500">도매가 (C등급)</span>
+                                            <span className="block font-black text-slate-900">{!priceLoading && !priceError && currentPriceInfo.exists ? `${currentPriceInfo.salesPrice.toLocaleString()}원` : '-'}</span>
                                         </div>
                                         <div className="text-[11px] space-y-0.5 text-right">
-                                            <span className="block font-bold text-slate-500">참고 판매가</span>
-                                            <span className="block font-black text-slate-900">{currentPriceInfo.wholesalePrice.toLocaleString()}원</span>
+                                            <span className="block font-bold text-slate-500">소매 판매가</span>
+                                            <span className="block font-black text-slate-900">{!priceLoading && !priceError && currentPriceInfo.exists ? `${currentPriceInfo.wholesalePrice.toLocaleString()}원` : '-'}</span>
                                         </div>
                                     </div>
                                 </fieldset>
@@ -820,10 +859,10 @@ export default function ProductionClient() {
                                 </div>
 
                                 <div className="flex gap-2 justify-end pt-2">
-                                    <Button variant="secondary" onClick={() => setIsCreating(false)}>
+                                    <Button variant="secondary" disabled={saving} onClick={() => setIsCreating(false)}>
                                         취소
                                     </Button>
-                                    <Button variant="primary" type="submit">
+                                    <Button variant="primary" type="submit" loading={saving} disabled={priceLoading || !!priceError || !selectedProduct}>
                                         {isEditing ? '수정 저장' : '저장'}
                                     </Button>
                                 </div>

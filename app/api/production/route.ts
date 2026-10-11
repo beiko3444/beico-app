@@ -1,6 +1,8 @@
 
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
+import { loadProductionProducts, resolveProductionProduct } from '@/lib/productionProduct'
+import { attachProductionPrices } from '@/lib/productionPricing'
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
@@ -8,11 +10,11 @@ export async function GET(request: Request) {
 
     try {
         const where = category ? { category } : {}
-        const logs = await prisma.productionBatch.findMany({
+        const [logs, products] = await Promise.all([prisma.productionBatch.findMany({
             where,
             orderBy: { productionDate: 'desc' }, // Order by production date
-        })
-        return NextResponse.json(logs)
+        }), loadProductionProducts()])
+        return NextResponse.json(logs.map(log => attachProductionPrices(log, products)), { headers: { 'Cache-Control': 'no-store' } })
     } catch (error) {
         return NextResponse.json({ error: "Failed to fetch production logs" }, { status: 500 })
     }
@@ -35,10 +37,11 @@ export async function POST(request: Request) {
             vat,
             quantity,
             unitCost,
-            salesPrice,
-            wholesalePrice,
             memo
         } = body
+
+        const pricing = await resolveProductionProduct(category, body.productId)
+        if (!pricing) return NextResponse.json({ error: '가격을 가져올 생산 상품을 선택해 주세요.' }, { status: 400 })
 
         const log = await prisma.productionBatch.create({
             data: {
@@ -55,8 +58,7 @@ export async function POST(request: Request) {
                 vat: Math.round(Number(vat || 0)),
                 quantity: Math.round(Number(quantity || 0)),
                 unitCost: unitCost ? Number(unitCost) : 0,
-                salesPrice: Math.round(Number(salesPrice || 0)),
-                wholesalePrice: Math.round(Number(wholesalePrice || 0)),
+                ...pricing,
                 memo
             }
         })
