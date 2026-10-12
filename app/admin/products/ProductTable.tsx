@@ -30,6 +30,34 @@ import {
 } from '@/lib/productTableColumns'
 import { getNaverProductUrl } from '@/lib/naverProductLinks.mjs'
 import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
+import { savePartnerProductStatus } from '@/lib/partnerProductStatusClient'
+
+function PartnerStatusSelect({ product, value, onChange, className }: {
+    product: ProductTableProduct
+    value: PartnerProductStatus
+    onChange: (id: string, status: PartnerProductStatus) => Promise<void>
+    className: string
+}) {
+    const [saving, setSaving] = useState(false)
+    return (
+        <div>
+            <select value={value} disabled={saving} aria-busy={saving}
+                aria-label={`${product.name} 파트너 노출 상태`}
+                className={`${className} disabled:cursor-wait disabled:opacity-60`}
+                onClick={(event) => event.stopPropagation()}
+                onChange={async (event) => {
+                    const status = event.target.value as PartnerProductStatus
+                    setSaving(true)
+                    try { await onChange(product.id, status) } finally { setSaving(false) }
+                }}>
+                <option value="VISIBLE">노출</option>
+                <option value="HIDDEN">비노출</option>
+                <option value="SOLD_OUT">품절</option>
+            </select>
+            {saving ? <span role="status" className="mt-1 block text-[10px] text-slate-500">저장 중…</span> : null}
+        </div>
+    )
+}
 
 const draftKey = (grade: ProductGrade, productId: string) => `${grade}:${productId}`
 const FIXED_PRODUCT_TABLE_WIDTH = 40 + 68 + 78 + 72 + 360
@@ -158,7 +186,7 @@ interface ProductRowProps {
     onMoqChange: (id: string, val: string) => void
     modifiedOrderUnit: string | undefined
     onOrderUnitChange: (id: string, val: string) => void
-    onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => void
+    onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => Promise<void>
 }
 
 const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, activeGrade, visibleColumns, onSelect, onDragStartProduct, onDragEndProduct, onGroupOrderChange, onImageClick, onDelete, onUngroup, onRestoreAutoGroup, checked, onToggleCheck, modifiedCost, onCostChange, modifiedCnyCost, modifiedUsdCost, onForeignCostChange, cnyRateAvailable, usdRateAvailable, onOpenContextMenu, modifiedWholesale, onWholesaleChange, modifiedRetail, onRetailChange, modifiedStock, onStockChange, modifiedMoq, onMoqChange, modifiedOrderUnit, onOrderUnitChange, onPartnerSaleStatusChange }: ProductRowProps) {
@@ -248,17 +276,12 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
             case 'availability':
                 return (
                     <td key={column} className={cellClass}>
-                        <select
+                        <PartnerStatusSelect
+                            product={product}
                             value={partnerSaleStatus}
-                            onClick={(event) => event.stopPropagation()}
-                            onChange={(event) => onPartnerSaleStatusChange(product.id, event.target.value as PartnerProductStatus)}
+                            onChange={onPartnerSaleStatusChange}
                             className={`h-9 min-w-[82px] rounded-md border px-2 text-[12px] font-black outline-none transition focus:ring-2 focus:ring-blue-200 ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
-                            aria-label={`${product.name} 파트너 노출 상태`}
-                        >
-                            <option value="VISIBLE">노출</option>
-                            <option value="HIDDEN">비노출</option>
-                            <option value="SOLD_OUT">품절</option>
-                        </select>
+                        />
                     </td>
                 )
             case 'moq':
@@ -463,7 +486,7 @@ interface ProductMobileCardProps {
     onMoqChange: (id: string, val: string) => void
     modifiedOrderUnit: string | undefined
     onOrderUnitChange: (id: string, val: string) => void
-    onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => void
+    onPartnerSaleStatusChange: (id: string, status: PartnerProductStatus) => Promise<void>
 }
 
 const ProductMobileCard = memo(function ProductMobileCard({
@@ -583,16 +606,12 @@ const ProductMobileCard = memo(function ProductMobileCard({
             <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 border-t border-slate-100 bg-slate-50/70 p-3">
                 <div className="min-w-0">
                     <span className={fieldLabelClass}>발주 상태</span>
-                    <select
+                    <PartnerStatusSelect
+                        product={product}
                         value={partnerSaleStatus}
-                        onChange={(event) => onPartnerSaleStatusChange(product.id, event.target.value as PartnerProductStatus)}
+                        onChange={onPartnerSaleStatusChange}
                         className={`h-10 w-full rounded-lg border px-2 text-center text-[12px] font-black outline-none transition ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
-                        aria-label={`${product.name} 파트너 판매 상태`}
-                    >
-                        <option value="VISIBLE">노출</option>
-                        <option value="HIDDEN">비노출</option>
-                        <option value="SOLD_OUT">품절</option>
-                    </select>
+                    />
                 </div>
                 <div className="min-w-0">
                     <div className="mb-1 flex items-center justify-between gap-2">
@@ -1029,9 +1048,10 @@ function ProductSummaryPanel({
 
 export default function ProductTable({ initialProducts }: { initialProducts: ProductTableProduct[] }) {
     const [products, setProducts] = useState(initialProducts)
+    const pendingPartnerStatusIds = useRef(new Set<string>())
     const [previewImage, setPreviewImage] = useState<{ imageUrl: string, productName: string } | null>(null)
     const activeGrade: ProductGrade = 'C'
-    const [activeCategory, setActiveCategory] = useState<ProductCatalogCategory>('soft')
+    const [activeCategory, setActiveCategory] = useState<ProductCatalogCategory>('quick')
     const [cnyKrwRate, setCnyKrwRate] = useState<number | null>(null)
     const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
     const [cnyRateUpdatedAt, setCnyRateUpdatedAt] = useState<string | null>(null)
@@ -1625,26 +1645,25 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         const product = products.find(p => p.id === id)
         if (!product) return
         const previousStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
-        if (status === previousStatus) return
+        if (status === previousStatus || pendingPartnerStatusIds.current.has(id)) return
+        pendingPartnerStatusIds.current.add(id)
         setProducts(prev => prev.map(p => p.id === id ? {
             ...p,
             partnerSaleStatus: status,
             wholesaleAvailable: status === 'VISIBLE',
         } : p))
         try {
-            const res = await fetch(`/api/products/${id}`, {
-                method: 'PATCH',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ partnerSaleStatus: status })
-            })
-            if (!res.ok) throw new Error('변경 실패')
-        } catch {
+            const saved = await savePartnerProductStatus(id, status)
+            setProducts(prev => prev.map(p => p.id === id ? { ...p, ...saved } : p))
+        } catch (error) {
             setProducts(prev => prev.map(p => p.id === id ? {
                 ...p,
                 partnerSaleStatus: product.partnerSaleStatus,
                 wholesaleAvailable: product.wholesaleAvailable,
             } : p))
-            alert('파트너 노출 상태를 변경하지 못했습니다.')
+            alert(error instanceof Error ? error.message : '파트너 노출상태를 저장하지 못했습니다.')
+        } finally {
+            pendingPartnerStatusIds.current.delete(id)
         }
     }, [products])
 

@@ -1,10 +1,16 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
+import { readFileSync } from 'node:fs'
 
 import {
     classifyProductCatalogCategory,
     getGroupedSkuLabel,
 } from '../lib/productCatalogDisplay.ts'
+
+test('product management initially opens the Quick Bait tab', () => {
+    const source = readFileSync(new URL('../app/admin/products/ProductTable.tsx', import.meta.url), 'utf8')
+    assert.match(source, /\[activeCategory, setActiveCategory\] = useState<ProductCatalogCategory>\('quick'\)/)
+})
 
 test('classifies reviewed product families with explicit priority', () => {
     assert.equal(classifyProductCatalogCategory({ name: 'BEIKO 퀵베이트V3 청갯지렁이' }), 'quick')
