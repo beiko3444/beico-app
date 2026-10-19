@@ -6,8 +6,10 @@
   --color-brand-blue: #2563eb;
   --color-brand-light-blue: #3b82f6;
   --color-brand-grey: #f4f6f8;
-  --color-brand-orange: #e43d20;
+  /* #d9341a keeps white labels at 4.7:1; -strong is for orange text on -soft. */
+  --color-brand-orange: #d9341a;
   --color-brand-orange-hover: #c9331b;
+  --color-brand-orange-strong: #b32d17;
   --color-brand-orange-soft: #fff3ef;
   --color-brand-ink: #101828;
 
@@ -35,7 +37,7 @@
   --primary: #2563eb;
   --primary-focus: #1d4ed8;
   --primary-on-dark: #60a5fa;
-  --brand-accent: #e43d20;
+  --brand-accent: #d9341a;
   --brand-accent-hover: #c9331b;
   --success: #138a57;
   --warning: #c66a08;
@@ -322,8 +324,9 @@ textarea::placeholder {
 
 /* Shared admin table header — one style across all admin tables. */
 .ux-thead th {
-  background: var(--color-brand-ink);
-  color: #fff;
+  background: var(--surface);
+  color: var(--muted-foreground);
+  border-bottom: 1px solid var(--border);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.01em;

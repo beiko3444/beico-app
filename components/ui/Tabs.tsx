@@ -14,10 +14,14 @@ type TabsProps<K extends string> = {
   'aria-label'?: string
 }
 
-/** Pill tabs — the one tab/segment style used across the admin console. */
+/** Segmented tabs — the one tab/segment style used across the admin console. Orange stays reserved for the primary button. */
 export default function Tabs<K extends string>({ items, value, onChange, className = '', ...rest }: TabsProps<K>) {
   return (
-    <div role="tablist" aria-label={rest['aria-label']} className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+    <div
+      role="tablist"
+      aria-label={rest['aria-label']}
+      className={`inline-flex max-w-full flex-wrap items-center gap-1 rounded-[10px] bg-[#f1f3f6] p-1 ${className}`}
+    >
       {items.map((item) => {
         const active = item.key === value
         return (
@@ -27,19 +31,15 @@ export default function Tabs<K extends string>({ items, value, onChange, classNa
             role="tab"
             aria-selected={active}
             onClick={() => onChange(item.key)}
-            className={`inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-xl border px-3.5 text-[13px] font-bold transition-colors ${
+            className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[13px] transition-colors ${
               active
-                ? 'border-brand-orange bg-brand-orange text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+                ? 'bg-white font-extrabold text-brand-orange shadow-[0_1px_2px_rgba(16,24,40,0.12)]'
+                : 'font-semibold text-slate-600 hover:bg-white/60 hover:text-slate-900'
             }`}
           >
             {item.label}
             {item.count !== undefined && item.count !== null ? (
-              <span
-                className={`inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[10px] font-extrabold ${
-                  active ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'
-                }`}
-              >
+              <span className="text-[11px] font-bold tabular-nums text-slate-500">
                 {item.count}
               </span>
             ) : null}

@@ -6,7 +6,9 @@ import { usePathname } from 'next/navigation'
 import { signOut } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
 import {
+  type LucideIcon,
   Boxes,
+  ChevronRight,
   Clock3,
   CreditCard,
   Factory,
@@ -178,8 +180,55 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
+type NavItem = { name: string; path: string; icon: LucideIcon }
+type NavGroup = { label: string; items: NavItem[] }
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: '주문·거래',
+    items: [
+      { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
+      { name: '파트너관리', path: '/admin/partners', icon: Handshake },
+      { name: 'PI발급', path: '/admin/proforma', icon: FileText },
+      { name: '수출신고', path: '/admin/export-declaration', icon: Ship },
+      { name: '인도 위임장', path: '/admin/cargo-delivery', icon: Truck },
+    ],
+  },
+  {
+    label: '상품·재고',
+    items: [
+      { name: '상품관리', path: '/admin/products', icon: Package },
+      { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
+      { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
+      { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
+      { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
+    ],
+  },
+  {
+    label: '운영',
+    items: [
+      { name: '생산관리', path: '/admin/production', icon: Factory },
+      { name: '근태관리', path: '/admin/tasks', icon: Clock3 },
+      { name: '카드사용내역', path: '/admin/card-usage', icon: CreditCard },
+      { name: '전력관리', path: '/admin/electricity', icon: PlugZap },
+    ],
+  },
+  {
+    label: '도구',
+    items: [
+      { name: '메모', path: '/admin/memos', icon: StickyNote },
+      { name: '마인드보드', path: '/admin/mindboard', icon: LayoutGrid },
+      { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
+      { name: '번역기', path: '/translator', icon: Languages },
+    ],
+  },
+]
+
+const EXTERNAL_PATHS = new Set(['/translator'])
+
 export default function AdminNav({
   counts,
+  userName,
 }: {
   counts?: { pendingOrders: number; pendingPartners: number; missingBill: number }
   userName?: string
@@ -191,27 +240,6 @@ export default function AdminNav({
   const [sendingSms, setSendingSms] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
-  const navItems = [
-    { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
-    { name: '상품관리', path: '/admin/products', icon: Package },
-    { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
-    { name: '번역기', path: '/translator', icon: Languages },
-    { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
-    { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
-    { name: '파트너관리', path: '/admin/partners', icon: Handshake },
-    { name: '생산관리', path: '/admin/production', icon: Factory },
-    { name: '근태관리', path: '/admin/tasks', icon: Clock3 },
-    { name: '카드사용내역', path: '/admin/card-usage', icon: CreditCard },
-    { name: '메모', path: '/admin/memos', icon: StickyNote },
-    { name: '마인드보드', path: '/admin/mindboard', icon: LayoutGrid },
-    { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
-    { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
-    { name: '인도 위임장', path: '/admin/cargo-delivery', icon: Truck },
-    { name: 'PI발급', path: '/admin/proforma', icon: FileText },
-    { name: '수출신고', path: '/admin/export-declaration', icon: Ship },
-    { name: '전력관리', path: '/admin/electricity', icon: PlugZap },
-  ]
-
   const alertCountByPath: Record<string, number> = {
     '/admin/orders': counts?.pendingOrders ?? 0,
     '/admin/partners': counts?.pendingPartners ?? 0,
@@ -219,13 +247,15 @@ export default function AdminNav({
   }
 
   const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
-  const activeItem = navItems.find((item) => isActive(item.path))
+  const activeGroup = NAV_GROUPS.find((group) => group.items.some((item) => isActive(item.path)))
+  const activeItem = activeGroup?.items.find((item) => isActive(item.path))
+  const displayName = userName || '관리자'
 
   useEffect(() => {
     setIsMobileMenuOpen(false)
   }, [pathname])
 
-  // Keep the active menu item visible when the 16-item list overflows the sidebar height.
+  // Keep the active menu item visible when the grouped list overflows the sidebar height.
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('#admin-desktop-sidebar [data-active="true"]')
     el?.scrollIntoView({ block: 'nearest' })
@@ -319,192 +349,126 @@ export default function AdminNav({
     }
   }
 
-  const renderNavItems = (mobile = false) => (
-    <>
-      {navItems.map((item) => {
-        const active = isActive(item.path)
-        const Icon = item.icon
-        return (
-          <Link
-            key={item.path}
-            href={item.path}
-            prefetch={item.path === '/translator' ? false : null}
-            target={item.path === '/translator' ? '_blank' : undefined}
-            rel={item.path === '/translator' ? 'noopener noreferrer' : undefined}
-            data-active={active ? 'true' : undefined}
-            onClick={() => setIsMobileMenuOpen(false)}
-            className={`group relative flex ${mobile ? 'min-h-12' : 'h-10 min-h-10'} min-w-0 items-center justify-between rounded-md border px-3 text-[13px] font-bold tracking-normal no-underline transition-colors duration-150 ${
-              active
-                ? 'border-[#FFD5CC] bg-[#FFF3EF] text-brand-orange'
-                : 'border-transparent bg-transparent text-[#344054] hover:border-[#E5E9EF] hover:bg-[#F4F6F8] hover:text-[#172033]'
-            }`}
-            style={{ color: active ? '#D9341A' : '#344054' }}
-          >
-            {active ? <span className="absolute left-0 top-2.5 h-6 w-1 rounded-r-full bg-brand-orange" /> : null}
-            <span className="flex min-w-0 items-center gap-2.5">
-              <span
-                className={`inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md transition-colors ${
-                  active ? 'bg-brand-orange text-white' : 'bg-transparent text-[#98A2B3] group-hover:bg-white group-hover:text-[#667085]'
-                }`}
-              >
-                <Icon size={15} strokeWidth={2.3} />
-              </span>
-              <span className="truncate text-inherit leading-none">{item.name}</span>
-            </span>
-            {alertCountByPath[item.path] > 0 ? (
-              <span
-                className={`ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-extrabold leading-none ${
-                  active ? 'bg-brand-orange text-white' : 'bg-brand-orange text-white'
-                }`}
-                aria-label={`${alertCountByPath[item.path]}건 알림`}
-              >
-                {alertCountByPath[item.path] > 99 ? '99+' : alertCountByPath[item.path]}
-              </span>
-            ) : null}
-          </Link>
-        )
-      })}
-    </>
-  )
+  const renderBadge = (path: string) => {
+    const count = alertCountByPath[path] ?? 0
+    if (count <= 0) return null
+    return (
+      <span
+        className="ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-orange px-1.5 text-[11px] font-extrabold leading-none text-white"
+        aria-label={`${count}건 알림`}
+      >
+        {count > 99 ? '99+' : count}
+      </span>
+    )
+  }
 
-  const desktopSidebarContent = (
-    <>
-      <div className="shrink-0">
-        <Image
-          src="/logo.png"
-          alt="beiko"
-          width={128}
-          height={88}
-          priority
-          className="h-auto w-[124px]"
-        />
-      </div>
-      <div className="mb-3 mt-4 h-px shrink-0 bg-[#E5E9EF]" />
-
-      <nav className="ux-scrollbar ux-nav-scroll flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto pb-7" aria-label="관리자 메뉴">{renderNavItems()}</nav>
-
-      <FavoriteInventoryPanel />
-
-      <div className="mt-1 flex h-10 shrink-0 items-center justify-between gap-2 rounded-xl border border-[#FFD4C8] bg-[#FFF6F3] px-3 transition-colors hover:bg-[#FFF1EC]">
-        <div className="flex min-w-0 items-center gap-2">
-          <div className="shrink-0 text-[12px] font-extrabold leading-none tracking-[-0.01em] text-[#111827]">집하 문자</div>
-          <input
-            type="number"
-            min={1}
-            inputMode="numeric"
-            value={shipmentCount}
-            onChange={(event) => setShipmentCount(event.target.value)}
-            className="h-6 w-9 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold leading-none text-brand-orange outline-none"
-            aria-label="발송 건수"
-          />
-          <span className="shrink-0 text-[11px] font-bold leading-none text-brand-orange">건</span>
-        </div>
-        <button
-          type="button"
-          onClick={handleSendPickupSms}
-          disabled={sendingSms || loadingFromNumber}
-          className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-brand-orange px-3 text-[12px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          {sendingSms ? '요청중' : '발송'}
-        </button>
-      </div>
-
-      <div className="mt-3 shrink-0 border-t border-[#E5E9EF] pt-3">
-        <button
-          type="button"
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#D0D5DD] bg-white px-4 text-[13px] font-bold text-[#344054] transition-colors hover:border-[#98A2B3] hover:bg-[#F8FAFC]"
-        >
-          <LogOut size={16} />
-          로그아웃
-        </button>
-      </div>
-    </>
-  )
-
-  const mobileMenuContent = (
-    <>
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-[14px] font-black leading-none text-brand-orange">관리자 메뉴</div>
-          <div className="mt-1 truncate text-[12px] font-extrabold text-[#111827]">{activeItem?.name || '관리자'}</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => setIsMobileMenuOpen(false)}
-          className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#E5E7EB] bg-white text-[#111827] transition hover:bg-[#F4F5F7]"
-          aria-label="관리자 메뉴 닫기"
-        >
-          <X size={18} />
-        </button>
-      </div>
-
-      <nav className="ux-scrollbar mt-4 grid max-h-[calc(100vh-260px)] grid-cols-2 gap-2 overflow-y-auto pr-1" aria-label="모바일 관리자 메뉴">{renderNavItems(true)}</nav>
-
-      <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
-
-      <div className="mt-4 border-t border-[#E5E7EB] pt-3">
-        <div className="flex items-center justify-between gap-2">
-          <div className="shrink-0 text-[12px] font-extrabold leading-none text-[#111827]">집하 문자</div>
-          <div className="flex min-w-0 items-center justify-end gap-1 text-[12px] font-bold leading-none text-brand-orange">
-            <input
-              type="number"
-              min={1}
-              inputMode="numeric"
-              value={shipmentCount}
-              onChange={(event) => setShipmentCount(event.target.value)}
-              className="h-7 w-10 rounded-md border border-[#FFD4C8] bg-white px-1 text-center text-[12px] font-extrabold text-brand-orange outline-none"
-              aria-label="발송 건수"
+  const renderNavLink = (item: NavItem, mobile: boolean) => {
+    const active = isActive(item.path)
+    const Icon = item.icon
+    const external = EXTERNAL_PATHS.has(item.path)
+    return (
+      <Link
+        key={item.path}
+        href={item.path}
+        prefetch={external ? false : null}
+        target={external ? '_blank' : undefined}
+        rel={external ? 'noopener noreferrer' : undefined}
+        data-active={active ? 'true' : undefined}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => setIsMobileMenuOpen(false)}
+        className={
+          mobile
+            ? `flex min-h-11 min-w-0 items-center justify-between gap-1.5 rounded-[10px] border px-3 text-[13px] no-underline transition-colors ${
+                active
+                  ? 'border-[#ffd5cc] bg-brand-orange-soft font-extrabold'
+                  : 'border-[#eef2f6] bg-[#f8fafc] font-semibold hover:bg-[#f1f3f6]'
+              }`
+            : `group relative flex h-9 min-w-0 items-center justify-between rounded-lg px-2.5 text-[13px] no-underline transition-colors duration-150 ${
+                active ? 'bg-brand-orange-soft font-extrabold' : 'font-semibold hover:bg-[#f4f6f8]'
+              }`
+        }
+        style={{ color: active ? 'var(--color-brand-orange-strong)' : '#344054' }}
+      >
+        {active && !mobile ? <span className="absolute left-0 top-2 h-5 w-[3px] rounded-r-full bg-brand-orange" /> : null}
+        <span className="flex min-w-0 items-center gap-2.5">
+          {mobile ? null : (
+            <Icon
+              size={16}
+              strokeWidth={2.2}
+              className={`shrink-0 ${active ? 'text-current' : 'text-[#98a2b3] group-hover:text-[#667085]'}`}
+              aria-hidden="true"
             />
-            <span className="shrink-0">건</span>
-            <button
-              type="button"
-              onClick={handleSendPickupSms}
-              disabled={sendingSms || loadingFromNumber}
-              className="inline-flex h-7 shrink-0 items-center justify-center rounded-full border-none bg-brand-orange px-3 text-[12px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {sendingSms ? '요청중' : '발송'}
-            </button>
-          </div>
+          )}
+          <span className="truncate leading-none">{item.name}</span>
+        </span>
+        {renderBadge(item.path)}
+      </Link>
+    )
+  }
+
+  const renderGroups = (mobile = false) =>
+    NAV_GROUPS.map((group) => (
+      <div key={group.label} className={mobile ? 'flex flex-col gap-1.5' : 'flex flex-col gap-0.5'}>
+        <div className={`text-[11px] font-bold text-[#667085] ${mobile ? '' : 'px-2.5 pb-1'}`}>{group.label}</div>
+        <div className={mobile ? 'grid grid-cols-2 gap-1.5' : 'flex flex-col gap-0.5'}>
+          {group.items.map((item) => renderNavLink(item, mobile))}
         </div>
-        <button
-          type="button"
-          onClick={() => signOut({ callbackUrl: '/login' })}
-          className="mt-3 flex h-11 w-full items-center justify-center gap-2 rounded-md border border-[#D0D5DD] bg-white px-4 text-[13px] font-bold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
-        >
-          <LogOut size={16} />
-          로그아웃
-        </button>
       </div>
-    </>
+    ))
+
+  const pickupControl = (
+    <div className="flex h-10 shrink-0 items-center gap-2 rounded-[10px] border border-[#e5e9ef] bg-white pl-3 pr-1.5">
+      <Truck size={16} className="shrink-0 text-[#667085]" aria-hidden="true" />
+      <label htmlFor="admin-pickup-count" className="whitespace-nowrap text-[13px] font-bold text-[#344054]">
+        집하 요청
+      </label>
+      <input
+        id="admin-pickup-count"
+        type="number"
+        min={1}
+        inputMode="numeric"
+        value={shipmentCount}
+        onChange={(event) => setShipmentCount(event.target.value)}
+        className="h-7 w-11 rounded-md border border-[#cfd6df] bg-white px-1 text-center text-[13px] font-extrabold text-[#172033] outline-none"
+      />
+      <span className="text-[12px] font-semibold text-[#667085]">건</span>
+      <button
+        type="button"
+        onClick={handleSendPickupSms}
+        disabled={sendingSms || loadingFromNumber}
+        className="inline-flex h-[30px] shrink-0 items-center justify-center rounded-lg border-none bg-brand-orange px-3 text-[12px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {sendingSms ? '요청중' : '문자 발송'}
+      </button>
+    </div>
   )
 
   return (
     <>
-      <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E9EF] bg-white/95 px-3 shadow-[0_1px_2px_rgba(16,24,40,0.06)] backdrop-blur print:hidden lg:hidden">
+      {/* Mobile top bar */}
+      <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E9EF] bg-white/95 px-3 backdrop-blur print:hidden lg:hidden">
         <button
           type="button"
-          onClick={() => setIsMobileMenuOpen(true)}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-[#D0D5DD] bg-white px-3 text-[#172033] transition-colors hover:bg-[#F4F6F8]"
-          aria-label="관리자 메뉴 열기"
+          onClick={() => setIsMobileMenuOpen((open) => !open)}
+          className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#f4f6f8] text-[#172033] transition-colors hover:bg-[#eef2f6]"
+          aria-label={isMobileMenuOpen ? '관리자 메뉴 닫기' : '관리자 메뉴 열기'}
           aria-expanded={isMobileMenuOpen}
           aria-controls="admin-mobile-menu"
         >
-          <Menu size={18} />
-          <span className="text-[13px] font-extrabold">메뉴</span>
+          {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
         </button>
-        <div className="flex min-w-0 flex-col items-center">
-          <Image
-            src="/logo.png"
-            alt="beiko"
-            width={74}
-            height={52}
-            priority
-            className="h-auto w-[58px]"
-          />
-          <div className="mt-0.5 truncate text-[11px] font-bold text-[#172033]">{activeItem?.name || '관리자'}</div>
+        <div className="flex min-w-0 items-center gap-2">
+          <Image src="/logo.png" alt="beiko" width={74} height={66} priority className="h-auto w-[34px]" />
+          <span className="truncate text-[15px] font-extrabold text-[#172033]">{activeItem?.name || '관리자'}</span>
         </div>
-        <a href="/translator" target="_blank" rel="noopener noreferrer" aria-label="번역기 열기" title="번역기" className="inline-flex h-10 w-10 items-center justify-center rounded-md border border-[#D0D5DD] bg-white text-[#344054] transition-colors hover:bg-[#F4F6F8]">
+        <a
+          href="/translator"
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label="번역기 열기"
+          title="번역기"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-[#344054] transition-colors hover:bg-[#F4F6F8]"
+        >
           <Languages size={20} />
         </a>
       </header>
@@ -513,28 +477,127 @@ export default function AdminNav({
         <>
           <button
             type="button"
-            className="fixed inset-0 z-[1001] bg-black/30 backdrop-blur-[1px] print:hidden lg:hidden"
+            className="fixed inset-x-0 bottom-0 top-14 z-[1001] bg-[rgba(16,24,40,0.32)] print:hidden lg:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="관리자 메뉴 닫기"
+            tabIndex={-1}
           />
           <aside
             id="admin-mobile-menu"
             role="dialog"
             aria-modal="true"
             aria-label="관리자 메뉴"
-            className="ux-scrollbar fixed left-3 top-16 z-[1002] box-border max-h-[calc(100vh-76px)] w-[calc(100vw-24px)] max-w-[420px] overflow-y-auto rounded-lg border border-[#D0D5DD] bg-white p-4 shadow-[0_18px_46px_rgba(15,23,42,0.18)] print:hidden lg:hidden"
+            className="ux-scrollbar fixed inset-x-0 top-14 z-[1002] box-border max-h-[calc(100vh-56px)] overflow-y-auto rounded-b-2xl bg-white px-4 pb-5 pt-4 shadow-[0_18px_46px_rgba(15,23,42,0.18)] print:hidden lg:hidden"
           >
-            {mobileMenuContent}
+            <nav className="flex flex-col gap-3.5" aria-label="모바일 관리자 메뉴">
+              {renderGroups(true)}
+            </nav>
+
+            <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
+
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E9EF] pt-3">
+              <div className="flex items-center gap-1.5">
+                <label htmlFor="admin-pickup-count-mobile" className="text-[13px] font-bold text-[#344054]">
+                  집하 요청
+                </label>
+                <input
+                  id="admin-pickup-count-mobile"
+                  type="number"
+                  min={1}
+                  inputMode="numeric"
+                  value={shipmentCount}
+                  onChange={(event) => setShipmentCount(event.target.value)}
+                  className="h-9 w-12 rounded-lg border border-[#cfd6df] bg-white px-1 text-center text-[14px] font-extrabold text-[#172033] outline-none"
+                />
+                <span className="text-[12px] text-[#667085]">건</span>
+              </div>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={handleSendPickupSms}
+                  disabled={sendingSms || loadingFromNumber}
+                  className="inline-flex h-11 items-center justify-center rounded-[10px] border-none bg-brand-orange px-3.5 text-[13px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {sendingSms ? '요청중' : '문자 발송'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => signOut({ callbackUrl: '/login' })}
+                  className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[#E5E9EF] bg-white text-[#667085] transition-colors hover:bg-[#F8FAFC]"
+                  aria-label="로그아웃"
+                >
+                  <LogOut size={18} />
+                </button>
+              </div>
+            </div>
           </aside>
         </>
       ) : null}
 
+      {/* Desktop sidebar */}
       <aside
         id="admin-desktop-sidebar"
-        className="fixed bottom-0 left-0 top-0 z-[1000] box-border hidden h-screen w-[248px] flex-col overflow-hidden border-r border-[#E5E9EF] bg-white px-4 pb-4 pt-5 shadow-[4px_0_16px_rgba(16,24,40,0.04)] print:hidden lg:flex"
+        className="fixed bottom-0 left-0 top-0 z-[1000] box-border hidden h-screen w-[240px] flex-col overflow-hidden border-r border-[#E5E9EF] bg-white px-3 pb-4 pt-5 print:hidden lg:flex"
       >
-        {desktopSidebarContent}
+        <Link href="/admin/orders" prefetch={null} className="flex shrink-0 items-center gap-2.5 px-2 no-underline">
+          <Image src="/logo.png" alt="beiko" width={104} height={93} priority className="h-auto w-[52px]" />
+          <span className="flex flex-col gap-0.5">
+            <span className="text-[13px] font-extrabold leading-tight text-[#172033]">관리자 콘솔</span>
+            <span className="text-[11px] font-semibold leading-tight text-[#667085]">beiko.co.kr</span>
+          </span>
+        </Link>
+
+        <nav className="ux-scrollbar ux-nav-scroll mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-7" aria-label="관리자 메뉴">
+          {renderGroups()}
+        </nav>
+
+        <FavoriteInventoryPanel />
       </aside>
+
+      {/* Desktop top bar */}
+      <header className="fixed left-[240px] right-0 top-0 z-[999] hidden h-[60px] items-center justify-between gap-3 border-b border-[#E5E9EF] bg-white/95 px-6 backdrop-blur print:hidden lg:flex">
+        <div className="flex min-w-0 items-center gap-2 text-[13px]">
+          {activeGroup ? (
+            <>
+              <span className="whitespace-nowrap font-bold text-[#667085]">{activeGroup.label}</span>
+              <ChevronRight size={14} className="shrink-0 text-[#98a2b3]" aria-hidden="true" />
+            </>
+          ) : null}
+          <span className="truncate font-extrabold text-[#172033]">{activeItem?.name || '관리자'}</span>
+        </div>
+        <div className="flex shrink-0 items-center gap-2.5">
+          {pickupControl}
+          <a
+            href="/translator"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="번역기 열기"
+            title="번역기"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#E5E9EF] text-[#344054] transition-colors hover:bg-[#F4F6F8]"
+          >
+            <Languages size={18} />
+          </a>
+          <div className="h-6 w-px bg-[#E5E9EF]" aria-hidden="true" />
+          <div className="flex items-center gap-2">
+            <span
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#172033] text-[12px] font-extrabold text-white"
+              aria-hidden="true"
+            >
+              {displayName.slice(0, 1)}
+            </span>
+            <span className="max-w-[120px] truncate text-[13px] font-bold text-[#344054]">{displayName}</span>
+            <button
+              type="button"
+              onClick={() => signOut({ callbackUrl: '/login' })}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] text-[#667085] transition-colors hover:bg-[#F4F6F8] hover:text-[#172033]"
+              aria-label="로그아웃"
+              title="로그아웃"
+            >
+              <LogOut size={18} />
+            </button>
+          </div>
+        </div>
+      </header>
     </>
   )
 }

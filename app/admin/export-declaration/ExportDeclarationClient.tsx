@@ -1694,8 +1694,8 @@ export default function ExportDeclarationClient({
                     <th className="w-[160px] px-2 py-2 text-left whitespace-nowrap">관리상품</th>
                     <th className="w-[210px] px-2 py-2 text-left whitespace-nowrap">상품명</th>
                     <th className="w-[210px] px-2 py-2 text-left whitespace-nowrap">영문명</th>
-                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">모델 <span className="text-[11px] font-medium text-white/70">Model</span></th>
-                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">세번부호 <span className="text-[11px] font-medium text-white/70">HS Code</span></th>
+                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">모델 <span className="text-[11px] font-medium text-slate-400">Model</span></th>
+                    <th className="w-[110px] px-2 py-2 text-left whitespace-nowrap">세번부호 <span className="text-[11px] font-medium text-slate-400">HS Code</span></th>
                     <th className="w-[90px] px-2 py-2 text-left whitespace-nowrap">원산지</th>
                     <th className="w-[80px] px-2 py-2 text-right whitespace-nowrap">수량</th>
                     <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">단가</th>
@@ -1745,7 +1745,7 @@ export default function ExportDeclarationClient({
           </section>
           </div>
 
-          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-4 xl:max-h-[calc(100vh-2rem)] xl:overflow-auto">
+          <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-[76px] xl:max-h-[calc(100vh-92px)] xl:overflow-auto">
             <Tabs
               aria-label="미리보기 문서"
               className="mb-3"
