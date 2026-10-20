@@ -1753,7 +1753,7 @@ export default function ElectricityClient() {
                                                     <tbody>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 w-16 font-bold text-center">청구 대상</td>
-                                                            <td className="border border-black p-0.5 font-bold italic underline decoration-gray-400">(주)에코모터스 귀하</td>
+                                                            <td className="border border-black p-0.5 font-bold italic underline decoration-gray-400">씨에이치씨 귀하</td>
                                                         </tr>
                                                         <tr>
                                                             <td className="border border-black bg-gray-50 p-0.5 text-center font-bold">청구 년월</td>
@@ -1848,7 +1848,7 @@ export default function ElectricityClient() {
                                                         <th className="border border-black p-0.5">항목</th>
                                                         <th className="border border-black p-0.5">전체 금액</th>
                                                         <th className="border border-black p-0.5">베이코 분담</th>
-                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">에코모터스 청구액</th>
+                                                        <th className="border border-black p-0.5 bg-gray-100 font-bold">씨에이치씨 청구액</th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
