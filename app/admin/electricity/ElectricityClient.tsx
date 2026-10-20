@@ -1756,7 +1756,7 @@ export default function ElectricityClient() {
             {
                 isInvoiceOpen && landlordData && billData && (
                     <div id="print-modal"
-                        className="fixed inset-0 bg-gray-950/95 z-[150] flex items-start justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:static print:block print:p-0"
+                        className="fixed inset-0 bg-gray-950/95 z-[1200] flex items-start justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:static print:block print:p-0"
                     >
                         <div
                             className="bg-white w-full min-w-0 max-w-[210mm] shadow-2xl relative print:static print:transform-none print:m-0 print:shadow-none"
