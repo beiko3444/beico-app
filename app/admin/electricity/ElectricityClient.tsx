@@ -7,6 +7,11 @@ import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
 import {
+    readInvoiceNotes, validateInvoiceNotes, MAX_INVOICE_NOTICES, MAX_NOTICE_TITLE_LENGTH,
+    MAX_NOTICE_CONTENT_LENGTH, MAX_INVOICE_REMARKS_LENGTH,
+    type ElectricityInvoiceNotice,
+} from '@/lib/electricityInvoiceNotes'
+import {
     defaultRentPaymentChecklistStatus,
     normalizeRentPaymentStatus,
     rentPaymentStatusKey,
@@ -112,6 +117,12 @@ export default function ElectricityClient() {
     const [loading, setLoading] = useState(false)
     const [prevMonthData, setPrevMonthData] = useState<any>(null)
     const [invoiceRemarks, setInvoiceRemarks] = useState('')
+    const [invoiceNotices, setInvoiceNotices] = useState<ElectricityInvoiceNotice[]>([])
+    const [savedInvoiceNotes, setSavedInvoiceNotes] = useState(JSON.stringify({ remarks: '', notices: [] }))
+    const [isInvoiceEditorOpen, setIsInvoiceEditorOpen] = useState(false)
+    const [savingInvoiceNotes, setSavingInvoiceNotes] = useState(false)
+    const [invoiceNotesStatus, setInvoiceNotesStatus] = useState('')
+    const [invoiceNotesError, setInvoiceNotesError] = useState('')
     const [paymentChecklist, setPaymentChecklist] = useState<Record<string, RentPaymentChecklistStatus>>({})
     const [monthlyLandlordTotals, setMonthlyLandlordTotals] = useState<Record<number, number | null>>({})
     const [monthlyBillStatuses, setMonthlyBillStatuses] = useState<Record<number, boolean>>({})
@@ -208,6 +219,7 @@ export default function ElectricityClient() {
 
     // Fetch data when Year/Month changes
     useEffect(() => {
+        let cancelled = false
         const fetchData = async () => {
             setBillData(null)
             setLandlordData(null)
@@ -216,6 +228,11 @@ export default function ElectricityClient() {
             setLandlordPhoto(null)
             setRawText('')
             setExtractionHistory([])
+            setInvoiceRemarks('')
+            setInvoiceNotices([])
+            setSavedInvoiceNotes(JSON.stringify({ remarks: '', notices: [] }))
+            setInvoiceNotesStatus('')
+            setInvoiceNotesError('')
             setLandlordInputs({
                 prevMeter: '',
                 currMeter: '',
@@ -228,7 +245,12 @@ export default function ElectricityClient() {
                 const res = await fetch(`/api/admin/electricity?year=${selectedYear}&month=${selectedMonth}`)
                 if (res.ok) {
                     const data = await res.json()
+                    if (cancelled) return
                     if (data && data.year) {
+                        const notes = readInvoiceNotes(data.invoiceNotes)
+                        setInvoiceRemarks(notes.remarks)
+                        setInvoiceNotices(notes.notices)
+                        setSavedInvoiceNotes(JSON.stringify(notes))
                         const parsed = data.rawBillData ? JSON.parse(data.rawBillData) : {}
                         setBillData({
                             year: data.year,
@@ -314,6 +336,7 @@ export default function ElectricityClient() {
                 const resPrev = await fetch(`/api/admin/electricity?year=${prevYear}&month=${prevMonth}`)
                 if (resPrev.ok) {
                     const prevData = await resPrev.json()
+                    if (cancelled) return
                     if (prevData && prevData.year) {
                         setPrevMonthData(prevData)
                         if (prevData.meterPhotoUrl) {
@@ -337,6 +360,7 @@ export default function ElectricityClient() {
             }
         }
         fetchData()
+        return () => { cancelled = true }
     }, [selectedYear, selectedMonth])
 
     useEffect(() => {
@@ -518,6 +542,53 @@ export default function ElectricityClient() {
         } finally {
             setLoading(false)
         }
+    }
+
+    const invoiceNotesDirty = JSON.stringify({ remarks: invoiceRemarks, notices: invoiceNotices }) !== savedInvoiceNotes
+
+    const saveInvoiceNotes = async () => {
+        setSavingInvoiceNotes(true)
+        setInvoiceNotesError('')
+        setInvoiceNotesStatus('')
+        try {
+            const notes = validateInvoiceNotes({ remarks: invoiceRemarks, notices: invoiceNotices })
+            const res = await fetch('/api/admin/electricity/invoice', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ year: selectedYear, month: selectedMonth, notes }),
+            })
+            const data = await res.json()
+            if (!res.ok) throw new Error(data.error || '고지 내용 저장에 실패했습니다.')
+            const saved = validateInvoiceNotes(data.notes)
+            setInvoiceRemarks(saved.remarks)
+            setInvoiceNotices(saved.notices)
+            setSavedInvoiceNotes(JSON.stringify(saved))
+            setInvoiceNotesStatus(`${selectedYear}년 ${selectedMonth}월 고지 내용이 저장되었습니다.`)
+            return true
+        } catch (error) {
+            setInvoiceNotesError(error instanceof Error ? error.message : '고지 내용 저장에 실패했습니다.')
+            setIsInvoiceEditorOpen(true)
+            return false
+        } finally {
+            setSavingInvoiceNotes(false)
+        }
+    }
+
+    const printInvoice = async () => {
+        if (invoiceNotesDirty && !await saveInvoiceNotes()) return
+        // Allow the saved content and toolbar state to render before opening print preview.
+        requestAnimationFrame(() => requestAnimationFrame(() => window.print()))
+    }
+
+    const closeInvoice = () => {
+        if (invoiceNotesDirty) {
+            if (!window.confirm('저장하지 않은 고지 내용을 버리고 닫으시겠습니까?')) return
+            const notes = readInvoiceNotes(savedInvoiceNotes)
+            setInvoiceRemarks(notes.remarks)
+            setInvoiceNotices(notes.notices)
+        }
+        setInvoiceNotesError('')
+        setIsInvoiceOpen(false)
     }
 
     const parseBillText = async () => {
@@ -1685,55 +1756,60 @@ export default function ElectricityClient() {
             {
                 isInvoiceOpen && landlordData && billData && (
                     <div id="print-modal"
-                        className="fixed inset-0 bg-gray-950/95 z-[150] flex items-center justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:absolute print:inset-0 print:block print:p-0"
+                        className="fixed inset-0 bg-gray-950/95 z-[150] flex items-start justify-center p-0 sm:p-4 backdrop-blur-xl overflow-y-auto print:static print:block print:p-0"
                     >
                         <div
-                            className="bg-white w-full max-w-[210mm] shadow-2xl relative print:static print:transform-none print:m-0 print:shadow-none animate-in fade-in zoom-in-95 duration-300 my-10 print:my-0"
+                            className="bg-white w-full min-w-0 max-w-[210mm] shadow-2xl relative print:static print:transform-none print:m-0 print:shadow-none"
                             onClick={e => e.stopPropagation()}
                         >
-                            {/* Floating Side Buttons - Fixed Right */}
-                            <div className="fixed top-1/2 right-6 -translate-y-1/2 z-[200] flex flex-col gap-4 print:hidden">
-                                {/* Remarks Input Modal Tool */}
-                                <div className="absolute right-full top-0 mr-4 w-64 bg-white dark:bg-[#1e1e1e] p-3 rounded-2xl shadow-xl dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-4 hover:shadow-2xl transition-all">
-                                    <div className="text-xs font-bold text-gray-700 mb-2">하단 비고란 입력</div>
-                                    <textarea
-                                        value={invoiceRemarks}
-                                        onChange={(e) => setInvoiceRemarks(e.target.value)}
-                                        placeholder="청구서 하단에 인쇄할 안내사항이나 입금 계좌 변경 등의 내용을 자유롭게 적어주세요."
-                                        rows={4}
-                                        className="w-full text-xs p-2.5 bg-gray-50 dark:bg-[#1a1a1a] border border-gray-200 dark:border-[#2a2a2a] rounded-xl focus:ring-brand-orange focus:border-brand-orange transition-all resize-none dark:text-white"
-                                    />
+                            <div className="sticky top-0 z-10 border-b border-gray-200 bg-white text-gray-900 print:hidden">
+                                <div className="flex flex-wrap items-center gap-2 p-3">
+                                    <Button variant="secondary" size="sm" aria-expanded={isInvoiceEditorOpen} aria-controls="invoice-notes-editor" onClick={() => setIsInvoiceEditorOpen(!isInvoiceEditorOpen)}>
+                                        {isInvoiceEditorOpen ? '편집 접기' : '고지 항목 편집'}
+                                    </Button>
+                                    <Button size="sm" onClick={saveInvoiceNotes} loading={savingInvoiceNotes} disabled={!invoiceNotesDirty}>고지 내용 저장</Button>
+                                    <span className="text-xs text-gray-500" role="status">{savingInvoiceNotes ? '저장 중…' : invoiceNotesDirty ? '저장하지 않은 변경사항' : invoiceNotesStatus || '월별 고지 내용'}</span>
+                                    <div className="ml-auto flex gap-2">
+                                        <Button variant="secondary" size="sm" disabled={savingInvoiceNotes} onClick={printInvoice}>인쇄 / PDF</Button>
+                                        <Button variant="ghost" size="sm" disabled={savingInvoiceNotes} onClick={closeInvoice}>닫기</Button>
+                                    </div>
                                 </div>
-                                <button
-                                    type="button"
-                                    onClick={() => window.print()}
-                                    title="PDF로 저장"
-                                    aria-label="PDF로 저장"
-                                    className="p-3 bg-brand-orange hover:bg-brand-orange-hover text-white rounded-full shadow-2xl transition-all border border-white/20 active:scale-90"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => window.print()}
-                                    title="청구서 인쇄"
-                                    aria-label="청구서 인쇄"
-                                    className="p-3 bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] text-gray-900 dark:text-white rounded-full shadow-2xl dark:shadow-none border border-gray-200 dark:border-[#2a2a2a] active:scale-90"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setIsInvoiceOpen(false)}
-                                    title="닫기"
-                                    aria-label="닫기"
-                                    className="p-3 bg-white dark:bg-[#1e1e1e] hover:bg-gray-50 dark:hover:bg-[#1a1a1a] text-gray-900 dark:text-white rounded-full shadow-2xl dark:shadow-none border border-gray-200 dark:border-[#2a2a2a] active:scale-90"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                                {invoiceNotesError && <p role="alert" className="px-3 pb-2 text-sm text-red-600">{invoiceNotesError}</p>}
+                                {isInvoiceEditorOpen && (
+                                    <div id="invoice-notes-editor" className="max-h-[50vh] space-y-3 overflow-y-auto border-t border-gray-100 bg-gray-50 p-3">
+                                        <div className="flex items-center justify-between gap-2">
+                                            <div>
+                                                <h3 className="text-sm font-bold">추가 고지 항목</h3>
+                                                <p className="mt-1 text-xs text-gray-500">{selectedYear}년 {selectedMonth}월 청구서에 저장하고 인쇄합니다. (최대 {MAX_INVOICE_NOTICES}개)</p>
+                                            </div>
+                                            <Button variant="secondary" size="sm" disabled={savingInvoiceNotes || invoiceNotices.length >= MAX_INVOICE_NOTICES} onClick={() => {
+                                                setInvoiceNotices(prev => [...prev, { title: '', content: '' }])
+                                                setInvoiceNotesError('')
+                                                requestAnimationFrame(() => document.getElementById(`invoice-notice-title-${invoiceNotices.length}`)?.focus())
+                                            }}>+ 고지 항목 추가</Button>
+                                        </div>
+                                        {invoiceNotices.length === 0 && <p className="rounded-lg border border-dashed border-gray-300 p-3 text-sm text-gray-500">추가로 안내할 사항을 항목별로 작성할 수 있습니다.</p>}
+                                        <fieldset disabled={savingInvoiceNotes} className="space-y-3 disabled:opacity-60">
+                                            {invoiceNotices.map((notice, index) => (
+                                                <div key={index} className="space-y-2 rounded-lg border border-gray-200 bg-white p-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <label htmlFor={`invoice-notice-title-${index}`} className="text-xs font-bold">고지 {index + 1} · 제목</label>
+                                                        <button type="button" aria-label={`고지 항목 ${index + 1} 삭제`} className="min-h-10 px-2 text-xs font-medium text-red-600 hover:underline focus-visible:outline-2 focus-visible:outline-brand-orange" onClick={() => setInvoiceNotices(prev => prev.filter((_, i) => i !== index))}>삭제</button>
+                                                    </div>
+                                                    <input id={`invoice-notice-title-${index}`} value={notice.title} maxLength={MAX_NOTICE_TITLE_LENGTH} placeholder="예: 세금계산서 발행 요청" className="w-full rounded-lg border border-gray-300 p-2 text-sm focus:border-brand-orange focus:outline-brand-orange" onChange={e => setInvoiceNotices(prev => prev.map((item, i) => i === index ? { ...item, title: e.target.value } : item))} />
+                                                    <label htmlFor={`invoice-notice-content-${index}`} className="block text-xs font-bold">내용</label>
+                                                    <textarea id={`invoice-notice-content-${index}`} value={notice.content} maxLength={MAX_NOTICE_CONTENT_LENGTH} rows={3} placeholder="고지할 내용을 입력해주세요. 줄바꿈도 그대로 인쇄됩니다." className="w-full resize-y rounded-lg border border-gray-300 p-2 text-sm focus:border-brand-orange focus:outline-brand-orange" onChange={e => setInvoiceNotices(prev => prev.map((item, i) => i === index ? { ...item, content: e.target.value } : item))} />
+                                                </div>
+                                            ))}
+                                            <label htmlFor="invoice-remarks" className="block text-xs font-bold">하단 비고 메시지</label>
+                                            <textarea id="invoice-remarks" value={invoiceRemarks} maxLength={MAX_INVOICE_REMARKS_LENGTH} onChange={e => setInvoiceRemarks(e.target.value)} rows={3} placeholder="청구서 하단에 표시할 안내사항" className="w-full resize-y rounded-lg border border-gray-300 bg-white p-2 text-sm focus:border-brand-orange focus:outline-brand-orange" />
+                                        </fieldset>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Invoice Content */}
+                            <div className="overflow-x-auto print:overflow-visible">
                             {(() => {
                                 const usageYear = selectedYear;
                                 const usageMonth = selectedMonth;
@@ -1741,7 +1817,7 @@ export default function ElectricityClient() {
                                 const usagePeriodStr = `${usageYear}.${usageMonth.toString().padStart(2, '0')}.01 ~ ${lastDay}일`;
 
                                 return (
-                                    <div className="h-[297mm] overflow-hidden bg-white p-[7mm] flex flex-col w-[210mm] mx-auto text-black font-sans" id="invoice-content">
+                                    <div className="min-h-[297mm] bg-white p-[7mm] w-[210mm] mx-auto text-black font-sans" id="invoice-content">
                                         {/* Title Section */}
                                         <div className="text-center mb-2">
                                             <h2 className="text-[14px] font-bold tracking-[0.2em] border-b border-black pb-0.5 inline-block px-8">{selectedMonth}월 전기요금 청구 명세서</h2>
@@ -1999,9 +2075,20 @@ export default function ElectricityClient() {
                                             </table>
                                         </div>
 
+                                        {invoiceNotices.some(notice => notice.title.trim() || notice.content.trim()) && (
+                                            <div className="mb-2">
+                                                <div className="invoice-section-title text-[10px] font-bold mb-0.5">6. 추가 고지 사항</div>
+                                                {invoiceNotices.filter(notice => notice.title.trim() || notice.content.trim()).map((notice, index) => (
+                                                    <div key={index} className="invoice-notice border border-black px-2 py-1 text-[9px] leading-relaxed break-words whitespace-pre-wrap [&+&]:border-t-0">
+                                                        {notice.title.trim() && <div className="font-bold">{notice.title.trim()}</div>}
+                                                        {notice.content.trim() && <div>{notice.content.trim()}</div>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
                                         <div>
-                                            <div className="text-[10px] font-bold mb-0.5">6. 비고 메시지</div>
-                                            <div className="min-h-[30px] border border-black px-2 py-1 text-[8px] leading-relaxed whitespace-pre-wrap">
+                                            <div className="invoice-section-title text-[10px] font-bold mb-0.5">{invoiceNotices.some(notice => notice.title.trim() || notice.content.trim()) ? '7' : '6'}. 비고 메시지</div>
+                                            <div className="min-h-[30px] border border-black px-2 py-1 text-[8px] leading-relaxed whitespace-pre-wrap break-words">
                                                 {invoiceRemarks.trim() || '\u00a0'}
                                             </div>
                                         </div>
@@ -2010,18 +2097,19 @@ export default function ElectricityClient() {
                                     </div>
                                 );
                             })()}
+                            </div>
                         </div>
 
                         <style jsx global>{`
                             @media print {
-                                @page { size: A4 portrait; margin: 0; }
+                                @page { size: A4 portrait; margin: 7mm; }
                                 html, body { 
-                                    width: 210mm !important;
-                                    height: 297mm !important;
+                                    width: auto !important;
+                                    height: auto !important;
                                     margin: 0 !important; 
                                     padding: 0 !important; 
                                     background: white !important;
-                                    overflow: hidden !important; 
+                                    overflow: visible !important;
                                 }
 
                                 .apple-admin-shell,
@@ -2037,7 +2125,8 @@ export default function ElectricityClient() {
                                 }
                                 
                                 /* Completely remove background layout elements from print flow */
-                                #electricity-main > div:not(#print-modal) {
+                                #electricity-main > :not(#print-modal),
+                                .apple-admin-shell > :not(main) {
                                     display: none !important;
                                 }
                                 
@@ -2047,18 +2136,22 @@ export default function ElectricityClient() {
                                 }
                                 
                                 #invoice-content {
-                                    position: fixed !important;
-                                    top: 0 !important;
-                                    left: 0 !important;
-                                    width: 210mm !important;
-                                    height: 297mm !important;
+                                    position: static !important;
+                                    width: 100% !important;
+                                    height: auto !important;
+                                    min-height: 0 !important;
                                     margin: 0 !important;
-                                    padding: 7mm !important;
+                                    padding: 0 !important;
                                     background: white !important;
                                     z-index: 99999 !important;
                                     box-sizing: border-box !important;
-                                    overflow: hidden !important; 
+                                    overflow: visible !important;
                                 }
+                                #print-modal { position: static !important; overflow: visible !important; background: white !important; backdrop-filter: none !important; }
+                                #invoice-content tr { break-inside: avoid; }
+                                #invoice-content .invoice-notice { break-inside: avoid; }
+                                #invoice-content .invoice-notice > .font-bold { break-after: avoid; }
+                                #invoice-content .invoice-section-title { break-after: avoid; }
                                 
                                 table { border-collapse: collapse !important; width: 100% !important; table-layout: fixed; }
                                 td, th { border: 1px solid black !important; word-break: break-all; }

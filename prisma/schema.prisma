@@ -280,6 +280,7 @@ model ElectricityUsage {
   meterPhotoUploadedAt DateTime?
   rawText              String?
   extractionHistory    String?
+  invoiceNotes         String?
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
