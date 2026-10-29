@@ -6,6 +6,15 @@ import { authOptions } from "@/lib/auth"
 import { unstable_cache } from "next/cache"
 import AdminNav from "./AdminNav"
 import PushNotificationRegistrar from "@/components/PushNotificationRegistrar"
+import type { Metadata } from "next"
+
+// The root layout is written for Japanese partners; the admin console is Korean.
+export const metadata: Metadata = {
+    title: {
+        default: "관리자 콘솔 · beiko",
+        template: "%s · beiko 관리자",
+    },
+}
 
 const getCachedAdminCounts = unstable_cache(
     async () => {

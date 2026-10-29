@@ -260,6 +260,13 @@ export default function AdminNav({
     setIsMobileMenuOpen(false)
   }, [pathname])
 
+  // The root <html lang> is Japanese for partners; admin pages are Korean (fonts, line breaking, screen readers).
+  useEffect(() => {
+    const previous = document.documentElement.lang
+    document.documentElement.lang = 'ko'
+    return () => { document.documentElement.lang = previous }
+  }, [])
+
   // Keep the active menu item visible when the grouped list overflows the sidebar height.
   useEffect(() => {
     const el = document.querySelector<HTMLElement>('#admin-desktop-sidebar [data-active="true"]')
