@@ -1,12 +1,13 @@
 'use client'
 
-import { ImageIcon } from 'lucide-react'
+import { ImageIcon, Trash2 } from 'lucide-react'
 
 import { useMemo, useState } from 'react'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import FitToWidth from '@/components/ui/FitToWidth'
 
 export type PartnerOption = {
     id: string
@@ -666,34 +667,40 @@ ${rowsHtml}
         }
     }
 
+    const quantityInputClass = (checked: boolean) =>
+        `h-9 w-20 rounded-lg border px-2 text-right font-bold tabular-nums transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+            checked
+                ? 'border-slate-300 bg-white text-slate-900 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-white'
+                : 'border-transparent bg-slate-50 text-slate-400 dark:bg-[#1a1a1a]'
+        }`
+
     return (
         <div className="min-w-0 space-y-6">
             <PageHeader
-                title="PI발급"
+                title="PI 발급"
                 description="작성 후 발행하면 발급리스트에 저장됩니다. 출력만으로는 발행 기록이 생성되지 않습니다."
-                count={issuedInvoices.length}
                 actions={
-                    <>
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
                         {leftTab === 'write' ? (
                             <Button variant="ghost" onClick={resetDraft}>
                                 초기화
                             </Button>
                         ) : null}
-                        <Button variant="secondary" onClick={handlePrint}>
-                            출력 (PDF 저장/인쇄)
+                        <Button variant="secondary" onClick={handlePrint} className={leftTab === 'write' ? '' : 'col-span-2'}>
+                            출력 (PDF)
                         </Button>
                         {leftTab === 'write' ? (
-                            <Button variant="primary" onClick={handleIssue} loading={isIssuing}>
+                            <Button variant="primary" onClick={handleIssue} loading={isIssuing} className="order-first col-span-2 sm:order-none">
                                 {isIssuing ? '발행 중...' : '발행하기'}
                             </Button>
                         ) : null}
-                    </>
+                    </div>
                 }
             />
 
-            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8 items-start">
+            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,560px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,640px)]">
                 <div className="pi-no-print min-w-0 space-y-6">
-                    <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4 min-w-0">
+                    <section className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:p-5">
                         <Tabs
                             aria-label="PI 작업"
                             items={[
@@ -706,94 +713,161 @@ ${rowsHtml}
 
                         {leftTab === 'write' ? (
                             <div className="space-y-4">
-                                <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a]">
-                                    <label className="text-xs font-bold text-gray-700 dark:text-gray-400">업체 선택</label>
-                                    <select
-                                        value={selectedPartnerId}
-                                        onChange={(event) => {
-                                            setSelectedPartnerId(event.target.value)
-                                            setActiveIssuedId(null)
-                                            setLeftTab('write')
-                                        }}
-                                        className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-bold dark:text-white focus:ring-brand-orange focus:border-brand-orange"
-                                    >
-                                        <option value="">업체를 선택하세요</option>
-                                        {partners.map((partner) => (
-                                            <option key={partner.id} value={partner.id}>
-                                                {partner.businessName || partner.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">상품관리의 미국 거래 단가(USD)가 적용됩니다. 단가 미설정 상품은 선택할 수 없습니다.</p>
-                                    <div className="mt-3">
-                                        <label className="text-xs font-bold text-gray-700 dark:text-gray-400">생산 소요기간</label>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <label className="block min-w-0">
+                                        <span className="text-[11px] font-bold text-slate-600 dark:text-gray-400">업체 선택</span>
+                                        <select
+                                            value={selectedPartnerId}
+                                            onChange={(event) => {
+                                                setSelectedPartnerId(event.target.value)
+                                                setActiveIssuedId(null)
+                                                setLeftTab('write')
+                                            }}
+                                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white"
+                                        >
+                                            <option value="">업체를 선택하세요</option>
+                                            {partners.map((partner) => (
+                                                <option key={partner.id} value={partner.id}>
+                                                    {partner.businessName || partner.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </label>
+                                    <label className="block min-w-0">
+                                        <span className="text-[11px] font-bold text-slate-600 dark:text-gray-400">생산 소요기간</span>
                                         <input
                                             type="text"
                                             value={draftProductionTime}
                                             onChange={(event) => setDraftProductionTime(event.target.value)}
-                                            className="mt-2 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-medium dark:text-white focus:ring-brand-orange focus:border-brand-orange"
+                                            className="mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white"
                                             placeholder="e.g. 3-5 days after receiving the deposit"
                                         />
-                                    </div>
+                                    </label>
+                                    <p className="text-[11px] text-slate-500 dark:text-gray-400 sm:col-span-2">상품관리의 미국 거래 단가(USD)가 적용됩니다. 단가 미설정 상품은 선택할 수 없습니다.</p>
                                 </div>
 
-                                <div className="flex flex-wrap items-center gap-3"><label className="min-w-0 flex-1"><span className="sr-only">PI 상품 검색</span><input type="search" className="ux-input" value={productSearch} onChange={event => setProductSearch(event.target.value)} placeholder="상품명·코드 검색" /></label><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={selectedOnly} onChange={event => setSelectedOnly(event.target.checked)} className="h-5 w-5" />선택 상품만</label></div>
-                                <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
-                                    <table className="w-full min-w-[560px] text-sm">
+                                <div className="flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4 dark:border-[#2a2a2a]">
+                                    <label className="min-w-0 flex-1">
+                                        <span className="sr-only">PI 상품 검색</span>
+                                        <input type="search" className="ux-input" value={productSearch} onChange={event => setProductSearch(event.target.value)} placeholder="상품명·코드 검색" />
+                                    </label>
+                                    <label className="flex min-h-11 items-center gap-2 text-sm font-bold text-slate-700 dark:text-gray-300">
+                                        <input type="checkbox" checked={selectedOnly} onChange={event => setSelectedOnly(event.target.checked)} className="h-5 w-5 accent-brand-orange" />
+                                        선택 상품만
+                                    </label>
+                                </div>
+
+                                {/* Phones: one card per product so price, quantity and amount stay on screen. */}
+                                <ul className="divide-y divide-slate-100 rounded-xl border border-slate-200 dark:divide-[#2a2a2a] dark:border-[#2a2a2a] sm:hidden">
+                                    {visibleProducts.map((product) => {
+                                        const rowState = draftState[product.id] || { checked: false, quantity: 1 }
+                                        const hasPrice = Number(product.usBuyPrice) > 0
+                                        const amount = rowState.quantity * Number(product.usBuyPrice || 0)
+                                        return (
+                                            <li
+                                                key={product.id}
+                                                className={`space-y-2 px-3 py-3 ${rowState.checked ? 'bg-brand-orange-soft/60 shadow-[inset_3px_0_0_var(--color-brand-orange)] dark:bg-[#2a1d19]' : ''}`}
+                                            >
+                                                <label className="flex items-start gap-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        disabled={!hasPrice}
+                                                        checked={rowState.checked}
+                                                        onChange={() => toggleProduct(product.id)}
+                                                        className="mt-0.5 h-5 w-5 shrink-0 accent-brand-orange"
+                                                    />
+                                                    <span className="min-w-0">
+                                                        <span className="block break-keep text-sm font-bold text-slate-900 dark:text-white">{product.nameJP || product.name}</span>
+                                                        <span className="block break-keep text-[11px] text-slate-500 dark:text-gray-400">{product.nameEN || product.name}</span>
+                                                        <span className="block font-mono text-[11px] text-slate-500 dark:text-gray-400">
+                                                            {product.productCode ? product.productCode.toUpperCase() : '-'} · 재고 {product.stock.toLocaleString()}
+                                                        </span>
+                                                    </span>
+                                                </label>
+                                                <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 pl-8 text-sm">
+                                                    <span className="tabular-nums text-slate-600 dark:text-gray-300">{hasPrice ? usdFormatter.format(Number(product.usBuyPrice)) : '단가 미설정'}</span>
+                                                    <input
+                                                        type="number"
+                                                        min={1}
+                                                        aria-label={`${product.nameJP || product.name} 수량`}
+                                                        disabled={!hasPrice}
+                                                        value={rowState.quantity}
+                                                        onChange={(event) => updateQuantity(product.id, event.target.value)}
+                                                        onFocus={(event) => event.currentTarget.select()}
+                                                        className={quantityInputClass(rowState.checked)}
+                                                    />
+                                                    <span className="text-right font-black tabular-nums text-slate-900 dark:text-white">{rowState.checked ? usdFormatter.format(amount) : '-'}</span>
+                                                </div>
+                                            </li>
+                                        )
+                                    })}
+                                </ul>
+
+                                <div className="hidden overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a] sm:block">
+                                    <table className="w-full min-w-[520px] text-sm">
                                         <thead className="ux-thead">
                                             <tr>
-                                                <th className="px-3 py-2 text-center w-10 whitespace-nowrap">선택</th>
-                                                <th className="px-3 py-2 text-center w-16 whitespace-nowrap">이미지</th>
-                                                <th className="px-3 py-2 text-left min-w-[180px] whitespace-nowrap">상품</th>
-                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">재고</th>
-                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">단가</th>
-                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">수량</th>
-                                                <th className="px-3 py-2 text-center min-w-[64px] whitespace-nowrap">금액</th>
+                                                <th className="w-10 text-center">선택</th>
+                                                <th className="w-16 text-center xl:hidden 2xl:table-cell">이미지</th>
+                                                <th className="min-w-[180px] text-left">상품</th>
+                                                <th className="text-right">재고</th>
+                                                <th className="text-right">단가</th>
+                                                <th className="text-right">수량</th>
+                                                <th className="text-right">금액</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
+                                        <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
                                             {visibleProducts.map((product) => {
                                                 const rowState = draftState[product.id] || { checked: false, quantity: 1 }
+                                                const hasPrice = Number(product.usBuyPrice) > 0
                                                 const amount = rowState.quantity * Number(product.usBuyPrice || 0)
                                                 return (
-                                                    <tr key={product.id} className={rowState.checked ? 'bg-brand-orange/5' : 'bg-white dark:bg-[#1e1e1e]'}>
+                                                    <tr
+                                                        key={product.id}
+                                                        className={rowState.checked ? 'bg-brand-orange-soft/60 shadow-[inset_3px_0_0_var(--color-brand-orange)] dark:bg-[#2a1d19]' : 'bg-white dark:bg-[#1e1e1e]'}
+                                                    >
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
-                                                                disabled={!(Number(product.usBuyPrice) > 0)}
+                                                                aria-label={`${product.nameJP || product.name} 선택`}
+                                                                disabled={!hasPrice}
                                                                 checked={rowState.checked}
                                                                 onChange={() => toggleProduct(product.id)}
                                                                 className="h-4 w-4 accent-brand-orange"
                                                             />
                                                         </td>
-                                                        <td className="px-3 py-2 text-center">
-                                                            <div className="mx-auto w-11 h-11 rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] overflow-hidden flex items-center justify-center">
+                                                        <td className="px-3 py-2 text-center xl:hidden 2xl:table-cell">
+                                                            <div className="mx-auto flex h-11 w-11 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                                                                 {product.imageUrl ? (
-                                                                    <img src={product.imageUrl} alt={product.name} className="w-full h-full object-cover" />
+                                                                    <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
                                                                 ) : (
                                                                     <ImageIcon size={16} className="text-slate-300" aria-hidden="true" />
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-2 min-w-[180px]">
-                                                            <div className="font-bold text-gray-900 dark:text-white break-keep">{product.nameJP || product.name}</div>
-                                                            <div className="text-[11px] text-gray-500 dark:text-gray-400 break-keep">{product.nameEN || product.name}</div>
-                                                            <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
+                                                        <td className="min-w-[180px] px-3 py-2">
+                                                            <div className="break-keep font-bold text-slate-900 dark:text-white">{product.nameJP || product.name}</div>
+                                                            <div className="break-keep text-[11px] text-slate-500 dark:text-gray-400">{product.nameEN || product.name}</div>
+                                                            <div className="font-mono text-[11px] text-slate-500 dark:text-gray-400">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
                                                         </td>
-                                                        <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{product.stock.toLocaleString()}</td>
-                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">{Number(product.usBuyPrice) > 0 ? usdFormatter.format(Number(product.usBuyPrice)) : '단가 미설정'}</td>
-                                                        <td className="px-3 py-2 text-center">
+                                                        <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-slate-600 dark:text-gray-400">{product.stock.toLocaleString()}</td>
+                                                        <td className={`whitespace-nowrap px-3 py-2 text-right tabular-nums ${hasPrice ? 'font-bold text-slate-900 dark:text-white' : 'text-xs text-slate-400'}`}>
+                                                            {hasPrice ? usdFormatter.format(Number(product.usBuyPrice)) : '단가 미설정'}
+                                                        </td>
+                                                        <td className="px-3 py-2 text-right">
                                                             <input
                                                                 type="number"
                                                                 min={1}
+                                                                aria-label={`${product.nameJP || product.name} 수량`}
+                                                                disabled={!hasPrice}
                                                                 value={rowState.quantity}
                                                                 onChange={(event) => updateQuantity(product.id, event.target.value)}
                                                                 onFocus={(event) => event.currentTarget.select()}
                                                                 onClick={(event) => event.currentTarget.select()}
-                                                                className="w-20 border border-gray-200 dark:border-[#2a2a2a] rounded-xl px-2 py-1 text-center font-bold bg-white dark:bg-[#1e1e1e] dark:text-white"
+                                                                className={quantityInputClass(rowState.checked)}
                                                             />
                                                         </td>
-                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">
+                                                        <td className="whitespace-nowrap px-3 py-2 text-right font-black tabular-nums text-slate-900 dark:text-white">
                                                             {rowState.checked ? usdFormatter.format(amount) : '-'}
                                                         </td>
                                                     </tr>
@@ -805,49 +879,49 @@ ${rowsHtml}
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                <div>
-                                    <h3 className="text-[13px] font-bold text-gray-900 dark:text-white">PI 발급리스트</h3>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">발급된 PI를 선택하면 인쇄 미리보기에 즉시 반영됩니다.</p>
-                                </div>
-                                <div className="max-h-[620px] overflow-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
+                                <p className="text-xs text-slate-500 dark:text-gray-400">발급된 PI를 선택하면 인쇄 미리보기에 즉시 반영됩니다.</p>
+                                <div className="max-h-[620px] overflow-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
                                     <table className="w-full min-w-[420px] text-xs">
                                         <thead className="ux-thead">
                                             <tr>
-                                                <th className="px-3 py-2 text-left whitespace-nowrap">날짜</th>
-                                                <th className="px-3 py-2 text-left whitespace-nowrap">업체명</th>
-                                                <th className="px-3 py-2 text-center whitespace-nowrap">총가격</th>
-                                                <th className="px-3 py-2 text-center whitespace-nowrap">관리</th>
+                                                <th className="text-left">날짜</th>
+                                                <th className="text-left">업체명</th>
+                                                <th className="text-right">총가격</th>
+                                                <th className="text-center">관리</th>
                                             </tr>
                                         </thead>
-                                        <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
+                                        <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
                                             {issuedInvoices.length === 0 ? (
                                                 <tr>
-                                                    <td colSpan={4} className="p-3">
-                                                        <EmptyState compact title="발급된 PI가 없습니다" description="PI 작성 탭에서 상품을 선택하고 발행하세요." />
+                                                    <td colSpan={4}>
+                                                        <EmptyState bare compact title="발급된 PI가 없습니다" description="PI 작성 탭에서 상품을 선택하고 발행하세요." />
                                                     </td>
                                                 </tr>
                                             ) : (
                                                 issuedInvoices.map((invoice) => (
                                                     <tr
                                                         key={invoice.id}
-                                                        className={`cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] ${activeIssuedId === invoice.id ? 'bg-brand-orange/5' : ''}`}
+                                                        aria-selected={activeIssuedId === invoice.id}
+                                                        className={`cursor-pointer ${activeIssuedId === invoice.id ? 'bg-brand-orange-soft dark:bg-[#2a1d19]' : 'hover:bg-slate-50 dark:hover:bg-[#252525]'}`}
                                                         onClick={() => setActiveIssuedId(invoice.id)}
                                                     >
-                                                        <td className="px-3 py-2 text-gray-600 dark:text-gray-400 whitespace-nowrap">{dateFormatter.format(new Date(invoice.issueDate))}</td>
-                                                        <td className="px-3 py-2 font-bold text-gray-900 dark:text-white">{invoice.partnerName}</td>
-                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">{usdFormatter.format(invoice.totalUsd)}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-600 dark:text-gray-400">{dateFormatter.format(new Date(invoice.issueDate))}</td>
+                                                        <td className="px-3 py-2 font-bold text-slate-900 dark:text-white">{invoice.partnerName}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 text-right font-black tabular-nums text-slate-900 dark:text-white">{usdFormatter.format(invoice.totalUsd)}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <Button
-                                                                variant="danger"
+                                                                variant="ghost"
                                                                 size="sm"
+                                                                className="h-8 w-8 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                                                aria-label={`${invoice.invoiceNumber} 삭제`}
+                                                                title="삭제"
                                                                 onClick={(event) => {
                                                                     event.stopPropagation()
                                                                     void handleDeleteIssued(invoice.id)
                                                                 }}
                                                                 loading={deletingInvoiceId === invoice.id}
-                                                            >
-                                                                {deletingInvoiceId === invoice.id ? '삭제중...' : '삭제'}
-                                                            </Button>
+                                                                icon={deletingInvoiceId === invoice.id ? undefined : <Trash2 size={15} />}
+                                                            />
                                                         </td>
                                                     </tr>
                                                 ))
@@ -860,26 +934,20 @@ ${rowsHtml}
                     </section>
                 </div>
 
-                <section
-                    id="pi-print-sheet"
-                    className="bg-[#f6f3f1] border border-gray-200 dark:border-[#2a2a2a] shadow-lg dark:shadow-none p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] 2xl:sticky 2xl:top-24 2xl:w-full 2xl:max-w-[794px] 2xl:h-[297mm] 2xl:min-h-[297mm] 2xl:aspect-auto"
-                >
-                    <div className="pi-no-print mb-3">
-                        <div className="text-[13px] font-bold text-slate-900">인쇄 미리보기</div>
-                        <p className="mt-0.5 text-[11px] text-slate-500">인쇄창에서 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다.</p>
-                    </div>
-
-                    <div className="pi-inner-content bg-white border border-gray-300 p-3">
+                <section className="min-w-0 xl:sticky xl:top-[76px]" aria-label="인쇄 미리보기">
+                    <p className="pi-no-print mb-2 text-xs font-bold text-slate-500 dark:text-gray-400">인쇄 미리보기</p>
+                    <FitToWidth width={794} className="bg-white shadow-lg ring-1 ring-slate-200 dark:ring-[#2a2a2a]">
+                    <div id="pi-print-sheet" className="pi-inner-content min-h-[297mm] bg-white pb-[18mm] pl-[12mm] pr-[15mm] pt-[10mm] text-[#22253f]">
                         <div className="h-1 w-full bg-brand-orange mb-2" />
                         <div className="border-b-2 border-brand-orange pb-2">
                             <div className="text-center">
-                                <h1 className="text-2xl leading-none font-black tracking-tight text-[#1f2340]">beiko Inc.</h1>
+                                <p className="text-2xl leading-none font-black tracking-tight text-[#1f2340]">beiko Inc.</p>
                                 <p className="mt-1 text-[11px]">ADD: 35, Nakdongnam-ro 1013beon-gil, Gangseo-gu, Busan, Korea</p>
                                 <p className="text-[11px] mt-0.5">Mob: +82-10-3444-3467&nbsp;&nbsp; EMAIL: contact@beiko.co.kr</p>
                             </div>
                         </div>
 
-                        <h2 className="text-center text-xl font-black text-brand-orange mt-2 mb-2">Proforma Invoice</h2>
+                        <p className="text-center text-xl font-black text-brand-orange mt-2 mb-2">Proforma Invoice</p>
 
                         <table className="w-full border-collapse border border-gray-900 text-[11px]">
                             <tbody>
@@ -998,6 +1066,8 @@ ${rowsHtml}
                             </div>
                         </div>
                     </div>
+                    </FitToWidth>
+                    <p className="pi-no-print mt-2 text-[11px] text-slate-500 dark:text-gray-400">인쇄창에서 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다.</p>
                 </section>
             </div>
         </div>

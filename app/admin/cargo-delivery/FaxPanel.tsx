@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { FileDown, Plus, RefreshCw, Send, Trash2 } from 'lucide-react'
+import { buttonClass } from '@/components/ui/buttonClass'
 import type { CargoFaxLogRecord, CargoFaxRecipientRecord, CargoProxyRecord } from '@/lib/cargoDeliveryProxy'
 
 type Props = {
@@ -18,12 +19,8 @@ type CheckResult = {
 }
 
 const inputClass =
-    'mt-1 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-medium dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]'
-const labelClass = 'text-xs font-bold text-gray-700 dark:text-gray-400'
-const primaryButtonClass =
-    'px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 disabled:opacity-50 transition-all'
-const secondaryButtonClass =
-    'px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] disabled:opacity-50 transition-all'
+    'mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white'
+const labelClass = 'text-[11px] font-bold text-slate-600 dark:text-gray-400'
 
 const formatFaxNumber = (value: string) => {
     const digits = value.replace(/[^0-9]/g, '')
@@ -226,30 +223,30 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
     }
 
     return (
-        <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a] space-y-3">
+        <div className="space-y-3 border-t border-slate-100 pt-4 dark:border-[#2a2a2a]">
             <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
-                    <div className="text-sm font-black text-gray-900 dark:text-white">팩스 발송 · {proxy.documentNo}</div>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">서버에서 위임장 PDF를 만들어 바로빌 팩스로 보냅니다.</p>
+                    <h3 className="text-[13px] font-black text-slate-900 dark:text-white">팩스 발송 · {proxy.documentNo}</h3>
+                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-gray-400">서버에서 위임장 PDF를 만들어 바로빌 팩스로 보냅니다.</p>
                 </div>
                 <div className="flex items-center gap-2">
                     <a
                         href={`/api/admin/cargo-delivery/pdf?id=${encodeURIComponent(proxy.id)}`}
                         target="_blank"
                         rel="noreferrer"
-                        className={`${secondaryButtonClass} inline-flex items-center gap-1`}
+                        className={buttonClass('secondary', 'sm')}
                         title="팩스로 나가는 PDF 미리보기"
                     >
                         <FileDown size={14} /> PDF 확인
                     </a>
-                    <button type="button" onClick={handleCheck} disabled={isChecking} className={secondaryButtonClass}>
+                    <button type="button" onClick={handleCheck} disabled={isChecking} className={buttonClass('secondary', 'sm')}>
                         {isChecking ? '점검 중...' : '설정 점검'}
                     </button>
                 </div>
             </div>
 
             {checkResult && (
-                <div className="rounded-lg border border-gray-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] p-2.5 text-[11px] space-y-1">
+                <div className="space-y-1 rounded-lg bg-slate-50 p-2.5 text-[11px] font-bold dark:bg-[#1a1a1a]">
                     <div className={checkResult.fromNumbers.ok ? 'text-emerald-600' : 'text-red-600'}>
                         발신번호: {checkResult.fromNumbers.ok
                             ? checkResult.fromNumbers.numbers.length > 0
@@ -263,18 +260,23 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                 </div>
             )}
 
-            <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
+            <div className="grid grid-cols-1 items-end gap-3 sm:grid-cols-3">
                 <div>
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-2">
                         <label className={labelClass}>저장된 수신처</label>
-                        <button type="button" onClick={() => setShowRecipientForm((prev) => !prev)} className="text-[11px] font-bold text-[#e53b19] hover:underline inline-flex items-center gap-0.5">
-                            <Plus size={12} /> 수신처 추가
+                        <button
+                            type="button"
+                            onClick={() => setShowRecipientForm((prev) => !prev)}
+                            aria-expanded={showRecipientForm}
+                            className="inline-flex items-center gap-0.5 rounded text-[11px] font-bold text-slate-600 hover:text-slate-900 dark:text-gray-300"
+                        >
+                            <Plus size={12} /> 수신처 관리
                         </button>
                     </div>
                     <select
                         value={selectedRecipientId}
                         onChange={(event) => applyRecipient(event.target.value)}
-                        className="mt-1 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-bold dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]"
+                        className={inputClass}
                     >
                         <option value="">직접 입력</option>
                         {recipients.map((recipient) => (
@@ -292,13 +294,15 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                     <label className={labelClass}>수신 팩스번호</label>
                     <input type="tel" value={toNumber} onChange={(event) => setToNumber(event.target.value)} className={inputClass} placeholder="051-000-0000" />
                 </div>
-                <button type="button" onClick={handleSend} disabled={isSending} className={`${primaryButtonClass} inline-flex items-center gap-1.5 whitespace-nowrap`}>
-                    <Send size={14} /> {isSending ? '발송 중...' : '팩스 발송'}
+            </div>
+            <div className="flex justify-end">
+                <button type="button" onClick={handleSend} disabled={isSending} className={buttonClass('primary', 'md')}>
+                    <Send size={15} /> {isSending ? '발송 중...' : '팩스 발송'}
                 </button>
             </div>
 
             {showRecipientForm && (
-                <div className="rounded-lg border border-dashed border-gray-300 dark:border-[#3a3a3a] p-3 space-y-2">
+                <div className="space-y-2 rounded-lg bg-slate-50 p-3 dark:bg-[#1a1a1a]">
                     <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
                         <div>
                             <label className={labelClass}>이름</label>
@@ -308,16 +312,16 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                             <label className={labelClass}>팩스번호</label>
                             <input type="tel" value={recipientForm.faxNumber} onChange={(event) => setRecipientForm((prev) => ({ ...prev, faxNumber: event.target.value }))} className={inputClass} placeholder="051-000-0000" />
                         </div>
-                        <button type="button" onClick={handleSaveRecipient} disabled={isSavingRecipient} className={primaryButtonClass}>
+                        <button type="button" onClick={handleSaveRecipient} disabled={isSavingRecipient} className={buttonClass('secondary', 'md')}>
                             {isSavingRecipient ? '저장 중...' : '저장'}
                         </button>
                     </div>
                     {recipients.length > 0 && (
                         <div className="flex flex-wrap gap-1.5">
                             {recipients.map((recipient) => (
-                                <span key={recipient.id} className="inline-flex items-center gap-1 rounded-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] px-2 py-0.5 text-[11px] text-gray-700 dark:text-gray-300">
+                                <span key={recipient.id} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] text-slate-700 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-gray-300">
                                     {recipient.name} · {formatFaxNumber(recipient.faxNumber)}
-                                    <button type="button" onClick={() => void handleDeleteRecipient(recipient)} className="text-gray-400 hover:text-red-600" title="삭제">
+                                    <button type="button" onClick={() => void handleDeleteRecipient(recipient)} className="text-slate-400 hover:text-red-600" title="삭제" aria-label={`${recipient.name} 수신처 삭제`}>
                                         <Trash2 size={11} />
                                     </button>
                                 </span>
@@ -329,33 +333,33 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
 
             <div className="flex items-center justify-between">
                 <span className={labelClass}>전송 내역 ({proxyLogs.length})</span>
-                <button type="button" onClick={handleRefresh} disabled={isRefreshing} className="text-[11px] font-bold text-gray-500 hover:text-[#e53b19] inline-flex items-center gap-1">
+                <button type="button" onClick={handleRefresh} disabled={isRefreshing} className={buttonClass('ghost', 'sm')}>
                     <RefreshCw size={12} className={isRefreshing ? 'animate-spin' : ''} /> 상태 새로고침
                 </button>
             </div>
             {proxyLogs.length === 0 ? (
-                <p className="text-[11px] text-gray-400">아직 발송한 팩스가 없습니다.</p>
+                <p className="text-[11px] text-slate-500">아직 발송한 팩스가 없습니다.</p>
             ) : (
-                <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-lg bg-white dark:bg-[#1e1e1e]">
+                <div className="overflow-x-auto rounded-lg border border-slate-200 bg-white dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
                     <table className="w-full text-xs">
-                        <thead className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] text-gray-600 dark:text-gray-400">
+                        <thead className="ux-thead">
                             <tr>
-                                <th className="px-2 py-1.5 text-left">발송</th>
-                                <th className="px-2 py-1.5 text-left">수신처</th>
-                                <th className="px-2 py-1.5 text-left">상태</th>
-                                <th className="px-2 py-1.5 text-left">결과</th>
-                                <th className="px-2 py-1.5 text-center">삭제</th>
+                                <th className="text-left">발송</th>
+                                <th className="text-left">수신처</th>
+                                <th className="text-left">상태</th>
+                                <th className="text-left">결과</th>
+                                <th className="text-center">삭제</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
+                        <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
                             {proxyLogs.map((log) => (
                                 <tr key={log.id}>
-                                    <td className="px-2 py-1.5 whitespace-nowrap text-gray-700 dark:text-gray-300">{formatDateTime(log.createdAt)}</td>
-                                    <td className="px-2 py-1.5 whitespace-nowrap text-gray-700 dark:text-gray-300">{log.toName} · {formatFaxNumber(log.toNumber)}</td>
-                                    <td className="px-2 py-1.5 whitespace-nowrap">
+                                    <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-gray-300">{formatDateTime(log.createdAt)}</td>
+                                    <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-gray-300">{log.toName} · {formatFaxNumber(log.toNumber)}</td>
+                                    <td className="whitespace-nowrap px-3 py-2">
                                         <span className={`inline-flex rounded-full px-2 py-0.5 text-[11px] font-bold ${stateBadgeClass(log)}`}>{log.sendStateLabel}</span>
                                     </td>
-                                    <td className="px-2 py-1.5 text-gray-600 dark:text-gray-400 break-all">
+                                    <td className="break-all px-3 py-2 text-slate-600 dark:text-gray-400">
                                         {log.error
                                             ? log.error
                                             : [
@@ -363,8 +367,8 @@ export default function FaxPanel({ proxy, recipients, logs, onRecipientsChange, 
                                                   log.sendPageCount !== null ? `${log.successPageCount ?? 0}/${log.sendPageCount}장` : null,
                                               ].filter(Boolean).join(' · ') || '-'}
                                     </td>
-                                    <td className="px-2 py-1.5 text-center">
-                                        <button type="button" onClick={() => void handleDeleteLog(log)} className="p-1 rounded text-gray-400 hover:text-red-600" title="내역 삭제">
+                                    <td className="px-3 py-2 text-center">
+                                        <button type="button" onClick={() => void handleDeleteLog(log)} className="rounded p-1 text-slate-400 hover:text-red-600" title="내역 삭제" aria-label="전송 내역 삭제">
                                             <Trash2 size={12} />
                                         </button>
                                     </td>

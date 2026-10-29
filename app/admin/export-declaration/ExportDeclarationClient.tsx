@@ -1,8 +1,9 @@
 'use client'
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Copy, FileSpreadsheet, FileText, ListChecks, PackageCheck, Plus, Printer, Save, Trash2 } from 'lucide-react'
-import Button from '@/components/ui/Button'
+import { AlertTriangle, Copy, FileSpreadsheet, ListChecks, Plus, Printer, Save, Trash2 } from 'lucide-react'
+import Button, { buttonClass } from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
@@ -1469,100 +1470,78 @@ export default function ExportDeclarationClient({
       <PageHeader
         title="수출신고"
         description="내부 문서 작성 도구입니다. 문서 생성 후 UNI-PASS에서 수출신고를 별도로 제출하세요."
-        count={savedDeclarations.length}
         actions={
-          <>
+          <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
             <Button variant="ghost" onClick={resetForm}>
               초기화
-            </Button>
-            <Button variant="secondary" icon={<FileText size={15} />} disabled={!selectedDeclarationId} onClick={() => printDocuments('commercial')}>
-              Commercial Invoice 인쇄
-            </Button>
-            <Button variant="secondary" icon={<PackageCheck size={15} />} disabled={!selectedDeclarationId} onClick={() => printDocuments('packing')}>
-              Packing List 인쇄
-            </Button>
-            <Button variant="secondary" icon={<Printer size={15} />} disabled={!selectedDeclarationId} onClick={() => printDocuments('both')}>
-              두 문서 연속 인쇄
             </Button>
             <Button variant="secondary" icon={<Save size={15} />} onClick={saveDraftDeclaration} loading={isUpdatingDeclaration}>
               {isUpdatingDeclaration ? '저장 중' : '임시저장'}
             </Button>
-            <Button variant="primary" icon={<Plus size={15} />} onClick={createDeclaration} loading={isCreating}>
+            <Button variant="primary" icon={<Plus size={15} />} onClick={createDeclaration} loading={isCreating} className="order-first col-span-2 sm:order-none">
               {isCreating ? '생성 중' : '내부 문서 생성'}
             </Button>
-          </>
+          </div>
         }
       />
 
-      <div className="flex flex-wrap items-center gap-3">
-        <Tabs
-          aria-label="수출신고 작업"
-          items={[
-            { key: 'list', label: '신청서 목록', count: savedDeclarations.length },
-            { key: 'documents', label: 'PI / Packing List' },
-            { key: 'unipass', label: '전자상거래 수출신고서' },
-          ]}
-          value={activeWorkTab}
-          onChange={(key) => {
-            if (key !== 'list' && !selectedDeclarationId) return
-            setActiveWorkTab(key)
-          }}
-        />
-        {!selectedDeclarationId ? (
-          <span className="text-[12px] font-bold text-slate-500">신청서를 선택하면 작성 탭이 열립니다.</span>
-        ) : null}
-      </div>
+      <Tabs
+        aria-label="수출신고 작업"
+        items={[
+          { key: 'list', label: '신청서 목록', count: savedDeclarations.length },
+          { key: 'documents', label: 'PI / Packing List', disabled: !selectedDeclarationId, reason: '신청서를 먼저 선택하세요' },
+          { key: 'unipass', label: '전자상거래 수출신고서', disabled: !selectedDeclarationId, reason: '신청서를 먼저 선택하세요' },
+        ]}
+        value={activeWorkTab}
+        onChange={setActiveWorkTab}
+      />
 
       <section className={activeWorkTab === 'list' ? 'rounded-2xl border border-slate-200 bg-white p-4 shadow-sm' : 'hidden'}>
-        <div className="mb-3 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-[13px] font-bold text-slate-900">신청서 목록</h2>
-            <p className="mt-1 text-[12px] text-slate-500">신청서를 선택하면 작성 탭이 열립니다.</p>
-          </div>
-          <span className="whitespace-nowrap text-[12px] font-bold text-slate-500">최근 {savedDeclarations.length}건</span>
-        </div>
+        <p className="mb-3 text-[12px] text-slate-500">신청서를 선택하면 PI / Packing List 작성 탭이 열립니다.</p>
         {savedDeclarations.length ? (
           <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             {savedDeclarations.slice(0, 30).map((row) => (
               <div
                 key={row.id}
-                className={`min-w-0 rounded-2xl border bg-slate-50 p-3 transition ${
-                  selectedDeclarationId === row.id ? 'border-brand-orange bg-brand-orange-soft ring-2 ring-brand-orange/15' : 'border-slate-200'
+                className={`relative min-w-0 rounded-xl border bg-white p-3 transition hover:border-slate-300 ${
+                  selectedDeclarationId === row.id ? 'border-brand-orange ring-2 ring-brand-orange/15' : 'border-slate-200'
                 }`}
               >
                 <button
                   type="button"
                   onClick={() => loadDeclaration(row.id)}
                   disabled={isLoadingDeclaration || deletingDeclarationId === row.id}
-                  className="block w-full text-left disabled:cursor-wait"
+                  aria-current={selectedDeclarationId === row.id ? 'true' : undefined}
+                  className="block w-full pr-9 text-left disabled:cursor-wait"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="truncate text-[12px] font-black text-slate-950">{row.invoiceNo}</span>
-                    <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600">{row.status}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span className="truncate text-[13px] font-black text-slate-950">{row.invoiceNo}</span>
+                    <Badge>{row.status}</Badge>
                   </div>
-                  <div className="mt-1 flex flex-wrap items-center justify-between gap-x-2 text-[11px] font-bold text-slate-500">
-                    <span>{formatSavedDate(row.createdAt)}</span>
-                    <span className="text-slate-900">{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
+                  <div className="mt-1.5 flex flex-wrap items-center justify-between gap-x-2 text-[11px] font-bold text-slate-500">
+                    <span className="tabular-nums">{formatSavedDate(row.createdAt)}</span>
+                    <span className="tabular-nums text-slate-900">{row.itemCount}품목 · {money(row.totalAmount, form.currency)}</span>
                   </div>
                 </button>
                 <Button
-                  variant="danger"
+                  variant="ghost"
                   size="sm"
-                  icon={<Trash2 size={13} />}
-                  className="mt-3 w-full"
+                  className="absolute right-2 top-2 h-8 w-8 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600"
+                  icon={deletingDeclarationId === row.id ? undefined : <Trash2 size={15} />}
                   onClick={() => deleteDeclaration(row.id)}
                   loading={deletingDeclarationId === row.id}
-                >
-                  {deletingDeclarationId === row.id ? '삭제 중' : '삭제'}
-                </Button>
+                  aria-label={`${row.invoiceNo} 삭제`}
+                  title="삭제"
+                />
               </div>
             ))}
           </div>
         ) : (
           <EmptyState
             compact
+            bare
             title="아직 생성된 신청서가 없습니다"
-            description="상단의 신청서 생성 버튼으로 새 신청서를 먼저 만드세요."
+            description="상단의 ‘내부 문서 생성’ 버튼으로 새 신청서를 먼저 만드세요."
           />
         )}
       </section>
@@ -1576,9 +1555,9 @@ export default function ExportDeclarationClient({
                 <FileSpreadsheet size={17} className="text-slate-500" />
                 <h2 className="text-[13px] font-bold text-slate-900">PI / Packing List 작성</h2>
               </div>
-              <span className={`whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-bold ${selectedDeclarationId ? 'bg-brand-orange-soft text-brand-orange' : 'bg-red-50 text-red-700'}`}>
+              <Badge tone={selectedDeclarationId ? 'neutral' : 'warning'}>
                 {selectedDeclarationId ? `${form.invoiceNo} 작성 중` : '신규 임시저장 가능'}
-              </span>
+              </Badge>
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <Field label="Invoice No. / 송장번호">
@@ -1682,7 +1661,7 @@ export default function ExportDeclarationClient({
                       ? '환율 조회 실패'
                       : '환율 조회 중'}
                 </span>
-                <Button variant="primary" size="sm" icon={<Plus size={14} />} onClick={addItem}>
+                <Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={addItem}>
                   행 추가
                 </Button>
               </div>
@@ -1701,10 +1680,10 @@ export default function ExportDeclarationClient({
                     <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">단가</th>
                     <th className="w-[110px] px-2 py-2 text-right whitespace-nowrap">금액</th>
                     <th className="w-[80px] px-2 py-2 text-right whitespace-nowrap">박스수</th>
-                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">순중량 <span className="text-[11px] font-medium text-white/70">KG</span></th>
-                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">총중량 <span className="text-[11px] font-medium text-white/70">KG</span></th>
-                    <th className="w-[85px] px-2 py-2 text-right whitespace-nowrap">부피 <span className="text-[11px] font-medium text-white/70">CBM</span></th>
-                    <th className="w-[130px] px-2 py-2 text-left whitespace-nowrap">규격 <span className="text-[11px] font-medium text-white/70">cm</span></th>
+                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">순중량 <span className="text-[11px] font-medium text-slate-400">KG</span></th>
+                    <th className="w-[95px] px-2 py-2 text-right whitespace-nowrap">총중량 <span className="text-[11px] font-medium text-slate-400">KG</span></th>
+                    <th className="w-[85px] px-2 py-2 text-right whitespace-nowrap">부피 <span className="text-[11px] font-medium text-slate-400">CBM</span></th>
+                    <th className="w-[130px] px-2 py-2 text-left whitespace-nowrap">규격 <span className="text-[11px] font-medium text-slate-400">cm</span></th>
                     <th className="w-[54px] px-2 py-2" />
                   </tr>
                 </thead>
@@ -1733,7 +1712,7 @@ export default function ExportDeclarationClient({
                       <td className="px-2 py-2"><input type="number" min={0} step="0.001" className={`${textInputClass()} text-right`} value={item.cbm} onChange={(event) => updateItem(item.id, { cbm: parseNumberInput(event.target.value) })} /></td>
                       <td className="px-2 py-2"><input className={textInputClass()} value={item.dimension} onChange={(event) => updateDimension(item.id, event.target.value)} placeholder="50x40x30cm" /></td>
                       <td className="px-2 py-2 text-center">
-                        <button type="button" onClick={() => removeItem(item.id)} className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-50" title="행 삭제" aria-label="행 삭제">
+                        <button type="button" onClick={() => removeItem(item.id)} className={buttonClass('ghost', 'sm', 'h-9 w-9 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600')} title="행 삭제" aria-label="행 삭제">
                           <Trash2 size={15} />
                         </button>
                       </td>
@@ -1746,16 +1725,25 @@ export default function ExportDeclarationClient({
           </div>
 
           <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm xl:sticky xl:top-[76px] xl:max-h-[calc(100vh-92px)] xl:overflow-auto">
-            <Tabs
-              aria-label="미리보기 문서"
-              className="mb-3"
-              items={[
-                { key: 'commercial', label: 'Commercial Invoice' },
-                { key: 'packing', label: 'Packing List' },
-              ]}
-              value={previewMode}
-              onChange={setPreviewMode}
-            />
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <Tabs
+                aria-label="미리보기 문서"
+                items={[
+                  { key: 'commercial', label: 'Commercial Invoice' },
+                  { key: 'packing', label: 'Packing List' },
+                ]}
+                value={previewMode}
+                onChange={setPreviewMode}
+              />
+              <div className="flex flex-wrap items-center gap-1.5">
+                <Button variant="secondary" size="sm" icon={<Printer size={14} />} onClick={() => printDocuments(previewMode)}>
+                  {previewMode === 'commercial' ? 'Invoice 인쇄' : 'Packing List 인쇄'}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => printDocuments('both')}>
+                  두 문서 연속 인쇄
+                </Button>
+              </div>
+            </div>
             <DocumentPreview form={form} items={previewItems} mode={previewMode} />
           </section>
         </div>

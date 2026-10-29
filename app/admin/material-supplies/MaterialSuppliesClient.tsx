@@ -8,6 +8,8 @@ import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import Badge from '@/components/ui/Badge'
+import Modal from '@/components/Modal'
 
 export type MaterialSupplyItem = {
   id: string
@@ -228,234 +230,268 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
     setFormOpen(true)
   }
 
+  const filterCounts: Record<ActiveFilter, number> = {
+    active: items.filter((item) => item.active).length,
+    all: items.length,
+    inactive: items.filter((item) => !item.active).length,
+  }
+
   return (
     <div className="min-w-0 space-y-3">
       <PageHeader
         title="부자재 주문"
-        count={`${filteredItems.length}개`}
+        count={`${items.length}개`}
         description="자주 구매하는 품목을 빠르게 찾고 재주문합니다."
         actions={<Button variant="primary" onClick={openNewForm} icon={<Plus size={15} />}>새 부자재</Button>}
       />
 
-      <div className={`grid min-w-0 items-start gap-3 ${formOpen ? 'xl:grid-cols-[minmax(0,1fr)_360px]' : ''}`}>
-        <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-          <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
-            <div className="relative min-w-0 flex-1">
-              <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="부자재명 · 카테고리 · 구매처 검색"
-                className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-[12px] font-bold transition focus:border-brand-orange focus:bg-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-              />
-            </div>
-            <Tabs aria-label="사용 상태" items={activeFilterItems} value={activeFilter} onChange={setActiveFilter} className="shrink-0" />
-          </div>
-
-          {categories.length ? (
-            <Tabs
-              aria-label="카테고리"
-              className="mt-2"
-              items={categories.map((category) => ({ key: category, label: category }))}
+      <section className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="flex flex-col gap-2 lg:flex-row lg:items-center">
+          <label className="relative min-w-0 flex-1">
+            <span className="sr-only">부자재 검색</span>
+            <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
               value={query}
-              onChange={(category) => setQuery(query === category ? '' : category)}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="부자재명 · 카테고리 · 구매처 검색"
+              className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 pl-9 pr-3 text-[13px] font-medium text-slate-900 transition focus:border-brand-orange focus:bg-white"
             />
-          ) : null}
+          </label>
+          <Tabs
+            aria-label="사용 상태"
+            items={activeFilterItems.map((item) => ({ ...item, count: filterCounts[item.key] }))}
+            value={activeFilter}
+            onChange={setActiveFilter}
+            className="shrink-0"
+          />
+        </div>
 
-          {filteredItems.length ? (
-            <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2">
-              {filteredItems.map((item) => {
-                const unitPrice = getMaterialSupplyUnitPrice(item.priceKrw, item.unit)
-                const dimension = formatDimension(item)
-                return (
-                  <article
-                    key={item.id}
-                    className={`group flex min-h-[178px] min-w-0 flex-col rounded-2xl border p-3 transition hover:border-slate-300 hover:shadow-md ${
-                      item.active ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-100 opacity-65'
-                    }`}
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="truncate rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black text-slate-500">{item.category || '미분류'}</span>
-                          {!item.active ? <span className="text-[11px] font-black text-slate-500">비활성</span> : null}
-                        </div>
-                        <h2 className="mt-1.5 line-clamp-2 text-[14px] font-black leading-[1.35] text-slate-950">{item.name}</h2>
+        {categories.length ? (
+          <Tabs
+            aria-label="카테고리"
+            className="mt-2"
+            items={categories.map((category) => ({ key: category, label: category }))}
+            value={query}
+            onChange={(category) => setQuery(query === category ? '' : category)}
+          />
+        ) : null}
+
+        {filteredItems.length ? (
+          <div className="mt-3 grid grid-cols-[repeat(auto-fill,minmax(260px,1fr))] gap-2">
+            {filteredItems.map((item) => {
+              const unitPrice = getMaterialSupplyUnitPrice(item.priceKrw, item.unit)
+              const dimension = formatDimension(item)
+              const supplierLine = [item.supplierName, item.unit].filter(Boolean).join(' · ')
+              return (
+                <article
+                  key={item.id}
+                  className={`flex min-w-0 flex-col rounded-xl border p-3 transition hover:border-slate-300 ${
+                    item.active ? 'border-slate-200 bg-white' : 'border-slate-200 bg-slate-50'
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className={`min-w-0 ${item.active ? '' : 'opacity-60'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <Badge outline className="max-w-full truncate">{item.category || '미분류'}</Badge>
+                        {!item.active ? <Badge>비활성</Badge> : null}
                       </div>
+                      <h2 className="mt-1.5 line-clamp-2 text-[14px] font-black leading-[1.35] text-slate-950">{item.name}</h2>
+                    </div>
+                    <div className="-mr-1 -mt-1 flex shrink-0 items-center">
                       <button
                         type="button"
                         onClick={() => editItem(item)}
-                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500 hover:text-slate-900')}
                         title="수정"
                         aria-label={`${item.name} 수정`}
                       >
-                        <Pencil size={13} />
-                      </button>
-                    </div>
-
-                    <div className="mt-2 flex items-end justify-between gap-2 border-t border-slate-100 pt-2">
-                      <div className="min-w-0">
-                        <p className="truncate text-[11px] font-bold text-slate-500">{item.supplierName || '구매처 미입력'} · {item.unit || '단위 미입력'}</p>
-                        <p className="mt-0.5 text-[15px] font-black text-slate-900">{formatCurrency(item.priceKrw)}</p>
-                      </div>
-                      <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-right text-[11px] font-black text-slate-600">
-                        {unitPrice ? `개당 ${(Math.round(unitPrice * 10) / 10).toLocaleString()}원` : '-'}
-                      </span>
-                    </div>
-
-                    <div className="mt-1.5 min-h-[32px] text-[11px] font-bold leading-4 text-slate-500">
-                      {dimension ? <span>규격 {dimension}</span> : null}
-                      {item.memo ? <p className="truncate">{item.memo}</p> : null}
-                    </div>
-
-                    <p className="mt-auto truncate text-[11px] font-bold text-slate-500">
-                      최근 구매 {formatDateTime(item.lastPurchasedAt)}
-                    </p>
-                    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5">
-                      <a
-                        href={item.purchaseUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg bg-[#07122F] px-2 text-[11px] font-black !text-white transition hover:bg-slate-800"
-                      >
-                        <ExternalLink size={12} />
-                        구매처 열기
-                      </a>
-                      <button
-                        type="button"
-                        onClick={() => markPurchased(item)}
-                        disabled={busyId === item.id}
-                        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
-                        title="실제 구매 후 최근 구매일을 기록합니다"
-                      >
-                        <CheckCircle2 size={12} />
-                        구매 기록
+                        <Pencil size={14} />
                       </button>
                       <button
                         type="button"
                         onClick={() => deleteItem(item)}
                         disabled={busyId === item.id}
-                        className="inline-flex min-h-11 w-8 items-center justify-center rounded-lg text-slate-300 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500 hover:bg-red-50 hover:text-red-600')}
                         title="삭제"
                         aria-label={`${item.name} 삭제`}
                       >
-                        <Trash2 size={12} />
+                        <Trash2 size={14} />
                       </button>
                     </div>
-                  </article>
-                )
-              })}
-            </div>
-          ) : (
-            <EmptyState
-              className="mt-3"
-              icon={<PackagePlus size={20} />}
-              title="조건에 맞는 부자재가 없습니다."
-              action={<Button variant="secondary" size="sm" onClick={openNewForm} icon={<Plus size={13} />}>새 부자재 등록</Button>}
-            />
-          )}
-        </section>
+                  </div>
 
-        {formOpen ? (
-          <aside className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-lg xl:sticky xl:top-20">
-            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <div className="flex items-center gap-2.5">
-                <span className="inline-flex min-h-11 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
-                  <ShoppingCart size={16} />
-                </span>
-                <div>
-                  <h2 className="text-[14px] font-black text-slate-950">{form.id ? '부자재 수정' : '새 부자재'}</h2>
-                  <p className="text-[11px] font-bold text-slate-500">필요한 정보만 빠르게 입력하세요.</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFormOpen(false)}
-                className="inline-flex min-h-11 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                title="닫기"
-                aria-label="닫기"
-              >
-                <X size={16} />
-              </button>
-            </div>
+                  <div className={`mt-2 border-t border-slate-100 pt-2 ${item.active ? '' : 'opacity-60'}`}>
+                    <p className="truncate text-[11px] font-bold text-slate-500">{supplierLine || '구매처 미입력'}</p>
+                    <div className="mt-0.5 flex items-baseline justify-between gap-2">
+                      {item.priceKrw ? (
+                        <p className="text-[15px] font-black tabular-nums text-slate-900">{formatCurrency(item.priceKrw)}</p>
+                      ) : (
+                        <p className="text-[13px] font-bold text-slate-400">가격 미입력</p>
+                      )}
+                      {unitPrice ? (
+                        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-black tabular-nums text-slate-600">
+                          개당 {(Math.round(unitPrice * 10) / 10).toLocaleString()}원
+                        </span>
+                      ) : null}
+                    </div>
+                    {dimension ? <p className="mt-1 text-[11px] font-bold text-slate-500">규격 {dimension}</p> : null}
+                    {item.memo ? <p className="mt-0.5 truncate text-[11px] text-slate-500" title={item.memo}>{item.memo}</p> : null}
+                    <p className="mt-1 truncate text-[11px] font-bold tabular-nums text-slate-500">
+                      최근 구매 {item.lastPurchasedAt ? formatDateTime(item.lastPurchasedAt) : '기록 없음'}
+                    </p>
+                  </div>
 
-            <div className="max-h-[calc(100vh-150px)] space-y-2.5 overflow-y-auto p-4">
-            <Field label="부자재명">
-              <input className={inputClass} value={form.name} onChange={(event) => setFormValue('name', event.target.value)} placeholder="예: 택배 박스 3호" />
-            </Field>
-            <div className="grid grid-cols-2 gap-2">
-              <Field label="카테고리">
-                <input className={inputClass} list="material-supply-categories" value={form.category} onChange={(event) => setFormValue('category', event.target.value)} placeholder="포장" />
-                <datalist id="material-supply-categories">
-                  {categories.map((category) => <option key={category} value={category} />)}
-                </datalist>
-              </Field>
-              <Field label="구매처">
-                <input className={inputClass} value={form.supplierName} onChange={(event) => setFormValue('supplierName', event.target.value)} placeholder="쿠팡, 네이버..." />
-              </Field>
-            </div>
-            <Field label="구매 링크">
-              <input className={inputClass} value={form.purchaseUrl} onChange={(event) => setFormValue('purchaseUrl', event.target.value)} placeholder="https://..." />
-            </Field>
-            <div className="grid grid-cols-3 gap-2">
-              <Field label="단위">
-                <input className={inputClass} value={form.unit} onChange={(event) => setFormValue('unit', event.target.value)} placeholder="100개" />
-              </Field>
-              <Field label="가격">
-                <input inputMode="numeric" className={inputClass} value={form.priceKrw} onChange={(event) => setFormValue('priceKrw', event.target.value)} placeholder="12500" />
-              </Field>
-              <Field label="정렬(표시순서)">
-                <input inputMode="numeric" className={inputClass} value={form.sortOrder} onChange={(event) => setFormValue('sortOrder', event.target.value)} />
-              </Field>
-            </div>
-            <div className="rounded-xl bg-slate-50 p-2.5">
-              <div className="mb-1.5 flex items-center justify-between gap-3">
-                <span className="text-[11px] font-black text-slate-500">규격 (선택)</span>
-                <select
-                  className="h-8 rounded-xl border border-slate-200 bg-white px-2 text-[11px] font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-                  value={form.dimensionUnit}
-                  onChange={(event) => setFormValue('dimensionUnit', event.target.value === 'cm' ? 'cm' : 'mm')}
-                  aria-label="규격 단위"
-                >
-                  <option value="mm">mm</option>
-                  <option value="cm">cm</option>
-                </select>
-              </div>
-              <div className="grid grid-cols-3 gap-1.5">
-                <Field label="가로">
-                  <input inputMode="decimal" className={inputClass} value={form.widthValue} onChange={(event) => setFormValue('widthValue', event.target.value)} placeholder="0" />
-                </Field>
-                <Field label="세로">
-                  <input inputMode="decimal" className={inputClass} value={form.depthValue} onChange={(event) => setFormValue('depthValue', event.target.value)} placeholder="0" />
-                </Field>
-                <Field label="높이">
-                  <input inputMode="decimal" className={inputClass} value={form.heightValue} onChange={(event) => setFormValue('heightValue', event.target.value)} placeholder="0" />
-                </Field>
-              </div>
-            </div>
-            <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] font-black">
-                <span className="text-slate-500">개당 단가</span>
-                <span className={formUnitPrice ? 'text-slate-900' : 'text-slate-500'}>{formatUnitPrice(formUnitPrice)}</span>
-            </div>
-            <Field label="메모">
-              <textarea className={`${inputClass} min-h-16 resize-none py-2`} value={form.memo} onChange={(event) => setFormValue('memo', event.target.value)} placeholder="주의사항, 대체 구매처 등" />
-            </Field>
-            <label className="flex items-center justify-between rounded-xl bg-slate-50 px-3 py-2 text-[11px] font-black text-slate-700">
-              사용중으로 표시
-              <input type="checkbox" checked={form.active} onChange={(event) => setFormValue('active', event.target.checked)} className="h-4 w-4 accent-brand-orange" />
-            </label>
-            <div className="flex gap-2 pt-1.5">
-              <Button variant="primary" onClick={submitForm} loading={saving} className="flex-1">
-                {saving ? '저장 중' : form.id ? '수정 저장' : '등록'}
-              </Button>
-              <Button variant="secondary" onClick={() => setForm(emptyForm())}>
-                초기화
-              </Button>
-            </div>
+                  <div className="mt-auto grid grid-cols-2 gap-1.5 pt-3">
+                    {item.purchaseUrl ? (
+                      <a
+                        href={item.purchaseUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className={buttonClass('secondary', 'sm', 'h-9 min-w-0')}
+                      >
+                        <ExternalLink size={13} />
+                        구매처 열기
+                      </a>
+                    ) : (
+                      <span aria-disabled="true" title="구매 링크를 입력하면 열 수 있습니다" className={buttonClass('secondary', 'sm', 'h-9 min-w-0 cursor-not-allowed opacity-50')}>
+                        <ExternalLink size={13} />
+                        구매처 열기
+                      </span>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => markPurchased(item)}
+                      disabled={busyId === item.id}
+                      className={buttonClass('secondary', 'sm', 'h-9 min-w-0')}
+                      title="실제 구매 후 최근 구매일을 기록합니다"
+                    >
+                      <CheckCircle2 size={13} />
+                      구매 기록
+                    </button>
+                  </div>
+                </article>
+              )
+            })}
           </div>
-        </aside>
-        ) : null}
-      </div>
+        ) : (
+          <EmptyState
+            bare
+            className="mt-3"
+            icon={<PackagePlus size={20} />}
+            title="조건에 맞는 부자재가 없습니다."
+            action={<Button variant="secondary" size="sm" onClick={openNewForm} icon={<Plus size={13} />}>새 부자재</Button>}
+          />
+        )}
+      </section>
+
+      {formOpen ? (
+        <Modal label={form.id ? '부자재 수정' : '새 부자재'} onClose={() => setFormOpen(false)} className="bg-slate-950/40">
+          <div
+            className="flex h-full w-full justify-end"
+            onMouseDown={(event) => { if (event.target === event.currentTarget) setFormOpen(false) }}
+          >
+            <aside className="flex h-full w-full max-w-[400px] flex-col bg-white shadow-2xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-4 py-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
+                    <ShoppingCart size={16} />
+                  </span>
+                  <div>
+                    <h2 className="text-[14px] font-black text-slate-950">{form.id ? '부자재 수정' : '새 부자재'}</h2>
+                    <p className="text-[11px] font-bold text-slate-500">필요한 정보만 빠르게 입력하세요.</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setFormOpen(false)}
+                  className={buttonClass('ghost', 'sm', 'h-9 w-9 px-0 text-slate-500')}
+                  title="닫기"
+                  aria-label="닫기"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
+                <Field label="부자재명">
+                  <input className={inputClass} value={form.name} onChange={(event) => setFormValue('name', event.target.value)} placeholder="예: 택배 박스 3호" />
+                </Field>
+                <div className="grid grid-cols-2 gap-2">
+                  <Field label="카테고리">
+                    <input className={inputClass} list="material-supply-categories" value={form.category} onChange={(event) => setFormValue('category', event.target.value)} placeholder="포장" />
+                    <datalist id="material-supply-categories">
+                      {categories.map((category) => <option key={category} value={category} />)}
+                    </datalist>
+                  </Field>
+                  <Field label="구매처">
+                    <input className={inputClass} value={form.supplierName} onChange={(event) => setFormValue('supplierName', event.target.value)} placeholder="쿠팡, 네이버..." />
+                  </Field>
+                </div>
+                <Field label="구매 링크">
+                  <input className={inputClass} value={form.purchaseUrl} onChange={(event) => setFormValue('purchaseUrl', event.target.value)} placeholder="https://..." />
+                </Field>
+                <div className="grid grid-cols-3 gap-2">
+                  <Field label="단위">
+                    <input className={inputClass} value={form.unit} onChange={(event) => setFormValue('unit', event.target.value)} placeholder="100개" />
+                  </Field>
+                  <Field label="가격">
+                    <input inputMode="numeric" className={`${inputClass} text-right tabular-nums`} value={form.priceKrw} onChange={(event) => setFormValue('priceKrw', event.target.value)} placeholder="12500" />
+                  </Field>
+                  <Field label="정렬(표시순서)">
+                    <input inputMode="numeric" className={`${inputClass} text-right tabular-nums`} value={form.sortOrder} onChange={(event) => setFormValue('sortOrder', event.target.value)} />
+                  </Field>
+                </div>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-3 text-[12px] font-bold">
+                  <span className="text-slate-500">개당 단가</span>
+                  <span className={`tabular-nums ${formUnitPrice ? 'text-slate-900' : 'text-slate-400'}`}>{formatUnitPrice(formUnitPrice)}</span>
+                </div>
+                <div className="rounded-xl bg-slate-50 p-2.5">
+                  <div className="mb-1.5 flex items-center justify-between gap-3">
+                    <span className="text-[11px] font-black text-slate-500">규격 (선택)</span>
+                    <select
+                      className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-[12px] font-bold text-slate-700"
+                      value={form.dimensionUnit}
+                      onChange={(event) => setFormValue('dimensionUnit', event.target.value === 'cm' ? 'cm' : 'mm')}
+                      aria-label="규격 단위"
+                    >
+                      <option value="mm">mm</option>
+                      <option value="cm">cm</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    <Field label="가로">
+                      <input inputMode="decimal" className={`${inputClass} text-right tabular-nums`} value={form.widthValue} onChange={(event) => setFormValue('widthValue', event.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="세로">
+                      <input inputMode="decimal" className={`${inputClass} text-right tabular-nums`} value={form.depthValue} onChange={(event) => setFormValue('depthValue', event.target.value)} placeholder="0" />
+                    </Field>
+                    <Field label="높이">
+                      <input inputMode="decimal" className={`${inputClass} text-right tabular-nums`} value={form.heightValue} onChange={(event) => setFormValue('heightValue', event.target.value)} placeholder="0" />
+                    </Field>
+                  </div>
+                </div>
+                <Field label="메모">
+                  <textarea className={`${inputClass} h-auto min-h-16 resize-none py-2`} value={form.memo} onChange={(event) => setFormValue('memo', event.target.value)} placeholder="주의사항, 대체 구매처 등" />
+                </Field>
+                <label className="flex min-h-10 items-center justify-between border-t border-slate-100 pt-3 text-[12px] font-bold text-slate-700">
+                  사용중으로 표시
+                  <input type="checkbox" checked={form.active} onChange={(event) => setFormValue('active', event.target.checked)} className="h-4 w-4 accent-brand-orange" />
+                </label>
+              </div>
+
+              <div className="flex shrink-0 gap-2 border-t border-slate-100 bg-white px-4 py-3">
+                <Button variant="secondary" onClick={() => setForm(emptyForm())}>
+                  초기화
+                </Button>
+                <Button variant="primary" onClick={submitForm} loading={saving} className="flex-1">
+                  {saving ? '저장 중' : form.id ? '수정 저장' : '등록'}
+                </Button>
+              </div>
+            </aside>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   )
 }
@@ -469,4 +505,4 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-[12px] font-bold text-slate-950 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
+const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-2.5 text-[13px] font-medium text-slate-950 transition focus:border-brand-orange'

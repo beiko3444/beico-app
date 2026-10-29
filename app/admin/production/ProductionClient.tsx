@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { productionReviewReason } from '@/lib/productionReview'
-import { createPortal } from 'react-dom'
-import Button from '@/components/ui/Button'
+import Button, { buttonClass } from '@/components/ui/Button'
+import Badge from '@/components/ui/Badge'
+import Modal from '@/components/Modal'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
@@ -15,14 +16,12 @@ import {
     YAxis,
     CartesianGrid,
     Tooltip,
-    Legend,
     ResponsiveContainer,
     AreaChart,
     Area,
-    ComposedChart,
     LabelList
 } from 'recharts'
-import { TrendingUp, Package, DollarSign, Calculator, ChevronRight, Activity, Plus, X } from 'lucide-react'
+import { Package, DollarSign, Calculator, Plus, Trash2, X } from 'lucide-react'
 
 type ProductionBatch = {
     id: string
@@ -51,6 +50,27 @@ type Product = ProductionPriceProduct
 
 const CATEGORIES = [...PRODUCTION_CATEGORIES]
 
+// One series colour for every trend chart; colour is not used to tell the charts apart.
+const CHART_COLOR = '#334155'
+const CHART_LABEL_COLOR = '#475569'
+const CHART_MARGIN = { top: 20, right: 24, left: 24, bottom: 0 }
+const tooltipStyle = { borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }
+
+const batchTotalCost = (b: ProductionBatch) =>
+    b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)
+
+const average = (values: number[]) => (values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : null)
+
+const legendClass = 'mb-3 w-full border-b border-slate-100 pb-2 text-[13px] font-black text-slate-900'
+const fieldLabelClass = 'text-[11px] font-bold text-slate-600'
+const fieldInputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 focus:border-brand-orange'
+const readonlyFieldClass = 'flex h-10 w-full items-center rounded-xl bg-slate-50 px-3 text-sm font-bold text-slate-700'
+
+function MarginBadge({ rate }: { rate: number | null }) {
+    if (rate === null) return <span className="text-slate-400">-</span>
+    return <Badge tone={rate < 0 ? 'danger' : rate >= 30 ? 'success' : 'neutral'} className="tabular-nums">{rate.toFixed(1)}%</Badge>
+}
+
 export default function ProductionClient() {
     const [excludeReview, setExcludeReview] = useState(false)
     const [activeTab, setActiveTab] = useState(CATEGORIES[0]) // Default to 청갯지렁이
@@ -77,11 +97,6 @@ export default function ProductionClient() {
     const [isEditing, setIsEditing] = useState<ProductionBatch | null>(null)
     const [isCreating, setIsCreating] = useState(false)
     const [sortConfig, setSortConfig] = useState<{ key: string; direction: 'asc' | 'desc' } | null>({ key: 'productionDate', direction: 'desc' })
-    const [mounted, setMounted] = useState(false)
-
-    useEffect(() => {
-        setMounted(true)
-    }, [])
 
     const handleSort = (key: string) => {
         let direction: 'asc' | 'desc' = 'asc'
@@ -339,285 +354,247 @@ export default function ProductionClient() {
         [...batches].sort((a, b) => new Date(a.productionDate).getTime() - new Date(b.productionDate).getTime())
             .map(b => ({
                 date: new Date(b.productionDate).toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' }),
-                unit: b.unitCost || 0
+                // A batch without a unit cost is a gap in the line, not a zero.
+                unit: b.unitCost && b.unitCost > 0 ? b.unitCost : null
             })), [batches]
     )
 
     const reviewBatches = batches.filter(batch => productionReviewReason(batch))
     const summaryBatches = excludeReview ? batches.filter(batch => !productionReviewReason(batch)) : batches
     const wholesaleMargins = summaryBatches.map(batch => productionMargin(batch.salesPrice, batch.unitCost)).filter((margin): margin is number => margin !== null)
+    const averageQuantity = average(summaryBatches.map(batch => batch.quantity))
+    const averageCost = average(summaryBatches.map(batchTotalCost))
+    const averageUnitCost = average(summaryBatches.map(batch => batch.unitCost).filter((cost): cost is number => cost !== null && cost > 0))
+    const averageMargin = average(wholesaleMargins)
+    const showEmpty = !loading && !batchError && batches.length === 0
+
+    const openNewRecord = () => {
+        setIsEditing(null)
+        setSelectedProductId('')
+        setFormData({
+            productionDate: new Date().toISOString().split('T')[0],
+            rawMaterialCost: '',
+            depositDollar: '',
+            electricityCost: '30000',
+            packagingCost: '200',
+            warehouseCost: '20350',
+            shippingCost: '',
+            customsFee: '33000',
+            customsDuty: '',
+            vat: '',
+            quantity: '',
+            memo: ''
+        })
+        setIsCreating(true)
+    }
+
+    const sortHeader = (key: string, label: string, title?: string) => (
+        <th
+            className="cursor-pointer select-none text-right hover:bg-slate-100"
+            title={title}
+            aria-sort={sortConfig?.key === key ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+            onClick={() => handleSort(key)}
+        >
+            {label} {sortConfig?.key === key && (sortConfig.direction === 'asc' ? '↑' : '↓')}
+        </th>
+    )
 
     return (
         <div className="min-w-0 space-y-6">
             <PageHeader
-                title="생산관리"
+                title="생산 관리"
                 description="카테고리별 생산 기록과 원가·마진을 관리합니다."
-                count={batches.length}
                 actions={
-                    <Button
-                        variant="primary"
-                        icon={<Plus size={15} />}
-                        onClick={() => {
-                            setIsEditing(null)
-                            setSelectedProductId('')
-                            setFormData({
-                                productionDate: new Date().toISOString().split('T')[0],
-                                rawMaterialCost: '',
-                                depositDollar: '',
-                                electricityCost: '30000',
-                                packagingCost: '200',
-                                warehouseCost: '20350',
-                                shippingCost: '',
-                                customsFee: '33000',
-                                customsDuty: '',
-                                vat: '',
-                                quantity: '',
-                                memo: ''
-                            })
-                            setIsCreating(true)
-                        }}
-                    >
+                    <Button variant="primary" icon={<Plus size={15} />} onClick={openNewRecord}>
                         생산 기록
                     </Button>
                 }
             />
 
-            {/* Category Tabs */}
-            <Tabs
-                aria-label="생산 카테고리"
-                items={CATEGORIES.map(cat => ({ key: cat, label: cat }))}
-                value={activeTab}
-                onChange={category => {
-                    ++batchRequestRef.current
-                    setLoading(true)
-                    setBatches([])
-                    setIsCreating(false)
-                    setIsEditing(null)
-                    setSelectedProductId('')
-                    setActiveTab(category)
-                }}
-            />
-
-            <h2 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">{activeTab} 생산일지</h2>
-
-            <div className="ux-context space-y-2">
-                <p>전체 {batches.length}차수 중 {summaryBatches.length}차수 집계 · 평균은 차수별 단순 평균입니다.</p>
-                {reviewBatches.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900" role="status">
-                    <p className="font-semibold">원가·수량을 검토할 기록이 {reviewBatches.length}건 있습니다.</p>
-                    <p className="mt-1">생산단가 미입력, 수량 0 이하 또는 단가가 도매가보다 높은 기록입니다. 오류나 생산 미완료로 단정하지 않으며 기본 집계에는 포함됩니다.</p>
-                    <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2"><input type="checkbox" checked={excludeReview} onChange={event => setExcludeReview(event.target.checked)} className="h-5 w-5" />검토할 기록을 요약 집계에서 제외</label>
-                </div>}
+            <div className="space-y-2">
+                <Tabs
+                    aria-label="생산 카테고리"
+                    items={CATEGORIES.map(cat => ({ key: cat, label: cat }))}
+                    value={activeTab}
+                    onChange={category => {
+                        ++batchRequestRef.current
+                        setLoading(true)
+                        setBatches([])
+                        setIsCreating(false)
+                        setIsEditing(null)
+                        setSelectedProductId('')
+                        setActiveTab(category)
+                    }}
+                />
+                {!loading && batches.length > 0 ? (
+                    <p className="text-xs text-slate-500 dark:text-gray-400">
+                        {activeTab} · 전체 {batches.length}차수 중 {summaryBatches.length}차수 집계 · 평균은 차수별 단순 평균입니다.
+                    </p>
+                ) : null}
             </div>
+
+            {reviewBatches.length > 0 && (
+                <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-[13px] text-amber-900" role="status">
+                    <p className="font-bold">원가·수량을 검토할 기록이 {reviewBatches.length}건 있습니다.</p>
+                    <p className="mt-1 text-xs">생산단가 미입력, 수량 0 이하 또는 단가가 도매가보다 높은 기록입니다. 오류나 생산 미완료로 단정하지 않으며 기본 집계에는 포함됩니다.</p>
+                    <label className="mt-2 flex min-h-10 cursor-pointer items-center gap-2 text-xs font-bold"><input type="checkbox" checked={excludeReview} onChange={event => setExcludeReview(event.target.checked)} className="h-4 w-4 accent-brand-orange" />검토할 기록을 요약 집계에서 제외</label>
+                </div>
+            )}
+
+            {showEmpty ? (
+                <EmptyState
+                    title={`${activeTab} 생산 기록이 없습니다`}
+                    description="생산 기록을 등록하면 원가·수량 지표와 추이 차트가 여기에 표시됩니다."
+                    action={<Button variant="secondary" size="sm" icon={<Plus size={14} />} onClick={openNewRecord}>생산 기록</Button>}
+                />
+            ) : (
+            <>
             {/* Statistics Dashboard */}
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                 {[
                     {
                         label: '총 생산수량',
-                        value: summaryBatches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + '개'
+                        value: summaryBatches.length > 0 ? summaryBatches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + '개' : '-'
                     },
                     {
                         label: '차수 평균 수량',
-                        value: summaryBatches.length > 0
-                            ? Math.round(summaryBatches.reduce((acc, b) => acc + b.quantity, 0) / summaryBatches.length).toLocaleString() + '개'
-                            : '0개'
+                        value: averageQuantity !== null ? Math.round(averageQuantity).toLocaleString() + '개' : '-'
                     },
                     {
                         label: '차수 평균 비용',
-                        value: summaryBatches.length > 0
-                            ? Math.round(summaryBatches.reduce((acc, b) => acc + (b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)), 0) / summaryBatches.length).toLocaleString() + '원'
-                            : '0원'
+                        value: averageCost !== null ? Math.round(averageCost).toLocaleString() + '원' : '-'
                     },
                     {
                         label: '차수 평균 단가',
-                        value: summaryBatches.length > 0
-                            ? Math.round(summaryBatches.reduce((acc, b) => acc + (b.unitCost || 0), 0) / summaryBatches.length).toLocaleString() + '원'
-                            : '0원'
+                        value: averageUnitCost !== null ? Math.round(averageUnitCost).toLocaleString() + '원' : '-'
                     },
                     {
                         label: '차수 평균 도매 마진',
-                        value: wholesaleMargins.length > 0
-                            ? (wholesaleMargins.reduce((sum, margin) => sum + margin, 0) / wholesaleMargins.length).toFixed(1) + '%'
-                            : '-'
+                        value: averageMargin !== null ? averageMargin.toFixed(1) + '%' : '-'
                     }
                 ].map((stat, idx) => (
-                    <div key={idx} className="bg-white dark:bg-[#1e1e1e] p-5 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-1 min-w-0">
+                    <div key={stat.label} className={`flex min-w-0 flex-col gap-1 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:p-5 ${idx === 0 ? 'col-span-2 sm:col-span-1' : ''}`}>
                         <span className="text-[11px] font-bold text-slate-500 dark:text-gray-400">{stat.label}</span>
-                        <div className="flex items-baseline gap-1">
-                            <span className="text-xl font-black text-slate-900 dark:text-white truncate">{stat.value}</span>
-                        </div>
+                        <span className={`truncate text-xl font-black tabular-nums ${stat.value === '-' ? 'text-slate-400' : 'text-slate-900 dark:text-white'}`}>{stat.value}</span>
                     </div>
                 ))}
             </div>
 
             {/* Visual Insights Section */}
             {!loading && batches.length > 0 && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* Total Production Cost Trend */}
-                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4 min-w-0">
-                        <div className="flex items-center justify-between">
+                <div className="hidden grid-cols-1 gap-4 sm:grid lg:grid-cols-3">
+                    {[
+                        { title: '총 생산비용 추이', icon: <DollarSign className="h-4 w-4" /> },
+                        { title: '생산수량 변동', icon: <Package className="h-4 w-4" /> },
+                        { title: '생산단가 추이', icon: <Calculator className="h-4 w-4" /> },
+                    ].map((chart, chartIndex) => (
+                        <div key={chart.title} className="flex min-w-0 flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
                             <div className="flex items-center gap-2">
-                                <div className="p-2 bg-blue-50 rounded-lg text-blue-600">
-                                    <DollarSign className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">총 생산비용 추이</h3>
+                                <span className="rounded-lg bg-slate-100 p-2 text-slate-600 dark:bg-[#252525] dark:text-gray-300">{chart.icon}</span>
+                                <h3 className="text-sm font-black text-slate-900 dark:text-white">{chart.title}</h3>
                             </div>
-                            <Activity className="w-4 h-4 text-gray-300" />
-                        </div>
-                        <div className="h-48 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <AreaChart data={areaChartData}>
-                                    <defs>
-                                        <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.1} />
-                                            <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                                        </linearGradient>
-                                    </defs>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
-                                    <YAxis hide />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
-                                        formatter={(value: any) => [Number(value).toLocaleString() + '원', '비용']}
-                                    />
-                                    <Area type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={3} fillOpacity={1} fill="url(#colorCost)" />
-                                </AreaChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* Production Quantity Trend */}
-                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4 min-w-0">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-emerald-50 rounded-lg text-emerald-600">
-                                    <Package className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">생산수량 변동</h3>
+                            <div className="h-48 w-full">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    {chartIndex === 0 ? (
+                                        <AreaChart data={areaChartData} margin={CHART_MARGIN}>
+                                            <defs>
+                                                <linearGradient id="colorCost" x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="5%" stopColor={CHART_COLOR} stopOpacity={0.12} />
+                                                    <stop offset="95%" stopColor={CHART_COLOR} stopOpacity={0} />
+                                                </linearGradient>
+                                            </defs>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontWeight: 'bold' }} />
+                                            <YAxis hide />
+                                            <Tooltip contentStyle={tooltipStyle} formatter={(value) => [Number(value).toLocaleString() + '원', '비용']} />
+                                            <Area type="monotone" dataKey="cost" stroke={CHART_COLOR} strokeWidth={2.5} fillOpacity={1} fill="url(#colorCost)" dot={{ r: 3, fill: CHART_COLOR, strokeWidth: 0 }}>
+                                                <LabelList dataKey="cost" position="top" fill={CHART_LABEL_COLOR} fontSize={10} fontWeight={700} formatter={(value) => Number(value).toLocaleString()} />
+                                            </Area>
+                                        </AreaChart>
+                                    ) : chartIndex === 1 ? (
+                                        <LineChart data={barChartData} margin={CHART_MARGIN}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontWeight: 'bold' }} />
+                                            <YAxis hide />
+                                            <Tooltip contentStyle={tooltipStyle} formatter={(value) => [Number(value).toLocaleString() + '개', '수량']} />
+                                            <Line type="linear" dataKey="qty" stroke={CHART_COLOR} strokeWidth={2.5} dot={{ r: 3, fill: CHART_COLOR, strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }}>
+                                                <LabelList dataKey="qty" position="top" fill={CHART_LABEL_COLOR} fontSize={10} fontWeight={700} formatter={(value) => Number(value).toLocaleString()} />
+                                            </Line>
+                                        </LineChart>
+                                    ) : (
+                                        <LineChart data={lineChartData} margin={CHART_MARGIN}>
+                                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                            <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#64748b', fontWeight: 'bold' }} />
+                                            <YAxis hide />
+                                            <Tooltip contentStyle={tooltipStyle} formatter={(value) => [value === null || value === undefined ? '미입력' : Number(value).toLocaleString() + '원', '단가']} />
+                                            <Line type="linear" dataKey="unit" connectNulls={false} stroke={CHART_COLOR} strokeWidth={2.5} dot={{ r: 3, fill: CHART_COLOR, strokeWidth: 0 }} activeDot={{ r: 5, strokeWidth: 0 }}>
+                                                <LabelList dataKey="unit" position="top" fill={CHART_LABEL_COLOR} fontSize={10} fontWeight={700} formatter={(value) => (value === null || value === undefined ? '' : Number(value).toLocaleString())} />
+                                            </Line>
+                                        </LineChart>
+                                    )}
+                                </ResponsiveContainer>
                             </div>
-                            <TrendingUp className="w-4 h-4 text-gray-300" />
                         </div>
-                        <div className="h-48 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={barChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
-                                    <YAxis hide />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
-                                        formatter={(value: any) => [Number(value).toLocaleString() + '개', '수량']}
-                                    />
-                                    <Line type="linear" dataKey="qty" stroke="#10b981" strokeWidth={3} dot={{ r: 4, fill: '#10b981', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }}>
-                                        <LabelList dataKey="qty" position="top" fill="#059669" fontSize={10} fontWeight={700} formatter={(value: any) => Number(value).toLocaleString()} />
-                                    </Line>
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
-
-                    {/* Unit Cost Trend */}
-                    <div className="bg-white dark:bg-[#1e1e1e] p-6 rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none flex flex-col gap-4 min-w-0">
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                                <div className="p-2 bg-orange-50 rounded-lg text-orange-600">
-                                    <Calculator className="w-4 h-4" />
-                                </div>
-                                <h3 className="text-sm font-black text-gray-900 dark:text-white tracking-tight">생산단가 추이</h3>
-                            </div>
-                            <ChevronRight className="w-4 h-4 text-gray-300" />
-                        </div>
-                        <div className="h-48 w-full">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <LineChart data={lineChartData}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                                    <XAxis dataKey="date" fontSize={10} tickLine={false} axisLine={false} tick={{ fill: '#9ca3af', fontWeight: 'bold' }} />
-                                    <YAxis hide />
-                                    <Tooltip
-                                        contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '11px', fontWeight: 'bold' }}
-                                        formatter={(value: any) => [Number(value).toLocaleString() + '원', '단가']}
-                                    />
-                                    <Line type="linear" dataKey="unit" stroke="#f59e0b" strokeWidth={3} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6, strokeWidth: 0 }}>
-                                        <LabelList dataKey="unit" position="top" fill="#d97706" fontSize={10} fontWeight={700} formatter={(value: any) => Number(value).toLocaleString()} />
-                                    </Line>
-                                </LineChart>
-                            </ResponsiveContainer>
-                        </div>
-                    </div>
+                    ))}
                 </div>
             )}
 
-
-            {/* Table */}
-            <div className="bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] rounded-2xl overflow-x-auto shadow-sm dark:shadow-none pb-16">
+            {/* Table — on wide screens it fits, so overflow stays visible and the cost tooltip can rise above the first rows. */}
+            <div className="overflow-x-auto rounded-xl border border-slate-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none xl:overflow-visible">
                 <div className="min-w-[800px]">
-                    <table className="w-full text-xs text-left">
+                    <table className="w-full text-left text-xs">
                         <thead className="ux-thead">
                             <tr>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center w-12 cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('productionDate')}>
-                                    No {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 whitespace-nowrap text-center cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('productionDate')}>
+                                <th className="w-12 text-center">No</th>
+                                <th
+                                    className="cursor-pointer select-none text-left hover:bg-slate-100"
+                                    aria-sort={sortConfig?.key === 'productionDate' ? (sortConfig.direction === 'asc' ? 'ascending' : 'descending') : undefined}
+                                    onClick={() => handleSort('productionDate')}
+                                >
                                     생산날짜 {sortConfig?.key === 'productionDate' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
                                 </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" title="원재료+전기+포장" onClick={() => handleSort('totalCost')}>
-                                    총 생산비용 {sortConfig?.key === 'totalCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('quantity')}>
-                                    생산수량 {sortConfig?.key === 'quantity' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('unitCost')}>
-                                    단가 {sortConfig?.key === 'unitCost' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('salesPrice')}>
-                                    도매가 {sortConfig?.key === 'salesPrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('wMargin')}>
-                                    도매마진 {sortConfig?.key === 'wMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('wholesalePrice')}>
-                                    소매가 {sortConfig?.key === 'wholesalePrice' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap cursor-pointer hover:bg-brand-ink/80" onClick={() => handleSort('rMargin')}>
-                                    소매마진 {sortConfig?.key === 'rMargin' && (sortConfig.direction === 'asc' ? '↑' : '↓')}
-                                </th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap">메모</th>
-                                <th className="px-4 py-1.5 text-center whitespace-nowrap">관리</th>
+                                {sortHeader('totalCost', '총 생산비용', '원재료+전기+포장 외 비용 합계')}
+                                {sortHeader('quantity', '생산수량')}
+                                {sortHeader('unitCost', '단가')}
+                                {sortHeader('salesPrice', '도매가')}
+                                {sortHeader('wMargin', '도매마진')}
+                                {sortHeader('wholesalePrice', '소매가')}
+                                {sortHeader('rMargin', '소매마진')}
+                                <th className="text-left">메모</th>
+                                <th className="text-center">관리</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-50 dark:divide-[#2a2a2a]">
+                        <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
                             {loading ? (
                                 <tr><td colSpan={11} className="px-4 py-10 text-center text-[12px] font-bold text-slate-500 dark:text-gray-400">로딩 중...</td></tr>
                             ) : batchError ? (
                                 <tr><td colSpan={11} className="px-4 py-10 text-center text-sm text-red-600" role="alert">{batchError} <button type="button" className="underline" onClick={fetchBatches}>다시 불러오기</button></td></tr>
-                            ) : sortedBatches.length === 0 ? (
-                                <tr><td colSpan={11} className="p-3"><EmptyState compact title="생산 기록이 없습니다" description="생산 기록 버튼을 눌러 첫 기록을 등록하세요." /></td></tr>
                             ) : (
                                 sortedBatches.map((batch, idx) => {
-                                    const totalCost = batch.rawMaterialCost
-                                        + batch.electricityCost
-                                        + batch.packagingCost
-                                        + (batch.warehouseCost || 0)
-                                        + (batch.shippingCost || 0)
-                                        + (batch.customsFee || 0)
-                                        + (batch.customsDuty || 0)
-                                        + (batch.vat || 0)
+                                    const totalCost = batchTotalCost(batch)
                                     const reviewReason = productionReviewReason(batch)
                                     const wMarginRate = productionMargin(batch.salesPrice, batch.unitCost)
                                     const rMarginRate = productionMargin(batch.wholesalePrice, batch.unitCost)
 
                                     return (
-                                        <tr key={batch.id} className="hover:bg-brand-orange-soft dark:hover:bg-[#252525] transition-colors group even:bg-slate-50 dark:even:bg-[#1a1a1a] hover:relative hover:z-50">
-                                            <td className="px-4 py-1.5 text-center text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
+                                        <tr key={batch.id} className="group transition-colors even:bg-slate-50 hover:relative hover:z-10 hover:bg-slate-100 dark:even:bg-[#1a1a1a] dark:hover:bg-[#252525]">
+                                            <td className="border-r border-slate-200 px-3 py-2 text-center font-bold tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">
                                                 {idx + 1}
                                             </td>
-                                            <td className="px-4 py-1.5 text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
+                                            <td className="whitespace-nowrap border-r border-slate-200 px-3 py-2 font-bold tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">
                                                 {new Date(batch.productionDate).toISOString().split('T')[0]}
-                                                {reviewReason && <span className="mt-1 block whitespace-normal rounded border border-amber-200 bg-amber-50 p-1 text-xs text-amber-800">검토 · {reviewReason}</span>}
+                                                {reviewReason && (
+                                                    <span className="ml-1.5 inline-flex align-middle" title={reviewReason}>
+                                                        <Badge tone="warning">검토</Badge>
+                                                        <span className="sr-only">: {reviewReason}</span>
+                                                    </span>
+                                                )}
                                             </td>
                                             <td
-                                                className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a] group/cost relative cursor-pointer hover:bg-gray-200/50 dark:hover:bg-[#252525] transition-colors font-bold"
+                                                className="group/cost relative cursor-pointer border-r border-slate-200 px-3 py-2 text-right font-bold tabular-nums text-slate-900 transition-colors hover:bg-slate-200/60 dark:border-[#2a2a2a] dark:text-white dark:hover:bg-[#252525]"
                                                 onClick={() => handleEdit(batch)}
                                             >
-                                                <span className="underline decoration-dotted underline-offset-4 decoration-gray-300">
+                                                <span className="underline decoration-slate-300 decoration-dotted underline-offset-4">
                                                     {totalCost.toLocaleString()}
                                                 </span>
                                                 {/* Tooltip for Cost Breakdown */}
@@ -668,27 +645,31 @@ export default function ProductionClient() {
                                                     )}
                                                 </div>
                                             </td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.quantity.toLocaleString()}</td>
-                                            <td className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">
-                                                {batch.unitCost ? batch.unitCost.toLocaleString() : '-'}
+                                            <td className="border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">{batch.quantity.toLocaleString()}</td>
+                                            <td className="border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">
+                                                {batch.unitCost ? batch.unitCost.toLocaleString() : <span className="text-slate-400">-</span>}
                                             </td>
-                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.salesPrice?.toLocaleString() ?? '상품 연결 필요'}</td>
-                                            <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
-                                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${Number(wMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
-                                                    {wMarginRate === null ? '-' : `${wMarginRate.toFixed(1)}%`}
-                                                </span>
+                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="whitespace-nowrap border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">{batch.salesPrice?.toLocaleString() ?? <span className="text-slate-400">상품 연결 필요</span>}</td>
+                                            <td className="border-r border-slate-200 px-3 py-2 text-right dark:border-[#2a2a2a]">
+                                                <MarginBadge rate={wMarginRate} />
                                             </td>
-                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]">{batch.wholesalePrice?.toLocaleString() ?? '-'}</td>
-                                            <td className="px-4 py-1.5 text-center border-r border-gray-200 dark:border-[#2a2a2a]">
-                                                <span className={`text-[11px] px-2 py-0.5 rounded-full font-bold ${Number(rMarginRate) > 30 ? 'bg-red-50 dark:bg-red-900/30 text-red-600' : 'bg-red-50 dark:bg-red-900/30 text-red-400'}`}>
-                                                    {rMarginRate === null ? '-' : `${rMarginRate.toFixed(1)}%`}
-                                                </span>
+                                            <td title={batch.priceProductName || '수정창에서 가격 기준 상품을 선택하세요.'} className="border-r border-slate-200 px-3 py-2 text-right tabular-nums text-slate-900 dark:border-[#2a2a2a] dark:text-white">{batch.wholesalePrice?.toLocaleString() ?? <span className="text-slate-400">-</span>}</td>
+                                            <td className="border-r border-slate-200 px-3 py-2 text-right dark:border-[#2a2a2a]">
+                                                <MarginBadge rate={rMarginRate} />
                                             </td>
-                                            <td className="px-4 py-1.5 text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a]" title={batch.memo || ''}>{batch.memo || '-'}</td>
-                                            <td className="px-4 py-1.5 text-center">
-                                                <div className="flex items-center justify-center gap-2 transition-opacity">
+                                            <td className="max-w-[200px] truncate border-r border-slate-200 px-3 py-2 text-slate-700 dark:border-[#2a2a2a] dark:text-gray-300" title={batch.memo || ''}>{batch.memo || <span className="text-slate-400">-</span>}</td>
+                                            <td className="px-3 py-2 text-center">
+                                                <div className="flex items-center justify-center gap-1">
                                                     <Button variant="secondary" size="sm" onClick={() => handleEdit(batch)}>수정</Button>
-                                                    <Button variant="danger" size="sm" onClick={() => handleDelete(batch.id)}>삭제</Button>
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleDelete(batch.id)}
+                                                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-400 hover:bg-red-50 hover:text-red-600')}
+                                                        title="삭제"
+                                                        aria-label={`${new Date(batch.productionDate).toISOString().split('T')[0]} 생산 기록 삭제`}
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
                                                 </div>
                                             </td>
                                         </tr>
@@ -699,106 +680,103 @@ export default function ProductionClient() {
                     </table>
                 </div>
             </div>
+            </>
+            )}
 
-            {/* Modal */}
-            {
-                isCreating && mounted && createPortal(
-                    <div className="fixed inset-0 bg-black/40 z-[99999] flex items-center justify-center p-4 overflow-hidden">
-                        <div
-                            className="bg-white w-full max-w-lg rounded-2xl border border-slate-200 shadow-xl animate-in fade-in duration-100 relative overflow-hidden"
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="production-record-modal-title"
-                            onClick={(e) => e.stopPropagation()}
+            {isCreating && (
+                <Modal labelledBy="production-record-modal-title" onClose={() => setIsCreating(false)} className="bg-black/40">
+                    <div className="flex h-full w-full items-center justify-center p-3 sm:p-4">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl"
                         >
-                            <div className="px-5 py-4 flex justify-between items-center border-b border-slate-100">
-                                <h3 id="production-record-modal-title" className="text-base font-black tracking-tight text-slate-900">
+                            <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4">
+                                <h2 id="production-record-modal-title" className="text-base font-black text-slate-900">
                                     {isEditing ? '생산 기록 수정' : '생산 기록 등록'}
-                                </h3>
+                                </h2>
                                 <button
                                     type="button"
                                     onClick={() => setIsCreating(false)}
                                     aria-label="닫기"
-                                    className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+                                    className={buttonClass('ghost', 'sm', 'h-8 w-8 rounded-full px-0 text-slate-500')}
                                 >
                                     <X size={16} />
                                 </button>
                             </div>
 
-                            <form onSubmit={handleSubmit} className="p-5 space-y-5 max-h-[80vh] overflow-y-auto scrollbar-hide">
-                                {/* Schedule Info */}
-                                <fieldset className="rounded-2xl border border-slate-200 p-4">
-                                    <legend className="px-2 text-[13px] font-bold text-slate-800">일정 및 생산 구분</legend>
+                            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
+                                <fieldset>
+                                    <legend className={legendClass}>일정 및 생산 구분</legend>
                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-slate-600">생산일</label>
+                                        <label className="block space-y-1">
+                                            <span className={fieldLabelClass}>생산일</span>
                                             <input
                                                 type="date"
                                                 required
-                                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm font-bold"
+                                                className={`${fieldInputClass} font-bold`}
                                                 value={formData.productionDate}
                                                 onChange={e => setFormData({ ...formData, productionDate: e.target.value })}
                                             />
-                                        </div>
+                                        </label>
                                         <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-slate-600">생산 구분</label>
-                                            <div className="w-full h-9 px-3 flex items-center bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-700">
-                                                {activeTab}
-                                            </div>
+                                            <span className={fieldLabelClass}>생산 구분</span>
+                                            <div className={readonlyFieldClass}>{activeTab}</div>
                                         </div>
                                     </div>
                                 </fieldset>
 
-                                {/* Cost Details */}
-                                <fieldset className="rounded-2xl border border-slate-200 p-4">
-                                    <legend className="px-2 text-[13px] font-bold text-slate-800">비용 상세</legend>
+                                <fieldset>
+                                    <legend className={legendClass}>비용 상세</legend>
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="space-y-1">
-                                                <label className="text-[11px] font-bold text-slate-600">해외송금금액 (원)</label>
+                                            <label className="block space-y-1">
+                                                <span className={fieldLabelClass}>해외송금금액 (원)</span>
                                                 <input
                                                     type="text"
+                                                    inputMode="numeric"
                                                     required
-                                                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm text-right tabular-nums"
+                                                    className={`${fieldInputClass} text-right tabular-nums`}
                                                     value={formatNumber(formData.rawMaterialCost)}
                                                     onChange={e => setFormData({ ...formData, rawMaterialCost: parseNumber(e.target.value) })}
                                                 />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <label className="text-[11px] font-bold text-slate-600">송금액 (USD)</label>
+                                            </label>
+                                            <label className="block space-y-1">
+                                                <span className={fieldLabelClass}>송금액 (USD)</span>
                                                 <input
                                                     type="text"
+                                                    inputMode="decimal"
                                                     placeholder="0.00"
-                                                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm text-right tabular-nums"
+                                                    className={`${fieldInputClass} text-right tabular-nums`}
                                                     value={formData.depositDollar}
                                                     onChange={e => setFormData({ ...formData, depositDollar: e.target.value })}
                                                 />
-                                            </div>
+                                            </label>
                                         </div>
 
                                         <div className="grid grid-cols-3 gap-2">
                                             {[
-                                                { label: '전기세', key: 'electricityCost', small: 'Elec' },
-                                                { label: '포장비', key: 'packagingCost', small: 'Pack' },
-                                                { label: '창고료', key: 'warehouseCost', small: 'Whse' },
-                                                { label: '운송료', key: 'shippingCost', small: 'Ship' },
-                                                { label: '관세사비', key: 'customsFee', small: 'Fees' },
-                                                { label: '관세', key: 'customsDuty', small: 'Duty' },
-                                                { label: '부가세', key: 'vat', small: 'VAT' }
+                                                { label: '전기세', key: 'electricityCost' },
+                                                { label: '포장비', key: 'packagingCost' },
+                                                { label: '창고료', key: 'warehouseCost' },
+                                                { label: '운송료', key: 'shippingCost' },
+                                                { label: '관세사비', key: 'customsFee' },
+                                                { label: '관세', key: 'customsDuty' },
+                                                { label: '부가세', key: 'vat' }
                                             ].map((field) => (
-                                                <div key={field.key} className="space-y-1">
-                                                    <label className="text-[11px] font-bold text-slate-600">{field.label}</label>
+                                                <label key={field.key} className="block space-y-1">
+                                                    <span className={fieldLabelClass}>{field.label}</span>
                                                     <input
                                                         type="text"
-                                                        className="w-full h-9 px-2.5 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-xs text-right tabular-nums"
+                                                        inputMode="numeric"
+                                                        className={`${fieldInputClass} px-2.5 text-right tabular-nums`}
                                                         value={formatNumber(formData[field.key as keyof typeof formData])}
                                                         onChange={e => setFormData({ ...formData, [field.key]: parseNumber(e.target.value) })}
                                                     />
-                                                </div>
+                                                </label>
                                             ))}
-                                            <div className="space-y-1 col-start-2">
-                                                <label className="text-[11px] font-bold text-slate-600">환율 (해외송금금액/USD)</label>
-                                                <div className="w-full h-9 px-2.5 flex items-center justify-end bg-slate-50 border border-slate-200 rounded-xl text-xs text-right tabular-nums font-bold text-slate-900">
+                                            <div className="col-span-2 space-y-1">
+                                                <span className={fieldLabelClass}>환율 (해외송금금액/USD)</span>
+                                                <div className={`${readonlyFieldClass} justify-end tabular-nums`}>
                                                     {remittanceExchangeRate !== null
                                                         ? `1 USD = ₩${remittanceExchangeRate.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
                                                         : '-'}
@@ -808,23 +786,23 @@ export default function ProductionClient() {
                                     </div>
                                 </fieldset>
 
-                                {/* Production Result */}
-                                <fieldset className="rounded-2xl border border-slate-200 p-4">
-                                    <legend className="px-2 text-[13px] font-bold text-slate-800">생산 결과</legend>
-                                    <div className="grid grid-cols-2 gap-6">
-                                        <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-slate-600">생산 수량</label>
+                                <fieldset>
+                                    <legend className={legendClass}>생산 결과</legend>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <label className="block space-y-1">
+                                            <span className={fieldLabelClass}>생산 수량</span>
                                             <input
                                                 type="text"
+                                                inputMode="numeric"
                                                 required
-                                                className="w-full h-9 px-3 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-sm text-right font-black text-slate-900 tabular-nums"
+                                                className={`${fieldInputClass} text-right font-black tabular-nums`}
                                                 value={formatNumber(formData.quantity)}
                                                 onChange={e => setFormData({ ...formData, quantity: parseNumber(e.target.value) })}
                                             />
-                                        </div>
+                                        </label>
                                         <div className="space-y-1">
-                                            <label className="text-[11px] font-bold text-slate-600">산출 단가</label>
-                                            <div className="w-full h-9 px-3 flex items-center justify-end bg-slate-50 border border-slate-200 rounded-xl text-sm text-right font-black text-slate-900 tabular-nums">
+                                            <span className={fieldLabelClass}>산출 단가</span>
+                                            <div className={`${readonlyFieldClass} justify-end font-black tabular-nums`}>
                                                 {(
                                                     ((Number(parseNumber(formData.rawMaterialCost)) || 0) +
                                                         (Number(parseNumber(formData.electricityCost)) || 0) +
@@ -840,10 +818,9 @@ export default function ProductionClient() {
                                         </div>
                                     </div>
 
-                                    {/* Current product prices */}
                                     <div className="mt-4 space-y-1">
-                                        <label htmlFor="production-price-product" className="text-[11px] font-bold text-slate-600">가격 기준 상품</label>
-                                        <select id="production-price-product" required disabled={priceLoading || saving} value={selectedProduct?.id || ''} onChange={event => setSelectedProductId(event.target.value)} className="h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm outline-none focus:border-brand-orange">
+                                        <label htmlFor="production-price-product" className={fieldLabelClass}>가격 기준 상품</label>
+                                        <select id="production-price-product" required disabled={priceLoading || saving} value={selectedProduct?.id || ''} onChange={event => setSelectedProductId(event.target.value)} className={fieldInputClass}>
                                             <option value="">{priceLoading ? '상품 가격 불러오는 중…' : '생산 상품을 선택하세요'}</option>
                                             {priceProducts.map(product => <option key={product.id} value={product.id}>{product.name}</option>)}
                                         </select>
@@ -851,42 +828,40 @@ export default function ProductionClient() {
                                         {!priceLoading && !priceError && selectedProductId && !selectedProduct ? <p role="alert" className="text-xs text-red-600">연결된 상품을 찾을 수 없습니다. 가격 기준 상품을 다시 선택해 주세요.</p> : null}
                                     </div>
                                     <div className="mt-4 grid grid-cols-2 gap-4">
-                                        <div className="text-[11px] space-y-0.5">
+                                        <div className="space-y-0.5 text-[11px]">
                                             <span className="block font-bold text-slate-500">도매가 (C등급)</span>
-                                            <span className="block font-black text-slate-900">{!priceLoading && !priceError && currentPriceInfo.exists ? `${currentPriceInfo.salesPrice.toLocaleString()}원` : '-'}</span>
+                                            <span className="block text-sm font-black tabular-nums text-slate-900">{!priceLoading && !priceError && currentPriceInfo.exists ? `${currentPriceInfo.salesPrice.toLocaleString()}원` : '-'}</span>
                                         </div>
-                                        <div className="text-[11px] space-y-0.5 text-right">
+                                        <div className="space-y-0.5 text-[11px]">
                                             <span className="block font-bold text-slate-500">소매 판매가</span>
-                                            <span className="block font-black text-slate-900">{!priceLoading && !priceError && currentPriceInfo.exists ? `${currentPriceInfo.wholesalePrice.toLocaleString()}원` : '-'}</span>
+                                            <span className="block text-sm font-black tabular-nums text-slate-900">{!priceLoading && !priceError && currentPriceInfo.exists ? `${currentPriceInfo.wholesalePrice.toLocaleString()}원` : '-'}</span>
                                         </div>
                                     </div>
                                 </fieldset>
 
-                                {/* Memo */}
-                                <div className="space-y-1">
-                                    <label className="text-[11px] font-bold text-slate-600">특이사항</label>
+                                <label className="block space-y-1">
+                                    <span className={fieldLabelClass}>특이사항</span>
                                     <textarea
-                                        className="w-full px-3 py-2 bg-white border border-slate-200 rounded-xl outline-none focus:border-brand-orange text-xs h-16 resize-none"
+                                        className="h-16 w-full resize-none rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 focus:border-brand-orange"
                                         placeholder="생산 관련 메모를 입력하세요"
                                         value={formData.memo || ''}
                                         onChange={e => setFormData({ ...formData, memo: e.target.value })}
                                     />
-                                </div>
+                                </label>
+                            </div>
 
-                                <div className="flex gap-2 justify-end pt-2">
-                                    <Button variant="secondary" disabled={saving} onClick={() => setIsCreating(false)}>
-                                        취소
-                                    </Button>
-                                    <Button variant="primary" type="submit" loading={saving} disabled={priceLoading || !!priceError || !selectedProduct}>
-                                        {isEditing ? '수정 저장' : '저장'}
-                                    </Button>
-                                </div>
-                            </form>
-                        </div>
-                    </div>,
-                    document.body
-                )
-            }
-        </div >
+                            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-white px-5 py-3">
+                                <Button variant="secondary" disabled={saving} onClick={() => setIsCreating(false)}>
+                                    취소
+                                </Button>
+                                <Button variant="primary" type="submit" loading={saving} disabled={priceLoading || !!priceError || !selectedProduct}>
+                                    {isEditing ? '수정 저장' : '저장'}
+                                </Button>
+                            </div>
+                        </form>
+                    </div>
+                </Modal>
+            )}
+        </div>
     )
 }

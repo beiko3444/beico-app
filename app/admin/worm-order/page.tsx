@@ -29,9 +29,8 @@ type WormTypeId = 'blue' | 'red'
 type WormType = {
     id: WormTypeId
     label: string
-    cardActiveClass: string
-    cardActiveBorderClass: string
-    cardTagClass: string
+    /** Identification only (not a status): a small colour dot next to the name. */
+    dotClass: string
 }
 
 type WormEmailAttachment = {
@@ -132,6 +131,8 @@ type PipelineSectionTarget = 'order' | 'inbox' | 'docInbox' | 'remittance' | 'cu
 type PipelineStepDefinition = {
     id: number
     title: string
+    /** Short name for the mobile step chips. */
+    shortLabel: string
     summary: string
     mode: PipelineMode
     owner: string
@@ -145,7 +146,6 @@ type PipelinePhaseDefinition = {
     id: string
     label: string
     stepIds: number[]
-    tone: 'red' | 'amber' | 'sky' | 'emerald' | 'slate'
 }
 
 function EmailBodyPreview({ loading, text }: { loading: boolean; text: string }) {
@@ -404,6 +404,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 1,
         title: '발주 메시지 생성 및 전송',
+        shortLabel: '발주',
         summary: '사이즈/수량 기반 발주 메시지를 생성하고 전송을 승인합니다.',
         mode: 'SEMI',
         owner: '관리자',
@@ -415,6 +416,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 2,
         title: '마이클 인보이스 이메일 수신',
+        shortLabel: '인보이스',
         summary: 'INBOX에서 관련 메일을 스캔하고 첨부파일을 확인합니다.',
         mode: 'AUTO',
         owner: '시스템',
@@ -425,6 +427,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 3,
         title: '모인비즈니스 송금 신청',
+        shortLabel: '송금',
         summary: '송금 금액과 인보이스 PDF를 이용해 모인 송금 신청 자동화를 실행합니다.',
         mode: 'SEMI',
         owner: '관리자',
@@ -435,6 +438,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 4,
         title: '선적 서류 수신 및 AWB OCR',
+        shortLabel: 'AWB',
         summary: 'SKM 문서에서 AWB를 OCR로 추출하고 캐시에 저장합니다.',
         mode: 'AUTO',
         owner: '시스템',
@@ -445,6 +449,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 5,
         title: '유니패스 수입 통관 조회',
+        shortLabel: '통관 조회',
         summary: 'AWB/B-L 번호로 통관 진행 정보를 조회하고 개입 단계를 강조합니다.',
         mode: 'SEMI',
         owner: '관리자 / 관세사',
@@ -455,6 +460,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 6,
         title: '통관 승인 문서 수령',
+        shortLabel: '통관 문서',
         summary: '통관 완료 후 필요한 문서를 수령/정리합니다.',
         mode: 'MANUAL',
         owner: '관리자 / 관세사',
@@ -465,6 +471,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 7,
         title: '카고/관세사 문서 전달',
+        shortLabel: '문서 전달',
         summary: '필요 첨부파일을 지정 이메일로 전달합니다.',
         mode: 'SEMI',
         owner: '관리자',
@@ -475,6 +482,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 8,
         title: '창고료 청구 메일 수신',
+        shortLabel: '창고료 메일',
         summary: '창고료 관련 메일을 감지하고 처리 대상을 표시합니다.',
         mode: 'AUTO',
         owner: '시스템',
@@ -485,6 +493,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 9,
         title: '창고료 결제',
+        shortLabel: '창고료 결제',
         summary: '청구 금액을 확인하고 결제를 완료합니다.',
         mode: 'SEMI',
         owner: '관리자',
@@ -495,6 +504,7 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
     {
         id: 10,
         title: '카고 현장 픽업',
+        shortLabel: '픽업',
         summary: '최종 현장 픽업을 수행하고 다음 사이클로 종료합니다.',
         mode: 'MANUAL',
         owner: '관리자',
@@ -505,11 +515,11 @@ const PIPELINE_STEP_DEFINITIONS: PipelineStepDefinition[] = [
 ]
 
 const PIPELINE_PHASES: PipelinePhaseDefinition[] = [
-    { id: 'order', label: '발주', stepIds: [1, 2], tone: 'red' },
-    { id: 'remittance', label: '송금', stepIds: [3], tone: 'amber' },
-    { id: 'document', label: '선적서류', stepIds: [4], tone: 'sky' },
-    { id: 'customs', label: '통관', stepIds: [5, 6, 7], tone: 'emerald' },
-    { id: 'release', label: '출고', stepIds: [8, 9, 10], tone: 'slate' },
+    { id: 'order', label: '발주', stepIds: [1, 2] },
+    { id: 'remittance', label: '송금', stepIds: [3] },
+    { id: 'document', label: '선적서류', stepIds: [4] },
+    { id: 'customs', label: '통관', stepIds: [5, 6, 7] },
+    { id: 'release', label: '출고', stepIds: [8, 9, 10] },
 ]
 
 const REMITTANCE_SIMULATED_STAGES: RemittanceProgressStage[] = [
@@ -578,10 +588,11 @@ const formatRemittanceAutomationError = (message: string) => {
         : withoutPageDump
 }
 
+// Automation mode is an identification label, so it stays neutral (outline); colour is kept for step status.
 function getPipelineModeBadgeClass(mode: PipelineMode) {
-    if (mode === 'AUTO') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    if (mode === 'SEMI') return 'bg-amber-100 text-amber-800 border-amber-200'
-    return 'bg-slate-200 dark:bg-[#2a2a2a] text-slate-700 dark:text-gray-300 border-slate-300 dark:border-[#333]'
+    if (mode === 'AUTO') return 'border-slate-300 bg-white text-slate-700 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-gray-200'
+    if (mode === 'SEMI') return 'border-dashed border-slate-300 bg-white text-slate-600 dark:border-[#3a3a3a] dark:bg-[#1e1e1e] dark:text-gray-300'
+    return 'border-slate-200 bg-slate-50 text-slate-500 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-400'
 }
 
 function getPipelineModeLabel(mode: PipelineMode) {
@@ -591,8 +602,8 @@ function getPipelineModeLabel(mode: PipelineMode) {
 }
 
 function getPipelineRuntimeBadgeClass(status: PipelineRuntimeStatus) {
-    if (status === 'done') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
-    if (status === 'active') return 'bg-red-100 text-red-800 border-red-200'
+    if (status === 'done') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    if (status === 'active') return 'bg-blue-50 text-blue-700 border-blue-200'
     return 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-600 dark:text-gray-400 border-slate-200 dark:border-[#2a2a2a]'
 }
 
@@ -600,14 +611,6 @@ function getPipelineRuntimeLabel(status: PipelineRuntimeStatus) {
     if (status === 'done') return '완료'
     if (status === 'active') return '진행중'
     return '대기'
-}
-
-function getPipelinePhaseClass(tone: PipelinePhaseDefinition['tone']) {
-    if (tone === 'red') return 'border-[#ffd7cc] bg-[#fff7f3] text-brand-orange'
-    if (tone === 'amber') return 'border-amber-200 bg-amber-50 text-amber-800'
-    if (tone === 'sky') return 'border-sky-200 bg-sky-50 text-sky-800'
-    if (tone === 'emerald') return 'border-emerald-200 bg-emerald-50 text-emerald-800'
-    return 'border-slate-200 bg-slate-50 text-slate-700'
 }
 
 function getWormOrderStatusLabel(status: string) {
@@ -618,8 +621,8 @@ function getWormOrderStatusLabel(status: string) {
 }
 
 function getWormOrderStatusClass(status: string) {
-    if (status === 'COMPLETED') return 'bg-blue-100 text-blue-800 border-blue-200'
-    if (status === 'REMITTANCE_APPLIED') return 'bg-emerald-100 text-emerald-800 border-emerald-200'
+    if (status === 'COMPLETED') return 'bg-emerald-50 text-emerald-700 border-emerald-200'
+    if (status === 'REMITTANCE_APPLIED') return 'bg-blue-50 text-blue-700 border-blue-200'
     if (status === 'DRAFT') return 'bg-slate-100 text-slate-700 border-slate-200'
     return 'bg-amber-100 text-amber-800 border-amber-200'
 }
@@ -639,16 +642,12 @@ const WORM_TYPES: WormType[] = [
     {
         id: 'blue',
         label: '청갯지렁이',
-        cardActiveClass: 'bg-green-50',
-        cardActiveBorderClass: 'border-green-400',
-        cardTagClass: 'bg-green-500 text-white',
+        dotClass: 'bg-sky-500',
     },
     {
         id: 'red',
         label: '홍갯지렁이',
-        cardActiveClass: 'bg-red-50',
-        cardActiveBorderClass: 'border-red-400',
-        cardTagClass: 'bg-red-500 text-white',
+        dotClass: 'bg-rose-500',
     },
 ]
 
@@ -788,14 +787,6 @@ function getCalendarPriceBadgeClass(colorType: CalendarPriceColorType, selected 
     if (colorType === 'spike') return 'bg-rose-50 text-rose-700 border border-rose-200'
     if (colorType === 'pullback') return 'bg-amber-50 text-amber-700 border border-amber-200'
     return 'bg-slate-100 text-slate-700 border border-slate-200'
-}
-
-function getCalendarPriceTintClass(colorType: CalendarPriceColorType) {
-    if (colorType === 'stable') return 'ring-1 ring-emerald-100'
-    if (colorType === 'rise') return 'ring-1 ring-orange-100'
-    if (colorType === 'spike') return 'ring-1 ring-rose-100'
-    if (colorType === 'pullback') return 'ring-1 ring-amber-100'
-    return 'ring-1 ring-slate-200'
 }
 
 const HEAVY_RAIN_WEATHER_CODES = new Set<number>([65, 81, 82, 95, 96, 99])
@@ -4704,6 +4695,41 @@ export default function WormOrderPage() {
             return { ...phase, done, total: phase.stepIds.length, active }
         })
     }, [pipelineStatusMap])
+    // The step list scrolls inside a viewport-high panel; tell the user which steps are still below the fold.
+    const flowListRef = useRef<HTMLDivElement>(null)
+    const [flowListHiddenFrom, setFlowListHiddenFrom] = useState<number | null>(null)
+    const updateFlowListHint = useCallback(() => {
+        const list = flowListRef.current
+        if (!list || list.clientHeight === 0) {
+            setFlowListHiddenFrom(null)
+            return
+        }
+        const visibleBottom = list.scrollTop + list.clientHeight
+        let hiddenFrom: number | null = null
+        for (const row of Array.from(list.querySelectorAll<HTMLElement>('[data-step-id]'))) {
+            if (row.offsetTop + row.offsetHeight / 2 > visibleBottom) {
+                hiddenFrom = Number(row.dataset.stepId)
+                break
+            }
+        }
+        setFlowListHiddenFrom(hiddenFrom)
+    }, [])
+    useEffect(() => {
+        const list = flowListRef.current
+        if (!list) return
+        updateFlowListHint()
+        const observer = new ResizeObserver(updateFlowListHint)
+        observer.observe(list)
+        return () => observer.disconnect()
+    }, [updateFlowListHint])
+    const mobileStepChipsRef = useRef<HTMLDivElement>(null)
+    useEffect(() => {
+        // Keep the selected step chip in view horizontally without scrolling the page.
+        const strip = mobileStepChipsRef.current
+        const chip = strip?.querySelector<HTMLElement>(`[data-chip-id="${selectedPipelineStepId}"]`)
+        if (!strip || !chip || strip.clientWidth === 0) return
+        strip.scrollTo({ left: chip.offsetLeft - strip.clientWidth / 2 + chip.offsetWidth / 2, behavior: 'smooth' })
+    }, [selectedPipelineStepId])
     const handlePipelineStepAction = (step: PipelineStepDefinition) => {
         setSelectedPipelineStepId(step.id)
         setManualStepNotice('')
@@ -4877,96 +4903,96 @@ export default function WormOrderPage() {
     const showRemittanceTools = showAllSteps || selectedPipelineStepId === 3
     const showCustomsTools = showAllSteps || selectedPipelineStepId === 5
     const showCargoCustomsMailTools = showAllSteps || selectedPipelineStepId === 7
+    const isStepDone = (stepId: number) => pipelineStatusMap[stepId] === 'done'
     const workflowFlowPanel = (
-        <aside className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <div className="border-b border-slate-100 px-4 py-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <h2 className="text-[13px] font-bold text-slate-900">프로세스 리스트</h2>
-                        <p className="mt-1 text-xs font-bold text-slate-500">
-                            {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
-                        </p>
-                    </div>
-                    {activeStepDefinition && (
-                        <Button variant="secondary" size="sm" onClick={() => handlePipelineStepAction(activeStepDefinition)}>
-                            {activeStepDefinition.id}단계로 이동
-                        </Button>
-                    )}
-                </div>
-
-                <div className="mt-4 grid grid-cols-5 gap-1.5">
-                    {phaseProgressSummaries.map((phase) => (
-                        <div
-                            key={phase.id}
-                            className={`rounded-md border px-2 py-2 text-center ${getPipelinePhaseClass(phase.tone)} ${phase.active ? 'ring-2 ring-brand-orange/20' : ''}`}
-                        >
-                            <p className="truncate text-[11px] font-black">{phase.label}</p>
-                            <p className="mt-1 text-[11px] font-bold opacity-75">{phase.done}/{phase.total}</p>
-                        </div>
-                    ))}
-                </div>
-
+        <aside className="relative flex max-h-[calc(100vh-84px)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm lg:max-h-[calc(100vh-92px)]">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-100 px-4 py-3">
+                <h2 className="text-[13px] font-bold text-slate-900">프로세스 리스트</h2>
+                {activeStepDefinition && (
+                    <Button variant="secondary" size="sm" onClick={() => handlePipelineStepAction(activeStepDefinition)}>
+                        {activeStepDefinition.id}단계로 이동
+                    </Button>
+                )}
             </div>
 
-            <div className="min-h-0 flex-1 divide-y divide-slate-100 overflow-y-auto">
-                {PIPELINE_STEP_DEFINITIONS.map((step) => {
-                    const runtimeStatus = pipelineStatusMap[step.id]
-                    const isCurrent = step.id === selectedPipelineStepId
-                    const isNext = step.id === activeStepId
-                    return (
-                        <button
-                            key={`flow-table-${step.id}`}
-                            type="button"
-                            onClick={() => handlePipelineStepAction(step)}
-                            className={`grid w-full grid-cols-[34px_minmax(0,1fr)] items-start gap-3 px-4 py-3 text-left transition-colors ${
-                                isCurrent
-                                    ? 'bg-[#fff3ef]'
-                                    : runtimeStatus === 'done'
-                                        ? 'bg-emerald-50/50 hover:bg-emerald-50'
-                                        : 'hover:bg-slate-50'
+            <div ref={flowListRef} onScroll={updateFlowListHint} className="relative min-h-0 flex-1 overflow-y-auto pb-3">
+                {phaseProgressSummaries.map((phase, phaseIndex) => (
+                    <div key={phase.id}>
+                        <p
+                            className={`relative flex items-center justify-between gap-2 pb-1 pl-[58px] pr-4 pt-3 text-[11px] font-black text-slate-500 ${
+                                phaseIndex > 0
+                                    ? `before:absolute before:bottom-0 before:left-[29px] before:top-0 before:w-0.5 ${isStepDone(phase.stepIds[0] - 1) ? 'before:bg-emerald-400' : 'before:bg-slate-200'}`
+                                    : ''
                             }`}
-                            title={step.summary}
                         >
-                            <span className={`mt-0.5 inline-flex h-8 min-w-8 items-center justify-center rounded-full text-sm font-black ${
-                                runtimeStatus === 'done'
-                                    ? 'bg-emerald-500 text-white'
-                                    : isCurrent
-                                        ? 'bg-brand-orange text-white'
-                                        : 'bg-slate-200 text-slate-600'
-                            }`}>
-                                {step.id}
-                            </span>
-                            <span className="min-w-0">
-                                <span className={`block text-sm font-black leading-tight ${
-                                    isCurrent
-                                        ? 'text-brand-orange'
-                                        : runtimeStatus === 'done'
-                                            ? 'text-emerald-700'
-                                            : 'text-slate-800'
-                                }`}>
-                                    {step.title}
-                                </span>
-                                <span className="mt-1 block text-[11px] font-medium leading-snug text-slate-500">
-                                    {step.summary}
-                                </span>
-                                <span className="mt-2 flex flex-wrap items-center gap-1.5">
-                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[11px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
-                                        {getPipelineModeLabel(step.mode)}
+                            <span>{phase.label}</span>
+                            <span className="font-bold tabular-nums">{phase.done}/{phase.total}</span>
+                        </p>
+                        {PIPELINE_STEP_DEFINITIONS.filter((step) => phase.stepIds.includes(step.id)).map((step) => {
+                            const runtimeStatus = pipelineStatusMap[step.id]
+                            const isCurrent = step.id === selectedPipelineStepId
+                            const isNext = step.id === activeStepId
+                            const isFirst = step.id === PIPELINE_STEP_DEFINITIONS[0].id
+                            const isLast = step.id === PIPELINE_STEP_DEFINITIONS[PIPELINE_STEP_DEFINITIONS.length - 1].id
+                            return (
+                                <button
+                                    key={`flow-table-${step.id}`}
+                                    type="button"
+                                    data-step-id={step.id}
+                                    onClick={() => handlePipelineStepAction(step)}
+                                    aria-current={isCurrent ? 'step' : undefined}
+                                    className={`relative grid w-full grid-cols-[28px_minmax(0,1fr)] items-start gap-3 px-4 py-2 text-left transition-colors ${
+                                        isFirst ? '' : `before:absolute before:left-[29px] before:top-0 before:h-6 before:w-0.5 ${isStepDone(step.id - 1) ? 'before:bg-emerald-400' : 'before:bg-slate-200'}`
+                                    } ${
+                                        isLast ? '' : `after:absolute after:bottom-0 after:left-[29px] after:top-6 after:w-0.5 ${isStepDone(step.id) ? 'after:bg-emerald-400' : 'after:bg-slate-200'}`
+                                    } ${isCurrent ? 'bg-brand-orange-soft' : 'hover:bg-slate-50'}`}
+                                    title={step.summary}
+                                >
+                                    <span className={`relative z-[1] mt-0.5 inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-black tabular-nums ${
+                                        runtimeStatus === 'done'
+                                            ? 'bg-emerald-500 text-white'
+                                            : isCurrent
+                                                ? 'bg-brand-orange text-white'
+                                                : 'border border-slate-300 bg-white text-slate-600'
+                                    }`}>
+                                        {step.id}
                                     </span>
-                                    <span className={`inline-flex h-5 items-center rounded-full border px-2 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
-                                        {isNext && runtimeStatus !== 'done' ? '다음 단계' : getPipelineRuntimeLabel(runtimeStatus)}
+                                    <span className="min-w-0">
+                                        <span className="block break-keep text-[13px] font-black leading-snug text-slate-900">
+                                            {step.title}
+                                        </span>
+                                        <span className="mt-1 flex flex-wrap items-center gap-1">
+                                            <span className={`inline-flex h-5 items-center rounded-full border px-1.5 text-[11px] font-bold ${getPipelineModeBadgeClass(step.mode)}`}>
+                                                {getPipelineModeLabel(step.mode)}
+                                            </span>
+                                            <span className={`inline-flex h-5 items-center rounded-full border px-1.5 text-[11px] font-bold ${getPipelineRuntimeBadgeClass(runtimeStatus)}`}>
+                                                {isNext && runtimeStatus !== 'done' ? '다음 단계' : getPipelineRuntimeLabel(runtimeStatus)}
+                                            </span>
+                                        </span>
                                     </span>
-                                </span>
-                            </span>
-                        </button>
-                    )
-                })}
+                                </button>
+                            )
+                        })}
+                    </div>
+                ))}
             </div>
+            {flowListHiddenFrom !== null && (
+                <button
+                    type="button"
+                    onClick={() => flowListRef.current?.scrollBy({ top: flowListRef.current.clientHeight * 0.7, behavior: 'smooth' })}
+                    className="absolute inset-x-0 bottom-0 flex h-12 items-end justify-center gap-1 bg-gradient-to-t from-white via-white/90 to-transparent pb-2 text-[11px] font-bold text-slate-600 hover:text-slate-900"
+                >
+                    {flowListHiddenFrom < PIPELINE_STEP_DEFINITIONS.length
+                        ? `${flowListHiddenFrom}–${PIPELINE_STEP_DEFINITIONS.length}단계 더 보기`
+                        : `${flowListHiddenFrom}단계 더 보기`}
+                    <ChevronDown size={13} />
+                </button>
+            )}
         </aside>
     )
 
     return (
-        <div className="mx-auto flex min-w-0 max-w-[1840px] flex-col gap-4 px-3 pb-10 md:px-5 xl:px-7">
+        <div className="flex min-w-0 max-w-[1840px] flex-col gap-4">
             <PageHeader
                 title="지렁이 발주"
                 description="중국 → 한국 수입 전 과정을 단계별로 실행하고 추적합니다."
@@ -4983,7 +5009,7 @@ export default function WormOrderPage() {
                             <ChevronDown size={14} className="shrink-0 text-slate-500" />
                         </Button>
                         <Button
-                            variant="primary"
+                            variant="secondary"
                             onClick={handleStartNewOrder}
                             loading={creatingOrder}
                             icon={<Plus size={16} />}
@@ -5006,13 +5032,13 @@ export default function WormOrderPage() {
                     </p>
                 )}
                 <div className="mb-2 flex items-center gap-2 px-3 pt-1">
-                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-[#f5d5cc]">
+                    <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-100">
                         <div
-                            className="h-full bg-brand-orange rounded-full transition-all duration-500"
+                            className="h-full rounded-full bg-emerald-500 transition-all duration-500"
                             style={{ width: `${Math.round((doneStepCount / PIPELINE_STEP_DEFINITIONS.length) * 100)}%` }}
                         />
                     </div>
-                    <span className="shrink-0 text-xs font-bold text-slate-600">
+                    <span className="shrink-0 text-xs font-bold tabular-nums text-slate-600">
                         {doneStepCount}/{PIPELINE_STEP_DEFINITIONS.length} 단계 완료
                     </span>
                 </div>
@@ -5029,16 +5055,17 @@ export default function WormOrderPage() {
                     </div>
                     <div className="min-w-0 border-b border-slate-100 px-3 py-3 sm:border-b-0 sm:border-r">
                         <p className="text-[11px] font-bold text-slate-600">다음 액션</p>
-                        <p className="mt-1 line-clamp-1 text-lg font-black text-brand-orange">{nextActionText}</p>
+                        <p className="mt-1 line-clamp-1 text-lg font-black text-slate-950">{nextActionText}</p>
                         <p className="text-xs font-semibold text-slate-500">{activeStepDefinition?.summary || '완료 상태를 확인하세요.'}</p>
                     </div>
                     <div className="min-w-0 px-3 py-3">
                         <p className="text-[11px] font-bold text-slate-600">발주 수량</p>
-                        <p className="mt-1 text-lg font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')} boxes</p>
+                        <p className="mt-1 text-lg font-black tabular-nums text-slate-950">{totalBoxes.toLocaleString('ko-KR')} boxes</p>
                         <div className="mt-1 flex flex-wrap gap-1">
                             {wormTypeTotals.map((wormType) => (
-                                <span key={wormType.id} className={`inline-flex h-6 items-center rounded-full px-2 text-[11px] font-black ${wormType.cardTagClass}`}>
-                                    {wormType.label} {wormType.total}
+                                <span key={wormType.id} className="inline-flex h-6 items-center gap-1.5 rounded-full border border-slate-300 bg-white px-2 text-[11px] font-bold text-slate-700">
+                                    <span aria-hidden="true" className={`h-2 w-2 rounded-full ${wormType.dotClass}`} />
+                                    {wormType.label} <span className="tabular-nums">{wormType.total}</span>
                                 </span>
                             ))}
                         </div>
@@ -5047,16 +5074,16 @@ export default function WormOrderPage() {
             </section>
 
             <div className="grid min-w-0 gap-4 md:grid-cols-[240px_minmax(0,1fr)] xl:grid-cols-[280px_minmax(0,1fr)]">
-            <div className="sticky top-4 hidden self-start md:block">{workflowFlowPanel}</div>
+            <div className="sticky top-[68px] hidden self-start md:block lg:top-[76px]">{workflowFlowPanel}</div>
             {orderListOpen && (
             <>
             <button
                 type="button"
-                className="fixed inset-0 z-40 bg-slate-950/35"
+                className="fixed inset-0 z-50 bg-slate-950/35"
                 onClick={() => setOrderListOpen(false)}
                 aria-label="발주 리스트 닫기"
             />
-            <section className="fixed inset-y-0 right-0 z-50 w-full max-w-[900px] overflow-y-auto border-l border-slate-200 bg-white p-4 shadow-2xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] md:p-6">
+            <section role="dialog" aria-modal="true" aria-label="발주 리스트" className="fixed inset-y-0 right-0 z-[51] w-full max-w-[900px] overflow-y-auto border-l border-slate-200 bg-white p-4 shadow-2xl dark:border-[#2a2a2a] dark:bg-[#1e1e1e] md:p-6">
                 <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                     <div>
                         <h2 className="text-2xl font-black tracking-tight text-slate-950 dark:text-white">발주 리스트</h2>
@@ -5270,8 +5297,11 @@ export default function WormOrderPage() {
             )}
 
             <div className="flex min-w-0 flex-col gap-4 md:col-start-2 md:row-start-1">
-                <div className="min-w-0 overflow-x-auto pb-1 md:hidden">
-                    <div className="flex min-w-max gap-2">
+                <div
+                    ref={mobileStepChipsRef}
+                    className="relative min-w-0 overflow-x-auto pb-1 [mask-image:linear-gradient(to_right,#000_88%,transparent)] md:hidden"
+                >
+                    <div className="flex min-w-max gap-2 pr-8">
                         {PIPELINE_STEP_DEFINITIONS.map((step) => {
                             const runtimeStatus = pipelineStatusMap[step.id]
                             const selected = step.id === selectedPipelineStepId
@@ -5280,7 +5310,9 @@ export default function WormOrderPage() {
                                     key={`mobile-step-${step.id}`}
                                     type="button"
                                     onClick={() => handlePipelineStepAction(step)}
-                                    className={`inline-flex h-9 items-center justify-center gap-1 whitespace-nowrap rounded-xl border px-3 text-xs font-bold ${
+                                    data-chip-id={step.id}
+                                    aria-current={selected ? 'step' : undefined}
+                                    className={`inline-flex h-9 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-xs font-bold ${
                                         selected
                                             ? 'border-brand-orange bg-brand-orange text-white'
                                             : runtimeStatus === 'done'
@@ -5289,23 +5321,18 @@ export default function WormOrderPage() {
                                     }`}
                                     aria-label={`${step.id}단계 ${step.title}`}
                                 >
-                                    <span>{step.id}</span>
-                                    <span>{step.title.slice(0, 2)}</span>
+                                    <span className="tabular-nums">{step.id}</span>
+                                    <span>{step.shortLabel}</span>
                                 </button>
                             )
                         })}
                     </div>
                 </div>
 
-                <div className="sticky top-[68px] z-30 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur lg:top-3">
-                    <span className="text-sm font-bold">{activeOrderNumberText} · {selectedStepDefinition.id}/10 {selectedStepDefinition.title}</span>
-                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={showAllSteps} onChange={event => setShowAllSteps(event.target.checked)} className="h-5 w-5" />전체 단계 작업 보기</label>
-                    {!activeWormOrderRecord && <p className="w-full text-xs text-amber-800">기존 발주를 선택하거나 새 발주를 만든 뒤 진행하세요. 현재는 작성 도구를 미리 보고 있습니다.</p>}
-                </div>
-                <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
+                <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
-                            <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-brand-orange text-sm font-black text-white">
+                            <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-brand-orange text-sm font-black tabular-nums text-white">
                                 {selectedStepDefinition.id}
                             </span>
                             <div className="min-w-0">
@@ -5321,16 +5348,27 @@ export default function WormOrderPage() {
                                 <p className="mt-1 text-sm font-medium text-slate-600">{selectedStepDefinition.summary}</p>
                             </div>
                         </div>
-                        <span className="shrink-0 text-xs font-bold text-slate-500">담당 · {selectedStepDefinition.owner}</span>
+                        <div className="flex shrink-0 flex-col items-start gap-1 sm:items-end">
+                            <span className="text-xs font-bold text-slate-500">담당 · {selectedStepDefinition.owner}</span>
+                            <label className="flex min-h-9 cursor-pointer items-center gap-2 text-xs font-bold text-slate-600">
+                                <input type="checkbox" checked={showAllSteps} onChange={event => setShowAllSteps(event.target.checked)} className="h-4 w-4 accent-brand-orange" />
+                                전체 단계 작업 보기
+                            </label>
+                        </div>
                     </div>
                     <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
                         {selectedStepDefinition.details.map((detail) => (
                             <span key={detail} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                <span className="h-1.5 w-1.5 rounded-full bg-brand-orange" />
+                                <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
                                 {detail}
                             </span>
                         ))}
                     </div>
+                    {!activeWormOrderRecord && (
+                        <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800">
+                            기존 발주를 선택하거나 새 발주를 만든 뒤 진행하세요. 현재는 작성 도구를 미리 보고 있습니다.
+                        </p>
+                    )}
                     {manualStepNotice && (
                         <p className="mt-3 text-xs font-semibold text-slate-600">{manualStepNotice}</p>
                     )}
@@ -5341,11 +5379,11 @@ export default function WormOrderPage() {
                         key={`manual-step-${step.id}`}
                         id={`worm-pipeline-step-${step.id}`}
                         style={{ order: step.id * 10 }}
-                        className="scroll-mt-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
+                        className="scroll-mt-[68px] lg:scroll-mt-[76px] rounded-2xl border border-slate-200 bg-white p-5 shadow-sm"
                     >
                         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex min-w-0 items-start gap-3">
-                                <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-slate-900 text-sm font-black text-white">
+                                <span className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-900 text-sm font-black tabular-nums text-white">
                                     {step.id}
                                 </span>
                                 <div>
@@ -5363,11 +5401,7 @@ export default function WormOrderPage() {
                                 type="button"
                                 onClick={() => void handleManualStepToggle(step.id, pipelineStatusMap[step.id] !== 'done')}
                                 disabled={manualStepSaving || !activeWormOrderRecord}
-                                className={`inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-lg px-4 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-50 ${
-                                    pipelineStatusMap[step.id] === 'done'
-                                        ? 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                                        : 'bg-brand-orange text-white hover:bg-brand-orange-hover'
-                                }`}
+                                className={buttonClass(pipelineStatusMap[step.id] === 'done' ? 'secondary' : 'primary', 'md')}
                             >
                                 {manualStepSaving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
                                 {pipelineStatusMap[step.id] === 'done' ? '완료 취소' : '완료로 표시'}
@@ -5376,7 +5410,7 @@ export default function WormOrderPage() {
                         <div className="mt-4 flex flex-wrap gap-x-5 gap-y-2 border-t border-slate-100 pt-3">
                             {step.details.map((detail) => (
                                 <span key={detail} className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-brand-orange" />
+                                    <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
                                     {detail}
                                 </span>
                             ))}
@@ -5388,19 +5422,16 @@ export default function WormOrderPage() {
                     ref={orderSectionRef}
                     id="worm-pipeline-step-1"
                     style={{ order: 10 }}
-                    className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
+                    className="scroll-mt-[68px] lg:scroll-mt-[76px] rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none"
                 >
-                    <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#fff7f3] dark:bg-[#1a1a1a] flex items-center justify-between">
-                        <div>
-                            <h2 className="text-lg font-black text-[#1f2937] dark:text-white">발주서 작성</h2>
-                            <p className="text-xs text-slate-500 dark:text-gray-400 mt-0.5">사이즈별 수량을 입력하고 발주 메시지를 생성합니다.</p>
-                        </div>
-                        <Sparkles size={18} className="text-brand-orange" />
+                    <div className="border-b border-slate-100 px-4 py-4 dark:border-[#2a2a2a] md:px-6">
+                        <h2 className="text-lg font-black text-slate-900 dark:text-white">발주서 작성</h2>
+                        <p className="mt-0.5 text-xs text-slate-500 dark:text-gray-400">사이즈별 수량을 입력하고 발주 메시지를 생성합니다.</p>
                     </div>
 
-                    <div className="p-4 md:p-6 space-y-6">
-                        <section className="rounded-xl border border-slate-200 dark:border-[#2a2a2a] bg-slate-50/60 dark:bg-[#1a1a1a]/60 p-4 md:p-5">
-                            <p className="text-[13px] font-bold text-slate-800 dark:text-gray-300">납품 예정일</p>
+                    <div className="space-y-6 p-4 md:p-6">
+                        <section>
+                            <h3 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">납품 예정일</h3>
 
                             <div className="mt-3 flex items-center justify-between">
                                 <button
@@ -5462,10 +5493,6 @@ export default function WormOrderPage() {
                                         dayCell.date.getDate(),
                                     )
                                     const isPast = dayStart.getTime() < todayDate.getTime()
-                                    const monthPriceTintClass =
-                                        !isSelected && dayCell.isCurrentMonth
-                                            ? getCalendarPriceTintClass(dayCell.colorType)
-                                            : ''
                                     const monthPriceTooltip = `${dayCell.date.getMonth() + 1}월 ${dayCell.priceStatus}: ${dayCell.memo}`
                                     const dayWeather = calendarWeatherByDate[ymd]
                                     const shanghaiWeather = dayWeather?.shanghai || null
@@ -5532,17 +5559,17 @@ export default function WormOrderPage() {
                                             }}
                                             disabled={isPast}
                                             title={cellTooltip}
-                                            className={`min-h-[74px] rounded-lg px-1.5 py-1 text-left transition-colors ${
+                                            className={`min-h-[74px] min-w-0 overflow-hidden rounded-lg px-1 py-1 text-left transition-colors sm:px-1.5 ${
                                                 isSelected
                                                     ? 'bg-brand-orange text-white'
                                                     : dayCell.isCurrentMonth
                                                         ? `${cellBgClass || 'bg-white dark:bg-[#1e1e1e] border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-100 dark:hover:bg-[#252525]'} text-slate-700 border`
                                                         : 'bg-slate-100 dark:bg-[#1a1a1a] text-slate-400 border border-slate-200 dark:border-[#2a2a2a] hover:bg-slate-200 dark:hover:bg-[#252525]'
-                                            } ${monthPriceTintClass} ${hasOrderOnDate ? 'border-2 border-brand-orange shadow-[inset_0_0_0_1px_rgba(227,66,25,0.18)]' : ''} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
+                                            } ${hasOrderOnDate ? 'border-2 border-brand-orange shadow-[inset_0_0_0_1px_rgba(227,66,25,0.18)]' : ''} ${isPast ? 'opacity-35 cursor-not-allowed' : ''}`}
                                         >
-                                            <div className="flex h-full flex-col">
-                                                <div className="flex items-center gap-1">
-                                                    <span className={`text-[11px] font-black inline-flex items-center justify-center ${
+                                            <div className="flex h-full min-w-0 flex-col">
+                                                <div className="flex min-w-0 flex-wrap items-center gap-0.5 sm:gap-1">
+                                                    <span className={`inline-flex shrink-0 items-center justify-center text-[11px] font-black tabular-nums ${
                                                         isGoodDeliveryDay && !isSelected
                                                             ? 'h-[18px] w-[18px] rounded-full border-[1.5px] border-emerald-500 text-emerald-700 dark:text-emerald-400'
                                                             : isSelected
@@ -5551,9 +5578,15 @@ export default function WormOrderPage() {
                                                     }`}>
                                                         {dayCell.date.getDate()}
                                                     </span>
+                                                    {isPublicHoliday && (
+                                                        <span aria-hidden="true" className="inline-flex gap-0.5 sm:hidden">
+                                                            {koreanHolidayName && <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white' : 'bg-red-500'}`} />}
+                                                            {chineseHolidayName && <span className={`h-1.5 w-1.5 rounded-full ${isSelected ? 'bg-white/70' : 'bg-rose-400'}`} />}
+                                                        </span>
+                                                    )}
                                                     {koreanHolidayName && (
                                                         <span
-                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
+                                                            className={`hidden max-w-full truncate rounded px-1 py-[1px] text-[9px] font-black leading-none sm:inline-block ${
                                                                 isSelected
                                                                     ? 'bg-white/20 text-white border border-white/30'
                                                                     : 'bg-red-100 text-red-700 border border-red-200 dark:bg-red-900/40 dark:text-red-300 dark:border-red-800'
@@ -5565,7 +5598,7 @@ export default function WormOrderPage() {
                                                     )}
                                                     {chineseHolidayName && (
                                                         <span
-                                                            className={`inline-flex items-center rounded px-1 py-[1px] text-[9px] font-black leading-none whitespace-nowrap ${
+                                                            className={`hidden max-w-full truncate rounded px-1 py-[1px] text-[9px] font-black leading-none sm:inline-block ${
                                                                 isSelected
                                                                     ? 'bg-white/20 text-white border border-white/30'
                                                                     : 'bg-rose-100 text-rose-700 border border-rose-200 dark:bg-rose-900/40 dark:text-rose-300 dark:border-rose-800'
@@ -5594,19 +5627,19 @@ export default function WormOrderPage() {
                                                         const busanTitle = busanGangseoWeather ? `부산 ${formatCalendarWeatherText(busanGangseoWeather)}` : '부산 -'
                                                         return (
                                                             <>
-                                                                <p className="flex items-center gap-1 truncate" title={shanghaiTitle}>
-                                                                    <span>상해</span>
+                                                                <p className="flex min-w-0 items-center gap-1" title={shanghaiTitle}>
+                                                                    <span className="hidden shrink-0 sm:inline">상해</span>
                                                                     {shanghaiIcon ? (
-                                                                        <shanghaiIcon.Icon size={11} strokeWidth={2.2} className={isSelected ? 'text-white/95 shrink-0' : `${shanghaiIcon.colorClass} shrink-0`} />
+                                                                        <shanghaiIcon.Icon size={11} strokeWidth={2.2} aria-label={shanghaiTitle} className={isSelected ? 'text-white/95 shrink-0' : `${shanghaiIcon.colorClass} shrink-0`} />
                                                                     ) : null}
-                                                                    <span className="truncate">{formatCalendarWeatherTempText(shanghaiWeather)}</span>
+                                                                    <span className="hidden min-w-0 truncate tabular-nums sm:inline">{formatCalendarWeatherTempText(shanghaiWeather)}</span>
                                                                 </p>
-                                                                <p className="flex items-center gap-1 truncate" title={busanTitle}>
-                                                                    <span>부산</span>
+                                                                <p className="flex min-w-0 items-center gap-1" title={busanTitle}>
+                                                                    <span className="hidden shrink-0 sm:inline">부산</span>
                                                                     {busanIcon ? (
-                                                                        <busanIcon.Icon size={11} strokeWidth={2.2} className={isSelected ? 'text-white/95 shrink-0' : `${busanIcon.colorClass} shrink-0`} />
+                                                                        <busanIcon.Icon size={11} strokeWidth={2.2} aria-label={busanTitle} className={isSelected ? 'text-white/95 shrink-0' : `${busanIcon.colorClass} shrink-0`} />
                                                                     ) : null}
-                                                                    <span className="truncate">{formatCalendarWeatherTempText(busanGangseoWeather)}</span>
+                                                                    <span className="hidden min-w-0 truncate tabular-nums sm:inline">{formatCalendarWeatherTempText(busanGangseoWeather)}</span>
                                                                 </p>
                                                             </>
                                                         )
@@ -5618,148 +5651,105 @@ export default function WormOrderPage() {
                                 })}
                             </div>
 
-                            <div className="mt-3 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-xs font-semibold text-slate-600 dark:text-gray-400">
-                                선택된 납품 예정일: {receiveDate || '-'}
-                            </div>
-                            {selectedDatePriceInfo && (
-                                <div className="mt-2 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                        <p className="text-[11px] font-black text-slate-700 dark:text-gray-300">월별 가격 추이</p>
+                            <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs font-semibold text-slate-600 dark:text-gray-400">
+                                <span>선택된 납품 예정일 <strong className="font-black tabular-nums text-slate-900 dark:text-white">{receiveDate || '-'}</strong></span>
+                                {selectedDatePriceInfo && (
+                                    <span className="inline-flex min-w-0 items-center gap-1.5">
+                                        월별 가격
                                         <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-black ${getCalendarPriceBadgeClass(selectedDatePriceInfo.colorType)}`}>
                                             {selectedDatePriceInfo.priceStatus}
                                         </span>
-                                    </div>
-                                    <p className="mt-1 text-[11px] font-semibold text-slate-600 dark:text-gray-400">
-                                        {selectedDatePriceInfo.memo}
-                                    </p>
-                                </div>
-                            )}
-                            <div className="mt-2 rounded-lg border border-slate-200 dark:border-[#2a2a2a] bg-white dark:bg-[#1e1e1e] px-3 py-2 text-[11px] font-semibold text-slate-600 dark:text-gray-400">
-                                {calendarWeatherLoading ? '날씨 정보를 최신으로 갱신 중...' : '날씨 정보는 접속 시마다 최신으로 갱신됩니다.'}
+                                        <span className="min-w-0 text-[11px] text-slate-500 dark:text-gray-400">{selectedDatePriceInfo.memo}</span>
+                                    </span>
+                                )}
                             </div>
+                            <p className="mt-1.5 text-[11px] text-slate-400">
+                                <span className="sm:hidden">날씨 아이콘은 위가 상해, 아래가 부산입니다. 점은 공휴일(빨강 한국 · 분홍 중국)입니다. </span>
+                                {calendarWeatherLoading ? '날씨 정보를 최신으로 갱신 중...' : '날씨 정보는 접속 시마다 최신으로 갱신됩니다.'}
+                            </p>
                             {calendarWeatherError && (
                                 <p className="mt-2 text-[11px] font-semibold text-red-600">{calendarWeatherError}</p>
                             )}
                         </section>
 
-                        <div className="space-y-5">
-                            <div className="grid gap-3 md:grid-cols-3">
-                                <div className="rounded-2xl border border-[#ffd7cc] bg-[#fff7f3] px-4 py-3">
-                                    <p className="text-[11px] font-bold text-brand-orange">총 발주</p>
-                                    <p className="mt-1 text-2xl font-black text-slate-950">{totalBoxes.toLocaleString('ko-KR')}</p>
-                                    <p className="text-xs font-semibold text-slate-500">boxes</p>
-                                </div>
-                                {wormTypeTotals.map((wormType) => (
-                                    <div
-                                        key={`worm-total-${wormType.id}`}
-                                        className={`rounded-2xl border px-4 py-3 ${
-                                            wormType.id === 'blue'
-                                                ? 'border-emerald-200 bg-emerald-50'
-                                                : 'border-red-200 bg-red-50'
-                                        }`}
-                                    >
-                                        <p className={`text-[11px] font-bold ${
-                                            wormType.id === 'blue' ? 'text-emerald-700' : 'text-red-700'
-                                        }`}>
-                                            {wormType.label}
-                                        </p>
-                                        <p className="mt-1 text-2xl font-black text-slate-950">{wormType.total.toLocaleString('ko-KR')}</p>
-                                        <p className="text-xs font-semibold text-slate-500">boxes</p>
-                                    </div>
-                                ))}
-                            </div>
-
-                            <div className="grid grid-cols-1 2xl:grid-cols-2 gap-5">
-                                {WORM_TYPES.map((wormType) => (
-                                    <section
-                                        key={wormType.id}
-                                        className={`space-y-3 rounded-2xl border p-4 ${
-                                            wormType.id === 'blue'
-                                                ? 'border-emerald-200 bg-emerald-50/40'
-                                                : 'border-red-200 bg-red-50/40'
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <span className={`inline-flex h-7 items-center rounded-full px-3 text-sm font-black ${wormType.cardTagClass}`}>
-                                                {wormType.label}
-                                            </span>
-                                            <span className="text-sm font-black text-slate-700">
-                                                {wormTypeTotals.find((item) => item.id === wormType.id)?.total.toLocaleString('ko-KR') || 0} boxes
-                                            </span>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4 2xl:grid-cols-2">
-                                            {WORM_SIZES.map((size) => {
-                                                const current = quantitiesByType[wormType.id]?.[size.id] || 0
-                                                const inputValue = current > 0 ? String(current) : ''
-                                                const isSelected = current > 0
-
-                                                return (
-                                                    <div
-                                                        key={`${wormType.id}-${size.id}`}
-                                                        className={`flex flex-col gap-2.5 justify-between border rounded-xl p-3.5 transition-all duration-200 ${
-                                                            isSelected
-                                                                ? `${wormType.cardActiveBorderClass} ${wormType.cardActiveClass} shadow-sm dark:shadow-none`
-                                                                : 'border-gray-200 bg-white hover:border-gray-300'
-                                                        }`}
-                                                    >
-                                                        <div className="flex flex-col items-start gap-0.5 px-0.5">
-                                                            <div className="text-[16px] font-black text-[#111827] leading-none">{size.id}</div>
-                                                            <div className="text-[11px] tracking-tight text-gray-500 font-medium leading-none">{size.range}</div>
-                                                        </div>
-
-                                                        <div className="grid grid-cols-[36px_minmax(44px,1fr)_36px] items-center rounded-lg border border-gray-300 overflow-hidden w-full transition-colors bg-white">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
-                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
-                                                                aria-label={`${wormType.label} ${size.id} decrease`}
-                                                            >
-                                                                <Minus size={15} />
-                                                            </button>
-                                                            <input
-                                                                type="number"
-                                                                min={0}
-                                                                value={inputValue}
-                                                                onChange={(event) => {
-                                                                    const rawValue = event.target.value.trim()
-                                                                    if (!rawValue) {
-                                                                        handleQuantityChange(wormType.id, size.id, 0)
-                                                                        return
-                                                                    }
-                                                                    const next = Number(rawValue)
-                                                                    handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
-                                                                }}
-                                                                className="h-[36px] min-w-[44px] px-1 text-center font-black tabular-nums text-[#111827] outline-none text-[15px]"
-                                                            />
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
-                                                                className="h-[36px] flex items-center justify-center text-gray-600 hover:bg-gray-50"
-                                                                aria-label={`${wormType.label} ${size.id} increase`}
-                                                            >
-                                                                <Plus size={15} />
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                )
-                                            })}
-                                        </div>
-                                    </section>
-                                ))}
+                        <div className="space-y-3">
+                            <h3 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">사이즈별 수량 (boxes)</h3>
+                            <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
+                                <table className="w-full min-w-[300px] text-sm">
+                                    <thead className="ux-thead">
+                                        <tr>
+                                            <th className="text-left">사이즈</th>
+                                            {wormTypeTotals.map((wormType) => (
+                                                <th key={`head-${wormType.id}`} className="w-[38%] text-center sm:w-[180px]">
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                        <span aria-hidden="true" className={`h-2 w-2 rounded-full ${wormType.dotClass}`} />
+                                                        {wormType.label}
+                                                        <span className="tabular-nums text-slate-400">{wormType.total}</span>
+                                                    </span>
+                                                </th>
+                                            ))}
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
+                                        {WORM_SIZES.map((size) => (
+                                            <tr key={size.id}>
+                                                <td className="px-3 py-2">
+                                                    <div className="text-[15px] font-black leading-none text-slate-900 dark:text-white">{size.id}</div>
+                                                    <div className="mt-1 text-[11px] font-medium leading-none text-slate-500">{size.range}</div>
+                                                </td>
+                                                {WORM_TYPES.map((wormType) => {
+                                                    const current = quantitiesByType[wormType.id]?.[size.id] || 0
+                                                    const inputValue = current > 0 ? String(current) : ''
+                                                    return (
+                                                        <td key={`${wormType.id}-${size.id}`} className="px-2 py-2">
+                                                            <div className={`mx-auto grid w-full max-w-[160px] grid-cols-[32px_minmax(0,1fr)_32px] items-center overflow-hidden rounded-lg border bg-white transition-colors dark:bg-[#1e1e1e] ${current > 0 ? 'border-slate-500' : 'border-slate-200 dark:border-[#2a2a2a]'}`}>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleQuantityChange(wormType.id, size.id, current - 1)}
+                                                                    className="flex h-9 items-center justify-center text-slate-500 hover:bg-slate-50"
+                                                                    aria-label={`${wormType.label} ${size.id} 1 줄이기`}
+                                                                >
+                                                                    <Minus size={15} />
+                                                                </button>
+                                                                <input
+                                                                    type="number"
+                                                                    min={0}
+                                                                    inputMode="numeric"
+                                                                    placeholder="0"
+                                                                    aria-label={`${wormType.label} ${size.id} 수량`}
+                                                                    value={inputValue}
+                                                                    onChange={(event) => {
+                                                                        const rawValue = event.target.value.trim()
+                                                                        if (!rawValue) {
+                                                                            handleQuantityChange(wormType.id, size.id, 0)
+                                                                            return
+                                                                        }
+                                                                        const next = Number(rawValue)
+                                                                        handleQuantityChange(wormType.id, size.id, Number.isFinite(next) ? next : 0)
+                                                                    }}
+                                                                    className="h-9 w-full min-w-0 border-x border-slate-100 bg-transparent px-1 text-center text-[15px] font-black tabular-nums text-slate-900 outline-none placeholder:text-slate-300 dark:border-[#2a2a2a] dark:text-white"
+                                                                />
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={() => handleQuantityChange(wormType.id, size.id, current + 1)}
+                                                                    className="flex h-9 items-center justify-center text-slate-500 hover:bg-slate-50"
+                                                                    aria-label={`${wormType.label} ${size.id} 1 늘리기`}
+                                                                >
+                                                                    <Plus size={15} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    )
+                                                })}
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
                             </div>
 
                             {validationError && (
-                                <p className="text-sm font-semibold text-brand-orange">{validationError}</p>
+                                <p role="alert" className="text-sm font-semibold text-red-600">{validationError}</p>
                             )}
-
-                            <button
-                                type="button"
-                                onClick={handleGenerate}
-                                className={buttonClass('primary', 'md', 'w-full px-6 md:w-auto md:min-w-[220px]')}
-                            >
-                                발주 메시지 생성
-                            </button>
                         </div>
 
                         {generatedMessage && (
@@ -5780,12 +5770,28 @@ export default function WormOrderPage() {
                             </div>
                         )}
                     </div>
+
+                    <div className="sticky bottom-0 z-10 flex items-center justify-between gap-3 rounded-b-2xl border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur dark:border-[#2a2a2a] dark:bg-[#1e1e1e]/95 md:px-6">
+                        <p className="min-w-0 text-sm font-bold text-slate-600 dark:text-gray-300">
+                            총 <span className="text-lg font-black tabular-nums text-slate-950 dark:text-white">{totalBoxes.toLocaleString('ko-KR')}</span> boxes
+                            <span className="ml-2 hidden text-xs font-semibold text-slate-500 sm:inline">
+                                {wormTypeTotals.map((wormType) => `${wormType.label} ${wormType.total}`).join(' · ')}
+                            </span>
+                        </p>
+                        <button
+                            type="button"
+                            onClick={handleGenerate}
+                            className={buttonClass('primary', 'md', 'px-5')}
+                        >
+                            발주 메시지 생성
+                        </button>
+                    </div>
                 </div>
             )}
 
             {/* ── 최근 메일 조회 (INBOX) ── */}
             {showInboxTools && (
-                <div ref={inboxSectionRef} id="worm-pipeline-step-2" style={{ order: 20 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
+                <div ref={inboxSectionRef} id="worm-pipeline-step-2" style={{ order: 20 }} className="scroll-mt-[68px] lg:scroll-mt-[76px] bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
                 
                 {/* 상단 프로그레스 게이지 바 */}
                 {fetchProgress > 0 && (
@@ -6077,7 +6083,7 @@ export default function WormOrderPage() {
 
             {/* ── AWB Documents 메일 조회 ── */}
             {showDocInboxTools && (
-                <div ref={docInboxSectionRef} id="worm-pipeline-step-4" style={{ order: 40 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
+                <div ref={docInboxSectionRef} id="worm-pipeline-step-4" style={{ order: 40 }} className="scroll-mt-[68px] lg:scroll-mt-[76px] bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden relative">
 
                 {docFetchProgress > 0 && (
                     <div className="absolute top-0 left-0 w-full h-[4px] bg-slate-100 z-10 overflow-hidden">
@@ -6444,7 +6450,7 @@ export default function WormOrderPage() {
             )}
 
             {showRemittanceTools && (
-                <div ref={remittanceSectionRef} id="worm-pipeline-step-3" style={{ order: 30 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
+                <div ref={remittanceSectionRef} id="worm-pipeline-step-3" style={{ order: 30 }} className="scroll-mt-[68px] lg:scroll-mt-[76px] bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-6 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-lg font-black text-[#111827]">모인 자동 송금 신청</h3>
@@ -6700,7 +6706,7 @@ export default function WormOrderPage() {
                 </div>
             )}
             {showCustomsTools && (
-                <div ref={customsProgressSectionRef} id="worm-pipeline-step-5" style={{ order: 50 }} className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
+                <div ref={customsProgressSectionRef} id="worm-pipeline-step-5" style={{ order: 50 }} className="scroll-mt-[68px] lg:scroll-mt-[76px] bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-4 space-y-4 md:p-6">
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h3 className="text-base font-black text-[#111827] md:text-lg">유니패스 수입 통관 조회</h3>
@@ -6905,7 +6911,7 @@ export default function WormOrderPage() {
                     ref={cargoCustomsMailSectionRef}
                     id="worm-pipeline-step-7"
                     style={{ order: 70 }}
-                    className="scroll-mt-4 bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
+                    className="scroll-mt-[68px] lg:scroll-mt-[76px] bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-200 dark:border-[#2a2a2a] shadow-sm dark:shadow-none overflow-hidden"
                 >
                     <div className="px-6 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-[#f0f9ff] dark:bg-[#1a1a1a] flex items-center justify-between">
                         <div>

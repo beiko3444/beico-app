@@ -20,6 +20,8 @@ import {
 import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
+import Modal from '@/components/Modal'
 
 export type Purchase1688Item = {
   id: string
@@ -63,14 +65,14 @@ const blankItem = (): Purchase1688Item => ({
 
 const money = (value: number, digits = 2) => value.toLocaleString('ko-KR', { maximumFractionDigits: digits })
 
-const inputClass = 'min-h-11 w-full rounded-xl border border-slate-200 px-3 text-sm text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
+const inputClass = 'min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition focus:border-brand-orange'
 
-function statusStyle(status: string) {
-  if (status === '완료') return 'bg-emerald-50 text-emerald-700 ring-emerald-200'
-  if (status === '취소') return 'bg-rose-50 text-rose-700 ring-rose-200'
-  if (status === '배송중') return 'bg-blue-50 text-blue-700 ring-blue-200'
-  if (status === '결제완료') return 'bg-amber-50 text-amber-700 ring-amber-200'
-  return 'bg-slate-100 text-slate-700 ring-slate-200'
+function statusTone(status: string): BadgeTone {
+  if (status === '완료') return 'success'
+  if (status === '취소') return 'danger'
+  if (status === '배송중') return 'info'
+  if (status === '확인필요') return 'warning'
+  return 'neutral'
 }
 
 export default function Purchase1688Client({ initialItems, initialRate, loadError }: { initialItems: Purchase1688Item[]; initialRate: number; loadError: string }) {
@@ -175,7 +177,7 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
   }
 
   return (
-    <div className="mx-auto w-full min-w-0 max-w-[1180px] space-y-3">
+    <div className="w-full min-w-0 max-w-[1180px] space-y-3">
       <PageHeader
         title="1688 구매내역"
         count={`${money(groups.length, 0)}건`}
@@ -189,52 +191,79 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
       />
 
       <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-        <div className="flex flex-col gap-2 md:flex-row">
-          <label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="주문번호, 상품명, 판매자, 운송장 검색" className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-[#ef5b2a] focus:bg-white focus:ring-2 focus:ring-orange-100" /></label>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#ef5b2a]">{['전체', ...statuses].map((value) => <option key={value}>{value}</option>)}</select>
-          <label title="환율 변경은 입력칸을 벗어나면 저장되며 전체 목록의 원화 예상액에 적용됩니다." className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-500">¥1 ≈ <input aria-label="위안 환율" type="number" value={rate} onChange={(event) => setRate(Number(event.target.value))} onBlur={(event) => saveRate(Number(event.target.value))} className="w-16 bg-transparent text-right text-sm font-black text-slate-900 outline-none" />원</label>
+        <div className="grid grid-cols-[minmax(0,1fr)_auto] gap-2 md:flex md:items-center">
+          <label className="relative col-span-2 min-w-0 md:flex-1">
+            <span className="sr-only">구매내역 검색</span>
+            <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
+            <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="주문번호, 상품명, 판매자, 운송장 검색" className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-900 transition focus:border-brand-orange focus:bg-white" />
+          </label>
+          <label className="min-w-0">
+            <span className="sr-only">상태</span>
+            <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 focus:border-brand-orange md:w-auto">{['전체', ...statuses].map((value) => <option key={value}>{value}</option>)}</select>
+          </label>
+          <label title="환율 변경은 입력칸을 벗어나면 저장되며 전체 목록의 원화 예상액에 적용됩니다." className="flex min-h-11 items-center gap-1.5 whitespace-nowrap text-xs font-bold text-slate-500 md:ml-auto md:border-l md:border-slate-200 md:pl-3">
+            환율 ¥1 =
+            <input aria-label="위안 환율" type="number" value={rate} onChange={(event) => setRate(Number(event.target.value))} onBlur={(event) => saveRate(Number(event.target.value))} className="h-9 w-20 rounded-lg border border-slate-200 bg-white px-2 text-right text-sm font-bold tabular-nums text-slate-900 focus:border-brand-orange" />
+            원
+          </label>
         </div>
-        {message && <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{message}</div>}
+        {message && <div role="status" className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{message}</div>}
       </section>
 
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
+      <div className="rounded-2xl border border-slate-200 bg-white">
+        {groups.length ? (
+          <div aria-hidden="true" className="sticky top-14 z-10 hidden grid-cols-[64px_minmax(0,1fr)_56px_72px_104px_112px_40px] items-center gap-3 rounded-t-2xl border-b border-slate-200 bg-slate-50 px-4 py-2 text-[11px] font-bold text-slate-500 md:grid lg:top-[60px]">
+            <span />
+            <span>상품 · 판매자 · 주문번호</span>
+            <span className="text-right">품목</span>
+            <span className="text-right">총수량</span>
+            <span className="text-right">주문결제액</span>
+            <span className="text-right">한화 예상</span>
+            <span />
+          </div>
+        ) : null}
         {pagedGroups.map((group) => {
           const isOpen = expanded.has(group.orderNo)
           const quantity = group.items.reduce((sum, item) => sum + item.quantity, 0)
           const lead = group.items[0]
           const isCancelled = group.status === '취소'
+          const strike = isCancelled ? 'line-through decoration-2 text-slate-500' : 'text-slate-900'
           return (
-            <article key={group.orderNo} className={`border-b border-[#eadfd5] transition-opacity last:border-b-0 ${isCancelled ? 'bg-slate-50/70' : ''}`}>
-              <div className="relative p-4 sm:p-5">
-                <button type="button" onClick={() => toggle(group.orderNo)} aria-label={isOpen ? '주문 접기' : '주문 펼치기'} className={buttonClass('ghost', 'sm', 'absolute right-2 top-3 h-10 w-10 rounded-full px-0')}>{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
-                <div className="grid min-w-0 grid-cols-[94px_minmax(0,1fr)] gap-4 pr-8">
-                  <LeadImage item={lead} />
-                  <button onClick={() => toggle(group.orderNo)} className="min-w-0 text-left">
-                    <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(group.status)}`}>{group.status}</span><span className="text-xs font-bold text-[#9a897a]">{group.orderedOn}</span></div>
-                    <p className="mt-2 line-clamp-2 text-base font-bold text-[#211c18] sm:text-lg">{lead.productKo || lead.productCn}</p>
-                    <p className="mt-1 truncate text-xs text-[#796b60]">{lead.productCn}</p>
-                    <p className="mt-1 truncate text-sm text-[#796b60]">{group.shop || '판매자 미확인'} · 주문번호 {group.orderNo}{group.trackingNo ? ` · 운송장 ${group.trackingNo}` : ''}</p>
-                  </button>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-y-3 rounded-xl border border-slate-200 bg-slate-50 py-3 text-center sm:grid-cols-4 sm:divide-x sm:divide-slate-200">
+            <article key={group.orderNo} className="border-b border-slate-200 last:border-b-0">
+              <div className={`grid min-w-0 grid-cols-[64px_minmax(0,1fr)_40px] gap-3 px-3 py-3 transition-opacity sm:px-4 md:grid-cols-[64px_minmax(0,1fr)_56px_72px_104px_112px_40px] md:items-center ${isCancelled ? 'opacity-60 [&_img]:grayscale' : ''}`}>
+                <LeadImage item={lead} />
+                <button type="button" onClick={() => toggle(group.orderNo)} aria-expanded={isOpen} className="min-w-0 text-left">
+                  <span className="flex min-w-0 items-center gap-2">
+                    <Badge tone={statusTone(group.status)}>{group.status}</Badge>
+                    <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500">{group.orderedOn}</span>
+                  </span>
+                  <span className="mt-1 block truncate text-[15px] font-bold text-slate-900">{lead.productKo || lead.productCn}</span>
+                  {lead.productKo ? <span className="block truncate text-xs text-slate-500">{lead.productCn}</span> : null}
+                  <span className="mt-0.5 block truncate text-xs text-slate-500">{group.shop || '판매자 미확인'}</span>
+                  <span className="block truncate text-xs tabular-nums text-slate-600">
+                    주문번호 {group.orderNo}{group.trackingNo ? ` · 운송장 ${group.trackingNo}` : ''}
+                  </span>
+                </button>
+                <button type="button" onClick={() => toggle(group.orderNo)} aria-label={isOpen ? '주문 접기' : '주문 펼치기'} aria-expanded={isOpen} className={buttonClass('ghost', 'sm', 'h-10 w-10 self-start rounded-full px-0 md:order-last md:self-center')}>{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
+                <dl className="col-span-3 grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg bg-slate-50 px-3 py-2 sm:grid-cols-4 md:contents md:text-right">
                   <OrderMetric label="품목" value={`${group.items.length}개`} />
                   <OrderMetric label="총수량" value={money(quantity, 0)} />
-                  <OrderMetric label="주문결제액" value={`¥${money(group.orderPaid)}`} strike={isCancelled} />
-                  <OrderMetric label="한화 예상" value={`₩${money(group.orderPaid * rate, 0)}`} strike={isCancelled} />
-                </div>
+                  <OrderMetric label="주문결제액" value={`¥${money(group.orderPaid)}`} className={strike} />
+                  <OrderMetric label="한화 예상" value={`₩${money(group.orderPaid * rate, 0)}`} className={strike} />
+                </dl>
               </div>
               {isOpen && <div className="border-t border-slate-200 bg-slate-50 p-3 sm:p-4"><div className="space-y-2">{group.items.map((item) => <ItemRow key={item.id} item={item} rate={rate} disabled={isCancelled} onEdit={() => setEditing({ ...item })} onDelete={() => removeItem(item)} />)}</div></div>}
             </article>
           )
         })}
-        {!groups.length && <div className="p-4"><EmptyState icon={<Box size={20} />} title="조건에 맞는 구매내역이 없습니다." /></div>}
+        {!groups.length && <EmptyState bare icon={<Box size={20} />} title="조건에 맞는 구매내역이 없습니다." />}
       </div>
 
       {groups.length ? (
         <footer className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[12px] font-bold text-slate-500 shadow-sm sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <span>
-              총 <strong className="text-slate-900">{money(groups.length, 0)}</strong>개 중{' '}
+              총 <strong className="tabular-nums text-slate-900">{money(groups.length, 0)}</strong>건 중{' '}
               {money(pageOffset + 1, 0)}-{money(Math.min(pageOffset + pageSize, groups.length), 0)} 표시
             </span>
             <label className="inline-flex items-center gap-2">
@@ -244,7 +273,7 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
                 onChange={(event) => setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])}
                 className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
               >
-                {pageSizeOptions.map((size) => <option key={size} value={size}>{size}개씩 보기</option>)}
+                {pageSizeOptions.map((size) => <option key={size} value={size}>{size}건씩 보기</option>)}
               </select>
             </label>
           </div>
@@ -289,15 +318,19 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
 
 function LeadImage({ item }: { item: Purchase1688Item }) {
   const [failed, setFailed] = useState(false)
-  return <div className="relative h-[94px] w-[94px] overflow-hidden rounded-xl border border-slate-200 bg-slate-100">{item.imageUrl && !failed ? <Image src={item.imageUrl} alt={item.productKo || item.productCn} fill sizes="94px" className="object-cover" onError={() => setFailed(true)} /> : <div className="flex h-full items-center justify-center"><ImageOff className="text-slate-300" /></div>}</div>
+  return <div className="relative h-16 w-16 overflow-hidden rounded-lg border border-slate-200 bg-slate-100">{item.imageUrl && !failed ? <Image src={item.imageUrl} alt={item.productKo || item.productCn} fill sizes="64px" className="object-cover" onError={() => setFailed(true)} /> : <div className="flex h-full items-center justify-center"><ImageOff size={18} className="text-slate-300" /></div>}</div>
 }
 
-function OrderMetric({ label, value, strike }: { label: string; value: string; strike?: boolean }) {
-  return <div className="min-w-0 px-1"><div className="truncate text-[11px] font-bold text-slate-500 sm:text-xs">{label}</div><div className={`mt-0.5 truncate text-sm font-black text-slate-900 sm:text-base ${strike ? 'line-through decoration-2' : ''}`}>{value}</div></div>
+/** On phones a labelled cell in the summary strip; from md up a plain right-aligned column under the list header. */
+function OrderMetric({ label, value, className = 'text-slate-900' }: { label: string; value: string; className?: string }) {
+  return <div className="min-w-0">
+    <dt className="truncate text-[11px] font-bold text-slate-500 md:sr-only">{label}</dt>
+    <dd className={`truncate text-sm font-black tabular-nums ${className}`}>{value}</dd>
+  </div>
 }
 
 function Metric({ label, value, sub }: { label: string; value: string; sub?: string }) {
-  return <div><div className="text-[11px] font-bold text-slate-500">{label}</div><div className="mt-0.5 font-black text-slate-900">{value}</div>{sub && <div className="text-xs font-bold text-slate-500">{sub}</div>}</div>
+  return <div><div className="text-[11px] font-bold text-slate-500">{label}</div><div className="mt-0.5 font-black tabular-nums text-slate-900">{value}</div>{sub && <div className="text-xs font-bold tabular-nums text-slate-500">{sub}</div>}</div>
 }
 
 function ItemRow({ item, rate, disabled, onEdit, onDelete }: { item: Purchase1688Item; rate: number; disabled?: boolean; onEdit: () => void; onDelete: () => void }) {
@@ -321,19 +354,22 @@ function ItemRow({ item, rate, disabled, onEdit, onDelete }: { item: Purchase168
 
 function EditModal({ item, setItem, saving, onSave, onClose }: { item: Purchase1688Item; setItem: (item: Purchase1688Item) => void; saving: boolean; onSave: () => void; onClose: () => void }) {
   const field = (key: keyof Purchase1688Item, value: string | number) => setItem({ ...item, [key]: value })
-  return <div className="fixed inset-0 z-[200] flex items-end justify-center bg-slate-950/45 p-0 sm:items-center sm:p-5" role="dialog" aria-modal="true">
-    <div className="max-h-[92vh] w-full max-w-3xl overflow-y-auto rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
-      <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white px-5 py-4"><div><h2 className="text-lg font-black text-slate-950">{item.id ? '구매내역 수정' : '구매내역 추가'}</h2><p className="text-xs text-slate-500">저장하면 데이터베이스에 바로 반영됩니다.</p></div><button type="button" onClick={onClose} aria-label="닫기" className={buttonClass('ghost', 'sm', 'h-10 w-10 px-0')}><X /></button></div>
-      <div className="grid gap-4 p-5 sm:grid-cols-2">
-        <Input label="주문번호 *" value={item.orderNo} onChange={(v) => field('orderNo', v)} /><Input label="주문일" type="date" value={item.orderedOn} onChange={(v) => field('orderedOn', v)} /><Input label="판매자" value={item.shop} onChange={(v) => field('shop', v)} wide /><Input label="중문 상품명 *" value={item.productCn} onChange={(v) => field('productCn', v)} wide textarea /><Input label="한글 상품명" value={item.productKo} onChange={(v) => field('productKo', v)} wide /><Input label="규격/옵션" value={item.spec} onChange={(v) => field('spec', v)} wide />
-        <Input label="수량" type="number" value={item.quantity} onChange={(v) => field('quantity', Number(v))} /><Input label="단가(¥)" type="number" value={item.unitPrice} onChange={(v) => field('unitPrice', Number(v))} /><Input label="품목 금액(¥)" type="number" value={item.itemTotal} onChange={(v) => field('itemTotal', Number(v))} /><Input label="주문 결제액(¥)" type="number" value={item.orderPaid} onChange={(v) => field('orderPaid', Number(v))} />
-        <label className="text-xs font-bold text-slate-600"><span className="mb-1.5 block">상태</span><select value={item.status} onChange={(e) => field('status', e.target.value)} className={inputClass}>{statuses.map((value) => <option key={value}>{value}</option>)}</select></label><Input label="운송장번호" value={item.trackingNo} onChange={(v) => field('trackingNo', v)} /><Input label="상품 링크" value={item.sourceUrl} onChange={(v) => field('sourceUrl', v)} wide /><Input label="메모" value={item.note} onChange={(v) => field('note', v)} wide textarea />
+  const title = item.id ? '구매내역 수정' : '구매내역 추가'
+  return <Modal labelledBy="purchase-1688-modal-title" onClose={onClose} className="bg-slate-950/45">
+    <div className="flex h-full w-full items-end justify-center sm:items-center sm:p-5" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose() }}>
+      <div className="flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl bg-white shadow-2xl sm:rounded-2xl">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-100 px-5 py-4"><div><h2 id="purchase-1688-modal-title" className="text-lg font-black text-slate-950">{title}</h2><p className="text-xs text-slate-500">저장하면 데이터베이스에 바로 반영됩니다.</p></div><button type="button" onClick={onClose} aria-label="닫기" className={buttonClass('ghost', 'sm', 'h-10 w-10 px-0')}><X /></button></div>
+        <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto p-5 sm:grid-cols-2">
+          <Input label="주문번호 *" value={item.orderNo} onChange={(v) => field('orderNo', v)} /><Input label="주문일" type="date" value={item.orderedOn} onChange={(v) => field('orderedOn', v)} /><Input label="판매자" value={item.shop} onChange={(v) => field('shop', v)} wide /><Input label="중문 상품명 *" value={item.productCn} onChange={(v) => field('productCn', v)} wide textarea /><Input label="한글 상품명" value={item.productKo} onChange={(v) => field('productKo', v)} wide /><Input label="규격/옵션" value={item.spec} onChange={(v) => field('spec', v)} wide />
+          <Input label="수량" type="number" value={item.quantity} onChange={(v) => field('quantity', Number(v))} /><Input label="단가(¥)" type="number" value={item.unitPrice} onChange={(v) => field('unitPrice', Number(v))} /><Input label="품목 금액(¥)" type="number" value={item.itemTotal} onChange={(v) => field('itemTotal', Number(v))} /><Input label="주문 결제액(¥)" type="number" value={item.orderPaid} onChange={(v) => field('orderPaid', Number(v))} />
+          <label className="block"><span className="mb-1.5 block text-xs font-bold text-slate-600">상태</span><select value={item.status} onChange={(e) => field('status', e.target.value)} className={inputClass}>{statuses.map((value) => <option key={value}>{value}</option>)}</select></label><Input label="운송장번호" value={item.trackingNo} onChange={(v) => field('trackingNo', v)} /><Input label="상품 링크" value={item.sourceUrl} onChange={(v) => field('sourceUrl', v)} wide /><Input label="메모" value={item.note} onChange={(v) => field('note', v)} wide textarea />
+        </div>
+        <div className="flex shrink-0 justify-end gap-2 border-t border-slate-100 bg-white p-4"><Button variant="secondary" onClick={onClose}>취소</Button><Button variant="primary" disabled={!item.orderNo || !item.productCn} loading={saving} onClick={onSave}>{saving ? '저장 중…' : '저장'}</Button></div>
       </div>
-      <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white p-4"><Button variant="secondary" onClick={onClose}>취소</Button><Button variant="primary" disabled={!item.orderNo || !item.productCn} loading={saving} onClick={onSave}>{saving ? '저장 중…' : '저장'}</Button></div>
     </div>
-  </div>
+  </Modal>
 }
 
 function Input({ label, value, onChange, type = 'text', wide, textarea }: { label: string; value: string | number; onChange: (value: string) => void; type?: string; wide?: boolean; textarea?: boolean }) {
-  return <label className={`text-xs font-bold text-slate-600 ${wide ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block">{label}</span>{textarea ? <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className={`${inputClass} min-h-0 py-2.5`} /> : <input type={type} value={value} onChange={(e) => onChange(e.target.value)} step={type === 'number' ? 'any' : undefined} className={inputClass} />}</label>
+  return <label className={`block ${wide ? 'sm:col-span-2' : ''}`}><span className="mb-1.5 block text-xs font-bold text-slate-600">{label}</span>{textarea ? <textarea value={value} onChange={(e) => onChange(e.target.value)} rows={3} className={`${inputClass} min-h-0 py-2.5`} /> : <input type={type} value={value} onChange={(e) => onChange(e.target.value)} step={type === 'number' ? 'any' : undefined} className={`${inputClass} ${type === 'number' ? 'text-right tabular-nums' : ''}`} />}</label>
 }

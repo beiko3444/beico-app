@@ -1,9 +1,14 @@
 'use client'
 
-import { useMemo, useRef, useState } from 'react'
-import { Pencil, Plus, Printer, Trash2, UserRoundCheck, X } from 'lucide-react'
+import { useMemo, useRef, useState, type ReactNode } from 'react'
+import { ChevronDown, Pencil, Plus, Printer, Trash2, UserPlus, UserRoundCheck, X } from 'lucide-react'
+import Button, { buttonClass } from '@/components/ui/Button'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
 import { ProxySheet } from './ProxySheet'
 import FaxPanel from './FaxPanel'
+import FitToWidth from '@/components/ui/FitToWidth'
 import {
     CARGO_PROXY_DEFAULT_CARGO_NAME,
     CARGO_PROXY_PRINCIPAL,
@@ -44,12 +49,11 @@ const buildEmptyDraft = (): DraftState => ({
 })
 
 const inputClass =
-    'mt-1 w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-medium dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]'
-const labelClass = 'text-xs font-bold text-gray-700 dark:text-gray-400'
-const primaryButtonClass =
-    'px-4 py-2 rounded-xl text-xs font-bold bg-[#e53b19] text-white hover:brightness-110 disabled:opacity-50 transition-all'
-const secondaryButtonClass =
-    'px-3 py-2 rounded-xl text-xs font-bold bg-gray-100 dark:bg-[#252525] text-gray-600 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-[#2a2a2a] disabled:opacity-50 transition-all'
+    'mt-1 h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white'
+const labelClass = 'text-[11px] font-bold text-slate-600 dark:text-gray-400'
+const groupTitleClass = 'text-[13px] font-black text-slate-900 dark:text-white'
+const iconButtonClass = buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500 hover:text-slate-900 dark:text-gray-400 dark:hover:bg-[#2a2a2a]')
+const deleteIconButtonClass = buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-red-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-[#2a2a2a]')
 
 export default function CargoDeliveryClient({ initialDrivers, initialProxies, recentAwbNumbers, initialFaxRecipients, initialFaxLogs }: Props) {
     const [drivers, setDrivers] = useState<CargoDriverRecord[]>(initialDrivers)
@@ -330,320 +334,333 @@ html, body { margin: 0; padding: 0; background: #fff; width: 210mm; }
     const selectedDriverId = drivers.some((driver) => driver.id === draft.driverId) ? draft.driverId : ''
 
     return (
-        <div className="grid grid-cols-1 xl:grid-cols-[minmax(480px,1fr)_210mm] gap-8 items-start">
-            <div className="space-y-6 xl:max-w-none">
-                <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div>
-                            <h2 className="text-base font-black text-gray-900 dark:text-white">인도 위임장 발행</h2>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">대리인(기사)과 화물 정보를 입력하면 우측에 위임장이 실시간으로 만들어집니다.</p>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                            <button type="button" onClick={handlePrint} className={`${primaryButtonClass} inline-flex items-center gap-1.5`}>
-                                <Printer size={14} /> 출력 (PDF 저장/인쇄)
-                            </button>
-                            {leftTab === 'write' && (
-                                <>
-                                    <button type="button" onClick={resetDraft} className={secondaryButtonClass}>초기화</button>
-                                    <button type="button" onClick={handleIssue} disabled={isIssuing} className={primaryButtonClass}>
-                                        {isIssuing ? '발행 중...' : '발행하기'}
-                                    </button>
-                                </>
-                            )}
-                        </div>
-                    </div>
-                    <p className="text-[11px] text-gray-500 dark:text-gray-400">인쇄창에서 &quot;PDF로 저장&quot;을 선택하면 PDF 파일로 저장됩니다. 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다.</p>
-
-                    <div className="inline-flex rounded-xl border border-gray-200 dark:border-[#2a2a2a] p-1 bg-gray-50 dark:bg-[#1a1a1a]">
-                        <button
-                            type="button"
-                            onClick={() => setLeftTab('write')}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'write' ? 'bg-[#e53b19] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
+        <div className="min-w-0">
+            <PageHeader
+                title="인도 위임장"
+                description="수입화물 인도 위임장입니다. 대리인(기사)과 화물 정보를 입력하면 미리보기에 위임장이 실시간으로 만들어집니다."
+                actions={
+                    <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center">
+                        {leftTab === 'write' && (
+                            <Button variant="ghost" onClick={resetDraft}>초기화</Button>
+                        )}
+                        <Button
+                            variant="secondary"
+                            icon={<Printer size={15} />}
+                            onClick={handlePrint}
+                            className={leftTab === 'write' ? '' : 'col-span-2'}
                         >
-                            위임장 작성
-                        </button>
-                        <button
-                            type="button"
-                            onClick={() => {
-                                setLeftTab('issued')
-                                if (!activeProxyId && proxies[0]) setActiveProxyId(proxies[0].id)
+                            출력 (PDF)
+                        </Button>
+                        {leftTab === 'write' && (
+                            <Button variant="primary" onClick={handleIssue} loading={isIssuing} className="order-first col-span-2 sm:order-none">
+                                {isIssuing ? '발행 중...' : '발행하기'}
+                            </Button>
+                        )}
+                    </div>
+                }
+            />
+
+            <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,520px)] 2xl:grid-cols-[minmax(0,1fr)_minmax(0,640px)]">
+                <div className="min-w-0 space-y-6">
+                    <section className="space-y-5 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:p-5">
+                        <Tabs
+                            aria-label="위임장 작업"
+                            items={[
+                                { key: 'write', label: '위임장 작성' },
+                                { key: 'issued', label: '발행 리스트', count: proxies.length },
+                            ]}
+                            value={leftTab}
+                            onChange={(key) => {
+                                setLeftTab(key)
+                                if (key === 'issued' && !activeProxyId && proxies[0]) setActiveProxyId(proxies[0].id)
                             }}
-                            className={`px-4 py-1.5 rounded-lg text-xs font-black transition-all ${leftTab === 'issued' ? 'bg-[#e53b19] text-white' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#252525]'}`}
-                        >
-                            발행 리스트 ({proxies.length})
-                        </button>
-                    </div>
+                        />
 
-                    {leftTab === 'write' ? (
-                        <div className="space-y-4">
-                            <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a] space-y-3">
-                                <div className="flex items-center justify-between gap-2">
-                                    <label className={labelClass}>대리인 (기사)</label>
+                        {leftTab === 'write' ? (
+                            <div className="space-y-5">
+                                <div className="space-y-3">
+                                    <h2 className={groupTitleClass}>대리인 (기사)</h2>
+                                    <Field label="기사 목록에서 선택">
+                                        <select
+                                            value={selectedDriverId}
+                                            onChange={(event) => {
+                                                const driver = drivers.find((item) => item.id === event.target.value)
+                                                if (driver) applyDriverToDraft(driver)
+                                                else updateDraft({ driverId: '' })
+                                            }}
+                                            className={inputClass}
+                                        >
+                                            <option value="">선택 안 함 (아래에 직접 입력)</option>
+                                            {drivers.map((driver) => (
+                                                <option key={driver.id} value={driver.id}>
+                                                    {driver.name} · {driver.phone || '-'} · {driver.vehicleNo || '-'}
+                                                </option>
+                                            ))}
+                                        </select>
+                                    </Field>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <Field label="대리인 이름">
+                                            <input type="text" value={draft.driverName} onChange={(event) => updateDraft({ driverName: event.target.value })} className={inputClass} placeholder="윤정국" />
+                                        </Field>
+                                        <Field label="대리인 연락처">
+                                            <input type="tel" value={draft.driverPhone} onChange={(event) => updateDraft({ driverPhone: event.target.value })} className={inputClass} placeholder="010-0000-0000" />
+                                        </Field>
+                                        <Field label="대리인 차량정보">
+                                            <input type="text" value={draft.driverVehicle} onChange={(event) => updateDraft({ driverVehicle: event.target.value })} className={inputClass} placeholder="부산 90자 4951" />
+                                        </Field>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button variant="ghost" size="sm" icon={<UserPlus size={14} />} onClick={handleSaveDraftDriver}>
+                                            입력한 대리인을 기사 목록에 저장
+                                        </Button>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-3 border-t border-slate-100 pt-5 dark:border-[#2a2a2a]">
+                                    <h2 className={groupTitleClass}>화물 정보</h2>
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                        <Field label="B/L 번호 (또는 AWB 번호)">
+                                            <input
+                                                type="text"
+                                                list="cargo-proxy-awb-list"
+                                                value={draft.blNumber}
+                                                onChange={(event) => updateDraft({ blNumber: event.target.value })}
+                                                className={inputClass}
+                                                placeholder="112-9114-6230"
+                                            />
+                                            <datalist id="cargo-proxy-awb-list">
+                                                {recentAwbNumbers.map((awb) => <option key={awb} value={awb} />)}
+                                            </datalist>
+                                        </Field>
+                                        <Field label="날짜">
+                                            <input type="date" value={draft.issueDate} onChange={(event) => updateDraft({ issueDate: event.target.value })} className={inputClass} />
+                                        </Field>
+                                        <Field label="화물명">
+                                            <input type="text" value={draft.cargoName} onChange={(event) => updateDraft({ cargoName: event.target.value })} className={inputClass} placeholder={CARGO_PROXY_DEFAULT_CARGO_NAME} />
+                                        </Field>
+                                        <Field label="수량">
+                                            <input type="text" value={draft.quantityText} onChange={(event) => updateDraft({ quantityText: event.target.value })} className={inputClass} placeholder="12박스 (144kg)" />
+                                        </Field>
+                                    </div>
+                                </div>
+
+                                <div className="border-t border-slate-100 pt-5 dark:border-[#2a2a2a]">
                                     <button
                                         type="button"
-                                        onClick={handleSaveDraftDriver}
-                                        className="text-[11px] font-bold text-[#e53b19] hover:underline"
+                                        onClick={() => setShowPrincipal((prev) => !prev)}
+                                        aria-expanded={showPrincipal}
+                                        className="flex w-full items-center justify-between gap-3 text-left"
                                     >
-                                        입력한 대리인을 기사 목록에 저장
+                                        <span className={groupTitleClass}>위임인 (수입자) 정보</span>
+                                        <span className="inline-flex min-w-0 items-center gap-1 text-xs font-bold text-slate-600 dark:text-gray-300">
+                                            <span className="truncate">{showPrincipal ? '접기' : `${draft.principalName} · 수정`}</span>
+                                            <ChevronDown size={15} className={`shrink-0 transition-transform ${showPrincipal ? 'rotate-180' : ''}`} />
+                                        </span>
                                     </button>
-                                </div>
-                                <select
-                                    value={selectedDriverId}
-                                    onChange={(event) => {
-                                        const driver = drivers.find((item) => item.id === event.target.value)
-                                        if (driver) applyDriverToDraft(driver)
-                                        else updateDraft({ driverId: '' })
-                                    }}
-                                    className="w-full bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl p-2.5 text-sm font-bold dark:text-white focus:ring-[#e53b19] focus:border-[#e53b19]"
-                                >
-                                    <option value="">기사 목록에서 선택 (또는 아래에 직접 입력)</option>
-                                    {drivers.map((driver) => (
-                                        <option key={driver.id} value={driver.id}>
-                                            {driver.name} · {driver.phone || '-'} · {driver.vehicleNo || '-'}
-                                        </option>
-                                    ))}
-                                </select>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                    <div>
-                                        <label className={labelClass}>대리인 이름</label>
-                                        <input type="text" value={draft.driverName} onChange={(event) => updateDraft({ driverName: event.target.value })} className={inputClass} placeholder="윤정국" />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>대리인 연락처</label>
-                                        <input type="tel" value={draft.driverPhone} onChange={(event) => updateDraft({ driverPhone: event.target.value })} className={inputClass} placeholder="010-0000-0000" />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>대리인 차량정보</label>
-                                        <input type="text" value={draft.driverVehicle} onChange={(event) => updateDraft({ driverVehicle: event.target.value })} className={inputClass} placeholder="부산 90자 4951" />
-                                    </div>
+                                    {showPrincipal && (
+                                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <Field label="위임인 이름">
+                                                <input type="text" value={draft.principalName} onChange={(event) => updateDraft({ principalName: event.target.value })} className={inputClass} />
+                                            </Field>
+                                            <Field label="위임인 전화번호">
+                                                <input type="tel" value={draft.principalPhone} onChange={(event) => updateDraft({ principalPhone: event.target.value })} className={inputClass} />
+                                            </Field>
+                                            <Field label="위임인 주소" className="sm:col-span-2">
+                                                <input type="text" value={draft.principalAddress} onChange={(event) => updateDraft({ principalAddress: event.target.value })} className={inputClass} />
+                                            </Field>
+                                            <Field label="사업자등록번호">
+                                                <input type="text" value={draft.principalBusinessNo} onChange={(event) => updateDraft({ principalBusinessNo: event.target.value })} className={inputClass} />
+                                            </Field>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
-
-                            <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a] space-y-3">
-                                <label className={labelClass}>화물 정보</label>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                                    <div>
-                                        <label className={labelClass}>B/L 번호 (또는 AWB 번호)</label>
-                                        <input
-                                            type="text"
-                                            list="cargo-proxy-awb-list"
-                                            value={draft.blNumber}
-                                            onChange={(event) => updateDraft({ blNumber: event.target.value })}
-                                            className={inputClass}
-                                            placeholder="112-9114-6230"
-                                        />
-                                        <datalist id="cargo-proxy-awb-list">
-                                            {recentAwbNumbers.map((awb) => <option key={awb} value={awb} />)}
-                                        </datalist>
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>날짜</label>
-                                        <input type="date" value={draft.issueDate} onChange={(event) => updateDraft({ issueDate: event.target.value })} className={inputClass} />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>화물명</label>
-                                        <input type="text" value={draft.cargoName} onChange={(event) => updateDraft({ cargoName: event.target.value })} className={inputClass} placeholder={CARGO_PROXY_DEFAULT_CARGO_NAME} />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>수량</label>
-                                        <input type="text" value={draft.quantityText} onChange={(event) => updateDraft({ quantityText: event.target.value })} className={inputClass} placeholder="12박스 (144kg)" />
-                                    </div>
+                        ) : (
+                            <div className="space-y-4">
+                                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
+                                    <table className="w-full text-sm">
+                                        <thead className="ux-thead">
+                                            <tr>
+                                                <th className="text-left">날짜</th>
+                                                <th className="text-left">문서번호</th>
+                                                <th className="text-left">B/L 번호</th>
+                                                <th className="text-left">대리인</th>
+                                                <th className="hidden text-left sm:table-cell">차량</th>
+                                                <th className="text-center">관리</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
+                                            {proxies.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={6}>
+                                                        <EmptyState bare compact title="발행된 위임장이 없습니다" description="위임장 작성 탭에서 내용을 입력하고 발행하세요." />
+                                                    </td>
+                                                </tr>
+                                            )}
+                                            {proxies.map((proxy) => {
+                                                const isActive = proxy.id === activeProxyId
+                                                return (
+                                                    <tr
+                                                        key={proxy.id}
+                                                        onClick={() => setActiveProxyId(proxy.id)}
+                                                        aria-selected={isActive}
+                                                        className={`cursor-pointer transition-colors ${isActive ? 'bg-brand-orange-soft dark:bg-[#2a1d19]' : 'hover:bg-slate-50 dark:hover:bg-[#252525]'}`}
+                                                    >
+                                                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-gray-300">{formatProxyDate(proxy.issueDate)}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900 dark:text-white">{proxy.documentNo}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-gray-300">{proxy.blNumber}</td>
+                                                        <td className="whitespace-nowrap px-3 py-2 text-slate-700 dark:text-gray-300">{proxy.driverName}</td>
+                                                        <td className="hidden whitespace-nowrap px-3 py-2 text-slate-700 dark:text-gray-300 sm:table-cell">{proxy.driverVehicle || '-'}</td>
+                                                        <td className="px-3 py-2">
+                                                            <div className="flex items-center justify-center gap-1">
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => { event.stopPropagation(); loadProxyIntoDraft(proxy) }}
+                                                                    className={iconButtonClass}
+                                                                    title="이 내용으로 새로 작성"
+                                                                    aria-label={`${proxy.documentNo} 내용으로 새로 작성`}
+                                                                >
+                                                                    <Pencil size={15} />
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    onClick={(event) => { event.stopPropagation(); void handleDeleteProxy(proxy) }}
+                                                                    disabled={deletingProxyId === proxy.id}
+                                                                    className={deleteIconButtonClass}
+                                                                    title="삭제"
+                                                                    aria-label={`${proxy.documentNo} 삭제`}
+                                                                >
+                                                                    <Trash2 size={15} />
+                                                                </button>
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )
+                                            })}
+                                        </tbody>
+                                    </table>
                                 </div>
-                            </div>
-
-                            <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a]">
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPrincipal((prev) => !prev)}
-                                    className="w-full flex items-center justify-between text-left"
-                                >
-                                    <span className={labelClass}>위임인 (수입자) 정보</span>
-                                    <span className="text-[11px] font-bold text-gray-400">{showPrincipal ? '접기' : `${draft.principalName} · 수정`}</span>
-                                </button>
-                                {showPrincipal && (
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-3">
-                                        <div>
-                                            <label className={labelClass}>위임인 이름</label>
-                                            <input type="text" value={draft.principalName} onChange={(event) => updateDraft({ principalName: event.target.value })} className={inputClass} />
-                                        </div>
-                                        <div>
-                                            <label className={labelClass}>위임인 전화번호</label>
-                                            <input type="tel" value={draft.principalPhone} onChange={(event) => updateDraft({ principalPhone: event.target.value })} className={inputClass} />
-                                        </div>
-                                        <div className="sm:col-span-2">
-                                            <label className={labelClass}>위임인 주소</label>
-                                            <input type="text" value={draft.principalAddress} onChange={(event) => updateDraft({ principalAddress: event.target.value })} className={inputClass} />
-                                        </div>
-                                        <div>
-                                            <label className={labelClass}>사업자등록번호</label>
-                                            <input type="text" value={draft.principalBusinessNo} onChange={(event) => updateDraft({ principalBusinessNo: event.target.value })} className={inputClass} />
-                                        </div>
-                                    </div>
+                                {activeProxy && (
+                                    <FaxPanel
+                                        proxy={activeProxy}
+                                        recipients={faxRecipients}
+                                        logs={faxLogs}
+                                        onRecipientsChange={setFaxRecipients}
+                                        onLogsChange={setFaxLogs}
+                                    />
                                 )}
                             </div>
+                        )}
+                    </section>
+
+                    <section className="space-y-4 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none sm:p-5">
+                        <div>
+                            <h2 className="text-base font-black text-slate-900 dark:text-white">기사 관리</h2>
+                            <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">자주 쓰는 기사를 등록해 두면 위임장 작성 시 바로 선택할 수 있습니다.</p>
                         </div>
-                    ) : (
-                        <div className="space-y-4">
-                        <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
+
+                        <div className="space-y-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <Field label="이름">
+                                    <input type="text" value={driverForm.name} onChange={(event) => setDriverForm((prev) => ({ ...prev, name: event.target.value }))} className={inputClass} placeholder="기사 이름" />
+                                </Field>
+                                <Field label="연락처">
+                                    <input type="tel" value={driverForm.phone} onChange={(event) => setDriverForm((prev) => ({ ...prev, phone: event.target.value }))} className={inputClass} placeholder="010-0000-0000" />
+                                </Field>
+                                <Field label="차량번호">
+                                    <input type="text" value={driverForm.vehicleNo} onChange={(event) => setDriverForm((prev) => ({ ...prev, vehicleNo: event.target.value }))} className={inputClass} placeholder="부산 90자 4951" />
+                                </Field>
+                            </div>
+                            <div className="flex justify-end gap-2">
+                                {editingDriverId && (
+                                    <Button variant="ghost" size="sm" icon={<X size={14} />} onClick={cancelEditDriver}>
+                                        수정 취소
+                                    </Button>
+                                )}
+                                <Button variant="secondary" size="sm" icon={editingDriverId ? <Pencil size={14} /> : <Plus size={14} />} onClick={handleSaveDriver} loading={isSavingDriver}>
+                                    {editingDriverId ? '수정 저장' : '기사 추가'}
+                                </Button>
+                            </div>
+                        </div>
+
+                        <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-[#2a2a2a]">
                             <table className="w-full text-sm">
-                                <thead className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] text-gray-600 dark:text-gray-400 text-xs">
+                                <thead className="ux-thead">
                                     <tr>
-                                        <th className="px-3 py-2 text-left">날짜</th>
-                                        <th className="px-3 py-2 text-left">문서번호</th>
-                                        <th className="px-3 py-2 text-left">B/L 번호</th>
-                                        <th className="px-3 py-2 text-left">대리인</th>
-                                        <th className="px-3 py-2 text-left">차량</th>
-                                        <th className="px-3 py-2 text-center">관리</th>
+                                        <th className="text-left">이름</th>
+                                        <th className="text-left">연락처</th>
+                                        <th className="hidden text-left sm:table-cell">차량번호</th>
+                                        <th className="text-center">관리</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                                    {proxies.length === 0 && (
+                                <tbody className="divide-y divide-slate-100 dark:divide-[#2a2a2a]">
+                                    {drivers.length === 0 && (
                                         <tr>
-                                            <td colSpan={6} className="px-3 py-8 text-center text-xs text-gray-400">발행된 위임장이 없습니다.</td>
+                                            <td colSpan={4}>
+                                                <EmptyState bare compact title="등록된 기사가 없습니다" />
+                                            </td>
                                         </tr>
                                     )}
-                                    {proxies.map((proxy) => {
-                                        const isActive = proxy.id === activeProxyId
-                                        return (
-                                            <tr
-                                                key={proxy.id}
-                                                onClick={() => setActiveProxyId(proxy.id)}
-                                                className={`cursor-pointer transition-colors ${isActive ? 'bg-[#e53b19]/5 dark:bg-[#e53b19]/10' : 'hover:bg-gray-50 dark:hover:bg-[#252525]'}`}
-                                            >
-                                                <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">{formatProxyDate(proxy.issueDate)}</td>
-                                                <td className="px-3 py-2 whitespace-nowrap font-bold text-gray-900 dark:text-white">{proxy.documentNo}</td>
-                                                <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">{proxy.blNumber}</td>
-                                                <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">{proxy.driverName}</td>
-                                                <td className="px-3 py-2 whitespace-nowrap text-gray-700 dark:text-gray-300">{proxy.driverVehicle || '-'}</td>
-                                                <td className="px-3 py-2">
-                                                    <div className="flex items-center justify-center gap-1">
-                                                        <button
-                                                            type="button"
-                                                            onClick={(event) => { event.stopPropagation(); loadProxyIntoDraft(proxy) }}
-                                                            className="p-1.5 rounded-lg text-gray-400 hover:text-[#e53b19] hover:bg-gray-100 dark:hover:bg-[#2a2a2a]"
-                                                            title="이 내용으로 새로 작성"
-                                                        >
-                                                            <Pencil size={14} />
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={(event) => { event.stopPropagation(); void handleDeleteProxy(proxy) }}
-                                                            disabled={deletingProxyId === proxy.id}
-                                                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] disabled:opacity-50"
-                                                            title="삭제"
-                                                        >
-                                                            <Trash2 size={14} />
-                                                        </button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
+                                    {drivers.map((driver) => (
+                                        <tr key={driver.id} className={draft.driverId === driver.id ? 'bg-brand-orange-soft dark:bg-[#2a1d19]' : ''}>
+                                            <td className="whitespace-nowrap px-3 py-2 font-bold text-slate-900 dark:text-white">
+                                                {driver.name}
+                                                <span className="block text-[11px] font-medium text-slate-500 sm:hidden">{driver.vehicleNo || '-'}</span>
+                                            </td>
+                                            <td className="whitespace-nowrap px-3 py-2 tabular-nums text-slate-700 dark:text-gray-300">{driver.phone || '-'}</td>
+                                            <td className="hidden whitespace-nowrap px-3 py-2 text-slate-700 dark:text-gray-300 sm:table-cell">{driver.vehicleNo || '-'}</td>
+                                            <td className="px-3 py-2">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <button type="button" onClick={() => applyDriverToDraft(driver)} className={iconButtonClass} title="위임장 대리인으로 선택" aria-label={`${driver.name} 대리인으로 선택`}>
+                                                        <UserRoundCheck size={15} />
+                                                    </button>
+                                                    <button type="button" onClick={() => startEditDriver(driver)} className={iconButtonClass} title="수정" aria-label={`${driver.name} 수정`}>
+                                                        <Pencil size={15} />
+                                                    </button>
+                                                    <span aria-hidden="true" className="mx-0.5 h-5 w-px bg-slate-200 dark:bg-[#2a2a2a]" />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => void handleDeleteDriver(driver)}
+                                                        disabled={deletingDriverId === driver.id}
+                                                        className={deleteIconButtonClass}
+                                                        title="삭제"
+                                                        aria-label={`${driver.name} 삭제`}
+                                                    >
+                                                        <Trash2 size={15} />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
                                 </tbody>
                             </table>
                         </div>
-                        {activeProxy && (
-                            <FaxPanel
-                                proxy={activeProxy}
-                                recipients={faxRecipients}
-                                logs={faxLogs}
-                                onRecipientsChange={setFaxRecipients}
-                                onLogsChange={setFaxLogs}
-                            />
-                        )}
-                        </div>
-                    )}
-                </section>
+                    </section>
+                </div>
 
-                <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4">
-                    <div>
-                        <h2 className="text-base font-black text-gray-900 dark:text-white">기사 관리</h2>
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">자주 쓰는 기사를 등록해 두면 위임장 작성 시 바로 선택할 수 있습니다.</p>
+                <section className="min-w-0 xl:sticky xl:top-[76px]" aria-label="인쇄 미리보기">
+                    <p className="mb-2 text-xs font-bold text-slate-500 dark:text-gray-400">
+                        인쇄 미리보기{leftTab === 'issued' && activeProxy ? ` · ${activeProxy.documentNo}` : ''}
+                    </p>
+                    <div ref={sheetRef}>
+                        <FitToWidth width={794} className="rounded-sm bg-white shadow-lg ring-1 ring-slate-200 dark:ring-[#2a2a2a]">
+                            <ProxySheet doc={previewDoc} />
+                        </FitToWidth>
                     </div>
-
-                    <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-xl p-3 border border-gray-100 dark:border-[#2a2a2a]">
-                        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_1fr_auto] gap-3 items-end">
-                            <div>
-                                <label className={labelClass}>이름</label>
-                                <input type="text" value={driverForm.name} onChange={(event) => setDriverForm((prev) => ({ ...prev, name: event.target.value }))} className={inputClass} placeholder="기사 이름" />
-                            </div>
-                            <div>
-                                <label className={labelClass}>연락처</label>
-                                <input type="tel" value={driverForm.phone} onChange={(event) => setDriverForm((prev) => ({ ...prev, phone: event.target.value }))} className={inputClass} placeholder="010-0000-0000" />
-                            </div>
-                            <div>
-                                <label className={labelClass}>차량번호</label>
-                                <input type="text" value={driverForm.vehicleNo} onChange={(event) => setDriverForm((prev) => ({ ...prev, vehicleNo: event.target.value }))} className={inputClass} placeholder="부산 90자 4951" />
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <button type="button" onClick={handleSaveDriver} disabled={isSavingDriver} className={`${primaryButtonClass} inline-flex items-center gap-1 whitespace-nowrap`}>
-                                    <Plus size={14} /> {editingDriverId ? '수정 저장' : '기사 추가'}
-                                </button>
-                                {editingDriverId && (
-                                    <button type="button" onClick={cancelEditDriver} className={secondaryButtonClass} title="수정 취소">
-                                        <X size={14} />
-                                    </button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-50 dark:bg-[#1a1a1a] border-b border-gray-100 dark:border-[#2a2a2a] text-gray-600 dark:text-gray-400 text-xs">
-                                <tr>
-                                    <th className="px-3 py-2 text-left">이름</th>
-                                    <th className="px-3 py-2 text-left">연락처</th>
-                                    <th className="px-3 py-2 text-left">차량번호</th>
-                                    <th className="px-3 py-2 text-center">관리</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                                {drivers.length === 0 && (
-                                    <tr>
-                                        <td colSpan={4} className="px-3 py-8 text-center text-xs text-gray-400">등록된 기사가 없습니다.</td>
-                                    </tr>
-                                )}
-                                {drivers.map((driver) => (
-                                    <tr key={driver.id} className={draft.driverId === driver.id ? 'bg-[#e53b19]/5 dark:bg-[#e53b19]/10' : ''}>
-                                        <td className="px-3 py-2 font-bold text-gray-900 dark:text-white whitespace-nowrap">{driver.name}</td>
-                                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{driver.phone || '-'}</td>
-                                        <td className="px-3 py-2 text-gray-700 dark:text-gray-300 whitespace-nowrap">{driver.vehicleNo || '-'}</td>
-                                        <td className="px-3 py-2">
-                                            <div className="flex items-center justify-center gap-1">
-                                                <button type="button" onClick={() => applyDriverToDraft(driver)} className="p-1.5 rounded-lg text-gray-400 hover:text-[#e53b19] hover:bg-gray-100 dark:hover:bg-[#2a2a2a]" title="위임장 대리인으로 선택">
-                                                    <UserRoundCheck size={14} />
-                                                </button>
-                                                <button type="button" onClick={() => startEditDriver(driver)} className="p-1.5 rounded-lg text-gray-400 hover:text-[#e53b19] hover:bg-gray-100 dark:hover:bg-[#2a2a2a]" title="수정">
-                                                    <Pencil size={14} />
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    onClick={() => void handleDeleteDriver(driver)}
-                                                    disabled={deletingDriverId === driver.id}
-                                                    className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-gray-100 dark:hover:bg-[#2a2a2a] disabled:opacity-50"
-                                                    title="삭제"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                    <p className="mt-2 text-[11px] text-slate-500 dark:text-gray-400">
+                        인쇄창에서 &quot;PDF로 저장&quot;을 선택하면 PDF 파일로 저장됩니다. 머리글/바닥글을 해제하면 날짜/URL 표시가 사라집니다.
+                    </p>
                 </section>
             </div>
-
-            <section className="xl:sticky xl:top-20">
-                <div className="mb-3 text-xs font-black text-[#e53b19] tracking-wide">
-                    실시간 인쇄 미리보기{leftTab === 'issued' && activeProxy ? ` · ${activeProxy.documentNo}` : ''}
-                </div>
-                <div ref={sheetRef} className="overflow-x-auto rounded-sm shadow-lg ring-1 ring-gray-200 dark:ring-[#2a2a2a] w-fit max-w-full">
-                    <ProxySheet doc={previewDoc} />
-                </div>
-            </section>
         </div>
+    )
+}
+
+function Field({ label, children, className = '' }: { label: string; children: ReactNode; className?: string }) {
+    return (
+        <label className={`block min-w-0 ${className}`}>
+            <span className={labelClass}>{label}</span>
+            {children}
+        </label>
     )
 }
