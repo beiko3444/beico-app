@@ -154,13 +154,13 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
                 <table className="mt-1.5 w-full table-fixed border-collapse text-[12px] font-black tabular-nums">
                   <tbody>
                     <tr>
-                      <td className="w-[38%] overflow-hidden whitespace-nowrap pr-1 text-left text-emerald-700">
+                      <td className="w-[38%] overflow-hidden whitespace-nowrap pr-1 text-left text-slate-700">
                         <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-emerald-600 px-1 text-[10px] font-black leading-none text-white">N</span>
                         <span>{formatSidebarStock(row.naverStock)}</span>
                       </td>
-                      <td className="w-[34%] overflow-hidden whitespace-nowrap px-1 text-left text-red-700">
+                      <td className="w-[34%] overflow-hidden whitespace-nowrap px-1 text-left text-slate-700">
                         <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-red-600 px-1 text-[10px] font-black leading-none text-white">C</span>
-                        <span>{coupangStale ? '오류' : formatSidebarStock(row.coupangStock)}</span>
+                        <span className={coupangStale ? 'text-red-700' : undefined}>{coupangStale ? '오류' : formatSidebarStock(row.coupangStock)}</span>
                       </td>
                       <td
                         className="w-[28%] overflow-hidden whitespace-nowrap pl-1 text-right text-[12px] font-black text-slate-950"
@@ -180,16 +180,17 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   )
 }
 
-type NavItem = { name: string; path: string; icon: LucideIcon }
+// subPages are pages without their own menu entry; they light up their parent item.
+type NavItem = { name: string; path: string; icon: LucideIcon; subPages?: { href: string; name: string }[] }
 type NavGroup = { label: string; items: NavItem[] }
 
 const NAV_GROUPS: NavGroup[] = [
   {
     label: '주문·거래',
     items: [
-      { name: '주문관리', path: '/admin/orders', icon: ShoppingCart },
-      { name: '파트너관리', path: '/admin/partners', icon: Handshake },
-      { name: 'PI발급', path: '/admin/proforma', icon: FileText },
+      { name: '주문 관리', path: '/admin/orders', icon: ShoppingCart },
+      { name: '파트너 관리', path: '/admin/partners', icon: Handshake, subPages: [{ href: '/admin/notices', name: '파트너 공지' }] },
+      { name: 'PI 발급', path: '/admin/proforma', icon: FileText },
       { name: '수출신고', path: '/admin/export-declaration', icon: Ship },
       { name: '인도 위임장', path: '/admin/cargo-delivery', icon: Truck },
     ],
@@ -197,8 +198,8 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: '상품·재고',
     items: [
-      { name: '상품관리', path: '/admin/products', icon: Package },
-      { name: '재고관리', path: '/admin/inventory', icon: Warehouse },
+      { name: '상품 관리', path: '/admin/products', icon: Package },
+      { name: '재고 관리', path: '/admin/inventory', icon: Warehouse },
       { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
       { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
       { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
@@ -207,10 +208,10 @@ const NAV_GROUPS: NavGroup[] = [
   {
     label: '운영',
     items: [
-      { name: '생산관리', path: '/admin/production', icon: Factory },
-      { name: '근태관리', path: '/admin/tasks', icon: Clock3 },
-      { name: '카드사용내역', path: '/admin/card-usage', icon: CreditCard },
-      { name: '전력관리', path: '/admin/electricity', icon: PlugZap },
+      { name: '생산 관리', path: '/admin/production', icon: Factory },
+      { name: '근태 관리', path: '/admin/tasks', icon: Clock3 },
+      { name: '카드 사용내역', path: '/admin/card-usage', icon: CreditCard },
+      { name: '전력 관리', path: '/admin/electricity', icon: PlugZap },
     ],
   },
   {
@@ -219,12 +220,9 @@ const NAV_GROUPS: NavGroup[] = [
       { name: '메모', path: '/admin/memos', icon: StickyNote },
       { name: '마인드보드', path: '/admin/mindboard', icon: LayoutGrid },
       { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
-      { name: '번역기', path: '/translator', icon: Languages },
     ],
   },
 ]
-
-const EXTERNAL_PATHS = new Set(['/translator'])
 
 export default function AdminNav({
   counts,
@@ -236,19 +234,26 @@ export default function AdminNav({
   const pathname = usePathname()
   const [shipmentCount, setShipmentCount] = useState('1')
   const [fromNumber, setFromNumber] = useState('01081193313')
-  const [loadingFromNumber, setLoadingFromNumber] = useState(true)
+  const [loadingFromNumber, setLoadingFromNumber] = useState(false)
+  const [fromNumberError, setFromNumberError] = useState('')
   const [sendingSms, setSendingSms] = useState(false)
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
 
   const alertCountByPath: Record<string, number> = {
     '/admin/orders': counts?.pendingOrders ?? 0,
     '/admin/partners': counts?.pendingPartners ?? 0,
-    '/admin/electricity': counts?.missingBill ?? 0,
+  }
+  // A yes/no flag (this month's bill is missing), so it shows as a dot rather than a count.
+  const flagByPath: Record<string, string | null> = {
+    '/admin/electricity': counts?.missingBill ? '이번 달 고지서 미등록' : null,
   }
 
-  const isActive = (path: string) => pathname === path || (path !== '/admin' && pathname.startsWith(path))
-  const activeGroup = NAV_GROUPS.find((group) => group.items.some((item) => isActive(item.path)))
-  const activeItem = activeGroup?.items.find((item) => isActive(item.path))
+  const matches = (path: string) => pathname === path || pathname.startsWith(`${path}/`)
+  const isActive = (item: NavItem) => matches(item.path) || Boolean(item.subPages?.some((page) => matches(page.href)))
+  const activeGroup = NAV_GROUPS.find((group) => group.items.some(isActive))
+  const activeItem = activeGroup?.items.find(isActive)
+  const activeSubPage = activeItem?.subPages?.find((page) => matches(page.href))
+  const isOrdersPage = pathname.startsWith('/admin/orders')
   const displayName = userName || '관리자'
 
   useEffect(() => {
@@ -275,11 +280,14 @@ export default function AdminNav({
     }
   }, [isMobileMenuOpen])
 
+  // The pickup SMS control only exists on 주문 관리, so the sender number is loaded there only.
   useEffect(() => {
+    if (!isOrdersPage) return
     let mounted = true
 
     async function loadFromNumber() {
       setLoadingFromNumber(true)
+      setFromNumberError('')
       try {
         const response = await fetch('/api/admin/sms?mode=sender')
         const result: {
@@ -296,7 +304,7 @@ export default function AdminNav({
         setFromNumber(defaultFrom || firstFrom)
       } catch (error) {
         if (!mounted) return
-        alert(error instanceof Error ? error.message : '발신번호를 불러오지 못했습니다.')
+        setFromNumberError(error instanceof Error ? error.message : '발신번호를 불러오지 못했습니다.')
       } finally {
         if (mounted) setLoadingFromNumber(false)
       }
@@ -306,7 +314,7 @@ export default function AdminNav({
     return () => {
       mounted = false
     }
-  }, [])
+  }, [isOrdersPage])
 
   const handleSendPickupSms = async () => {
     if (!fromNumber) {
@@ -349,12 +357,18 @@ export default function AdminNav({
     }
   }
 
-  const renderBadge = (path: string) => {
+  const renderBadge = (path: string, active: boolean) => {
+    const flag = flagByPath[path]
+    if (flag) {
+      return <span className="ml-2 h-2 w-2 shrink-0 rounded-full bg-brand-orange" title={flag} aria-label={flag} />
+    }
     const count = alertCountByPath[path] ?? 0
     if (count <= 0) return null
     return (
       <span
-        className="ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-orange px-1.5 text-[11px] font-extrabold leading-none text-white"
+        className={`ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold leading-none ${
+          active ? 'bg-white text-brand-orange-strong ring-1 ring-[#ffd5cc]' : 'bg-brand-orange text-white'
+        }`}
         aria-label={`${count}건 알림`}
       >
         {count > 99 ? '99+' : count}
@@ -363,61 +377,53 @@ export default function AdminNav({
   }
 
   const renderNavLink = (item: NavItem, mobile: boolean) => {
-    const active = isActive(item.path)
+    const active = isActive(item)
     const Icon = item.icon
-    const external = EXTERNAL_PATHS.has(item.path)
     return (
       <Link
         key={item.path}
         href={item.path}
-        prefetch={external ? false : null}
-        target={external ? '_blank' : undefined}
-        rel={external ? 'noopener noreferrer' : undefined}
+        prefetch={null}
         data-active={active ? 'true' : undefined}
         aria-current={active ? 'page' : undefined}
         onClick={() => setIsMobileMenuOpen(false)}
-        className={
-          mobile
-            ? `flex min-h-11 min-w-0 items-center justify-between gap-1.5 rounded-[10px] border px-3 text-[13px] no-underline transition-colors ${
-                active
-                  ? 'border-[#ffd5cc] bg-brand-orange-soft font-extrabold'
-                  : 'border-[#eef2f6] bg-[#f8fafc] font-semibold hover:bg-[#f1f3f6]'
-              }`
-            : `group relative flex h-9 min-w-0 items-center justify-between rounded-lg px-2.5 text-[13px] no-underline transition-colors duration-150 ${
-                active ? 'bg-brand-orange-soft font-extrabold' : 'font-semibold hover:bg-[#f4f6f8]'
-              }`
-        }
-        style={{ color: active ? 'var(--color-brand-orange-strong)' : '#344054' }}
+        className={`group relative flex min-w-0 items-center justify-between rounded-lg px-2.5 text-[13px] no-underline transition-colors duration-150 ${
+          mobile ? 'min-h-11' : 'h-8'
+        } ${active ? 'bg-brand-orange-soft font-extrabold text-brand-orange-strong' : 'font-semibold text-[#344054] hover:bg-[#f4f6f8]'}`}
       >
-        {active && !mobile ? <span className="absolute left-0 top-2 h-5 w-[3px] rounded-r-full bg-brand-orange" /> : null}
+        {active && !mobile ? <span className="absolute left-0 top-1.5 h-5 w-[3px] rounded-r-full bg-brand-orange" /> : null}
         <span className="flex min-w-0 items-center gap-2.5">
-          {mobile ? null : (
-            <Icon
-              size={16}
-              strokeWidth={2.2}
-              className={`shrink-0 ${active ? 'text-current' : 'text-[#98a2b3] group-hover:text-[#667085]'}`}
-              aria-hidden="true"
-            />
-          )}
+          <Icon
+            size={16}
+            strokeWidth={2.2}
+            className={`shrink-0 ${active ? 'text-current' : 'text-[#98a2b3] group-hover:text-[#667085]'}`}
+            aria-hidden="true"
+          />
           <span className="truncate leading-none">{item.name}</span>
         </span>
-        {renderBadge(item.path)}
+        {renderBadge(item.path, active)}
       </Link>
     )
   }
 
   const renderGroups = (mobile = false) =>
     NAV_GROUPS.map((group) => (
-      <div key={group.label} className={mobile ? 'flex flex-col gap-1.5' : 'flex flex-col gap-0.5'}>
-        <div className={`text-[11px] font-bold text-[#667085] ${mobile ? '' : 'px-2.5 pb-1'}`}>{group.label}</div>
-        <div className={mobile ? 'grid grid-cols-2 gap-1.5' : 'flex flex-col gap-0.5'}>
+      <div key={group.label} className="flex flex-col gap-0.5">
+        <div className="px-2.5 pb-1 text-[11px] font-bold text-[#667085]">{group.label}</div>
+        <div className={mobile ? 'grid grid-cols-2 gap-x-1.5 gap-y-0.5' : 'flex flex-col gap-0.5'}>
           {group.items.map((item) => renderNavLink(item, mobile))}
         </div>
       </div>
     ))
 
+  const pickupError = fromNumberError ? (
+    <span role="alert" className="max-w-[220px] truncate text-[12px] font-semibold text-red-700" title={fromNumberError}>
+      {fromNumberError}
+    </span>
+  ) : null
+
   const pickupControl = (
-    <div className="flex h-10 shrink-0 items-center gap-2 rounded-[10px] border border-[#e5e9ef] bg-white pl-3 pr-1.5">
+    <div className="flex h-10 shrink-0 items-center gap-2 rounded-[10px] border border-[#e5e9ef] bg-white pl-3 pr-1.5" title={fromNumberError || undefined}>
       <Truck size={16} className="shrink-0 text-[#667085]" aria-hidden="true" />
       <label htmlFor="admin-pickup-count" className="whitespace-nowrap text-[13px] font-bold text-[#344054]">
         집하 요청
@@ -436,7 +442,7 @@ export default function AdminNav({
         type="button"
         onClick={handleSendPickupSms}
         disabled={sendingSms || loadingFromNumber}
-        className="inline-flex h-[30px] shrink-0 items-center justify-center rounded-lg border-none bg-brand-orange px-3 text-[12px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-[30px] shrink-0 items-center justify-center rounded-lg border border-[#cfd6df] bg-white px-3 text-[12px] font-extrabold text-[#172033] transition hover:border-slate-400 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {sendingSms ? '요청중' : '문자 발송'}
       </button>
@@ -446,7 +452,8 @@ export default function AdminNav({
   return (
     <>
       {/* Mobile top bar */}
-      <header className="fixed inset-x-0 top-0 z-[1000] flex h-14 items-center justify-between border-b border-[#E5E9EF] bg-white/95 px-3 backdrop-blur print:hidden lg:hidden">
+      {/* Shell layers: z-40 for the bars, z-45/46 for the mobile menu. Page modals use z-50 and up. */}
+      <header className="fixed inset-x-0 top-0 z-40 flex h-14 items-center justify-between border-b border-[#E5E9EF] bg-white/95 px-3 backdrop-blur print:hidden lg:hidden">
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen((open) => !open)}
@@ -459,7 +466,7 @@ export default function AdminNav({
         </button>
         <div className="flex min-w-0 items-center gap-2">
           <Image src="/logo.png" alt="beiko" width={74} height={66} priority className="h-auto w-[34px]" />
-          <span className="truncate text-[15px] font-extrabold text-[#172033]">{activeItem?.name || '관리자'}</span>
+          <span className="truncate text-[15px] font-extrabold text-[#172033]">{activeSubPage?.name || activeItem?.name || '관리자'}</span>
         </div>
         <a
           href="/translator"
@@ -477,7 +484,7 @@ export default function AdminNav({
         <>
           <button
             type="button"
-            className="fixed inset-x-0 bottom-0 top-14 z-[1001] bg-[rgba(16,24,40,0.32)] print:hidden lg:hidden"
+            className="fixed inset-x-0 bottom-0 top-14 z-[45] bg-[rgba(16,24,40,0.32)] print:hidden lg:hidden"
             onClick={() => setIsMobileMenuOpen(false)}
             aria-label="관리자 메뉴 닫기"
             tabIndex={-1}
@@ -487,7 +494,7 @@ export default function AdminNav({
             role="dialog"
             aria-modal="true"
             aria-label="관리자 메뉴"
-            className="ux-scrollbar fixed inset-x-0 top-14 z-[1002] box-border max-h-[calc(100vh-56px)] overflow-y-auto rounded-b-2xl bg-white px-4 pb-5 pt-4 shadow-[0_18px_46px_rgba(15,23,42,0.18)] print:hidden lg:hidden"
+            className="ux-scrollbar fixed inset-x-0 top-14 z-[46] box-border max-h-[calc(100vh-56px)] overflow-y-auto rounded-b-2xl bg-white px-4 pb-5 pt-4 shadow-[0_18px_46px_rgba(15,23,42,0.18)] print:hidden lg:hidden"
           >
             <nav className="flex flex-col gap-3.5" aria-label="모바일 관리자 메뉴">
               {renderGroups(true)}
@@ -495,7 +502,8 @@ export default function AdminNav({
 
             <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
 
-            {pathname.startsWith('/admin/orders') && (            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E9EF] pt-3">
+            {isOrdersPage && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E9EF] pt-3">
               <div className="flex items-center gap-1.5">
                 <label htmlFor="admin-pickup-count-mobile" className="text-[13px] font-bold text-[#344054]">
                   집하 요청
@@ -511,25 +519,35 @@ export default function AdminNav({
                 />
                 <span className="text-[12px] text-[#667085]">건</span>
               </div>
-              <div className="flex gap-1.5">
-                <button
-                  type="button"
-                  onClick={handleSendPickupSms}
-                  disabled={sendingSms || loadingFromNumber}
-                  className="inline-flex h-11 items-center justify-center rounded-[10px] border-none bg-brand-orange px-3.5 text-[13px] font-extrabold text-white transition hover:bg-brand-orange-hover disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  {sendingSms ? '요청중' : '문자 발송'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => signOut({ callbackUrl: '/login' })}
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] border border-[#E5E9EF] bg-white text-[#667085] transition-colors hover:bg-[#F8FAFC]"
-                  aria-label="로그아웃"
-                >
-                  <LogOut size={18} />
-                </button>
+              <button
+                type="button"
+                onClick={handleSendPickupSms}
+                disabled={sendingSms || loadingFromNumber}
+                className="inline-flex h-11 items-center justify-center rounded-[10px] border border-[#cfd6df] bg-white px-3.5 text-[13px] font-extrabold text-[#172033] transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {sendingSms ? '요청중' : '문자 발송'}
+              </button>
+              {pickupError ? <div className="basis-full">{pickupError}</div> : null}
+            </div>
+            )}
+
+            {/* Account footer: logout is reachable from every page on phones. */}
+            <div className="mt-4 flex items-center justify-between gap-2 border-t border-[#E5E9EF] pt-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#172033] text-[12px] font-extrabold text-white" aria-hidden="true">
+                  {displayName.slice(0, 1)}
+                </span>
+                <span className="truncate text-[13px] font-bold text-[#344054]">{displayName}</span>
               </div>
-            </div>)}
+              <button
+                type="button"
+                onClick={() => signOut({ callbackUrl: '/login' })}
+                className="inline-flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-[10px] border border-[#E5E9EF] bg-white px-3 text-[13px] font-bold text-[#344054] transition-colors hover:bg-[#F8FAFC]"
+              >
+                <LogOut size={16} aria-hidden="true" />
+                로그아웃
+              </button>
+            </div>
           </aside>
         </>
       ) : null}
@@ -537,7 +555,7 @@ export default function AdminNav({
       {/* Desktop sidebar */}
       <aside
         id="admin-desktop-sidebar"
-        className="fixed bottom-0 left-0 top-0 z-[1000] box-border hidden h-screen w-[240px] flex-col overflow-hidden border-r border-[#E5E9EF] bg-white px-3 pb-4 pt-5 print:hidden lg:flex"
+        className="fixed bottom-0 left-0 top-0 z-40 box-border hidden h-screen w-[240px] flex-col overflow-hidden border-r border-[#E5E9EF] bg-white px-3 pb-4 pt-4 print:hidden lg:flex"
       >
         <Link href="/admin/orders" prefetch={null} className="flex shrink-0 items-center gap-2.5 px-2 no-underline">
           <Image src="/logo.png" alt="beiko" width={104} height={93} priority className="h-auto w-[52px]" />
@@ -547,7 +565,7 @@ export default function AdminNav({
           </span>
         </Link>
 
-        <nav className="ux-scrollbar ux-nav-scroll mt-5 flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto pb-7" aria-label="관리자 메뉴">
+        <nav className="ux-scrollbar ux-nav-scroll mt-4 flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto pb-7" aria-label="관리자 메뉴">
           {renderGroups()}
         </nav>
 
@@ -555,7 +573,7 @@ export default function AdminNav({
       </aside>
 
       {/* Desktop top bar */}
-      <header className="fixed left-[240px] right-0 top-0 z-[999] hidden h-[60px] items-center justify-between gap-3 border-b border-[#E5E9EF] bg-white/95 px-6 backdrop-blur print:hidden lg:flex">
+      <header className="fixed left-[240px] right-0 top-0 z-40 hidden h-[60px] items-center justify-between gap-3 border-b border-[#E5E9EF] bg-white/95 px-6 backdrop-blur print:hidden lg:flex">
         <div className="flex min-w-0 items-center gap-2 text-[13px]">
           {activeGroup ? (
             <>
@@ -563,17 +581,26 @@ export default function AdminNav({
               <ChevronRight size={14} className="shrink-0 text-[#98a2b3]" aria-hidden="true" />
             </>
           ) : null}
-          <span className="truncate font-extrabold text-[#172033]">{activeItem?.name || '관리자'}</span>
+          {activeSubPage && activeItem ? (
+            <>
+              <Link href={activeItem.path} prefetch={null} className="whitespace-nowrap font-bold text-[#667085] no-underline hover:text-[#172033]">
+                {activeItem.name}
+              </Link>
+              <ChevronRight size={14} className="shrink-0 text-[#98a2b3]" aria-hidden="true" />
+            </>
+          ) : null}
+          <span className="truncate font-extrabold text-[#172033]">{activeSubPage?.name || activeItem?.name || '관리자'}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
-          {pathname.startsWith('/admin/orders') && pickupControl}
+          {isOrdersPage ? pickupError : null}
+          {isOrdersPage && pickupControl}
           <a
             href="/translator"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="번역기 열기"
             title="번역기"
-            className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] border border-[#E5E9EF] text-[#344054] transition-colors hover:bg-[#F4F6F8]"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-[10px] text-[#344054] transition-colors hover:bg-[#F4F6F8]"
           >
             <Languages size={18} />
           </a>

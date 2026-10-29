@@ -111,7 +111,7 @@ export default async function PartnersPage({ searchParams }: { searchParams: Pro
                 <label className="min-w-0 flex-1"><span className="mb-1 block text-xs font-semibold">상호·아이디·담당자</span><input name="q" type="search" defaultValue={filters.q || ''} placeholder="파트너 검색" className="ux-input" /></label>
                 <label><span className="mb-1 block text-xs font-semibold">승인 상태</span><select name="status" defaultValue={filters.status || ''} className="ux-input"><option value="">전체</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인 완료</option></select></label>
                 <label><span className="mb-1 block text-xs font-semibold">거래 국가</span><select name="country" defaultValue={filters.country || ''} className="ux-input"><option value="">전체</option><option value="Korea">한국</option><option value="Japan">일본</option><option value="USA">미국</option><option value="China">중국</option><option value="Turkey">투르키예</option><option value="Indonesia">인도네시아</option></select></label>
-                <button type="submit" className="ux-button-primary self-end">조회</button><Link href="/admin/partners" className="ux-button self-end">초기화</Link>
+                <button type="submit" className="ux-button self-end">조회</button><Link href="/admin/partners" className="ux-button self-end">초기화</Link>
             </form>
             <p className="ux-helper">{mappedActivePartners.length}개 조회 · 상호를 누르면 정보를 수정할 수 있습니다. 등급은 거래 단가에 적용됩니다.</p>
             <div className="glass-panel rounded-2xl shadow-sm dark:shadow-none bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] overflow-x-auto">

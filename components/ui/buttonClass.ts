@@ -8,7 +8,8 @@ const base =
   'disabled:cursor-not-allowed disabled:opacity-50'
 
 const variants: Record<ButtonVariant, string> = {
-  primary: 'bg-brand-orange font-extrabold text-white hover:bg-brand-orange-hover',
+  // A disabled primary turns grey so it doesn't read as a lighter primary.
+  primary: 'bg-brand-orange font-extrabold text-white hover:bg-brand-orange-hover disabled:bg-slate-200 disabled:text-slate-500 disabled:opacity-100',
   secondary: 'border border-[#cfd6df] bg-white text-slate-700 hover:border-slate-400 hover:bg-slate-50',
   danger: 'border border-[#f3b7b2] bg-white text-red-700 hover:bg-red-50',
   ghost: 'bg-transparent text-slate-600 hover:bg-slate-100',
