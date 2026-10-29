@@ -161,6 +161,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: `입고 수량은 ${MAX_INBOUND_QUANTITY.toLocaleString('ko-KR')}개 이하로 입력해 주세요.` }, { status: 400 })
   }
 
+  const exists = await prisma.warehouseInventoryItem.findUnique({ where: { id: warehouseItemId }, select: { id: true } })
+  if (!exists) {
+    return NextResponse.json({ error: '창고재고 상품을 찾지 못했습니다.' }, { status: 404 })
+  }
+
   const item = await prisma.$transaction(async (tx) => {
     const warehouseItem = await tx.warehouseInventoryItem.findUnique({
       where: { id: warehouseItemId },

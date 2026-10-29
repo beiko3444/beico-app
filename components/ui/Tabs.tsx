@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
+
 export type TabItem<K extends string = string> = {
   key: K
   label: string
@@ -17,13 +19,29 @@ type TabsProps<K extends string> = {
   'aria-label'?: string
 }
 
-/** Segmented tabs — the one tab/segment style used across the admin console. Orange stays reserved for the primary button. */
+/**
+ * Segmented tabs — the one tab/segment style used across the admin console. Orange stays reserved for the primary button.
+ * On phones the row scrolls sideways instead of wrapping onto ragged extra rows.
+ */
 export default function Tabs<K extends string>({ items, value, onChange, className = '', ...rest }: TabsProps<K>) {
+  const listRef = useRef<HTMLDivElement>(null)
+
+  // When the row scrolls sideways, keep the selected tab in view (e.g. a filter opened from a link).
+  useEffect(() => {
+    const list = listRef.current
+    const active = list?.querySelector<HTMLElement>('[aria-selected="true"]')
+    if (!list || !active || list.scrollWidth <= list.clientWidth) return
+    const listRect = list.getBoundingClientRect()
+    const activeRect = active.getBoundingClientRect()
+    list.scrollLeft += activeRect.left - listRect.left - (listRect.width - activeRect.width) / 2
+  }, [value])
+
   return (
     <div
+      ref={listRef}
       role="tablist"
       aria-label={rest['aria-label']}
-      className={`inline-flex max-w-full flex-wrap items-center gap-1 rounded-[10px] bg-[#f1f3f6] p-1 ${className}`}
+      className={`inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-[10px] bg-[#f1f3f6] p-1 [scrollbar-width:none] sm:flex-wrap sm:overflow-visible [&::-webkit-scrollbar]:hidden ${className}`}
     >
       {items.map((item) => {
         const active = item.key === value
@@ -37,7 +55,7 @@ export default function Tabs<K extends string>({ items, value, onChange, classNa
             aria-disabled={item.disabled || undefined}
             title={item.disabled ? item.reason : undefined}
             onClick={() => { if (!item.disabled) onChange(item.key) }}
-            className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[13px] transition-colors ${
+            className={`inline-flex h-8 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-[13px] transition-colors ${
               active
                 ? 'bg-white font-extrabold text-slate-900 shadow-[0_1px_2px_rgba(16,24,40,0.12)]'
                 : item.disabled
