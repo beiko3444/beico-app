@@ -64,6 +64,37 @@ export function resolvePartnerOrderTerms(
   }
 }
 
+// Unit price a partner is charged at checkout. The order page shows this price and
+// the order API recomputes it, so a client-sent price is never trusted.
+export function resolvePartnerCheckoutUnitPrice(
+  product: PartnerOrderPricingProduct,
+  partner: { country?: string | null; grade?: string | null },
+) {
+  const grade = getPartnerOrderGrade(partner.grade)
+  const regionalRoot = readRecord(product.regionalPrices)
+  const gradeData = readRecord(regionalRoot?.[grade]) || readRecord(regionalRoot?.C)
+  if (!gradeData) return resolveLegacyPrice(product, grade)
+
+  const wholesale = (code: PartnerOrderCountry) => readNonNegativeNumber(readRecord(gradeData[code])?.wholesale, 0)
+  const kr = wholesale('KR')
+  const jp = wholesale('JP')
+  const us = wholesale('US')
+  if (partner.country === 'Korea' && kr > 0) return kr
+  if (partner.country === 'Japan' && jp > 0) return jp
+  if (us > 0) return us
+  if (kr > 0) return kr
+  return readNonNegativeNumber(product.sellPrice, 0)
+}
+
+// Shipping is 3,000 per started 100 units and VAT is 10%, both waived for USD partners.
+export function calculatePartnerOrderTotals(subtotal: number, totalQuantity: number, country?: string | null) {
+  const isUSD = country !== 'Korea' && country !== 'Japan'
+  const shippingFee = totalQuantity > 0 && !isUSD ? Math.ceil(totalQuantity / 100) * 3000 : 0
+  const supplyTotal = subtotal + shippingFee
+  const vat = isUSD ? 0 : Math.round(supplyTotal * 0.1)
+  return { isUSD, shippingFee, supplyTotal, vat, total: supplyTotal + vat }
+}
+
 function resolveLegacyPrice(product: PartnerOrderPricingProduct, grade: string) {
   const gradePrice = {
     A: product.priceA,

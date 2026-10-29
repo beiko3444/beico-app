@@ -6,6 +6,7 @@ import { sendOrderNotification } from "@/lib/notification"
 import { getProductImageUrl } from "@/lib/product-image-url"
 import { sendNewOrderAdminPush } from "@/lib/adminPush"
 import { isPartnerProductOrderable } from '@/lib/partnerProductStatus'
+import { calculatePartnerOrderTotals, resolvePartnerCheckoutUnitPrice } from '@/lib/partnerOrderPricing'
 
 const getCountryKey = (country?: string | null) => {
     if (country === 'Korea') return 'KR'
@@ -49,9 +50,11 @@ export async function POST(request: Request) {
         }
 
         const body = await request.json()
-        const { items, total } = body // items: { productId, quantity }[]
+        // Only product IDs and quantities are read from the client; prices and the
+        // total are recomputed here from the partner's grade and country.
+        const { items } = body // items: { productId, quantity }[]
 
-        if (!items || items.length === 0) {
+        if (!Array.isArray(items) || items.length === 0) {
             return NextResponse.json({ error: "No items" }, { status: 400 })
         }
 
@@ -71,6 +74,7 @@ export async function POST(request: Request) {
             const gradeKey = getGradeKey(user?.partnerProfile?.grade)
 
             // 1. Verify that every product is currently available for partner orders.
+            const pricedItems: { productId: string; quantity: number; price: number }[] = []
             for (const item of items) {
                 const product = await tx.product.findUnique({ where: { id: item.productId } })
                 if (!product) {
@@ -79,7 +83,8 @@ export async function POST(request: Request) {
                 if (!isPartnerProductOrderable(product.partnerSaleStatus, product.wholesaleAvailable)) {
                     throw new Error(`현재 발주 불가능한 상품입니다: ${product.name}`)
                 }
-                if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.price) || item.price <= 0) {
+                const price = resolvePartnerCheckoutUnitPrice(product, { country: user?.country, grade: gradeKey })
+                if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0 || !Number.isFinite(price) || price <= 0) {
                     throw new Error(`${product.name}: 주문 수량과 거래 단가를 확인해 주세요.`)
                 }
                 const { minimumQuantity, orderUnit } = resolveOrderRules(product, gradeKey, countryKey)
@@ -89,7 +94,12 @@ export async function POST(request: Request) {
                 if (item.quantity % orderUnit !== 0) {
                     throw new Error(`${product.name} must be ordered in units of ${orderUnit}`)
                 }
+                pricedItems.push({ productId: product.id, quantity: item.quantity, price })
             }
+
+            const subtotal = pricedItems.reduce((sum, item) => sum + item.price * item.quantity, 0)
+            const totalQuantity = pricedItems.reduce((sum, item) => sum + item.quantity, 0)
+            const { total } = calculatePartnerOrderTotals(subtotal, totalQuantity, user?.country)
 
             // 2. Generate Order Number (YYYYMMDD + 3-digit sequence)
             const now = new Date()
@@ -126,11 +136,7 @@ export async function POST(request: Request) {
                     userId: session.user.id,
                     total,
                     items: {
-                        create: items.map((item: any) => ({
-                            productId: item.productId,
-                            quantity: item.quantity,
-                            price: item.price
-                        }))
+                        create: pricedItems
                     }
                 },
                 include: { items: true }

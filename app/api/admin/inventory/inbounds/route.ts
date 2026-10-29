@@ -2,9 +2,14 @@ import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getProductImageUrl } from '@/lib/product-image-url'
 import { formatKoreanYmd, koreanMonthRange, parseKoreanYmd } from '@/lib/inventoryInboundDates.mjs'
+import { isSameOriginRequest } from '@/lib/sameOrigin'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+
+// The standalone /inventory page records inbounds without a login, so writes are
+// limited to requests from this site and to a sane quantity.
+const MAX_INBOUND_QUANTITY = 100_000
 
 const DEFAULT_WAREHOUSE_ITEMS = [
   {
@@ -70,7 +75,7 @@ export async function GET(request: Request) {
         productImageUrl: true,
         quantity: true,
         createdAt: true,
-        createdBy: { select: { name: true, username: true } },
+        createdBy: { select: { name: true } },
       },
     }),
     prisma.inventoryInbound.findMany({
@@ -132,6 +137,10 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: '허용되지 않은 요청입니다.' }, { status: 403 })
+  }
+
   const body = await request.json().catch(() => ({}))
   const inboundDate = parseKoreanYmd(body?.inboundDate) || todayStart()
   const warehouseItemId = typeof body?.warehouseItemId === 'string' && body.warehouseItemId.trim() ? body.warehouseItemId.trim() : null
@@ -147,6 +156,9 @@ export async function POST(request: Request) {
   }
   if (!Number.isFinite(quantity) || quantity <= 0) {
     return NextResponse.json({ error: '입고 수량은 1 이상이어야 합니다.' }, { status: 400 })
+  }
+  if (quantity > MAX_INBOUND_QUANTITY) {
+    return NextResponse.json({ error: `입고 수량은 ${MAX_INBOUND_QUANTITY.toLocaleString('ko-KR')}개 이하로 입력해 주세요.` }, { status: 400 })
   }
 
   const item = await prisma.$transaction(async (tx) => {

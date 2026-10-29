@@ -2,6 +2,7 @@ import { prisma } from "@/lib/prisma"
 import OrderInterface from "./order-interface"
 import { getProductImageUrl } from "@/lib/product-image-url"
 import { normalizePartnerProductStatus } from '@/lib/partnerProductStatus'
+import { resolvePartnerCheckoutUnitPrice } from '@/lib/partnerOrderPricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,7 +108,7 @@ export default async function NewOrderPage() {
 
     // Map products to apply correct price based on grade
     const productsWithTieredPrice = products.map(p => {
-        let finalPrice = safeNonNegativeNumber(p.sellPrice);
+        const finalPrice = resolvePartnerCheckoutUnitPrice(p, { country: user?.country, grade: userGrade });
 
         const regional = p.regionalPrices as Record<string, RegionalGradePrices> | null;
         const validGrades = ['A', 'B', 'C', 'D'];
@@ -139,12 +140,6 @@ export default async function NewOrderPage() {
                 currentMoq = safePositiveInt(gradeData?.US?.moq, safePositiveInt(p.minOrderQuantity, 1));
                 currentOrderUnit = safePositiveInt(gradeData?.US?.orderUnit, safePositiveInt(p.orderUnit, 1));
             }
-
-            // Set final checkout price based on the user's country
-            if (user?.country === 'Korea' && krBuy > 0) finalPrice = krBuy;
-            else if (user?.country === 'Japan' && jpBuy > 0) finalPrice = jpBuy;
-            else if (usBuy > 0) finalPrice = usBuy;
-            else if (krBuy > 0) finalPrice = krBuy; // fallback to KR if US missing
         };
 
         if (regional && typeof regional === 'object' && regional[gradeToUse]) {
@@ -152,20 +147,7 @@ export default async function NewOrderPage() {
         } else if (regional && typeof regional === 'object' && regional['C']) {
             parsePrices(regional['C']);
         } else {
-            // Old fallback logic
-            const gradePriceMap: Record<string, number | null | undefined> = {
-                'A': p.priceA,
-                'B': p.priceB,
-                'C': p.priceC,
-                'D': p.priceD
-            }
-
-            const selectedPrice = safeNonNegativeNumber(gradePriceMap[gradeToUse])
-            if (selectedPrice > 0) {
-                finalPrice = selectedPrice
-            } else if (safeNonNegativeNumber(p.priceC) > 0) {
-                finalPrice = safeNonNegativeNumber(p.priceC)
-            }
+            // Old fallback logic: grade price, then C price, then sell price
             krBuy = finalPrice;
         }
 

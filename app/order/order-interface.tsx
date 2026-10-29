@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
 import { Minus, Plus, ArrowRight, Search, PackageSearch } from 'lucide-react'
 import { isPartnerProductOrderable, normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
+import { calculatePartnerOrderTotals } from '@/lib/partnerOrderPricing'
 
 type Product = {
     id?: string | null
@@ -277,18 +278,14 @@ export default function OrderInterface({ products, isKorean = false }: { product
         return sum + (p.sellPrice * safeNonNegativeInt(quantities[p.id]))
     }, 0)
 
-    const totalQuantity = Object.values(quantities).reduce((sum, q) => sum + safeNonNegativeInt(q), 0)
+    const totalQuantity = safeProducts.reduce((sum, p) => (
+        isPartnerProductOrderable(p.partnerSaleStatus) ? sum + safeNonNegativeInt(quantities[p.id]) : sum
+    ), 0)
     const userCountry = safeProducts[0]?.country
     const currencySymbol = userCountry === 'Korea' ? '₩' : userCountry === 'Japan' ? '¥' : '$'
-    const isUSD = userCountry !== 'Korea' && userCountry !== 'Japan'
 
-    // Shipping: 3000 base + 3000 extra for every 100 items starting from 101
-    // Disabled for US pricing users as requested
-    const shippingFee = (totalQuantity > 0 && !isUSD) ? Math.ceil(totalQuantity / 100) * 3000 : 0
-
-    const supplyTotal = productTotal + shippingFee
-    const vat = isUSD ? 0 : Math.round(supplyTotal * 0.1)
-    const totalAmount = supplyTotal + vat
+    // Same calculation the order API uses to store the total.
+    const { isUSD, shippingFee, supplyTotal, vat, total: totalAmount } = calculatePartnerOrderTotals(productTotal, totalQuantity, userCountry)
 
     const hasItems = productTotal > 0
 

@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { isSameOriginRequest } from '@/lib/sameOrigin'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: Request, context: { params: Promise<{ id: string }> }) {
+  if (!isSameOriginRequest(request)) {
+    return NextResponse.json({ error: '허용되지 않은 요청입니다.' }, { status: 403 })
+  }
+
   const { id } = await context.params
   if (!id) {
     return NextResponse.json({ error: '삭제할 입고 기록이 없습니다.' }, { status: 400 })
