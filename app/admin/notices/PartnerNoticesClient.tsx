@@ -1,10 +1,13 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import Link from 'next/link'
-import { ArrowLeft, AlertTriangle, BellRing, CalendarClock, Edit3, Info, Megaphone, Plus, Power, Trash2, X } from 'lucide-react'
+import { CalendarClock, ChevronDown, Edit3, Megaphone, Plus, Trash2, X } from 'lucide-react'
+import Modal from '@/components/Modal'
 import Button from '@/components/ui/Button'
+import { buttonClass } from '@/components/ui/buttonClass'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
 import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
 
 export type PartnerNoticeItem = {
@@ -39,17 +42,12 @@ const emptyForm = (): NoticeForm => ({
   endsAt: '',
 })
 
+// Importance shows as a pill and a thin left bar; the card itself stays white so tone colours don't flood the page.
 const toneOptions = [
-  { value: 'INFO' as const, label: '일반', icon: Info, active: 'border-blue-500 bg-blue-50 text-blue-700' },
-  { value: 'IMPORTANT' as const, label: '중요', icon: BellRing, active: 'border-amber-500 bg-amber-50 text-amber-800' },
-  { value: 'URGENT' as const, label: '긴급', icon: AlertTriangle, active: 'border-rose-500 bg-rose-50 text-rose-700' },
+  { value: 'INFO' as const, label: '일반', badge: 'neutral' as BadgeTone, bar: 'border-l-slate-300' },
+  { value: 'IMPORTANT' as const, label: '중요', badge: 'warning' as BadgeTone, bar: 'border-l-amber-400' },
+  { value: 'URGENT' as const, label: '긴급', badge: 'danger' as BadgeTone, bar: 'border-l-rose-500' },
 ]
-
-const toneCard = {
-  INFO: 'border-blue-200 bg-blue-50/50',
-  IMPORTANT: 'border-amber-200 bg-amber-50/60',
-  URGENT: 'border-rose-200 bg-rose-50/60',
-} as const
 
 const formatDate = (value: string | null) => value
   ? new Intl.DateTimeFormat('ko-KR', {
@@ -68,13 +66,24 @@ const toLocalDateTime = (value: string | null) => {
   return local.toISOString().slice(0, 16)
 }
 
-const getStatus = (notice: PartnerNoticeItem) => {
+const getStatus = (notice: PartnerNoticeItem): { label: string; tone: BadgeTone } => {
   const now = Date.now()
-  if (!notice.isActive) return { label: '사용 중지', style: 'bg-slate-100 text-slate-600' }
-  if (notice.startsAt && new Date(notice.startsAt).getTime() > now) return { label: '노출 예약', style: 'bg-violet-100 text-violet-700' }
-  if (notice.endsAt && new Date(notice.endsAt).getTime() < now) return { label: '노출 종료', style: 'bg-slate-100 text-slate-500' }
-  return { label: '게시 중', style: 'bg-emerald-100 text-emerald-700' }
+  if (!notice.isActive) return { label: '사용 중지', tone: 'neutral' }
+  if (notice.startsAt && new Date(notice.startsAt).getTime() > now) return { label: '노출 예약', tone: 'info' }
+  if (notice.endsAt && new Date(notice.endsAt).getTime() < now) return { label: '노출 종료', tone: 'neutral' }
+  return { label: '게시 중', tone: 'success' }
 }
+
+/** Visual track for an on/off switch; the caller supplies the control and its label. */
+function SwitchTrack({ on }: { on: boolean }) {
+  return (
+    <span aria-hidden="true" className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors ${on ? 'bg-emerald-600' : 'bg-slate-300'}`}>
+      <span className={`absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${on ? 'translate-x-4' : 'translate-x-0'}`} />
+    </span>
+  )
+}
+
+const fieldLabelClass = 'mb-2 block text-xs font-black text-slate-700'
 
 export default function PartnerNoticesClient({ initialNotices }: { initialNotices: PartnerNoticeItem[] }) {
   const [notices, setNotices] = useState(initialNotices)
@@ -162,27 +171,20 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
     }
   }
 
+  const closeEditor = () => {
+    if (!saving) setEditorOpen(false)
+  }
+
   return (
-    <div className="space-y-5">
-      <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
-        <div className="flex items-center gap-2">
-          <Link href="/admin/partners" aria-label="파트너 관리로 돌아가기" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-[#333] dark:text-slate-300">
-            <ArrowLeft size={17} />
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-[#d9361b]">
-              <Megaphone size={19} />
-            </div>
-            <div>
-              <h1 className="text-xl font-black text-slate-950 dark:text-white">파트너 공지</h1>
-              <p className="mt-0.5 text-xs font-medium text-slate-500">현재 파트너에게 노출 중인 공지 {liveCount}개</p>
-            </div>
-          </div>
-        </div>
-        <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#d9361b] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#c52e16]">
-          <Plus size={17} /> 새 공지 등록
-        </button>
-      </header>
+    <div className="space-y-4">
+      <PageHeader
+        title="파트너 공지"
+        count={notices.length}
+        description={`파트너 상품 목록 상단에 표시되는 공지입니다. 지금 노출 중인 공지 ${liveCount}개.`}
+        backHref="/admin/partners"
+        backLabel="파트너 관리로 돌아가기"
+        actions={<button type="button" onClick={openCreate} className={buttonClass('primary', 'md')}><Plus size={15} />새 공지 등록</button>}
+      />
 
       {error && !editorOpen ? (
         <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</div>
@@ -200,31 +202,47 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
           )}
         />
       ) : (
-        <div className="grid gap-4 xl:grid-cols-2">
+        <div className="grid gap-3">
           {notices.map((notice) => {
             const status = getStatus(notice)
-            const cardTone = toneCard[notice.tone as keyof typeof toneCard] || toneCard.INFO
+            const tone = toneOptions.find((option) => option.value === notice.tone) || toneOptions[0]
             return (
-              <article key={notice.id} className={`rounded-2xl border p-5 shadow-sm ${cardTone} dark:border-[#333] dark:bg-[#1e1e1e]`}>
-                <div className="flex items-start justify-between gap-3">
+              <article key={notice.id} className={`rounded-[10px] border border-l-4 border-slate-200 bg-white p-5 shadow-sm ${tone.bar}`}>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${status.style}`}>{status.label}</span>
-                      <span className="text-[11px] font-bold text-slate-500">{toneOptions.find((option) => option.value === notice.tone)?.label || '일반'}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tone={status.tone}>{status.label}</Badge>
+                      <Badge tone={tone.badge}>{tone.label}</Badge>
                     </div>
-                    <h2 className="mt-3 text-lg font-black leading-snug text-slate-950 break-keep dark:text-white">{notice.title}</h2>
+                    <h2 className="mt-2 break-keep text-lg font-black leading-snug text-slate-950">{notice.title}</h2>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    <button type="button" onClick={() => openEdit(notice)} aria-label="공지 수정" className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 dark:border-[#333] dark:bg-[#242424]"><Edit3 size={15} /></button>
-                    <button type="button" onClick={() => toggleNotice(notice)} aria-label={notice.isActive ? '공지 중지' : '공지 사용'} className={`flex h-11 w-11 items-center justify-center rounded-lg border bg-white dark:border-[#333] dark:bg-[#242424] ${notice.isActive ? 'border-emerald-200 text-emerald-600' : 'border-slate-200 text-slate-400'}`}><Power size={15} /></button>
-                    <button type="button" onClick={() => deleteNotice(notice)} aria-label="공지 삭제" className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-[#333] dark:bg-[#242424]"><Trash2 size={15} /></button>
+                  <div className="flex shrink-0 items-center gap-2">
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={notice.isActive}
+                      onClick={() => toggleNotice(notice)}
+                      className="inline-flex h-8 items-center gap-2 rounded-lg px-2 text-xs font-bold text-slate-700 transition-colors hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                      title={notice.isActive ? '끄면 기간과 관계없이 파트너에게 표시되지 않습니다.' : '켜면 노출 기간 동안 파트너에게 표시됩니다.'}
+                    >
+                      <SwitchTrack on={notice.isActive} />
+                      게시
+                    </button>
+                    <button type="button" onClick={() => openEdit(notice)} className={buttonClass('secondary', 'sm')}><Edit3 size={13} />수정</button>
+                    <button type="button" onClick={() => deleteNotice(notice)} className={buttonClass('danger', 'sm')}><Trash2 size={13} />삭제</button>
                   </div>
                 </div>
-                <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-600 dark:text-slate-300">공지 전문 보기</summary><p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-600 dark:text-slate-300">{notice.content}</p></details>
-                <div className="mt-5 grid gap-2 rounded-xl border border-white/80 bg-white/65 p-3 text-[11px] font-medium text-slate-500 sm:grid-cols-2 dark:border-[#333] dark:bg-[#242424]">
-                  <span className="flex items-center gap-1.5"><CalendarClock size={13} /> 시작: {formatDate(notice.startsAt)}</span>
-                  <span className="flex items-center gap-1.5"><CalendarClock size={13} /> 종료: {formatDate(notice.endsAt)}</span>
-                </div>
+                <details className="group mt-3">
+                  <summary className="flex min-h-10 cursor-pointer list-none items-center gap-1.5 text-sm font-semibold text-slate-600 hover:text-slate-900 [&::-webkit-details-marker]:hidden">
+                    공지 전문 보기
+                    <ChevronDown size={15} className="text-slate-400 transition-transform group-open:rotate-180" />
+                  </summary>
+                  <p className="mt-1 whitespace-pre-wrap break-keep text-sm font-medium leading-6 text-slate-600">{notice.content}</p>
+                </details>
+                <p className="mt-3 flex items-center gap-1.5 text-[12px] tabular-nums text-slate-500">
+                  <CalendarClock size={13} className="shrink-0" />
+                  기간 · {formatDate(notice.startsAt)} – {formatDate(notice.endsAt)}
+                </p>
               </article>
             )
           })}
@@ -232,71 +250,66 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
       )}
 
       {editorOpen ? (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
-          <section role="dialog" aria-modal="true" aria-labelledby="notice-editor-title" className="max-h-[calc(100dvh-32px)] w-full max-w-2xl overflow-y-auto rounded-2xl bg-white shadow-2xl dark:bg-[#1e1e1e]">
-            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-white/95 px-6 py-5 backdrop-blur dark:border-[#303030] dark:bg-[#1e1e1e]/95">
-              <div>
-                <h2 id="notice-editor-title" className="text-xl font-black text-slate-950 dark:text-white">{form.id ? '공지 수정' : '새 공지 등록'}</h2>
-              </div>
-              <button type="button" onClick={() => setEditorOpen(false)} aria-label="닫기" className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#292929] dark:text-slate-300"><X size={18} /></button>
+        <Modal labelledBy="notice-editor-title" onClose={closeEditor} className="flex items-center justify-center bg-slate-950/55 p-4">
+          <section className="flex max-h-[calc(100dvh-32px)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
+              <h2 id="notice-editor-title" className="text-lg font-black text-slate-950">{form.id ? '공지 수정' : '새 공지 등록'}</h2>
+              <button type="button" onClick={closeEditor} aria-label="닫기" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"><X size={18} /></button>
             </div>
 
-            <div className="space-y-5 p-6">
+            <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-6">
               <label className="block">
-                <span className="mb-2 block text-xs font-black text-slate-700 dark:text-slate-200">공지 제목</span>
-                <input value={form.title} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: 추석 연휴 배송 일정 안내" className="h-12 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold outline-none focus:border-brand-orange dark:border-[#333] dark:bg-[#242424]" />
+                <span className={fieldLabelClass}>공지 제목</span>
+                <input value={form.title} maxLength={120} onChange={(event) => setForm((current) => ({ ...current, title: event.target.value }))} placeholder="예: 추석 연휴 배송 일정 안내" className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold outline-none focus:border-brand-orange" />
               </label>
 
               <label className="block">
-                <span className="mb-2 block text-xs font-black text-slate-700 dark:text-slate-200">공지 내용</span>
-                <textarea value={form.content} maxLength={5000} rows={8} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} placeholder="파트너에게 전달할 내용을 입력하세요." className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 outline-none focus:border-brand-orange dark:border-[#333] dark:bg-[#242424]" />
-                <span className="mt-1 block text-right text-[11px] font-medium text-slate-500">{form.content.length.toLocaleString()} / 5,000</span>
+                <span className={fieldLabelClass}>공지 내용</span>
+                <textarea value={form.content} maxLength={5000} rows={8} onChange={(event) => setForm((current) => ({ ...current, content: event.target.value }))} placeholder="파트너에게 전달할 내용을 입력하세요." className="w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium leading-6 outline-none focus:border-brand-orange" />
+                <span className="mt-1 block text-right text-[11px] font-medium tabular-nums text-slate-500">{form.content.length.toLocaleString()} / 5,000</span>
               </label>
 
-              <fieldset>
-                <legend className="mb-2 text-xs font-black text-slate-700 dark:text-slate-200">공지 중요도</legend>
-                <div className="grid grid-cols-3 gap-2">
-                  {toneOptions.map((option) => {
-                    const Icon = option.icon
-                    return (
-                      <button key={option.value} type="button" onClick={() => setForm((current) => ({ ...current, tone: option.value }))} className={`flex min-h-12 items-center justify-center gap-2 rounded-xl border text-sm font-black transition ${form.tone === option.value ? option.active : 'border-slate-200 bg-white text-slate-500 dark:border-[#333] dark:bg-[#242424]'}`}>
-                        <Icon size={16} /> {option.label}
-                      </button>
-                    )
-                  })}
-                </div>
-              </fieldset>
+              <div>
+                <span className={fieldLabelClass}>공지 중요도</span>
+                <Tabs
+                  aria-label="공지 중요도"
+                  items={toneOptions.map((option) => ({ key: option.value, label: option.label }))}
+                  value={form.tone}
+                  onChange={(tone) => setForm((current) => ({ ...current, tone }))}
+                />
+              </div>
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <label>
-                  <span className="mb-2 block text-xs font-black text-slate-700 dark:text-slate-200">노출 시작</span>
-                  <input type="datetime-local" value={form.startsAt} onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold dark:border-[#333] dark:bg-[#242424]" />
+                  <span className={fieldLabelClass}>노출 시작</span>
+                  <input type="datetime-local" lang="ko-KR" value={form.startsAt} onChange={(event) => setForm((current) => ({ ...current, startsAt: event.target.value }))} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold tabular-nums" />
                   <span className="mt-1 block text-[11px] text-slate-500">비워두면 즉시 시작</span>
                 </label>
                 <label>
-                  <span className="mb-2 block text-xs font-black text-slate-700 dark:text-slate-200">노출 종료</span>
-                  <input type="datetime-local" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} className="h-12 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold dark:border-[#333] dark:bg-[#242424]" />
+                  <span className={fieldLabelClass}>노출 종료</span>
+                  <input type="datetime-local" lang="ko-KR" value={form.endsAt} onChange={(event) => setForm((current) => ({ ...current, endsAt: event.target.value }))} className="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold tabular-nums" />
                   <span className="mt-1 block text-[11px] text-slate-500">비워두면 계속 노출</span>
                 </label>
               </div>
 
-              <label className="flex cursor-pointer items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 dark:border-[#333] dark:bg-[#242424]">
+              <label className="flex cursor-pointer items-center justify-between gap-4 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
                 <span>
-                  <span className="block text-sm font-black text-slate-800 dark:text-white">공지 사용</span>
+                  <span className="block text-sm font-black text-slate-800">공지 사용</span>
                   <span className="mt-0.5 block text-[11px] text-slate-500">끄면 기간과 관계없이 파트너에게 표시되지 않습니다.</span>
                 </span>
-                <input type="checkbox" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))} className="h-5 w-5 accent-brand-orange" />
+                <input type="checkbox" role="switch" checked={form.isActive} onChange={(event) => setForm((current) => ({ ...current, isActive: event.target.checked }))} className="peer sr-only" />
+                <span className="rounded-full peer-focus-visible:ring-2 peer-focus-visible:ring-brand-orange/40 peer-focus-visible:ring-offset-2"><SwitchTrack on={form.isActive} /></span>
               </label>
 
               {error ? <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</div> : null}
             </div>
 
-            <div className="sticky bottom-0 flex justify-end gap-2 border-t border-slate-100 bg-white/95 px-6 py-4 backdrop-blur dark:border-[#303030] dark:bg-[#1e1e1e]/95">
-              <Button type="button" variant="secondary" onClick={() => setEditorOpen(false)}>취소</Button>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-slate-200 bg-white px-6 py-4">
+              <Button type="button" variant="secondary" onClick={closeEditor}>취소</Button>
               <Button type="button" variant="primary" loading={saving} onClick={saveNotice}>{saving ? '저장 중...' : '저장하기'}</Button>
             </div>
           </section>
-        </div>
+        </Modal>
       ) : null}
     </div>
   )

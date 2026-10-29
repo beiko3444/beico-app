@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { Download, ExternalLink, FileText, Plus, X, ZoomIn } from 'lucide-react'
+import { Download, ExternalLink, FileText, Paperclip, Plus, X, ZoomIn } from 'lucide-react'
 import Modal from '@/components/Modal'
 import { getPartnerBusinessRegistrationUrl } from '@/lib/partner-business-registration-url'
 import Button, { buttonClass } from '@/components/ui/Button'
@@ -17,6 +17,7 @@ const inputClass =
     'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-900 transition ' +
     'focus:border-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
 const labelClass = 'mb-1.5 block text-[12px] font-bold text-slate-600'
+const legendClass = 'mb-3 text-[14px] font-black text-slate-900'
 
 function TriggerButton() {
     return (
@@ -34,6 +35,9 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
     const [loading, setLoading] = useState(false)
     const [enlargedImage, setEnlargedImage] = useState<string | null>(null)
     const [hasBusinessRegistrationChanged, setHasBusinessRegistrationChanged] = useState(false)
+    const [selectedFileName, setSelectedFileName] = useState('')
+    const fileInputRef = useRef<HTMLInputElement>(null)
+    const formId = useId()
 
     useEffect(() => {
         setMounted(true)
@@ -73,6 +77,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 businessRegistrationContentType: initialData.partnerProfile?.businessRegistrationContentType || ''
             })
             setHasBusinessRegistrationChanged(false)
+            setSelectedFileName('')
         } else if (isOpen && !initialData) {
             setFormData({
                 username: '',
@@ -90,6 +95,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 businessRegistrationContentType: ''
             })
             setHasBusinessRegistrationChanged(false)
+            setSelectedFileName('')
         }
     }, [isOpen, initialData])
 
@@ -105,6 +111,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
     const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]
         if (!file) return
+        setSelectedFileName(file.name)
 
         const reader = new FileReader()
         reader.onload = (event) => {
@@ -216,19 +223,21 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                 className="relative flex max-h-[95vh] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
-                    <h3 className="text-[20px] font-black tracking-tight text-slate-900">
+                <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
+                    <h3 className="text-lg font-black text-slate-900">
                         {initialData ? '파트너 정보 수정' : '새 파트너 계정 등록'}
                     </h3>
                     <button
                         type="button"
                         onClick={() => setIsOpen(false)}
-                        aria-label="파트너 정보 닫기" className="ux-icon-button"
+                        aria-label="파트너 정보 닫기"
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
                     >
-                        <X className="h-5 w-5" />
+                        <X size={18} />
                     </button>
                 </div>
                 <form
+                    id={formId}
                     onSubmit={handleSubmit}
                     onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
@@ -239,95 +248,87 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                             }
                         }
                     }}
-                    className="min-w-0 flex-1 space-y-4 overflow-y-auto px-5 py-5 text-xs sm:px-6"
+                    className="min-h-0 min-w-0 flex-1 space-y-5 overflow-y-auto px-5 py-5 text-[13px] sm:px-6"
                 >
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className={labelClass}>상호명</label>
-                            <input name="name" type="text" value={formData.name} onChange={handleChange} className={inputClass} required />
+                    {/* Fields are grouped by what they describe: the login, the business, how to reach it. */}
+                    <fieldset className="space-y-3">
+                        <legend className={legendClass}>계정</legend>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                            <div>
+                                <label className={labelClass}>로그인 아이디</label>
+                                <input name="username" type="text" value={formData.username} onChange={handleChange} className={inputClass} required />
+                            </div>
+                            <div>
+                                <label className={labelClass}>비밀번호 {initialData && '(변경 시에만 입력)'}</label>
+                                <input name="password" type="password" value={formData.password} onChange={handleChange} className={inputClass} required={!initialData} placeholder={initialData ? '••••••••' : '비밀번호 입력'} />
+                            </div>
+                            <div>
+                                <label className={labelClass}>파트너 등급</label>
+                                <select name="grade" value={formData.grade} onChange={handleChange} className={`${inputClass} font-bold`}>
+                                    <option value="A">A 등급 (최적가)</option>
+                                    <option value="B">B 등급</option>
+                                    <option value="C">C 등급 (기본)</option>
+                                    <option value="D">D 등급</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className={labelClass}>계정 권한</label>
+                                <select name="role" value={formData.role} onChange={handleChange} className={`${inputClass} font-bold`}>
+                                    <option value="PARTNER">일반 파트너</option>
+                                    <option value="ADMIN">최고 관리자</option>
+                                </select>
+                            </div>
                         </div>
-                        <div>
-                            <label className={labelClass}>담당자명</label>
-                            <input name="representativeName" type="text" value={formData.representativeName} onChange={handleChange} className={inputClass} placeholder="성함 입력" />
-                        </div>
-                    </div>
+                    </fieldset>
 
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className={labelClass}>로그인 아이디</label>
-                            <input name="username" type="text" value={formData.username} onChange={handleChange} className={inputClass} required />
-                        </div>
-                        <div>
-                            <label className={labelClass}>비밀번호 {initialData && '(변경 시에만 입력)'}</label>
-                            <input name="password" type="password" value={formData.password} onChange={handleChange} className={inputClass} required={!initialData} placeholder={initialData ? '••••••••' : '비밀번호 입력'} />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className={labelClass}>파트너 등급</label>
-                            <select name="grade" value={formData.grade} onChange={handleChange} className={`${inputClass} font-bold`}>
-                                <option value="A">A 등급 (최적가)</option>
-                                <option value="B">B 등급</option>
-                                <option value="C">C 등급 (기본)</option>
-                                <option value="D">D 등급</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelClass}>계정 권한</label>
-                            <select name="role" value={formData.role} onChange={handleChange} className={`${inputClass} font-bold`}>
-                                <option value="PARTNER">일반 파트너</option>
-                                <option value="ADMIN">최고 관리자</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className={labelClass}>전화번호</label>
-                            <input name="contact" type="text" value={formData.contact} onChange={handleChange} className={inputClass} placeholder="010-0000-0000" />
+                    <fieldset className="space-y-3 border-t border-slate-200 pt-5">
+                        <legend className={`${legendClass} float-left w-full`}>사업자</legend>
+                        <div className="clear-both grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                            <div>
+                                <label className={labelClass}>상호명</label>
+                                <input name="name" type="text" value={formData.name} onChange={handleChange} className={inputClass} required />
+                            </div>
+                            <div>
+                                <label className={labelClass}>담당자명</label>
+                                <input name="representativeName" type="text" value={formData.representativeName} onChange={handleChange} className={inputClass} placeholder="성함 입력" />
+                            </div>
+                            <div>
+                                <label className={labelClass}>사업자 등록 번호</label>
+                                <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className={`${inputClass} tabular-nums`} placeholder="숫자만 입력" />
+                            </div>
+                            <div>
+                                <label className={labelClass}>국적</label>
+                                <select name="country" value={formData.country} onChange={handleChange} className={`${inputClass} font-bold`} required>
+                                    <option value="">국적 선택</option>
+                                    <option value="Japan">일본</option>
+                                    <option value="Korea">한국</option>
+                                    <option value="USA">미국</option>
+                                    <option value="China">중국</option>
+                                    <option value="Turkey">투르키예</option>
+                                    <option value="Indonesia">인도네시아</option>
+                                </select>
+                            </div>
                         </div>
 
                         <div>
-                            <label className={labelClass}>이메일 주소</label>
-                            <input name="email" type="email" value={formData.email} onChange={handleChange} className={inputClass} placeholder="example@email.com" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className={labelClass}>배송지 주소</label>
-                        <input name="address" type="text" value={formData.address} onChange={handleChange} className={inputClass} placeholder="상세 주소 입력" />
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                        <div>
-                            <label className={labelClass}>국적</label>
-                            <select name="country" value={formData.country} onChange={handleChange} className={`${inputClass} font-bold`} required>
-                                <option value="">국적 선택</option>
-                                <option value="Japan">일본</option>
-                                <option value="Korea">한국</option>
-                                <option value="USA">미국</option>
-                                <option value="China">중국</option>
-                                <option value="Turkey">투르키예</option>
-                                <option value="Indonesia">인도네시아</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className={labelClass}>사업자 등록 번호</label>
-                            <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className={inputClass} placeholder="숫자만 입력" />
-                        </div>
-                    </div>
-
-                    <div>
-                        <label className={labelClass}>사업자 등록증 (첨부)</label>
-                        <div className="flex flex-col gap-3">
-                            <input
-                                type="file"
-                                accept="image/*,application/pdf"
-                                onChange={handleFileChange}
-                                className="block w-full text-xs text-slate-500 file:mr-4 file:rounded-lg file:border-0 file:bg-brand-orange-soft file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-brand-orange hover:file:bg-orange-100"
-                            />
-                            {formData.businessRegistrationUrl && (
+                            <span className={labelClass}>사업자 등록증 (첨부)</span>
+                            <div className="flex flex-col gap-3">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept="image/*,application/pdf"
+                                        onChange={handleFileChange}
+                                        className="hidden"
+                                    />
+                                    <button type="button" onClick={() => fileInputRef.current?.click()} className={buttonClass('secondary', 'sm')}>
+                                        <Paperclip size={13} /> 파일 선택
+                                    </button>
+                                    <span className="min-w-0 truncate text-[12px] text-slate-500">
+                                        {selectedFileName || (formData.businessRegistrationUrl ? '첨부된 파일이 있습니다.' : '선택된 파일 없음')}
+                                    </span>
+                                </div>
+                                {formData.businessRegistrationUrl && (
                                 <div className="flex flex-col gap-2 rounded-xl border border-slate-200 bg-slate-50/60 p-3">
                                     {isDocumentImage ? (
                                         <div className="group relative cursor-pointer" onClick={() => setEnlargedImage(formData.businessRegistrationUrl)}>
@@ -376,6 +377,8 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                             icon={<X size={13} />}
                                             onClick={() => {
                                                 setHasBusinessRegistrationChanged(true)
+                                                setSelectedFileName('')
+                                                if (fileInputRef.current) fileInputRef.current.value = ''
                                                 setFormData(prev => ({
                                                     ...prev,
                                                     businessRegistrationUrl: '',
@@ -388,24 +391,44 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                                     </div>
                                 </div>
                             )}
+                            </div>
                         </div>
-                    </div>
+                    </fieldset>
 
-                    <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-200 pt-4">
-                        <Button
-                            variant="secondary"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                setIsOpen(false);
-                            }}
-                        >
-                            취소
-                        </Button>
-                        <Button type="submit" variant="primary" loading={loading}>
-                            {loading ? '저장 중...' : initialData ? '파트너 수정' : '계정 생성'}
-                        </Button>
-                    </div>
+                    <fieldset className="space-y-3 border-t border-slate-200 pt-5">
+                        <legend className={`${legendClass} float-left w-full`}>연락처</legend>
+                        <div className="clear-both grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                            <div>
+                                <label className={labelClass}>전화번호</label>
+                                <input name="contact" type="text" value={formData.contact} onChange={handleChange} className={`${inputClass} tabular-nums`} placeholder="010-0000-0000" />
+                            </div>
+                            <div>
+                                <label className={labelClass}>이메일 주소</label>
+                                <input name="email" type="email" value={formData.email} onChange={handleChange} className={inputClass} placeholder="example@email.com" />
+                            </div>
+                        </div>
+                        <div>
+                            <label className={labelClass}>배송지 주소</label>
+                            <input name="address" type="text" value={formData.address} onChange={handleChange} className={inputClass} placeholder="상세 주소 입력" />
+                        </div>
+                    </fieldset>
                 </form>
+
+                {/* Outside the scrolling form so the actions stay visible however long the form gets. */}
+                <div className="flex shrink-0 flex-wrap justify-end gap-2 border-t border-slate-200 px-5 py-4 sm:px-6">
+                    <Button
+                        variant="secondary"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            setIsOpen(false);
+                        }}
+                    >
+                        취소
+                    </Button>
+                    <Button type="submit" form={formId} variant="primary" loading={loading}>
+                        {loading ? '저장 중...' : initialData ? '파트너 수정' : '계정 생성'}
+                    </Button>
+                </div>
             </div>
         </Modal>
     )

@@ -21,6 +21,7 @@ import {
   AlertCircle,
   AlertTriangle,
   Boxes,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Database,
@@ -52,6 +53,7 @@ import { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import Badge from '@/components/ui/Badge'
 import ProductInventoryHistoryModal from './ProductInventoryHistoryModal'
 
 type FilterMode = 'all' | 'empty' | 'inbound' | 'unlinked' | 'linked'
@@ -66,11 +68,18 @@ const filterOptions: Array<{ value: FilterMode; label: string }> = [
   { value: 'all', label: '전체' },
   { value: 'empty', label: '품절' },
   { value: 'inbound', label: '입고대기' },
-  { value: 'unlinked', label: '채널 연결 없는 관리 상품' },
+  { value: 'unlinked', label: '채널 미연결' },
   { value: 'linked', label: '연결상품 있음' },
 ]
 
 const pageSizeOptions = [20, 50, 100] as const
+
+const tableModeTabs: Array<{ key: TableMode; label: string }> = [
+  { key: 'masters', label: '관리 상품' },
+  { key: 'unlinked', label: '미연결 채널 SKU' },
+]
+
+const pageButtonBase = 'inline-flex h-8 min-w-8 items-center justify-center rounded-lg border px-2 text-xs font-bold tabular-nums transition-colors'
 
 const restrictToVerticalDrag: Modifier = ({ transform }) => ({
   ...transform,
@@ -127,39 +136,88 @@ function representativePrice(row: SmartInventoryMasterRow) {
   return row.naverPrice ?? row.coupangPrice ?? null
 }
 
+// Icons stay neutral; red is used only when the number itself needs attention.
 function StatCard({
   icon,
   label,
   value,
   sub,
-  tone = 'navy',
+  alert = false,
+  unknown = false,
+  className = '',
 }: {
   icon: ReactNode
   label: string
   value: string
   sub: ReactNode
-  tone?: 'navy' | 'blue' | 'orange' | 'red' | 'green'
+  alert?: boolean
+  /** The source failed to load, so the number is not shown as if it were real. */
+  unknown?: boolean
+  className?: string
 }) {
-  const iconClass =
-    tone === 'blue'
-      ? 'bg-sky-50 text-sky-600'
-      : tone === 'orange'
-        ? 'bg-orange-50 text-orange-600'
-        : tone === 'red'
-          ? 'bg-red-50 text-red-600'
-          : tone === 'green'
-            ? 'bg-emerald-50 text-emerald-600'
-            : 'bg-slate-100 text-slate-900'
-
   return (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-      <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:inline-flex ${iconClass}`}>
+    <div className={`flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm ${className}`}>
+      <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:inline-flex ${alert ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
         {icon}
       </span>
       <div className="min-w-0">
         <div className="text-[12px] font-extrabold text-slate-500">{label}</div>
-        <div className="mt-0.5 break-words text-[20px] font-black leading-tight tabular-nums text-slate-900 sm:text-[24px]">{value}</div>
-        <div className="mt-0.5 text-[11px] font-bold text-slate-500">{sub}</div>
+        <div className={`mt-0.5 break-words text-[20px] font-black leading-tight tabular-nums sm:text-[24px] ${unknown ? 'text-slate-400' : alert ? 'text-red-700' : 'text-slate-900'}`}>{unknown ? '—' : value}</div>
+        <div className="mt-0.5 line-clamp-1 text-[11px] font-bold text-slate-500">{sub}</div>
+      </div>
+    </div>
+  )
+}
+
+/** Groups failures that share a cause ("A를 불러오지 못했습니다: <원인>") into one line with the cause shown once. */
+function summarizeWarnings(warnings: string[]) {
+  const failures = new Map<string, string[]>()
+  const notes: string[] = []
+  for (const warning of warnings) {
+    const match = warning.match(/^(.+?) 불러오지 못했습니다: ([\s\S]+)$/)
+    if (!match) {
+      notes.push(warning)
+      continue
+    }
+    const subjects = failures.get(match[2]) || []
+    subjects.push(match[1].replace(/[을를]$/, ''))
+    failures.set(match[2], subjects)
+  }
+  return {
+    failures: [...failures.entries()].map(([reason, subjects]) => ({ reason, subjects })),
+    failedCount: [...failures.values()].reduce((sum, subjects) => sum + subjects.length, 0),
+    notes,
+  }
+}
+
+function InventoryWarnings({ warnings }: { warnings: string[] }) {
+  const { failures, failedCount, notes } = summarizeWarnings(warnings)
+  return (
+    <div role="status" className={`rounded-xl border px-4 py-3 text-[13px] ${failedCount ? 'border-red-200 bg-red-50 text-red-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`}>
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+        <div className="min-w-0 flex-1">
+          {failedCount ? <p className="font-bold">재고 데이터 {failedCount}개 항목을 불러오지 못했습니다. 아래 요약 값은 확인되지 않은 항목이 있습니다.</p> : null}
+          {notes.map((note) => (
+            <p key={note} className={failedCount ? 'mt-1 text-[12px] font-semibold' : 'font-semibold'}>{note}</p>
+          ))}
+          {failures.length ? (
+            <details className="group mt-1">
+              <summary className="inline-flex cursor-pointer list-none items-center gap-1 text-[12px] font-bold underline-offset-2 hover:underline [&::-webkit-details-marker]:hidden">
+                자세히
+                <ChevronDown size={13} className="transition-transform group-open:rotate-180" />
+              </summary>
+              <ul className="mt-2 space-y-2">
+                {failures.map((failure) => (
+                  <li key={failure.reason}>
+                    <span className="font-semibold">{failure.subjects.join(', ')}</span>
+                    <span className="mt-0.5 block break-all font-mono text-[11px] opacity-80">{failure.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </details>
+          ) : null}
+        </div>
       </div>
     </div>
   )
@@ -180,10 +238,10 @@ function InventoryStockSub({
   coupangStale?: boolean
 }) {
   return (
-    <span>
-      <span className="text-emerald-600">네이버 {formatNumber(naver)}</span>
+    <span className="tabular-nums">
+      <span>네이버 {formatNumber(naver)}</span>
       <span className="mx-1 text-slate-300">/</span>
-      <span className={coupangStale ? 'text-red-700' : 'text-red-600'}>
+      <span className={coupangStale ? 'text-red-700' : undefined}>
         쿠팡 {coupangStale ? '연동 오류' : formatNumber(coupang)}
       </span>
     </span>
@@ -229,11 +287,7 @@ function LinkedProducts({ links }: { links: SmartInventoryMasterRow['linked'] })
               if (!href) event.preventDefault()
             }}
             onPointerDown={(event) => event.stopPropagation()}
-            className={`inline-flex max-w-[132px] items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-black no-underline ${
-              link.channel === 'naver'
-                ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                : 'border-sky-100 bg-sky-50 text-sky-700'
-            } ${href ? 'hover:brightness-95' : 'pointer-events-none'}`}
+            className={`inline-flex max-w-[132px] items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-700 no-underline ${href ? 'hover:border-slate-400 hover:text-slate-900' : 'pointer-events-none'}`}
             title={link.name}
           >
             <span className="shrink-0">{channelLabel[link.channel]}</span>
@@ -330,7 +384,7 @@ function SortableMasterRow({
               </div>
               <div className="mt-1 truncate text-[12px] font-bold text-slate-500">
                 단가 {formatMoney(row.unitCost)}
-                <span className="ml-2 text-brand-orange">차감 그래프</span>
+                <span className="ml-2 text-blue-700">차감 그래프</span>
                 {row.memo ? <span className="ml-2 text-emerald-700">메모 {row.memo}</span> : null}
               </div>
             </div>
@@ -338,12 +392,12 @@ function SortableMasterRow({
         </div>
       </td>
       <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-slate-900">{formatMoney(representativePrice(row))}</td>
-      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-emerald-600">{formatNumber(row.naverStock)}</td>
-      <td className="px-3 py-2 text-right text-[14px] font-black tabular-nums text-red-600">
-        {coupangStale ? <span title="쿠팡 API 인증 오류로 현재 재고를 확인할 수 없습니다.">연동 오류</span> : formatNumber(row.coupangStock)}
+      <td className="px-3 py-2 text-right text-[14px] font-bold tabular-nums text-slate-800">{formatNumber(row.naverStock)}</td>
+      <td className="px-3 py-2 text-right text-[14px] font-bold tabular-nums text-slate-800">
+        {coupangStale ? <span className="text-red-700" title="쿠팡 API 인증 오류로 현재 재고를 확인할 수 없습니다.">연동 오류</span> : formatNumber(row.coupangStock)}
       </td>
       <td className="px-3 py-2 text-right text-[15px] font-black tabular-nums text-slate-950">{coupangStale ? '-' : formatNumber(row.totalStock)}</td>
-      <td className="hidden px-3 py-2 text-right text-[13px] font-black tabular-nums text-orange-600 xl:table-cell">{formatNumber(row.totalInboundPending)}</td>
+      <td className="hidden px-3 py-2 text-right text-[13px] font-bold tabular-nums text-slate-800 xl:table-cell">{formatNumber(row.totalInboundPending)}</td>
       <td className="hidden px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900 2xl:table-cell">{coupangStale ? '-' : formatMoney(row.stockCost)}</td>
       <td className="px-3 py-2"><LinkedProducts links={row.linked} /></td>
       <td className="hidden px-3 py-2 text-[12px] font-bold text-slate-500 2xl:table-cell">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
@@ -360,6 +414,7 @@ function MasterTable({
   onReorder,
   onSelect,
   coupangStale,
+  emptyState,
 }: {
   rows: SmartInventoryMasterRow[]
   allRows: SmartInventoryMasterRow[]
@@ -369,6 +424,7 @@ function MasterTable({
   onReorder: (nextOrder: number[]) => void
   onSelect: (row: SmartInventoryMasterRow) => void
   coupangStale: boolean
+  emptyState: ReactNode
 }) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }))
 
@@ -391,11 +447,12 @@ function MasterTable({
   }
 
   return (
-    <div className="max-h-[calc(100dvh-310px)] min-h-[360px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="max-h-[calc(100dvh-310px)] overflow-x-auto overflow-y-auto">
       <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalDrag]} onDragEnd={handleDragEnd}>
         <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-[13px]">
+          {/* The row carries the header colour too, so it reaches the edge whichever columns this breakpoint hides. */}
           <thead className="ux-thead sticky top-0 z-20">
-            <tr>
+            <tr className="bg-[var(--surface)]">
               <th className="w-[88px] whitespace-nowrap">순번</th>
               <th className="w-[310px] whitespace-nowrap">상품</th>
               <th className="w-[100px] whitespace-nowrap text-right">판매가</th>
@@ -425,9 +482,7 @@ function MasterTable({
               </SortableContext>
             ) : (
               <tr>
-                <td colSpan={10} className="p-4">
-                  <EmptyState compact icon={<Boxes size={20} />} title="표시할 마스터 재고가 없습니다." />
-                </td>
+                <td colSpan={10} className="p-0">{emptyState}</td>
               </tr>
             )}
           </tbody>
@@ -437,8 +492,9 @@ function MasterTable({
   )
 }
 
-function MasterCards({ rows, allRows, favoriteIds, onToggleFavorite, onReorder, onSelect, coupangStale }: {
+function MasterCards({ rows, allRows, favoriteIds, onToggleFavorite, onReorder, onSelect, coupangStale, emptyState }: {
   coupangStale: boolean
+  emptyState: ReactNode
   rows: SmartInventoryMasterRow[]
   allRows: SmartInventoryMasterRow[]
   favoriteIds: number[]
@@ -454,8 +510,8 @@ function MasterCards({ rows, allRows, favoriteIds, onToggleFavorite, onReorder, 
     ;[ids[index], ids[target]] = [ids[target], ids[index]]
     onReorder(ids)
   }
-  return <div className="space-y-3 lg:hidden">
-    {!rows.length && <div className="ux-empty-state ux-panel">조건에 맞는 관리 상품이 없습니다.</div>}
+  return <div className="space-y-3 p-3 lg:hidden">
+    {!rows.length && emptyState}
     {rows.map(row => {
       const index = allRows.findIndex(item => item.id === row.id)
       const favorite = favoriteIds.includes(row.id)
@@ -465,20 +521,20 @@ function MasterCards({ rows, allRows, favoriteIds, onToggleFavorite, onReorder, 
             <ProductImage src={row.imageUrl} alt={row.name} />
             <span className="min-w-0"><span className="block text-base font-bold text-slate-900">{row.name}</span><span className="mt-1 block text-xs text-slate-500">재고 이력·차감 추이 보기</span></span>
           </button>
-          <button onClick={() => onToggleFavorite(row.id)} aria-label={`${row.name} 즐겨찾기 ${favorite ? '해제' : '추가'}`} aria-pressed={favorite} className="ux-icon-button shrink-0"><Star size={18} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-amber-500' : 'text-slate-400'} /></button>
+          <button type="button" onClick={() => onToggleFavorite(row.id)} aria-label={`${row.name} 즐겨찾기 ${favorite ? '해제' : '추가'}`} aria-pressed={favorite} className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border transition-colors ${favorite ? 'border-amber-200 bg-amber-50' : 'border-slate-200 bg-white'}`}><Star size={18} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-amber-500' : 'text-slate-400'} /></button>
         </div>
         <dl className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-3 text-center">
           <div><dt className="text-xs text-slate-500">네이버</dt><dd className="mt-1 text-lg font-bold tabular-nums">{formatNumber(row.naverStock)}</dd></div>
           <div><dt className="text-xs text-slate-500">쿠팡</dt><dd className="mt-1 text-lg font-bold tabular-nums">{coupangStale ? '확인 불가' : formatNumber(row.coupangStock)}</dd></div>
           <div><dt className="text-xs text-slate-500">합계</dt><dd className="mt-1 text-lg font-bold tabular-nums">{coupangStale ? '확인 불가' : formatNumber(row.totalStock)}</dd></div>
         </dl>
-        <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs text-slate-600"><span>입고대기 {formatNumber(row.totalInboundPending)}개</span><span>원가 {formatMoney(row.unitCost)}</span><span>{row.linkCount ? `${row.linkCount}개 SKU 연결` : '채널 연결 없음'}</span></div>
-        <details className="mt-3 border-t border-slate-100 pt-2"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">연결 상품·목록 순서</summary>
+        <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs tabular-nums text-slate-600"><span>입고대기 {formatNumber(row.totalInboundPending)}개</span><span>원가 {formatMoney(row.unitCost)}</span><span>{row.linkCount ? `${row.linkCount}개 SKU 연결` : '채널 연결 없음'}</span></div>
+        <details className="group mt-3 border-t border-slate-100 pt-2"><summary className="flex min-h-11 cursor-pointer list-none items-center justify-between py-3 text-sm font-semibold [&::-webkit-details-marker]:hidden">연결 상품·목록 순서<ChevronDown size={16} className="text-slate-400 transition-transform group-open:rotate-180" /></summary>
           <div className="space-y-2">{row.linked.map(link => {
             const href = externalProductHref(link.productUrl, link.channel)
             return <div key={`${link.channel}:${link.productKey}`} className="text-sm">{href ? <a href={href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2">{channelLabel[link.channel]} · {link.name}<ExternalLink size={14} /></a> : <span>{channelLabel[link.channel]} · {link.name}</span>}</div>
           })}{!row.linked.length && <p className="text-sm text-slate-500">연결된 채널 상품이 없습니다.</p>}</div>
-          <div className="mt-2 flex gap-2"><button className="ux-button" disabled={index <= 0} onClick={() => move(row.id, -1)}>위로</button><button className="ux-button" disabled={index === allRows.length - 1} onClick={() => move(row.id, 1)}>아래로</button></div>
+          <div className="mt-2 flex gap-2"><button type="button" className={buttonClass('secondary', 'sm')} disabled={index <= 0} onClick={() => move(row.id, -1)}>위로</button><button type="button" className={buttonClass('secondary', 'sm')} disabled={index === allRows.length - 1} onClick={() => move(row.id, 1)}>아래로</button></div>
         </details>
       </article>
     })}
@@ -487,10 +543,10 @@ function MasterCards({ rows, allRows, favoriteIds, onToggleFavorite, onReorder, 
 
 function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventoryChannelRow[]; rankOffset: number; coupangStale: boolean }) {
   return (
-    <div className="max-h-[calc(100dvh-310px)] min-h-[360px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
+    <div className="max-h-[calc(100dvh-310px)] overflow-x-auto overflow-y-auto">
       <table className="w-full min-w-[900px] table-fixed border-collapse text-left text-[13px]">
         <thead className="ux-thead sticky top-0 z-20">
-          <tr>
+          <tr className="bg-[var(--surface)]">
             <th className="w-[70px] whitespace-nowrap text-right">순번</th>
             <th className="w-[90px] whitespace-nowrap">채널</th>
             <th className="w-[360px] whitespace-nowrap">상품</th>
@@ -506,13 +562,7 @@ function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventor
               <tr key={`${row.channel}:${row.identityKey}`} className="h-16 bg-white hover:bg-slate-50">
                 <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-500">{rankOffset + index + 1}</td>
                 <td className="px-3 py-2">
-                  <span className={`inline-flex rounded-md border px-2 py-1 text-[11px] font-black ${
-                    row.channel === 'naver'
-                      ? 'border-emerald-100 bg-emerald-50 text-emerald-700'
-                      : 'border-sky-100 bg-sky-50 text-sky-700'
-                  }`}>
-                    {channelLabel[row.channel]}
-                  </span>
+                  <Badge outline>{channelLabel[row.channel]}</Badge>
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex min-w-0 items-center gap-3">
@@ -549,8 +599,8 @@ function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventor
             ))
           ) : (
             <tr>
-              <td colSpan={7} className="p-4">
-                <EmptyState compact icon={<AlertCircle size={20} />} title="미연결 상품이 없습니다." />
+              <td colSpan={7} className="p-0">
+                <EmptyState bare compact icon={<AlertCircle size={20} />} title="미연결 상품이 없습니다." />
               </td>
             </tr>
           )}
@@ -803,18 +853,38 @@ export default function InventoryClient() {
   const pageNumberStart = Math.min(Math.max(1, safePage - 2), Math.max(1, totalPages - 4))
   const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, index) => pageNumberStart + index)
 
+  const { failedCount } = summarizeWarnings(data?.warnings || [])
+  // When a source failed, zeros would look like real stock, so the cards show "—" instead.
+  const summaryUnknown = failedCount > 0
+  const activeFilterLabel = filterOptions.find((option) => option.value === filter)?.label || '전체'
+  const filtersApplied = filter !== 'all' || Boolean(normalizedQuery)
+  const masterEmptyState = (
+    <EmptyState
+      bare
+      compact
+      icon={<Boxes size={20} />}
+      title={filtersApplied ? `${filter === 'all' ? '검색 조건에 맞는' : `'${activeFilterLabel}'`} 관리 상품이 없습니다.` : '표시할 관리 상품이 없습니다.'}
+      action={filtersApplied ? (
+        <button type="button" onClick={() => { setFilter('all'); setQuery('') }} className={buttonClass('secondary', 'sm')}>전체 보기</button>
+      ) : undefined}
+    />
+  )
+
   return (
     <div className="mx-auto w-full min-w-0 max-w-[1540px] space-y-4 pb-6">
       <PageHeader
-        title="채널 재고관리"
+        title="재고 관리"
         count={summary ? `${formatNumber(summary.masterCount)}개` : undefined}
         description="네이버·쿠팡 판매 재고입니다. 실물 창고 재고와 별도로 집계합니다."
         actions={(
           <>
-            <div className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600">
+            <div
+              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 max-sm:basis-full"
+              title="조회 시각과 채널 수집 시각은 다를 수 있습니다. 최신 재고는 채널 재고 수집 후 확인하세요."
+            >
               <span className={`h-2 w-2 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               <span>{monitorUnavailable ? '수집기 연결 실패' : coupangStale ? '쿠팡 연동 오류' : healthStatus ? '수집기 연결됨' : '연결 확인 중'}</span>
-              <span className="hidden border-l border-slate-200 pl-2 text-slate-500 sm:inline">{cacheLabel}</span>
+              <span className="border-l border-slate-200 pl-2 text-slate-500">{cacheLabel}</span>
             </div>
             <button
               type="button"
@@ -822,7 +892,6 @@ export default function InventoryClient() {
               disabled={loading || syncing}
               className={buttonClass('secondary', 'md')}
               title="화면 데이터 새로고침"
-              aria-label="화면 데이터 새로고침"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}화면 갱신
             </button>
@@ -830,7 +899,7 @@ export default function InventoryClient() {
               type="button"
               onClick={handleSync}
               disabled={loading || syncing || data?.configured === false}
-              className={buttonClass('primary', 'md')}
+              className={buttonClass('primary', 'md', 'max-sm:flex-1')}
             >
               {syncing ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
               채널 재고 수집
@@ -840,141 +909,167 @@ export default function InventoryClient() {
       />
 
       {error ? (
-        <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-bold text-red-700">
+        <div role="alert" className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-[13px] font-bold text-red-700">
           <AlertTriangle size={18} className="mt-0.5 shrink-0" />
           <span>{error}</span>
         </div>
       ) : null}
 
-      {data?.warnings?.length ? (
-        <div className="rounded-xl border border-amber-200 bg-white px-4 py-3 text-[12px] font-bold text-amber-800">
-          {data.warnings.map((warning) => (
-            <div key={warning}>{warning}</div>
-          ))}
-        </div>
-      ) : null}
-
-      <section aria-label="재고 요약">
+      {/* The warning sits directly on the numbers it affects. */}
+      <section aria-label="재고 요약" className="space-y-2">
+        {data?.warnings?.length ? <InventoryWarnings warnings={data.warnings} /> : null}
         <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(summary?.masterCount)} sub="등록된 관리 상품" />
+          <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(summary?.masterCount)} sub="등록된 관리 상품" unknown={summaryUnknown} />
           <StatCard
             icon={<Database size={20} />}
             label="총 재고"
             value={monitorUnavailable || coupangStale ? '확인 불가' : formatNumber(summary?.totalStock)}
             sub={<InventoryStockSub naver={summary?.naverStock} coupang={summary?.coupangStock} coupangStale={coupangStale} />}
-            tone="blue"
+            unknown={summaryUnknown}
           />
-          <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(summary?.totalInboundPending)} sub="입고 예정 수량" tone="orange" />
-          <StatCard icon={<AlertCircle size={20} />} label="미연결 채널 SKU" value={formatNumber(summary?.unlinkedProducts)} sub="관리 상품과 연결하지 않은 채널 SKU 수" tone="red" />
-          <StatCard icon={<WalletCards size={20} />} label="재고가치" value={monitorUnavailable || coupangStale ? '확인 불가' : formatMoney(summary?.stockCost)} sub="현재 재고 원가 기준" tone="green" />
+          <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(summary?.totalInboundPending)} sub="입고 예정 수량" unknown={summaryUnknown} />
+          <StatCard
+            icon={<AlertCircle size={20} />}
+            label="미연결 채널 SKU"
+            value={formatNumber(summary?.unlinkedProducts)}
+            sub="관리 상품과 연결 안 됨"
+            alert={(summary?.unlinkedProducts ?? 0) > 0}
+            unknown={summaryUnknown}
+          />
+          <StatCard
+            icon={<WalletCards size={20} />}
+            label="재고가치"
+            value={monitorUnavailable || coupangStale ? '확인 불가' : formatMoney(summary?.stockCost)}
+            sub="현재 재고 원가 기준"
+            unknown={summaryUnknown}
+            className="col-span-2 sm:col-span-1"
+          />
         </div>
-        <p className="mt-2 text-xs text-slate-500">조회 시각과 채널 수집 시각은 다를 수 있습니다. 최신 재고는 채널 재고 수집 후 확인하세요.</p>
       </section>
 
-      <section className="flex min-w-0 flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm xl:flex-row xl:items-center">
-        <div className="flex min-w-0 flex-1 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/40 xl:max-w-[620px]">
-          <Search size={17} className="shrink-0 text-slate-400" />
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="상품명, 링크상품, 키워드 검색"
-            className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] font-bold text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
-          />
-        </div>
-        <Tabs
-          aria-label="재고 필터"
-          items={filterOptions.map((option) => ({ key: option.value, label: option.label, count: filterCounts[option.value] }))}
-          value={filter}
-          onChange={(value) => {
-            setFilter(value)
-            setTableMode('masters')
-          }}
-        />
-        <button className="ux-button" aria-pressed={tableMode === 'unlinked'} onClick={() => { setTableMode(tableMode === 'unlinked' ? 'masters' : 'unlinked'); setPage(1) }}>미연결 채널 SKU 보기</button><div className="hidden h-7 w-px bg-slate-200 xl:block" />
-        <button
-          type="button"
-          onClick={handleDownload}
-          disabled={!activeRowsCount}
-          className={buttonClass('secondary', 'md')}
-        >
-          <Download size={15} />
-          CSV 다운로드
-        </button>
-      </section>
-
-      {loading && !data ? (
-        <div className="flex h-64 items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-black text-slate-500 shadow-sm">
-          <Loader2 size={20} className="mr-2 animate-spin text-brand-orange" />
-          재고를 불러오는 중입니다.
-        </div>
-      ) : tableMode === 'masters' ? (
-        <><MasterCards rows={pagedMasters} allRows={orderedMasters} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onReorder={handleReorder} onSelect={setSelectedHistoryProduct} coupangStale={coupangStale} /><div className="hidden lg:block"><MasterTable
-          rows={pagedMasters}
-          allRows={orderedMasters}
-          rankOffset={pageOffset}
-          favoriteIds={favoriteIds}
-          onToggleFavorite={handleToggleFavorite}
-          onReorder={handleReorder}
-          onSelect={setSelectedHistoryProduct}
-          coupangStale={coupangStale}
-        /></div></>
-      ) : (
-        <UnlinkedTable rows={pagedUnlinkedRows} rankOffset={pageOffset} coupangStale={coupangStale} />
-      )}
-
-      {!loading && data ? (
-        <footer className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[12px] font-bold text-slate-500 shadow-sm sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex flex-wrap items-center gap-3">
-            <span>
-              총 <strong className="text-slate-900">{formatNumber(activeRowsCount)}</strong>개 중{' '}
-              {activeRowsCount ? formatNumber(pageOffset + 1) : 0}-{formatNumber(Math.min(pageOffset + pageSize, activeRowsCount))} 표시
-            </span>
-            <label className="inline-flex items-center gap-2">
-              <span className="sr-only">페이지당 표시 수</span>
-              <select
-                value={pageSize}
-                onChange={(event) => setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])}
-                className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-              >
-                {pageSizeOptions.map((size) => <option key={size} value={size}>{size}개씩 보기</option>)}
-              </select>
-            </label>
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="재고 목록">
+        <div className="space-y-2 border-b border-slate-200 p-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/40 sm:basis-auto sm:min-w-[300px]">
+              <Search size={17} className="shrink-0 text-slate-400" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="상품명, 링크상품, 키워드 검색"
+                aria-label="재고 검색"
+                className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] font-bold text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
+              />
+            </div>
+            <Tabs
+              aria-label="목록 종류"
+              items={tableModeTabs.map((tab) => ({
+                ...tab,
+                count: tab.key === 'masters' ? filterCounts.all : filteredUnlinkedRows.length,
+              }))}
+              value={tableMode}
+              onChange={(value) => {
+                setTableMode(value)
+                setPage(1)
+              }}
+            />
+            <button
+              type="button"
+              onClick={handleDownload}
+              disabled={!activeRowsCount}
+              className={buttonClass('secondary', 'md', 'ml-auto')}
+              aria-label="CSV 다운로드"
+              title="CSV 다운로드"
+            >
+              <Download size={15} />
+              <span className="hidden sm:inline">CSV 다운로드</span>
+            </button>
           </div>
-          <nav className="flex flex-wrap items-center gap-1" aria-label="재고 목록 페이지">
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.max(1, current - 1))}
-              disabled={safePage <= 1}
-              className={buttonClass('secondary', 'sm', 'w-9 px-0')}
-              title="이전 페이지 (왼쪽 방향키)"
-              aria-label="이전 페이지"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            {pageNumbers.map((pageNumber) => (
+          {tableMode === 'masters' ? (
+            <Tabs
+              aria-label="재고 필터"
+              items={filterOptions.map((option) => ({ key: option.value, label: option.label, count: filterCounts[option.value] }))}
+              value={filter}
+              onChange={setFilter}
+            />
+          ) : null}
+        </div>
+
+        {loading && !data ? (
+          <div className="flex h-64 items-center justify-center text-[13px] font-black text-slate-500">
+            <Loader2 size={20} className="mr-2 animate-spin text-slate-400" />
+            재고를 불러오는 중입니다.
+          </div>
+        ) : tableMode === 'masters' ? (
+          <><MasterCards rows={pagedMasters} allRows={orderedMasters} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onReorder={handleReorder} onSelect={setSelectedHistoryProduct} coupangStale={coupangStale} emptyState={masterEmptyState} /><div className="hidden lg:block"><MasterTable
+            rows={pagedMasters}
+            allRows={orderedMasters}
+            rankOffset={pageOffset}
+            favoriteIds={favoriteIds}
+            onToggleFavorite={handleToggleFavorite}
+            onReorder={handleReorder}
+            onSelect={setSelectedHistoryProduct}
+            coupangStale={coupangStale}
+            emptyState={masterEmptyState}
+          /></div></>
+        ) : (
+          <UnlinkedTable rows={pagedUnlinkedRows} rankOffset={pageOffset} coupangStale={coupangStale} />
+        )}
+
+        {!loading && data ? (
+          <footer className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-[12px] font-bold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="tabular-nums">
+                총 <strong className="text-slate-900">{formatNumber(activeRowsCount)}</strong>개 중{' '}
+                {activeRowsCount ? formatNumber(pageOffset + 1) : 0}-{formatNumber(Math.min(pageOffset + pageSize, activeRowsCount))} 표시
+              </span>
+              <label className="inline-flex items-center gap-2">
+                <span className="sr-only">페이지당 표시 수</span>
+                <select
+                  value={pageSize}
+                  onChange={(event) => setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])}
+                  className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                >
+                  {pageSizeOptions.map((size) => <option key={size} value={size}>{size}개씩 보기</option>)}
+                </select>
+              </label>
+            </div>
+            <nav className="flex flex-wrap items-center gap-1" aria-label="재고 목록 페이지">
               <button
-                key={pageNumber}
                 type="button"
-                onClick={() => setPage(pageNumber)}
-                className={buttonClass(pageNumber === safePage ? 'primary' : 'secondary', 'sm', 'min-w-9 px-2')}
-                aria-current={pageNumber === safePage ? 'page' : undefined}
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={safePage <= 1}
+                className={`${pageButtonBase} border-transparent text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40`}
+                title="이전 페이지 (왼쪽 방향키)"
+                aria-label="이전 페이지"
               >
-                {pageNumber}
+                <ChevronLeft size={16} />
               </button>
-            ))}
-            <button
-              type="button"
-              onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-              disabled={safePage >= totalPages}
-              className={buttonClass('secondary', 'sm', 'w-9 px-0')}
-              title="다음 페이지 (오른쪽 방향키)"
-              aria-label="다음 페이지"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </nav>
-        </footer>
-      ) : null}
+              {/* The current page is outlined, not filled: orange stays for the one primary action. */}
+              {pageNumbers.map((pageNumber) => (
+                <button
+                  key={pageNumber}
+                  type="button"
+                  onClick={() => setPage(pageNumber)}
+                  className={`${pageButtonBase} ${pageNumber === safePage ? 'border-slate-900 bg-white text-slate-900' : 'border-transparent text-slate-600 hover:bg-slate-100'}`}
+                  aria-current={pageNumber === safePage ? 'page' : undefined}
+                >
+                  {pageNumber}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={safePage >= totalPages}
+                className={`${pageButtonBase} border-transparent text-slate-600 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40`}
+                title="다음 페이지 (오른쪽 방향키)"
+                aria-label="다음 페이지"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </nav>
+          </footer>
+        ) : null}
+      </section>
       {selectedHistoryProduct ? (
         <ProductInventoryHistoryModal
           product={selectedHistoryProduct}

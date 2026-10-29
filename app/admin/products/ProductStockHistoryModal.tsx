@@ -159,10 +159,10 @@ export default function ProductStockHistoryModal({
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className={buttonClass('secondary', 'sm', 'w-8 px-0')}
+              className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
               aria-label="관리용 재고 이력 닫기"
             >
-              <X size={16} />
+              <X size={18} />
             </button>
           </div>
         </header>
@@ -180,7 +180,7 @@ export default function ProductStockHistoryModal({
             <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm font-bold text-red-700">{error}</div>
           ) : payload?.history.length ? (
             <div className="overflow-hidden rounded-xl border border-slate-200 text-sm">
-              <div className="hidden grid-cols-[1.1fr_1fr_.55fr_1.6fr] bg-brand-ink px-3 py-2.5 text-[12px] font-bold text-white sm:grid">
+              <div className="hidden grid-cols-[1.1fr_1fr_.55fr_1.6fr] border-b border-slate-200 bg-[var(--surface)] px-3 py-2.5 text-[12px] font-bold text-[var(--muted-foreground)] sm:grid">
                 <div>수정 시각</div>
                 <div className="text-center">수량 변경</div>
                 <div className="text-center">증감</div>
@@ -283,7 +283,7 @@ export default function ProductStockHistoryModal({
         type="button"
         onClick={openHistory}
         className={compact
-          ? buttonClass('ghost', 'sm', 'h-8 w-8 px-0 text-slate-500')
+          ? 'inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
           : 'mt-1 inline-flex items-center gap-1 whitespace-nowrap rounded-md text-[11px] font-black text-slate-600 hover:text-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'}
         aria-label={`${productName} 관리용 재고 이력 보기`}
         title="재고 이력"

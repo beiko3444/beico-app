@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
+import Modal from '@/components/Modal'
+import { buttonClass } from '@/components/ui/buttonClass'
 import {
   AlertTriangle,
   Check,
@@ -691,14 +693,22 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
       ) : null}
 
       {deleteModalOpen ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 px-4 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+        <Modal
+          label="주문 삭제 확인"
+          onClose={() => {
+            if (loadingAction === 'delete') return
+            setDeleteModalOpen(false)
+            setDeleteConfirmText('')
+          }}
+          className="flex items-center justify-center bg-slate-950/50 px-4"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-red-600">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="text-[18px] font-black text-slate-900">주문을 삭제하시겠습니까?</h4>
+                <h4 className="text-lg font-black text-slate-900">주문을 삭제하시겠습니까?</h4>
                 <p className="mt-2 text-[13px] leading-6 text-slate-500">
                   삭제된 주문은 복구할 수 없습니다. 정말 삭제하려면 주문번호 <strong className="text-slate-900">{detail.orderNumber}</strong> 를 입력하세요.
                 </p>
@@ -718,7 +728,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                   setDeleteModalOpen(false)
                   setDeleteConfirmText('')
                 }}
-                className="rounded-xl border border-slate-200 px-4 py-2 text-[13px] font-bold text-slate-600 transition hover:bg-slate-50"
+                className={buttonClass('secondary')}
               >
                 취소
               </button>
@@ -726,13 +736,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 type="button"
                 onClick={handleDeleteOrder}
                 disabled={loadingAction === 'delete'}
-                className="rounded-xl bg-red-600 px-4 py-2 text-[13px] font-bold text-white transition hover:bg-red-700 disabled:opacity-50"
+                className={buttonClass('danger')}
               >
                 {loadingAction === 'delete' ? '삭제 중...' : '주문 삭제'}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       ) : null}
 
       <div className={summaryCardClass}>
@@ -993,7 +1003,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 type="button"
                 onClick={handleSaveTracking}
                 disabled={loadingAction === 'ship'}
-                className="h-[46px] w-full rounded-xl bg-blue-600 px-4 text-[13px] font-black text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-700 disabled:opacity-50"
+                className={buttonClass('primary', 'md', 'w-full')}
               >
                 {loadingAction === 'ship' ? '처리 중...' : '배송 처리'}
               </button>

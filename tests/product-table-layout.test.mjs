@@ -19,6 +19,16 @@ test('normalizes saved columns and removes duplicates or unknown values', () => 
     assert.deepEqual(normalizeProductTableColumns(null), DEFAULT_PRODUCT_TABLE_COLUMNS)
 })
 
+test('draws row cells in the same column order as the headers', () => {
+    // Defaults, presets and saved selections all render in option order, so the default
+    // list must already be in that order and rows must read the ordered key list.
+    assert.deepEqual(normalizeProductTableColumns(DEFAULT_PRODUCT_TABLE_COLUMNS), DEFAULT_PRODUCT_TABLE_COLUMNS)
+    const table = readFileSync(new URL('../app/admin/products/ProductTable.tsx', import.meta.url), 'utf8')
+    assert.doesNotMatch(table, /visibleColumns=\{visibleColumns\}/)
+    assert.match(table, /visibleColumns=\{visibleColumnKeys\}/)
+    assert.match(table, /setVisibleColumns\(normalizeProductTableColumns\(preset\.columns\)\)/)
+})
+
 test('connects permanent product numbers and the configurable table UI', () => {
     const schema = readFileSync(new URL('../prisma/schema.prisma', import.meta.url), 'utf8')
     const page = readFileSync(new URL('../app/admin/products/page.tsx', import.meta.url), 'utf8')

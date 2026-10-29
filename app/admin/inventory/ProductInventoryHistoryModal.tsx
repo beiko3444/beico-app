@@ -14,7 +14,6 @@ import {
 } from 'recharts'
 import { BarChart3, CalendarDays, Clock3, Loader2, PackageSearch, X } from 'lucide-react'
 import type { SmartInventoryMasterRow } from '@/lib/smartInventoryClient'
-import { buttonClass } from '@/components/ui/Button'
 import Tabs from '@/components/ui/Tabs'
 
 type HistoryPoint = {
@@ -219,7 +218,7 @@ export default function ProductInventoryHistoryModal({
             <ProductThumb src={product.imageUrl} name={product.name} />
             <div className="min-w-0">
               <div className="text-[11px] font-bold text-slate-500">재고차감 이력</div>
-              <h2 className="mt-1 truncate text-[21px] font-black tracking-tight text-slate-950" title={product.name}>
+              <h2 className="mt-1 truncate text-lg font-black text-slate-950" title={product.name}>
                 {product.name}
               </h2>
               <div className="mt-1 text-[11px] font-bold text-slate-500">
@@ -230,10 +229,10 @@ export default function ProductInventoryHistoryModal({
           <button
             type="button"
             onClick={onClose}
-            className={buttonClass('secondary', 'md', 'w-10 px-0')}
+            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
             aria-label="상품 재고차감 그래프 닫기"
           >
-            <X size={19} />
+            <X size={18} />
           </button>
         </div>
 
@@ -266,7 +265,7 @@ export default function ProductInventoryHistoryModal({
 
           {loading && !data ? (
             <div className="flex h-[360px] items-center justify-center rounded-2xl border border-slate-200 bg-white text-[13px] font-black text-slate-500">
-              <Loader2 size={20} className="mr-2 animate-spin text-brand-orange" />
+              <Loader2 size={20} className="mr-2 animate-spin text-slate-400" />
               상품 재고차감 이력을 계산하는 중입니다.
             </div>
           ) : data ? (
@@ -289,7 +288,7 @@ export default function ProductInventoryHistoryModal({
               <div className="grid gap-5 xl:grid-cols-2">
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                   <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-brand-orange-soft text-brand-orange">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                       <BarChart3 size={20} />
                     </span>
                     <div>
@@ -320,7 +319,7 @@ export default function ProductInventoryHistoryModal({
 
                 <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
                   <div className="flex items-start gap-3">
-                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sky-50 text-sky-600">
+                    <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
                       <Clock3 size={20} />
                     </span>
                     <div>

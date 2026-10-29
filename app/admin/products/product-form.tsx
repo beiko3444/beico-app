@@ -1,12 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import Modal from '@/components/Modal'
 import { ImagePlus, Plus, X } from 'lucide-react'
 import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
-import Button, { buttonClass } from '@/components/ui/Button'
+import Button from '@/components/ui/Button'
 import Tabs from '@/components/ui/Tabs'
 
 type ExchangeRates = { USD: number, JPY: number, CNY: number }
@@ -98,6 +98,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const router = useRouter()
     const [mounted, setMounted] = useState(false)
     const [isOpen, setIsOpen] = useState(false)
+    const imageInputRef = useRef<HTMLInputElement>(null)
 
     useEffect(() => {
         setMounted(true)
@@ -394,26 +395,27 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
     const numberInputClass = `${inputClass} text-right font-bold tabular-nums`
     const priceInputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white pl-7 pr-2 text-right text-xs font-bold tabular-nums text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
-    const labelClass = 'text-[11px] font-bold text-slate-600'
+    const labelClass = 'text-[12px] font-bold text-slate-600'
+    const sectionTitleClass = 'mb-4 border-b border-slate-200 pb-2 text-[14px] font-black text-slate-900'
     const conversionClass = 'mt-0.5 text-right text-[11px] font-bold leading-tight text-slate-500'
     const modalTitle = isCopy ? '상품 복사 등록' : initialData ? '상품 수정' : '상품 등록'
     const submitLabel = loading ? '저장 중…' : isCopy ? '복사 저장' : '저장'
 
     const modalContent = (
-        <Modal label={modalTitle} onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-slate-950/45 p-0 sm:p-4">
+        <Modal label={modalTitle} onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-slate-950/45 p-0 sm:p-6">
             <div
-                className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[95vh] sm:rounded-2xl sm:border sm:border-slate-200"
+                className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-48px)] sm:rounded-2xl sm:border sm:border-slate-200"
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-3 sm:px-6">
+                <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
                     <div className="min-w-0">
                         <h3 className="truncate text-lg font-black text-slate-950">{modalTitle}</h3>
-                        {initialData ? <p className="truncate text-[11px] font-bold text-slate-500">{initialData.name}</p> : null}
+                        {initialData ? <p className="truncate text-[12px] font-semibold text-slate-500">{initialData.name}</p> : null}
                     </div>
                     <button
                         type="button"
                         onClick={() => setIsOpen(false)}
-                        className={buttonClass('ghost', 'sm', 'h-9 w-9 px-0')}
+                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
                         aria-label="닫기"
                     >
                         <X size={18} />
@@ -433,58 +435,52 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     }}
                     className="flex min-h-0 flex-1 flex-col [&_input:not([type='file'])]:min-h-10 [&_select]:min-h-10"
                 >
-                    <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
-                        <section className="rounded-2xl border border-slate-200 p-4">
-                            <h4 className="mb-3 text-[13px] font-black text-slate-900">기본 정보</h4>
+                    <div className="min-h-0 flex-1 space-y-8 overflow-y-auto p-4 sm:p-6">
+                        <section>
+                            <h4 className={sectionTitleClass}>기본 정보</h4>
 
-                            <div className="mb-4 flex items-start gap-4">
-                                <div
-                                    className="group relative flex h-20 w-20 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100"
-                                    onClick={() => document.getElementById('image-upload-input')?.click()}
+                            <div className="mb-5 flex items-end gap-3">
+                                <button
+                                    type="button"
+                                    className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-slate-100 transition-colors hover:border-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                                    onClick={() => imageInputRef.current?.click()}
+                                    aria-label={imageUrl ? '상품 이미지 변경' : '상품 이미지 업로드'}
                                 >
                                     {imageUrl ? (
-                                        <>
-                                            <img src={imageUrl} alt="상품 이미지 미리보기" className="h-full w-full object-contain" />
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    setHasImageChanged(true)
-                                                    setImageUrl(null)
-                                                }}
-                                                className={buttonClass('danger', 'sm', 'absolute right-1 top-1 h-6 w-6 rounded-full px-0 opacity-100 transition-opacity md:opacity-0 group-hover:opacity-100')}
-                                                aria-label="이미지 삭제"
-                                            >
-                                                <X size={12} />
-                                            </button>
-                                        </>
+                                        <img src={imageUrl} alt="상품 이미지 미리보기" className="h-full w-full object-contain" />
                                     ) : (
-                                        <div className="flex flex-col items-center gap-1 text-slate-400">
+                                        <span className="flex flex-col items-center gap-1 text-slate-400">
                                             <ImagePlus size={18} />
                                             <span className="text-[11px] font-bold">이미지 업로드</span>
-                                        </div>
+                                        </span>
                                     )}
-                                </div>
-                                <div className="flex-1">
-                                    <label className={`${labelClass} mb-1 block`}>상품 이미지 선택</label>
-                                    <input
-                                        id="image-upload-input"
-                                        type="file"
-                                        accept="image/*"
-                                        onChange={handleImageChange}
-                                        className="hidden"
-                                    />
-                                    <button
-                                        type="button"
-                                        onClick={() => document.getElementById('image-upload-input')?.click()}
-                                        className={buttonClass('secondary', 'sm')}
-                                    >
-                                        파일 선택
-                                    </button>
-                                </div>
+                                </button>
+                                <input
+                                    ref={imageInputRef}
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={handleImageChange}
+                                    className="hidden"
+                                />
+                                {imageUrl ? (
+                                    <div className="flex items-center gap-1 pb-0.5 text-[12px] font-bold">
+                                        <button type="button" onClick={() => imageInputRef.current?.click()} className="rounded-md px-1.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-slate-900">변경</button>
+                                        <span className="text-slate-300" aria-hidden="true">·</span>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                setHasImageChanged(true)
+                                                setImageUrl(null)
+                                            }}
+                                            className="rounded-md px-1.5 py-1 text-red-700 hover:bg-red-50"
+                                        >
+                                            삭제
+                                        </button>
+                                    </div>
+                                ) : null}
                             </div>
 
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
                                 <div className="space-y-1">
                                     <label className={labelClass}>상품명 (국문)</label>
                                     <input
@@ -515,6 +511,9 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         placeholder="영문 상품명"
                                     />
                                 </div>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                                 <div className="space-y-1">
                                     <label className={labelClass}>상품 코드 (SKU)</label>
                                     <input
@@ -533,38 +532,6 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         onChange={e => setGroupName(e.target.value)}
                                         className={inputClass}
                                         placeholder="예: 퀵베이트 V3"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className={labelClass}>관리용 재고</label>
-                                    <input
-                                        type="text"
-                                        inputMode="numeric"
-                                        value={stock}
-                                        onChange={e => setStock(formatNumber(e.target.value))}
-                                        className={`${numberInputClass} font-black`}
-                                        placeholder="도매 발주와 무관"
-                                    />
-                                    <p className="text-[11px] font-bold text-slate-500">관리자가 보는 내부 재고입니다. 파트너 발주 가능 여부와 별도로 관리됩니다.</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <label className={labelClass}>HS Code / 세번부호</label>
-                                    <input
-                                        type="text"
-                                        value={hsCode}
-                                        onChange={e => setHsCode(normalizeHsCode(e.target.value))}
-                                        className={`${inputClass} font-mono`}
-                                        placeholder="예: 9507.90"
-                                    />
-                                </div>
-                                <div className="space-y-1">
-                                    <label className={labelClass}>Japan HS Code / 일본세번</label>
-                                    <input
-                                        type="text"
-                                        value={japanHsCode}
-                                        onChange={e => setJapanHsCode(normalizeHsCode(e.target.value))}
-                                        className={`${inputClass} font-mono`}
-                                        placeholder="예: 9507.90"
                                     />
                                 </div>
                                 <div className="space-y-1">
@@ -587,14 +554,45 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         placeholder="쿠팡 판매자상품코드 (숫자)"
                                     />
                                 </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>HS Code / 세번부호</label>
+                                    <input
+                                        type="text"
+                                        value={hsCode}
+                                        onChange={e => setHsCode(normalizeHsCode(e.target.value))}
+                                        className={`${inputClass} font-mono`}
+                                        placeholder="예: 9507.90"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>Japan HS Code / 일본세번</label>
+                                    <input
+                                        type="text"
+                                        value={japanHsCode}
+                                        onChange={e => setJapanHsCode(normalizeHsCode(e.target.value))}
+                                        className={`${inputClass} font-mono`}
+                                        placeholder="예: 9507.90"
+                                    />
+                                </div>
                             </div>
                         </section>
 
-                        <section className="rounded-2xl border border-slate-200 p-4">
-                            <h4 className="mb-3 text-[13px] font-black text-slate-900">발주 설정</h4>
-                            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                        <section>
+                            <h4 className={sectionTitleClass}>재고·발주</h4>
+                            <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-4">
                                 <div className="space-y-1">
-                                    <label className={labelClass}>파트너 노출 상태</label>
+                                    <label className={labelClass}>관리용 재고</label>
+                                    <input
+                                        type="text"
+                                        inputMode="numeric"
+                                        value={stock}
+                                        onChange={e => setStock(formatNumber(e.target.value))}
+                                        className={`${numberInputClass} font-black`}
+                                        placeholder="도매 발주와 무관"
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <label className={labelClass}>파트너 노출</label>
                                     <select
                                         value={partnerSaleStatus}
                                         onChange={e => setPartnerSaleStatus(e.target.value as PartnerProductStatus)}
@@ -628,10 +626,11 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     />
                                 </div>
                             </div>
+                            <p className="mt-2 break-keep text-[12px] text-slate-500">관리용 재고는 관리자가 보는 내부 재고입니다. 파트너 발주 가능 여부는 파트너 노출로 정합니다.</p>
                         </section>
 
-                        <section className="rounded-2xl border border-slate-200 p-4">
-                            <h4 className="mb-3 text-[13px] font-black text-slate-900">지역별·등급별 단가</h4>
+                        <section>
+                            <h4 className={sectionTitleClass}>지역별·등급별 단가</h4>
 
                             <div className="mb-4 flex flex-wrap items-center gap-2">
                                 <Tabs
@@ -817,15 +816,13 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
 
     return (
         <>
-            {isOpen ? null : (
-                <div onClick={() => setIsOpen(true)}>
-                    {trigger || (
-                        <Button variant="primary" icon={<Plus size={15} />}>
-                            새 상품 추가
-                        </Button>
-                    )}
-                </div>
-            )}
+            <div onClick={() => setIsOpen(true)}>
+                {trigger || (
+                    <Button variant="primary" icon={<Plus size={15} />}>
+                        새 상품 추가
+                    </Button>
+                )}
+            </div>
             {isOpen && mounted && createPortal(modalContent, document.body)}
         </>
     )

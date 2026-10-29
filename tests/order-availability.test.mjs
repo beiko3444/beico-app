@@ -12,13 +12,14 @@ const orderDetailRouteSource = readSource('app/api/orders/[id]/route.ts')
 const productSchemaSource = readSource('prisma/schema.prisma')
 const productRouteSource = readSource('app/api/products/[id]/route.ts')
 
-assert.match(productFormSource, /파트너 노출 상태/)
+// The field is called 파트너 노출 everywhere (table header, mobile card, form, filter).
+assert.match(productFormSource, /파트너 노출/)
 assert.match(productFormSource, /partnerSaleStatus/)
 assert.match(productFormSource, /SOLD_OUT/)
 assert.match(productFormSource, /관리용 재고/)
 assert.match(productFormSource, /groupName/)
 
-assert.match(productTableSource, /파트너 상태 전체/)
+assert.match(productTableSource, /파트너 노출 전체/)
 assert.match(productTableSource, /비노출/)
 assert.match(productTableSource, /품절/)
 assert.match(productTableSource, /관리용 재고/)
