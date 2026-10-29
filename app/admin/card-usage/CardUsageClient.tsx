@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTheme } from '@/components/ThemeProvider'
-import { Calendar, CheckCircle2, ChevronDown, Circle, CreditCard, GripVertical, HelpCircle, Loader2, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
+import { ArrowUpDown, Check, CheckCircle2, ChevronDown, Circle, GripVertical, Keyboard, Link2, Loader2, Package, Plus, RefreshCw, Search, Settings, X } from 'lucide-react'
 import { DEFAULT_CATEGORIES, getCategoryMeta, classifyCategory } from '@/lib/cardCategory'
 import type { CategoryMeta } from '@/lib/cardCategory'
 import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import Modal from '@/components/Modal'
 
 /* ═══════════════════ Types ═══════════════════ */
 type CoupangPurchaseItemDetail = {
@@ -339,14 +340,17 @@ function saveUserCategories(cats: CategoryMeta[]) {
 
 /* ═══════════════════ CSS tokens ═══════════════════ */
 const LIGHT_TOKENS = {
-  bg: '#FAFAF8',
+  bg: '#F8FAFC',
   surface: '#FFFFFF',
-  surfaceSecondary: '#F5F5F0',
-  border: '#E8E6E1',
-  borderLight: '#EEECE7',
-  text: '#1A1A1A',
-  textSecondary: '#4A4A4A',
-  textTertiary: '#737373',
+  surfaceSecondary: '#F1F5F9',
+  border: '#E5E9EF',
+  borderLight: '#EEF2F6',
+  inputBorder: '#CFD6DF',
+  text: '#172033',
+  textSecondary: '#475569',
+  textTertiary: '#667085',
+  chipActiveBg: '#172033',
+  chipActiveText: '#FFFFFF',
   success: '#3D8B37',
   successBg: '#EDF7EC',
   successBorder: '#D4EDD2',
@@ -360,8 +364,8 @@ const LIGHT_TOKENS = {
   reviewDoneBorder: '#D4EDD2',
   reviewPendingBg: '#FFF7F1',
   reviewPendingBorder: '#F6D7C8',
-  selectedBg: '#EAF3FF',
-  selectedBorder: '#BFDBFE',
+  selectedBg: '#F8FAFC',
+  selectedBorder: '#334155',
 }
 
 const DARK_TOKENS = {
@@ -370,9 +374,12 @@ const DARK_TOKENS = {
   surfaceSecondary: '#252525',
   border: '#2a2a2a',
   borderLight: '#2a2a2a',
+  inputBorder: '#3b485a',
   text: '#ffffff',
   textSecondary: '#e5e5e5',
   textTertiary: '#9ca3af',
+  chipActiveBg: '#f4f7fb',
+  chipActiveText: '#111111',
   success: '#4ade80',
   successBg: '#14291a',
   successBorder: '#1a3a22',
@@ -386,8 +393,8 @@ const DARK_TOKENS = {
   reviewDoneBorder: '#1a3a22',
   reviewPendingBg: '#2a1f18',
   reviewPendingBorder: '#3a2820',
-  selectedBg: '#1a2a3a',
-  selectedBorder: '#2a4a6a',
+  selectedBg: '#1d2635',
+  selectedBorder: '#a7b0bf',
 }
 
 const DEFAULT_GAUGE_PALETTE = [
@@ -467,8 +474,8 @@ export default function CardUsageClient() {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null)
   const [pendingJumpDate, setPendingJumpDate] = useState<string | null>(null)
-  const [showShortcutDock, setShowShortcutDock] = useState(false)
-  const monthInputRef = useRef<HTMLInputElement | null>(null)
+  const [showShortcutTips, setShowShortcutTips] = useState(false)
+  const shortcutTipsRef = useRef<HTMLDivElement | null>(null)
   const startDateInputRef = useRef<HTMLInputElement | null>(null)
   const endDateInputRef = useRef<HTMLInputElement | null>(null)
   const didInitDateAutoLoadRef = useRef(false)
@@ -847,19 +854,30 @@ export default function CardUsageClient() {
     }
   }
 
-  const handleSortClick = (field: 'date' | 'amount') => {
-    if (sortField === field) {
-      setSortOrder(prev => (prev === 'desc' ? 'asc' : 'desc'))
-      return
-    }
+  const handleSortChange = (value: string) => {
+    const [field, order] = value.split('-') as ['date' | 'amount', 'asc' | 'desc']
     setSortField(field)
-    setSortOrder('desc')
+    setSortOrder(order)
   }
 
   const selectedMonth = useMemo(
     () => resolveMonthValueFromRange(startDate, endDate),
     [startDate, endDate],
   )
+
+  // Korean month labels instead of the browser's month picker ("October 2026").
+  const monthOptions = useMemo(() => {
+    const now = new Date()
+    const values = Array.from({ length: 24 }, (_, index) => {
+      const date = new Date(now.getFullYear(), now.getMonth() - index, 1)
+      return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+    })
+    if (selectedMonth && !values.includes(selectedMonth)) values.push(selectedMonth)
+    return values.map(value => {
+      const [y, m] = value.split('-')
+      return { value, label: `${y}년 ${Number(m)}월` }
+    })
+  }, [selectedMonth])
 
   const handleMonthChange = (value: string) => {
     const range = resolveMonthRange(value)
@@ -1049,9 +1067,13 @@ export default function CardUsageClient() {
       }
     }
 
-    const start = new Date(`${startDate}T00:00:00+09:00`)
-    const end = new Date(`${endDate}T00:00:00+09:00`)
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start > end) {
+    // Cells are built from local dates, so the range has to be local too (a +09:00 parse shifts
+    // the first day into the previous month outside KST).
+    const startParts = parseYmd(startDate)
+    const endParts = parseYmd(endDate)
+    const start = startParts ? new Date(startParts.year, startParts.month - 1, startParts.day) : null
+    const end = endParts ? new Date(endParts.year, endParts.month - 1, endParts.day) : null
+    if (!start || !end || start > end) {
       return { months: [] as CalendarMonth[], maxDailyAmount: 0 }
     }
 
@@ -1131,19 +1153,20 @@ export default function CardUsageClient() {
   }, [categories, editingCategoryTarget, cancelCategoryLabelEdit])
 
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const media = window.matchMedia('(min-width: 1320px)')
-    const apply = () => setShowShortcutDock(media.matches)
-    apply()
-
-    if (typeof media.addEventListener === 'function') {
-      media.addEventListener('change', apply)
-      return () => media.removeEventListener('change', apply)
+    if (!showShortcutTips) return
+    const onPointerDown = (event: MouseEvent) => {
+      if (!shortcutTipsRef.current?.contains(event.target as Node)) setShowShortcutTips(false)
     }
-
-    media.addListener(apply)
-    return () => media.removeListener(apply)
-  }, [])
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setShowShortcutTips(false)
+    }
+    document.addEventListener('mousedown', onPointerDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onPointerDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
+  }, [showShortcutTips])
 
   useEffect(() => {
     if (!selectedItemId) return
@@ -1192,44 +1215,41 @@ export default function CardUsageClient() {
   }
 
   const flatInputStyle: React.CSSProperties = {
-    background: T.surfaceSecondary,
-    border: `1px solid ${T.borderLight}`,
+    background: T.surface,
+    border: `1px solid ${T.inputBorder}`,
     borderRadius: 10,
     color: T.text,
     fontSize: 13,
-    height: 42,
+    height: 40,
     outline: 'none',
-    paddingLeft: 14,
-    paddingRight: 14,
+    paddingLeft: 12,
+    paddingRight: 12,
   }
+
+  const kpiLabelStyle: React.CSSProperties = { fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 600 }
+  const kpiValueStyle: React.CSSProperties = { fontSize: 24, fontWeight: 800, color: T.text, margin: '6px 0 6px', lineHeight: 1.2, fontVariantNumeric: 'tabular-nums' }
+  const kpiUnitStyle: React.CSSProperties = { fontSize: 14, fontWeight: 600, color: T.textSecondary, marginLeft: 1 }
+
+  // Same white field as the search bar and the rest of the console.
+  const filterSelectClass = 'h-10 w-full min-w-0 cursor-pointer appearance-none truncate rounded-[10px] border border-[var(--input-border)] bg-[var(--input-bg)] pl-3 pr-8 text-[13px] text-[var(--foreground)] transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15'
+  const filterFieldClass = 'flex h-10 min-w-0 items-center gap-2 rounded-[10px] border border-[var(--input-border)] bg-[var(--input-bg)] px-3 transition-colors focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/15'
+  const filterBareInputClass = 'min-w-0 flex-1 cursor-pointer border-0 bg-transparent text-[13px] tabular-nums text-[var(--foreground)] focus:shadow-none focus:outline-none'
+  const shortcutTipsAvailable = viewMode !== 'calendar' && sortedItems.length > 0 && shortcutCategories.length > 0
 
   return (
     <div className="cu-root min-w-0" style={{ fontFamily: '"Noto Sans KR", "Apple SD Gothic Neo", sans-serif' }}>
       {/* ════════ Header ════════ */}
       <PageHeader
-        title="카드사용내역"
+        title="카드 사용내역"
         description={`최근 동기화: ${formatSyncTime(data?.summary?.lastSyncedAt || null)}`}
         actions={(
           <>
-            <label className="inline-flex cursor-pointer items-center gap-1.5 whitespace-nowrap text-[11px]" style={{ color: T.textTertiary }}>
-              <input type="checkbox" checked={refreshBeforeFetch} onChange={e => setRefreshBeforeFetch(e.target.checked)} style={{ accentColor: T.accent }} />
-              즉시조회
-            </label>
-            <Button
-              type="button"
-              variant="primary"
-              onClick={handleSync}
-              loading={syncing}
-              icon={<RefreshCw size={14} />}
-            >
-              바로빌 동기화
-            </Button>
             <Button
               type="button"
               variant="secondary"
               onClick={handleLotteSync}
               loading={lotteSyncing}
-              icon={<CreditCard size={14} />}
+              icon={<RefreshCw size={14} />}
               title="이미 로그인된 롯데카드 디버그 브라우저에서 이용내역을 직접 수집"
             >
               롯데카드 동기화
@@ -1239,98 +1259,34 @@ export default function CardUsageClient() {
               variant="secondary"
               onClick={() => { setCoupangError(''); setCoupangModalOpen(true) }}
               loading={coupangSyncing}
-              icon={<RefreshCw size={14} />}
+              icon={<Link2 size={14} />}
               title="쿠팡 로그인하여 구매내역 가져오기 + 카드결제와 자동매칭"
             >
               쿠팡 매칭
             </Button>
+            {/* 즉시조회 only changes 바로빌 동기화, so it sits with that button; on phones this pair comes first at full width. */}
+            <div className="order-first flex w-full items-center gap-3 lg:order-none lg:w-auto">
+              <label
+                className="inline-flex shrink-0 cursor-pointer items-center gap-1.5 whitespace-nowrap text-xs font-medium text-[var(--muted-foreground)]"
+                title="동기화 전에 카드사에 최신 승인내역 조회를 먼저 요청합니다"
+              >
+                <input type="checkbox" checked={refreshBeforeFetch} onChange={e => setRefreshBeforeFetch(e.target.checked)} className="h-4 w-4 accent-brand-orange" />
+                즉시조회
+              </label>
+              <Button
+                type="button"
+                variant="primary"
+                onClick={handleSync}
+                loading={syncing}
+                icon={<RefreshCw size={14} />}
+                className="flex-1 lg:flex-none"
+              >
+                바로빌 동기화
+              </Button>
+            </div>
           </>
         )}
       />
-
-      {(viewMode === 'list' || viewMode === 'table') && shortcutCategories.length > 0 && (
-        <details
-          open={showShortcutDock}
-          className="mb-4 rounded-2xl"
-          style={{
-            border: `1px solid ${T.border}`,
-            background: T.surface,
-            padding: '10px 12px',
-          }}
-        >
-          <summary className="flex cursor-pointer list-none items-center gap-2 [&::-webkit-details-marker]:hidden">
-            <span
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: 9,
-                background: T.surfaceSecondary,
-                border: `1px solid ${T.borderLight}`,
-                color: T.textSecondary,
-                display: 'inline-flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                flexShrink: 0,
-              }}
-            >
-              <HelpCircle size={15} />
-            </span>
-            <span style={{ minWidth: 0 }}>
-              <span style={{ display: 'block', fontSize: 12, fontWeight: 800, color: T.text }}>
-                단축키 팁
-              </span>
-              <span style={{ display: 'block', marginTop: 2, fontSize: 11, color: T.textTertiary }}>
-                거래 선택 후 숫자키 1~6 · 눌러서 펼치기/접기
-              </span>
-            </span>
-          </summary>
-          <div className="mt-2.5 flex flex-wrap gap-1.5">
-            {shortcutCategories.map((cat, idx) => (
-              <div
-                key={cat.code}
-                draggable
-                onDragStart={(e) => {
-                  setDraggedCatIdx(idx)
-                  e.dataTransfer.effectAllowed = 'move'
-                }}
-                onDragOver={(e) => {
-                  e.preventDefault()
-                  e.dataTransfer.dropEffect = 'move'
-                }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  if (draggedCatIdx !== null) moveCategory(draggedCatIdx, idx)
-                  setDraggedCatIdx(null)
-                }}
-                onDragEnd={() => setDraggedCatIdx(null)}
-                title="드래그해서 단축키 순서 변경"
-                style={{
-                  display: 'inline-grid',
-                  gridTemplateColumns: '16px 28px 18px auto',
-                  alignItems: 'center',
-                  gap: 6,
-                  background: cat.bgColor,
-                  border: `1px solid ${T.borderLight}`,
-                  borderRadius: 8,
-                  padding: '5px 8px',
-                  cursor: draggedCatIdx === idx ? 'grabbing' : 'grab',
-                  opacity: draggedCatIdx === idx ? 0.55 : 1,
-                }}
-              >
-                <GripVertical size={13} style={{ color: T.textTertiary }} />
-                <span style={{ fontSize: 11, fontWeight: 900, color: T.text, textAlign: 'center', whiteSpace: 'nowrap' }}>{idx + 1}번</span>
-                <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
-                <span style={{ fontSize: 11, color: T.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
-                  {cat.label}
-                </span>
-              </div>
-            ))}
-          </div>
-          <p style={{ margin: '8px 0 0', fontSize: 11, color: T.textTertiary, lineHeight: 1.4 }}>
-            드래그하면 1~6번 순서가 바뀝니다. · 선택: {selectedItem?.useStoreName || '-'}
-          </p>
-        </details>
-      )}
 
       {/* Coupang status bar */}
       {(coupangMessage || coupangError) && (
@@ -1357,102 +1313,98 @@ export default function CardUsageClient() {
 
       {/* Coupang sync modal */}
       {coupangModalOpen && (
-        <div
-          onClick={() => !coupangSyncing && setCoupangModalOpen(false)}
-          style={{
-            position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-          }}
-        >
-          <div
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              background: T.surface, borderRadius: 12, padding: 24,
-              width: 'min(420px, 92vw)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
-              border: `1px solid ${T.border}`,
-            }}
-          >
-            <h2 style={{ fontSize: 16, fontWeight: 600, color: T.text, margin: '0 0 6px' }}>쿠팡 로그인</h2>
-            <p style={{ fontSize: 12, color: T.textTertiary, margin: '0 0 16px' }}>
-              조회 기간({formatDisplayDate(startDate)} ~ {formatDisplayDate(endDate)})의 쿠팡 주문을 가져와 카드결제와 자동매칭합니다.
-              비밀번호는 한 번의 로그인에만 사용되며 어디에도 저장되지 않습니다.
-            </p>
-            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>쿠팡 아이디 *</label>
-            <input
-              type="text"
-              value={coupangLoginId}
-              onChange={(e) => setCoupangLoginId(e.target.value)}
-              placeholder="아이디 또는 이메일"
-              required
+        <Modal labelledBy="coupang-login-title" onClose={() => { if (!coupangSyncing) setCoupangModalOpen(false) }} className="bg-slate-950/50">
+          <div className="flex h-full items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget && !coupangSyncing) setCoupangModalOpen(false) }}>
+            <div
               style={{
-                width: '100%', height: 36, padding: '0 12px', borderRadius: 8,
-                border: `1px solid ${T.border}`, background: T.surface, color: T.text,
-                fontSize: 13, marginBottom: 12, outline: 'none',
+                background: T.surface, borderRadius: 16, padding: 24,
+                width: 'min(420px, 92vw)', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+                border: `1px solid ${T.border}`,
               }}
-              autoComplete="username"
-              autoFocus
-            />
-            <label style={{ display: 'block', fontSize: 11, color: T.textSecondary, marginBottom: 4 }}>쿠팡 비밀번호 *</label>
-            <input
-              type="password"
-              value={coupangPassword}
-              onChange={(e) => setCoupangPassword(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && coupangLoginId.trim() && coupangPassword && !coupangSyncing) {
-                  e.preventDefault()
-                  void handleCoupangSync()
-                }
-              }}
-              placeholder="비밀번호"
-              required
-              style={{
-                width: '100%', height: 36, padding: '0 12px', borderRadius: 8,
-                border: `1px solid ${T.border}`, background: T.surface, color: T.text,
-                fontSize: 13, marginBottom: 12, outline: 'none',
-              }}
-              autoComplete="current-password"
-            />
-            <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 11, color: T.textTertiary, marginBottom: 16, cursor: 'pointer' }}>
+            >
+              <h2 id="coupang-login-title" style={{ fontSize: 16, fontWeight: 800, color: T.text, margin: '0 0 6px' }}>쿠팡 로그인</h2>
+              <p className="break-keep" style={{ fontSize: 12, color: T.textTertiary, margin: '0 0 16px', lineHeight: 1.5 }}>
+                조회 기간({formatDisplayDate(startDate)} ~ {formatDisplayDate(endDate)})의 쿠팡 주문을 가져와 카드결제와 자동매칭합니다.
+                비밀번호는 한 번의 로그인에만 사용되며 어디에도 저장되지 않습니다.
+              </p>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.textSecondary, marginBottom: 4 }}>쿠팡 아이디 *</label>
               <input
-                type="checkbox"
-                checked={coupangRememberId}
-                onChange={(e) => setCoupangRememberId(e.target.checked)}
-                style={{ accentColor: T.accent }}
+                type="text"
+                value={coupangLoginId}
+                onChange={(e) => setCoupangLoginId(e.target.value)}
+                placeholder="아이디 또는 이메일"
+                required
+                className="focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
+                style={{
+                  width: '100%', height: 40, padding: '0 12px', borderRadius: 10,
+                  border: `1px solid ${T.inputBorder}`, background: T.surface, color: T.text,
+                  fontSize: 13, marginBottom: 12,
+                }}
+                autoComplete="username"
+                autoFocus
               />
-              아이디 기억하기 (이 브라우저에만)
-            </label>
-            {coupangError && (
-              <div style={{ fontSize: 12, color: T.error, marginBottom: 12 }}>{coupangError}</div>
-            )}
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setCoupangModalOpen(false)}
-                disabled={coupangSyncing}
-              >취소</Button>
-              <Button
-                type="button"
-                variant="primary"
-                onClick={handleCoupangSync}
-                disabled={coupangSyncing || !coupangLoginId.trim() || !coupangPassword}
-                loading={coupangSyncing}
-              >
-                로그인 + 동기화
-              </Button>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 700, color: T.textSecondary, marginBottom: 4 }}>쿠팡 비밀번호 *</label>
+              <input
+                type="password"
+                value={coupangPassword}
+                onChange={(e) => setCoupangPassword(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && coupangLoginId.trim() && coupangPassword && !coupangSyncing) {
+                    e.preventDefault()
+                    void handleCoupangSync()
+                  }
+                }}
+                placeholder="비밀번호"
+                required
+                className="focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
+                style={{
+                  width: '100%', height: 40, padding: '0 12px', borderRadius: 10,
+                  border: `1px solid ${T.inputBorder}`, background: T.surface, color: T.text,
+                  fontSize: 13, marginBottom: 12,
+                }}
+                autoComplete="current-password"
+              />
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, color: T.textTertiary, marginBottom: 16, cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={coupangRememberId}
+                  onChange={(e) => setCoupangRememberId(e.target.checked)}
+                  className="h-4 w-4 accent-brand-orange"
+                />
+                아이디 기억하기 (이 브라우저에만)
+              </label>
+              {coupangError && (
+                <div style={{ fontSize: 12, color: T.error, marginBottom: 12 }}>{coupangError}</div>
+              )}
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setCoupangModalOpen(false)}
+                  disabled={coupangSyncing}
+                >취소</Button>
+                <Button
+                  type="button"
+                  variant="primary"
+                  onClick={handleCoupangSync}
+                  disabled={coupangSyncing || !coupangLoginId.trim() || !coupangPassword}
+                  loading={coupangSyncing}
+                >
+                  로그인 + 동기화
+                </Button>
+              </div>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
-      <p className="ux-context mb-4" role="status">저장된 카드 내역 기준입니다. 마지막 동기화 이후 거래는 포함되지 않을 수 있으며, 0원은 미수집 여부를 확인한 뒤 판단해 주세요. 최근 동기화: {formatSyncTime(data?.summary?.lastSyncedAt || null)}</p>
       {/* ════════ Metric Cards ════════ */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" style={{ marginBottom: 16 }}>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3" style={{ marginBottom: 8 }}>
         {/* 이번 달 총 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px' }}>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>조회 기간 확인된 지출</p>
-          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
-            {totalAmount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
+        <div className="col-span-2 sm:col-span-1" style={{ ...cardStyle, padding: '18px 20px' }}>
+          <p style={kpiLabelStyle}>조회 기간 확인된 지출</p>
+          <p style={kpiValueStyle}>
+            {totalAmount.toLocaleString()}<span style={kpiUnitStyle}>원</span>
           </p>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>
             {formatDisplayDate(startDate)} — {formatDisplayDate(endDate).split('. ').slice(1).join('. ')}
@@ -1461,33 +1413,40 @@ export default function CardUsageClient() {
 
         {/* 거래 건수 */}
         <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>거래 건수</p>
-          <p style={{ fontSize: 22, fontWeight: 900, color: T.text, margin: '6px 0 8px', lineHeight: 1.2 }}>
-            {totalCount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>건</span>
+          <p style={kpiLabelStyle}>거래 건수</p>
+          <p style={kpiValueStyle}>
+            {totalCount.toLocaleString()}<span style={kpiUnitStyle}>건</span>
           </p>
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            <span style={{
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
-              background: T.successBg, color: T.success, border: `1px solid ${T.successBorder}`,
-            }}>금액확인 {amountResolvedCount}건</span>
-            {amountMissingCount > 0 && (
-              <span style={{
-                fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20,
-                background: T.warningBg, color: T.warning, border: `1px solid ${T.warningBorder}`,
-              }}>미확인 {amountMissingCount}건</span>
-            )}
-          </div>
+          {(amountResolvedCount > 0 || amountMissingCount > 0) && (
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {amountResolvedCount > 0 && (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+                  background: T.successBg, color: T.success, border: `1px solid ${T.successBorder}`,
+                }}>금액확인 {amountResolvedCount}건</span>
+              )}
+              {amountMissingCount > 0 && (
+                <span style={{
+                  fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 20, whiteSpace: 'nowrap',
+                  background: T.warningBg, color: T.warning, border: `1px solid ${T.warningBorder}`,
+                }}>미확인 {amountMissingCount}건</span>
+              )}
+            </div>
+          )}
         </div>
 
         {/* 일평균 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px' }}>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>확인된 일평균 지출</p>
-          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
-            {dailyAvg.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
+        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
+          <p style={kpiLabelStyle}>확인된 일평균 지출</p>
+          <p style={kpiValueStyle}>
+            {dailyAvg.toLocaleString()}<span style={kpiUnitStyle}>원</span>
           </p>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>{daysInRange}일 기준</p>
         </div>
       </div>
+      <p className="mb-4 break-keep text-xs" style={{ color: T.textTertiary }}>
+        저장된 카드 내역 기준입니다. 마지막 동기화 이후 거래는 빠질 수 있고, 0원은 미수집일 수 있으니 확인한 뒤 판단해 주세요.
+      </p>
 
       {/* ════════ Status bar ════════ */}
       {syncMessage && (
@@ -1526,9 +1485,9 @@ export default function CardUsageClient() {
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 5,
                 padding: '6px 12px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                background: categoryFilter === cat.code ? T.accent : cat.bgColor,
-                color: categoryFilter === cat.code ? '#fff' : T.text,
-                border: categoryFilter === cat.code ? `1px solid ${T.accent}` : `1px solid ${T.borderLight}`,
+                background: categoryFilter === cat.code ? T.chipActiveBg : cat.bgColor,
+                color: categoryFilter === cat.code ? T.chipActiveText : T.text,
+                border: categoryFilter === cat.code ? `1px solid ${T.chipActiveBg}` : `1px solid ${T.borderLight}`,
                 cursor: 'pointer', transition: 'all .15s',
               }}
             >
@@ -1579,7 +1538,7 @@ export default function CardUsageClient() {
                   {cat.label}
                 </span>
               )}
-              <span style={{ color: categoryFilter === cat.code ? 'rgba(255,255,255,0.7)' : T.textTertiary, fontWeight: 500 }}>
+              <span style={{ color: categoryFilter === cat.code ? T.chipActiveText : T.textTertiary, opacity: categoryFilter === cat.code ? 0.75 : 1, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>
                 {cat.total.toLocaleString()}원
               </span>
             </button>
@@ -1595,7 +1554,8 @@ export default function CardUsageClient() {
                 border: `1px solid ${T.borderLight}`, cursor: 'pointer',
               }}
             >
-              ✕ 필터 해제
+              <X size={12} />
+              필터 해제
             </button>
           )}
           {/* Category Manager toggle */}
@@ -1605,9 +1565,9 @@ export default function CardUsageClient() {
             style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
               padding: '6px 10px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-              background: showCatManager ? T.accent : T.surfaceSecondary,
-              color: showCatManager ? '#fff' : T.textSecondary,
-              border: `1px solid ${showCatManager ? T.accent : T.borderLight}`,
+              background: showCatManager ? T.chipActiveBg : T.surfaceSecondary,
+              color: showCatManager ? T.chipActiveText : T.textSecondary,
+              border: `1px solid ${showCatManager ? T.chipActiveBg : T.borderLight}`,
               cursor: 'pointer', transition: 'all .15s',
             }}
           >
@@ -1648,7 +1608,7 @@ export default function CardUsageClient() {
                 placeholder="이모지"
                 maxLength={4}
                 style={{
-                  ...flatInputStyle, width: 60, textAlign: 'center', height: 36,
+                  ...flatInputStyle, width: 60, textAlign: 'center',
                 }}
               />
               <input
@@ -1658,13 +1618,13 @@ export default function CardUsageClient() {
                 placeholder="카테고리 이름"
                 onKeyDown={e => { if (e.key === 'Enter') handleAddCategory() }}
                 style={{
-                  ...flatInputStyle, flex: 1, height: 36,
+                  ...flatInputStyle, flex: 1,
                 }}
               />
               <button
                 type="button"
                 onClick={handleAddCategory}
-                className={buttonClass('primary', 'sm', 'h-9')}
+                className={buttonClass('secondary', 'sm', 'h-10')}
               >
                 <Plus size={12} />
                 추가
@@ -1776,100 +1736,74 @@ export default function CardUsageClient() {
       )}
 
       {/* ════════ Filter bar ════════ */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 12 }}>
-        {/* Month select */}
-        <div style={{
-          ...flatInputStyle, display: 'flex', alignItems: 'center', gap: 8,
-          flex: '0 1 180px', paddingLeft: 12,
-          cursor: 'pointer',
-        }} onClick={() => openNativePicker(monthInputRef.current)}>
-          <Calendar size={14} style={{ color: T.textTertiary, flexShrink: 0 }} />
-          <input
-            ref={monthInputRef}
-            type="month"
+      {/* Phones: two columns, with the period and 조회 on their own full-width rows. */}
+      <div className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <div className="relative min-w-0 sm:w-40">
+          <select
+            aria-label="월 선택"
             value={selectedMonth}
             onChange={e => handleMonthChange(e.target.value)}
-            onClick={e => {
-              e.stopPropagation()
-              openNativePicker(monthInputRef.current)
-            }}
-            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit', cursor: 'pointer' }}
-          />
+            className={filterSelectClass}
+          >
+            {!selectedMonth && <option value="">기간 직접 선택</option>}
+            {monthOptions.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
         </div>
 
-        {/* Date range */}
-        <div style={{
-          ...flatInputStyle, display: 'flex', alignItems: 'center', gap: 8,
-          flex: '1 1 320px', paddingLeft: 12,
-        }}>
-          <Calendar size={14} style={{ color: T.textTertiary, flexShrink: 0 }} />
+        <div className={`${filterFieldClass} order-1 col-span-2 sm:order-none sm:min-w-[300px] sm:flex-1`}>
           <input
             ref={startDateInputRef}
             type="date"
+            aria-label="시작일"
             value={startDate}
             onChange={e => setStartDate(e.target.value)}
             onClick={() => openNativePicker(startDateInputRef.current)}
-            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit', cursor: 'pointer' }}
+            className={filterBareInputClass}
           />
-          <span style={{ color: T.textTertiary, fontSize: 13, flexShrink: 0 }}>—</span>
+          <span aria-hidden="true" className="shrink-0 text-[13px] text-[var(--muted-foreground)]">—</span>
           <input
             ref={endDateInputRef}
             type="date"
+            aria-label="종료일"
             value={endDate}
             onChange={e => setEndDate(e.target.value)}
             onClick={() => openNativePicker(endDateInputRef.current)}
-            style={{ border: 'none', background: 'transparent', fontSize: 13, color: T.text, outline: 'none', flex: 1, fontFamily: 'inherit', cursor: 'pointer' }}
+            className={filterBareInputClass}
           />
         </div>
 
-        {/* Card number select */}
-        <div style={{ position: 'relative', flex: '0 1 auto' }}>
-          <select
-            value={cardNum}
-            onChange={e => setCardNum(e.target.value)}
-            style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 180, fontFamily: 'inherit' }}
-          >
+        <div className="relative min-w-0 sm:min-w-[170px]">
+          <select aria-label="카드번호" value={cardNum} onChange={e => setCardNum(e.target.value)} className={filterSelectClass}>
             <option value="">카드번호 전체</option>
             {uniqueCards.map(c => <option key={c} value={c}>{maskCard(c)}</option>)}
           </select>
-          <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
         </div>
 
-        {/* Store name select */}
-        <div style={{ position: 'relative', flex: '0 1 auto' }}>
-          <select
-            value={storeName}
-            onChange={e => setStoreName(e.target.value)}
-            style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 180, fontFamily: 'inherit' }}
-          >
+        <div className="relative min-w-0 sm:min-w-[170px]">
+          <select aria-label="가맹점" value={storeName} onChange={e => setStoreName(e.target.value)} className={filterSelectClass}>
             <option value="">가맹점 전체</option>
             {uniqueStores.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
-          <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
         </div>
 
-        {/* Category select */}
-        <div style={{ position: 'relative', flex: '0 1 auto' }}>
-          <select
-            value={categoryFilter}
-            onChange={e => setCategoryFilter(e.target.value)}
-            style={{ ...flatInputStyle, paddingRight: 32, appearance: 'none', cursor: 'pointer', minWidth: 140, fontFamily: 'inherit' }}
-          >
+        <div className="relative min-w-0 sm:min-w-[150px]">
+          <select aria-label="카테고리" value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className={filterSelectClass}>
             <option value="">카테고리 전체</option>
             {categories.map(c => <option key={c.code} value={c.code}>{c.emoji} {c.label}</option>)}
           </select>
-          <ChevronDown size={14} style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', color: T.textTertiary, pointerEvents: 'none' }} />
+          <ChevronDown size={14} className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
         </div>
 
-        {/* Search button */}
         <Button
           type="button"
           variant="secondary"
           onClick={handleSearch}
           loading={loading}
           icon={<Search size={14} />}
-          className="min-w-[72px]"
-          style={{ height: 42 }}
+          className="order-2 col-span-2 min-w-[72px] sm:order-none"
         >
           조회
         </Button>
@@ -1879,10 +1813,10 @@ export default function CardUsageClient() {
       <div style={{
         display: 'flex', alignItems: 'center', gap: 8,
         background: T.surface,
-        border: `1px solid ${searchQuery.trim() ? T.accent : T.border}`,
-        borderRadius: 12,
-        padding: '0 14px',
-        height: 44,
+        border: `1px solid ${searchQuery.trim() ? T.accent : T.inputBorder}`,
+        borderRadius: 10,
+        padding: '0 12px',
+        height: 40,
         marginBottom: 14,
         transition: 'border-color .15s',
         boxShadow: searchQuery.trim() ? '0 0 0 3px rgba(228,61,32,0.10)' : 'none',
@@ -1892,7 +1826,8 @@ export default function CardUsageClient() {
           type="text"
           value={searchQuery}
           onChange={e => setSearchQuery(e.target.value)}
-          placeholder="가맹점명, 메모 검색 · 금액범위: >50000  /  <10000  /  10000~50000"
+          aria-label="가맹점·메모·금액 검색"
+          placeholder="가맹점·메모·금액(>50000, 10000~50000) 검색"
           style={{
             flex: 1, border: 'none', outline: 'none', background: 'transparent',
             fontSize: 13, color: T.text, fontFamily: 'inherit',
@@ -1910,7 +1845,7 @@ export default function CardUsageClient() {
           </button>
         )}
         {searchQuery.trim() && (
-          <span style={{ fontSize: 11, fontWeight: 600, color: T.accent, whiteSpace: 'nowrap', paddingLeft: 4 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: T.textSecondary, whiteSpace: 'nowrap', paddingLeft: 4, fontVariantNumeric: 'tabular-nums' }}>
             {filteredItems.length}건 매칭
           </span>
         )}
@@ -1947,38 +1882,39 @@ export default function CardUsageClient() {
       )}
 
       {/* ════════ Section header ════════ */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: T.textTertiary, fontWeight: 500, whiteSpace: 'nowrap' }}>
-            거래내역 {sortedItems.length.toLocaleString()}건
+      {/* The view tabs sit right after the title and every control keeps its place across views, so switching never moves them. */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h2 className="flex items-center gap-2 whitespace-nowrap text-sm font-bold text-[var(--foreground)]">
+          거래내역
+          <span className="inline-flex h-5 items-center rounded-full bg-[var(--muted)] px-2 text-[11px] font-bold tabular-nums text-[var(--muted-foreground)]">
+            {sortedItems.length.toLocaleString()}건
           </span>
+        </h2>
+        <Tabs
+          aria-label="보기 방식"
+          items={[
+            { key: 'table', label: '테이블' },
+            { key: 'list', label: '카드' },
+            { key: 'calendar', label: '캘린더' },
+          ]}
+          value={viewMode}
+          onChange={(mode) => setViewMode(mode)}
+        />
+        <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
           {reviewMode && (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                color: pendingReviewCount > 0 ? T.warning : T.success,
-                background: pendingReviewCount > 0 ? T.warningBg : T.successBg,
-                border: `1px solid ${pendingReviewCount > 0 ? T.warningBorder : T.successBorder}`,
-                borderRadius: 999,
-                padding: '2px 8px',
-              }}
+            <button
+              type="button"
+              aria-pressed={reviewOnlyPending}
+              onClick={() => setReviewOnlyPending(prev => !prev)}
+              className={`inline-flex h-8 items-center whitespace-nowrap rounded-lg border px-3 text-xs font-bold transition-colors ${
+                reviewOnlyPending
+                  ? 'border-amber-300 bg-amber-50 text-amber-800'
+                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
+              }`}
             >
-              {pendingReviewCount > 0 ? `미리뷰 ${pendingReviewCount}건` : '리뷰 완료'}
-            </span>
+              미리뷰만 보기
+            </button>
           )}
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Tabs
-            aria-label="보기 방식"
-            items={[
-              { key: 'table', label: '테이블' },
-              { key: 'list', label: '카드' },
-              { key: 'calendar', label: '캘린더' },
-            ]}
-            value={viewMode}
-            onChange={(mode) => setViewMode(mode)}
-          />
           <button
             type="button"
             aria-pressed={reviewMode}
@@ -1988,47 +1924,103 @@ export default function CardUsageClient() {
                 return !prev
               })
             }}
-            className={`inline-flex h-9 items-center whitespace-nowrap rounded-xl border px-3.5 text-[13px] font-bold transition-colors ${
+            className={`inline-flex h-8 items-center whitespace-nowrap rounded-lg border px-3 text-xs font-bold transition-colors ${
               reviewMode
-                ? 'border-brand-orange bg-brand-orange-soft text-brand-orange'
+                ? 'border-slate-400 bg-slate-100 text-slate-900'
                 : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
             }`}
           >
             리뷰 모드 {reviewMode ? '켜짐' : '꺼짐'}
           </button>
-          {reviewMode && (
+          <label className="relative inline-flex items-center" title={viewMode === 'calendar' ? '캘린더 보기에는 정렬이 적용되지 않습니다' : undefined}>
+            <span className="sr-only">정렬</span>
+            <ArrowUpDown size={13} className="pointer-events-none absolute left-2.5 text-slate-400" />
+            <select
+              value={`${sortField}-${sortOrder}`}
+              onChange={e => handleSortChange(e.target.value)}
+              disabled={viewMode === 'calendar'}
+              className="h-8 cursor-pointer appearance-none rounded-lg border border-slate-200 bg-white pl-8 pr-7 text-xs font-bold text-slate-700 transition-colors hover:border-slate-300 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="date-desc">최신순</option>
+              <option value="date-asc">오래된순</option>
+              <option value="amount-desc">금액 큰 순</option>
+              <option value="amount-asc">금액 작은 순</option>
+            </select>
+            <ChevronDown size={13} className="pointer-events-none absolute right-2 text-slate-400" />
+          </label>
+          <div ref={shortcutTipsRef} className={`relative ${shortcutTipsAvailable ? '' : 'invisible'}`}>
             <button
               type="button"
-              aria-pressed={reviewOnlyPending}
-              onClick={() => setReviewOnlyPending(prev => !prev)}
-              className={`inline-flex h-9 items-center whitespace-nowrap rounded-xl border px-3.5 text-[13px] font-bold transition-colors ${
-                reviewOnlyPending
-                  ? 'border-amber-300 bg-amber-50 text-amber-800'
-                  : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-slate-50'
-              }`}
+              onClick={() => setShowShortcutTips(prev => !prev)}
+              aria-expanded={showShortcutTips}
+              aria-label="단축키 팁"
+              title="단축키 팁"
+              tabIndex={shortcutTipsAvailable ? undefined : -1}
+              className={buttonClass('ghost', 'sm', 'w-8 px-0')}
             >
-              미리뷰만 보기
+              <Keyboard size={16} />
             </button>
-          )}
-          {(viewMode === 'list' || viewMode === 'table') && (
-            <Tabs
-              aria-label="정렬"
-              items={[
-                { key: 'date', label: `날짜순${sortField === 'date' ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}` },
-                { key: 'amount', label: `금액순${sortField === 'amount' ? (sortOrder === 'desc' ? ' ↓' : ' ↑') : ''}` },
-              ]}
-              value={sortField}
-              onChange={(mode) => handleSortClick(mode)}
-            />
-          )}
+            {showShortcutTips && shortcutTipsAvailable && (
+              <div
+                role="dialog"
+                aria-label="단축키 팁"
+                className="absolute right-0 top-[calc(100%+6px)] z-30 w-[min(360px,calc(100vw-24px))] rounded-xl border p-3 shadow-lg"
+                style={{ background: T.surface, borderColor: T.border }}
+              >
+                <p className="text-xs font-bold" style={{ color: T.text }}>숫자키로 카테고리 지정</p>
+                <p className="mt-1 break-keep text-[11px] leading-relaxed" style={{ color: T.textTertiary }}>
+                  거래를 고른 뒤 1~6을 누르면 아래 순서의 카테고리로 바로 저장됩니다. 드래그하면 순서가 바뀝니다.
+                </p>
+                <div className="mt-2.5 flex flex-wrap gap-1.5">
+                  {shortcutCategories.map((cat, idx) => (
+                    <div
+                      key={cat.code}
+                      draggable
+                      onDragStart={(e) => {
+                        setDraggedCatIdx(idx)
+                        e.dataTransfer.effectAllowed = 'move'
+                      }}
+                      onDragOver={(e) => {
+                        e.preventDefault()
+                        e.dataTransfer.dropEffect = 'move'
+                      }}
+                      onDrop={(e) => {
+                        e.preventDefault()
+                        if (draggedCatIdx !== null) moveCategory(draggedCatIdx, idx)
+                        setDraggedCatIdx(null)
+                      }}
+                      onDragEnd={() => setDraggedCatIdx(null)}
+                      title="드래그해서 단축키 순서 변경"
+                      style={{
+                        display: 'inline-grid',
+                        gridTemplateColumns: '14px 16px 18px auto',
+                        alignItems: 'center',
+                        gap: 6,
+                        background: T.surfaceSecondary,
+                        border: `1px solid ${T.borderLight}`,
+                        borderRadius: 8,
+                        padding: '5px 8px',
+                        cursor: draggedCatIdx === idx ? 'grabbing' : 'grab',
+                        opacity: draggedCatIdx === idx ? 0.55 : 1,
+                      }}
+                    >
+                      <GripVertical size={13} style={{ color: T.textTertiary }} />
+                      <span style={{ fontSize: 11, fontWeight: 800, color: T.text, textAlign: 'center', fontVariantNumeric: 'tabular-nums' }}>{idx + 1}</span>
+                      <span style={{ fontSize: 14, lineHeight: 1 }}>{cat.emoji}</span>
+                      <span style={{ fontSize: 11, color: T.text, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 120 }}>
+                        {cat.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2 truncate text-[11px]" style={{ color: T.textTertiary }}>
+                  선택한 거래: {selectedItem?.useStoreName || '없음'}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </div>
-
-      {(viewMode === 'list' || viewMode === 'table') && (
-        <p style={{ margin: '-4px 0 10px', fontSize: 12, color: T.textTertiary }}>
-          거래내역을 클릭한 뒤 숫자키 1~6을 누르면 카테고리 순서대로 즉시 적용됩니다.
-        </p>
-      )}
 
       {/* ════════ Transaction list ════════ */}
       {loading ? (
@@ -2037,85 +2029,87 @@ export default function CardUsageClient() {
           불러오는 중...
         </div>
       ) : viewMode === 'calendar' ? (
-        calendarData.months.length === 0 ? (
+        calendarData.months.length === 0 || filteredItems.length === 0 ? (
           <EmptyState compact title="조회된 카드 사용내역이 없습니다." description="조회 기간이나 필터를 바꿔 보세요." />
         ) : (
           <div style={{ ...cardStyle, padding: '14px 14px 6px' }}>
-            <p style={{ margin: '0 0 12px', fontSize: 12, color: T.textTertiary }}>
-              일별 사용액 게이지 (카테고리 분할, 최대 {calendarData.maxDailyAmount.toLocaleString()}원 = 100%)
+            <p className="break-keep" style={{ margin: '0 0 12px', fontSize: 12, color: T.textTertiary }}>
+              막대는 일별 사용액입니다. 가장 많이 쓴 날({calendarData.maxDailyAmount.toLocaleString()}원)이 100%이고, 색은 카테고리 비중입니다.
             </p>
             {calendarData.months.map(month => (
               <div key={month.key} style={{ marginBottom: 14 }}>
-                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 700, color: T.text }}>
+                <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 800, color: T.text }}>
                   {month.label}
                 </p>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6, marginBottom: 6 }}>
-                  {['일', '월', '화', '수', '목', '금', '토'].map(day => (
-                    <div key={`${month.key}-${day}`} style={{ textAlign: 'center', fontSize: 11, color: T.textTertiary, fontWeight: 600 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4, marginBottom: 4 }}>
+                  {['일', '월', '화', '수', '목', '금', '토'].map((day, dayIdx) => (
+                    <div key={`${month.key}-${day}`} style={{ textAlign: 'center', fontSize: 12, color: dayIdx === 0 || dayIdx === 6 ? T.error : T.textTertiary, fontWeight: 700 }}>
                       {day}
                     </div>
                   ))}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 6 }}>
-                  {month.cells.map((cell, idx) => (
-                    cell ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7, minmax(0, 1fr))', gap: 4 }}>
+                  {month.cells.map((cell, idx) => {
+                    if (!cell) return <div key={`${month.key}-blank-${idx}`} />
+                    const weekday = cell.date.getDay()
+                    const clickable = cell.inRange && cell.hasTransactions
+                    return (
                       <div
                         key={cell.key}
                         onClick={() => handleCalendarDateClick(cell.key, cell.hasTransactions)}
                         style={{
-                          borderRadius: 10,
-                          border: `1px solid ${cell.inRange ? T.borderLight : T.borderLight}`,
-                          background: cell.inRange
-                            ? (cell.percent > 0 ? T.surfaceSecondary : T.surface)
-                            : T.bg,
+                          borderRadius: 8,
+                          background: cell.inRange ? (cell.amount > 0 ? T.surfaceSecondary : T.bg) : 'transparent',
                           padding: '8px 8px 7px',
                           minHeight: 66,
                           opacity: cell.inRange ? 1 : 0.45,
-                          cursor: cell.inRange && cell.hasTransactions ? 'pointer' : 'default',
+                          cursor: clickable ? 'pointer' : 'default',
                         }}
                         title={cell.hasTransactions ? '클릭하면 해당 날짜 결제내역으로 이동' : undefined}
                       >
-                        <div style={{ fontSize: 11, fontWeight: 700, color: T.text, marginBottom: 4 }}>
-                          {cell.date.getDate()}일
+                        <div style={{ fontSize: 12, fontWeight: 700, color: weekday === 0 || weekday === 6 ? T.error : T.text, marginBottom: 4 }}>
+                          {cell.date.getDate()}
                         </div>
-                        <div style={{ fontSize: 11, color: T.textSecondary, marginBottom: 6, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {cell.amount > 0 ? `${cell.amount.toLocaleString()}원` : '-'}
+                        <div style={{ fontSize: 11, fontWeight: cell.amount > 0 ? 700 : 400, color: cell.amount > 0 ? T.text : T.textTertiary, marginBottom: 6, textAlign: 'right', fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {cell.amount > 0 ? `${cell.amount.toLocaleString()}원` : (cell.hasTransactions ? '0원' : '')}
                         </div>
-                        <div style={{ height: 6, borderRadius: 999, background: T.surfaceSecondary, overflow: 'hidden' }}>
-                          <div
-                            style={{
-                              width: `${cell.percent}%`,
-                              height: '100%',
-                              display: 'flex',
-                              borderRadius: 999,
-                              overflow: 'hidden',
-                            }}
-                          >
-                            {cell.segments.length > 0 ? (
-                              cell.segments.map(segment => (
-                                <div
-                                  key={`${cell.key}-${segment.code}`}
-                                  style={{
-                                    width: `${segment.ratio * 100}%`,
-                                    height: '100%',
-                                    background: gaugeColorByCode.get(segment.code) || pickGaugeColor(segment.code),
-                                  }}
-                                  title={`${segment.code}: ${segment.amount.toLocaleString()}원`}
-                                />
-                              ))
-                            ) : (
-                              <div style={{ width: '100%', height: '100%', background: '#2563EB' }} />
-                            )}
-                          </div>
-                        </div>
-                        <div style={{ marginTop: 4, fontSize: 10, color: T.textTertiary, textAlign: 'right' }}>
-                          {cell.percent}%
-                        </div>
+                        {cell.amount > 0 && (
+                          <>
+                            <div style={{ height: 6, borderRadius: 999, background: T.surface, overflow: 'hidden' }}>
+                              <div
+                                style={{
+                                  width: `${cell.percent}%`,
+                                  height: '100%',
+                                  display: 'flex',
+                                  borderRadius: 999,
+                                  overflow: 'hidden',
+                                }}
+                              >
+                                {cell.segments.length > 0 ? (
+                                  cell.segments.map(segment => (
+                                    <div
+                                      key={`${cell.key}-${segment.code}`}
+                                      style={{
+                                        width: `${segment.ratio * 100}%`,
+                                        height: '100%',
+                                        background: gaugeColorByCode.get(segment.code) || pickGaugeColor(segment.code),
+                                      }}
+                                      title={`${segment.code}: ${segment.amount.toLocaleString()}원`}
+                                    />
+                                  ))
+                                ) : (
+                                  <div style={{ width: '100%', height: '100%', background: '#64748B' }} />
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ marginTop: 4, fontSize: 10, color: T.textTertiary, textAlign: 'right', fontVariantNumeric: 'tabular-nums' }}>
+                              {cell.percent}%
+                            </div>
+                          </>
+                        )}
                       </div>
-                    ) : (
-                      <div key={`${month.key}-blank-${idx}`} />
                     )
-                  ))}
+                  })}
                 </div>
               </div>
             ))}
@@ -2207,7 +2201,7 @@ export default function CardUsageClient() {
                             alignItems: 'center',
                             justifyContent: 'center',
                             cursor: 'pointer',
-                            boxShadow: isSelected ? '0 0 0 2px rgba(59,130,246,0.25)' : 'none',
+                            boxShadow: isSelected ? '0 0 0 2px rgba(15,23,42,0.18)' : 'none',
                           }}
                         >
                           {cat.emoji}
@@ -2348,7 +2342,7 @@ export default function CardUsageClient() {
                                 }}>{c.emoji}</span>
                                 <span>{c.label}</span>
                                 {draftCategoryCode === c.code && (
-                                  <span style={{ marginLeft: 'auto', color: T.success, fontSize: 11 }}>✓</span>
+                                  <Check size={13} style={{ marginLeft: 'auto', color: T.success }} />
                                 )}
                               </button>
                             ))}
@@ -2402,14 +2396,16 @@ export default function CardUsageClient() {
                                       : (item.coupangPurchase.itemSummary || '')
                                   }
                                   style={{
-                                    fontSize: 11, fontWeight: 600, color: '#FF4444',
-                                    background: theme === 'dark' ? '#2a1515' : '#FFF1F1',
-                                    border: `1px solid ${theme === 'dark' ? '#3a1818' : '#FBC9C9'}`,
+                                    display: 'inline-flex', alignItems: 'center', gap: 4,
+                                    fontSize: 11, fontWeight: 600, color: T.textSecondary,
+                                    background: T.surface,
+                                    border: `1px solid ${T.inputBorder}`,
                                     padding: '2px 8px', borderRadius: 999,
                                     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 320,
                                   }}
                                 >
-                                  {'📦 '}{item.coupangPurchase.itemSummary || '쿠팡 주문'}
+                                  <Package size={12} style={{ flexShrink: 0 }} />
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.coupangPurchase.itemSummary || '쿠팡 주문'}</span>
                                 </span>
                                 <button
                                   type="button"
@@ -2428,13 +2424,14 @@ export default function CardUsageClient() {
                                 type="button"
                                 onClick={(e) => { e.stopPropagation(); void openCoupangManualMatch(item) }}
                                 style={{
-                                  fontSize: 11, fontWeight: 600, color: '#FF4444',
+                                  display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  fontSize: 11, fontWeight: 600, color: T.textSecondary,
                                   background: 'transparent',
-                                  border: `1px dashed ${theme === 'dark' ? '#5a2222' : '#FBC9C9'}`,
+                                  border: `1px dashed ${T.inputBorder}`,
                                   padding: '2px 8px', borderRadius: 999, cursor: 'pointer',
                                 }}
                                 title={'쿠팡 구매내역 수동 매칭'}
-                              >{'📦 쿠팡 매칭'}</button>
+                              ><Package size={12} />쿠팡 매칭</button>
                             )}
                           </div>
                         )}
@@ -2491,7 +2488,7 @@ export default function CardUsageClient() {
                       {/* Amount */}
                       <div style={{ textAlign: 'right', flexShrink: 0 }}>
                         <p style={{
-                          fontSize: 15, fontWeight: 600, margin: 0, whiteSpace: 'nowrap',
+                          fontSize: 15, fontWeight: 700, margin: 0, whiteSpace: 'nowrap', fontVariantNumeric: 'tabular-nums',
                           color: approvalStatus === 'CANCELED' ? '#DC2626' : T.text
                         }}>
                           {signedAmt.toLocaleString()}<span style={{ fontSize: 12, fontWeight: 400 }}>원</span>
@@ -2553,92 +2550,76 @@ export default function CardUsageClient() {
       {/* Coupang manual match modal */}
       {coupangManualOpenForId && (() => {
         const targetItem = data?.items.find((row) => row.id === coupangManualOpenForId) || null
+        const closeManualMatch = () => setCoupangManualOpenForId(null)
         return (
-          <div
-            onClick={() => setCoupangManualOpenForId(null)}
-            style={{
-              position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000,
-            }}
-          >
-            <div
-              onClick={(e) => e.stopPropagation()}
-              style={{
-                background: T.surface, borderRadius: 12, padding: 22,
-                width: 'min(560px, 94vw)', maxHeight: '80vh', overflow: 'auto',
-                boxShadow: '0 20px 60px rgba(0,0,0,0.3)', border: `1px solid ${T.border}`,
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 }}>
-                <div>
-                  <h2 style={{ fontSize: 16, fontWeight: 600, color: T.text, margin: 0 }}>쿠팡 구매내역 매칭</h2>
-                  {targetItem && (
-                    <p style={{ fontSize: 12, color: T.textTertiary, margin: '4px 0 0' }}>
-                      {targetItem.useStoreName || '가맹점 없음'} · {resolveAmount(targetItem).toLocaleString()}원
-                      {targetItem.usedAt ? ` · ${formatMonthDay(targetItem.usedAt)}` : ''}
-                    </p>
-                  )}
+          <Modal labelledBy="coupang-manual-title" onClose={closeManualMatch} className="bg-slate-950/50">
+            <div className="flex h-full items-center justify-center p-4" onMouseDown={e => { if (e.target === e.currentTarget) closeManualMatch() }}>
+              <div
+                style={{
+                  background: T.surface, borderRadius: 16, padding: 22,
+                  width: 'min(560px, 94vw)', maxHeight: '80vh', overflow: 'auto',
+                  boxShadow: '0 20px 60px rgba(0,0,0,0.3)', border: `1px solid ${T.border}`,
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 12 }}>
+                  <div>
+                    <h2 id="coupang-manual-title" style={{ fontSize: 16, fontWeight: 800, color: T.text, margin: 0 }}>쿠팡 구매내역 매칭</h2>
+                    {targetItem && (
+                      <p style={{ fontSize: 12, color: T.textTertiary, margin: '4px 0 0' }}>
+                        {targetItem.useStoreName || '가맹점 없음'} · {resolveAmount(targetItem).toLocaleString()}원
+                        {targetItem.usedAt ? ` · ${formatMonthDay(targetItem.usedAt)}` : ''}
+                      </p>
+                    )}
+                  </div>
+                  <button type="button" onClick={closeManualMatch} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}>
+                    <X size={16} />
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setCoupangManualOpenForId(null)}
-                  style={{
-                    background: 'transparent', border: 'none', color: T.textTertiary,
-                    fontSize: 18, cursor: 'pointer', padding: 0, lineHeight: 1,
-                  }}
-                >✕</button>
-              </div>
-              {coupangManualLoading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
-                  <Loader2 size={14} className="animate-spin" /> 쿠팡 구매내역 검색 중...
-                </div>
-              ) : coupangManualResults.length === 0 ? (
-                <div style={{ padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
-                  매칭 후보가 없습니다. 상단 “쿠팡 매칭” 버튼으로 최신 주문을 먼저 동기화해 주세요.
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {coupangManualResults.map((purchase) => {
-                    const isCurrent = targetItem?.coupangPurchaseId === purchase.id
-                    return (
-                      <div
-                        key={purchase.id}
-                        style={{
-                          display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
-                          padding: '10px 12px', borderRadius: 10,
-                          border: `1px solid ${isCurrent ? T.successBorder : T.border}`,
-                          background: isCurrent ? T.successBg : T.surfaceSecondary,
-                        }}
-                      >
-                        <div style={{ minWidth: 0 }}>
-                          <p style={{ fontSize: 13, fontWeight: 600, color: T.text, margin: 0 }}>
-                            {purchase.itemSummary || '쿠팡 주문'}
-                          </p>
-                          <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0' }}>
-                            주문 {purchase.orderId} · {new Date(purchase.orderedAt).toLocaleDateString('ko-KR')} · {purchase.totalAmount.toLocaleString()}원
-                            {purchase.paymentMethod ? ` · ${purchase.paymentMethod}` : ''}
-                          </p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => targetItem && void linkCoupangPurchase(targetItem, isCurrent ? null : purchase.id)}
-                          disabled={!targetItem || coupangManualSavingId === targetItem?.id}
+                {coupangManualLoading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
+                    <Loader2 size={14} className="animate-spin" /> 쿠팡 구매내역 검색 중...
+                  </div>
+                ) : coupangManualResults.length === 0 ? (
+                  <div className="break-keep" style={{ padding: '20px 0', color: T.textTertiary, fontSize: 13 }}>
+                    매칭 후보가 없습니다. 상단 “쿠팡 매칭” 버튼으로 최신 주문을 먼저 동기화해 주세요.
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    {coupangManualResults.map((purchase) => {
+                      const isCurrent = targetItem?.coupangPurchaseId === purchase.id
+                      return (
+                        <div
+                          key={purchase.id}
                           style={{
-                            height: 30, padding: '0 12px', borderRadius: 8,
-                            background: isCurrent ? 'transparent' : '#FF4444',
-                            color: isCurrent ? T.textSecondary : '#fff',
-                            border: isCurrent ? `1px solid ${T.border}` : 'none',
-                            fontSize: 12, fontWeight: 600,
-                            cursor: coupangManualSavingId === targetItem?.id ? 'wait' : 'pointer',
+                            display: 'grid', gridTemplateColumns: '1fr auto', gap: 12, alignItems: 'center',
+                            padding: '10px 12px', borderRadius: 10,
+                            border: `1px solid ${isCurrent ? T.successBorder : T.border}`,
+                            background: isCurrent ? T.successBg : T.surfaceSecondary,
                           }}
-                        >{isCurrent ? '해제' : '매칭'}</button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+                        >
+                          <div style={{ minWidth: 0 }}>
+                            <p style={{ fontSize: 13, fontWeight: 600, color: T.text, margin: 0 }}>
+                              {purchase.itemSummary || '쿠팡 주문'}
+                            </p>
+                            <p style={{ fontSize: 11, color: T.textTertiary, margin: '2px 0 0' }}>
+                              주문 {purchase.orderId} · {new Date(purchase.orderedAt).toLocaleDateString('ko-KR')} · {purchase.totalAmount.toLocaleString()}원
+                              {purchase.paymentMethod ? ` · ${purchase.paymentMethod}` : ''}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => targetItem && void linkCoupangPurchase(targetItem, isCurrent ? null : purchase.id)}
+                            disabled={!targetItem || coupangManualSavingId === targetItem?.id}
+                            className={buttonClass(isCurrent ? 'ghost' : 'secondary', 'sm')}
+                          >{isCurrent ? '해제' : '매칭'}</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </Modal>
         )
       })()}
 

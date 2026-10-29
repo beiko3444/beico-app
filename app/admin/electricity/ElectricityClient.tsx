@@ -1,11 +1,13 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { Camera, Check, ChevronLeft, ChevronRight, FileText, Printer, Wand2, X, Zap } from 'lucide-react'
 import { buildElectricitySavePayload, hasSavedLandlordReading } from '@/lib/electricityUsageClient'
 import Button, { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
 import EmptyState from '@/components/ui/EmptyState'
+import Modal from '@/components/Modal'
 import {
     readInvoiceNotes, validateInvoiceNotes, MAX_INVOICE_NOTICES, MAX_NOTICE_TITLE_LENGTH,
     MAX_NOTICE_CONTENT_LENGTH, MAX_INVOICE_REMARKS_LENGTH,
@@ -101,6 +103,15 @@ export default function ElectricityClient() {
     const [selectedYear, setSelectedYear] = useState(Math.max(today.getFullYear(), PAYMENT_START_YEAR))
     const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1)
     const [activeTab, setActiveTab] = useState<'analysis' | 'payment' | 'rent-receipt'>('analysis')
+    const monthStripRef = useRef<HTMLDivElement>(null)
+
+    // On phones the month strip scrolls sideways; keep the selected month in view without moving the page.
+    useEffect(() => {
+        const strip = monthStripRef.current
+        const chip = strip?.querySelector<HTMLElement>(`[data-month="${selectedMonth}"]`)
+        if (!strip || !chip || strip.scrollWidth <= strip.clientWidth) return
+        strip.scrollLeft = chip.offsetLeft - strip.clientWidth / 2 + chip.clientWidth / 2
+    }, [selectedMonth])
 
     const [billData, setBillData] = useState<BillData | null>(null)
     const [landlordData, setLandlordData] = useState<LandlordData | null>(null)
@@ -1040,19 +1051,14 @@ export default function ElectricityClient() {
     return (
         <div id="electricity-main" className="min-w-0 space-y-5 font-sans pb-20 print:pb-0 print:space-y-0">
             <PageHeader
-                title="전력관리"
+                title="전력 관리"
                 description="월별 전기요금 명세서와 임대인 분담, 납부 현황을 관리합니다."
-                actions={(
-                    <Button type="button" variant="primary" onClick={() => setIsUsageModalOpen(true)}>
-                        {billData ? '고지서 수정' : '명세서 입력하기'}
-                    </Button>
-                )}
             />
 
             <Tabs
-                aria-label="전력관리 메뉴"
+                aria-label="전력 관리 메뉴"
                 items={[
-                    { key: 'analysis', label: '전력관리' },
+                    { key: 'analysis', label: '사용량·요금' },
                     { key: 'payment', label: '납부관리' },
                     { key: 'rent-receipt', label: '임대료영수증' },
                 ]}
@@ -1060,133 +1066,90 @@ export default function ElectricityClient() {
                 onChange={(key) => setActiveTab(key)}
             />
 
-            {/* Month Selection */}
-            <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div className="min-w-0">
-                        <h2 className="text-lg font-black text-gray-950 break-keep dark:text-white">{selectedYear}년 전력 데이터</h2>
-                    </div>
-                    <div className="flex items-center gap-2">
+            {/* Month Selection — shared by all three tabs */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex items-center gap-1">
                         <button
                             type="button"
                             onClick={() => setSelectedYear(selectedYear - 1)}
-                            className="h-10 w-10 rounded-xl border border-gray-200 bg-gray-50 text-sm font-black text-gray-600 transition hover:bg-gray-100 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-300"
+                            className={buttonClass('ghost', 'sm', 'w-8 px-0')}
                             aria-label="이전 연도"
                         >
-                            ‹
+                            <ChevronLeft size={16} />
                         </button>
-                        <select
-                            value={selectedYear}
-                            onChange={(e) => setSelectedYear(Number(e.target.value))}
-                            className="h-10 rounded-xl border border-gray-200 bg-gray-50 px-3 text-sm font-black text-gray-900 outline-none focus:border-brand-orange dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
-                        >
-                            {[2024, 2025, 2026, 2027].map(y => <option key={y} value={y}>{y}년</option>)}
-                        </select>
+                        <h2 className="min-w-[64px] text-center text-base font-black tabular-nums text-slate-900 dark:text-white">{selectedYear}년</h2>
                         <button
                             type="button"
                             onClick={() => setSelectedYear(selectedYear + 1)}
-                            className="h-10 w-10 rounded-xl border border-gray-200 bg-gray-50 text-sm font-black text-gray-600 transition hover:bg-gray-100 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-300"
+                            className={buttonClass('ghost', 'sm', 'w-8 px-0')}
                             aria-label="다음 연도"
                         >
-                            ›
+                            <ChevronRight size={16} />
                         </button>
+                        <span className="ml-1 text-xs font-medium text-slate-500 dark:text-gray-400">월 선택</span>
                     </div>
+                    {activeTab !== 'rent-receipt' && !(activeTab === 'analysis' && !billData) && (
+                        <Button type="button" variant={billData ? 'secondary' : 'primary'} onClick={() => setIsUsageModalOpen(true)}>
+                            {billData ? `${selectedMonth}월 고지서 수정` : `${selectedMonth}월 명세서 입력`}
+                        </Button>
+                    )}
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-12">
+                {/* Phones scroll the twelve months sideways instead of stacking four rows. */}
+                <div ref={monthStripRef} className="relative -mx-1 mt-3 flex snap-x gap-2 overflow-x-auto px-1 pb-1 sm:mx-0 sm:grid sm:grid-cols-4 sm:overflow-visible sm:px-0 sm:pb-0 lg:grid-cols-6 xl:grid-cols-12">
                     {Array.from({ length: 12 }, (_, i) => i + 1).map(month => {
                         const hasBill = monthlyBillStatuses[month]
                         const isSelected = selectedMonth === month
                         const calendarSummary = monthlyCalendarSummaries[month]
                         const displayValue = calendarSummary?.value !== null && calendarSummary?.value !== undefined
                             ? calendarSummary.value.toLocaleString()
-                            : hasBill
-                                ? calendarSummary?.label || '저장됨'
-                                : '미입력'
+                            : calendarSummary?.label || '저장됨'
 
                         return (
                             <button
                                 key={month}
                                 type="button"
+                                data-month={month}
+                                aria-pressed={isSelected}
                                 onClick={() => setSelectedMonth(month)}
-                                className={`min-h-[72px] rounded-2xl border p-2 text-left transition-all ${
+                                className={`min-h-[56px] min-w-[64px] shrink-0 snap-start rounded-xl border p-2 text-left transition-colors sm:min-h-[68px] sm:min-w-0 ${
                                     isSelected
-                                        ? 'border-brand-orange bg-brand-orange-soft shadow-[0_10px_22px_rgba(217,54,27,0.14)] ring-2 ring-brand-orange/15 dark:bg-[#2a1712]'
+                                        ? 'border-slate-900 bg-white ring-1 ring-slate-900 dark:border-white dark:bg-[#1a1a1a] dark:ring-white'
                                         : hasBill
-                                            ? 'border-[#ffd1c7] bg-white hover:border-brand-orange/50 hover:bg-[#fff8f6] dark:border-[#3a2a25] dark:bg-[#1a1a1a]'
-                                            : 'border-gray-100 bg-gray-50/70 hover:bg-white dark:border-[#2a2a2a] dark:bg-[#171717]'
+                                            ? 'border-slate-200 bg-white hover:border-slate-400 dark:border-[#3a3a3a] dark:bg-[#1a1a1a]'
+                                            : 'border-slate-100 bg-slate-50/70 hover:border-slate-300 hover:bg-white dark:border-[#2a2a2a] dark:bg-[#171717]'
                                 }`}
                             >
                                 <span className="flex items-center justify-between gap-2">
-                                    <span className={`text-sm font-black ${isSelected ? 'text-brand-orange' : 'text-gray-900 dark:text-white'}`}>{month}월</span>
-                                    <span className={`h-2 w-2 rounded-full ${hasBill ? 'bg-brand-orange' : 'bg-gray-300 dark:bg-gray-600'}`} />
+                                    <span className={`text-sm font-black ${hasBill || isSelected ? 'text-slate-900 dark:text-white' : 'text-slate-500 dark:text-gray-400'}`}>{month}월</span>
+                                    {hasBill && <span aria-label="입력됨" className="h-1.5 w-1.5 rounded-full bg-emerald-500" />}
                                 </span>
-                                <span className={`mt-2 block truncate text-sm font-black leading-tight ${hasBill ? 'text-gray-950 dark:text-white' : 'text-gray-400 dark:text-gray-500'}`}>
-                                    {displayValue}
-                                </span>
-                                <span className={`mt-1 block text-[11px] font-bold ${hasBill ? 'text-brand-orange' : 'text-gray-500 dark:text-gray-500'}`}>
-                                    {hasBill ? calendarSummary?.label || '데이터 저장됨' : '데이터 없음'}
-                                </span>
+                                {hasBill ? (
+                                    <>
+                                        <span className="mt-1.5 block truncate text-sm font-black leading-tight tabular-nums text-slate-900 dark:text-white">{displayValue}</span>
+                                        {calendarSummary?.value !== null && calendarSummary?.value !== undefined && (
+                                            <span className="mt-0.5 hidden text-[11px] font-bold text-slate-500 sm:block">{calendarSummary.label}</span>
+                                        )}
+                                    </>
+                                ) : (
+                                    <span aria-label="미입력" className="mt-1.5 block text-sm font-black leading-tight text-slate-300 dark:text-gray-600">—</span>
+                                )}
                             </button>
                         )
                     })}
                 </div>
-
-                {activeTab === 'analysis' && billData && (
-                    <div className="flex flex-wrap gap-2 justify-start pt-3 mt-4 border-t border-gray-100 dark:border-[#2a2a2a]">
-                        <Button type="button" variant="secondary" size="sm" onClick={() => setIsPhotoModalOpen(true)}>
-                            계량기 확인하기
-                        </Button>
-                        <Button type="button" variant="secondary" size="sm" onClick={() => setIsLandlordModalOpen(true)}>
-                            {landlordData ? '임대인 데이터 수정' : '임대인 사용량 입력'}
-                        </Button>
-                        <Button type="button" variant="secondary" size="sm" onClick={() => setIsInvoiceOpen(true)} className="ml-auto">
-                            📄 청구서 발행
-                        </Button>
-                    </div>
-                )}
-
-                {activeTab === 'analysis' && (
-                    <details className="pt-3 mt-4 border-t border-gray-100 dark:border-[#2a2a2a]"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{selectedYear}년 {selectedMonth}월 계량기 사진 · {landlordData?.photo ? '등록됨' : '미등록'}</summary>
-                        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <div className="min-w-0">
-                                <h2 className="text-sm font-black text-gray-900 break-keep dark:text-white">선택 월 단자함/계량기 사진</h2>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                                    {selectedYear}년 {selectedMonth}월 · 사진 업로드일: {formatPhotoUploadedAt(landlordData?.photoUploadedAt)}
-                                </div>
-                            </div>
-                            <Button type="button" variant="secondary" size="sm" onClick={() => setIsLandlordModalOpen(true)}>
-                                {landlordData?.photo ? '사진 수정' : '사진 업로드'}
-                            </Button>
-                        </div>
-                        {landlordData?.photo ? (
-                            <div
-                                className="aspect-[16/9] sm:aspect-[21/9] max-h-[360px] w-full rounded-2xl border border-gray-200 bg-black overflow-hidden cursor-pointer dark:border-[#2a2a2a]"
-                                onClick={() => setIsPhotoModalOpen(true)}
-                            >
-                                <img src={landlordData.photo} className="w-full h-full object-contain" alt={`${selectedMonth}월 계량기 사진`} />
-                            </div>
-                        ) : (
-                            <EmptyState
-                                compact
-                                className="max-h-[200px]"
-                                title="사진 데이터 없음"
-                                description="선택한 월의 계량기 사진을 업로드하세요."
-                            />
-                        )}
-                    </details>
-                )}
             </div>
 
             {
-                activeTab === 'analysis' && (billData ? (
+                activeTab === 'analysis' && (<>{billData ? (
                     <>
                         {/* Total Bill Summary */}
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] overflow-hidden">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-slate-200 dark:border-[#2a2a2a] overflow-hidden">
                             <div className="bg-brand-ink p-6 text-white flex flex-wrap justify-between items-center gap-4">
                                 <div className="min-w-0">
                                     <h2 className="text-xl font-bold flex items-center gap-2 break-keep">
-                                        <span>⚡️</span> {selectedMonth}월 전기요금 총괄표
+                                        <Zap size={18} className="shrink-0 text-amber-300" /> {selectedMonth}월 전기요금 총괄표
                                     </h2>
                                     <p className="text-sm text-gray-300 mt-1">{billData.usagePeriod}</p>
                                 </div>
@@ -1207,6 +1170,18 @@ export default function ElectricityClient() {
                                         )}
                                     </div>
                                 </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-6 py-3 dark:border-[#2a2a2a]">
+                                <Button type="button" variant="secondary" size="sm" onClick={() => setIsPhotoModalOpen(true)}>
+                                    계량기 확인하기
+                                </Button>
+                                <Button type="button" variant="secondary" size="sm" onClick={() => setIsLandlordModalOpen(true)}>
+                                    {landlordData ? '임대인 데이터 수정' : '임대인 사용량 입력'}
+                                </Button>
+                                <Button type="button" variant="secondary" size="sm" onClick={() => setIsInvoiceOpen(true)} icon={<FileText size={14} />} className="ml-auto">
+                                    청구서 발행
+                                </Button>
                             </div>
 
                             <div className="p-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1332,57 +1307,74 @@ export default function ElectricityClient() {
                 ) : (
                     <EmptyState
                         title={`${selectedYear}년 ${selectedMonth}월 데이터 없음`}
-                        description="등록된 전기요금 명세서가 없습니다. 상단의 '명세서 입력하기'로 고지서를 등록하세요."
+                        description="등록된 전기요금 명세서가 없습니다. 고지서 문자나 명세서 내용을 붙여넣어 등록하세요."
                         action={(
-                            <Button type="button" variant="secondary" size="sm" onClick={() => setIsLandlordModalOpen(true)}>
-                                📸 단자함 사진 업로드
+                            <Button type="button" variant="primary" onClick={() => setIsUsageModalOpen(true)}>
+                                {selectedMonth}월 명세서 입력
                             </Button>
                         )}
                     />
-                ))
+                )}
+
+                {/* Meter photo — only relevant to this tab, so it lives in its own card below the month picker. */}
+                <details className="group rounded-2xl border border-slate-200 bg-white px-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+                    <summary className="flex min-h-12 cursor-pointer list-none items-center gap-2 py-3 text-sm font-bold text-slate-900 dark:text-white [&::-webkit-details-marker]:hidden">
+                        <ChevronRight size={16} className="shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+                        {selectedMonth}월 계량기 사진
+                        <span className={`text-xs font-medium ${landlordData?.photo ? 'text-slate-500' : 'text-slate-400'}`}>· {landlordData?.photo ? '등록됨' : '미등록'}</span>
+                    </summary>
+                    <div className="border-t border-slate-100 pb-4 pt-3 dark:border-[#2a2a2a]">
+                        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                            <div className="text-xs text-slate-500 dark:text-gray-400">
+                                {selectedYear}년 {selectedMonth}월 · 사진 업로드일: {formatPhotoUploadedAt(landlordData?.photoUploadedAt)}
+                            </div>
+                            <Button type="button" variant="secondary" size="sm" icon={<Camera size={14} />} onClick={() => setIsLandlordModalOpen(true)}>
+                                {landlordData?.photo ? '사진 수정' : '사진 업로드'}
+                            </Button>
+                        </div>
+                        {landlordData?.photo ? (
+                            <div
+                                className="aspect-[16/9] sm:aspect-[21/9] max-h-[360px] w-full rounded-2xl border border-slate-200 bg-black overflow-hidden cursor-pointer dark:border-[#2a2a2a]"
+                                onClick={() => setIsPhotoModalOpen(true)}
+                            >
+                                <img src={landlordData.photo} className="w-full h-full object-contain" alt={`${selectedMonth}월 계량기 사진`} />
+                            </div>
+                        ) : (
+                            <EmptyState
+                                compact
+                                bare
+                                title="사진 데이터 없음"
+                                description="선택한 월의 계량기 사진을 업로드하세요."
+                            />
+                        )}
+                    </div>
+                </details>
+                </>)
             }
+
 
             {
                 activeTab === 'payment' && (
                     <div className="min-w-0 space-y-4">
-                        <div className="space-y-3 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                                <div className="min-w-0">
-                                    <h2 className="text-lg font-black text-gray-900 break-keep dark:text-white">납부관리 체크리스트</h2>
-                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
-                                </div>
-                                <div className="text-right">
-                                    <div className="text-xs text-gray-500 dark:text-gray-400">선택 월</div>
-                                    <div className="text-sm font-bold text-gray-900 dark:text-white">{selectedYear}년 {selectedMonth}월</div>
-                                </div>
+                        <div className="space-y-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
+                            <div className="min-w-0">
+                                <h2 className="text-base font-black text-slate-900 break-keep dark:text-white">{selectedMonth}월 납부 체크리스트</h2>
+                                <p className="mt-1 text-xs text-slate-500 dark:text-gray-400">기준 시작: 2025년 1월, 월세 자동이체일: 매월 14일</p>
                             </div>
 
-                            <div className="rounded-xl border border-red-100 bg-red-50 px-4 py-3">
-                                <div className="text-xs font-bold text-red-600">현재 일자 기준 임대인 미납 전기세</div>
-                                <div className="mt-1 text-lg font-black text-slate-900 dark:text-white">
+                            {/* Red only when something is actually unpaid. */}
+                            <div className={`rounded-xl border px-4 py-3 ${unpaidLandlordElectricitySummary.total > 0 ? 'border-red-100 bg-red-50 dark:border-red-900/40 dark:bg-red-950/20' : 'border-slate-200 bg-slate-50 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]'}`}>
+                                <div className={`text-xs font-bold ${unpaidLandlordElectricitySummary.total > 0 ? 'text-red-700 dark:text-red-300' : 'text-slate-500 dark:text-gray-400'}`}>현재 일자 기준 임대인 미납 전기세</div>
+                                <div className="mt-1 text-lg font-black tabular-nums text-slate-900 dark:text-white">
                                     {unpaidLandlordElectricitySummary.total.toLocaleString()}원
                                 </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                                <div className="text-xs text-slate-600 dark:text-gray-400 mt-1">
                                     {selectedYear}년 도래분 중 미납 {unpaidLandlordElectricitySummary.months}개월 합계
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-blue-50/50 px-4 py-3 dark:border-[#2a2a2a] dark:bg-blue-950/20">
-                                    <div>
-                                        <div className="text-sm font-bold text-gray-900 dark:text-white">월세 납부 세금계산서 발행</div>
-                                        <div className="mt-1.5 space-y-0.5">
-                                            <div className="text-[11px] font-bold text-blue-700 bg-blue-100 px-1.5 py-0.5 rounded inline-block">
-                                                임대기간: {rentInfo.period}
-                                            </div>
-                                            <div className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                                                • 납부금액: <span className="font-bold text-gray-900 dark:text-white">{rentInfo.amount}</span>
-                                            </div>
-                                            <div className="text-xs text-gray-600 dark:text-gray-400">
-                                                • 납부상태: <span className="font-bold text-gray-900 dark:text-white">{formatRentPaidDateLabel(rentPaidDates[selectedMonth])}</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
                                     <input
                                         type="checkbox"
                                         checked={currentPaymentStatus.rentTaxInvoiceIssued}
@@ -1390,17 +1382,25 @@ export default function ElectricityClient() {
                                             ...prev,
                                             rentTaxInvoiceIssued: e.target.checked
                                         }))}
-                                        className="h-5 w-5 accent-brand-orange"
+                                        className="mt-0.5 h-5 w-5 shrink-0 accent-brand-orange"
                                     />
-                                </label>
-
-                                <label className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
-                                    <div>
-                                        <div className="text-sm font-bold text-gray-900 dark:text-white">전기세 납부 완료</div>
-                                        <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                                            임대인 월별 전기세: {selectedMonthLandlordTotal !== null ? `${selectedMonthLandlordTotal.toLocaleString()}원` : '계산 데이터 없음'}
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">월세 납부 세금계산서 발행</div>
+                                        <div className="mt-1.5 space-y-0.5">
+                                            <div className="inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-bold text-slate-700 dark:bg-[#252525] dark:text-gray-300">
+                                                임대기간: {rentInfo.period}
+                                            </div>
+                                            <div className="text-xs text-slate-600 dark:text-gray-400 mt-1">
+                                                납부금액: <span className="font-bold tabular-nums text-slate-900 dark:text-white">{rentInfo.amount}</span>
+                                            </div>
+                                            <div className="text-xs text-slate-600 dark:text-gray-400">
+                                                납부상태: <span className="font-bold text-slate-900 dark:text-white">{formatRentPaidDateLabel(rentPaidDates[selectedMonth])}</span>
+                                            </div>
                                         </div>
                                     </div>
+                                </label>
+
+                                <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 hover:border-slate-300 dark:border-[#2a2a2a] dark:bg-[#1a1a1a]">
                                     <input
                                         type="checkbox"
                                         checked={currentPaymentStatus.electricityPaid}
@@ -1409,8 +1409,14 @@ export default function ElectricityClient() {
                                             electricityPaid: e.target.checked,
                                             electricityPaidAt: e.target.checked ? new Date().toISOString() : null
                                         }))}
-                                        className="h-5 w-5 accent-brand-orange"
+                                        className="mt-0.5 h-5 w-5 shrink-0 accent-brand-orange"
                                     />
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-bold text-slate-900 dark:text-white">전기세 납부 완료</div>
+                                        <div className="text-xs text-slate-600 dark:text-gray-400 mt-1">
+                                            임대인 월별 전기세: <span className="font-bold tabular-nums text-slate-900 dark:text-white">{selectedMonthLandlordTotal !== null ? `${selectedMonthLandlordTotal.toLocaleString()}원` : '계산 데이터 없음'}</span>
+                                        </div>
+                                    </div>
                                 </label>
                             </div>
                         </div>
@@ -1418,7 +1424,7 @@ export default function ElectricityClient() {
                         <div className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:shadow-none">
                             <div className="px-5 py-4 border-b border-gray-100 dark:border-[#2a2a2a] bg-gray-50 dark:bg-[#1a1a1a] flex flex-wrap items-center justify-between gap-2">
                                 <h3 className="text-sm font-bold text-gray-800 dark:text-white">{selectedYear}년 월별 납부 현황</h3>
-                                <div className="text-xs text-gray-500 dark:text-gray-400">입금일자와 체크 결과는 DB에 저장됩니다.</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400">행을 누르면 그 달을 선택합니다. 입금일자와 체크 결과는 DB에 저장됩니다.</div>
                             </div>
                             <div className="overflow-x-auto">
                                 <table className="w-full min-w-[920px] table-fixed text-xs">
@@ -1442,28 +1448,22 @@ export default function ElectricityClient() {
                                                     landlordElectricityAmount: lTotal,
                                                     missingTaxInvoice,
                                                     missingElectricityPayment,
-                                                    needsAttention,
                                                 } = row
                                                 const isSelected = m === selectedMonth
-                                                const rowClassName = needsAttention
-                                                    ? 'bg-red-50/90 hover:bg-red-100/80 dark:bg-red-950/20 dark:hover:bg-red-950/30'
-                                                    : isSelected
-                                                        ? 'bg-brand-orange/5 hover:bg-brand-orange/10'
-                                                        : 'hover:bg-gray-50 dark:hover:bg-[#1a1a1a]'
+                                                // Status pills carry the warning; the row stays neutral (selected month is the only tint).
+                                                const rowClassName = isSelected
+                                                    ? 'bg-slate-100/80 dark:bg-[#252525]'
+                                                    : 'hover:bg-slate-50 dark:hover:bg-[#1a1a1a]'
 
                                                 return (
-                                                    <tr key={m} className={`transition-colors ${rowClassName}`}>
-                                                        <td className="whitespace-nowrap px-3 py-2.5">
+                                                    <tr key={m} onClick={() => setSelectedMonth(m)} className={`cursor-pointer transition-colors ${rowClassName}`}>
+                                                        <td className={`whitespace-nowrap px-3 py-2.5 ${isSelected ? 'shadow-[inset_2px_0_0_#0f172a]' : ''}`}>
                                                             <button
                                                                 type="button"
-                                                                onClick={() => setSelectedMonth(m)}
+                                                                onClick={(e) => { e.stopPropagation(); setSelectedMonth(m) }}
                                                                 aria-pressed={isSelected}
                                                                 aria-label={`${m}월 선택`}
-                                                                className={`inline-flex min-w-[62px] items-center justify-center whitespace-nowrap rounded-xl border px-2.5 py-1 text-xs font-black transition-all ${
-                                                                    isSelected
-                                                                        ? 'border-brand-orange bg-brand-orange text-white shadow-sm'
-                                                                        : 'border-gray-200 bg-white text-gray-900 hover:border-brand-orange hover:bg-brand-orange-soft hover:text-brand-orange dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white dark:hover:bg-[#2a1712]'
-                                                                }`}
+                                                                className={`text-xs ${isSelected ? 'font-black text-slate-900 dark:text-white' : 'font-bold text-slate-700 hover:underline dark:text-gray-300'}`}
                                                             >
                                                                 {m}월
                                                             </button>
@@ -1472,32 +1472,34 @@ export default function ElectricityClient() {
                                                             <input
                                                                 type="date"
                                                                 value={rentPaidDates[m] || ''}
+                                                                onClick={(e) => e.stopPropagation()}
                                                                 onChange={(e) => saveRentPaidDate(m, e.target.value || null)}
                                                                 disabled={savingRentMonth === m}
-                                                                className="w-[128px] rounded-md border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-medium text-gray-900 focus:border-brand-orange focus:ring-brand-orange disabled:opacity-60 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
+                                                                aria-label={`${m}월 월세 입금일자`}
+                                                                className="w-[128px] rounded-md border border-slate-300 bg-white px-2 py-1 text-xs font-medium tabular-nums text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 disabled:opacity-60 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
                                                             />
                                                         </td>
-                                                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold text-gray-900 dark:text-white">
+                                                        <td className="whitespace-nowrap px-3 py-2.5 text-right font-bold tabular-nums text-slate-900 dark:text-white">
                                                             {rowRentInfo.amount}
                                                         </td>
-                                                        <td className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] text-gray-500 dark:text-gray-400">
+                                                        <td className="whitespace-nowrap px-3 py-2.5 text-center text-[11px] text-slate-500 dark:text-gray-400">
                                                             {rowRentInfo.period}
                                                         </td>
                                                         <td className="px-3 py-2.5 text-center">
                                                             <span className={`inline-flex min-w-6 items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-black ${
                                                                 status.rentTaxInvoiceIssued
-                                                                    ? 'bg-green-100 text-green-600'
+                                                                    ? 'bg-emerald-50 text-emerald-700'
                                                                     : missingTaxInvoice
                                                                         ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
-                                                                        : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'
+                                                                        : 'bg-slate-100 dark:bg-[#252525] text-slate-400 dark:text-gray-400'
                                                             }`}>
-                                                                {status.rentTaxInvoiceIssued ? '✓' : missingTaxInvoice ? '미발행' : '-'}
+                                                                {status.rentTaxInvoiceIssued ? <Check size={12} strokeWidth={3} aria-label="발행" /> : missingTaxInvoice ? '미발행' : '-'}
                                                             </span>
                                                         </td>
-                                                        <td className={`whitespace-nowrap px-3 py-2.5 text-right ${
+                                                        <td className={`whitespace-nowrap px-3 py-2.5 text-right tabular-nums ${
                                                             missingElectricityPayment
                                                                 ? 'font-black text-red-700 dark:text-red-300'
-                                                                : 'text-gray-600 dark:text-gray-400'
+                                                                : 'text-slate-600 dark:text-gray-400'
                                                         }`}>
                                                             {lTotal !== null && lTotal !== undefined ? formatWon(lTotal) : '-'}
                                                         </td>
@@ -1505,14 +1507,14 @@ export default function ElectricityClient() {
                                                             <div className="flex flex-col items-center">
                                                                 <span className={`inline-flex min-w-6 items-center justify-center whitespace-nowrap rounded-full px-2 py-1 text-[11px] font-black ${
                                                                     status.electricityPaid
-                                                                        ? 'bg-green-100 text-green-600'
+                                                                        ? 'bg-emerald-50 text-emerald-700'
                                                                         : missingElectricityPayment
                                                                             ? 'bg-red-100 text-red-700 ring-1 ring-red-200'
-                                                                            : 'bg-gray-100 dark:bg-[#252525] text-gray-400 dark:text-gray-400'
+                                                                            : 'bg-slate-100 dark:bg-[#252525] text-slate-400 dark:text-gray-400'
                                                                 }`}>
-                                                                    {status.electricityPaid ? '✓' : missingElectricityPayment ? '미납' : '-'}
+                                                                    {status.electricityPaid ? <Check size={12} strokeWidth={3} aria-label="납부" /> : missingElectricityPayment ? '미납' : '-'}
                                                                 </span>
-                                                                {status.electricityPaid && <div className="text-[11px] text-gray-500 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
+                                                                {status.electricityPaid && <div className="text-[11px] text-slate-500 mt-1 whitespace-nowrap">{formatChecklistTimestamp(status.electricityPaidAt)}</div>}
                                                             </div>
                                                         </td>
                                                     </tr>
@@ -1553,157 +1555,170 @@ export default function ElectricityClient() {
 
             {
                 isUsageModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={() => setIsUsageModalOpen(false)}>
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl p-6 max-w-2xl w-full shadow-2xl dark:shadow-none animate-in zoom-in-95 my-8" onClick={e => e.stopPropagation()}>
-                            <div className="flex justify-between items-center mb-6 border-b pb-4">
-                                <h3 className="text-lg font-bold break-keep">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
-                                <button type="button" onClick={() => setIsUsageModalOpen(false)} aria-label="닫기" className="rounded-full p-1.5 text-gray-500 dark:text-gray-400 hover:bg-gray-100 hover:text-black dark:hover:bg-[#252525] dark:hover:text-white">✕</button>
-                            </div>
+                    <Modal labelledBy="usage-modal-title" onClose={() => setIsUsageModalOpen(false)} className="bg-slate-950/55">
+                        <div className="flex h-full items-center justify-center p-3 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsUsageModalOpen(false) }}>
+                            {/* One scroll area for the whole body, so no field is cut off behind a column scrollbar. */}
+                            <div className="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl dark:bg-[#1e1e1e] dark:shadow-none">
+                                <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-6 py-4 dark:border-[#2a2a2a]">
+                                    <h3 id="usage-modal-title" className="text-lg font-bold break-keep text-slate-900 dark:text-white">{selectedYear}년 {selectedMonth}월 고지서 상세 입력</h3>
+                                    <button type="button" onClick={() => setIsUsageModalOpen(false)} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}><X size={16} /></button>
+                                </div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                <div className="space-y-4">
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400">문자/명세서 내용 붙여넣기</label>
-                                    <textarea
-                                        value={rawText}
-                                        onChange={(e) => setRawText(e.target.value)}
-                                        className="w-full h-40 p-3 text-xs font-mono bg-gray-50 dark:bg-[#1a1a1a] border dark:border-[#2a2a2a] rounded-xl resize-none focus:ring-2 focus:ring-brand-orange dark:text-white"
-                                        placeholder="여기에 텍스트를 붙여넣고 [추출하기]를 누르면 우측 폼이 자동으로 채워집니다."
-                                    />
-                                    <button type="button" onClick={parseBillText} className={buttonClass('secondary', 'sm', 'w-full')}>텍스트에서 데이터 추출하기</button>
+                                <div className="grid min-h-0 flex-1 grid-cols-1 gap-6 overflow-y-auto px-6 py-5 md:grid-cols-2">
+                                    <div className="space-y-3">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">① 문자·명세서 붙여넣기</h4>
+                                        <textarea
+                                            value={rawText}
+                                            onChange={(e) => setRawText(e.target.value)}
+                                            aria-label="문자/명세서 내용"
+                                            className="h-40 w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 font-mono text-xs text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-white"
+                                            placeholder="여기에 텍스트를 붙여넣고 [데이터 추출하기]를 누르면 오른쪽 폼이 자동으로 채워집니다."
+                                        />
+                                        <button type="button" onClick={parseBillText} className={buttonClass('secondary', 'md', 'w-full')}>
+                                            <Wand2 size={15} />
+                                            텍스트에서 데이터 추출하기
+                                        </button>
 
-                                    {extractionHistory.length > 0 && (
-                                        <div className="mt-4 space-y-2">
-                                            <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400">추출 히스토리</label>
-                                            <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
-                                                {extractionHistory.map((item) => (
-                                                    <div key={item.id} className="flex gap-1">
-                                                        <button
-                                                            onClick={() => {
-                                                                setRawText(item.rawText)
-                                                                setManualInputs(item.inputs)
-                                                            }}
-                                                            className="flex-1 text-left px-3 py-1.5 bg-gray-50 dark:bg-[#1a1a1a] hover:bg-gray-100 dark:hover:bg-[#252525] border border-gray-100 dark:border-[#2a2a2a] rounded-lg text-[11px] text-gray-600 dark:text-gray-400 flex justify-between items-center transition-colors"
-                                                        >
-                                                            <span>{item.timestamp}</span>
-                                                            <span className="font-bold text-gray-500">불러오기</span>
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => deleteHistoryItem(item.id)}
-                                                            className="px-2 text-gray-400 hover:text-red-500 transition-colors"
-                                                            title="삭제"
-                                                            aria-label="추출 히스토리 삭제"
-                                                        >
-                                                            ✕
-                                                        </button>
-                                                    </div>
-                                                ))}
+                                        {extractionHistory.length > 0 && (
+                                            <div className="space-y-2 pt-2">
+                                                <p className="text-xs font-bold text-slate-500 dark:text-gray-400">추출 히스토리</p>
+                                                <div className="max-h-40 overflow-y-auto space-y-1 pr-1">
+                                                    {extractionHistory.map((item) => (
+                                                        <div key={item.id} className="flex gap-1">
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => {
+                                                                    setRawText(item.rawText)
+                                                                    setManualInputs(item.inputs)
+                                                                }}
+                                                                className="flex flex-1 items-center justify-between rounded-lg border border-slate-100 bg-slate-50 px-3 py-1.5 text-left text-[11px] text-slate-600 transition-colors hover:bg-slate-100 dark:border-[#2a2a2a] dark:bg-[#1a1a1a] dark:text-gray-400 dark:hover:bg-[#252525]"
+                                                            >
+                                                                <span>{item.timestamp}</span>
+                                                                <span className="font-bold text-slate-500">불러오기</span>
+                                                            </button>
+                                                            <button
+                                                                type="button"
+                                                                onClick={() => deleteHistoryItem(item.id)}
+                                                                className="inline-flex w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-red-50 hover:text-red-500"
+                                                                title="삭제"
+                                                                aria-label="추출 히스토리 삭제"
+                                                            >
+                                                                <X size={14} />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
                                             </div>
+                                        )}
+
+                                        <div className="space-y-3 border-t border-slate-100 pt-3 dark:border-[#2a2a2a]">
+                                            <InputGroup label="검침일" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
+                                            <InputGroup label="사용기간" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
                                         </div>
-                                    )}
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <h4 className="text-sm font-bold text-slate-900 dark:text-white">② 금액 확인·수정</h4>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <InputGroup label="총 청구금액(원)" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
+                                            <InputGroup label="당월 사용량(kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
+                                        </div>
+                                        <div className="h-px bg-slate-100 dark:bg-[#2a2a2a]"></div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <InputGroup label="기본요금" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
+                                            <InputGroup label="전력량요금" value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
+                                            <InputGroup label="기후환경요금" value={manualInputs.envFee} onChange={v => setManualInputs({ ...manualInputs, envFee: v })} />
+                                            <InputGroup label="연료비조정액" value={manualInputs.fuelFee} onChange={v => setManualInputs({ ...manualInputs, fuelFee: v })} />
+                                            <InputGroup label="역률요금" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
+                                            <InputGroup label="TV수신료" value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
+                                        </div>
+                                        <div className="h-px bg-slate-100 dark:bg-[#2a2a2a]"></div>
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <InputGroup label="부가가치세" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
+                                            <InputGroup label="전력기금" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
+                                        </div>
+                                    </div>
                                 </div>
 
-                                <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-2">
-                                    <h4 className="font-bold text-sm border-b pb-2">상세 내역 (직접 수정 가능)</h4>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <InputGroup label="총 청구금액" value={manualInputs.totalAmount} onChange={v => setManualInputs({ ...manualInputs, totalAmount: v })} />
-                                        <InputGroup label="당월 사용량(kWh)" value={manualInputs.currentUsage} onChange={v => setManualInputs({ ...manualInputs, currentUsage: v })} />
-                                    </div>
-                                    <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-2"></div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <InputGroup label="기본요금" value={manualInputs.baseFee} onChange={v => setManualInputs({ ...manualInputs, baseFee: v })} />
-                                        <InputGroup label="전력량요금" value={manualInputs.usageFee} onChange={v => setManualInputs({ ...manualInputs, usageFee: v })} />
-                                        <InputGroup label="기후환경요금" value={manualInputs.envFee} onChange={v => setManualInputs({ ...manualInputs, envFee: v })} />
-                                        <InputGroup label="연료비조정액" value={manualInputs.fuelFee} onChange={v => setManualInputs({ ...manualInputs, fuelFee: v })} />
-                                        <InputGroup label="역률요금" value={manualInputs.powerFactorFee} onChange={v => setManualInputs({ ...manualInputs, powerFactorFee: v })} />
-                                        <InputGroup label="TV수신료" value={manualInputs.tvFee} onChange={v => setManualInputs({ ...manualInputs, tvFee: v })} />
-                                    </div>
-                                    <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-2"></div>
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <InputGroup label="부가가치세" value={manualInputs.vat} onChange={v => setManualInputs({ ...manualInputs, vat: v })} />
-                                        <InputGroup label="전력기금" value={manualInputs.fund} onChange={v => setManualInputs({ ...manualInputs, fund: v })} />
-                                    </div>
-                                    <div className="h-px bg-gray-100 dark:bg-[#2a2a2a] my-2"></div>
-                                    <div className="space-y-2">
-                                        <InputGroup label="검침일" value={manualInputs.readingDate} onChange={v => setManualInputs({ ...manualInputs, readingDate: v })} placeholder="YYYY-MM-DD" isNumeric={false} />
-                                        <InputGroup label="사용기간" value={manualInputs.usagePeriod} onChange={v => setManualInputs({ ...manualInputs, usagePeriod: v })} isNumeric={false} />
-                                    </div>
+                                <div className="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-6 py-4 dark:border-[#2a2a2a]">
+                                    <Button type="button" variant="ghost" onClick={resetManualInputs} className="mr-auto">상세내역 초기화</Button>
+                                    <Button type="button" variant="secondary" onClick={() => setIsUsageModalOpen(false)}>취소</Button>
+                                    <Button type="button" variant="primary" onClick={confirmBillInput} loading={loading}>
+                                        {loading ? '저장 중...' : '저장'}
+                                    </Button>
                                 </div>
-                            </div>
-
-                            <div className="flex flex-wrap gap-2 justify-end mt-6 border-t pt-4">
-                                <Button type="button" variant="ghost" onClick={resetManualInputs} className="mr-auto">상세내역 초기화</Button>
-                                <Button type="button" variant="secondary" onClick={() => setIsUsageModalOpen(false)}>취소</Button>
-                                <Button type="button" variant="primary" onClick={confirmBillInput} loading={loading}>
-                                    {loading ? '저장 중...' : '저장'}
-                                </Button>
                             </div>
                         </div>
-                    </div>
+                    </Modal>
                 )
             }
 
             {
                 isLandlordModalOpen && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setIsLandlordModalOpen(false)}>
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl p-6 max-w-lg w-full shadow-2xl dark:shadow-none animate-in zoom-in-95" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-lg font-bold mb-4">임대인 사용량 입력</h3>
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <InputGroup label="전월 지침 (자동)" value={landlordInputs.prevMeter} onChange={v => setLandlordInputs({ ...landlordInputs, prevMeter: v })} />
-                                    <InputGroup label="당월 지침" value={landlordInputs.currMeter} onChange={v => setLandlordInputs({ ...landlordInputs, currMeter: v })} />
+                    <Modal labelledBy="landlord-modal-title" onClose={() => setIsLandlordModalOpen(false)} className="bg-slate-950/55">
+                        <div className="flex h-full items-center justify-center p-3 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsLandlordModalOpen(false) }}>
+                            <div className="max-h-[calc(100dvh-1.5rem)] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-[#1e1e1e] dark:shadow-none">
+                                <div className="mb-4 flex items-center justify-between gap-3">
+                                    <h3 id="landlord-modal-title" className="text-lg font-bold text-slate-900 dark:text-white">임대인 사용량 입력</h3>
+                                    <button type="button" onClick={() => setIsLandlordModalOpen(false)} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-8 px-0')}><X size={16} /></button>
                                 </div>
-                                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-dashed">
-                                    <InputGroup label="온수기 (kWh)" value={landlordInputs.waterHeaterKw} onChange={v => setLandlordInputs({ ...landlordInputs, waterHeaterKw: v })} />
-                                    <InputGroup label="외등 (kWh)" value={landlordInputs.outdoorLightKw} onChange={v => setLandlordInputs({ ...landlordInputs, outdoorLightKw: v })} />
-                                </div>
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <InputGroup label="전월 지침 (자동)" value={landlordInputs.prevMeter} onChange={v => setLandlordInputs({ ...landlordInputs, prevMeter: v })} />
+                                        <InputGroup label="당월 지침" value={landlordInputs.currMeter} onChange={v => setLandlordInputs({ ...landlordInputs, currMeter: v })} />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 border-t border-dashed border-slate-200 pt-4 dark:border-[#2a2a2a]">
+                                        <InputGroup label="온수기 (kWh)" value={landlordInputs.waterHeaterKw} onChange={v => setLandlordInputs({ ...landlordInputs, waterHeaterKw: v })} />
+                                        <InputGroup label="외등 (kWh)" value={landlordInputs.outdoorLightKw} onChange={v => setLandlordInputs({ ...landlordInputs, outdoorLightKw: v })} />
+                                    </div>
 
-                                <div className="pt-4">
-                                    <label className="block text-xs font-bold text-gray-500 dark:text-gray-400 mb-2">계량기 사진 업로드</label>
-                                    <div className="border-2 border-dashed border-gray-300 dark:border-[#2a2a2a] rounded-xl p-4 text-center hover:bg-gray-50 dark:hover:bg-[#1a1a1a] transition-colors cursor-pointer relative overflow-hidden">
-                                        <input type="file" accept="image/*" onChange={handlePhotoChange} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10" />
-                                        {landlordPhoto ? (
-                                            <div className="relative h-40 w-full rounded-lg overflow-hidden">
-                                                <img src={landlordPhoto} alt="Meter Preview" className="w-full h-full object-cover" />
-                                            </div>
-                                        ) : (
-                                            <div className="py-4">
-                                                <div className="text-3xl mb-2">📸</div>
-                                                <div className="text-gray-500 text-xs font-bold">클릭하여 계량기 사진 업로드</div>
+                                    <div className="pt-4">
+                                        <p className="mb-2 text-xs font-bold text-slate-500 dark:text-gray-400">계량기 사진 업로드</p>
+                                        <div className="relative cursor-pointer overflow-hidden rounded-xl border-2 border-dashed border-slate-300 p-4 text-center transition-colors hover:bg-slate-50 dark:border-[#2a2a2a] dark:hover:bg-[#1a1a1a]">
+                                            <input type="file" accept="image/*" aria-label="계량기 사진 업로드" onChange={handlePhotoChange} className="absolute inset-0 z-10 h-full w-full cursor-pointer opacity-0" />
+                                            {landlordPhoto ? (
+                                                <div className="relative h-40 w-full rounded-lg overflow-hidden">
+                                                    <img src={landlordPhoto} alt="계량기 사진 미리보기" className="w-full h-full object-cover" />
+                                                </div>
+                                            ) : (
+                                                <div className="flex flex-col items-center gap-2 py-4">
+                                                    <Camera size={26} className="text-slate-400" />
+                                                    <div className="text-xs font-bold text-slate-500">눌러서 계량기 사진 업로드</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {landlordPhoto && (
+                                            <div className="mt-2 flex justify-end">
+                                                <Button type="button" variant="danger" size="sm" onClick={handlePhotoDelete}>
+                                                    사진 삭제
+                                                </Button>
                                             </div>
                                         )}
                                     </div>
-                                    {landlordPhoto && (
-                                        <div className="mt-2 flex justify-end">
-                                            <Button type="button" variant="danger" size="sm" onClick={handlePhotoDelete}>
-                                                사진 삭제
-                                            </Button>
-                                        </div>
-                                    )}
+                                </div>
+                                <div className="flex flex-wrap gap-2 justify-end mt-6">
+                                    <Button type="button" variant="secondary" onClick={() => setIsLandlordModalOpen(false)}>취소</Button>
+                                    <Button type="button" variant="primary" onClick={calculateLandlordBill} loading={loading}>
+                                        {loading ? '저장 중...' : '저장'}
+                                    </Button>
                                 </div>
                             </div>
-                            <div className="flex flex-wrap gap-2 justify-end mt-6">
-                                <Button type="button" variant="secondary" onClick={() => setIsLandlordModalOpen(false)}>취소</Button>
-                                <Button type="button" variant="primary" onClick={calculateLandlordBill} loading={loading}>
-                                    {loading ? '저장 중...' : '저장'}
-                                </Button>
-                            </div>
                         </div>
-                    </div>
+                    </Modal>
                 )
             }
 
             {
                 isPhotoModalOpen && landlordData && (
-                    <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-md" onClick={() => setIsPhotoModalOpen(false)}>
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-2xl p-5 sm:p-8 max-w-5xl w-full max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-                            <div className="flex justify-between items-center gap-3 mb-8 border-b pb-4">
-                                <h3 className="text-2xl font-black text-gray-900 break-keep dark:text-white">계량기 사진 확인 (전월 vs 당월)</h3>
-                                <button type="button" onClick={() => setIsPhotoModalOpen(false)} aria-label="닫기" className="shrink-0 bg-gray-100 dark:bg-[#252525] hover:bg-gray-200 dark:hover:bg-[#333] p-2 rounded-full transition-colors">
-                                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
-                            </div>
-
+                    <Modal labelledBy="photo-modal-title" onClose={() => setIsPhotoModalOpen(false)} className="bg-slate-950/80">
+                        <div className="flex h-full items-center justify-center p-3 sm:p-4" onMouseDown={e => { if (e.target === e.currentTarget) setIsPhotoModalOpen(false) }}>
+                            <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-5 sm:p-8 dark:bg-[#1e1e1e]">
+                                <div className="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4 dark:border-[#2a2a2a]">
+                                    <h3 id="photo-modal-title" className="text-xl font-black text-slate-900 break-keep dark:text-white">계량기 사진 확인 (전월 vs 당월)</h3>
+                                    <button type="button" onClick={() => setIsPhotoModalOpen(false)} aria-label="닫기" className={buttonClass('ghost', 'sm', 'w-9 px-0')}>
+                                        <X size={18} />
+                                    </button>
+                                </div>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 font-sans">
                                 <div className="space-y-4">
                                     <div className="flex justify-between items-end">
@@ -1743,13 +1758,14 @@ export default function ElectricityClient() {
                             </div>
 
                             <div className="mt-8 p-6 bg-brand-orange-soft rounded-2xl border border-red-100 text-center">
-                                <div className="text-xs text-brand-orange font-bold mb-1">사용량 증가분</div>
-                                <div className="text-3xl font-black text-slate-900">
+                                <div className="text-xs text-brand-orange-strong font-bold mb-1">사용량 증가분</div>
+                                <div className="text-3xl font-black tabular-nums text-slate-900">
                                     {(landlordData.currMeter - landlordData.prevMeter).toLocaleString()} <span className="text-lg font-bold">kWh 증가</span>
                                 </div>
                             </div>
+                            </div>
                         </div>
-                    </div>
+                    </Modal>
                 )
             }
 
@@ -2174,7 +2190,7 @@ export default function ElectricityClient() {
     )
 }
 
-function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = true }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string, isNumeric?: boolean }) {
+function InputGroup({ label, value, onChange, placeholder = '', isNumeric = true }: { label: string, value: string, onChange: (v: string) => void, placeholder?: string, isNumeric?: boolean }) {
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const val = e.target.value;
         if (!isNumeric) {
@@ -2191,17 +2207,23 @@ function InputGroup({ label, value, onChange, placeholder = '0', isNumeric = tru
     };
 
     return (
-        <div>
-            <label className="block text-[11px] font-bold text-gray-500 dark:text-gray-400 mb-1">{label}</label>
+        <label className="block">
+            <span className="mb-1 block text-xs font-bold text-slate-500 dark:text-gray-400">{label}</span>
             <input
                 type="text"
+                inputMode={isNumeric ? 'numeric' : undefined}
                 value={value}
                 onChange={handleChange}
-                className="w-full p-2 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#2a2a2a] rounded-xl text-xs font-medium focus:border-brand-orange dark:focus:border-gray-500 outline-none transition-colors dark:text-white"
+                className={`h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm font-medium text-slate-900 transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15 dark:border-[#2a2a2a] dark:bg-[#1e1e1e] dark:text-white ${isNumeric ? 'text-right tabular-nums' : ''}`}
                 placeholder={placeholder}
             />
-        </div>
+        </label>
     )
+}
+
+// The seal image is deployed separately; without it the (印) placeholder shows instead of a broken image.
+const hideBrokenStamp = (event: React.SyntheticEvent<HTMLImageElement>) => {
+    event.currentTarget.style.display = 'none'
 }
 
 // ── 임대료영수증 컴포넌트 ──────────────────────────────────────────────────────
@@ -2226,10 +2248,10 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
 
     return (
         <div className="space-y-4 font-sans text-black pb-10 print:pb-0">
-            {/* 인쇄 버튼 */}
-            <div className="flex justify-end gap-2 print:hidden mb-4">
-                <Button type="button" variant="secondary" onClick={() => window.print()}>
-                    🖨 인쇄 / PDF 저장
+            {/* The print button lines up with the paper it prints. */}
+            <div className="mx-auto flex w-[210mm] max-w-full justify-end print:hidden">
+                <Button type="button" variant="secondary" icon={<Printer size={14} />} onClick={() => window.print()}>
+                    인쇄 / PDF 저장
                 </Button>
             </div>
 
@@ -2266,6 +2288,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                 }
             `}</style>
 
+            <div className="overflow-x-auto print:overflow-visible">
             <div id="rent-receipt-print" className="w-[210mm] min-h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[10mm] shadow-xl print:shadow-none relative flex flex-col box-border">
                 {/* Formal Header */}
                 <div className="text-center mb-6 pt-2 pb-3 border-b-4 border-black">
@@ -2346,7 +2369,7 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                                             <span className="text-[14px] text-gray-300 font-black opacity-30">(印)</span>
                                         </div>
                                         <div className="absolute inset-0 flex items-center justify-center z-10 px-1 py-1">
-                                            <img src="/stamp.png" alt="Seal" style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} className="select-none" />
+                                            <img src="/stamp.png" alt="" onError={hideBrokenStamp} style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} className="select-none" />
                                         </div>
                                     </td>
                                 </tr>
@@ -2459,11 +2482,13 @@ function RentReceipt({ selectedYear, selectedMonth }: { selectedYear: number; se
                     <div className="text-right flex flex-col items-end gap-2 shrink-0 pt-2">
                         <p className="text-sm font-bold">(주)에코모터스</p>
                         <div className="relative w-[70px] h-[70px]">
-                            <img src="/stamp.png" alt="Seal" style={{ width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} className="select-none" />
+                            <span className="absolute inset-0 flex items-center justify-center text-[14px] font-black text-gray-300 opacity-30 pointer-events-none">(印)</span>
+                            <img src="/stamp.png" alt="" onError={hideBrokenStamp} style={{ position: 'relative', width: '100%', height: '100%', objectFit: 'contain', mixBlendMode: 'multiply' }} className="select-none" />
                         </div>
                     </div>
                 </div>
 
+            </div>
             </div>
         </div>
     )

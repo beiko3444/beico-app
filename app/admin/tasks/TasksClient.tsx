@@ -2,10 +2,14 @@
 
 import React, { useMemo, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { CalendarDays, ChevronLeft, ChevronRight, Plus, Trash2, UserRound } from 'lucide-react'
+import { CalendarDays, Check, Pencil, Plus, Trash2, UserRound } from 'lucide-react'
 import { createEmployee, deleteEmployee, toggleAttendanceDate, updateEmployee } from './actions'
 import { getKoreanHolidayName } from '@/lib/koreanHolidays'
-import DashboardCalendarWidget from '@/components/DashboardCalendarWidget'
+import DashboardCalendarWidget, { CalendarMonthNav, WEEKDAY_LABELS, isWeekendDay } from '@/components/DashboardCalendarWidget'
+import PageHeader from '@/components/ui/PageHeader'
+import Tabs from '@/components/ui/Tabs'
+import EmptyState from '@/components/ui/EmptyState'
+import { buttonClass } from '@/components/ui/buttonClass'
 
 type AttendanceRecord = {
     id: string
@@ -55,6 +59,7 @@ export default function TasksClient({
     const [isPending, startTransition] = useTransition()
     const [previousEmployees, setPreviousEmployees] = useState(initialEmployees)
     const [activeView, setActiveView] = useState<'attendance' | 'tasks'>('attendance')
+    const [employeeForm, setEmployeeForm] = useState<'create' | 'edit' | null>(null)
 
     if (previousEmployees !== initialEmployees) {
         setPreviousEmployees(initialEmployees)
@@ -98,6 +103,7 @@ export default function TasksClient({
                 setEmployees(prev => [...prev, result.employee])
                 setSelectedEmployeeId(result.employee.id)
             }
+            setEmployeeForm(null)
             router.refresh()
         })
     }
@@ -117,6 +123,7 @@ export default function TasksClient({
                 ? { ...employee, name: nextName, hourlyWage: nextHourlyWage, dailyHours: nextDailyHours }
                 : employee
             ))
+            setEmployeeForm(null)
             router.refresh()
         })
     }
@@ -136,6 +143,7 @@ export default function TasksClient({
                 setSelectedEmployeeId(next[0]?.id || '')
                 return next
             })
+            setEmployeeForm(null)
             router.refresh()
         })
     }
@@ -164,248 +172,277 @@ export default function TasksClient({
         })
     }
 
+    const toggleEmployeeForm = (form: 'create' | 'edit') => {
+        setEmployeeForm(previous => previous === form ? null : form)
+    }
+
+    const inputClass = 'mt-1 h-10 w-full rounded-[10px] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-900 transition-colors focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15'
+
     return (
-        <div className="ux-page-stack font-sans">
-            <header>
-                <h1 className="ux-page-title">근태·업무 관리</h1>
-                <p className="mt-2 text-sm text-[var(--muted-foreground)]">근무일과 급여를 확인하거나 업무 일정을 관리하세요.</p>
-            </header>
-            <div className="ux-tabs" role="tablist" aria-label="관리할 업무">
-                <button id="attendance-tab" role="tab" aria-selected={activeView === 'attendance'} aria-controls="attendance-panel" onClick={() => setActiveView('attendance')}>근태·급여</button>
-                <button id="tasks-tab" role="tab" aria-selected={activeView === 'tasks'} aria-controls="tasks-panel" onClick={() => setActiveView('tasks')}>업무 일정</button>
-            </div>
-            <div id="tasks-panel" role="tabpanel" aria-labelledby="tasks-tab" hidden={activeView !== 'tasks'}>
-            <section className="space-y-6">
-                <div>
-                    <h2 className="ux-section-title">업무 일정</h2>
-                    <p className="mt-1 text-sm font-medium text-gray-500">업무를 완료하면 경험치가 쌓이고 레벨이 올라갑니다.</p>
-                </div>
+        <div className="font-sans">
+            <PageHeader
+                title="근태 관리"
+                description="직원별 근무일과 월 급여를 확인하고, 업무 일정을 관리합니다."
+            />
+            <Tabs
+                aria-label="관리할 업무"
+                items={[{ key: 'attendance', label: '근태·급여' }, { key: 'tasks', label: '업무 일정' }]}
+                value={activeView}
+                onChange={setActiveView}
+            />
+
+            <div role="tabpanel" aria-label="업무 일정" hidden={activeView !== 'tasks'} className="mt-4">
                 <DashboardCalendarWidget tasks={initialTasks} />
-            </section>
-
-            </div>
-            <section id="attendance-panel" role="tabpanel" aria-labelledby="attendance-tab" hidden={activeView !== 'attendance'} className="space-y-5">
-            <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                    <h2 className="text-xl font-bold text-gray-900">근태·급여</h2>
-                    <p className="mt-1 text-sm font-medium text-gray-500">직원별 근무일을 체크하고 월 지출급여를 계산합니다.</p>
-                </div>
-                <div className="shrink-0 rounded-xl bg-gray-900 px-4 py-3 text-right text-white shadow-sm">
-                    <div className="text-[11px] font-black uppercase tracking-widest text-gray-400">선택 직원 급여</div>
-                    <div className="text-2xl font-black">{formatMoney(monthlyPayroll)}</div>
-                </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-                <aside className="space-y-4">
-                    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                            <h2 className="text-sm font-black text-gray-900">직원 선택</h2>
-                            <UserRound className="w-4 h-4 text-gray-400" />
-                        </div>
-                        <div className="p-3 space-y-2">
-                            {employees.length > 0 ? employees.map(employee => {
+            <div role="tabpanel" aria-label="근태·급여" hidden={activeView !== 'attendance'} className="mt-4">
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[360px_minmax(0,1fr)] xl:items-start xl:gap-6">
+                    {/* On phones the calendar is the main task, so employees become a chip row above it. */}
+                    {employees.length > 0 && (
+                        <div role="group" aria-label="직원 선택" className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 xl:hidden">
+                            {employees.map(employee => {
                                 const selected = employee.id === selectedEmployee?.id
                                 return (
                                     <button
                                         key={employee.id}
                                         type="button"
+                                        aria-pressed={selected}
                                         onClick={() => setSelectedEmployeeId(employee.id)}
-                                        className={`w-full rounded-xl border px-4 py-3 text-left transition-all ${selected ? 'border-[#d9361b] bg-red-50' : 'border-gray-100 bg-white hover:bg-gray-50'}`}
+                                        className={`inline-flex h-9 shrink-0 items-center rounded-full border px-4 text-sm font-bold transition-colors ${selected ? 'border-slate-900 bg-slate-900 text-white' : 'border-slate-200 bg-white text-slate-700 hover:border-slate-400'}`}
                                     >
-                                        <div className="flex items-center justify-between gap-3">
-                                            <div className="font-black text-gray-900">{employee.name}</div>
-                                            <div className="text-xs font-bold text-gray-500">{formatMoney(employee.hourlyWage)}/h</div>
-                                        </div>
-                                        <div className="mt-1 text-xs font-medium text-gray-400">1일근로시간 {employee.dailyHours}시간</div>
+                                        {employee.name}
                                     </button>
                                 )
-                            }) : (
-                                <div className="rounded-xl border border-dashed border-gray-200 px-4 py-8 text-center text-sm font-bold text-gray-400">
-                                    등록된 직원이 없습니다.
+                            })}
+                        </div>
+                    )}
+
+                    <aside className={employees.length > 0 ? 'order-last xl:order-none' : ''}>
+                        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                            <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+                                <h2 className="flex items-center gap-2 text-sm font-black text-slate-900">
+                                    직원
+                                    <span className="text-xs font-bold tabular-nums text-slate-400">{employees.length}</span>
+                                </h2>
+                                <div className="flex items-center gap-1">
+                                    {selectedEmployee && (
+                                        <button
+                                            type="button"
+                                            onClick={() => toggleEmployeeForm('edit')}
+                                            aria-expanded={employeeForm === 'edit'}
+                                            className={buttonClass('ghost', 'sm', 'xl:hidden')}
+                                        >
+                                            <Pencil className="h-3.5 w-3.5" />
+                                            {selectedEmployee.name} 수정
+                                        </button>
+                                    )}
+                                    <button
+                                        type="button"
+                                        onClick={() => toggleEmployeeForm('create')}
+                                        aria-expanded={employeeForm === 'create'}
+                                        className={buttonClass('ghost', 'sm')}
+                                    >
+                                        <Plus className="h-3.5 w-3.5" />
+                                        추가
+                                    </button>
                                 </div>
+                            </div>
+
+                            <div className={`space-y-2 p-3 ${employees.length > 0 ? 'hidden xl:block' : ''}`}>
+                                {employees.length > 0 ? employees.map(employee => {
+                                    const selected = employee.id === selectedEmployee?.id
+                                    const editing = selected && employeeForm === 'edit'
+                                    return (
+                                        <div
+                                            key={employee.id}
+                                            className={`flex items-center rounded-xl border transition-colors ${selected ? 'border-slate-900 bg-slate-50' : 'border-slate-100 bg-white hover:bg-slate-50'}`}
+                                        >
+                                            <button
+                                                type="button"
+                                                aria-pressed={selected}
+                                                onClick={() => setSelectedEmployeeId(employee.id)}
+                                                className="min-w-0 flex-1 px-4 py-3 text-left"
+                                            >
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <span className="truncate font-black text-slate-900">{employee.name}</span>
+                                                    <span className="shrink-0 text-xs font-bold tabular-nums text-slate-500">{formatMoney(employee.hourlyWage)}/h</span>
+                                                </div>
+                                                <div className="mt-1 text-xs font-medium text-slate-500">1일 {employee.dailyHours}시간</div>
+                                            </button>
+                                            <button
+                                                type="button"
+                                                aria-label={`${employee.name} 근로 조건 수정`}
+                                                title="근로 조건 수정"
+                                                aria-expanded={editing}
+                                                onClick={() => {
+                                                    setSelectedEmployeeId(employee.id)
+                                                    setEmployeeForm(editing ? null : 'edit')
+                                                }}
+                                                className={`mr-2 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors hover:bg-white hover:text-slate-900 ${editing ? 'bg-white text-slate-900' : 'text-slate-400'}`}
+                                            >
+                                                <Pencil className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    )
+                                }) : (
+                                    <EmptyState bare compact icon={<UserRound size={20} />} title="등록된 직원이 없습니다" description="[추가]를 눌러 첫 직원을 등록하세요." />
+                                )}
+                            </div>
+
+                            {employeeForm === 'create' && (
+                                <form action={handleCreateEmployee} className="space-y-4 border-t border-slate-100 p-5">
+                                    <p className="text-xs font-bold text-slate-500">새 직원</p>
+                                    <AttendanceInputs inputClass={inputClass} />
+                                    <div className="flex gap-2">
+                                        <button disabled={isPending} className={buttonClass('primary', 'md', 'flex-1')}>직원 추가</button>
+                                        <button type="button" onClick={() => setEmployeeForm(null)} className={buttonClass('secondary', 'md')}>취소</button>
+                                    </div>
+                                </form>
+                            )}
+
+                            {employeeForm === 'edit' && selectedEmployee && (
+                                <form key={selectedEmployee.id} action={handleUpdateEmployee} className="space-y-4 border-t border-slate-100 p-5">
+                                    <p className="text-xs font-bold text-slate-500">{selectedEmployee.name} 근로 조건</p>
+                                    <AttendanceInputs employee={selectedEmployee} inputClass={inputClass} />
+                                    <div className="flex gap-2">
+                                        <button disabled={isPending} className={buttonClass('primary', 'md', 'flex-1')}>설정 저장</button>
+                                        <button
+                                            type="button"
+                                            onClick={handleDeleteEmployee}
+                                            disabled={isPending}
+                                            className={buttonClass('danger', 'md', 'w-10 px-0')}
+                                            aria-label="직원 삭제"
+                                            title="직원 삭제"
+                                        >
+                                            <Trash2 className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </form>
                             )}
                         </div>
-                    </div>
+                    </aside>
 
-                    <details className="ux-panel"><summary className="min-h-12 cursor-pointer px-5 py-3 text-sm font-bold">새 직원 추가</summary><form action={handleCreateEmployee} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                        <div className="flex items-center gap-2">
-                            <Plus className="w-4 h-4 text-[#d9361b]" />
-                            <h2 className="text-sm font-black text-gray-900">직원 추가</h2>
-                        </div>
-                        <AttendanceInputs />
-                        <button disabled={isPending} className="w-full rounded-xl bg-[#d9361b] py-3 text-sm font-black text-white hover:bg-red-600 disabled:opacity-50">
-                            직원 추가
-                        </button>
-                    </form></details>
-
-                    {selectedEmployee && (
-                        <details key={selectedEmployee.id} className="ux-panel"><summary className="min-h-12 cursor-pointer px-5 py-3 text-sm font-bold">{selectedEmployee.name} 근로 조건 수정</summary><form action={handleUpdateEmployee} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
-                            <h2 className="text-sm font-black text-gray-900">직원 설정</h2>
-                            <AttendanceInputs employee={selectedEmployee} />
-                            <div className="flex gap-2">
-                                <button disabled={isPending} className="flex-1 rounded-xl bg-gray-900 py-3 text-sm font-black text-white hover:bg-black disabled:opacity-50">
-                                    설정 저장
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={handleDeleteEmployee}
-                                    disabled={isPending}
-                                    className="rounded-xl border border-red-100 px-4 text-red-600 hover:bg-red-50 disabled:opacity-50"
-                                    title="직원 삭제"
-                                >
-                                    <Trash2 className="w-4 h-4" />
-                                </button>
+                    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4 sm:px-6">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <CalendarDays className="h-5 w-5 shrink-0 text-slate-400" />
+                                <div className="min-w-0">
+                                    <h2 className="text-xl font-black text-slate-900">{currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월</h2>
+                                    <p className="break-keep text-xs font-medium text-slate-500">{selectedEmployee ? `${selectedEmployee.name} · 날짜를 누르면 근무일이 바로 저장됩니다.` : '직원을 먼저 추가하세요.'}</p>
+                                </div>
                             </div>
-                        </form></details>
-                    )}
-                </aside>
-
-                <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-6 py-5 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
-                            <CalendarDays className="w-5 h-5 text-[#d9361b]" />
-                            <div>
-                                <h2 className="text-xl font-black text-gray-900">{currentMonth.getFullYear()}년 {currentMonth.getMonth() + 1}월</h2>
-                                <p className="text-xs font-bold text-gray-400">{selectedEmployee ? `${selectedEmployee.name} · 날짜를 누르면 근무일이 즉시 저장됩니다.` : '직원을 먼저 선택하세요.'}</p>
-                            </div>
+                            <CalendarMonthNav onPrev={() => changeMonth(-1)} onToday={() => setCurrentMonth(new Date())} onNext={() => changeMonth(1)} />
                         </div>
-                        <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => changeMonth(-1)} aria-label="이전 달" className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-100 p-2 hover:bg-gray-50">
-                                <ChevronLeft className="w-4 h-4" />
-                            </button>
-                            <button type="button" onClick={() => setCurrentMonth(new Date())} className="rounded-xl border border-gray-100 px-4 py-2 text-xs font-black text-gray-600 hover:bg-gray-50">
-                                이번 달
-                            </button>
-                            <button type="button" onClick={() => changeMonth(1)} aria-label="다음 달" className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray-100 p-2 hover:bg-gray-50">
-                                <ChevronRight className="w-4 h-4" />
-                            </button>
+
+                        <div className="grid grid-cols-7 border-b border-slate-100 bg-slate-50">
+                            {WEEKDAY_LABELS.map((day, idx) => (
+                                <div key={day} className={`py-2.5 text-center text-xs font-bold ${isWeekendDay(idx) ? 'text-red-500' : 'text-slate-500'}`}>
+                                    {day}
+                                </div>
+                            ))}
                         </div>
-                    </div>
 
-                    <div className="grid grid-cols-7 border-b border-gray-100 bg-gray-50">
-                        {['일', '월', '화', '수', '목', '금', '토'].map((day, idx) => (
-                            <div key={day} className={`py-3 text-center text-xs font-black ${idx === 0 ? 'text-red-500' : idx === 6 ? 'text-blue-500' : 'text-gray-400'}`}>
-                                {day}
-                            </div>
-                        ))}
-                    </div>
+                        <div className="grid grid-cols-7">
+                            {calendarDays.map((date, index) => {
+                                if (!date) return <div key={`blank-${index}`} className="min-h-[72px] border-b border-r border-slate-100 bg-slate-50/40 sm:min-h-[112px]" />
 
-                    <div className="grid grid-cols-7">
-                        {calendarDays.map((date, index) => {
-                            if (!date) return <div key={`blank-${index}`} className="min-h-[88px] sm:min-h-[112px] border-r border-b border-gray-100 bg-gray-50/40" />
+                                const key = dateKey(date)
+                                const checked = selectedWorkDates.has(key)
+                                const holidayName = getKoreanHolidayName(key)
+                                const isWeekend = isWeekendDay(date.getDay())
 
-                            const key = dateKey(date)
-                            const checked = selectedWorkDates.has(key)
-                            const holidayName = getKoreanHolidayName(key)
-                            const isSunday = date.getDay() === 0
-                            const isSaturday = date.getDay() === 6
-                            const isWeekend = isSunday || isSaturday
-                            const dayTextClass = holidayName || isSunday
-                                ? 'text-red-600'
-                                : isSaturday
-                                    ? 'text-blue-500'
-                                    : checked
-                                        ? 'text-[#d9361b]'
-                                        : 'text-gray-700'
-
-                            return (
-                                <button
-                                    key={key}
-                                    type="button"
-                                    onClick={() => handleToggleDate(date)}
-                                    disabled={!selectedEmployee || isPending}
-                                    aria-pressed={checked}
-                                    aria-label={`${date.getMonth() + 1}월 ${date.getDate()}일${holidayName ? ` ${holidayName}` : ''}, ${checked ? '근무일' : '미등록'}`}
-                                    className={`min-h-[88px] sm:min-h-[112px] border-r border-b p-1.5 sm:p-3 text-left transition-all disabled:cursor-not-allowed ${
-                                        checked
-                                            ? 'border-blue-200 bg-blue-50 hover:bg-blue-100'
-                                            : holidayName
-                                                ? 'border-red-100 bg-red-50/50 hover:bg-red-50'
-                                                : isWeekend
-                                                    ? 'border-gray-100 bg-gray-50/70 hover:bg-gray-100'
-                                                    : 'border-gray-100 bg-white hover:bg-gray-50'
-                                    }`}
-                                >
-                                    <div className="flex items-start justify-between gap-2">
-                                        <span className={`text-sm font-black ${dayTextClass}`}>{date.getDate()}</span>
-                                        <span className={`h-5 w-5 rounded-full border flex items-center justify-center ${checked ? 'border-blue-600 bg-blue-600' : 'border-gray-200 bg-white'}`}>
-                                            {checked && <span className="text-[11px] font-black text-white">✓</span>}
-                                        </span>
-                                    </div>
-                                    {(holidayName || isWeekend) && (
-                                        <div
-                                            className={`mt-2 inline-flex max-w-full rounded-md px-2 py-1 text-[10px] font-black leading-none ${
-                                                holidayName
-                                                    ? 'bg-red-100 text-red-700'
-                                                    : isSunday
-                                                        ? 'bg-red-50 text-red-500'
-                                                        : 'bg-blue-50 text-blue-500'
-                                            }`}
-                                        >
-                                            <span className="truncate">{holidayName || (isSunday ? '일요일' : '토요일')}</span>
+                                return (
+                                    <button
+                                        key={key}
+                                        type="button"
+                                        onClick={() => handleToggleDate(date)}
+                                        disabled={!selectedEmployee || isPending}
+                                        aria-pressed={checked}
+                                        aria-label={`${date.getMonth() + 1}월 ${date.getDate()}일${holidayName ? ` ${holidayName}` : ''}, ${checked ? '근무일' : '미등록'}`}
+                                        className={`min-h-[72px] border-b border-r p-1.5 text-left transition-colors disabled:cursor-not-allowed sm:min-h-[112px] sm:p-3 ${
+                                            checked
+                                                ? 'border-emerald-200 bg-emerald-50 hover:bg-emerald-100'
+                                                : holidayName
+                                                    ? 'border-slate-100 bg-red-50/50 hover:bg-red-50'
+                                                    : isWeekend
+                                                        ? 'border-slate-100 bg-slate-50/70 hover:bg-slate-100'
+                                                        : 'border-slate-100 bg-white hover:bg-slate-50'
+                                        }`}
+                                    >
+                                        <div className="flex flex-col items-start gap-1 sm:flex-row sm:justify-between sm:gap-2">
+                                            <span className={`text-sm font-black tabular-nums ${holidayName || isWeekend ? 'text-red-600' : 'text-slate-700'}`}>{date.getDate()}</span>
+                                            <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border sm:h-5 sm:w-5 ${checked ? 'border-emerald-600 bg-emerald-600 text-white' : 'border-slate-200 bg-white'}`}>
+                                                {checked && <Check className="h-2.5 w-2.5 sm:h-3 sm:w-3" strokeWidth={3.5} />}
+                                            </span>
                                         </div>
-                                    )}
-                                    {checked && selectedEmployee && (
-                                        <div className="mt-3 rounded-lg bg-white/80 px-1 py-1 text-[10px] font-bold text-blue-700 sm:px-2 sm:text-[11px]">
-                                            {selectedEmployee.dailyHours}h · {formatMoney(selectedEmployee.hourlyWage * selectedEmployee.dailyHours)}
-                                        </div>
-                                    )}
-                                </button>
-                            )
-                        })}
-                    </div>
+                                        {holidayName && (
+                                            <>
+                                                <span aria-hidden="true" className="mt-1.5 block h-1.5 w-1.5 rounded-full bg-red-500 sm:hidden" />
+                                                <span className="mt-2 hidden max-w-full rounded-md bg-red-100 px-2 py-1 text-[11px] font-bold leading-none text-red-700 sm:inline-flex">
+                                                    <span className="truncate">{holidayName}</span>
+                                                </span>
+                                            </>
+                                        )}
+                                        {checked && selectedEmployee && (
+                                            <div className="mt-2 hidden rounded-lg bg-white/80 px-2 py-1 text-[11px] font-bold tabular-nums text-emerald-700 sm:block">
+                                                {selectedEmployee.dailyHours}h · {formatMoney(selectedEmployee.hourlyWage * selectedEmployee.dailyHours)}
+                                            </div>
+                                        )}
+                                    </button>
+                                )
+                            })}
+                        </div>
 
-                    <div className="px-6 py-5 bg-gray-50 flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-sm font-bold text-gray-500">
-                            {selectedEmployee ? `${selectedEmployee.name} · ${monthlyWorkDays}일 근무 · ${selectedEmployee.dailyHours}시간/일` : '직원을 추가하거나 선택해 주세요.'}
+                        <div className="flex flex-wrap items-end justify-between gap-3 bg-slate-50 px-4 py-4 sm:px-6">
+                            <div className="text-sm font-bold text-slate-500">
+                                {selectedEmployee ? `${selectedEmployee.name} · ${monthlyWorkDays}일 근무 · ${selectedEmployee.dailyHours}시간/일` : '직원을 추가하거나 선택해 주세요.'}
+                            </div>
+                            <div className="text-right">
+                                <div className="text-xs font-bold text-slate-500">{currentMonth.getMonth() + 1}월 급여</div>
+                                <div className="text-2xl font-black tabular-nums text-slate-900">{formatMoney(monthlyPayroll)}</div>
+                            </div>
                         </div>
-                        <div className="text-right">
-                            <div className="text-xs font-black text-gray-400 uppercase tracking-widest">선택 직원 급여</div>
-                            <div className="text-3xl font-black text-[#d9361b]">{formatMoney(monthlyPayroll)}</div>
-                        </div>
-                    </div>
-                </section>
+                    </section>
+                </div>
             </div>
-            </section>
         </div>
     )
 }
 
-function AttendanceInputs({ employee }: { employee?: AttendanceEmployee }) {
+function AttendanceInputs({ employee, inputClass }: { employee?: AttendanceEmployee; inputClass: string }) {
     return (
         <div className="space-y-3">
             <label className="block">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">직원명</span>
+                <span className="text-xs font-bold text-slate-500">직원명</span>
                 <input
                     name="name"
                     required
                     defaultValue={employee?.name || ''}
                     placeholder="직원 이름"
-                    className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#d9361b] focus:ring-2 focus:ring-[#d9361b]/10"
+                    className={inputClass}
                 />
             </label>
             <div className="grid grid-cols-2 gap-3">
                 <label className="block">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">시급</span>
+                    <span className="text-xs font-bold text-slate-500">시급(원)</span>
                     <input
                         name="hourlyWage"
                         required
                         inputMode="numeric"
                         defaultValue={employee?.hourlyWage || ''}
                         placeholder="10000"
-                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#d9361b] focus:ring-2 focus:ring-[#d9361b]/10"
+                        className={`${inputClass} text-right tabular-nums`}
                     />
                 </label>
                 <label className="block">
-                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">1일근로시간</span>
+                    <span className="text-xs font-bold text-slate-500">1일 근로시간</span>
                     <input
                         name="dailyHours"
                         required
                         inputMode="decimal"
                         defaultValue={employee?.dailyHours || ''}
                         placeholder="8"
-                        className="mt-1 w-full rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-bold text-gray-900 outline-none focus:border-[#d9361b] focus:ring-2 focus:ring-[#d9361b]/10"
+                        className={`${inputClass} text-right tabular-nums`}
                     />
                 </label>
             </div>

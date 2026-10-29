@@ -1,7 +1,9 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, X, CheckCircle2, LayoutGrid, Wand2, AlertCircle, Undo2, Redo2, Calendar } from 'lucide-react'
+import { Plus, Minus, X, CheckCircle2, ChevronRight, LayoutGrid, Wand2, AlertCircle, Undo2, Redo2, Calendar } from 'lucide-react'
+import PageHeader from '@/components/ui/PageHeader'
+import { buttonClass } from '@/components/ui/buttonClass'
 
 // Add styles/keyframes for the gradient border
 const styles = `
@@ -162,6 +164,7 @@ export default function MindBoardClient() {
 
     // Boards State
     const [boards, setBoards] = useState<BoardData[]>([])
+    const [boardsLoaded, setBoardsLoaded] = useState(false)
     const [currentBoardId, setCurrentBoardId] = useState<string | null>(null)
     const [selectedGroupId, setSelectedGroupId] = useState<string | null>(null)
     const [resizeGroup, setResizeGroup] = useState<{ id: string, startX: number, startY: number, initialW: number, initialH: number, groupX: number, groupY: number } | null>(null)
@@ -183,6 +186,7 @@ export default function MindBoardClient() {
                         const targetId = data.find((b: BoardData) => b.id === lastId) ? lastId : data[0].id
                         setCurrentBoardId(targetId)
                     }
+                    setBoardsLoaded(true)
                 }
                 else throw new Error('보드 목록을 불러오지 못했습니다.')
             } catch { setBoardError('보드 목록을 불러오지 못했습니다. 새로고침 후 다시 확인해 주세요.') }
@@ -1711,8 +1715,41 @@ export default function MindBoardClient() {
         })
     }
 
+    const currentBoard = boards.find(board => board.id === currentBoardId) || null
+    const saveLabel = saveStatus === 'error' ? '저장 실패' : saveStatus === 'saving' ? '저장 중…' : saveStatus === 'pending' ? '변경사항 저장 대기…' : '저장됨'
+    const addMemoAtCenter = () => {
+        const container = containerRef.current
+        if (!container) return
+        const rect = container.getBoundingClientRect()
+        const position = getWorldCoords(rect.left + rect.width / 2, rect.top + rect.height / 2)
+        createMemo(position.x, position.y, true)
+    }
+    const submitNewBoard = (event: React.FormEvent<HTMLFormElement>) => {
+        event.preventDefault()
+        const input = event.currentTarget.elements.namedItem('boardTitle') as HTMLInputElement | null
+        const title = input?.value.trim()
+        if (!title || !input) return
+        createBoard(title)
+        input.value = ''
+    }
+    const toolButton = 'flex h-11 w-11 items-center justify-center rounded-lg text-slate-600 transition-colors hover:bg-slate-100 disabled:text-slate-300 disabled:hover:bg-transparent'
+
     return (
-        <div className="fixed left-0 right-0 bottom-0 top-[68px] lg:left-[248px] lg:top-0 z-10 bg-gray-100 select-none touch-none overflow-hidden">
+        // The canvas fills the area the shell leaves free: below the 56px mobile header / 60px top bar, right of the 240px sidebar.
+        <div className="fixed inset-x-0 bottom-0 top-14 z-10 flex flex-col bg-white lg:left-[240px] lg:top-[60px]">
+            <div className="shrink-0 border-b border-slate-200 bg-white px-4 pt-3 lg:px-6 lg:pt-4">
+                <PageHeader
+                    title="마인드보드"
+                    description={(
+                        <span role="status" aria-live="polite">
+                            {currentBoard
+                                ? `${currentBoard.title || '이름 없는 보드'} · ${isLoaded ? saveLabel : '불러오는 중…'}`
+                                : '보드마다 메모를 자유롭게 붙이고 묶어 정리합니다.'}
+                        </span>
+                    )}
+                />
+            </div>
+            <div className="relative min-h-0 flex-1 select-none touch-none overflow-hidden bg-gray-100">
             <style dangerouslySetInnerHTML={{ __html: styles }} />
             {/* minimap */}
             <div className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${items.length > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -1798,143 +1835,163 @@ export default function MindBoardClient() {
             </div>
 
 
-            {/* Toolbar & Group Nav */}
-
-
-            <div className="absolute bottom-3 left-3 right-3 z-[120] w-fit max-w-[calc(100%-24px)] rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm" role="status" aria-live="polite">
-                {boardError || (!currentBoardId ? '새 보드를 만들면 메모를 추가할 수 있습니다.' : saveStatus === 'error' ? '저장 실패 · 변경사항이 아직 저장되지 않았습니다.' : saveStatus === 'saving' ? '저장 중…' : saveStatus === 'pending' ? '변경사항 저장 대기…' : '저장됨')}
-                {saveStatus === 'error' && <button className="ux-button ml-2" onClick={() => setRetrySave(value => value + 1)}>다시 저장</button>}
-            </div>
-            {/* Left Toolbar */}
-            <div className="absolute left-4 top-4 z-50 flex flex-col gap-2 pointer-events-auto">
-                <div className="bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-white/20 flex flex-col gap-2 w-[min(52vw,208px)]">
-                    <button className="ux-button-primary mb-2 w-full disabled:opacity-50" disabled={!currentBoardId || !isLoaded} onClick={() => {
-                        const container = containerRef.current
-                        if (!container) return
-                        const rect = container.getBoundingClientRect()
-                        const position = getWorldCoords(rect.left + rect.width / 2, rect.top + rect.height / 2)
-                        createMemo(position.x, position.y, true)
-                    }}><Plus size={16} />메모 추가</button>
-                    <div className="flex gap-2">
-                        <input
-                            type="text"
-                            placeholder="새 보드 이름" aria-label="새 보드 이름"
-                            className="min-w-0 flex-1 bg-white/50 border border-gray-200 rounded px-2 py-1 text-xs outline-none focus:border-blue-500"
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter') {
-                                    const title = e.currentTarget.value
-                                    if (title) {
-                                        createBoard(title)
-                                        e.currentTarget.value = ''
-                                    }
-                                }
-                            }}
-                        />
-                        <button
-                            onClick={(e) => {
-                                const input = e.currentTarget.previousElementSibling as HTMLInputElement
-                                if (input.value) {
-                                    createBoard(input.value)
-                                    input.value = ''
-                                }
-                            }}
-                            aria-label="새 보드 만들기"
-                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-blue-600 text-white transition-colors hover:bg-blue-700"
-                        >
-                            <Plus size={14} />
-                        </button>
-                    </div>
-                </div>
-
-                <details className="rounded-xl border border-slate-200 bg-white shadow-sm"><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold">편집 도구</summary><div className="flex max-h-[55vh] gap-2 overflow-y-auto p-2">
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
-                    <button
-                        onClick={autoArrange}
-                        className="flex h-11 w-11 items-center justify-center rounded text-gray-600 hover:bg-gray-100"
-                        title="자동 정렬"
-                    >
-                        <LayoutGrid size={18} />
-                    </button>
-                    <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
-                    <button onClick={() => {
-                        const container = containerRef.current
-                        if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="flex h-11 w-11 items-center justify-center rounded text-gray-600 hover:bg-gray-100" title="확대">
-                        <Plus size={18} />
-                    </button>
-                    <span className="text-[10px] font-bold font-mono py-0.5">{Math.round(scale * 100)}%</span>
-                    <button onClick={() => {
-                        const container = containerRef.current
-                        if (container) handleZoom(-0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="flex h-11 w-11 items-center justify-center rounded text-gray-600 hover:bg-gray-100" title="축소">
-                        <Minus size={18} />
-                    </button>
-                    <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
-                    <button onClick={undo} disabled={past.length === 0} className={`p-1.5 rounded transition-colors ${past.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="실행 취소 (Ctrl+Z)">
-                        <Undo2 size={18} />
-                    </button>
-                    <button onClick={redo} disabled={future.length === 0} className={`p-1.5 rounded transition-colors ${future.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="다시 실행 (Ctrl+Y)">
-                        <Redo2 size={18} />
-                    </button>
-                </div>
-                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
-                    <div className="flex flex-col gap-1 p-0.5">
-                        {COLORS.map((c) => (
-                            <button key={c} aria-label={`색상 ${c}`}
-                                onClick={() => {
-                                    if (selectedGroupId) {
-                                        saveHistory()
-                                        setGroups(prev => prev.map(g => g.id === selectedGroupId ? { ...g, color: c } : g))
-                                    } else if (selectedIds.size > 0) {
-                                        saveHistory()
-                                        setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, color: c } : i))
-                                    }
-                                }}
-                                className={`w-11 h-11 shrink-0 rounded-full border border-black/10 transition-transform hover:scale-125 ${(selectedGroupId && groups.find(g => g.id === selectedGroupId)?.color === c) ||
-                                    (!selectedGroupId && selectedIds.size > 0 && items.find(i => selectedIds.has(i.id))?.color === c)
-                                    ? 'ring-1 ring-offset-1 ring-black/20' : ''}`}
-                                style={{ backgroundColor: c }} />
-                        ))}
-                    </div>
-                </div>
-                </div></details>
-            </div>
-            {/* Right Toolbar - Board List */}
-            <div className="absolute right-4 top-4 z-50 flex flex-col gap-2 pointer-events-auto h-[calc(100vh-100px)] pointer-events-none">
-                <details className="pointer-events-auto w-28 max-h-full overflow-y-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-lg sm:w-56"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">내 보드 {boards.length}</summary>
-                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex justify-between items-center">
-                        보드 목록
-                        <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{boards.length}</span>
-                    </h3>
-                    {boards.map(board => (
-                        <div
-                            key={board.id}
-                            className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${currentBoardId === board.id ? 'bg-blue-50 border-blue-200 border shadow-sm' : 'hover:bg-white border border-transparent hover:shadow-sm'}`}
-                            onClick={() => { if (!['pending', 'saving', 'error'].includes(saveStatus) || confirm('저장하지 못한 변경사항이 있습니다. 다른 보드로 이동하시겠습니까?')) setCurrentBoardId(board.id) }}
-                        >
-                            <span className={`text-sm font-medium truncate ${currentBoardId === board.id ? 'text-blue-700' : 'text-slate-700'}`}>
-                                {board.title || "Untitled"}
-                            </span>
-                            {boards.length > 1 && (
-                                <button
-                                    className="p-1 hover:bg-red-100 text-slate-300 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
-                                    onClick={(e) => { e.stopPropagation(); deleteBoard(board.id) }}
-                                >
-                                    <X size={12} />
-                                </button>
-                            )}
-                        </div>
-                    ))}
-                    {boards.length === 0 && (
-                        <div className="text-xs text-slate-400 text-center py-4">보드를 만들어 시작하세요</div>
+            {/* Errors only; the normal save state is in the page header. */}
+            {(boardError || saveStatus === 'error') && (
+                <div className="absolute bottom-3 left-3 right-3 z-[120] flex w-fit max-w-[calc(100%-24px)] flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-white p-3 text-sm text-red-700 shadow-sm" role="alert">
+                    {boardError || '저장 실패 · 변경사항이 아직 저장되지 않았습니다.'}
+                    {!boardError && saveStatus === 'error' && (
+                        <button type="button" className={buttonClass('secondary', 'sm')} onClick={() => setRetrySave(value => value + 1)}>다시 저장</button>
                     )}
-                </details>
-            </div>
+                </div>
+            )}
+
+            {/* No board yet: the one next step sits in the middle of the canvas. */}
+            {boardsLoaded && boards.length === 0 && (
+                <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center p-4">
+                    <form onSubmit={submitNewBoard} className="pointer-events-auto w-full max-w-sm rounded-2xl border border-slate-200 bg-white p-6 text-center shadow-lg">
+                        <div className="mx-auto mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+                            <LayoutGrid size={20} />
+                        </div>
+                        <h2 className="text-base font-black text-slate-900">첫 보드를 만들어 시작하세요</h2>
+                        <p className="mt-1 break-keep text-xs text-slate-500">보드를 만들면 메모를 추가하고 그룹으로 묶을 수 있습니다.</p>
+                        <div className="mt-4 flex gap-2">
+                            <input
+                                name="boardTitle"
+                                required
+                                autoFocus
+                                placeholder="보드 이름"
+                                aria-label="새 보드 이름"
+                                className="h-10 min-w-0 flex-1 rounded-[10px] border border-slate-300 bg-white px-3 text-sm text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
+                            />
+                            <button type="submit" className={buttonClass('primary', 'md')}>보드 만들기</button>
+                        </div>
+                    </form>
+                </div>
+            )}
+
+            {/* Left Toolbar */}
+            {boards.length > 0 && (
+                <div className="absolute left-4 top-4 z-50 flex w-[min(44vw,208px)] flex-col gap-2 pointer-events-auto">
+                    <button type="button" className={buttonClass('primary', 'md', 'w-full shadow-sm')} disabled={!currentBoardId || !isLoaded} onClick={addMemoAtCenter}>
+                        <Plus size={16} />
+                        메모 추가
+                    </button>
+
+                    <details className="group w-fit rounded-xl border border-slate-200 bg-white shadow-sm">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+                            <ChevronRight size={15} className="shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+                            편집 도구
+                        </summary>
+                        <div className="flex max-h-[55vh] gap-1 overflow-y-auto border-t border-slate-100 p-1">
+                            <div className="flex flex-col items-center gap-1 pointer-events-auto">
+                                <button type="button" onClick={autoArrange} className={toolButton} title="자동 정렬" aria-label="자동 정렬">
+                                    <LayoutGrid size={18} />
+                                </button>
+                                <div className="my-0.5 h-px w-4 bg-slate-200"></div>
+                                <button type="button" onClick={() => {
+                                    const container = containerRef.current
+                                    if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
+                                }} className={toolButton} title="확대" aria-label="확대">
+                                    <Plus size={18} />
+                                </button>
+                                <span className="py-0.5 font-mono text-[11px] font-bold tabular-nums text-slate-600">{Math.round(scale * 100)}%</span>
+                                <button type="button" onClick={() => {
+                                    const container = containerRef.current
+                                    if (container) handleZoom(-0.1, container.clientWidth / 2, container.clientHeight / 2)
+                                }} className={toolButton} title="축소" aria-label="축소">
+                                    <Minus size={18} />
+                                </button>
+                                <div className="my-0.5 h-px w-4 bg-slate-200"></div>
+                                <button type="button" onClick={undo} disabled={past.length === 0} className={toolButton} title="실행 취소 (Ctrl+Z)" aria-label="실행 취소">
+                                    <Undo2 size={18} />
+                                </button>
+                                <button type="button" onClick={redo} disabled={future.length === 0} className={toolButton} title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">
+                                    <Redo2 size={18} />
+                                </button>
+                            </div>
+                            <div className="w-px self-stretch bg-slate-100" aria-hidden="true" />
+                            <div className="flex flex-col gap-1 p-0.5 pointer-events-auto">
+                                {COLORS.map((c) => (
+                                    <button key={c} type="button" aria-label={`색상 ${c}`}
+                                        onClick={() => {
+                                            if (selectedGroupId) {
+                                                saveHistory()
+                                                setGroups(prev => prev.map(g => g.id === selectedGroupId ? { ...g, color: c } : g))
+                                            } else if (selectedIds.size > 0) {
+                                                saveHistory()
+                                                setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, color: c } : i))
+                                            }
+                                        }}
+                                        className={`w-11 h-11 shrink-0 rounded-full border border-black/10 transition-transform hover:scale-110 ${(selectedGroupId && groups.find(g => g.id === selectedGroupId)?.color === c) ||
+                                            (!selectedGroupId && selectedIds.size > 0 && items.find(i => selectedIds.has(i.id))?.color === c)
+                                            ? 'ring-2 ring-offset-1 ring-slate-900/40' : ''}`}
+                                        style={{ backgroundColor: c }} />
+                                ))}
+                            </div>
+                        </div>
+                    </details>
+                </div>
+            )}
+
+            {/* Right Toolbar - Board List; creating a board lives at the bottom of the same list. */}
+            {boards.length > 0 && (
+                <div className="pointer-events-none absolute bottom-4 right-4 top-4 z-50 flex flex-col items-end md:bottom-56">
+                    <details className="group pointer-events-auto max-h-full w-36 overflow-y-auto rounded-xl border border-slate-200 bg-white/95 shadow-lg sm:w-56">
+                        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 text-sm font-semibold text-slate-700 [&::-webkit-details-marker]:hidden">
+                            <ChevronRight size={15} className="shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+                            내 보드
+                            <span className="text-xs font-bold tabular-nums text-slate-400">{boards.length}</span>
+                        </summary>
+                        <div className="space-y-0.5 border-t border-slate-100 p-1.5">
+                            {boards.map(board => {
+                                const active = currentBoardId === board.id
+                                return (
+                                    <div
+                                        key={board.id}
+                                        className={`group/board flex items-center justify-between gap-1 rounded-lg px-2 py-1.5 transition-colors ${active ? 'bg-brand-orange-soft shadow-[inset_2px_0_0_var(--color-brand-orange)]' : 'hover:bg-slate-50'}`}
+                                    >
+                                        <button
+                                            type="button"
+                                            aria-current={active ? 'true' : undefined}
+                                            className={`min-w-0 flex-1 truncate text-left text-sm ${active ? 'font-bold text-brand-orange-strong' : 'font-medium text-slate-700'}`}
+                                            onClick={() => { if (!['pending', 'saving', 'error'].includes(saveStatus) || confirm('저장하지 못한 변경사항이 있습니다. 다른 보드로 이동하시겠습니까?')) setCurrentBoardId(board.id) }}
+                                        >
+                                            {board.title || '이름 없는 보드'}
+                                        </button>
+                                        {boards.length > 1 && (
+                                            <button
+                                                type="button"
+                                                aria-label={`${board.title || '이름 없는 보드'} 삭제`}
+                                                className="rounded p-1 text-slate-300 opacity-0 transition-opacity hover:bg-red-100 hover:text-red-500 focus-visible:opacity-100 group-hover/board:opacity-100"
+                                                onClick={(e) => { e.stopPropagation(); deleteBoard(board.id) }}
+                                            >
+                                                <X size={12} />
+                                            </button>
+                                        )}
+                                    </div>
+                                )
+                            })}
+                        </div>
+                        <form onSubmit={submitNewBoard} className="flex gap-1.5 border-t border-slate-100 p-2">
+                            <input
+                                name="boardTitle"
+                                required
+                                placeholder="새 보드 이름"
+                                aria-label="새 보드 이름"
+                                className="h-8 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-2 text-xs text-slate-900 focus:border-brand-orange focus:outline-none focus:ring-2 focus:ring-brand-orange/15"
+                            />
+                            <button type="submit" aria-label="새 보드 만들기" title="새 보드 만들기" className={buttonClass('secondary', 'sm', 'w-8 px-0')}>
+                                <Plus size={14} />
+                            </button>
+                        </form>
+                    </details>
+                </div>
+            )}
 
             <div
                 ref={containerRef}
                 id="mind-board-bg" role="region" aria-label="메모 캔버스"
-                className="w-full h-screen cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
+                className="w-full h-full cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
                 onTouchStart={onTouchStart}
                 onMouseDown={(e: React.MouseEvent) => {
                     // Background Deselect
@@ -2039,7 +2096,7 @@ export default function MindBoardClient() {
                                             setTimeout(() => dateInputRef.current?.showPicker(), 0)
                                         }}
                                         className={`p-1 rounded transition-colors ${item.dueDate ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-blue-50 hover:text-blue-500'}`}
-                                        title={item.dueDate ? `Due: ${item.dueDate}` : "Set Date"}
+                                        title={item.dueDate ? `마감일: ${item.dueDate}` : '마감일 설정'}
                                     >
                                         <Calendar size={14} />
                                     </button>
@@ -2126,17 +2183,18 @@ export default function MindBoardClient() {
                     >
                         <button
                             onClick={(e: React.MouseEvent) => { e.stopPropagation(); groupSelectedItems() }}
-                            className="bg-blue-600 text-white px-3 py-1.5 rounded-full shadow-lg font-bold text-sm hover:bg-blue-700 hover:scale-105 transition-all flex items-center gap-1.5 pointer-events-auto -translate-x-1/2"
+                            className="bg-slate-900 text-white px-3 py-1.5 rounded-full shadow-lg font-bold text-sm hover:bg-slate-800 transition-colors flex items-center gap-1.5 pointer-events-auto -translate-x-1/2"
                             onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                         >
                             <LayoutGrid size={14} />
-                            Group
+                            그룹으로 묶기
                         </button>
                     </div>
                 )
             }
             {/* Hidden Date Input */}
             <input type="date" ref={dateInputRef} className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none" onChange={handleDateSelect} />
-        </div >
+            </div>
+        </div>
     )
 }
