@@ -2,14 +2,20 @@
 
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
+import { Download, Printer, X } from 'lucide-react'
+import { buttonClass } from '@/components/ui/buttonClass'
 
 interface InvoiceButtonsProps {
     orderNumber: string
+    isKorean?: boolean
 }
 
-export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
+export default function InvoiceButtons({ orderNumber, isKorean = true }: InvoiceButtonsProps) {
     const router = useRouter()
     const [isDownloading, setIsDownloading] = useState(false)
+    const t = isKorean
+        ? { title: '거래명세표', close: '닫기', png: 'PNG 저장', saving: '저장 중…', print: '인쇄', missing: '문서 내용을 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.', failed: '이미지를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.' }
+        : { title: '取引明細書', close: '閉じる', png: 'PNG保存', saving: '保存中…', print: '印刷', missing: '書類が見つかりません。再読み込みしてからお試しください。', failed: '画像を保存できませんでした。しばらくしてから再度お試しください。' }
 
     const handleClose = () => {
         if (window.history.length > 1) {
@@ -26,7 +32,7 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
     const handleDownloadPNG = async () => {
         const element = document.getElementById('invoice-content')
         if (!element) {
-            alert('문서 내용을 찾을 수 없습니다. 새로고침 후 다시 시도해 주세요.')
+            alert(t.missing)
             return
         }
 
@@ -54,7 +60,7 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
             link.click()
         } catch (error) {
             console.error('Download failed:', error)
-            alert('이미지를 저장하지 못했습니다. 잠시 후 다시 시도해 주세요.')
+            alert(t.failed)
         } finally {
             setIsDownloading(false)
         }
@@ -62,7 +68,9 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Enter') {
+            // Enter on a focused button or link is that control's own action, not "print".
+            const onControl = e.target instanceof Element && e.target.closest('button, a, input, select, textarea')
+            if (e.key === 'Enter' && !onControl) {
                 handlePrint()
             }
             if (e.key === 'Escape') {
@@ -74,35 +82,21 @@ export default function InvoiceButtons({ orderNumber }: InvoiceButtonsProps) {
     }, [router]);
 
     return (
-        <div className="sticky top-0 z-40 mb-5 flex flex-col items-center gap-3 border-b border-[var(--border)] bg-[var(--card)]/95 p-3 text-center backdrop-blur print:hidden">
-            <div className="flex flex-wrap justify-center gap-2">
-                <button
-                    onClick={handlePrint}
-                    className="bg-gray-800 text-white px-4 min-h-12 rounded-xl font-bold hover:bg-black transition-all shadow-lg active:scale-95 flex flex-col items-center justify-center leading-tight"
-                >
-                    <span className="text-[14px]">取引明細書を印刷する</span>
-                    <span className="text-[11px] font-medium opacity-80">인쇄하기</span>
+        <div className="sticky top-0 z-40 mb-4 border-b border-[var(--border)] bg-[var(--card)] print:hidden">
+            <div className="mx-auto flex max-w-[calc(210mm+48px)] items-center gap-2 px-3 py-2 sm:px-6 sm:py-3">
+                <button type="button" onClick={handleClose} className="ux-icon-button shrink-0" aria-label={t.close} title={t.close}>
+                    <X size={18} aria-hidden />
                 </button>
-                <button
-                    onClick={handleDownloadPNG}
-                    disabled={isDownloading}
-                    className="bg-blue-600 text-white px-4 min-h-12 rounded-xl font-bold hover:bg-blue-700 transition-all shadow-lg active:scale-95 disabled:opacity-50 flex flex-col items-center justify-center leading-tight"
-                >
-                    {isDownloading ? (
-                        'Saving...'
-                    ) : (
-                        <>
-                            <span className="text-[14px]">PNGで保存</span>
-                            <span className="text-[11px] font-medium opacity-80">PNG 다운로드</span>
-                        </>
-                    )}
+                <p className="min-w-0 flex-1 truncate text-sm font-bold text-[var(--foreground)]">
+                    {t.title} <span className="font-normal text-[var(--muted-foreground)] tabular-nums">{orderNumber}</span>
+                </p>
+                <button type="button" onClick={handleDownloadPNG} disabled={isDownloading} className={buttonClass('secondary', 'md')}>
+                    <Download size={16} aria-hidden />
+                    {isDownloading ? t.saving : t.png}
                 </button>
-                <button
-                    onClick={handleClose}
-                    className="bg-white text-gray-700 border-2 border-gray-200 px-4 min-h-12 rounded-xl font-bold hover:bg-gray-50 hover:border-gray-300 transition-all shadow-sm active:scale-95 flex flex-col items-center justify-center leading-tight"
-                >
-                    <span className="text-[14px]">閉じる</span>
-                    <span className="text-[11px] font-medium opacity-80">닫기</span>
+                <button type="button" onClick={handlePrint} className={buttonClass('primary', 'md')}>
+                    <Printer size={16} aria-hidden />
+                    {t.print}
                 </button>
             </div>
         </div>

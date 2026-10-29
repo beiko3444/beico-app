@@ -4,6 +4,7 @@ import { authOptions } from "@/lib/auth"
 import { redirect } from "next/navigation"
 import InvoiceButtons from "@/components/InvoiceButtons"
 import InvoiceWrapper from "@/components/InvoiceWrapper"
+import InvoiceFit from "./InvoiceFit"
 
 export default async function InvoicePage({ params }: { params: Promise<{ id: string }> }) {
     const session = await getServerSession(authOptions)
@@ -21,6 +22,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
             user: {
                 select: {
                     name: true,
+                    country: true,
                     partnerProfile: {
                         select: {
                             businessRegNumber: true,
@@ -51,9 +53,9 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
     if (!order || order.items.length === 0) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-                <div className="text-center p-8 bg-white rounded-2xl shadow-sm border border-gray-100">
-                    <p className="text-xs font-bold text-gray-400">주문내역이 없습니다.</p>
+            <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4">
+                <div className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-8 text-center shadow-sm">
+                    <p className="text-sm font-semibold text-[var(--muted-foreground)]">{session.user.country === 'Japan' ? '注文履歴がありません。' : '주문내역이 없습니다.'}</p>
                 </div>
             </div>
         )
@@ -61,7 +63,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
     // Security Check: Only Admin or the Order Owner can view
     if (session.user.role !== 'ADMIN' && order.userId !== session.user.id) {
-        return <div>Unauthorized</div>
+        return <div className="flex min-h-screen items-center justify-center bg-[var(--background)] p-4 text-sm font-semibold text-[var(--muted-foreground)]">{session.user.country === 'Japan' ? 'この書類を表示する権限がありません。' : '이 문서를 볼 권한이 없습니다.'}</div>
     }
 
     // Generate Info (Formatted to match other views)
@@ -78,13 +80,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
     const displayOrderNumber = order.orderNumber || order.id.slice(0, 8);
 
     // Calculate Totals based on items + shipping fee logic
-    const productTotal = order.items.reduce((sum: number, item: any) => sum + (item.price * item.quantity), 0);
-    const totalQuantity = order.items.reduce((sum: number, item: any) => sum + item.quantity, 0);
+    const productTotal = order.items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    const totalQuantity = order.items.reduce((sum, item) => sum + item.quantity, 0);
     const shippingFee = order.shippingFeeOverride ?? (totalQuantity > 0 ? Math.ceil(totalQuantity / 100) * 3000 : 0);
 
     const supplyTotal = productTotal + shippingFee
     const taxTotal = Math.round(supplyTotal * 0.1)
     const grandTotal = supplyTotal + taxTotal
+
+    // The document is bilingual by design; the partner's own language goes first in item names.
+    // The toolbar and phone summary follow the viewer (admins are Korean staff).
+    const partnerIsKorean = order.user.country === 'Korea'
+    const viewerIsKorean = session.user.role === 'ADMIN' || session.user.country === 'Korea'
+    const issueDate = `${year}.${month}.${day}`
 
     return (
         <InvoiceWrapper>
@@ -106,12 +114,30 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 .print\\:p-0 { padding: 0 !important; }
             `}</style>
 
-            <InvoiceButtons orderNumber={displayOrderNumber} />
-            <div className="w-full overflow-x-auto print:overflow-visible"><div id="invoice-content" className="w-[210mm] h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[5mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
+            <InvoiceButtons orderNumber={displayOrderNumber} isKorean={viewerIsKorean} />
+            <div className="px-3 sm:px-6 print:p-0">
+            {/* On phones the sheet is scaled down, so the figures a partner needs come first at a readable size. */}
+            <section aria-label={viewerIsKorean ? '거래 요약' : '取引の概要'} className="mx-auto mb-4 max-w-[210mm] rounded-2xl border border-[var(--border)] bg-[var(--card)] p-4 text-[var(--foreground)] sm:hidden print:hidden">
+                <dl className="grid grid-cols-[auto_minmax(0,1fr)] items-baseline gap-x-4 gap-y-1.5 text-sm">
+                    <dt className="text-[var(--muted-foreground)]">{viewerIsKorean ? '주문번호' : '注文番号'}</dt>
+                    <dd className="font-semibold tabular-nums">{displayOrderNumber}</dd>
+                    <dt className="text-[var(--muted-foreground)]">{viewerIsKorean ? '발행일' : '発行日'}</dt>
+                    <dd className="tabular-nums">{issueDate}</dd>
+                    <dt className="text-[var(--muted-foreground)]">{viewerIsKorean ? '합계 (VAT 포함)' : '合計（税込）'}</dt>
+                    <dd className="text-xl font-bold tabular-nums">₩{grandTotal.toLocaleString()}</dd>
+                </dl>
+                <div className="mt-3 border-t border-[var(--border)] pt-3 text-sm">
+                    <p className="text-xs font-semibold text-[var(--muted-foreground)]">{viewerIsKorean ? '입금 계좌' : 'お振込先'}</p>
+                    <p className="mt-1 font-semibold tabular-nums">{viewerIsKorean ? 'IBK기업은행' : 'IBK Industrial Bank of Korea'} 656-045236-01-013</p>
+                    <p className="text-[var(--muted-foreground)]">{viewerIsKorean ? '예금주' : '名義人'} 주식회사 베이코</p>
+                </div>
+                <p className="ux-helper mt-3 break-keep">{viewerIsKorean ? '아래 문서는 화면 폭에 맞춰 축소해 보여 줍니다. 인쇄와 PNG 저장은 원래 A4 크기로 됩니다.' : '下の書類は画面幅に合わせて縮小表示しています。印刷・PNG保存は元のA4サイズで出力されます。'}</p>
+            </section>
+            <InvoiceFit><div id="invoice-content" className="relative mx-auto flex min-h-[280mm] w-[210mm] flex-col bg-white px-[15mm] pb-[5mm] pt-[30mm] font-sans text-black shadow-xl print:shadow-none">
 
                 {/* Formal Header */}
                 <div className="text-center mb-4 border-b-4 border-black pb-2">
-                    <h1 className="text-2xl font-extrabold tracking-[0.2em] mb-1 uppercase">取引明細書 / 거 래 명 세 표</h1>
+                    <h1 className="mb-1 text-2xl font-extrabold">取引明細書 / 거래명세표</h1>
                     <div className="flex justify-between items-end mt-2 text-xs">
                         <div className="text-left space-y-1">
                             <p>注文番号 (주문번호): <span className="font-bold">{displayOrderNumber}</span></p>
@@ -203,7 +229,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                                     <td colSpan={2} className="py-1 px-2 text-xs leading-tight font-bold">부산시 강서구 낙동남로 1013번길 35</td>
                                 </tr>
                                 <tr>
-                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話번호<br />전화번호</td>
+                                    <td className="py-1 px-2 font-bold w-20 whitespace-nowrap border-r border-black text-xs leading-tight text-center bg-gray-50/50">電話番号<br />전화번호</td>
                                     <td colSpan={2} className="py-1 px-2 text-xs font-bold">010-8119-3313</td>
                                 </tr>
                                 <tr>
@@ -230,17 +256,19 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-300">
-                            {order.items.map((item: any, index: number) => {
+                            {order.items.map((item, index) => {
                                 const itemSupply = item.price * item.quantity
                                 const itemTax = Math.round(itemSupply * 0.1)
                                 const itemTotal = itemSupply + itemTax
 
                                 return (
-                                    <tr key={item.id} className="text-center h-7 text-[9px]">
+                                    <tr key={item.id} className="h-8 text-center text-[11px]">
                                         <td className="border-x border-black py-0.5 text-gray-500 font-inter">{index + 1}</td>
                                         <td className="border-x border-black py-0.5 px-2 text-left leading-tight">
-                                            <span className="font-bold text-[10px] block">{item.product.nameJP || item.product.name}</span>
-                                            <span className="text-[9px] text-gray-600 block">{item.product.name}</span>
+                                            <span className="block text-[11px] font-bold">{partnerIsKorean ? item.product.name : (item.product.nameJP || item.product.name)}</span>
+                                            {partnerIsKorean
+                                                ? (item.product.nameJP && item.product.nameJP !== item.product.name ? <span className="block text-[10px] text-gray-600">{item.product.nameJP}</span> : null)
+                                                : (item.product.nameJP ? <span className="block text-[10px] text-gray-600">{item.product.name}</span> : null)}
                                         </td>
                                         <td className="border-x border-black py-0.5 font-inter">{item.quantity.toLocaleString()}</td>
                                         <td className="border-x border-black py-0.5 px-1 text-right font-inter">{item.price.toLocaleString()}</td>
@@ -253,11 +281,11 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
                             {/* Shipping Fee */}
                             {shippingFee > 0 && (
-                                <tr className="text-center h-7 text-[9px]">
+                                <tr className="h-8 text-center text-[11px]">
                                     <td className="border-x border-black py-0.5 text-gray-500 font-inter">-</td>
-                                    <td className="border-x border-black py-0.5 px-2 text-left">
-                                        <span className="font-bold text-[10px] block">送料</span>
-                                        <span className="text-[9px] text-gray-600 block">배송비 (Shipping)</span>
+                                    <td className="border-x border-black py-0.5 px-2 text-left leading-tight">
+                                        <span className="block text-[11px] font-bold">{partnerIsKorean ? '배송비' : '送料'}</span>
+                                        <span className="block text-[10px] text-gray-600">{partnerIsKorean ? '送料' : '배송비'}</span>
                                     </td>
                                     <td className="border-x border-black py-0.5 font-inter">1</td>
                                     <td className="border-x border-black py-0.5 px-1 text-right font-inter">{shippingFee.toLocaleString()}</td>
@@ -269,7 +297,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
 
                             {/* Blank Rows - Reduced count and height to fit 1 page */}
                             {[...Array(Math.max(0, 5 - order.items.length - (shippingFee > 0 ? 1 : 0)))].map((_, i) => (
-                                <tr key={`blank-${i}`} className="h-3">
+                                <tr key={`blank-${i}`} className="h-8">
                                     <td className="border-x border-black py-0.5"></td>
                                     <td className="border-x border-black py-0.5"></td>
                                     <td className="border-x border-black py-0.5"></td>
@@ -282,51 +310,49 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                         </tbody>
                         <tfoot className="bg-gray-100 border-t-2 border-black font-bold text-center">
                             <tr>
-                                <td colSpan={2} className="border-x border-black p-3 text-[11px]">合計 (TOTAL / 합 계)</td>
+                                <td colSpan={2} className="border-x border-black p-3 text-[11px]">合計 / 합계</td>
                                 <td className="border-x border-black p-3 font-inter">{totalQuantity.toLocaleString()}</td>
                                 <td className="border-x border-black p-3 bg-gray-200">-</td>
                                 <td className="border-x border-black p-3 text-right font-inter">{supplyTotal.toLocaleString()}</td>
                                 <td className="border-x border-black p-3 text-right font-inter">{taxTotal.toLocaleString()}</td>
-                                <td className="border-x border-black p-3 text-right bg-gray-200 font-inter whitespace-nowrap">₩ {grandTotal.toLocaleString()}</td>
+                                <td className="border-x border-black p-3 text-right bg-gray-200 font-inter whitespace-nowrap">₩{grandTotal.toLocaleString()}</td>
                             </tr>
                         </tfoot>
                     </table>
 
                     {/* Total Summary Bar - Reduced margin */}
-                    <div className="flex border-4 border-black mt-2 items-center">
-                        <div className="text-black border-r-4 border-black px-6 py-3 font-extrabold text-center w-48 text-sm leading-tight">
+                    <div className="mt-2 flex break-inside-avoid items-center border-2 border-t-4 border-black">
+                        <div className="w-48 border-r-2 border-black px-6 py-3 text-center text-sm font-extrabold leading-tight text-black">
                             合計金額<br />합계금액
                         </div>
-                        <div className="flex-grow px-8 py-3 text-2xl font-black text-right tracking-tight text-black font-inter">
-                            ₩ {grandTotal.toLocaleString()} <span className="text-xs font-normal ml-2 tracking-normal">(VAT 含む / 포함)</span>
+                        <div className="flex-grow px-8 py-3 text-right font-inter text-2xl font-black text-black">
+                            ₩{grandTotal.toLocaleString()} <span className="ml-2 text-xs font-normal">(税込 / VAT 포함)</span>
                         </div>
                     </div>
                 </div>
 
                 {/* Footer Section - Removed margin */}
-                <div className="border-t border-black pt-2 flex justify-between items-start">
+                <div className="break-inside-avoid border-t border-black pt-2">
                     <div className="space-y-4">
                         <div>
-                            <p className="font-bold text-xs mb-2 underline decoration-[#e34219]/30 decoration-2 underline-offset-4">お支払い情報 / 입금 계좌 정보</p>
-                            <div className="text-[11px] font-bold space-y-1">
-                                <p><span className="text-gray-500 mr-2 font-normal">銀行名 / 은행:</span> IBK Industrial Bank of Korea (기업은행)</p>
-                                <p><span className="text-gray-500 mr-2 font-normal">口座番号 / 계좌:</span> 656-045236-01-013</p>
-                                <p><span className="text-gray-500 mr-2 font-normal">名義人 / 예금주:</span> 주식회사 베이코</p>
-                            </div>
+                            <p className="mb-2 text-xs font-bold">お支払い情報 / 입금 계좌 정보</p>
+                            <dl className="grid w-fit grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] font-bold">
+                                <dt className="font-normal text-gray-500">銀行名 / 은행:</dt>
+                                <dd>IBK Industrial Bank of Korea (기업은행)</dd>
+                                <dt className="font-normal text-gray-500">口座番号 / 계좌:</dt>
+                                <dd>656-045236-01-013</dd>
+                                <dt className="font-normal text-gray-500">名義人 / 예금주:</dt>
+                                <dd>주식회사 베이코</dd>
+                            </dl>
                         </div>
-                        <div className="text-[10px] text-gray-500 italic">
-                            * 本取引明細書は印影省略時にも有効な文書です. / 본 거래명세표는 인장 생략 시에도 유효한 문서입니다。
+                        <div className="text-[10px] italic text-gray-500">
+                            * 本取引明細書は印影省略時にも有効な文書です。 / 본 거래명세표는 인장 생략 시에도 유효한 문서입니다.
                         </div>
-                    </div>
-                    <div className="text-right flex flex-col items-end gap-1">
-                        <p className="text-sm font-bold">주식회사 베이코</p>
                     </div>
                 </div>
 
-            </div></div>
-
-            {/* Interactive Buttons - Outside A4 container */}
-
+            </div></InvoiceFit>
+            </div>
         </InvoiceWrapper>
     )
 }

@@ -1,7 +1,8 @@
 'use client'
 
-import { AlertTriangle, BellRing, ChevronDown, Info, Megaphone } from 'lucide-react'
+import { AlertTriangle, BellRing, ChevronDown, Info } from 'lucide-react'
 import { usePathname } from 'next/navigation'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
 
 export type PartnerNoticeBoardItem = {
   id: string
@@ -11,26 +12,33 @@ export type PartnerNoticeBoardItem = {
   updatedAt: string
 }
 
-const toneStyles = {
+// Icon, badge and panel all follow the notice tone, so an ordinary notice doesn't read as a warning.
+const toneStyles: Record<'INFO' | 'IMPORTANT' | 'URGENT', { badge: BadgeTone; icon: typeof Info; iconWrap: string; panel: string; ko: string; ja: string }> = {
   INFO: {
-    badge: 'border-blue-200 bg-blue-50 text-blue-700',
-    panel: 'border-blue-100 bg-blue-50/60',
+    badge: 'neutral',
     icon: Info,
-    label: 'NOTICE',
+    iconWrap: 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-slate-300',
+    panel: 'border-[var(--border)] bg-[var(--surface)]',
+    ko: '일반',
+    ja: '一般',
   },
   IMPORTANT: {
-    badge: 'border-amber-300 bg-amber-50 text-amber-800',
-    panel: 'border-amber-200 bg-amber-50/70',
+    badge: 'warning',
     icon: BellRing,
-    label: 'IMPORTANT',
+    iconWrap: 'bg-amber-50 text-amber-700',
+    panel: 'border-amber-200 bg-amber-50/70',
+    ko: '중요',
+    ja: '重要',
   },
   URGENT: {
-    badge: 'border-rose-300 bg-rose-50 text-rose-700',
-    panel: 'border-rose-200 bg-rose-50/70',
+    badge: 'danger',
     icon: AlertTriangle,
-    label: 'URGENT',
+    iconWrap: 'bg-red-50 text-red-700',
+    panel: 'border-red-200 bg-red-50/70',
+    ko: '긴급',
+    ja: '緊急',
   },
-} as const
+}
 
 const formatNoticeDate = (value: string, isKorean: boolean) => new Intl.DateTimeFormat(isKorean ? 'ko-KR' : 'ja-JP', {
   year: 'numeric',
@@ -45,42 +53,43 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
   if (pathname !== '/order' || notices.length === 0) return null
 
   return (
-    <section aria-labelledby="partner-notice-board-title" className="mb-5 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm dark:border-rose-950 dark:from-rose-950/20 dark:via-[#1e1e1e] dark:to-[#1e1e1e]">
+    <section aria-labelledby="partner-notice-board-title" className="mb-5 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm">
       <h2 id="partner-notice-board-title" className="sr-only">{isKorean ? '공지사항' : 'お知らせ'}</h2>
-      <div className="divide-y divide-rose-100 dark:divide-rose-950/60">
-        {notices.map((notice, index) => {
+      <div className="divide-y divide-[var(--border)]">
+        {notices.map((notice) => {
           const tone = toneStyles[notice.tone as keyof typeof toneStyles] || toneStyles.INFO
           const Icon = tone.icon
+          const date = formatNoticeDate(notice.updatedAt, isKorean)
           return (
             <details key={notice.id} className="group">
-              <summary className="grid cursor-pointer list-none gap-3 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)_110px] sm:items-center sm:px-6 lg:px-7 [&::-webkit-details-marker]:hidden">
-                <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[#d9361b]">
-                    {index === 0 ? <Megaphone size={21} /> : <Icon size={19} />}
+              <summary className="grid cursor-pointer list-none gap-3 px-4 py-2.5 sm:grid-cols-[180px_minmax(0,1fr)_110px] sm:items-center sm:px-6 sm:py-3 lg:px-7 [&::-webkit-details-marker]:hidden">
+                <div className="hidden items-center gap-3 sm:flex">
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tone.iconWrap}`}>
+                    <Icon size={18} aria-hidden />
                   </span>
-                  <div>
-                    <p className="text-base font-black text-[#d9361b]">{isKorean ? '공지사항' : 'お知らせ'}</p>
-                    <p className="mt-0.5 text-sm font-bold tracking-[0.12em] text-slate-400">{isKorean ? '파트너 안내' : 'PARTNER NOTICE'}</p>
-                  </div>
+                  <p className="text-base font-bold text-[var(--foreground)]">{isKorean ? '공지사항' : 'お知らせ'}</p>
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-sm font-black ${tone.badge}`}>{isKorean ? notice.tone === 'URGENT' ? '긴급' : notice.tone === 'IMPORTANT' ? '중요' : '일반' : tone.label}</span>
-                    <p className="break-words text-base font-semibold text-slate-900 dark:text-white">{notice.title}</p>
+                    <Badge tone={tone.badge}>{isKorean ? tone.ko : tone.ja}</Badge>
+                    <p className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--foreground)] sm:whitespace-normal sm:break-words sm:text-base">{notice.title}</p>
+                    {/* On phones the notice is a one-line banner: date and chevron sit at the end of the title row. */}
+                    <time dateTime={notice.updatedAt} className="shrink-0 text-xs text-[var(--muted-foreground)] sm:hidden">{date}</time>
+                    <ChevronDown size={16} aria-hidden className="shrink-0 text-[var(--muted-foreground)] transition-transform group-open:rotate-180 sm:hidden" />
                   </div>
-                  <p className="mt-1.5 line-clamp-1 whitespace-pre-wrap text-sm font-normal leading-6 text-slate-600 dark:text-slate-400">{notice.content}</p>
+                  <p className="mt-1.5 hidden whitespace-pre-wrap text-sm leading-6 text-[var(--muted-foreground)] sm:line-clamp-1">{notice.content}</p>
                 </div>
 
-                <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-400 sm:flex-col sm:items-end">
-                  <time dateTime={notice.updatedAt}>{formatNoticeDate(notice.updatedAt, isKorean)}</time>
-                  <span className="flex items-center gap-1 text-slate-700 dark:text-slate-200">
+                <div className="hidden flex-col items-end gap-1 text-sm sm:flex">
+                  <time dateTime={notice.updatedAt} className="text-xs text-[var(--muted-foreground)]">{date}</time>
+                  <span className="flex items-center gap-1 font-semibold text-[var(--foreground)]">
                     {isKorean ? '자세히 보기' : '詳細を見る'}
-                    <ChevronDown size={15} className="transition-transform group-open:rotate-180" />
+                    <ChevronDown size={15} aria-hidden className="transition-transform group-open:rotate-180" />
                   </span>
                 </div>
               </summary>
-              <div className={`mx-4 mb-5 whitespace-pre-wrap break-words rounded-xl border px-5 py-4 text-base font-normal leading-7 text-slate-700 sm:ml-[210px] sm:mr-6 dark:border-[#383838] dark:bg-[#252525] dark:text-slate-200 ${tone.panel}`}>
+              <div className={`mx-4 mb-4 whitespace-pre-wrap break-words rounded-xl border px-5 py-4 text-base leading-7 text-[var(--foreground)] sm:ml-[216px] sm:mr-6 dark:border-[var(--border)] dark:bg-[var(--surface)] ${tone.panel}`}>
                 {notice.content}
               </div>
             </details>

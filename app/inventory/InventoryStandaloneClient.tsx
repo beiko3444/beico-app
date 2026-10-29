@@ -8,7 +8,9 @@ import {
   Boxes,
   CalendarDays,
   Check,
+  ChevronDown,
   PackagePlus,
+  Plus,
   RefreshCw,
   Search,
   Trash2,
@@ -98,6 +100,15 @@ const KOREAN_PUBLIC_HOLIDAYS: Record<string, string> = {
   '2027-12-25': '성탄절',
 }
 
+// Short labels so holiday names fit a calendar cell; the full name stays in the tooltip.
+const HOLIDAY_SHORT_NAMES: Record<string, string> = {
+  '대체공휴일': '대체',
+  '부처님오신날': '석탄일',
+  '근로자의날': '근로자',
+  '어린이날': '어린이',
+  '지방선거': '선거',
+}
+
 function todayYmd() {
   const now = new Date()
   const koreaDate = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }))
@@ -112,10 +123,15 @@ function formatNumber(value: number | null | undefined) {
   return new Intl.NumberFormat('ko-KR').format(value)
 }
 
+// Always Korean time, like the inbound dates, so "갱신" and "오늘" never point at different days.
+function formatClock(date: Date) {
+  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Seoul' })
+}
+
 function formatTime(value: string) {
   const date = new Date(value)
   if (Number.isNaN(date.getTime())) return ''
-  return date.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })
+  return formatClock(date)
 }
 
 function addDays(date: Date, days: number) {
@@ -140,21 +156,41 @@ function getHolidayName(dateText: string) {
   return KOREAN_PUBLIC_HOLIDAYS[dateText] || null
 }
 
+// Red stays with Sundays and holidays on this page; low or no stock is amber.
 function stockTone(value: number | null | undefined) {
   if (value === null || value === undefined) return 'text-slate-400'
-  if (value <= 0) return 'text-red-600'
   if (value <= 5) return 'text-amber-700'
   return 'text-slate-950'
+}
+
+// Most products share a brand/line prefix ("BEIKO 퀵베이트V3 …"). Showing it as a small first line
+// leaves the distinguishing name room on two lines instead of breaking mid-word.
+function commonNamePrefix(names: string[]) {
+  const counts = new Map<string, number>()
+  for (const name of names) {
+    const words = name.trim().split(/\s+/)
+    for (let length = 1; length < words.length; length += 1) {
+      const prefix = words.slice(0, length).join(' ')
+      counts.set(prefix, (counts.get(prefix) || 0) + 1)
+    }
+  }
+  let best = ''
+  for (const [prefix, count] of counts) {
+    if (count >= 3 && count >= names.length * 0.3 && prefix.length > best.length) best = prefix
+  }
+  return best
 }
 
 function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefined; alt: string; size?: 'sm' | 'md' | 'lg' }) {
   const [failed, setFailed] = useState(false)
   const sizeClass = size === 'lg' ? 'h-40 w-full sm:h-44' : size === 'sm' ? 'h-12 w-14' : 'h-16 w-20'
+  // The large image sits directly on the product card, so it gets no frame of its own.
+  const frame = size === 'lg' ? '' : 'border border-slate-200'
 
   if (!src || failed) {
     return (
-        <div className={`${sizeClass} flex shrink-0 items-center justify-center rounded-md border border-slate-200 bg-slate-50 text-slate-300`}>
-        <Boxes size={size === 'lg' ? 28 : 20} />
+      <div className={`${sizeClass} ${frame} flex shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-400`}>
+        <Boxes size={size === 'lg' ? 28 : 20} aria-hidden />
       </div>
     )
   }
@@ -163,7 +199,7 @@ function ProductImage({ src, alt, size = 'md' }: { src: string | null | undefine
     <img
       src={src}
       alt={alt}
-      className={`${sizeClass} shrink-0 rounded-md border border-slate-200 bg-white object-contain p-2`}
+      className={`${sizeClass} ${frame} shrink-0 rounded-md bg-white object-contain p-2`}
       onError={() => setFailed(true)}
     />
   )
@@ -176,6 +212,7 @@ export default function InventoryStandaloneClient() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const [saveError, setSaveError] = useState('')
   const [lastLoadedAt, setLastLoadedAt] = useState<Date | null>(null)
   const [selectedProduct, setSelectedProduct] = useState<ProductCandidate | null>(null)
   const [keypadValue, setKeypadValue] = useState('')
@@ -217,6 +254,8 @@ export default function InventoryStandaloneClient() {
   }, [selectedDate])
 
   const rows = useMemo(() => inbounds.quickProducts || [], [inbounds.quickProducts])
+  const namePrefix = useMemo(() => commonNamePrefix(rows.map(row => row.name)), [rows])
+  const dayLabel = selectedDate === todayYmd() ? '오늘' : selectedDate
   const warehouseStockTotal = useMemo(() => rows.reduce((sum, row) => sum + (row.stock || 0), 0), [rows])
 
   const filteredInboundRows = useMemo(() => {
@@ -230,14 +269,17 @@ export default function InventoryStandaloneClient() {
   function openKeypad(row: ProductCandidate) {
     setSelectedProduct(row)
     setKeypadValue('')
+    setSaveError('')
   }
 
   function closeKeypad() {
     setSelectedProduct(null)
     setKeypadValue('')
+    setSaveError('')
   }
 
   function pressKey(value: string) {
+    setSaveError('')
     setKeypadValue((current) => {
       if (value === 'back') return current.slice(0, -1)
       if (value === 'clear') return ''
@@ -251,11 +293,12 @@ export default function InventoryStandaloneClient() {
     if (!selectedProduct) return
     const quantity = Number(keypadValue)
     if (!Number.isFinite(quantity) || quantity <= 0) {
-      setError('입고 수량을 입력하세요.')
+      setSaveError('입고 수량을 입력하세요.')
       return
     }
 
     setSaving(true)
+    setSaveError('')
     try {
       const response = await fetch('/api/admin/inventory/inbounds', {
         method: 'POST',
@@ -272,8 +315,9 @@ export default function InventoryStandaloneClient() {
       if (!response.ok) throw new Error(payload?.error || '입고 저장에 실패했습니다.')
       closeKeypad()
       await loadInbounds(selectedDate)
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : '입고 저장에 실패했습니다.')
+    } catch (failure) {
+      // Shown inside the keypad: the header banner sits behind the open dialog.
+      setSaveError(failure instanceof Error ? failure.message : '입고 저장에 실패했습니다.')
     } finally {
       setSaving(false)
     }
@@ -299,54 +343,50 @@ export default function InventoryStandaloneClient() {
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex max-w-[1600px] flex-col gap-3 px-4 py-3 sm:px-5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex min-w-0 flex-1 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#111827] text-white">
-                <PackagePlus size={22} />
+                <PackagePlus size={22} aria-hidden />
               </div>
               <div className="min-w-0">
                 <h1 className="truncate text-xl font-black tracking-normal text-slate-950 sm:text-2xl">창고 입고 등록</h1>
-                <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-slate-500">
-                  <span>창고재고 {formatNumber(warehouseStockTotal)}</span>
-                  <span>오늘입고 {formatNumber(inbounds.totalQuantity)}</span>
-                  {lastLoadedAt && <span>갱신 {lastLoadedAt.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' })}</span>}
-                </div>
+                <p className="mt-0.5 truncate text-xs font-bold text-slate-500 tabular-nums">
+                  창고재고 {formatNumber(warehouseStockTotal)} · {dayLabel} 입고 {formatNumber(inbounds.totalQuantity)}
+                  {lastLoadedAt ? ` · 갱신 ${formatClock(lastLoadedAt)}` : ''}
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  void loadInbounds(selectedDate, true)
-                }}
-                className="flex h-11 w-11 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm"
-                aria-label="새로고침"
-              >
-                <RefreshCw size={19} className={loading ? 'animate-spin' : ''} />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={() => {
+                void loadInbounds(selectedDate, true)
+              }}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-700 shadow-sm"
+              aria-label="새로고침"
+            >
+              <RefreshCw size={19} className={loading ? 'animate-spin' : ''} />
+            </button>
           </div>
 
-          <div className="grid gap-2">
-            <div className="flex h-12 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3">
-              <Search size={20} className="shrink-0 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="상품명 검색"
-                className="h-full min-w-0 flex-1 bg-transparent text-base font-bold text-slate-900 outline-none placeholder:text-slate-400"
-              />
-              {query && (
-                <button type="button" onClick={() => setQuery('')} className="text-slate-400" aria-label="검색 지우기">
-                  <X size={20} />
-                </button>
-              )}
-            </div>
+          <div className="flex h-12 items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20">
+            <Search size={20} className="shrink-0 text-slate-400" aria-hidden />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="상품명 검색"
+              aria-label="상품명 검색"
+              className="h-full min-w-0 flex-1 bg-transparent text-base font-bold text-slate-900 outline-none placeholder:text-slate-400 focus:shadow-none"
+            />
+            {query && (
+              <button type="button" onClick={() => setQuery('')} className="text-slate-400" aria-label="검색 지우기">
+                <X size={20} />
+              </button>
+            )}
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+            <div role="alert" className="flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
               <AlertTriangle size={18} />
               {error}
             </div>
@@ -357,6 +397,8 @@ export default function InventoryStandaloneClient() {
       <InboundTab
         loading={loading}
         rows={filteredInboundRows}
+        namePrefix={namePrefix}
+        dayLabel={dayLabel}
         inbounds={inbounds}
         selectedDate={selectedDate}
         saving={saving}
@@ -371,6 +413,7 @@ export default function InventoryStandaloneClient() {
           inboundDate={selectedDate}
           value={keypadValue}
           saving={saving}
+          error={saveError}
           onPress={pressKey}
           onClose={closeKeypad}
           onSubmit={() => void saveInbound()}
@@ -383,6 +426,8 @@ export default function InventoryStandaloneClient() {
 function InboundTab({
   loading,
   rows,
+  namePrefix,
+  dayLabel,
   inbounds,
   selectedDate,
   saving,
@@ -392,6 +437,8 @@ function InboundTab({
 }: {
   loading: boolean
   rows: ProductCandidate[]
+  namePrefix: string
+  dayLabel: string
   inbounds: InboundPayload
   selectedDate: string
   saving: boolean
@@ -399,6 +446,10 @@ function InboundTab({
   onOpenKeypad: (row: ProductCandidate) => void
   onDeleteInbound: (id: string) => void
 }) {
+  const [panelOpen, setPanelOpen] = useState(false)
+  const panelTitle = `${dayLabel} 입고`
+  const panelSummary = `${inbounds.date} · 총 ${formatNumber(inbounds.totalQuantity)}개`
+
   return (
     <section className="mx-auto grid max-w-[1600px] gap-4 px-4 py-4 sm:px-5 lg:grid-cols-[minmax(0,1fr)_380px]">
       <div className="min-w-0">
@@ -406,70 +457,95 @@ function InboundTab({
           <LoadingBlock label="입고 상품 불러오는 중" />
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            {rows.map((row) => (
-              <button
-                key={`${row.sourceId || row.id}`}
-                type="button"
-                onClick={() => onOpenKeypad(row)}
-                className="rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition active:scale-[0.99] sm:p-4"
-              >
-                <div className="flex flex-col gap-3">
+            {rows.map((row) => {
+              const prefixed = Boolean(namePrefix) && row.name.startsWith(`${namePrefix} `)
+              const mainName = prefixed ? row.name.slice(namePrefix.length + 1) : row.name
+              const stock = row.stock ?? 0
+              return (
+                <button
+                  key={`${row.sourceId || row.id}`}
+                  type="button"
+                  onClick={() => onOpenKeypad(row)}
+                  className="flex h-full flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-sm transition hover:border-slate-400 active:scale-[0.99] sm:p-4"
+                >
                   <ProductImage src={row.imageUrl} alt={row.name} size="lg" />
                   <div className="min-w-0">
-                    <div className="line-clamp-2 min-h-[38px] text-[13px] font-black leading-snug tracking-normal text-slate-950 sm:text-base">{row.name}</div>
+                    {namePrefix ? <div className="h-4 truncate text-xs font-semibold leading-4 text-slate-500">{prefixed ? namePrefix : ''}</div> : null}
+                    <div className="line-clamp-2 min-h-[36px] break-keep text-[13px] font-black leading-snug tracking-normal text-slate-950 sm:min-h-[44px] sm:text-base">{mainName}</div>
                   </div>
-                  <div className="rounded-md bg-slate-100 px-3 py-3 text-right text-base font-black text-slate-700">
-                    재고 <span className={`ml-2 text-lg tabular-nums ${stockTone(row.stock ?? 0)}`}>{formatNumber(row.stock ?? 0)}</span>
+                  <div className="mt-auto flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-slate-500">
+                      재고 <span className={`ml-1 text-lg font-black tabular-nums ${stockTone(stock)}`}>{formatNumber(stock)}</span>
+                      {stock <= 0 ? <span className="ml-1 text-xs text-amber-700">품절</span> : null}
+                    </span>
+                    {/* The whole card opens the keypad; the chip says so. */}
+                    <span className="inline-flex shrink-0 items-center gap-0.5 rounded-md bg-slate-100 px-2 py-1 text-xs font-black text-slate-900">
+                      <Plus size={13} strokeWidth={3} aria-hidden />
+                      입고
+                    </span>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              )
+            })}
           </div>
         )}
         {!loading && rows.length === 0 ? <EmptyBlock label="입고할 상품이 없습니다." /> : null}
       </div>
 
-      <aside className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-[150px] lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
-        <div className="mb-3 flex items-center justify-between gap-2">
-          <div>
-            <div className="flex items-center gap-2 text-sm font-black text-slate-950">
-              <CalendarDays size={17} />
-              오늘 입고
-            </div>
-            <div className="mt-1 text-xs font-bold text-slate-500">{inbounds.date} · 총 {formatNumber(inbounds.totalQuantity)}개</div>
+      {/* On phones this comes first, collapsed to one line, so the result of an entry is visible without scrolling past every product. */}
+      <aside className="order-first rounded-lg border border-slate-200 bg-white p-3 shadow-sm lg:sticky lg:top-[150px] lg:order-none lg:max-h-[calc(100vh-170px)] lg:overflow-auto">
+        <button
+          type="button"
+          onClick={() => setPanelOpen(open => !open)}
+          aria-expanded={panelOpen}
+          aria-controls="inbound-panel-body"
+          className="flex min-h-11 w-full items-center justify-between gap-2 text-left lg:hidden"
+        >
+          <span className="flex min-w-0 items-center gap-2 text-sm font-black text-slate-950">
+            <CalendarDays size={17} aria-hidden />
+            {panelTitle}
+            <span className="truncate text-xs font-bold text-slate-500 tabular-nums">{panelSummary}</span>
+          </span>
+          <ChevronDown size={18} aria-hidden className={`shrink-0 text-slate-500 transition-transform ${panelOpen ? 'rotate-180' : ''}`} />
+        </button>
+        <div className="mb-3 hidden lg:block">
+          <div className="flex items-center gap-2 text-sm font-black text-slate-950">
+            <CalendarDays size={17} aria-hidden />
+            {panelTitle}
           </div>
+          <div className="mt-1 text-xs font-bold text-slate-500 tabular-nums">{panelSummary}</div>
         </div>
 
-        {inbounds.items.length === 0 ? (
-          <div className="mb-4 rounded-md border border-dashed border-slate-200 bg-slate-50 px-3 py-8 text-center text-sm font-bold text-slate-400">
-            오늘 입고 기록 없음
-          </div>
-        ) : (
-          <div className="mb-4 grid gap-2">
-            {inbounds.items.map((item) => (
-              <div key={item.id} className="grid grid-cols-[44px_minmax(0,1fr)_auto] items-center gap-2 rounded-md border border-slate-200 bg-slate-50 p-2">
-                <ProductImage src={item.productImageUrl} alt={item.productName} size="sm" />
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-black text-slate-950">{item.productName}</div>
-                  <div className="mt-0.5 text-xs font-bold text-slate-500">
-                    {formatTime(item.createdAt)} · {formatNumber(item.quantity)}개
+        <div id="inbound-panel-body" className={`${panelOpen ? 'mt-3 block' : 'hidden'} lg:mt-0 lg:block`}>
+          {inbounds.items.length === 0 ? (
+            <p className="mb-4 py-6 text-center text-sm font-bold text-slate-400">{panelTitle} 기록 없음</p>
+          ) : (
+            <ul className="mb-4 divide-y divide-slate-100">
+              {inbounds.items.map((item) => (
+                <li key={item.id} className="grid grid-cols-[56px_minmax(0,1fr)_auto] items-center gap-2 py-2">
+                  <ProductImage src={item.productImageUrl} alt={item.productName} size="sm" />
+                  <div className="min-w-0">
+                    <div className="truncate break-keep text-sm font-black text-slate-950">{item.productName}</div>
+                    <div className="mt-0.5 text-xs font-bold text-slate-500 tabular-nums">
+                      {formatTime(item.createdAt)} · {formatNumber(item.quantity)}개
+                    </div>
                   </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => onDeleteInbound(item.id)}
-                  disabled={saving}
-                  className="flex h-9 w-9 items-center justify-center rounded-md bg-white text-red-600 shadow-sm disabled:opacity-50"
-                  aria-label="입고 삭제"
-                >
-                  <Trash2 size={17} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
+                  <button
+                    type="button"
+                    onClick={() => onDeleteInbound(item.id)}
+                    disabled={saving}
+                    className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-red-600 disabled:opacity-50"
+                    aria-label={`${item.productName} 입고 삭제`}
+                  >
+                    <Trash2 size={17} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
 
-        <InboundCalendar selectedDate={selectedDate} calendar={inbounds.calendar || []} onSelectDate={onSelectDate} />
+          <InboundCalendar selectedDate={selectedDate} calendar={inbounds.calendar || []} onSelectDate={onSelectDate} />
+        </div>
       </aside>
     </section>
   )
@@ -498,13 +574,14 @@ function InboundCalendar({
     onSelectDate(formatYmd(next))
   }
 
+  // No frame of its own: it already sits inside the panel, and cells show state by fill alone.
   return (
-    <div className="mb-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+    <div>
       <div className="mb-3 flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={() => moveMonth(-1)}
-          className="h-9 rounded-md bg-white px-3 text-sm font-black text-slate-600 shadow-sm"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-600"
         >
           이전
         </button>
@@ -512,7 +589,7 @@ function InboundCalendar({
         <button
           type="button"
           onClick={() => moveMonth(1)}
-          className="h-9 rounded-md bg-white px-3 text-sm font-black text-slate-600 shadow-sm"
+          className="h-9 rounded-md border border-slate-200 bg-white px-3 text-sm font-black text-slate-600"
         >
           다음
         </button>
@@ -538,27 +615,30 @@ function InboundCalendar({
               key={dateText}
               type="button"
               onClick={() => onSelectDate(dateText)}
-              className={`min-h-[54px] rounded-md border p-1 text-left transition ${
+              title={holidayName || undefined}
+              aria-label={`${dateText}${holidayName ? ` ${holidayName}` : ''}${item ? ` 입고 ${formatNumber(item.totalQuantity)}개` : ''}`}
+              aria-pressed={active}
+              className={`min-h-[54px] rounded-md p-1 text-left transition ${
                 active
-                  ? 'border-slate-950 bg-slate-950 text-white'
+                  ? 'bg-white text-slate-950 ring-2 ring-inset ring-slate-900'
                   : holidayName
-                    ? 'border-red-200 bg-red-50 text-red-700'
+                    ? 'bg-red-50 text-red-700'
                   : item
-                    ? 'border-emerald-200 bg-emerald-50 text-slate-950'
-                    : 'border-slate-200 bg-white text-slate-700'
+                    ? 'bg-emerald-50 text-slate-950'
+                    : 'bg-slate-50 text-slate-700 hover:bg-slate-100'
               } ${inCurrentMonth ? '' : 'opacity-40'}`}
             >
               <div className="flex items-center justify-between gap-1">
-                <span className={`text-xs font-black ${!active && holiday ? 'text-red-600' : ''}`}>{day.getDate()}</span>
-                {isToday ? <span className={`h-1.5 w-1.5 rounded-full ${active ? 'bg-white' : 'bg-blue-500'}`} /> : null}
+                <span className={`text-xs font-black ${holiday ? 'text-red-600' : ''}`}>{day.getDate()}</span>
+                {isToday ? <span className="h-1.5 w-1.5 rounded-full bg-slate-900" /> : null}
               </div>
               {holidayName ? (
-                <div className={`mt-0.5 truncate text-[9px] font-black leading-tight ${active ? 'text-white' : 'text-red-600'}`}>
-                  {holidayName}
+                <div className="mt-0.5 truncate text-[10px] font-black leading-tight text-red-600">
+                  {HOLIDAY_SHORT_NAMES[holidayName] || holidayName}
                 </div>
               ) : null}
               {item ? (
-                <div className={`mt-1 text-[10px] font-black leading-tight ${active ? 'text-white' : holidayName ? 'text-red-700' : 'text-emerald-700'}`}>
+                <div className={`mt-1 text-[10px] font-black leading-tight tabular-nums ${holidayName ? 'text-red-700' : 'text-emerald-700'}`}>
                   {formatNumber(item.totalQuantity)}개
                 </div>
               ) : null}
@@ -575,6 +655,7 @@ function KeypadModal({
   inboundDate,
   value,
   saving,
+  error,
   onPress,
   onClose,
   onSubmit,
@@ -583,6 +664,7 @@ function KeypadModal({
   inboundDate: string
   value: string
   saving: boolean
+  error: string
   onPress: (value: string) => void
   onClose: () => void
   onSubmit: () => void
@@ -600,7 +682,7 @@ function KeypadModal({
               <div className="mt-1 text-xs font-bold text-slate-500">입고 수량 입력 · {inboundDate}</div>
             </div>
           </div>
-          <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+          <button type="button" onClick={onClose} disabled={saving} aria-label="닫기" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-md bg-slate-100 text-slate-600">
             <X size={20} />
           </button>
         </div>
@@ -622,11 +704,18 @@ function KeypadModal({
           ))}
         </div>
 
+        {error ? (
+          <p role="alert" className="mt-3 flex items-center gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm font-bold text-red-700">
+            <AlertTriangle size={17} className="shrink-0" aria-hidden />
+            {error}
+          </p>
+        ) : null}
+
         <button
           type="button"
           onClick={onSubmit}
           disabled={saving || !value || Number(value) <= 0}
-          className="mt-3 flex h-14 w-full items-center justify-center gap-2 rounded-lg bg-[#111827] text-lg font-black text-white disabled:bg-slate-300"
+          className="ux-button-primary mt-3 h-14 w-full text-lg font-black disabled:border-slate-300 disabled:bg-slate-300"
         >
           {saving ? <RefreshCw size={22} className="animate-spin" /> : <Check size={22} />}
           입력완료

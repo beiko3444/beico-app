@@ -23,6 +23,8 @@ assert.match(layoutSource, /endsAt: \{ gte: now \}/)
 assert.match(layoutSource, /PartnerNoticeBoard notices=\{activeNotices\}/)
 assert.doesNotMatch(layoutSource, /PartnerNoticePopup/)
 assert.match(boardSource, /pathname !== '\/order' \|\| notices\.length === 0/)
-assert.match(boardSource, /PARTNER NOTICE/)
+// The board used an English "PARTNER NOTICE" subtitle under the Japanese label; it now shows one label per language.
+assert.match(boardSource, /'お知らせ'/)
+assert.doesNotMatch(boardSource, /PARTNER NOTICE/)
 
 console.log('partner notice tests passed')

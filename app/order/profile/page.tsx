@@ -4,6 +4,8 @@ import { redirect } from 'next/navigation'
 import { prisma } from '@/lib/prisma'
 import ChangePasswordForm from '@/components/ChangePasswordForm'
 import PartnerProfileForm from '@/components/PartnerProfileForm'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { PartnerPageHeader, partnerCountryLabel } from '../partner-ui'
 
 export default async function ProfilePage() {
     const session = await getServerSession(authOptions)
@@ -21,27 +23,29 @@ export default async function ProfilePage() {
         [isKorean ? '업체명' : '会社名', profile?.businessName],
         [isKorean ? '대표자명' : '代表者名', profile?.representativeName],
         [isKorean ? '사업자등록번호' : '事業者登録番号', profile?.businessRegNumber],
-        [isKorean ? '거래 국가' : '取引国', user.country],
+        [isKorean ? '거래 국가' : '取引国', partnerCountryLabel(user.country)],
     ]
-    return <div className="mx-auto max-w-4xl space-y-6 pb-16">
-        <header>
-            <h1 className="text-3xl font-bold">{isKorean ? '내 정보' : 'マイページ'}</h1>
-            <p className="mt-2 text-base text-[var(--muted-foreground)]">{isKorean ? '연락처와 주소를 최신 정보로 관리해 주세요.' : '連絡先と住所を最新の情報に更新してください。'}</p>
-        </header>
+    // Left-aligned like 주문 / 주문내역, so the title doesn't jump when switching tabs.
+    return <div className="max-w-4xl space-y-6 pb-16">
+        <PartnerPageHeader title={isKorean ? '내 정보' : 'マイページ'} description={isKorean ? '연락처와 주소를 최신 정보로 관리해 주세요.' : '連絡先と住所を最新の情報に更新してください。'} />
         {user.role === 'PARTNER' && user.status === 'APPROVED' && <PartnerProfileForm isKorean={isKorean} initial={{
             name: user.name, contact: profile?.contact || '', email: profile?.email || '', fax: profile?.fax || '', address: profile?.address || '',
         }} />}
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-7">
-            <h2 className="text-xl font-bold">{isKorean ? '계정 및 사업자 정보' : 'アカウント・事業者情報'}</h2>
-            <p className="mt-2 text-sm text-[var(--muted-foreground)]">{isKorean ? '아래 정보의 변경은 관리자에게 요청해 주세요. 연락용 이메일을 바꿔도 로그인 아이디는 유지됩니다.' : '以下の情報の変更は管理者にご依頼ください。連絡先メールを変更してもログインIDは変わりません。'}</p>
-            <a href="mailto:contact@beiko.co.kr?subject=BEIKO%20partner%20information" className="ux-button mt-4">{isKorean ? '사업자 정보 변경 문의' : '事業者情報の変更について問い合わせ'}</a>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div className="space-y-1">
+                    <h2 className="text-xl font-bold">{isKorean ? '계정 및 사업자 정보' : 'アカウント・事業者情報'}</h2>
+                    <p className="break-keep text-sm leading-6 text-[var(--muted-foreground)]">{isKorean ? '아래 정보의 변경은 관리자에게 요청해 주세요. 연락용 이메일을 바꿔도 로그인 아이디는 유지됩니다.' : '以下の情報の変更は管理者にご依頼ください。連絡先メールを変更してもログインIDは変わりません。'}</p>
+                </div>
+                <a href="mailto:contact@beiko.co.kr?subject=BEIKO%20partner%20information" className={buttonClass('secondary', 'md', 'min-h-11 self-start')}>{isKorean ? '사업자 정보 변경 문의' : '事業者情報の変更を問い合わせ'}</a>
+            </div>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2">
                 {accountFields.map(([label, value]) => <div key={label}><dt className="text-sm text-[var(--muted-foreground)]">{label}</dt><dd className="mt-1 break-words text-base font-semibold">{value || '—'}</dd></div>)}
             </dl>
         </section>
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-7">
-            <h2 className="mb-5 text-xl font-bold">{isKorean ? '비밀번호 변경' : 'パスワード変更'}</h2>
-            <div className="max-w-lg"><ChangePasswordForm isKorean={isKorean} /></div>
+            <h2 className="text-xl font-bold">{isKorean ? '비밀번호 변경' : 'パスワード変更'}</h2>
+            <div className="mt-5"><ChangePasswordForm isKorean={isKorean} /></div>
         </section>
     </div>
 }

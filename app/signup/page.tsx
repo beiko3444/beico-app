@@ -1,93 +1,192 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import {
-    User, Lock, Building2, Mail, Phone, Printer, MapPin, Home, ArrowRight, Eye, EyeOff, Globe, ArrowLeft
+    User, Lock, Building2, Mail, Phone, Printer, MapPin, Home, ArrowRight, Eye, EyeOff, Globe, ArrowLeft, Check, ChevronDown, Hash, FileUp
 } from 'lucide-react'
+import AuthShell, { useAuthLanguage, type AuthLanguage } from '../login/AuthShell'
 
-const TRANSLATIONS: Record<string, any> = {
-    Japan: {
-        title: "業者向け会員登録",
-        subtitle: "WHOLESALE REGISTRATION",
-        userId: "ユーザーID / User ID",
-        password: "パスワード / Password",
-        confirmPassword: "パスワードの確認 / Confirm Password",
-        companyName: "商号 / Company Name",
-        contactPerson: "担当者名 / Contact Person",
-        nationality: "国籍 / Nationality",
-        registrationNumber: "事業者登録番号 / Business Reg. Number",
-        email: "メールアドレス / Email",
-        emailMemo: "(税金計算書発行用メールアドレス)",
-        phone: "電話番号 / Phone",
-        fax: "ファックス / Fax",
-        address1: "住所 / Address",
-        address1Memo: "(この住所に卸売商品が配送されます)",
-        address2: "詳細住所 / Address 2",
-        submit: "登録する / Register",
-        passwordMismatch: "パスワードが一致しません。 / Passwords do not match.",
-        successMsg: "会員登録が完了しました。管理者の承認をお待ちください。\nRegistration complete. Please wait for admin approval.",
-        errorPrefix: "登録中にエラーが発生しました。 / An error occurred during registration.",
-        loginText: "すでにアカウントをお持ちですか？",
-        loginLink: "ログイン Login",
-        countryPlaceholder: "国籍を選択 / Select Nationality",
-        nextButton: "次へ / Next"
+// One language at a time, chosen with the switch in AuthShell (or by the country picked in step 1).
+const TRANSLATIONS = {
+    ko: {
+        title: '도매 계정 신청',
+        intro: '승인 후 도매 주문을 시작할 수 있습니다.',
+        stepsLabel: '가입 단계',
+        stepCountry: '국가 선택',
+        stepAccount: '계정·사업자 정보',
+        nationality: '거래 국가',
+        countryPlaceholder: '국가를 선택해 주세요',
+        selectCountryFirst: '국가를 먼저 선택해 주세요.',
+        nextButton: '다음',
+        changeCountry: '국가 변경',
+        sectionLogin: '1. 로그인 정보',
+        sectionBusiness: '2. 사업자 정보 및 증빙',
+        sectionContact: '3. 연락처 및 배송 주소',
+        userId: '로그인 아이디',
+        password: '비밀번호',
+        confirmPassword: '비밀번호 확인',
+        showPassword: '비밀번호 표시',
+        hidePassword: '비밀번호 숨기기',
+        companyName: '상호명',
+        contactPerson: '대표자명',
+        registrationNumber: '사업자등록번호',
+        registrationPlaceholder: '숫자만 입력',
+        document: '사업자등록증',
+        chooseFile: '파일 선택 (이미지 또는 PDF)',
+        fileSelected: '파일 선택됨 · 가입 신청 시 함께 전송됩니다.',
+        email: '이메일',
+        emailMemo: '세금계산서 발급용 이메일',
+        phone: '전화번호',
+        fax: '팩스 (선택)',
+        address1: '기본 주소',
+        address1Memo: '해당 주소지로 도매상품이 배송됩니다.',
+        address1Placeholder: '도로명 주소 및 건물번호',
+        address2: '상세 주소 (선택)',
+        address2Placeholder: '건물명, 층, 호수',
+        submit: '가입 신청',
+        processing: '신청 중…',
+        passwordMismatch: '비밀번호가 일치하지 않습니다.',
+        successTitle: '가입 신청이 접수되었습니다',
+        successMsg: '회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.',
+        successNote: '현재 관리자 승인 대기 중입니다. 승인 후 신청한 아이디로 로그인해 주세요.',
+        errorPrefix: '등록 중 오류가 발생했습니다.',
+        loginText: '이미 계정이 있으신가요?',
+        loginLink: '로그인',
     },
-    Korea: {
-        title: "도매상 회원가입",
-        subtitle: "WHOLESALE REGISTRATION",
-        userId: "로그인 아이디 (User ID)",
-        password: "비밀번호 (Password)",
-        confirmPassword: "비밀번호 확인 (Confirm Password)",
-        companyName: "상호명 (Company Name)",
-        contactPerson: "대표자명 (Contact Person)",
-        nationality: "국가 (Nationality)",
-        registrationNumber: "사업자등록번호 (Business Reg. Number)",
-        email: "이메일 (Email)",
-        emailMemo: "(세금계산서 발급용 이메일)",
-        phone: "전화번호 (Phone)",
-        fax: "팩스 (Fax)",
-        address1: "기본 주소 (Address)",
-        address1Memo: "(해당 주소지로 도매상품이 배송됩니다)",
-        address2: "상세 주소 (Address 2)",
-        submit: "가입하기 (Register)",
-        passwordMismatch: "비밀번호가 일치하지 않습니다.",
-        successMsg: "회원가입이 완료되었습니다. 관리자 승인을 기다려주세요.",
-        errorPrefix: "등록 중 오류가 발생했습니다.",
-        loginText: "이미 계정이 있으신가요?",
-        loginLink: "로그인 Login",
-        countryPlaceholder: "국가 선택 / Select Nationality",
-        nextButton: "다음 / Next"
+    ja: {
+        title: '業者向け会員登録',
+        intro: '承認後に卸売のご注文を開始できます。',
+        stepsLabel: '登録の手順',
+        stepCountry: '国籍の選択',
+        stepAccount: 'アカウント・事業者情報',
+        nationality: '国籍',
+        countryPlaceholder: '国籍を選択してください',
+        selectCountryFirst: '先に国籍を選択してください。',
+        nextButton: '次へ',
+        changeCountry: '国籍を変更',
+        sectionLogin: '1. ログイン情報',
+        sectionBusiness: '2. 事業者情報・書類',
+        sectionContact: '3. 連絡先・配送先',
+        userId: 'ユーザーID',
+        password: 'パスワード',
+        confirmPassword: 'パスワードの確認',
+        showPassword: 'パスワードを表示',
+        hidePassword: 'パスワードを隠す',
+        companyName: '商号',
+        contactPerson: '担当者名',
+        registrationNumber: '事業者登録番号',
+        registrationPlaceholder: '数字のみ',
+        document: '事業者登録証',
+        chooseFile: '画像・PDFを選択',
+        fileSelected: '選択済み · 申請時に送信されます。',
+        email: 'メールアドレス',
+        emailMemo: '税金計算書発行用メールアドレス',
+        phone: '電話番号',
+        fax: 'ファックス（任意）',
+        address1: '住所',
+        address1Memo: 'この住所に卸売商品が配送されます。',
+        address1Placeholder: '都道府県・市区町村・番地',
+        address2: '詳細住所（任意）',
+        address2Placeholder: '建物名・部屋番号',
+        submit: '登録する',
+        processing: '送信中…',
+        passwordMismatch: 'パスワードが一致しません。',
+        successTitle: '申請を受け付けました',
+        successMsg: '会員登録が完了しました。管理者の承認をお待ちください。',
+        successNote: '現在、管理者の承認待ちです。承認後にログインしてください。',
+        errorPrefix: '登録中にエラーが発生しました。',
+        loginText: 'すでにアカウントをお持ちですか？',
+        loginLink: 'ログイン',
     },
-    Default: {
-        title: "Wholesale Registration",
-        subtitle: "WHOLESALE REGISTRATION",
-        userId: "User ID",
-        password: "Password",
-        confirmPassword: "Confirm Password",
-        companyName: "Company Name",
-        contactPerson: "Contact Person",
-        nationality: "Nationality",
-        registrationNumber: "Business Registration Number",
-        email: "Email",
-        emailMemo: "(For tax invoice issuance)",
-        phone: "Phone",
-        fax: "Fax",
-        address1: "Address",
-        address1Memo: "(Wholesale products will be shipped to this address)",
-        address2: "Address 2",
-        submit: "Register",
-        passwordMismatch: "Passwords do not match.",
-        successMsg: "Registration complete. Please wait for admin approval.",
-        errorPrefix: "An error occurred during registration.",
-        loginText: "Already have an account?",
-        loginLink: "Log in",
-        countryPlaceholder: "Select Nationality",
-        nextButton: "Next"
-    }
+    en: {
+        title: 'Wholesale registration',
+        intro: 'You can place wholesale orders once your account is approved.',
+        stepsLabel: 'Registration steps',
+        stepCountry: 'Country',
+        stepAccount: 'Account and business',
+        nationality: 'Nationality',
+        countryPlaceholder: 'Select your country',
+        selectCountryFirst: 'Please select a nationality first.',
+        nextButton: 'Next',
+        changeCountry: 'Change country',
+        sectionLogin: '1. Account details',
+        sectionBusiness: '2. Business details',
+        sectionContact: '3. Contact and delivery',
+        userId: 'User ID',
+        password: 'Password',
+        confirmPassword: 'Confirm password',
+        showPassword: 'Show password',
+        hidePassword: 'Hide password',
+        companyName: 'Company name',
+        contactPerson: 'Contact person',
+        registrationNumber: 'Business registration number',
+        registrationPlaceholder: 'Numbers only',
+        document: 'Business registration document',
+        chooseFile: 'Choose an image or PDF',
+        fileSelected: 'Selected · uploaded when you submit your application.',
+        email: 'Email',
+        emailMemo: 'Used for tax invoices',
+        phone: 'Phone',
+        fax: 'Fax (optional)',
+        address1: 'Address',
+        address1Memo: 'Wholesale products will be shipped to this address.',
+        address1Placeholder: 'Street address, city and region',
+        address2: 'Address 2 (optional)',
+        address2Placeholder: 'Building, apartment or suite',
+        submit: 'Register',
+        processing: 'Processing…',
+        passwordMismatch: 'Passwords do not match.',
+        successTitle: 'Application received',
+        successMsg: 'Registration complete. Please wait for admin approval.',
+        successNote: 'Your account is awaiting administrator approval. Please sign in once approved.',
+        errorPrefix: 'An error occurred during registration.',
+        loginText: 'Already have an account?',
+        loginLink: 'Log in',
+    },
+} satisfies Record<AuthLanguage, Record<string, string>>
+
+// Each country in its own language, so it reads the same whatever the page language is.
+const COUNTRIES = [
+    { value: 'Japan', label: '🇯🇵 日本' },
+    { value: 'Korea', label: '🇰🇷 한국' },
+    { value: 'USA', label: '🇺🇸 United States' },
+    { value: 'China', label: '🇨🇳 中国' },
+    { value: 'Turkey', label: '🇹🇷 Türkiye' },
+    { value: 'Indonesia', label: '🇮🇩 Indonesia' },
+]
+
+const countryLanguage = (country: string): AuthLanguage => country === 'Korea' ? 'ko' : country === 'Japan' ? 'ja' : 'en'
+
+const inputClass = 'ux-input h-12 pl-11 text-base'
+
+function Field({ id, label, required = false, hint, icon, after, children }: {
+    id: string
+    label: string
+    required?: boolean
+    hint?: string
+    icon: ReactNode
+    after?: ReactNode
+    children: ReactNode
+}) {
+    return (
+        <div className="space-y-1.5">
+            <label htmlFor={id} className="block text-sm font-semibold">
+                {label}
+                {required ? <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span> : null}
+            </label>
+            {hint ? <p id={`${id}-hint`} className="text-xs text-[var(--muted-foreground)]">{hint}</p> : null}
+            <div className="relative">
+                <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">{icon}</span>
+                {children}
+            </div>
+            {after}
+        </div>
+    )
 }
 
 export default function SignupPage() {
+    const [language, setLanguage] = useAuthLanguage()
     const [step, setStep] = useState(1)
     const [formData, setFormData] = useState({
         businessName: '',
@@ -109,7 +208,8 @@ export default function SignupPage() {
     const [submitted, setSubmitted] = useState(false)
     const [error, setError] = useState('')
 
-    const t = TRANSLATIONS[formData.country] || TRANSLATIONS['Default'];
+    const t = TRANSLATIONS[language]
+    const passwordMismatch = Boolean(formData.confirmPassword) && formData.password !== formData.confirmPassword
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         const { name, value } = e.target
@@ -154,7 +254,7 @@ export default function SignupPage() {
     const handleNextStep = (e: React.FormEvent) => {
         e.preventDefault()
         if (!formData.country) {
-            setError('Please select a nationality first.')
+            setError(t.selectCountryFirst)
             return
         }
         setError('')
@@ -202,268 +302,203 @@ export default function SignupPage() {
             }
 
             setSubmitted(true)
-        } catch (err: any) {
-            setError(err.message)
+        } catch (err: unknown) {
+            setError(err instanceof Error ? err.message : t.errorPrefix)
         } finally {
             setLoading(false)
         }
     }
 
+    const steps = (
+        <ol aria-label={t.stepsLabel} className="mb-6 flex items-center gap-3 text-sm">
+            {[t.stepCountry, t.stepAccount].map((label, index) => {
+                const number = index + 1
+                const done = step > number
+                const current = step === number
+                return (
+                    <Fragment key={label}>
+                        {index > 0 ? <li aria-hidden className="h-px min-w-6 flex-1 bg-[var(--border-strong)]" /> : null}
+                        <li aria-current={current ? 'step' : undefined} className="flex min-w-0 items-center gap-2">
+                            <span className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                                done
+                                    ? 'bg-slate-900 text-white dark:bg-slate-200 dark:text-slate-900'
+                                    : current
+                                        ? 'border-2 border-brand-orange text-brand-orange-strong dark:text-[var(--brand-accent)]'
+                                        : 'border-2 border-[var(--border-strong)] text-[var(--muted-foreground)]'
+                            }`}>
+                                {done ? <Check size={14} strokeWidth={3} aria-hidden /> : number}
+                            </span>
+                            <span className={`truncate font-semibold ${done || current ? '' : 'text-[var(--muted-foreground)]'}`}>{label}</span>
+                        </li>
+                    </Fragment>
+                )
+            })}
+        </ol>
+    )
+
     return (
-        <main className="min-h-screen bg-[var(--background)] px-4 py-8 text-[var(--foreground)] sm:px-6">
-            <div className="mx-auto mb-6 w-full max-w-[560px]">
-                <div className="flex items-center gap-4">
-                    <div className="h-auto w-[72px] shrink-0">
-                        <img
-                            src="/logo.png"
-                            alt="BEIKO BAIT"
-                            className="w-full h-full object-contain"
-                        />
-                    </div>
-                    <div className="flex min-w-0 flex-col justify-center">
-                        <h1 className="text-xl font-black text-[var(--foreground)]">{t.title}</h1>
-                        <p className="mt-1 text-xs font-semibold text-[var(--muted-foreground)]">
-                            {t.subtitle}
-                        </p>
-                    </div>
+        <AuthShell language={language} onLanguageChange={setLanguage} title={t.title} intro={t.intro}>
+            {error && (
+                <div role="alert" className="mb-5 rounded-lg border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--danger)]">
+                    {error}
                 </div>
-            </div>
+            )}
 
-            <div className="mx-auto w-full max-w-[560px]">
-                {error && (
-                    <div role="alert" className="mb-5 rounded-md border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm font-semibold text-[var(--danger)]">
-                        {error}
-                    </div>
-                )}
-
-                {submitted ? (
-                    <section className="ux-panel space-y-4 p-6 text-center" role="status">
-                        <h2 className="text-xl font-bold">{formData.country === 'Korea' ? '가입 신청이 접수되었습니다' : formData.country === 'Japan' ? '申請を受け付けました' : 'Application received'}</h2>
-                        <p className="text-sm leading-7 text-[var(--muted-foreground)]">{t.successMsg}</p>
-                        <p className="ux-context">{formData.country === 'Korea' ? '현재 관리자 승인 대기 중입니다. 승인 후 신청한 아이디로 로그인해 주세요.' : formData.country === 'Japan' ? '現在、管理者の承認待ちです。承認後にログインしてください。' : 'Your account is awaiting administrator approval. Please sign in once approved.'}</p>
-                        <Link href="/login" className="ux-button-primary w-full">{t.loginLink}</Link>
-                    </section>
-                ) : step === 1 ? (
-                    <form onSubmit={handleNextStep} className="ux-panel space-y-5 p-5 sm:p-7">
-                        <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> 国籍 / Nationality / 국가
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors pointer-events-none">
-                                    <Globe size={18} strokeWidth={1.5} />
-                                </div>
-                                <select
-                                    name="country"
-                                    value={formData.country}
-                                    onChange={(e) => {
-                                        handleChange(e as any)
-                                        setError('')
-                                    }}
-                                    required
-                                    className="w-full h-12 pl-11 pr-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium shadow-sm appearance-none cursor-pointer"
-                                >
-                                    <option value="" disabled>Select Nationality</option>
-                                    <option value="Japan">🇯🇵 日本 / Japan / 일본</option>
-                                    <option value="Korea">🇰🇷 韓国 / Korea / 한국</option>
-                                    <option value="USA">🇺🇸 米国 / USA / 미국</option>
-                                    <option value="China">🇨🇳 中国 / China / 중국</option>
-                                    <option value="Turkey">🇹🇷 トルコ / Türkiye / 투르키예</option>
-                                    <option value="Indonesia">🇮🇩 印度尼西亜 / Indonesia / 인도네시아</option>
-                                </select>
-                                <div className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                    <ArrowRight size={14} className="rotate-90" />
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="pt-4">
-                            <button
-                                type="submit"
-                                className="ux-button ux-button-primary h-12 w-full text-[15px]"
+            {submitted ? (
+                <section className="ux-panel space-y-4 p-6 text-center" role="status">
+                    <h2 className="text-xl font-bold">{t.successTitle}</h2>
+                    <p className="text-sm leading-7 text-[var(--muted-foreground)]">{t.successMsg}</p>
+                    <p className="ux-context">{t.successNote}</p>
+                    <Link href="/login" className="ux-button-primary min-h-12 w-full text-[15px]">{t.loginLink}</Link>
+                </section>
+            ) : step === 1 ? (
+                <form onSubmit={handleNextStep} className="ux-panel space-y-5 p-5 sm:p-7">
+                    {steps}
+                    <div className="space-y-1.5">
+                        <label htmlFor="signup-country" className="block text-sm font-semibold">
+                            {t.nationality}
+                            <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span>
+                        </label>
+                        <div className="relative">
+                            <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]">
+                                <Globe size={18} strokeWidth={1.5} />
+                            </span>
+                            <select
+                                id="signup-country"
+                                name="country"
+                                value={formData.country}
+                                onChange={(e) => {
+                                    handleChange(e)
+                                    setError('')
+                                    // The form follows the partner's country, as before; the switch above can still change it.
+                                    if (e.target.value) setLanguage(countryLanguage(e.target.value), false)
+                                }}
+                                required
+                                className={`${inputClass} cursor-pointer appearance-none pr-11`}
                             >
-                                <span>Next / 次へ / 다음</span>
-                                <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
-                            </button>
+                                <option value="" disabled>{t.countryPlaceholder}</option>
+                                {COUNTRIES.map(country => <option key={country.value} value={country.value}>{country.label}</option>)}
+                            </select>
+                            <ChevronDown size={16} aria-hidden className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" />
                         </div>
-                    </form>
-                ) : (
-                    <form onSubmit={handleSubmit} className="ux-panel space-y-5 p-5 sm:p-7">
-                        <div className="flex justify-between items-center mb-6">
+                    </div>
+
+                    <button type="submit" className="ux-button-primary min-h-12 w-full text-[15px]">
+                        {t.nextButton}
+                        <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
+                    </button>
+                </form>
+            ) : (
+                <form onSubmit={handleSubmit} className="ux-panel space-y-5 p-5 sm:p-7">
+                    {steps}
+                    <button
+                        type="button"
+                        onClick={() => setStep(1)}
+                        className="ux-button min-h-10 px-3 text-[var(--muted-foreground)]"
+                    >
+                        <ArrowLeft size={14} strokeWidth={2.5} aria-hidden />
+                        {t.changeCountry} · {COUNTRIES.find(country => country.value === formData.country)?.label}
+                    </button>
+
+                    <fieldset className="space-y-5"><legend className="mb-4 text-base font-bold">{t.sectionLogin}</legend>
+                        <Field id="signup-username" label={t.userId} required icon={<User size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="text"
+                                id="signup-username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false}
+                                value={formData.username}
+                                onChange={handleChange}
+                                required
+                                className={inputClass}
+                            />
+                        </Field>
+
+                        <Field id="signup-password" label={t.password} required icon={<Lock size={18} strokeWidth={1.5} />}>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                id="signup-password" name="password" autoComplete="new-password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                required
+                                className={`${inputClass} pr-12`}
+                            />
                             <button
                                 type="button"
-                                onClick={() => setStep(1)}
-                                className="ux-button min-h-10 border border-[var(--border)] bg-[var(--card)] px-3 text-[11px] text-[var(--muted-foreground)] hover:bg-[var(--card-hover)]"
+                                onClick={() => setShowPassword(!showPassword)}
+                                aria-label={showPassword ? t.hidePassword : t.showPassword} aria-pressed={showPassword}
+                                className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-[var(--muted-foreground)] hover:bg-[var(--card-hover)]"
                             >
-                                <ArrowLeft size={12} strokeWidth={3} />
-                                Change Nationality / 国籍変更 / 국가 변경
+                                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                             </button>
-                            <div className="rounded-md border border-[var(--danger-border)] bg-[var(--danger-soft)] px-3 py-1 text-[10px] font-black text-[var(--danger)]">
-                                Step 2/2
-                            </div>
-                        </div>
+                        </Field>
 
-                        <fieldset className="space-y-5"><legend className="mb-4 text-base font-bold">{formData.country === 'Korea' ? '1. 로그인 정보' : formData.country === 'Japan' ? '1. ログイン情報' : '1. Account details'}</legend>
-                        {/* User ID */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-username" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.userId}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <User size={18} strokeWidth={1.5} />
-                                </div>
-                                <input
-                                    type="text"
-                                    id="signup-username" name="username" autoComplete="username" autoCapitalize="none"
-                                    value={formData.username}
-                                    onChange={handleChange as any}
-                                    required
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder="your_id"
-                                />
-                            </div>
-                        </div>
+                        <Field
+                            id="signup-confirmPassword"
+                            label={t.confirmPassword}
+                            required
+                            icon={<Lock size={18} strokeWidth={1.5} />}
+                            after={passwordMismatch ? <p id="signup-confirmPassword-error" className="text-xs font-semibold text-[var(--danger)]">{t.passwordMismatch}</p> : null}
+                        >
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                id="signup-confirmPassword" name="confirmPassword" autoComplete="new-password"
+                                value={formData.confirmPassword}
+                                onChange={handleChange}
+                                required
+                                aria-invalid={passwordMismatch}
+                                aria-describedby={passwordMismatch ? 'signup-confirmPassword-error' : undefined}
+                                className={`${inputClass} ${passwordMismatch ? 'border-[var(--danger)]' : ''}`}
+                            />
+                        </Field>
+                    </fieldset>
 
-                        {/* Password */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-password" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.password}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Lock size={18} strokeWidth={1.5} />
-                                </div>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    id="signup-password" name="password" autoComplete="new-password"
-                                    value={formData.password}
-                                    onChange={handleChange as any}
-                                    required
-                                    className="w-full h-12 pl-11 pr-11 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-400 transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm"
-                                    placeholder="••••••••"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    aria-label={showPassword ? 'Hide password / 비밀번호 숨기기' : 'Show password / 비밀번호 표시'} aria-pressed={showPassword}
-                                    className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50"
-                                >
-                                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                                </button>
-                            </div>
-                        </div>
+                    <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{t.sectionBusiness}</legend>
+                        <Field id="signup-businessName" label={t.companyName} required icon={<Building2 size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="text"
+                                id="signup-businessName" name="businessName" autoComplete="organization"
+                                value={formData.businessName}
+                                onChange={handleChange}
+                                required
+                                className={inputClass}
+                            />
+                        </Field>
 
-                        {/* Confirm Password */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-confirmPassword" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.confirmPassword}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Lock size={18} strokeWidth={1.5} />
-                                </div>
-                                <input
-                                    type={showPassword ? "text" : "password"}
-                                    id="signup-confirmPassword" name="confirmPassword" autoComplete="new-password"
-                                    value={formData.confirmPassword}
-                                    onChange={handleChange as any}
-                                    required
-                                    className={`w-full h-12 pl-11 pr-11 bg-white border rounded-lg outline-none transition-all text-sm font-medium placeholder:text-gray-300 tracking-widest shadow-sm ${formData.confirmPassword && formData.password !== formData.confirmPassword
-                                        ? 'border-red-300 focus:border-red-400'
-                                        : 'border-gray-200 focus:border-gray-400'
-                                        }`}
-                                    placeholder="••••••••"
-                                />
-                            </div>
-                            {formData.confirmPassword && formData.password !== formData.confirmPassword && (
-                                <p className="text-[10px] text-[#e34219] font-bold ml-1 transition-all">
-                                    {t.passwordMismatch}
-                                </p>
-                            )}
-                        </div>
+                        <Field id="signup-representativeName" label={t.contactPerson} required icon={<User size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="text"
+                                id="signup-representativeName" name="representativeName" autoComplete="name"
+                                value={formData.representativeName}
+                                onChange={handleChange}
+                                required
+                                className={inputClass}
+                            />
+                        </Field>
 
-                        </fieldset>
-                        <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{formData.country === 'Korea' ? '2. 사업자 정보 및 증빙' : formData.country === 'Japan' ? '2. 事業者情報・書類' : '2. Business details'}</legend>
-                        {/* Company Name */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-businessName" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.companyName}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Building2 size={18} strokeWidth={1.5} />
-                                </div>
-                                <input
-                                    type="text"
-                                    id="signup-businessName" name="businessName"
-                                    value={formData.businessName}
-                                    onChange={handleChange as any}
-                                    required
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder="Your Company Name"
-                                />
-                            </div>
-                        </div>
+                        <Field id="signup-businessRegNumber" label={t.registrationNumber} required icon={<Hash size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="text"
+                                inputMode="numeric"
+                                id="signup-businessRegNumber" name="businessRegNumber"
+                                value={formData.businessRegNumber}
+                                onChange={handleChange}
+                                required
+                                className={`${inputClass} tabular-nums`}
+                                placeholder={t.registrationPlaceholder}
+                            />
+                        </Field>
 
-                        {/* Contact Person */}
                         <div className="space-y-1.5">
-                            <label htmlFor="signup-representativeName" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.contactPerson}
+                            <label htmlFor="signup-document" className="block text-sm font-semibold">
+                                {t.document}
+                                <span aria-hidden className="ml-0.5 text-[var(--danger)]">*</span>
                             </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <User size={18} strokeWidth={1.5} />
-                                </div>
+                            <label className="flex h-12 w-full cursor-pointer items-center justify-center rounded-lg border border-dashed border-[var(--input-border)] bg-[var(--input-bg)] px-4 transition-colors hover:bg-[var(--card-hover)] focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/20">
+                                <span className="flex min-w-0 items-center gap-2 text-sm font-medium text-[var(--muted-foreground)]">
+                                    <FileUp size={18} strokeWidth={1.5} aria-hidden />
+                                    <span className="truncate">{formData.businessRegistrationDocument ? formData.businessRegistrationDocument.name : t.chooseFile}</span>
+                                </span>
                                 <input
-                                    type="text"
-                                    id="signup-representativeName" name="representativeName"
-                                    value={formData.representativeName}
-                                    onChange={handleChange as any}
-                                    required
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder="Full Name"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Business Reg Number */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-businessRegNumber" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.registrationNumber}
-                            </label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <span className="text-lg font-bold">#</span>
-                                </div>
-                                <input
-                                    type="text"
-                                    id="signup-businessRegNumber" name="businessRegNumber"
-                                    value={formData.businessRegNumber}
-                                    onChange={handleChange as any}
-                                    required
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder="Business Registration Number (numbers only)"
-                                />
-                            </div>
-                        </div>
-
-                        {/* Business Registration Document */}
-                        <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {formData.country === 'Korea' ? '사업자등록증' : formData.country === 'Japan' ? '事業者登録証' : 'Business registration document'}
-                            </label>
-                            <label className="flex items-center justify-center w-full h-12 px-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] border-dashed rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] focus:border-gray-400 transition-all shadow-sm dark:shadow-none">
-                                <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
-                                    <Printer size={18} strokeWidth={1.5} />
-                                    <span>
-                                        {formData.businessRegistrationDocument ?
-                                            formData.businessRegistrationDocument.name :
-                                            (formData.country === 'Korea' ? '파일 선택 (이미지 또는 PDF)' : formData.country === 'Japan' ? '画像・PDFを選択' : 'Choose an image or PDF')
-                                        }
-                                    </span>
-                                </div>
-                                <input
+                                    id="signup-document"
                                     type="file"
                                     accept="image/*,.pdf"
                                     onChange={handleFileChange}
@@ -472,151 +507,96 @@ export default function SignupPage() {
                                 />
                             </label>
                             {formData.businessRegistrationDocument && (
-                                <p className="text-[10px] text-green-600 font-bold ml-1">
-                                    {formData.country === 'Korea' ? '파일 선택됨 · 가입 신청 시 함께 전송됩니다.' : formData.country === 'Japan' ? '選択済み · 申請時に送信されます。' : 'Selected · uploaded when you submit your application.'}
-                                </p>
+                                <p className="text-xs font-semibold text-[var(--success)]">{t.fileSelected}</p>
                             )}
                         </div>
+                    </fieldset>
 
-                        </fieldset>
-                        <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{formData.country === 'Korea' ? '3. 연락처 및 배송 주소' : formData.country === 'Japan' ? '3. 連絡先・配送先' : '3. Contact and delivery'}</legend>
-                        {/* Email */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-email" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.email}
-                            </label>
-                            <p className="ml-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                                {t.emailMemo}
-                            </p>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Mail size={18} strokeWidth={1.5} />
-                                </div>
+                    <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{t.sectionContact}</legend>
+                        <Field id="signup-email" label={t.email} required hint={t.emailMemo} icon={<Mail size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="email"
+                                id="signup-email" name="email" autoComplete="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                required
+                                aria-describedby="signup-email-hint"
+                                className={inputClass}
+                                placeholder="name@company.com"
+                            />
+                        </Field>
+
+                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-3">
+                            <Field id="signup-contact" label={t.phone} required icon={<Phone size={18} strokeWidth={1.5} />}>
                                 <input
-                                    type="email"
-                                    id="signup-email" name="email"
-                                    value={formData.email}
-                                    onChange={handleChange as any}
+                                    type="tel"
+                                    id="signup-contact" name="contact" autoComplete="tel"
+                                    value={formData.contact}
+                                    onChange={handleChange}
                                     required
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder={t.emailPlaceholder}
+                                    maxLength={13}
+                                    className={`${inputClass} tabular-nums`}
+                                    placeholder={formData.country === 'Korea' ? '010-1234-5678' : formData.country === 'Japan' ? '03-1234-5678' : '+1 555 123 4567'}
                                 />
-                            </div>
-                        </div>
+                            </Field>
 
-                        {/* Phone & Fax Grid */}
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            {/* Phone */}
-                            <div className="space-y-1.5">
-                                <label htmlFor="signup-contact" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                    <span className="text-[#e34219]">*</span> {t.phone}
-                                </label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                        <Phone size={18} strokeWidth={1.5} />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        id="signup-contact" name="contact"
-                                        value={formData.contact}
-                                        onChange={handleChange as any}
-                                        required
-                                        maxLength={13}
-                                        className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                        placeholder={formData.country === 'Korea' ? '010-1234-5678' : formData.country === 'Japan' ? '03-1234-5678' : '+1 555 123 4567'}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Fax */}
-                            <div className="space-y-1.5">
-                                <label htmlFor="signup-fax" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.fax}</label>
-                                <div className="relative group">
-                                    <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                        <Printer size={18} strokeWidth={1.5} />
-                                    </div>
-                                    <input
-                                        type="text"
-                                        id="signup-fax" name="fax"
-                                        value={formData.fax}
-                                        onChange={handleChange as any}
-                                        className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                        placeholder="(Optional)"
-                                    />
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Address 1 */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-address" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> {t.address1}
-                            </label>
-                            <p className="ml-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
-                                {t.address1Memo}
-                            </p>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <MapPin size={18} strokeWidth={1.5} />
-                                </div>
+                            <Field id="signup-fax" label={t.fax} icon={<Printer size={18} strokeWidth={1.5} />}>
                                 <input
-                                    type="text"
-                                    id="signup-address" name="address"
-                                    value={formData.address}
-                                    onChange={handleChange as any}
-                                    required
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder={formData.country === 'Korea' ? '도로명 주소 및 건물번호' : formData.country === 'Japan' ? '都道府県・市区町村・番地' : 'Street address, city and region'}
+                                    type="tel"
+                                    id="signup-fax" name="fax"
+                                    value={formData.fax}
+                                    onChange={handleChange}
+                                    className={`${inputClass} tabular-nums`}
                                 />
-                            </div>
+                            </Field>
                         </div>
 
-                        {/* Address 2 */}
-                        <div className="space-y-1.5">
-                            <label htmlFor="signup-addressDetail" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.address2}</label>
-                            <div className="relative group">
-                                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
-                                    <Home size={18} strokeWidth={1.5} />
-                                </div>
-                                <input
-                                    type="text"
-                                    id="signup-addressDetail" name="addressDetail"
-                                    value={formData.addressDetail}
-                                    onChange={handleChange as any}
-                                    className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder={formData.country === 'Korea' ? '건물명, 층, 호수 (선택)' : formData.country === 'Japan' ? '建物名・部屋番号' : 'Building, apartment or suite'}
-                                />
-                            </div>
-                        </div>
+                        <Field id="signup-address" label={t.address1} required hint={t.address1Memo} icon={<MapPin size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="text"
+                                id="signup-address" name="address" autoComplete="street-address"
+                                value={formData.address}
+                                onChange={handleChange}
+                                required
+                                aria-describedby="signup-address-hint"
+                                className={inputClass}
+                                placeholder={t.address1Placeholder}
+                            />
+                        </Field>
 
-                        </fieldset>
-                        {/* Submit Button */}
-                        <div className="pt-6">
-                            <button
-                                type="submit"
-                                disabled={loading}
-                                className="ux-button ux-button-primary h-12 w-full text-[15px] disabled:opacity-70"
-                            >
-                                {loading ? (
-                                    <span className="animate-pulse">Processing...</span>
-                                ) : (
-                                    <>
-                                        <span>{t.submit}</span>
-                                        <ArrowRight size={18} strokeWidth={2.5} className="group-hover:translate-x-0.5 transition-transform" />
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                )}
+                        <Field id="signup-addressDetail" label={t.address2} icon={<Home size={18} strokeWidth={1.5} />}>
+                            <input
+                                type="text"
+                                id="signup-addressDetail" name="addressDetail"
+                                value={formData.addressDetail}
+                                onChange={handleChange}
+                                className={inputClass}
+                                placeholder={t.address2Placeholder}
+                            />
+                        </Field>
+                    </fieldset>
 
-                {/* Footer */}
-                <div className="mt-6 text-center">
-                    <p className="text-xs font-medium text-[var(--muted-foreground)]">
-                        {t.loginText} <Link href="/login" className="text-[#e34219] hover:underline font-bold ml-1">{t.loginLink}</Link>
-                    </p>
-                </div>
-            </div>
-        </main>
+                    <button
+                        type="submit"
+                        disabled={loading}
+                        className="ux-button-primary min-h-12 w-full text-[15px] disabled:opacity-60"
+                    >
+                        {loading ? t.processing : (
+                            <>
+                                {t.submit}
+                                <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
+                            </>
+                        )}
+                    </button>
+                </form>
+            )}
+
+            {!submitted && (
+                <section className="mt-6 text-center">
+                    <p className="text-sm text-[var(--muted-foreground)]">{t.loginText}</p>
+                    <Link href="/login" className="ux-button mt-3 min-h-12 w-full text-[15px]">{t.loginLink}</Link>
+                </section>
+            )}
+        </AuthShell>
     )
 }

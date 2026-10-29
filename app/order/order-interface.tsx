@@ -4,7 +4,10 @@ import { useMemo, useRef, useState } from 'react'
 import Modal from '@/components/Modal'
 import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
-import { Minus, Plus, ArrowRight, Search, PackageSearch } from 'lucide-react'
+import { Minus, Plus, ArrowRight, Search, PackageSearch, ChevronDown, ListChecks, X } from 'lucide-react'
+import Badge from '@/components/ui/Badge'
+import { buttonClass } from '@/components/ui/buttonClass'
+import { PartnerPageHeader, ProductThumb } from './partner-ui'
 import { isPartnerProductOrderable, normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 import { calculatePartnerOrderTotals } from '@/lib/partnerOrderPricing'
 
@@ -138,6 +141,8 @@ export default function OrderInterface({ products, isKorean = false }: { product
         soldOutOnly: '품절 상품',
         noResults: '검색 조건에 맞는 상품이 없습니다.',
         resultCount: '개 상품',
+        selectedOnly: '선택 상품만',
+        resetFilters: '검색 조건 초기화',
         productCode: '상품코드:',
         noImage: '이미지 없음',
         noBarcode: '바코드 없음',
@@ -154,12 +159,9 @@ export default function OrderInterface({ products, isKorean = false }: { product
         minimumOrder: '최소 주문 수량',
         minimumOrderSub: '최소 수량',
         orderUnit: '주문 단위',
-        totalExcludingTax: '합계 금액 (부가세 별도)',
-        totalExcludingTaxSub: '상품 합계',
-        orderNow: '주문하기',
-        orderNowSub: '선택 상품 주문',
+        totalExcludingTax: '상품 합계 (부가세·배송비 별도)',
+        orderNow: '주문 내용 확인',
         summaryTitle: '주문 내용 확인',
-        summarySub: '최종 주문 확인',
         shipping: '배송비',
         supply: '공급가액',
         tax: '부가세 (10%)',
@@ -175,31 +177,30 @@ export default function OrderInterface({ products, isKorean = false }: { product
         availableOnly: '注文可能',
         soldOutOnly: '品切れ',
         noResults: '検索条件に一致する商品がありません。',
-        resultCount: '商品',
-        productCode: 'Product Code:',
-        noImage: 'No Image',
-        noBarcode: 'No Barcode',
+        resultCount: '件',
+        selectedOnly: '選択した商品のみ',
+        resetFilters: '検索条件をリセット',
+        productCode: '商品コード:',
+        noImage: '画像なし',
+        noBarcode: 'バーコードなし',
         soldOut: '品切れ',
-        soldOutSub: 'SOLD OUT',
+        soldOutSub: '注文不可',
         wholesaleKr: '卸売価格 韓国',
         retailKr: '小売価格 韓国',
-        krPriceSub: 'KOREA',
+        krPriceSub: '韓国',
         orderStatus: '注文状態',
-        orderStatusSub: 'Order Status',
+        orderStatusSub: '注文可否',
         available: '注文可能',
         margin: 'マージン',
-        marginSub: 'Margin%',
+        marginSub: '予想マージン',
         minimumOrder: '最小注文数量',
-        minimumOrderSub: 'Min Order',
-        orderUnit: 'Order Unit',
-        totalExcludingTax: '合計金額 (税抜)',
-        totalExcludingTaxSub: 'Total (Excl. Tax)',
-        orderNow: '今すぐ注文する',
-        orderNowSub: 'ORDER NOW',
+        minimumOrderSub: '最小数量',
+        orderUnit: '注文単位',
+        totalExcludingTax: '商品合計（税・送料別）',
+        orderNow: '注文内容を確認',
         summaryTitle: '注文内容の確認',
-        summarySub: 'Order Summary',
-        shipping: '配送料 (Shipping)',
-        supply: '供給価額 (Supply)',
+        shipping: '送料',
+        supply: '供給価額',
         tax: '消費税 (10%)',
         total: '合計金額',
         confirmOrder: '注文を確定する',
@@ -288,65 +289,76 @@ export default function OrderInterface({ products, isKorean = false }: { product
     const { isUSD, shippingFee, supplyTotal, vat, total: totalAmount } = calculatePartnerOrderTotals(productTotal, totalQuantity, userCountry)
 
     const hasItems = productTotal > 0
-
+    const selectedCount = safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).length
+    const money = (value: unknown) => `${currencySymbol}${formatMoney(value, isUSD)}`
 
     return (
         <div className="space-y-5 pb-36">
-            {orderError && !showSummary && <p role="alert" className="ux-context text-[var(--danger)]">{orderError}</p>}
-            <section aria-labelledby="partner-product-list-title" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div>
-                    <h1 id="partner-product-list-title" className="text-2xl font-black text-slate-950 sm:text-3xl dark:text-white">{copy.productList}</h1>
-                    <p className="mt-1 text-sm font-medium text-slate-500 dark:text-slate-400">{copy.productListHelper}</p>
-                </div>
-                <div className="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
-                    <label className="relative block min-w-0 flex-1 lg:w-[360px]">
+            {orderError && !showSummary && <p role="alert" className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-soft)] px-4 py-3 text-sm text-[var(--danger)]">{orderError}</p>}
+            <PartnerPageHeader id="partner-product-list-title" title={copy.productList} description={copy.productListHelper}>
+                <div role="search" className="grid w-full grid-cols-[minmax(0,1fr)_auto] gap-2 lg:flex lg:w-auto">
+                    <label className="relative block min-w-0 lg:w-[340px]">
                         <span className="sr-only">{copy.searchPlaceholder}</span>
-                        <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={19} />
+                        <Search className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[var(--muted-foreground)]" size={19} aria-hidden />
                         <input
                             type="search"
                             value={searchQuery}
                             onChange={(event) => setSearchQuery(event.target.value)}
                             placeholder={copy.searchPlaceholder}
-                            className="h-12 w-full rounded-xl border border-slate-200 bg-white pl-11 pr-4 text-sm font-semibold text-slate-900 shadow-sm placeholder:font-medium dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                            className="ux-input h-12 pl-11 pr-4 font-semibold"
                         />
                     </label>
                     <select
                         aria-label={isKorean ? '상품 상태 필터' : '商品状態フィルター'}
                         value={statusFilter}
                         onChange={(event) => setStatusFilter(event.target.value as 'ALL' | 'AVAILABLE' | 'SOLD_OUT')}
-                        className="h-12 min-w-[150px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-800 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                        className="ux-input h-12 w-auto min-w-[116px] font-semibold sm:min-w-[150px]"
                     >
                         <option value="ALL">{copy.allProducts}</option>
                         <option value="AVAILABLE">{copy.availableOnly}</option>
                         <option value="SOLD_OUT">{copy.soldOutOnly}</option>
                     </select>
+                    <button
+                        type="button"
+                        aria-pressed={showSelected}
+                        onClick={() => setShowSelected(value => !value)}
+                        className={`col-span-2 inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 text-sm font-semibold transition-colors lg:col-span-1 ${
+                            showSelected
+                                ? 'border-brand-orange bg-brand-orange-soft text-brand-orange-strong'
+                                : 'border-[var(--border-strong)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--card-hover)]'
+                        }`}
+                    >
+                        <ListChecks size={17} aria-hidden />
+                        {copy.selectedOnly}{selectedCount > 0 ? <span className="tabular-nums">({selectedCount})</span> : null}
+                    </button>
                 </div>
-            </section>
+            </PartnerPageHeader>
 
-            <div className="flex items-center justify-between border-b border-slate-200 pb-3 text-xs font-bold text-slate-400 dark:border-slate-800">
-                <span>{filteredProducts.length.toLocaleString()} {copy.resultCount}</span>
-                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]"><input type="checkbox" className="h-5 w-5" checked={showSelected} onChange={event => setShowSelected(event.target.checked)} />{isKorean ? '선택 상품만 보기' : '選択した商品のみ'}</label>
-                {searchQuery || statusFilter !== 'ALL' ? (
+            <div className="flex min-h-10 items-center justify-between gap-3 border-b border-[var(--border)] pb-3">
+                <span className="text-sm text-[var(--muted-foreground)] tabular-nums">{filteredProducts.length.toLocaleString()}{copy.resultCount}</span>
+                {searchQuery || statusFilter !== 'ALL' || showSelected ? (
                     <button
                         type="button"
                         onClick={() => {
                             setSearchQuery('')
                             setStatusFilter('ALL')
+                            setShowSelected(false)
                         }}
-                        className="text-[#d9361b] hover:text-[#b92c16]"
+                        className={buttonClass('ghost', 'sm')}
                     >
-                        {isKorean ? '검색 조건 초기화' : '検索条件をリセット'}
+                        <X size={14} aria-hidden />
+                        {copy.resetFilters}
                     </button>
                 ) : null}
             </div>
 
             {filteredProducts.length === 0 ? (
-                <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-white px-6 text-center dark:border-slate-700 dark:bg-slate-900">
-                    <PackageSearch size={34} className="text-slate-300 dark:text-slate-600" />
-                    <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">{copy.noResults}</p>
+                <div className="flex min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border-strong)] bg-[var(--card)] px-6 text-center">
+                    <PackageSearch size={34} className="text-[var(--muted-foreground)]" aria-hidden />
+                    <p className="mt-3 text-sm font-bold text-[var(--muted-foreground)]">{copy.noResults}</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
                     {filteredProducts.map((product) => {
                         const qty = safeNonNegativeInt(quantities[product.id])
                         const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
@@ -364,67 +376,61 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
                         const invalidQuantity = qty > 0 && (qty < product.minOrderQuantity || qty % orderUnit !== 0)
                         return (
-                            <article key={product.id} data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'} className={`flex h-full flex-col rounded-2xl border bg-[var(--card)] p-4 sm:p-5 ${qty > 0 ? 'border-blue-400 ring-1 ring-blue-200' : 'border-[var(--border)]'}`}>
+                            // Content stays top-aligned (no mt-auto), so a taller card in the same row never moves its neighbour.
+                            <article key={product.id} data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'} className={`flex flex-col rounded-2xl border bg-[var(--card)] p-4 sm:p-5 ${qty > 0 ? 'border-brand-orange ring-1 ring-brand-orange/20' : 'border-[var(--border)]'}`}>
                                 <div className="flex items-start gap-4">
-                                    <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] p-1 sm:h-28 sm:w-24">
-                                        {product.imageUrl ? <img src={product.imageUrl} alt={displayProductName(product)} className="max-h-full max-w-full object-contain" loading="lazy" /> : <span className="text-xs text-[var(--muted-foreground)]">{copy.noImage}</span>}
-                                    </div>
+                                    <ProductThumb src={product.imageUrl} alt={displayProductName(product)} className="h-24 w-20 sm:h-28 sm:w-24" />
                                     <div className="min-w-0 flex-1">
-                                        <span role="status" className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${isSoldOut || priceMissing ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{isSoldOut ? copy.soldOut : priceMissing ? (isKorean ? '가격 확인 필요' : '価格確認が必要') : copy.available}</span>
-                                        <h2 className="mt-2 break-words text-base font-bold leading-snug sm:text-lg">{displayProductName(product)}</h2>
-                                        <div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="text-xs text-[var(--muted-foreground)]">{wholesaleLabel}</span><strong className="text-2xl tabular-nums">{priceMissing ? '—' : `${priceSymbol}${formatNumber(displayWholesale, priceOptions)}`}</strong></div>
+                                        {isSoldOut || priceMissing ? <Badge tone="warning" className="mb-2">{isSoldOut ? copy.soldOut : (isKorean ? '가격 확인 필요' : '価格確認が必要')}</Badge> : null}
+                                        <h2 className="break-keep break-words text-base font-bold leading-snug sm:text-lg">{displayProductName(product)}</h2>
+                                        <div className="mt-2 flex flex-wrap items-baseline gap-x-2"><span className="text-xs text-[var(--muted-foreground)]">{wholesaleLabel}</span><strong className="text-2xl tabular-nums">{priceMissing ? '—' : `${priceSymbol}${formatNumber(displayWholesale, priceOptions)}`}</strong></div>
                                     </div>
                                 </div>
-                                <details className="mt-3 border-t border-[var(--border)] pt-1">
-                                    <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-[var(--muted-foreground)]">{isKorean ? '상품 자료·권장 판매가' : '商品情報・参考価格'}</summary>
-                                    <div className="space-y-3 pb-3 text-sm text-[var(--muted-foreground)]">
+                                <div className="mt-4 border-t border-[var(--border)] pt-3">
+                                    <p className="mb-3 text-xs leading-5 text-[var(--muted-foreground)]">{copy.minimumOrderSub} {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : '個'} · {copy.orderUnit} {formatNumber(orderUnit)}{isKorean ? '개' : '個'}</p>
+                                    {isSoldOut || priceMissing ? <p className="rounded-lg bg-[var(--surface)] p-3 text-sm text-[var(--muted-foreground)]">{isSoldOut ? copy.soldOutOrderDisabled : (isKorean ? '거래 단가 확인 후 주문할 수 있습니다. 관리자에게 문의해 주세요.' : '価格確認後にご注文いただけます。管理者にお問い合わせください。')}</p> : <>
+                                        <div className="flex flex-wrap items-center gap-4">
+                                            <div className="flex h-12 items-center overflow-hidden rounded-lg border border-[var(--border-strong)]">
+                                                <button type="button" aria-label={isKorean ? '수량 줄이기' : '数量を減らす'} onClick={() => handleQuantityChange(product.id, qty - orderUnit < product.minOrderQuantity ? 0 : qty - orderUnit)} className="flex h-full w-12 items-center justify-center hover:bg-[var(--surface)]"><Minus size={17} /></button>
+                                                <input type="text" inputMode="numeric" aria-label={`${displayProductName(product)} ${isKorean ? '주문 수량' : '注文数量'}`} aria-invalid={invalidQuantity} aria-describedby={`quantity-help-${product.id}`} value={formatNumber(qty)} onChange={event => { const value = event.target.value.replace(/,/g, ''); if (/^\d*$/.test(value)) handleQuantityChange(product.id, value) }} className="h-full w-20 border-x border-[var(--border)] bg-transparent text-center text-lg font-bold tabular-nums" />
+                                                <button type="button" aria-label={isKorean ? '수량 늘리기' : '数量を増やす'} onClick={() => handleQuantityChange(product.id, qty === 0 ? Math.ceil(product.minOrderQuantity / orderUnit) * orderUnit : qty + orderUnit)} className="flex h-full w-12 items-center justify-center hover:bg-[var(--surface)]"><Plus size={17} /></button>
+                                            </div>
+                                            <span className={`text-base font-semibold tabular-nums ${qty > 0 ? 'text-[var(--foreground)]' : 'text-[var(--muted-foreground)]'}`}>{priceSymbol}{formatMoney(qty * product.sellPrice, isUSD)}</span>
+                                        </div>
+                                        {/* Reserved line: the hint appearing doesn't push the rest of the card down. */}
+                                        <p id={`quantity-help-${product.id}`} className="mt-2 min-h-4 text-xs leading-4 text-[var(--danger)]">{invalidQuantity ? (isKorean ? '최소 수량 이상, 주문 단위의 배수로 입력해 주세요.' : '最小数量以上、注文単位の倍数で入力してください。') : ''}</p>
+                                    </>}
+                                </div>
+                                <details className="group mt-1">
+                                    <summary className="flex min-h-10 cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium text-[var(--muted-foreground)] hover:text-[var(--foreground)] [&::-webkit-details-marker]:hidden">
+                                        {isKorean ? '상품 자료·권장 판매가' : '商品情報・参考価格'}
+                                        <ChevronDown size={16} aria-hidden className="transition-transform group-open:rotate-180" />
+                                    </summary>
+                                    <div className="space-y-3 pb-1 pt-1 text-sm text-[var(--muted-foreground)]">
                                         <p>{copy.productCode} {product.productCode || '—'}</p>
                                         {!isKorean && product.nameEN && <p>{product.nameEN}</p>}
-                                        <p>{retailLabel} {displayRetail > 0 ? `${priceSymbol}${formatNumber(displayRetail, priceOptions)}` : '—'} · {copy.margin} {displayRetail > 0 && !priceMissing ? `${marginPercent}%` : '—'}</p>
-                                        {product.barcode ? <div><BarcodeDisplay value={product.barcode} width={0.8} height={25} displayValue={false} containerClassName="gap-2 mb-1" buttonClassName="ux-button" /><p className="mt-2 font-mono">{product.barcode}</p></div> : <p>{copy.noBarcode}</p>}
+                                        <p className="tabular-nums">{retailLabel} {displayRetail > 0 ? `${priceSymbol}${formatNumber(displayRetail, priceOptions)}` : '—'} · {copy.margin} {displayRetail > 0 && !priceMissing ? `${marginPercent}%` : '—'}</p>
+                                        {product.barcode ? <div><BarcodeDisplay value={product.barcode} width={0.8} height={25} displayValue={false} containerClassName="gap-2 mb-1" buttonClassName={buttonClass('secondary', 'sm')} /><p className="mt-2 font-mono">{product.barcode}</p></div> : <p>{copy.noBarcode}</p>}
                                     </div>
                                 </details>
-                                <div className="mt-auto border-t border-[var(--border)] pt-3">
-                                    <p className="mb-3 text-xs leading-5 text-[var(--muted-foreground)]">{copy.minimumOrderSub} {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : 'EA'} · {copy.orderUnit} {formatNumber(orderUnit)}{isKorean ? '개' : 'EA'}</p>
-                                    {isSoldOut || priceMissing ? <p className="rounded-lg bg-[var(--surface)] p-3 text-sm text-[var(--muted-foreground)]">{isSoldOut ? copy.soldOutOrderDisabled : (isKorean ? '거래 단가 확인 후 주문할 수 있습니다. 관리자에게 문의해 주세요.' : '価格確認後にご注文いただけます。管理者にお問い合わせください。')}</p> : <div className="flex flex-wrap items-center justify-between gap-3">
-                                        <div className="flex h-12 items-center overflow-hidden rounded-lg border border-[var(--border-strong)]">
-                                            <button type="button" aria-label={isKorean ? '수량 줄이기' : '数量を減らす'} onClick={() => handleQuantityChange(product.id, qty - orderUnit < product.minOrderQuantity ? 0 : qty - orderUnit)} className="flex h-full w-12 items-center justify-center hover:bg-[var(--surface)]"><Minus size={17} /></button>
-                                            <input type="text" inputMode="numeric" aria-label={`${displayProductName(product)} ${isKorean ? '주문 수량' : '注文数量'}`} aria-invalid={invalidQuantity} aria-describedby={`quantity-help-${product.id}`} value={formatNumber(qty)} onChange={event => { const value = event.target.value.replace(/,/g, ''); if (/^\d*$/.test(value)) handleQuantityChange(product.id, value) }} className="h-full w-20 border-x border-[var(--border)] bg-transparent text-center text-lg font-bold" />
-                                            <button type="button" aria-label={isKorean ? '수량 늘리기' : '数量を増やす'} onClick={() => handleQuantityChange(product.id, qty === 0 ? Math.ceil(product.minOrderQuantity / orderUnit) * orderUnit : qty + orderUnit)} className="flex h-full w-12 items-center justify-center hover:bg-[var(--surface)]"><Plus size={17} /></button>
-                                        </div>
-                                        <span className="text-base font-semibold tabular-nums">{priceSymbol}{formatMoney(qty * product.sellPrice, isUSD)}</span>
-                                    </div>}
-                                    <p id={`quantity-help-${product.id}`} className={`mt-2 text-xs ${invalidQuantity ? 'text-[var(--danger)]' : 'text-[var(--muted-foreground)]'}`}>{invalidQuantity ? (isKorean ? '최소 수량 이상, 주문 단위의 배수로 입력해 주세요.' : '最小数量以上、注文単位の倍数で入力してください。') : qty > 0 ? (isKorean ? '선택됨 · 주문 내용 확인에서 최종 금액을 확인하세요.' : '選択済み · 注文内容の確認へお進みください。') : ''}</p>
-                                </div>
                             </article>
                         )
                     })}
                 </div>
             )}
 
-            {/* Sticky Footer */}
             {hasItems && (
-                <div className="fixed bottom-[calc(68px+env(safe-area-inset-bottom))] sm:bottom-0 left-0 right-0 bg-white/95 dark:bg-[#1e1e1e]/95 backdrop-blur-xl border-t border-gray-200 dark:border-[#2a2a2a] p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none animate-in slide-in-from-bottom duration-300">
-                    <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
-                        <div className="text-right flex flex-col items-end">
-                            <div className="flex flex-col items-end mb-1 text-gray-400 dark:text-gray-500 gap-0.5">
-                                <span className="text-sm font-black leading-tight">{copy.totalExcludingTax}</span>
-                                <span className="text-xs font-bold uppercase tracking-widest leading-none">{copy.totalExcludingTaxSub}</span>
-                            </div>
-                            <p className="text-2xl font-bold text-[#111827] dark:text-white leading-none font-inter tracking-tighter">
-                                <span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(productTotal, isUSD)}
-                            </p>
+                <div className="fixed inset-x-0 bottom-[calc(68px+env(safe-area-inset-bottom))] z-50 border-t border-[var(--border-strong)] bg-[var(--card)] shadow-[0_-8px_24px_rgba(16,24,40,0.12)] sm:bottom-0">
+                    {/* Same width and gutters as the page content in layout.tsx, so total and button line up with the cards. */}
+                    <div className="mx-auto flex min-h-14 max-w-[1440px] items-center justify-between gap-3 px-3 py-2 sm:px-5 sm:py-4 lg:px-7">
+                        <div className="min-w-0">
+                            <p className="truncate text-xs text-[var(--muted-foreground)] sm:text-sm">{copy.totalExcludingTax}</p>
+                            <p className="text-xl font-bold leading-tight tabular-nums sm:text-2xl">{money(productTotal)}</p>
                         </div>
 
-                        <button
-                            onClick={handleOrderNow}
-                            className="min-h-12 px-5 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-end md:justify-center gap-3 font-bold text-[15px] tracking-wide group shrink-0"
-                        >
-                            <div className="flex flex-col items-end md:items-start leading-none">
-                                <span className="text-lg">{copy.orderNow}</span>
-                                <span className="text-sm opacity-70 font-bold tracking-[0.2em] -mt-0.5">{copy.orderNowSub}</span>
-                            </div>
-                            <ArrowRight size={20} strokeWidth={2.5} className="group-hover:translate-x-1 transition-transform" />
+                        <button type="button" onClick={handleOrderNow} className="ux-button-primary min-h-11 shrink-0 px-5 text-[15px]">
+                            {copy.orderNow} <span className="tabular-nums">({selectedCount})</span>
+                            <ArrowRight size={18} strokeWidth={2.5} aria-hidden />
                         </button>
                     </div>
                 </div>
@@ -432,60 +438,59 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
             {
                 showSummary && (
-                    <Modal label={copy.summaryTitle} onClose={() => { if (!submittingRef.current) setShowSummary(false) }} className="flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-[32px] shadow-2xl dark:shadow-none max-w-md w-full p-6 relative animate-in zoom-in-95 duration-200 overflow-y-auto">
+                    <Modal label={copy.summaryTitle} onClose={() => { if (!submittingRef.current) setShowSummary(false) }} className="flex items-center justify-center bg-black/60 p-4">
+                        <div className="relative w-full max-w-md overflow-y-auto rounded-2xl bg-[var(--card)] p-6 shadow-2xl">
                             <button
+                                type="button"
                                 aria-label={isKorean ? '주문 확인 닫기' : '閉じる'} disabled={submitting}
                                 onClick={() => setShowSummary(false)}
-                                className="absolute top-6 right-6 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors"
+                                className="ux-icon-button absolute right-4 top-4 border-transparent text-[var(--muted-foreground)]"
                             >
-                                ✕
+                                <X size={18} aria-hidden />
                             </button>
 
-                            <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{copy.summaryTitle}</h3>
-                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-medium uppercase tracking-widest">{copy.summarySub}</p>
+                            <h3 className="mb-5 pr-12 text-2xl font-bold">{copy.summaryTitle}</h3>
 
-                            <button type="button" className="ux-button mb-4" disabled={submitting} onClick={() => { setShowSummary(false); setShowSelected(true); setSearchQuery(''); setStatusFilter('ALL') }}>{isKorean ? '선택 상품 수량 수정' : '選択商品の数量を変更'}</button>
-                            <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
+                            <button type="button" className={buttonClass('secondary', 'sm', 'mb-4')} disabled={submitting} onClick={() => { setShowSummary(false); setShowSelected(true); setSearchQuery(''); setStatusFilter('ALL') }}>{isKorean ? '선택 상품 수량 수정' : '選択商品の数量を変更'}</button>
+                            <div className="mb-5 max-h-[40vh] divide-y divide-[var(--border)] overflow-y-auto pr-2">
                                 {safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
-                                    <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-[#2a2a2a]">
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-800 dark:text-gray-200">{displayProductName(p)}</p>
-                                            <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">
-                                                {!isKorean && p.nameEN ? <span className="mr-1">{p.nameEN}</span> : null}
-                                                <span>{isKorean ? `수량 ${formatNumber(quantities[p.id])}개` : `× ${formatNumber(quantities[p.id])}`}</span>
+                                    <div key={p.id} className="flex items-center justify-between gap-3 py-3">
+                                        <div className="min-w-0">
+                                            <p className="break-keep text-sm font-bold">{displayProductName(p)}</p>
+                                            <p className="mt-0.5 text-sm text-[var(--muted-foreground)] tabular-nums">
+                                                {isKorean ? `수량 ${formatNumber(quantities[p.id])}개` : `数量 ${formatNumber(quantities[p.id])}個`}
                                             </p>
                                         </div>
-                                        <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(p.sellPrice * safeNonNegativeInt(quantities[p.id]), isUSD)}</span>
+                                        <span className="shrink-0 text-right font-bold tabular-nums">{money(p.sellPrice * safeNonNegativeInt(quantities[p.id]))}</span>
                                     </div>
                                 ))}
                                 {shippingFee > 0 && (
-                                    <div className="flex justify-between items-center py-2 border-t border-dashed border-gray-200 dark:border-[#2a2a2a] mt-2">
-                                        <span className="text-sm font-bold text-gray-600 dark:text-gray-400">{copy.shipping}</span>
-                                        <span className="font-bold text-gray-900 dark:text-white"><span className="text-[0.7em] mr-0.5">{currencySymbol}</span>{formatMoney(shippingFee, isUSD)}</span>
+                                    <div className="flex items-center justify-between gap-3 py-3">
+                                        <span className="text-sm font-bold text-[var(--muted-foreground)]">{copy.shipping}</span>
+                                        <span className="text-right font-bold tabular-nums">{money(shippingFee)}</span>
                                     </div>
                                 )}
                             </div>
 
-                            <div className="bg-gray-50 dark:bg-[#1a1a1a] rounded-2xl p-6 space-y-3 mb-8">
-                                <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                    <span>{copy.supply}</span>
-                                    <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatMoney(supplyTotal, isUSD)}</span>
+                            <dl className="mb-6 space-y-2 rounded-xl bg-[var(--surface)] p-5 text-sm">
+                                <div className="flex justify-between gap-3 text-[var(--muted-foreground)]">
+                                    <dt>{copy.supply}</dt>
+                                    <dd className="tabular-nums">{money(supplyTotal)}</dd>
                                 </div>
                                 {!isUSD && (
-                                    <div className="flex justify-between text-sm text-gray-500 dark:text-gray-400 font-medium">
-                                        <span>{copy.tax}</span>
-                                        <span><span className="text-[0.8em] mr-0.5">{currencySymbol}</span>{formatNumber(vat)}</span>
+                                    <div className="flex justify-between gap-3 text-[var(--muted-foreground)]">
+                                        <dt>{copy.tax}</dt>
+                                        <dd className="tabular-nums">{currencySymbol}{formatNumber(vat)}</dd>
                                     </div>
                                 )}
-                                <div className="flex justify-between items-baseline pt-4 border-t border-gray-200 dark:border-[#2a2a2a] mt-2">
-                                    <span className="font-bold text-lg text-gray-900 dark:text-white">{copy.total}</span>
-                                    <span className="text-3xl font-black text-[#e34219]"><span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(totalAmount, isUSD)}</span>
+                                <div className="mt-2 flex items-baseline justify-between gap-3 border-t border-[var(--border)] pt-3">
+                                    <dt className="text-base font-bold">{copy.total}</dt>
+                                    <dd className="text-2xl font-bold tabular-nums">{money(totalAmount)}</dd>
                                 </div>
-                            </div>
+                            </dl>
 
                             {orderError && <p role="alert" className="mb-4 text-sm text-[var(--danger)]">{orderError}</p>}
-                            <button disabled={submitting} aria-busy={submitting}
+                            <button type="button" disabled={submitting} aria-busy={submitting}
                                 onClick={async () => {
                                     if (submittingRef.current) return
                                     submittingRef.current = true
@@ -520,7 +525,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                         setOrderError(isKorean ? '주문 처리 중 오류가 발생했습니다. 다시 시도해 주세요.' : 'エラーが発生しました。再度お試しください。');
                                     } finally { submittingRef.current = false; setSubmitting(false) }
                                 }}
-                                className="w-full bg-[#111827] dark:bg-white text-white dark:text-[#111827] py-4 rounded-xl font-bold text-lg hover:bg-black dark:hover:bg-gray-200 transition-colors shadow-xl dark:shadow-none"
+                                className="ux-button-primary min-h-12 w-full text-base disabled:opacity-60"
                             >
                                 {submitting ? (isKorean ? '주문 접수 중…' : '注文処理中…') : copy.confirmOrder}
                             </button>

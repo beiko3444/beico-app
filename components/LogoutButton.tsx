@@ -6,11 +6,13 @@ import { LogOut } from 'lucide-react'
 export default function LogoutButton({
     className,
     children,
-    vertical = false
+    vertical = false,
+    label = '로그아웃'
 }: {
     className?: string,
     children?: React.ReactNode,
-    vertical?: boolean
+    vertical?: boolean,
+    label?: string
 }) {
     return (
         <button
@@ -21,7 +23,7 @@ export default function LogoutButton({
                 ${vertical ? 'min-h-10 min-w-[72px] gap-2 px-3 text-[12px] font-bold' : 'min-h-10 gap-2 px-3 text-sm font-semibold'}
                 ${className || ''}
             `}
-            aria-label="로그아웃"
+            aria-label={label}
         >
             {children || (
                 <>

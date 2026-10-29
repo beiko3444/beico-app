@@ -2,20 +2,19 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { ShoppingCart, History, User, Languages } from 'lucide-react'
+import { ShoppingCart, History, User } from 'lucide-react'
 
+// The translator opens in a new tab, so it lives with the header utilities (app/order/layout.tsx), not here.
 const JAPANESE_NAV_ITEMS = [
-    { href: '/order', label: '注文', subLabel: 'Order', icon: ShoppingCart },
-    { href: '/order/history', label: '履歴', subLabel: 'History', icon: History },
-    { href: '/order/profile', label: 'マイページ', subLabel: 'My Page', icon: User },
-    { href: '/translator', label: '翻訳', subLabel: 'Translator', icon: Languages },
+    { href: '/order', label: '注文', icon: ShoppingCart },
+    { href: '/order/history', label: '注文履歴', icon: History },
+    { href: '/order/profile', label: 'マイページ', icon: User },
 ]
 
 const KOREAN_NAV_ITEMS = [
-    { href: '/order', label: '주문', subLabel: '상품 주문', icon: ShoppingCart },
-    { href: '/order/history', label: '주문내역', subLabel: '진행 현황', icon: History },
-    { href: '/order/profile', label: '내 정보', subLabel: '계정 관리', icon: User },
-    { href: '/translator', label: '번역기', subLabel: '바로 번역', icon: Languages },
+    { href: '/order', label: '주문', icon: ShoppingCart },
+    { href: '/order/history', label: '주문내역', icon: History },
+    { href: '/order/profile', label: '내 정보', icon: User },
 ]
 
 export default function UserNavbar({ isKorean = false }: { isKorean?: boolean }) {
@@ -23,7 +22,7 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
     const navItems = isKorean ? KOREAN_NAV_ITEMS : JAPANESE_NAV_ITEMS
 
     return (
-        <nav className="fixed inset-x-0 bottom-0 z-[100] grid min-h-[68px] grid-cols-4 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] sm:static sm:flex sm:min-h-0 sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label="파트너 메뉴">
+        <nav className="fixed inset-x-0 bottom-0 z-[100] grid min-h-[68px] grid-cols-3 border-t border-[var(--border)] bg-[var(--card)] px-2 pb-[max(6px,env(safe-area-inset-bottom))] pt-1 shadow-[0_-6px_20px_rgba(16,24,40,0.08)] sm:static sm:flex sm:min-h-0 sm:items-center sm:gap-2 sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none" aria-label={isKorean ? '파트너 메뉴' : 'パートナーメニュー'}>
             {navItems.map((item) => {
                 const isActive = pathname === item.href || (item.href !== '/order' && pathname.startsWith(item.href))
                 const Icon = item.icon
@@ -32,24 +31,16 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
                     <Link
                         key={item.href}
                         href={item.href}
-                        prefetch={item.href === '/translator' ? false : undefined}
-                        target={item.href === '/translator' ? '_blank' : undefined}
-                        rel={item.href === '/translator' ? 'noopener noreferrer' : undefined}
                         aria-current={isActive ? 'page' : undefined}
-                        className={`group relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-3 text-center no-underline transition-colors sm:min-h-12 sm:min-w-[118px] sm:flex-row sm:gap-2.5 sm:px-4 ${
+                        className={`group relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-lg px-3 text-center no-underline transition-colors sm:min-h-11 sm:min-w-[118px] sm:flex-row sm:gap-2 sm:px-4 ${
                             isActive
-                                ? 'bg-[#FFF2EE] text-[#D9341A]'
-                                : 'text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)]'
+                                ? 'bg-brand-orange-soft font-bold text-brand-orange-strong dark:bg-white/10 dark:text-[var(--brand-accent)]'
+                                : 'font-semibold text-[var(--muted-foreground)] hover:bg-[var(--card-hover)] hover:text-[var(--foreground)]'
                         }`}
                     >
-                        {isActive ? <span className="absolute inset-x-4 top-0 h-0.5 rounded-b bg-[#E43D20] sm:hidden" /> : null}
-                        <Icon size={21} strokeWidth={isActive ? 2.5 : 2} />
-                        <span className="text-sm font-semibold leading-none sm:text-base">
-                            {item.label}
-                        </span>
-                        <span className={isKorean ? "hidden" : "hidden text-sm font-medium leading-none lg:inline"}>
-                            {item.subLabel}
-                        </span>
+                        {isActive ? <span className="absolute inset-x-4 top-0 h-0.5 rounded-b bg-brand-orange sm:hidden" /> : null}
+                        <Icon size={20} strokeWidth={isActive ? 2.5 : 2} aria-hidden />
+                        <span className="text-sm leading-none sm:text-[15px]">{item.label}</span>
                     </Link>
                 )
             })}

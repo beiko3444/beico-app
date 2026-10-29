@@ -1,18 +1,8 @@
-'use client'
-
-import { useRouter } from 'next/navigation'
-
+// No click-to-close on the background: it didn't look like a modal backdrop, so a stray tap closed the document.
 export default function InvoiceWrapper({ children }: { children: React.ReactNode }) {
-    const router = useRouter()
-
     return (
-        <div
-            className="min-h-screen bg-gray-100 py-10 print:bg-white print:py-0 font-sans cursor-pointer"
-            onClick={() => router.back()}
-        >
-            <div onClick={(e) => e.stopPropagation()} className="cursor-default">
-                {children}
-            </div>
+        <div className="min-h-screen bg-[var(--background)] pb-10 font-sans print:bg-white print:pb-0">
+            {children}
         </div>
     )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { buttonClass } from '@/components/ui/buttonClass'
 
 export default function ChangePasswordForm({ isKorean = false }: { isKorean?: boolean }) {
     const [currentPassword, setCurrentPassword] = useState('')
@@ -49,6 +50,9 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
         }
     }
 
+    const inputClass = 'ux-input h-12 text-base'
+    const ready = Boolean(currentPassword && newPassword && confirmPassword)
+
     return (
         <form
             onSubmit={handleSubmit}
@@ -61,61 +65,66 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
                     }
                 }
             }}
-            className="space-y-6"
+            className="space-y-5"
         >
-            <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">{isKorean ? '현재 비밀번호' : '現在のパスワード / Current Password'}</label>
-                <input
-                    type="password"
-                    required
-                    autoComplete="current-password"
-                    value={currentPassword}
-                    onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--input-border)] rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
-                    placeholder={isKorean ? '현재 비밀번호를 입력해주세요.' : '現在のパスワードを入力してください。'}
-                />
-            </div>
+            <div className="grid gap-5 sm:grid-cols-2">
+                <div className="space-y-2">
+                    <label htmlFor="current-password" className="block text-sm font-semibold">{isKorean ? '현재 비밀번호' : '現在のパスワード'}</label>
+                    <input
+                        id="current-password"
+                        type="password"
+                        required
+                        autoComplete="current-password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        className={inputClass}
+                    />
+                </div>
 
-            <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">{isKorean ? '새 비밀번호' : '新しいパスワード / New Password'}</label>
-                <input
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--input-border)] rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
-                    minLength={6}
-                    placeholder={isKorean ? '새 비밀번호(6자 이상)' : '新しいパスワード（6文字以上）'}
-                />
-            </div>
+                <div className="space-y-2 sm:col-start-1">
+                    <label htmlFor="new-password" className="block text-sm font-semibold">{isKorean ? '새 비밀번호' : '新しいパスワード'}</label>
+                    <input
+                        id="new-password"
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        className={inputClass}
+                        minLength={6}
+                        aria-describedby="new-password-help"
+                    />
+                    <p id="new-password-help" className="ux-helper">{isKorean ? '6자 이상' : '6文字以上'}</p>
+                </div>
 
-            <div className="space-y-1.5">
-                <label className="text-[12px] font-semibold text-[#1e293b] tracking-tight ml-1">{isKorean ? '새 비밀번호 확인' : 'パスワード確認 / Confirm Password'}</label>
-                <input
-                    type="password"
-                    required
-                    autoComplete="new-password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--input-border)] rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
-                    minLength={6}
-                    placeholder={isKorean ? '새 비밀번호를 다시 입력해주세요.' : '新しいパスワードをもう一度入力してください。'}
-                />
+                <div className="space-y-2">
+                    <label htmlFor="confirm-password" className="block text-sm font-semibold">{isKorean ? '새 비밀번호 확인' : '新しいパスワード（確認）'}</label>
+                    <input
+                        id="confirm-password"
+                        type="password"
+                        required
+                        autoComplete="new-password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        className={inputClass}
+                        minLength={6}
+                    />
+                </div>
             </div>
 
             {message.text && (
-                <div className={`p-4 rounded-xl text-xs font-bold ${message.type === 'success' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                <p role={message.type === 'success' ? 'status' : 'alert'} className={`rounded-lg border px-4 py-3 text-sm ${message.type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-[var(--danger-border)] bg-[var(--danger-soft)] text-[var(--danger)]'}`}>
                     {message.text}
-                </div>
+                </p>
             )}
 
+            {/* Stays grey until all three fields are filled, so the profile save above remains the one active primary. */}
             <button
                 type="submit"
-                disabled={loading}
-                className="w-full h-12 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-center font-bold text-[15px] tracking-wide disabled:opacity-70 mt-2"
+                disabled={loading || !ready}
+                className={buttonClass('primary', 'md', 'min-h-11')}
             >
-                {loading ? (isKorean ? '변경 중...' : 'Processing...') : (isKorean ? '비밀번호 변경' : 'パスワード変更 / Change Password')}
+                {loading ? (isKorean ? '변경 중…' : '変更中…') : (isKorean ? '비밀번호 변경' : 'パスワードを変更')}
             </button>
         </form>
     )
