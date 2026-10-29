@@ -285,7 +285,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                       <button
                         type="button"
                         onClick={() => editItem(item)}
-                        className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0')}
+                        className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                         title="수정"
                         aria-label={`${item.name} 수정`}
                       >
@@ -312,37 +312,30 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
                       최근 구매 {formatDateTime(item.lastPurchasedAt)}
                     </p>
                     <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto_auto] gap-1.5">
-                      {item.purchaseUrl ? (
-                        <a
-                          href={item.purchaseUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className={buttonClass('secondary', 'sm', 'min-w-0 px-2 no-underline')}
-                        >
-                          <ExternalLink size={12} />
-                          구매
-                        </a>
-                      ) : (
-                        <button type="button" disabled className={buttonClass('secondary', 'sm', 'min-w-0 px-2')} title="구매 링크가 없습니다">
-                          <ExternalLink size={12} />
-                          구매
-                        </button>
-                      )}
+                      <a
+                        href={item.purchaseUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-lg bg-[#07122F] px-2 text-[11px] font-black !text-white transition hover:bg-slate-800"
+                      >
+                        <ExternalLink size={12} />
+                        구매처 열기
+                      </a>
                       <button
                         type="button"
                         onClick={() => markPurchased(item)}
                         disabled={busyId === item.id}
-                        className={buttonClass('secondary', 'sm', 'px-2')}
-                        title="구매 완료 기록"
+                        className="inline-flex min-h-11 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[10px] font-black text-slate-600 transition hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50"
+                        title="실제 구매 후 최근 구매일을 기록합니다"
                       >
                         <CheckCircle2 size={12} />
-                        완료
+                        구매 기록
                       </button>
                       <button
                         type="button"
                         onClick={() => deleteItem(item)}
                         disabled={busyId === item.id}
-                        className={buttonClass('danger', 'sm', 'w-8 px-0')}
+                        className="inline-flex min-h-11 w-8 items-center justify-center rounded-lg text-slate-300 transition hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
                         title="삭제"
                         aria-label={`${item.name} 삭제`}
                       >
@@ -367,7 +360,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
           <aside className="min-w-0 rounded-2xl border border-slate-200 bg-white shadow-lg xl:sticky xl:top-20">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <div className="flex items-center gap-2.5">
-                <span className="inline-flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600">
+                <span className="inline-flex min-h-11 w-8 items-center justify-center rounded-lg bg-slate-100 text-slate-600">
                   <ShoppingCart size={16} />
                 </span>
                 <div>
@@ -378,7 +371,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
               <button
                 type="button"
                 onClick={() => setFormOpen(false)}
-                className={buttonClass('ghost', 'sm', 'h-8 w-8 px-0')}
+                className="inline-flex min-h-11 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                 title="닫기"
                 aria-label="닫기"
               >

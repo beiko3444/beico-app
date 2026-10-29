@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
+import Modal from '@/components/Modal'
 import { useRouter } from 'next/navigation'
 import BarcodeDisplay from '@/components/BarcodeDisplay'
-import { Minus, Plus, ArrowRight, Search, PackageSearch, CircleAlert } from 'lucide-react'
+import { Minus, Plus, ArrowRight, Search, PackageSearch } from 'lucide-react'
 import { isPartnerProductOrderable, normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 
 type Product = {
@@ -117,6 +118,10 @@ export default function OrderInterface({ products, isKorean = false }: { product
     const router = useRouter()
     const [quantities, setQuantities] = useState<Record<string, number>>({})
     const [showSummary, setShowSummary] = useState(false)
+    const [showSelected, setShowSelected] = useState(false)
+    const [submitting, setSubmitting] = useState(false)
+    const submittingRef = useRef(false)
+    const [orderError, setOrderError] = useState('')
     const [searchQuery, setSearchQuery] = useState('')
     const [statusFilter, setStatusFilter] = useState<'ALL' | 'AVAILABLE' | 'SOLD_OUT'>('ALL')
     const safeProducts = useMemo(
@@ -206,6 +211,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
         return safeProducts.filter((product) => {
             const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
+            if (showSelected && !safeNonNegativeInt(quantities[product.id])) return false
             if (statusFilter === 'AVAILABLE' && isSoldOut) return false
             if (statusFilter === 'SOLD_OUT' && !isSoldOut) return false
             if (!normalizedQuery) return true
@@ -214,12 +220,12 @@ export default function OrderInterface({ products, isKorean = false }: { product
                 .filter(Boolean)
                 .some((value) => value?.toLocaleLowerCase().includes(normalizedQuery))
         })
-    }, [safeProducts, searchQuery, statusFilter])
+    }, [safeProducts, searchQuery, statusFilter, showSelected, quantities])
 
     const handleQuantityChange = (productId: string, value: string | number) => {
         const qty = safeNonNegativeInt(value)
         const product = safeProducts.find(p => p.id === productId)
-        if (!product || !isPartnerProductOrderable(product.partnerSaleStatus)) return
+        if (!product || !isPartnerProductOrderable(product.partnerSaleStatus) || product.sellPrice <= 0) return
 
         setQuantities(prev => ({
             ...prev,
@@ -228,6 +234,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
     }
 
     const handleOrderNow = () => {
+        setOrderError('')
         const minimumViolations = safeProducts
             .filter(p => isPartnerProductOrderable(p.partnerSaleStatus))
             .filter(p => {
@@ -287,7 +294,8 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
 
     return (
-        <div className="space-y-6 pb-32">
+        <div className="space-y-5 pb-36">
+            {orderError && !showSummary && <p role="alert" className="ux-context text-[var(--danger)]">{orderError}</p>}
             <section aria-labelledby="partner-product-list-title" className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
                 <div>
                     <h1 id="partner-product-list-title" className="text-2xl font-black text-slate-950 sm:text-3xl dark:text-white">{copy.productList}</h1>
@@ -320,6 +328,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
             <div className="flex items-center justify-between border-b border-slate-200 pb-3 text-xs font-bold text-slate-400 dark:border-slate-800">
                 <span>{filteredProducts.length.toLocaleString()} {copy.resultCount}</span>
+                <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm font-medium text-[var(--foreground)]"><input type="checkbox" className="h-5 w-5" checked={showSelected} onChange={event => setShowSelected(event.target.checked)} />{isKorean ? '선택 상품만 보기' : '選択した商品のみ'}</label>
                 {searchQuery || statusFilter !== 'ALL' ? (
                     <button
                         type="button"
@@ -341,12 +350,13 @@ export default function OrderInterface({ products, isKorean = false }: { product
                 </div>
             ) : (
                 <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
-                    {filteredProducts.map((product, index) => {
+                    {filteredProducts.map((product) => {
                         const qty = safeNonNegativeInt(quantities[product.id])
                         const isSoldOut = product.partnerSaleStatus === 'SOLD_OUT'
                         const orderUnit = product.orderUnit
                         const displayRetail = product.country === 'Korea' ? product.krSellPrice : product.country === 'Japan' ? product.jpSellPrice : product.usSellPrice
-                        const displayWholesale = product.country === 'Korea' ? product.krBuyPrice : product.country === 'Japan' ? product.jpBuyPrice : product.usBuyPrice
+                        const displayWholesale = product.sellPrice
+                        const priceMissing = displayWholesale <= 0
                         const marginPercent = displayRetail > 0 ? ((displayRetail - displayWholesale) / displayRetail * 100).toFixed(1) : '0.0'
                         const priceSymbol = product.country === 'Korea' ? '₩' : product.country === 'Japan' ? '¥' : '$'
                         const priceOptions = product.country !== 'Korea' && product.country !== 'Japan'
@@ -354,123 +364,40 @@ export default function OrderInterface({ products, isKorean = false }: { product
                             : undefined
                         const wholesaleLabel = product.country === 'Korea' ? copy.wholesaleKr : product.country === 'Japan' ? '卸売価格 日本' : '卸売価格 米国'
                         const retailLabel = product.country === 'Korea' ? copy.retailKr : product.country === 'Japan' ? '小売価格 日本' : '小売価格 米国'
-                        const regionLabel = product.country === 'Korea' ? copy.krPriceSub : product.country === 'Japan' ? 'JAPAN' : 'UNITED STATES'
 
+                        const invalidQuantity = qty > 0 && (qty < product.minOrderQuantity || qty % orderUnit !== 0)
                         return (
-                            <article
-                                key={product.id}
-                                data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'}
-                                className={`group flex h-full flex-col overflow-hidden rounded-2xl border bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)] transition-shadow hover:shadow-[0_14px_36px_rgba(15,23,42,0.10)] dark:bg-slate-900 ${isSoldOut ? 'border-rose-200 dark:border-rose-900/80' : 'border-slate-200 dark:border-slate-800'}`}
-                            >
-                                <div className="flex flex-1 flex-col p-4 sm:p-5">
-                                    <div className="grid grid-cols-[96px_minmax(0,1fr)] gap-4 sm:grid-cols-[150px_minmax(0,1fr)] sm:gap-5">
-                                        <div className="flex min-h-[142px] items-center justify-center overflow-hidden rounded-xl bg-slate-100 p-2 sm:min-h-[184px] dark:bg-slate-800">
-                                            {product.imageUrl ? (
-                                                <img src={product.imageUrl} alt={product.name} className="max-h-[168px] max-w-full object-contain mix-blend-multiply transition-transform duration-300 group-hover:scale-[1.03] dark:mix-blend-normal" />
-                                            ) : (
-                                                <span className="text-center text-sm font-bold text-slate-400">{copy.noImage}</span>
-                                            )}
-                                        </div>
-
-                                        <div className="min-w-0">
-                                            <div className="flex flex-wrap items-start justify-between gap-2">
-                                                <span
-                                                    role="status"
-                                                    aria-label={isSoldOut ? (isKorean ? '품절 상품' : '品切れ商品') : (isKorean ? '주문 가능 상품' : '注文可能商品')}
-                                                    className={`inline-flex shrink-0 items-center rounded-lg px-3 py-1.5 text-sm font-black ${isSoldOut ? 'bg-rose-500 text-white' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:ring-emerald-900'}`}
-                                                >
-                                                    {isSoldOut ? copy.soldOut : copy.available}
-                                                </span>
-                                                <span className="pt-1 text-sm font-bold tabular-nums text-slate-300 dark:text-slate-600">{String(index + 1).padStart(3, '0')}</span>
-                                            </div>
-                                            <h2 className="mt-3 break-words text-lg font-bold leading-snug text-slate-950 sm:text-2xl dark:text-white">{displayProductName(product)}</h2>
-                                            {!isKorean ? <p className="mt-1 line-clamp-1 text-xs font-semibold text-slate-400">{product.nameEN || product.name}</p> : null}
-                                            <p className="mt-3 text-sm font-bold text-slate-500 dark:text-slate-400">
-                                                {copy.productCode} <span className="font-mono text-slate-800 dark:text-slate-200">{product.productCode || '-'}</span>
-                                            </p>
-
-                                            {product.barcode ? (
-                                                <div className="mt-2 max-w-full overflow-hidden">
-                                                    <BarcodeDisplay
-                                                        value={product.barcode}
-                                                        width={0.8}
-                                                        height={25}
-                                                        displayValue={false}
-                                                        containerClassName="gap-2 mb-1"
-                                                        buttonClassName="rounded-md border border-slate-200 bg-white px-2 py-1 text-sm font-bold text-slate-500 transition-colors hover:border-[#d9361b] hover:bg-[#d9361b] hover:text-white dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
-                                                    />
-                                                    <p className="mt-1 font-mono text-sm font-semibold text-slate-500">{product.barcode}</p>
-                                                </div>
-                                            ) : (
-                                                <p className="mt-3 text-sm font-bold text-slate-300 dark:text-slate-600">{copy.noBarcode}</p>
-                                            )}
-                                        </div>
+                            <article key={product.id} data-partner-sale-status={isSoldOut ? 'sold-out' : 'available'} className={`flex h-full flex-col rounded-2xl border bg-[var(--card)] p-4 sm:p-5 ${qty > 0 ? 'border-blue-400 ring-1 ring-blue-200' : 'border-[var(--border)]'}`}>
+                                <div className="flex items-start gap-4">
+                                    <div className="flex h-24 w-20 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] p-1 sm:h-28 sm:w-24">
+                                        {product.imageUrl ? <img src={product.imageUrl} alt={displayProductName(product)} className="max-h-full max-w-full object-contain" loading="lazy" /> : <span className="text-xs text-[var(--muted-foreground)]">{copy.noImage}</span>}
                                     </div>
-
-                                    {isSoldOut ? (
-                                        <div className="mt-4 flex items-start gap-2 rounded-xl bg-rose-50 px-4 py-3 text-base font-medium leading-6 text-rose-700 dark:bg-rose-950/25 dark:text-rose-300">
-                                            <CircleAlert size={17} className="mt-0.5 shrink-0" />
-                                            <span>{copy.soldOutNotice}</span>
-                                        </div>
-                                    ) : null}
-
-                                    <div className="mt-4 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 dark:border-slate-700 dark:bg-slate-800/70">
-                                        <div className="grid grid-cols-2 border-b border-slate-200 dark:border-slate-700">
-                                            <div className="border-r border-slate-200 px-4 py-3 dark:border-slate-700">
-                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{wholesaleLabel}</p>
-                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{regionLabel}</p>}
-                                                <p className="mt-2 text-right text-2xl font-bold tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayWholesale, priceOptions)}</p>
-                                            </div>
-                                            <div className="px-4 py-3">
-                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{retailLabel}</p>
-                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{regionLabel}</p>}
-                                                <p className="mt-2 text-right text-2xl font-bold tabular-nums text-slate-950 dark:text-white"><span className="mr-1 text-sm">{priceSymbol}</span>{formatNumber(displayRetail, priceOptions)}</p>
-                                            </div>
-                                        </div>
-                                        <div className="grid grid-cols-2">
-                                            <div className={`border-r border-slate-200 px-4 py-3 dark:border-slate-700 ${isSoldOut ? 'bg-rose-50/70 dark:bg-rose-950/20' : ''}`}>
-                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{copy.orderStatus}</p>
-                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{copy.orderStatusSub}</p>}
-                                                <p className={`mt-2 text-right text-lg font-black ${isSoldOut ? 'text-rose-600 dark:text-rose-400' : 'text-emerald-600 dark:text-emerald-400'}`}>{isSoldOut ? copy.soldOut : copy.available}</p>
-                                            </div>
-                                            <div className="px-4 py-3">
-                                                <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{copy.margin}</p>
-                                                {!isKorean && <p className="text-sm font-medium text-slate-500">{copy.marginSub}</p>}
-                                                <p className="mt-2 text-right text-2xl font-bold tabular-nums text-[#e34219]">{marginPercent}%</p>
-                                            </div>
-                                        </div>
+                                    <div className="min-w-0 flex-1">
+                                        <span role="status" className={`inline-flex rounded-md px-2 py-1 text-xs font-semibold ${isSoldOut || priceMissing ? 'bg-amber-50 text-amber-800' : 'bg-emerald-50 text-emerald-700'}`}>{isSoldOut ? copy.soldOut : priceMissing ? (isKorean ? '가격 확인 필요' : '価格確認が必要') : copy.available}</span>
+                                        <h2 className="mt-2 break-words text-base font-bold leading-snug sm:text-lg">{displayProductName(product)}</h2>
+                                        <div className="mt-2 flex flex-wrap items-baseline gap-2"><span className="text-xs text-[var(--muted-foreground)]">{wholesaleLabel}</span><strong className="text-2xl tabular-nums">{priceMissing ? '—' : `${priceSymbol}${formatNumber(displayWholesale, priceOptions)}`}</strong></div>
                                     </div>
                                 </div>
-
-                                <div className="flex flex-col gap-4 border-t border-slate-100 bg-white px-4 py-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-5 dark:border-slate-800 dark:bg-slate-900">
-                                    <div>
-                                        <p className="text-base font-semibold text-slate-700 dark:text-slate-200">{copy.minimumOrder}</p>
-                                        <p className="mt-1 text-sm font-medium leading-6 text-slate-600">{copy.minimumOrderSub}: {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : 'EA'} · {copy.orderUnit}: {formatNumber(orderUnit)}{isKorean ? '개' : 'EA'}</p>
+                                <details className="mt-3 border-t border-[var(--border)] pt-1">
+                                    <summary className="min-h-11 cursor-pointer py-3 text-sm font-medium text-[var(--muted-foreground)]">{isKorean ? '상품 자료·권장 판매가' : '商品情報・参考価格'}</summary>
+                                    <div className="space-y-3 pb-3 text-sm text-[var(--muted-foreground)]">
+                                        <p>{copy.productCode} {product.productCode || '—'}</p>
+                                        {!isKorean && product.nameEN && <p>{product.nameEN}</p>}
+                                        <p>{retailLabel} {displayRetail > 0 ? `${priceSymbol}${formatNumber(displayRetail, priceOptions)}` : '—'} · {copy.margin} {displayRetail > 0 && !priceMissing ? `${marginPercent}%` : '—'}</p>
+                                        {product.barcode ? <div><BarcodeDisplay value={product.barcode} width={0.8} height={25} displayValue={false} containerClassName="gap-2 mb-1" buttonClassName="ux-button" /><p className="mt-2 font-mono">{product.barcode}</p></div> : <p>{copy.noBarcode}</p>}
                                     </div>
-
-                                    {isSoldOut ? (
-                                        <div className="rounded-xl bg-slate-100 px-4 py-3 text-center text-sm font-medium text-slate-600 sm:min-w-[220px] dark:bg-slate-800 dark:text-slate-400">{copy.soldOutOrderDisabled}</div>
-                                    ) : (
-                                        <div className={`flex h-12 items-center overflow-hidden rounded-xl border shadow-sm ${qty === 0 ? 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900' : 'border-[#e34219] bg-[#fff7f3] dark:bg-[#2a1a1a]'}`}>
-                                            <button type="button" aria-label={isKorean ? '수량 줄이기' : '数量を減らす'} onClick={() => handleQuantityChange(product.id, Math.max(0, qty - orderUnit))} className="flex h-full w-11 items-center justify-center text-slate-700 hover:bg-slate-50 dark:text-white dark:hover:bg-slate-800">
-                                                <Minus size={16} strokeWidth={2.5} />
-                                            </button>
-                                            <input
-                                                aria-label={isKorean ? `${displayProductName(product)} 주문 수량` : `${displayProductName(product)} 注文数量`}
-                                                inputMode="numeric"
-                                                type="text"
-                                                value={formatNumber(qty)}
-                                                onChange={(event) => {
-                                                    const value = event.target.value.replace(/,/g, '')
-                                                    if (/^\d*$/.test(value)) handleQuantityChange(product.id, value)
-                                                }}
-                                                className={`h-full w-20 border-x border-y-0 border-slate-200 bg-transparent text-center text-lg font-black outline-none dark:border-slate-700 ${qty > 0 ? 'text-[#e34219]' : 'text-slate-900 dark:text-white'}`}
-                                            />
-                                            <button type="button" aria-label={isKorean ? '수량 늘리기' : '数量を増やす'} onClick={() => handleQuantityChange(product.id, qty + orderUnit)} className="flex h-full w-11 items-center justify-center text-slate-700 hover:bg-slate-50 dark:text-white dark:hover:bg-slate-800">
-                                                <Plus size={16} strokeWidth={2.5} />
-                                            </button>
+                                </details>
+                                <div className="mt-auto border-t border-[var(--border)] pt-3">
+                                    <p className="mb-3 text-xs leading-5 text-[var(--muted-foreground)]">{copy.minimumOrderSub} {formatNumber(product.minOrderQuantity)}{isKorean ? '개' : 'EA'} · {copy.orderUnit} {formatNumber(orderUnit)}{isKorean ? '개' : 'EA'}</p>
+                                    {isSoldOut || priceMissing ? <p className="rounded-lg bg-[var(--surface)] p-3 text-sm text-[var(--muted-foreground)]">{isSoldOut ? copy.soldOutOrderDisabled : (isKorean ? '거래 단가 확인 후 주문할 수 있습니다. 관리자에게 문의해 주세요.' : '価格確認後にご注文いただけます。管理者にお問い合わせください。')}</p> : <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex h-12 items-center overflow-hidden rounded-lg border border-[var(--border-strong)]">
+                                            <button type="button" aria-label={isKorean ? '수량 줄이기' : '数量を減らす'} onClick={() => handleQuantityChange(product.id, qty - orderUnit < product.minOrderQuantity ? 0 : qty - orderUnit)} className="flex h-full w-12 items-center justify-center hover:bg-[var(--surface)]"><Minus size={17} /></button>
+                                            <input type="text" inputMode="numeric" aria-label={`${displayProductName(product)} ${isKorean ? '주문 수량' : '注文数量'}`} aria-invalid={invalidQuantity} aria-describedby={`quantity-help-${product.id}`} value={formatNumber(qty)} onChange={event => { const value = event.target.value.replace(/,/g, ''); if (/^\d*$/.test(value)) handleQuantityChange(product.id, value) }} className="h-full w-20 border-x border-[var(--border)] bg-transparent text-center text-lg font-bold" />
+                                            <button type="button" aria-label={isKorean ? '수량 늘리기' : '数量を増やす'} onClick={() => handleQuantityChange(product.id, qty === 0 ? Math.ceil(product.minOrderQuantity / orderUnit) * orderUnit : qty + orderUnit)} className="flex h-full w-12 items-center justify-center hover:bg-[var(--surface)]"><Plus size={17} /></button>
                                         </div>
-                                    )}
+                                        <span className="text-base font-semibold tabular-nums">{priceSymbol}{formatMoney(qty * product.sellPrice, isUSD)}</span>
+                                    </div>}
+                                    <p id={`quantity-help-${product.id}`} className={`mt-2 text-xs ${invalidQuantity ? 'text-[var(--danger)]' : 'text-[var(--muted-foreground)]'}`}>{invalidQuantity ? (isKorean ? '최소 수량 이상, 주문 단위의 배수로 입력해 주세요.' : '最小数量以上、注文単位の倍数で入力してください。') : qty > 0 ? (isKorean ? '선택됨 · 주문 내용 확인에서 최종 금액을 확인하세요.' : '選択済み · 注文内容の確認へお進みください。') : ''}</p>
                                 </div>
                             </article>
                         )
@@ -481,20 +408,20 @@ export default function OrderInterface({ products, isKorean = false }: { product
             {/* Sticky Footer */}
             {hasItems && (
                 <div className="fixed bottom-[calc(68px+env(safe-area-inset-bottom))] sm:bottom-0 left-0 right-0 bg-white/95 dark:bg-[#1e1e1e]/95 backdrop-blur-xl border-t border-gray-200 dark:border-[#2a2a2a] p-4 md:px-8 md:py-6 z-50 shadow-[0_-10px_40px_-15px_rgba(0,0,0,0.1)] dark:shadow-none animate-in slide-in-from-bottom duration-300">
-                    <div className="max-w-6xl mx-auto flex flex-col md:flex-row justify-end items-end md:items-center gap-4 md:gap-12">
+                    <div className="mx-auto flex max-w-6xl items-center justify-between gap-3">
                         <div className="text-right flex flex-col items-end">
                             <div className="flex flex-col items-end mb-1 text-gray-400 dark:text-gray-500 gap-0.5">
                                 <span className="text-sm font-black leading-tight">{copy.totalExcludingTax}</span>
                                 <span className="text-xs font-bold uppercase tracking-widest leading-none">{copy.totalExcludingTaxSub}</span>
                             </div>
-                            <p className="text-4xl font-medium text-[#111827] dark:text-white leading-none font-inter tracking-tighter">
+                            <p className="text-2xl font-bold text-[#111827] dark:text-white leading-none font-inter tracking-tighter">
                                 <span className="text-[0.5em] mr-1">{currencySymbol}</span>{formatMoney(productTotal, isUSD)}
                             </p>
                         </div>
 
                         <button
                             onClick={handleOrderNow}
-                            className="h-14 px-10 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-end md:justify-center gap-3 font-bold text-[15px] tracking-wide group w-full md:w-auto"
+                            className="min-h-12 px-5 bg-[#e34219] hover:bg-[#d03a15] text-white rounded-lg shadow-[0_4px_14px_0_rgba(227,66,25,0.12)] hover:shadow-[0_6px_20px_0_rgba(227,66,25,0.18)] transition-all active:scale-[0.98] flex items-center justify-end md:justify-center gap-3 font-bold text-[15px] tracking-wide group shrink-0"
                         >
                             <div className="flex flex-col items-end md:items-start leading-none">
                                 <span className="text-lg">{copy.orderNow}</span>
@@ -508,9 +435,10 @@ export default function OrderInterface({ products, isKorean = false }: { product
 
             {
                 showSummary && (
-                    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-[32px] shadow-2xl dark:shadow-none max-w-md w-full p-8 relative animate-in zoom-in-95 duration-200 overflow-hidden">
+                    <Modal label={copy.summaryTitle} onClose={() => { if (!submittingRef.current) setShowSummary(false) }} className="flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+                        <div className="bg-white dark:bg-[#1e1e1e] rounded-[32px] shadow-2xl dark:shadow-none max-w-md w-full p-6 relative animate-in zoom-in-95 duration-200 overflow-y-auto">
                             <button
+                                aria-label={isKorean ? '주문 확인 닫기' : '閉じる'} disabled={submitting}
                                 onClick={() => setShowSummary(false)}
                                 className="absolute top-6 right-6 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 dark:hover:bg-[#2a2a2a] transition-colors"
                             >
@@ -520,6 +448,7 @@ export default function OrderInterface({ products, isKorean = false }: { product
                             <h3 className="text-2xl font-black text-gray-900 dark:text-white mb-2">{copy.summaryTitle}</h3>
                             <p className="text-xs text-gray-500 dark:text-gray-400 mb-8 font-medium uppercase tracking-widest">{copy.summarySub}</p>
 
+                            <button type="button" className="ux-button mb-4" disabled={submitting} onClick={() => { setShowSummary(false); setShowSelected(true); setSearchQuery(''); setStatusFilter('ALL') }}>{isKorean ? '선택 상품 수량 수정' : '選択商品の数量を変更'}</button>
                             <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-200 dark:scrollbar-thumb-gray-700">
                                 {safeProducts.filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0).map(p => (
                                     <div key={p.id} className="flex justify-between items-center py-2 border-b border-gray-50 dark:border-[#2a2a2a]">
@@ -558,8 +487,13 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                 </div>
                             </div>
 
-                            <button
+                            {orderError && <p role="alert" className="mb-4 text-sm text-[var(--danger)]">{orderError}</p>}
+                            <button disabled={submitting} aria-busy={submitting}
                                 onClick={async () => {
+                                    if (submittingRef.current) return
+                                    submittingRef.current = true
+                                    setSubmitting(true)
+                                    setOrderError('')
                                     try {
                                         const items = safeProducts
                                             .filter(p => isPartnerProductOrderable(p.partnerSaleStatus) && safeNonNegativeInt(quantities[p.id]) > 0)
@@ -576,25 +510,25 @@ export default function OrderInterface({ products, isKorean = false }: { product
                                         })
 
                                         if (res.ok) {
-                                            alert(isKorean ? '주문이 접수되었습니다. 감사합니다!' : 'ご注文ありがとうございます！');
+
                                             setShowSummary(false);
                                             setQuantities({});
                                             router.push('/order/history');
                                         } else {
                                             const errorData = await res.json();
-                                            alert(`${isKorean ? '주문 실패' : '注文に失敗しました'}: ${errorData.error}`);
+                                            setOrderError(`${isKorean ? '주문 실패' : '注文に失敗しました'}: ${errorData.error}`);
                                         }
                                     } catch (e) {
                                         console.error(e)
-                                        alert(isKorean ? '주문 처리 중 오류가 발생했습니다.' : 'エラーが発生しました。');
-                                    }
+                                        setOrderError(isKorean ? '주문 처리 중 오류가 발생했습니다. 다시 시도해 주세요.' : 'エラーが発生しました。再度お試しください。');
+                                    } finally { submittingRef.current = false; setSubmitting(false) }
                                 }}
                                 className="w-full bg-[#111827] dark:bg-white text-white dark:text-[#111827] py-4 rounded-xl font-bold text-lg hover:bg-black dark:hover:bg-gray-200 transition-colors shadow-xl dark:shadow-none"
                             >
-                                {copy.confirmOrder}
+                                {submitting ? (isKorean ? '주문 접수 중…' : '注文処理中…') : copy.confirmOrder}
                             </button>
                         </div>
-                    </div>
+                    </Modal>
                 )}
         </div>
     )

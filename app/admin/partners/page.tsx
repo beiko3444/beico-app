@@ -75,7 +75,9 @@ const getCachedPartnersPageData = unstable_cache(
     { revalidate: 60, tags: ['partners'] }
 )
 
-export default async function PartnersPage() {
+export default async function PartnersPage({ searchParams }: { searchParams: Promise<{ q?: string; status?: string; country?: string }> }) {
+    const filters = await searchParams
+    const query = (filters.q || '').trim().toLocaleLowerCase()
     const { activePartners, deletedPartners } = await getCachedPartnersPageData()
 
     const mapPartnerDocuments = (partners: typeof activePartners) => partners.map(({ partnerProfile, updatedAt, ...partner }) => ({
@@ -90,30 +92,31 @@ export default async function PartnersPage() {
         } : null,
     }))
 
-    const mappedActivePartners = mapPartnerDocuments(activePartners)
+    const mappedActivePartners = mapPartnerDocuments(activePartners).filter(partner => {
+        if (filters.status && partner.status !== filters.status) return false
+        if (filters.country && partner.country !== filters.country) return false
+        return !query || [partner.name, partner.username, partner.partnerProfile?.businessName, partner.partnerProfile?.representativeName].some(value => value?.toLocaleLowerCase().includes(query))
+    })
     const mappedDeletedPartners = mapPartnerDocuments(deletedPartners)
 
     return (
-        <div className="min-w-0 space-y-5">
-            <PageHeader
-                title="파트너관리"
-                count={mappedActivePartners.length}
-                description="파트너 계정을 등록·수정하고 가입 승인과 등급을 관리합니다."
-                actions={(
-                    <>
-                        <Link href="/admin/notices" className={buttonClass('secondary', 'md')}>
-                            <Megaphone size={15} />
-                            파트너 공지
-                        </Link>
-                        <PartnerTrashbin deletedPartners={mappedDeletedPartners} />
-                        <PartnerForm />
-                    </>
-                )}
-            />
 
-            <div className="min-w-0 overflow-x-auto rounded-2xl border border-slate-200 bg-white dark:bg-[#1e1e1e] dark:border-[#2a2a2a]">
-                <table className="w-full min-w-[960px] table-auto border-collapse text-xs">
-                    <thead className="ux-thead">
+        <div className="min-w-0 space-y-6">
+            <PageHeader title="파트너 관리" count={mappedActivePartners.length} description="거래처 정보를 조회하고 승인 상태를 관리합니다." actions={<>
+                <Link href="/admin/notices" className={buttonClass('secondary')}><Megaphone size={15} />파트너 공지</Link>
+                <PartnerTrashbin deletedPartners={mappedDeletedPartners} /><PartnerForm />
+            </>} />
+
+            <form className="ux-panel flex flex-wrap gap-3 p-4" method="get">
+                <label className="min-w-0 flex-1"><span className="mb-1 block text-xs font-semibold">상호·아이디·담당자</span><input name="q" type="search" defaultValue={filters.q || ''} placeholder="파트너 검색" className="ux-input" /></label>
+                <label><span className="mb-1 block text-xs font-semibold">승인 상태</span><select name="status" defaultValue={filters.status || ''} className="ux-input"><option value="">전체</option><option value="PENDING">승인 대기</option><option value="APPROVED">승인 완료</option></select></label>
+                <label><span className="mb-1 block text-xs font-semibold">거래 국가</span><select name="country" defaultValue={filters.country || ''} className="ux-input"><option value="">전체</option><option value="Korea">한국</option><option value="Japan">일본</option><option value="USA">미국</option><option value="China">중국</option><option value="Turkey">투르키예</option><option value="Indonesia">인도네시아</option></select></label>
+                <button type="submit" className="ux-button-primary self-end">조회</button><Link href="/admin/partners" className="ux-button self-end">초기화</Link>
+            </form>
+            <p className="ux-helper">{mappedActivePartners.length}개 조회 · 상호를 누르면 정보를 수정할 수 있습니다. 등급은 거래 단가에 적용됩니다.</p>
+            <div className="glass-panel rounded-2xl shadow-sm dark:shadow-none bg-white dark:bg-[#1e1e1e] border border-gray-100 dark:border-[#2a2a2a] overflow-x-auto">
+                <table className="table-auto min-w-full border-collapse text-xs">
+                    <thead className="bg-[#d9361b] text-white h-8">
                         <tr>
                             <th className="w-12 text-center">No</th>
                             <th className="text-left">상호명</th>
@@ -141,14 +144,14 @@ export default async function PartnersPage() {
                                         <PartnerForm
                                             initialData={partner}
                                             trigger={
-                                                <button type="button" className="text-left underline-offset-4 decoration-slate-400 hover:underline dark:decoration-gray-500">
-                                                    <div className="flex items-center gap-2 whitespace-nowrap">
-                                                        <div className="text-sm font-bold text-slate-900 transition-colors group-hover:text-brand-orange dark:text-white">{partner.name}</div>
+                                                <button className="text-left hover:underline decoration-gray-400 dark:decoration-gray-500 underline-offset-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="font-bold text-gray-900 dark:text-white group-hover:text-[var(--color-brand-blue)] transition-colors text-sm">{partner.partnerProfile?.businessName || partner.name}</div>
                                                         {partner.role === 'ADMIN' && (
                                                             <span className="inline-flex h-5 items-center whitespace-nowrap rounded-full bg-brand-ink px-2 text-[11px] font-bold text-white">관리자</span>
                                                         )}
                                                     </div>
-                                                    <div className="mt-0.5 text-[11px] text-slate-500 dark:text-gray-500">담당자: {partner.partnerProfile?.representativeName || '-'}</div>
+                                                    <div className="text-[10px] text-gray-400 dark:text-gray-500">{partner.username} · 담당자 {partner.partnerProfile?.representativeName || '-'} · 수정</div>
                                                 </button>
                                             }
                                         />

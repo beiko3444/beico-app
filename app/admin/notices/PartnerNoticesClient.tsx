@@ -1,7 +1,8 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { AlertTriangle, BellRing, CalendarClock, Edit3, Info, Megaphone, Plus, Power, Trash2, X } from 'lucide-react'
+import Link from 'next/link'
+import { ArrowLeft, AlertTriangle, BellRing, CalendarClock, Edit3, Info, Megaphone, Plus, Power, Trash2, X } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import EmptyState from '@/components/ui/EmptyState'
@@ -162,17 +163,26 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
   }
 
   return (
-    <div className="min-w-0 space-y-5">
-      <PageHeader
-        title="파트너 공지"
-        count={notices.length}
-        description={`현재 파트너에게 노출 중인 공지 ${liveCount}개`}
-        actions={(
-          <Button type="button" variant="primary" onClick={openCreate} icon={<Plus size={16} />}>
-            새 공지 등록
-          </Button>
-        )}
-      />
+    <div className="space-y-5">
+      <header className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between dark:border-[#2a2a2a] dark:bg-[#1e1e1e]">
+        <div className="flex items-center gap-2">
+          <Link href="/admin/partners" aria-label="파트너 관리로 돌아가기" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 hover:text-slate-900 dark:border-[#333] dark:text-slate-300">
+            <ArrowLeft size={17} />
+          </Link>
+          <div className="flex items-center gap-2">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-orange-50 text-[#d9361b]">
+              <Megaphone size={19} />
+            </div>
+            <div>
+              <h1 className="text-xl font-black text-slate-950 dark:text-white">파트너 공지</h1>
+              <p className="mt-0.5 text-xs font-medium text-slate-500">현재 파트너에게 노출 중인 공지 {liveCount}개</p>
+            </div>
+          </div>
+        </div>
+        <button type="button" onClick={openCreate} className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-[#d9361b] px-5 text-sm font-black text-white shadow-sm transition hover:bg-[#c52e16]">
+          <Plus size={17} /> 새 공지 등록
+        </button>
+      </header>
 
       {error && !editorOpen ? (
         <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-bold text-rose-700">{error}</div>
@@ -205,12 +215,12 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
                     <h2 className="mt-3 text-lg font-black leading-snug text-slate-950 break-keep dark:text-white">{notice.title}</h2>
                   </div>
                   <div className="flex shrink-0 gap-1">
-                    <button type="button" onClick={() => openEdit(notice)} aria-label="공지 수정" className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:border-[#333] dark:bg-[#242424]"><Edit3 size={15} /></button>
-                    <button type="button" onClick={() => toggleNotice(notice)} aria-label={notice.isActive ? '공지 중지' : '공지 사용'} className={`flex h-9 w-9 items-center justify-center rounded-xl border bg-white dark:border-[#333] dark:bg-[#242424] ${notice.isActive ? 'border-emerald-200 text-emerald-600' : 'border-slate-200 text-slate-500'}`}><Power size={15} /></button>
-                    <button type="button" onClick={() => deleteNotice(notice)} aria-label="공지 삭제" className="flex h-9 w-9 items-center justify-center rounded-xl border border-red-200 bg-white text-red-600 hover:bg-red-50 dark:border-[#333] dark:bg-[#242424]"><Trash2 size={15} /></button>
+                    <button type="button" onClick={() => openEdit(notice)} aria-label="공지 수정" className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:text-blue-600 dark:border-[#333] dark:bg-[#242424]"><Edit3 size={15} /></button>
+                    <button type="button" onClick={() => toggleNotice(notice)} aria-label={notice.isActive ? '공지 중지' : '공지 사용'} className={`flex h-11 w-11 items-center justify-center rounded-lg border bg-white dark:border-[#333] dark:bg-[#242424] ${notice.isActive ? 'border-emerald-200 text-emerald-600' : 'border-slate-200 text-slate-400'}`}><Power size={15} /></button>
+                    <button type="button" onClick={() => deleteNotice(notice)} aria-label="공지 삭제" className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 hover:border-rose-200 hover:text-rose-600 dark:border-[#333] dark:bg-[#242424]"><Trash2 size={15} /></button>
                   </div>
                 </div>
-                <p className="mt-4 line-clamp-4 whitespace-pre-wrap text-sm font-medium leading-6 text-slate-600 dark:text-slate-300">{notice.content}</p>
+                <details className="mt-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-600 dark:text-slate-300">공지 전문 보기</summary><p className="whitespace-pre-wrap text-sm font-medium leading-6 text-slate-600 dark:text-slate-300">{notice.content}</p></details>
                 <div className="mt-5 grid gap-2 rounded-xl border border-white/80 bg-white/65 p-3 text-[11px] font-medium text-slate-500 sm:grid-cols-2 dark:border-[#333] dark:bg-[#242424]">
                   <span className="flex items-center gap-1.5"><CalendarClock size={13} /> 시작: {formatDate(notice.startsAt)}</span>
                   <span className="flex items-center gap-1.5"><CalendarClock size={13} /> 종료: {formatDate(notice.endsAt)}</span>
@@ -228,7 +238,7 @@ export default function PartnerNoticesClient({ initialNotices }: { initialNotice
               <div>
                 <h2 id="notice-editor-title" className="text-xl font-black text-slate-950 dark:text-white">{form.id ? '공지 수정' : '새 공지 등록'}</h2>
               </div>
-              <button type="button" onClick={() => setEditorOpen(false)} aria-label="닫기" className="flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#292929] dark:text-slate-300"><X size={18} /></button>
+              <button type="button" onClick={() => setEditorOpen(false)} aria-label="닫기" className="flex h-11 w-11 items-center justify-center rounded-full bg-slate-100 text-slate-500 dark:bg-[#292929] dark:text-slate-300"><X size={18} /></button>
             </div>
 
             <div className="space-y-5 p-6">

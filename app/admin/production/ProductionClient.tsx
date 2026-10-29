@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { productionReviewReason } from '@/lib/productionReview'
 import { createPortal } from 'react-dom'
 import Button from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
@@ -51,6 +52,7 @@ type Product = ProductionPriceProduct
 const CATEGORIES = [...PRODUCTION_CATEGORIES]
 
 export default function ProductionClient() {
+    const [excludeReview, setExcludeReview] = useState(false)
     const [activeTab, setActiveTab] = useState(CATEGORIES[0]) // Default to 청갯지렁이
 
     // Formatting Helpers
@@ -313,7 +315,6 @@ export default function ProductionClient() {
     }
 
     const currentPriceInfo = getProductPricing()
-    const wholesaleMargins = batches.map(batch => productionMargin(batch.salesPrice, batch.unitCost)).filter((margin): margin is number => margin !== null)
     const overseasRemittanceAmount = Number(parseNumber(formData.rawMaterialCost)) || 0
     const usdAmount = Number(parseDecimal(formData.depositDollar)) || 0
     const remittanceExchangeRate = usdAmount > 0 ? overseasRemittanceAmount / usdAmount : null
@@ -341,6 +342,10 @@ export default function ProductionClient() {
                 unit: b.unitCost || 0
             })), [batches]
     )
+
+    const reviewBatches = batches.filter(batch => productionReviewReason(batch))
+    const summaryBatches = excludeReview ? batches.filter(batch => !productionReviewReason(batch)) : batches
+    const wholesaleMargins = summaryBatches.map(batch => productionMargin(batch.salesPrice, batch.unitCost)).filter((margin): margin is number => margin !== null)
 
     return (
         <div className="min-w-0 space-y-6">
@@ -395,33 +400,41 @@ export default function ProductionClient() {
 
             <h2 className="text-[13px] font-bold text-slate-800 dark:text-gray-300">{activeTab} 생산일지</h2>
 
+            <div className="ux-context space-y-2">
+                <p>전체 {batches.length}차수 중 {summaryBatches.length}차수 집계 · 평균은 차수별 단순 평균입니다.</p>
+                {reviewBatches.length > 0 && <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-amber-900" role="status">
+                    <p className="font-semibold">원가·수량을 검토할 기록이 {reviewBatches.length}건 있습니다.</p>
+                    <p className="mt-1">생산단가 미입력, 수량 0 이하 또는 단가가 도매가보다 높은 기록입니다. 오류나 생산 미완료로 단정하지 않으며 기본 집계에는 포함됩니다.</p>
+                    <label className="mt-2 flex min-h-11 cursor-pointer items-center gap-2"><input type="checkbox" checked={excludeReview} onChange={event => setExcludeReview(event.target.checked)} className="h-5 w-5" />검토할 기록을 요약 집계에서 제외</label>
+                </div>}
+            </div>
             {/* Statistics Dashboard */}
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                 {[
                     {
                         label: '총 생산수량',
-                        value: batches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + '개'
+                        value: summaryBatches.reduce((acc, b) => acc + b.quantity, 0).toLocaleString() + '개'
                     },
                     {
-                        label: '평균 생산수량',
-                        value: batches.length > 0
-                            ? Math.round(batches.reduce((acc, b) => acc + b.quantity, 0) / batches.length).toLocaleString() + '개'
+                        label: '차수 평균 수량',
+                        value: summaryBatches.length > 0
+                            ? Math.round(summaryBatches.reduce((acc, b) => acc + b.quantity, 0) / summaryBatches.length).toLocaleString() + '개'
                             : '0개'
                     },
                     {
-                        label: '평균 생산비용',
-                        value: batches.length > 0
-                            ? Math.round(batches.reduce((acc, b) => acc + (b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)), 0) / batches.length).toLocaleString() + '원'
+                        label: '차수 평균 비용',
+                        value: summaryBatches.length > 0
+                            ? Math.round(summaryBatches.reduce((acc, b) => acc + (b.rawMaterialCost + b.electricityCost + b.packagingCost + (b.warehouseCost || 0) + (b.shippingCost || 0) + (b.customsFee || 0) + (b.customsDuty || 0) + (b.vat || 0)), 0) / summaryBatches.length).toLocaleString() + '원'
                             : '0원'
                     },
                     {
-                        label: '평균 생산단가',
-                        value: batches.length > 0
-                            ? Math.round(batches.reduce((acc, b) => acc + (b.unitCost || 0), 0) / batches.length).toLocaleString() + '원'
+                        label: '차수 평균 단가',
+                        value: summaryBatches.length > 0
+                            ? Math.round(summaryBatches.reduce((acc, b) => acc + (b.unitCost || 0), 0) / summaryBatches.length).toLocaleString() + '원'
                             : '0원'
                     },
                     {
-                        label: '평균 마진율',
+                        label: '차수 평균 도매 마진',
                         value: wholesaleMargins.length > 0
                             ? (wholesaleMargins.reduce((sum, margin) => sum + margin, 0) / wholesaleMargins.length).toFixed(1) + '%'
                             : '-'
@@ -587,6 +600,7 @@ export default function ProductionClient() {
                                         + (batch.customsFee || 0)
                                         + (batch.customsDuty || 0)
                                         + (batch.vat || 0)
+                                    const reviewReason = productionReviewReason(batch)
                                     const wMarginRate = productionMargin(batch.salesPrice, batch.unitCost)
                                     const rMarginRate = productionMargin(batch.wholesalePrice, batch.unitCost)
 
@@ -597,6 +611,7 @@ export default function ProductionClient() {
                                             </td>
                                             <td className="px-4 py-1.5 text-black dark:text-white font-bold border-r border-gray-200 dark:border-[#2a2a2a]">
                                                 {new Date(batch.productionDate).toISOString().split('T')[0]}
+                                                {reviewReason && <span className="mt-1 block whitespace-normal rounded border border-amber-200 bg-amber-50 p-1 text-xs text-amber-800">검토 · {reviewReason}</span>}
                                             </td>
                                             <td
                                                 className="px-4 py-1.5 text-right tabular-nums text-black dark:text-white border-r border-gray-200 dark:border-[#2a2a2a] group/cost relative cursor-pointer hover:bg-gray-200/50 dark:hover:bg-[#252525] transition-colors font-bold"

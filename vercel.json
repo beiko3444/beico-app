@@ -1,5 +1,7 @@
 {
-  "buildCommand": "npx prisma db push --accept-data-loss && next build --webpack",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "regions": ["iad1"],
+  "buildCommand": "npm run build",
   "crons": [
     {
       "path": "/api/admin/inventory/favorite-push",

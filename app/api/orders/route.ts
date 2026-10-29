@@ -79,6 +79,9 @@ export async function POST(request: Request) {
                 if (!isPartnerProductOrderable(product.partnerSaleStatus, product.wholesaleAvailable)) {
                     throw new Error(`현재 발주 불가능한 상품입니다: ${product.name}`)
                 }
+                if (!Number.isSafeInteger(item.quantity) || item.quantity <= 0 || !Number.isFinite(item.price) || item.price <= 0) {
+                    throw new Error(`${product.name}: 주문 수량과 거래 단가를 확인해 주세요.`)
+                }
                 const { minimumQuantity, orderUnit } = resolveOrderRules(product, gradeKey, countryKey)
                 if (item.quantity < minimumQuantity) {
                     throw new Error(`${product.name} minimum order quantity is ${minimumQuantity}`)

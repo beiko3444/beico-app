@@ -1,9 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { Plus, Minus, GripHorizontal, X, CheckCircle2, LayoutGrid, Wand2, MousePointer2, Type, Lock, Unlock, AlertCircle, Undo2, Redo2, Calendar } from 'lucide-react'
-import { buttonClass } from '@/components/ui/Button'
-import PageHeader from '@/components/ui/PageHeader'
+import { Plus, Minus, X, CheckCircle2, LayoutGrid, Wand2, AlertCircle, Undo2, Redo2, Calendar } from 'lucide-react'
 
 // Add styles/keyframes for the gradient border
 const styles = `
@@ -154,6 +152,13 @@ export default function MindBoardClient() {
     const autoPanVelocity = useRef({ x: 0, y: 0 })
     const autoPanFrame = useRef<number>(0)
     const [isLoaded, setIsLoaded] = useState(false)
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'pending' | 'saving' | 'saved' | 'error'>('idle')
+    const [retrySave, setRetrySave] = useState(0)
+    const [boardError, setBoardError] = useState('')
+    const savedSnapshot = useRef('')
+    const pendingWrite = useRef(false)
+    const saveRevision = useRef(0)
+    const saveQueue = useRef<Promise<void>>(Promise.resolve())
 
     // Boards State
     const [boards, setBoards] = useState<BoardData[]>([])
@@ -177,12 +182,10 @@ export default function MindBoardClient() {
                         const lastId = localStorage.getItem('lastBoardId')
                         const targetId = data.find((b: BoardData) => b.id === lastId) ? lastId : data[0].id
                         setCurrentBoardId(targetId)
-                    } else {
-                        // Create default board
-                        createBoard("새 보드")
                     }
                 }
-            } catch (e) { console.error("Failed to load boards", e) }
+                else throw new Error('보드 목록을 불러오지 못했습니다.')
+            } catch { setBoardError('보드 목록을 불러오지 못했습니다. 새로고침 후 다시 확인해 주세요.') }
         }
         loadBoards()
     }, [])
@@ -191,12 +194,17 @@ export default function MindBoardClient() {
     useEffect(() => {
         if (!currentBoardId) return
         setIsLoaded(false)
+        setSaveStatus('idle')
+        pendingWrite.current = false
+        setBoardError('')
+        let cancelled = false
 
         const loadBoardData = async () => {
             try {
                 const res = await fetch(`/api/mindboard/${currentBoardId}`)
                 if (res.ok) {
-                    const data = await res.json()
+                    const data = await res.json() as { items?: BoardItem[]; groups?: GroupData[] }
+                    if (cancelled) return
                     // Handle migration or default empty
                     const loadedItems = data.items || []
                     const loadedGroups = data.groups || []
@@ -204,41 +212,62 @@ export default function MindBoardClient() {
                     // Migration: if groups have no geometry, calculate it?
                     // Or let layout engine handle it.
 
+                    savedSnapshot.current = JSON.stringify({ items: loadedItems, groups: loadedGroups })
                     setItems(loadedItems)
                     setGroups(loadedGroups)
+                    setSaveStatus('saved')
 
                     // LocalStorage fallback only for very first migration if DB is empty
                     // But we already switched to DB.
 
-                    const maxZ = loadedItems.reduce((max: number, item: any) => Math.max(max, item.zIndex || 1), 1)
+                    const maxZ = loadedItems.reduce((max: number, item: BoardItem) => Math.max(max, item.zIndex || 1), 1)
                     setMaxZIndex(maxZ)
 
                     localStorage.setItem('lastBoardId', currentBoardId)
-                }
-            } catch (e) { console.error("Failed to load board data", e) }
-            finally { setIsLoaded(true) }
+                    setIsLoaded(true)
+                } else throw new Error('load failed')
+            } catch { if (!cancelled) setBoardError('보드를 불러오지 못했습니다. 저장을 중지했습니다. 새로고침 후 다시 확인해 주세요.') }
         }
         loadBoardData()
+        return () => { cancelled = true }
     }, [currentBoardId])
 
-    // 3. Save Board Data
+    // Serialize writes so an older response cannot overwrite a more recent edit.
     useEffect(() => {
         if (!isLoaded || !currentBoardId) return
-        const save = async () => {
-            try {
-                await fetch(`/api/mindboard/${currentBoardId}`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ items, groups })
-                })
+        const body = JSON.stringify({ items, groups })
+        if (body === savedSnapshot.current && !pendingWrite.current) { setSaveStatus('saved'); return }
+        const revision = ++saveRevision.current
+        let cancelled = false
+        setSaveStatus('pending')
+        const timeout = setTimeout(() => {
+            pendingWrite.current = true
+            const save = async () => {
+                if (cancelled) return
+                setSaveStatus('saving')
+                try {
+                    const response = await fetch(`/api/mindboard/${currentBoardId}`, {
+                        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body,
+                    })
+                    if (!response.ok) throw new Error('save failed')
+                    if (cancelled || revision !== saveRevision.current) return
+                    savedSnapshot.current = body
+                    pendingWrite.current = false
+                    setSaveStatus('saved')
+                    setBoards(previous => previous.map(board => board.id === currentBoardId ? { ...board, updatedAt: new Date().toISOString() } : board))
+                } catch { if (!cancelled && revision === saveRevision.current) setSaveStatus('error') }
+            }
+            saveQueue.current = saveQueue.current.then(save, save)
+        }, 1000)
+        return () => { cancelled = true; clearTimeout(timeout) }
+    }, [items, groups, currentBoardId, isLoaded, retrySave])
 
-                // Update timestamp in boards list locally
-                setBoards(prev => prev.map(b => b.id === currentBoardId ? { ...b, updatedAt: new Date().toISOString() } : b))
-            } catch (e) { console.error("Failed to save mindboard", e) }
-        }
-        const timeout = setTimeout(save, 2000)
-        return () => clearTimeout(timeout)
-    }, [items, groups, currentBoardId, isLoaded])
+    useEffect(() => {
+        if (!['pending', 'saving', 'error'].includes(saveStatus)) return
+        const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+    }, [saveStatus])
 
     const createBoard = async (title: string) => {
         try {
@@ -251,12 +280,12 @@ export default function MindBoardClient() {
                 const newBoard = await res.json()
                 setBoards(prev => [newBoard, ...prev])
                 setCurrentBoardId(newBoard.id)
-            }
-        } catch (e) { console.error(e) }
+            } else throw new Error('create failed')
+        } catch { setBoardError('보드를 만들지 못했습니다. 다시 시도해 주세요.') }
     }
 
     const deleteBoard = async (id: string) => {
-        if (!confirm("이 보드를 삭제할까요?")) return
+        if (!confirm("이 보드와 메모를 삭제하시겠습니까?")) return
         try {
             await fetch(`/api/mindboard/${id}`, { method: 'DELETE' })
             setBoards(prev => prev.filter(b => b.id !== id))
@@ -351,8 +380,8 @@ export default function MindBoardClient() {
     }, [])
 
     const createMemo = useCallback((x: number, y: number, shouldEdit: boolean = false) => {
+        if (!currentBoardId || !isLoaded) return
         saveHistory()
-
 
         const snappedX = Math.round((x - 120) / GRID_SIZE) * GRID_SIZE
         const snappedY = Math.round((y - 80) / GRID_SIZE) * GRID_SIZE
@@ -376,7 +405,7 @@ export default function MindBoardClient() {
         if (shouldEdit) {
             setEditingId(newItem.id)
         }
-    }, [maxZIndex, resolveCollision])
+    }, [maxZIndex, resolveCollision, saveHistory, currentBoardId, isLoaded])
 
     // --- Actions ---
     const handleZoom = useCallback((delta: number, pivotX: number, pivotY: number) => {
@@ -423,8 +452,9 @@ export default function MindBoardClient() {
             return
         }
 
-        const clientX = 'touches' in e ? (e as any).touches[0].clientX : (e as any).clientX
-        const clientY = 'touches' in e ? (e as any).touches[0].clientY : (e as any).clientY
+        const point = 'touches' in e ? (e.touches[0] || e.changedTouches[0]) : e
+        if (!point) return
+        const { clientX, clientY } = point
         const { x, y } = getWorldCoords(clientX, clientY)
         createMemo(x, y, true) // Enable editing immediately
     }
@@ -753,7 +783,7 @@ export default function MindBoardClient() {
         let currentX = 100
         let currentY = 100
         let maxHeightInRow = 0
-        let newItems: BoardItem[] = []
+        const newItems: BoardItem[] = []
 
         const maxW = containerRef.current ? Math.max(2000, containerRef.current.clientWidth - 200) : 2000
 
@@ -870,7 +900,7 @@ export default function MindBoardClient() {
         const width = Math.max(360, maxX - minX + 20) // Default padding
 
         setItems((prev: BoardItem[]) => prev.map((i: BoardItem) => selectedIds.has(i.id) ? { ...i, groupId: newGroupId } : i))
-        setGroups(prev => [...prev, { id: newGroupId, name: "새 그룹", w: width }])
+        setGroups(prev => [...prev, { id: newGroupId, name: "New Group", w: width }])
     }
 
     const optimizeSize = () => {
@@ -893,7 +923,7 @@ export default function MindBoardClient() {
 
             // 2. Repack Groups
             const handledGroups = new Set<string>()
-            let finalItems = [...nextItems]
+            const finalItems = [...nextItems]
 
             nextItems.forEach((item: BoardItem) => {
                 if (item.groupId && !handledGroups.has(item.groupId)) {
@@ -933,7 +963,7 @@ export default function MindBoardClient() {
 
     const renameGroup = (groupId: string) => {
         const group = groups.find(g => g.id === groupId)
-        const newName = prompt("그룹 이름을 입력하세요", group?.name || "새 그룹")
+        const newName = prompt("Enter Group Name", group?.name || "New Group")
         if (newName) {
             saveHistory()
             setGroups(prev => {
@@ -1220,7 +1250,7 @@ export default function MindBoardClient() {
         // Grouping Logic on Drop
         if (dragItems.size > 0 && !selectionBox) {
             setItems(currentItems => {
-                let newItems = [...currentItems]
+                const newItems = [...currentItems]
                 const draggedIds = Array.from(dragItems.keys())
 
                 // Get the primary moved item (to determine drop target)
@@ -1558,7 +1588,7 @@ export default function MindBoardClient() {
             window.removeEventListener('keydown', handleKeyDown)
             window.removeEventListener('keyup', handleKeyUp)
         }
-    }, [createMemo, getWorldCoords, editingId, selectedIds, items, groups, arrangeGroup, undo, redo])
+    }, [createMemo, getWorldCoords, editingId, selectedIds, items, groups, arrangeGroup, undo, redo, saveHistory])
 
     const scrollToGroup = (groupId: string) => {
         const members = items.filter(i => i.groupId === groupId)
@@ -1597,7 +1627,7 @@ export default function MindBoardClient() {
             return (
                 <div
                     key={group.id}
-                    className="absolute rounded-2xl transition-all duration-200"
+                    className="absolute rounded-3xl transition-all duration-200"
                     style={{
                         left: minX - 20,
                         top: minY - 50,
@@ -1611,7 +1641,7 @@ export default function MindBoardClient() {
                 >
                     {/* Header Area */}
                     <div
-                        className="absolute top-0 left-0 right-0 h-10 flex items-center px-4 cursor-grab pointer-events-auto bg-white/50 rounded-t-2xl border-b border-gray-100"
+                        className="absolute top-0 left-0 right-0 h-10 flex items-center px-4 cursor-grab pointer-events-auto bg-white/50 rounded-t-3xl border-b border-gray-100"
                         onMouseDown={(e) => {
                             e.stopPropagation()
                             setSelectedGroupId(group.id)
@@ -1648,7 +1678,6 @@ export default function MindBoardClient() {
                         <div className="flex gap-1">
                             <input
                                 type="number"
-                                aria-label="그룹 너비"
                                 className="w-16 h-6 text-xs border border-gray-200 rounded px-1"
                                 value={group.w || 360}
                                 onChange={(e) => {
@@ -1663,23 +1692,17 @@ export default function MindBoardClient() {
                                     saveHistory()
                                     optimizeGroup(group.id)
                                 }}
-                                className="p-1 hover:bg-brand-orange-soft rounded text-brand-orange transition-colors"
-                                title="그룹 정리"
-                                aria-label="그룹 정리"
+                                className="p-1 hover:bg-sky-100 rounded text-sky-500 transition-colors"
                             >
                                 <Wand2 size={14} />
                             </button>
                             <button
-                                type="button"
-                                className="p-1 hover:bg-red-100 text-red-500 rounded transition-colors"
-                                title="그룹 해제"
-                                aria-label="그룹 해제"
+                                className="p-1 hover:bg-red-100 text-red-400 rounded transition-colors"
                                 onClick={(e) => {
                                     e.stopPropagation()
                                     unGroup(group.id)
                                 }}
                             >
-                                <X size={14} />
                             </button>
                         </div>
                     </div>
@@ -1689,9 +1712,7 @@ export default function MindBoardClient() {
     }
 
     return (
-        <div className="flex h-[calc(100dvh-112px)] min-h-[520px] w-full min-w-0 flex-col lg:h-[calc(100dvh-72px)]">
-            <PageHeader title="마인드보드" description="메모를 자유롭게 배치하고 그룹으로 묶어 정리합니다. 더블클릭으로 메모를 추가합니다." />
-        <div className="relative min-h-0 w-full flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-gray-100 select-none touch-none">
+        <div className="fixed left-0 right-0 bottom-0 top-[68px] lg:left-[248px] lg:top-0 z-10 bg-gray-100 select-none touch-none overflow-hidden">
             <style dangerouslySetInnerHTML={{ __html: styles }} />
             {/* minimap */}
             <div className={`absolute bottom-4 right-4 z-50 w-48 h-48 bg-white/80 backdrop-blur-md rounded-xl shadow-2xl border border-gray-200 overflow-hidden md:block hidden transition-opacity duration-300 ${items.length > 0 ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -1750,7 +1771,7 @@ export default function MindBoardClient() {
                                     />
                                 ))}
                                 {containerRef.current && (
-                                    <div className="absolute border-2 border-brand-orange bg-brand-orange/10 cursor-move pointer-events-auto"
+                                    <div className="absolute border-2 border-blue-500 bg-blue-500/10 cursor-move pointer-events-auto"
                                         onMouseDown={(e: React.MouseEvent) => {
                                             e.stopPropagation()
                                             setIsMinimapDragging(true)
@@ -1777,15 +1798,28 @@ export default function MindBoardClient() {
             </div>
 
 
+            {/* Toolbar & Group Nav */}
+
+
+            <div className="absolute bottom-3 left-3 right-3 z-[120] w-fit max-w-[calc(100%-24px)] rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm" role="status" aria-live="polite">
+                {boardError || (!currentBoardId ? '새 보드를 만들면 메모를 추가할 수 있습니다.' : saveStatus === 'error' ? '저장 실패 · 변경사항이 아직 저장되지 않았습니다.' : saveStatus === 'saving' ? '저장 중…' : saveStatus === 'pending' ? '변경사항 저장 대기…' : '저장됨')}
+                {saveStatus === 'error' && <button className="ux-button ml-2" onClick={() => setRetrySave(value => value + 1)}>다시 저장</button>}
+            </div>
             {/* Left Toolbar */}
             <div className="absolute left-4 top-4 z-50 flex flex-col gap-2 pointer-events-auto">
-                <div className="bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-white/20 flex flex-col gap-2 w-52">
+                <div className="bg-white/90 backdrop-blur p-2 rounded-xl shadow-lg border border-white/20 flex flex-col gap-2 w-[min(52vw,208px)]">
+                    <button className="ux-button-primary mb-2 w-full disabled:opacity-50" disabled={!currentBoardId || !isLoaded} onClick={() => {
+                        const container = containerRef.current
+                        if (!container) return
+                        const rect = container.getBoundingClientRect()
+                        const position = getWorldCoords(rect.left + rect.width / 2, rect.top + rect.height / 2)
+                        createMemo(position.x, position.y, true)
+                    }}><Plus size={16} />메모 추가</button>
                     <div className="flex gap-2">
                         <input
                             type="text"
-                            placeholder="새 보드 이름"
-                            aria-label="새 보드 이름"
-                            className="min-w-0 flex-1 bg-white/50 border border-gray-200 rounded-xl px-2 py-1 text-xs outline-none focus:border-brand-orange"
+                            placeholder="새 보드 이름" aria-label="새 보드 이름"
+                            className="min-w-0 flex-1 bg-white/50 border border-gray-200 rounded px-2 py-1 text-xs outline-none focus:border-blue-500"
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter') {
                                     const title = e.currentTarget.value
@@ -1804,54 +1838,49 @@ export default function MindBoardClient() {
                                     input.value = ''
                                 }
                             }}
-                            className={buttonClass('primary', 'sm', 'px-2')}
-                            aria-label="새 보드"
-                            title="새 보드"
+                            aria-label="새 보드 만들기"
+                            className="flex h-11 w-11 shrink-0 items-center justify-center rounded bg-blue-600 text-white transition-colors hover:bg-blue-700"
                         >
                             <Plus size={14} />
                         </button>
                     </div>
                 </div>
 
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
+                <details className="rounded-xl border border-slate-200 bg-white shadow-sm"><summary className="min-h-11 cursor-pointer px-3 py-3 text-sm font-semibold">편집 도구</summary><div className="flex max-h-[55vh] gap-2 overflow-y-auto p-2">
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
                     <button
-                        type="button"
                         onClick={autoArrange}
-                        className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600"
+                        className="flex h-11 w-11 items-center justify-center rounded text-gray-600 hover:bg-gray-100"
                         title="자동 정렬"
-                        aria-label="자동 정렬"
                     >
                         <LayoutGrid size={18} />
                     </button>
                     <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
-                    <button type="button" onClick={() => {
+                    <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600" title="확대" aria-label="확대">
+                    }} className="flex h-11 w-11 items-center justify-center rounded text-gray-600 hover:bg-gray-100" title="확대">
                         <Plus size={18} />
                     </button>
-                    <span className="text-[11px] font-bold font-mono py-0.5">{Math.round(scale * 100)}%</span>
-                    <button type="button" onClick={() => {
+                    <span className="text-[10px] font-bold font-mono py-0.5">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => {
                         const container = containerRef.current
                         if (container) handleZoom(-0.1, container.clientWidth / 2, container.clientHeight / 2)
-                    }} className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-600" title="축소" aria-label="축소">
+                    }} className="flex h-11 w-11 items-center justify-center rounded text-gray-600 hover:bg-gray-100" title="축소">
                         <Minus size={18} />
                     </button>
                     <div className="w-3 h-[1px] bg-gray-200 my-0.5"></div>
-                    <button type="button" onClick={undo} disabled={past.length === 0} className={`p-1.5 rounded-lg transition-colors ${past.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="실행 취소 (Ctrl+Z)" aria-label="실행 취소">
+                    <button onClick={undo} disabled={past.length === 0} className={`p-1.5 rounded transition-colors ${past.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="실행 취소 (Ctrl+Z)">
                         <Undo2 size={18} />
                     </button>
-                    <button type="button" onClick={redo} disabled={future.length === 0} className={`p-1.5 rounded-lg transition-colors ${future.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="다시 실행 (Ctrl+Y)" aria-label="다시 실행">
+                    <button onClick={redo} disabled={future.length === 0} className={`p-1.5 rounded transition-colors ${future.length === 0 ? 'text-gray-300' : 'hover:bg-gray-100 text-gray-600'}`} title="다시 실행 (Ctrl+Y)">
                         <Redo2 size={18} />
                     </button>
                 </div>
-                <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
+                <div className="bg-white rounded-lg shadow-lg border border-gray-200 p-1 flex flex-col items-center gap-1 pointer-events-auto">
                     <div className="flex flex-col gap-1 p-0.5">
                         {COLORS.map((c) => (
-                            <button key={c}
-                                type="button"
-                                aria-label={`색상 ${c}`}
-                                title="선택한 메모 색상 변경"
+                            <button key={c} aria-label={`색상 ${c}`}
                                 onClick={() => {
                                     if (selectedGroupId) {
                                         saveHistory()
@@ -1861,36 +1890,34 @@ export default function MindBoardClient() {
                                         setItems(prev => prev.map(i => selectedIds.has(i.id) ? { ...i, color: c } : i))
                                     }
                                 }}
-                                className={`w-3.5 h-3.5 rounded-full border border-black/10 transition-transform hover:scale-125 ${(selectedGroupId && groups.find(g => g.id === selectedGroupId)?.color === c) ||
+                                className={`w-11 h-11 shrink-0 rounded-full border border-black/10 transition-transform hover:scale-125 ${(selectedGroupId && groups.find(g => g.id === selectedGroupId)?.color === c) ||
                                     (!selectedGroupId && selectedIds.size > 0 && items.find(i => selectedIds.has(i.id))?.color === c)
                                     ? 'ring-1 ring-offset-1 ring-black/20' : ''}`}
                                 style={{ backgroundColor: c }} />
                         ))}
                     </div>
                 </div>
+                </div></details>
             </div>
             {/* Right Toolbar - Board List */}
-            <div className="absolute right-4 top-4 bottom-4 z-50 flex flex-col gap-2 pointer-events-none">
-                <div className="pointer-events-auto bg-white/90 backdrop-blur p-3 rounded-xl shadow-lg border border-white/20 flex flex-col gap-1 w-40 sm:w-64 max-h-full overflow-y-auto">
-                    <h3 className="text-[11px] font-bold text-slate-500 mb-2 px-1 flex justify-between items-center">
-                        내 보드
+            <div className="absolute right-4 top-4 z-50 flex flex-col gap-2 pointer-events-auto h-[calc(100vh-100px)] pointer-events-none">
+                <details className="pointer-events-auto w-28 max-h-full overflow-y-auto rounded-xl border border-slate-200 bg-white/95 p-2 shadow-lg sm:w-56"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">내 보드 {boards.length}</summary>
+                    <h3 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1 flex justify-between items-center">
+                        보드 목록
                         <span className="bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full">{boards.length}</span>
                     </h3>
                     {boards.map(board => (
                         <div
                             key={board.id}
-                            className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${currentBoardId === board.id ? 'bg-brand-orange-soft border-brand-orange border shadow-sm' : 'hover:bg-white border border-transparent hover:shadow-sm'}`}
-                            onClick={() => setCurrentBoardId(board.id)}
+                            className={`group flex items-center justify-between p-2 rounded-lg cursor-pointer transition-all ${currentBoardId === board.id ? 'bg-blue-50 border-blue-200 border shadow-sm' : 'hover:bg-white border border-transparent hover:shadow-sm'}`}
+                            onClick={() => { if (!['pending', 'saving', 'error'].includes(saveStatus) || confirm('저장하지 못한 변경사항이 있습니다. 다른 보드로 이동하시겠습니까?')) setCurrentBoardId(board.id) }}
                         >
-                            <span className={`text-sm font-medium truncate ${currentBoardId === board.id ? 'text-brand-orange' : 'text-slate-700'}`}>
-                                {board.title || "제목 없음"}
+                            <span className={`text-sm font-medium truncate ${currentBoardId === board.id ? 'text-blue-700' : 'text-slate-700'}`}>
+                                {board.title || "Untitled"}
                             </span>
                             {boards.length > 1 && (
                                 <button
-                                    type="button"
-                                    aria-label="보드 삭제"
-                                    title="보드 삭제"
-                                    className="p-1 hover:bg-red-100 text-slate-400 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+                                    className="p-1 hover:bg-red-100 text-slate-300 hover:text-red-500 rounded opacity-0 group-hover:opacity-100 transition-opacity"
                                     onClick={(e) => { e.stopPropagation(); deleteBoard(board.id) }}
                                 >
                                     <X size={12} />
@@ -1899,15 +1926,15 @@ export default function MindBoardClient() {
                         </div>
                     ))}
                     {boards.length === 0 && (
-                        <div className="text-xs text-slate-500 text-center py-4">보드가 없습니다</div>
+                        <div className="text-xs text-slate-400 text-center py-4">보드를 만들어 시작하세요</div>
                     )}
-                </div>
+                </details>
             </div>
 
             <div
                 ref={containerRef}
-                id="mind-board-bg"
-                className="absolute inset-0 cursor-grab active:cursor-grabbing bg-white overflow-hidden"
+                id="mind-board-bg" role="region" aria-label="메모 캔버스"
+                className="w-full h-screen cursor-grab active:cursor-grabbing relative bg-white overflow-hidden"
                 onTouchStart={onTouchStart}
                 onMouseDown={(e: React.MouseEvent) => {
                     // Background Deselect
@@ -1993,11 +2020,11 @@ export default function MindBoardClient() {
                                         }}
                                         onBlur={() => setEditingId(null)}
                                         onKeyDown={(e) => e.stopPropagation()}
-                                        placeholder="내용을 입력하세요..."
+                                        placeholder="메모 내용을 입력하세요"
                                     />
                                 ) : (
                                     <div className="whitespace-pre-wrap text-slate-800 font-medium text-lg leading-relaxed break-words select-none">
-                                        {item.content || <span className="text-slate-500 italic">빈 메모</span>}
+                                        {item.content || <span className="text-slate-400 italic">빈 메모</span>}
                                         {item.completed && <div className="absolute inset-0 flex items-center justify-center bg-white/60 backdrop-blur-[1px] rounded-xl"><CheckCircle2 className="text-green-500 w-12 h-12" /></div>}
                                     </div>
                                 )}
@@ -2011,22 +2038,20 @@ export default function MindBoardClient() {
                                             setTargetDateItemId(item.id);
                                             setTimeout(() => dateInputRef.current?.showPicker(), 0)
                                         }}
-                                        className={`p-1 rounded transition-colors ${item.dueDate ? 'bg-brand-orange-soft text-brand-orange' : 'text-gray-400 hover:bg-brand-orange-soft hover:text-brand-orange'}`}
-                                        title={item.dueDate ? `마감: ${item.dueDate}` : "날짜 지정"}
-                                        aria-label={item.dueDate ? `마감: ${item.dueDate}` : "날짜 지정"}
+                                        className={`p-1 rounded transition-colors ${item.dueDate ? 'bg-blue-100 text-blue-600' : 'text-gray-400 hover:bg-blue-50 hover:text-blue-500'}`}
+                                        title={item.dueDate ? `Due: ${item.dueDate}` : "Set Date"}
                                     >
                                         <Calendar size={14} />
                                     </button>
                                     <button onClick={(e: React.MouseEvent) => { e.stopPropagation(); saveHistory(); toggleUrgent(item.id) }}
-                                        className={`p-1 rounded transition-colors ${item.isUrgent ? 'text-amber-500 bg-amber-100' : 'text-gray-400 hover:bg-amber-50 hover:text-amber-500'}`}
-                                        title="긴급/집중"
-                                        aria-label="긴급/집중">
+                                        className={`p-1 rounded transition-colors ${item.isUrgent ? 'text-amber-500 bg-amber-100' : 'text-gray-300 hover:bg-amber-50 hover:text-amber-500'}`}
+                                        title="긴급/집중">
                                         <AlertCircle size={14} fill={item.isUrgent ? "currentColor" : "none"} />
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); saveHistory(); toggleComplete(item.id) }} className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`} title="완료" aria-label="완료 표시">
+                                    <button onClick={(e) => { e.stopPropagation(); saveHistory(); toggleComplete(item.id) }} className={`p-1 rounded transition-colors ${item.completed ? 'text-green-600 bg-green-100' : 'text-gray-400 hover:bg-green-50 hover:text-green-500'}`}>
                                         <CheckCircle2 size={14} />
                                     </button>
-                                    <button onClick={(e) => { e.stopPropagation(); saveHistory(); deleteItem(item.id) }} className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-800" title="삭제" aria-label="메모 삭제">
+                                    <button onClick={(e) => { e.stopPropagation(); saveHistory(); deleteItem(item.id) }} className="p-1 hover:bg-gray-200 rounded text-gray-500 hover:text-gray-800">
                                         <X size={14} />
                                     </button>
                                 </div>
@@ -2038,8 +2063,6 @@ export default function MindBoardClient() {
                                     {COLORS.map(c => (
                                         <button
                                             key={c}
-                                            type="button"
-                                            aria-label={`색상 ${c}`}
                                             className="w-7 h-7 rounded-full border border-slate-200 hover:scale-110 transition-transform"
                                             style={{ backgroundColor: c }}
                                             onClick={(e) => {
@@ -2102,20 +2125,18 @@ export default function MindBoardClient() {
                         }}
                     >
                         <button
-                            type="button"
                             onClick={(e: React.MouseEvent) => { e.stopPropagation(); groupSelectedItems() }}
-                            className={buttonClass('primary', 'sm', 'shadow-lg pointer-events-auto -translate-x-1/2')}
+                            className="bg-blue-600 text-white px-3 py-1.5 rounded-full shadow-lg font-bold text-sm hover:bg-blue-700 hover:scale-105 transition-all flex items-center gap-1.5 pointer-events-auto -translate-x-1/2"
                             onMouseDown={(e: React.MouseEvent) => e.stopPropagation()}
                         >
                             <LayoutGrid size={14} />
-                            그룹으로 묶기
+                            Group
                         </button>
                     </div>
                 )
             }
             {/* Hidden Date Input */}
-            <input type="date" ref={dateInputRef} aria-label="마감일" className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none" onChange={handleDateSelect} />
+            <input type="date" ref={dateInputRef} className="absolute top-0 left-0 w-0 h-0 opacity-0 pointer-events-none" onChange={handleDateSelect} />
         </div >
-        </div>
     )
 }

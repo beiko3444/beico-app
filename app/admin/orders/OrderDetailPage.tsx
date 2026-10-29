@@ -565,7 +565,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         <span>{product.quantity.toLocaleString('ko-KR')}개</span>
         {order && !taxInvoiceIssued ? (
           <button type="button" aria-label={`${product.name} 수량 수정`} disabled={Boolean(loadingAction)}
-            className="ml-2 text-xs font-bold text-blue-600 disabled:opacity-50" onClick={() => {
+            className="ml-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-xs font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-50" onClick={() => {
               setEditingQuantityId(product.id)
               setQuantityInput(String(product.quantity))
             }}>수정</button>
@@ -780,7 +780,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
               <ReceiptText className="h-4 w-4 shrink-0" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
             </button>
-            <button
+            <details className="rounded-xl border border-slate-200 p-3 sm:col-span-2 2xl:col-span-1"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-600">주문 마감·삭제</summary><p className="mb-3 text-xs leading-5 text-slate-500">배송·계산서 처리 여부와 별도로 주문을 마감할 수 있습니다. 삭제는 복구할 수 없습니다.</p><div className="grid gap-2">            <button
               type="button"
               onClick={handleCompleteOrder}
               disabled={currentStatus === 'CANCELED' || currentStatus === 'COMPLETED' || loadingAction === 'complete'}
@@ -795,12 +795,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             >
               주문 삭제
             </button>
+            </div></details>
           </div>
         </div>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-        <div className="min-w-0 space-y-6">
+        <div className="min-w-0 space-y-6" style={{ containerType: 'inline-size', containerName: 'order-lines' }}>
           <DetailCard
             title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개${detail.payment.shippingFee > 0 ? ', 배송비 포함' : ''})`}
             icon={<Package className="h-4 w-4" />}
@@ -811,7 +812,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 ? '세금계산서를 취소한 뒤 수량과 배송비를 수정할 수 있습니다.'
                 : '품목별 수량 옆의 수정 버튼으로 변경하세요. 단가는 유지되며 상품금액·부가세·총액과 자동 배송비가 다시 계산됩니다. 직접 지정한 배송비는 유지됩니다.'}
             </p>
-            <div className="hidden overflow-x-auto rounded-2xl border border-[#E6EAF2] lg:block">
+            <div className="ux-order-line-table overflow-x-auto rounded-2xl border border-[#E6EAF2]">
               <table className="w-full min-w-[900px] border-collapse">
                 <thead className="bg-slate-50 text-left text-[12px] font-black text-slate-500">
                   <tr>
@@ -854,7 +855,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               </table>
             </div>
 
-            <div className="space-y-3 lg:hidden">
+            <div className="ux-order-line-cards space-y-3">
               {productRows.map((product) => (
                 <div key={product.id} className={`rounded-2xl border border-slate-200 p-4 ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
                   <div className="flex gap-4">
@@ -953,7 +954,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </DetailCard>
         </div>
 
-        <aside className="space-y-5 xl:sticky xl:top-24">
+        <aside id={`order-${detail.orderId}-shipping`} className="order-first scroll-mt-4 space-y-5 xl:order-none xl:sticky xl:top-24">
           <DetailCard
             title="배송 처리"
             icon={<Truck className="h-4 w-4" />}

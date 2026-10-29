@@ -2222,6 +2222,7 @@ export default function WormOrderPage() {
     // ── 자동 페치 & 게이지 관련 State ──
     const [fetchProgress, setFetchProgress] = useState(0)
     const [selectedPipelineStepId, setSelectedPipelineStepId] = useState(1)
+    const [showAllSteps, setShowAllSteps] = useState(false)
     const [orderListOpen, setOrderListOpen] = useState(false)
     const [manualStepSaving, setManualStepSaving] = useState(false)
     const [manualStepNotice, setManualStepNotice] = useState('')
@@ -4870,12 +4871,12 @@ export default function WormOrderPage() {
         }
     }, [activeWormOrderRecord?.id, manualStepSaving])
 
-    const showOrderTools = true
-    const showInboxTools = true
-    const showDocInboxTools = true
-    const showRemittanceTools = true
-    const showCustomsTools = true
-    const showCargoCustomsMailTools = true
+    const showOrderTools = showAllSteps || selectedPipelineStepId === 1
+    const showInboxTools = showAllSteps || selectedPipelineStepId === 2
+    const showDocInboxTools = showAllSteps || selectedPipelineStepId === 4
+    const showRemittanceTools = showAllSteps || selectedPipelineStepId === 3
+    const showCustomsTools = showAllSteps || selectedPipelineStepId === 5
+    const showCargoCustomsMailTools = showAllSteps || selectedPipelineStepId === 7
     const workflowFlowPanel = (
         <aside className="flex max-h-[calc(100vh-2rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <div className="border-b border-slate-100 px-4 py-4">
@@ -5296,7 +5297,12 @@ export default function WormOrderPage() {
                     </div>
                 </div>
 
-                <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
+                <div className="sticky top-[68px] z-30 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/95 p-3 shadow-sm backdrop-blur lg:top-3">
+                    <span className="text-sm font-bold">{activeOrderNumberText} · {selectedStepDefinition.id}/10 {selectedStepDefinition.title}</span>
+                    <label className="flex min-h-11 cursor-pointer items-center gap-2 text-sm"><input type="checkbox" checked={showAllSteps} onChange={event => setShowAllSteps(event.target.checked)} className="h-5 w-5" />전체 단계 작업 보기</label>
+                    {!activeWormOrderRecord && <p className="w-full text-xs text-amber-800">기존 발주를 선택하거나 새 발주를 만든 뒤 진행하세요. 현재는 작성 도구를 미리 보고 있습니다.</p>}
+                </div>
+                <section className="rounded-lg border border-slate-200 bg-white px-4 py-4 shadow-sm md:px-5">
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                         <div className="flex min-w-0 items-start gap-3">
                             <span className="inline-flex h-9 min-w-9 items-center justify-center rounded-lg bg-brand-orange text-sm font-black text-white">
@@ -5330,7 +5336,7 @@ export default function WormOrderPage() {
                     )}
                 </section>
 
-                {PIPELINE_STEP_DEFINITIONS.filter((step) => step.target === 'none').map((step) => (
+                {PIPELINE_STEP_DEFINITIONS.filter((step) => step.target === 'none' && (showAllSteps || step.id === selectedPipelineStepId)).map((step) => (
                     <section
                         key={`manual-step-${step.id}`}
                         id={`worm-pipeline-step-${step.id}`}

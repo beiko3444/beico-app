@@ -1445,12 +1445,13 @@ export default function CardUsageClient() {
         </div>
       )}
 
+      <p className="ux-context mb-4" role="status">저장된 카드 내역 기준입니다. 마지막 동기화 이후 거래는 포함되지 않을 수 있으며, 0원은 미수집 여부를 확인한 뒤 판단해 주세요. 최근 동기화: {formatSyncTime(data?.summary?.lastSyncedAt || null)}</p>
       {/* ════════ Metric Cards ════════ */}
-      <div className="mb-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3" style={{ marginBottom: 16 }}>
         {/* 이번 달 총 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>이번 달 총 지출</p>
-          <p style={{ fontSize: 22, fontWeight: 900, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
+        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>조회 기간 확인된 지출</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
             {totalAmount.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
           </p>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>
@@ -1479,9 +1480,9 @@ export default function CardUsageClient() {
         </div>
 
         {/* 일평균 지출 */}
-        <div style={{ ...cardStyle, padding: '18px 20px', minWidth: 0 }}>
-          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>일평균 지출</p>
-          <p style={{ fontSize: 22, fontWeight: 900, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
+        <div style={{ ...cardStyle, padding: '18px 20px' }}>
+          <p style={{ fontSize: 12, color: T.textTertiary, margin: 0, fontWeight: 500 }}>확인된 일평균 지출</p>
+          <p style={{ fontSize: 22, fontWeight: 700, color: T.text, margin: '6px 0 4px', lineHeight: 1.2 }}>
             {dailyAvg.toLocaleString()}<span style={{ fontSize: 14, fontWeight: 400, color: T.textSecondary }}>원</span>
           </p>
           <p style={{ fontSize: 12, color: T.textTertiary, margin: 0 }}>{daysInRange}일 기준</p>

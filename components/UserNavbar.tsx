@@ -35,7 +35,6 @@ export default function UserNavbar({ isKorean = false }: { isKorean?: boolean })
                         prefetch={item.href === '/translator' ? false : undefined}
                         target={item.href === '/translator' ? '_blank' : undefined}
                         rel={item.href === '/translator' ? 'noopener noreferrer' : undefined}
-                        style={{ color: 'inherit' }}
                         aria-current={isActive ? 'page' : undefined}
                         className={`group relative flex min-h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-3 text-center no-underline transition-colors sm:min-h-12 sm:min-w-[118px] sm:flex-row sm:gap-2.5 sm:px-4 ${
                             isActive

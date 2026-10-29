@@ -45,7 +45,7 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
   if (pathname !== '/order' || notices.length === 0) return null
 
   return (
-    <section aria-labelledby="partner-notice-board-title" className="mb-7 overflow-hidden rounded-2xl border border-rose-200 bg-gradient-to-r from-rose-50/80 via-white to-white shadow-[0_8px_30px_rgba(190,24,93,0.05)] dark:border-rose-950 dark:from-rose-950/20 dark:via-[#1e1e1e] dark:to-[#1e1e1e]">
+    <section aria-labelledby="partner-notice-board-title" className="mb-5 overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--card)] shadow-sm dark:border-rose-950 dark:from-rose-950/20 dark:via-[#1e1e1e] dark:to-[#1e1e1e]">
       <h2 id="partner-notice-board-title" className="sr-only">{isKorean ? '공지사항' : 'お知らせ'}</h2>
       <div className="divide-y divide-rose-100 dark:divide-rose-950/60">
         {notices.map((notice, index) => {
@@ -53,9 +53,9 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
           const Icon = tone.icon
           return (
             <details key={notice.id} className="group">
-              <summary className="grid cursor-pointer list-none gap-4 px-4 py-5 sm:grid-cols-[180px_minmax(0,1fr)_110px] sm:items-center sm:px-6 lg:px-7 [&::-webkit-details-marker]:hidden">
+              <summary className="grid cursor-pointer list-none gap-3 px-4 py-3 sm:grid-cols-[180px_minmax(0,1fr)_110px] sm:items-center sm:px-6 lg:px-7 [&::-webkit-details-marker]:hidden">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[#d9361b]">
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[#d9361b]">
                     {index === 0 ? <Megaphone size={21} /> : <Icon size={19} />}
                   </span>
                   <div>
@@ -67,9 +67,9 @@ export default function PartnerNoticeBoard({ notices, isKorean = false }: { noti
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={`shrink-0 rounded-lg border px-2.5 py-1 text-sm font-black ${tone.badge}`}>{isKorean ? notice.tone === 'URGENT' ? '긴급' : notice.tone === 'IMPORTANT' ? '중요' : '일반' : tone.label}</span>
-                    <p className="break-words text-lg font-bold text-slate-900 dark:text-white sm:text-xl">{notice.title}</p>
+                    <p className="break-words text-base font-semibold text-slate-900 dark:text-white">{notice.title}</p>
                   </div>
-                  <p className="mt-1.5 line-clamp-2 whitespace-pre-wrap text-base font-normal leading-7 text-slate-600 dark:text-slate-400">{notice.content}</p>
+                  <p className="mt-1.5 line-clamp-1 whitespace-pre-wrap text-sm font-normal leading-6 text-slate-600 dark:text-slate-400">{notice.content}</p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-400 sm:flex-col sm:items-end">

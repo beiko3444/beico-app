@@ -39,6 +39,7 @@ function PartnerStatusSelect({ product, value, onChange, className }: {
     className: string
 }) {
     const [saving, setSaving] = useState(false)
+    const [feedback, setFeedback] = useState('변경 즉시 반영')
     return (
         <div>
             <select value={value} disabled={saving} aria-busy={saving}
@@ -48,13 +49,16 @@ function PartnerStatusSelect({ product, value, onChange, className }: {
                 onChange={async (event) => {
                     const status = event.target.value as PartnerProductStatus
                     setSaving(true)
-                    try { await onChange(product.id, status) } finally { setSaving(false) }
+                    setFeedback('저장 중…')
+                    try { await onChange(product.id, status); setFeedback('저장됨') }
+                    catch (error) { setFeedback(error instanceof Error ? error.message : '저장 실패 · 다시 시도하세요') }
+                    finally { setSaving(false) }
                 }}>
                 <option value="VISIBLE">노출</option>
                 <option value="HIDDEN">비노출</option>
                 <option value="SOLD_OUT">품절</option>
             </select>
-            {saving ? <span role="status" className="mt-1 block text-[10px] text-slate-500">저장 중…</span> : null}
+            <span role="status" aria-live="polite" className="mt-1 block max-w-44 whitespace-normal text-[11px] font-medium text-slate-500">{feedback}</span>
         </div>
     )
 }
@@ -221,7 +225,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, groupOrder, 
     const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
     const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
     const stockStatus = stockNumber <= 0
-        ? { label: '품절', className: 'border-red-200 bg-red-50 text-red-700' }
+        ? { label: '재고 없음', className: 'border-red-200 bg-red-50 text-red-700' }
         : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
             ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
             : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
@@ -542,7 +546,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
     const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
     const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
     const stockStatus = stockNumber <= 0
-        ? { label: '품절', className: 'border-red-200 bg-red-50 text-red-700' }
+        ? { label: '재고 없음', className: 'border-red-200 bg-red-50 text-red-700' }
         : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
             ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
             : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
@@ -1083,6 +1087,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const imagePreviewRef = useRef<HTMLDivElement>(null)
     const [isCompactViewport, setIsCompactViewport] = useState(false)
     const router = useRouter()
+
+    const unsavedProductIds = new Set([
+        ...Object.keys(modifiedStocks),
+        ...[modifiedCnyCosts, modifiedUsdCosts, modifiedCosts, modifiedWholesales, modifiedRetails, modifiedMoqs, modifiedOrderUnits].flatMap(drafts => Object.keys(drafts).map(key => key.slice(2))),
+    ])
+    const unsavedCount = unsavedProductIds.size
+    useEffect(() => {
+        if (!unsavedCount) return
+        const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = '' }
+        window.addEventListener('beforeunload', warn)
+        return () => window.removeEventListener('beforeunload', warn)
+    }, [unsavedCount])
 
     useEffect(() => {
         if (!previewImage) return
@@ -1661,7 +1677,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 partnerSaleStatus: product.partnerSaleStatus,
                 wholesaleAvailable: product.wholesaleAvailable,
             } : p))
-            alert(error instanceof Error ? error.message : '파트너 노출상태를 저장하지 못했습니다.')
+            throw error
         } finally {
             pendingPartnerStatusIds.current.delete(id)
         }
@@ -1857,7 +1873,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
             className="ux-panel w-full overflow-hidden"
             style={{ maxWidth: productTableWidth + (selectedGroup ? 310 : 0) + 24 }}
         >
-            <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-xl sm:px-6 lg:px-8">
+            <header className="lg:sticky lg:top-0 z-40 border-b border-slate-200 bg-white/95 px-4 py-2 backdrop-blur-xl sm:px-6 lg:px-8">
                 <div className="flex min-h-14 flex-col gap-2 xl:flex-row xl:items-center">
                     <div className="flex shrink-0 items-center gap-2">
                         <Link href="/admin" className="inline-flex h-9 w-9 items-center justify-center rounded-full text-blue-600 transition hover:bg-blue-50" title="관리자 홈">
@@ -2030,12 +2046,23 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </div>
                 </div>
             </div>
+            <div className="space-y-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                <div className="flex flex-wrap items-center gap-2" role="group" aria-label="작업별 표시 열">
+                    <span className="mr-1 text-xs font-semibold text-slate-600">작업 보기</span>
+                    <button className="ux-button" onClick={() => setVisibleColumns(['stock', 'safetyStock', 'stockStatus', 'actions'])}>관리용 재고</button>
+                    <button className="ux-button" onClick={() => setVisibleColumns(['cnyCost', 'cost', 'wholesale', 'retail', 'margin'])}>가격·마진</button>
+                    <button className="ux-button" onClick={() => setVisibleColumns(['availability', 'moq', 'orderUnit', 'wholesale'])}>파트너 판매</button>
+                    <button className="ux-button" onClick={resetVisibleColumns}>기본 보기</button>
+                </div>
+                <p className="text-xs leading-5 text-slate-600">관리용 재고는 실물 수량 기록이며 파트너 주문 가능 여부와 별개입니다. <strong>판매 상태·순서·그룹은 즉시 반영</strong>되고, <strong>가격·수량·발주 조건은 수정사항 저장</strong>을 눌러야 반영됩니다.</p>
+            </div>
+            {unsavedCount > 0 && <p role="status" className="border-b border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-900">{unsavedCount}개 상품에 저장하지 않은 변경사항이 있습니다. 저장할 행을 선택한 뒤 수정사항 저장을 눌러 주세요.</p>}
             {checkedIds.size > 0 && (
                 <div className={isCompactViewport
                     ? 'fixed inset-x-3 bottom-4 z-[80] flex items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-white/95 p-3 shadow-2xl backdrop-blur-xl'
                     : 'flex items-center justify-between gap-3 border-b border-blue-100 bg-blue-50 px-3 py-2'}
                 >
-                    <span className="text-xs font-black text-blue-800">{checkedIds.size}개 상품 선택됨</span>
+                    <span className="text-xs font-semibold text-blue-800">{checkedIds.size}개 선택 · 가격·수량 변경 후 저장하세요</span>
                     <button
                         onClick={handleSaveChanges}
                         disabled={isSaving}
@@ -2143,7 +2170,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <th className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">이미지</th>
                             <th className="px-3 py-3 text-left text-[12px] font-black whitespace-nowrap">상품명</th>
                             {visibleColumnOptions.map(option => (
-                                <th key={option.key} className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">{option.label === '재고' ? '현재고' : option.label}</th>
+                                <th key={option.key} className="px-2 py-3 text-center text-[12px] font-black whitespace-nowrap">{option.key === 'stock' ? '현재고' : option.label}</th>
                             ))}
                         </tr>
                     </thead>

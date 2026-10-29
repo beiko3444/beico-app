@@ -190,9 +190,9 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
 
       <section className="rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
         <div className="flex flex-col gap-2 md:flex-row">
-          <label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="주문번호, 상품명, 판매자, 운송장 검색" className={`${inputClass} bg-slate-50 pl-10 focus:bg-white`} /></label>
-          <select value={status} onChange={(event) => setStatus(event.target.value)} aria-label="주문 상태 필터" className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40">{['전체', ...statuses].map((value) => <option key={value}>{value}</option>)}</select>
-          <label className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-500">¥1 ≈ <input aria-label="위안 환율" type="number" value={rate} onChange={(event) => setRate(Number(event.target.value))} onBlur={(event) => saveRate(Number(event.target.value))} className="w-16 rounded-md bg-transparent text-right text-sm font-black text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40" />원</label>
+          <label className="relative min-w-0 flex-1"><Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} /><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="주문번호, 상품명, 판매자, 운송장 검색" className="min-h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-[#ef5b2a] focus:bg-white focus:ring-2 focus:ring-orange-100" /></label>
+          <select value={status} onChange={(event) => setStatus(event.target.value)} className="min-h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm font-bold outline-none focus:border-[#ef5b2a]">{['전체', ...statuses].map((value) => <option key={value}>{value}</option>)}</select>
+          <label title="환율 변경은 입력칸을 벗어나면 저장되며 전체 목록의 원화 예상액에 적용됩니다." className="flex min-h-11 items-center gap-2 rounded-xl border border-slate-200 px-3 text-xs font-bold text-slate-500">¥1 ≈ <input aria-label="위안 환율" type="number" value={rate} onChange={(event) => setRate(Number(event.target.value))} onBlur={(event) => saveRate(Number(event.target.value))} className="w-16 bg-transparent text-right text-sm font-black text-slate-900 outline-none" />원</label>
         </div>
         {message && <div className="mt-2 rounded-xl bg-slate-50 px-3 py-2 text-xs font-bold text-slate-600">{message}</div>}
       </section>
@@ -204,16 +204,16 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
           const lead = group.items[0]
           const isCancelled = group.status === '취소'
           return (
-            <article key={group.orderNo} className={`border-b border-slate-200 transition-opacity last:border-b-0 ${isCancelled ? 'bg-slate-50/70 opacity-60' : ''}`}>
+            <article key={group.orderNo} className={`border-b border-[#eadfd5] transition-opacity last:border-b-0 ${isCancelled ? 'bg-slate-50/70' : ''}`}>
               <div className="relative p-4 sm:p-5">
                 <button type="button" onClick={() => toggle(group.orderNo)} aria-label={isOpen ? '주문 접기' : '주문 펼치기'} className={buttonClass('ghost', 'sm', 'absolute right-2 top-3 h-10 w-10 rounded-full px-0')}>{isOpen ? <ChevronUp size={20} /> : <ChevronDown size={20} />}</button>
                 <div className="grid min-w-0 grid-cols-[94px_minmax(0,1fr)] gap-4 pr-8">
                   <LeadImage item={lead} />
-                  <button type="button" onClick={() => toggle(group.orderNo)} className="min-w-0 rounded-xl text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40">
-                    <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(group.status)}`}>{group.status}</span><span className="text-xs font-bold text-slate-500">{group.orderedOn}</span></div>
-                    <p className="mt-2 truncate text-base font-black text-slate-900 sm:text-lg">{lead.productCn}</p>
-                    <p className="mt-1 truncate text-sm font-bold text-slate-600">{lead.productKo || '한글 상품명 미등록'}</p>
-                    <p className="mt-1 truncate text-sm text-slate-500">{group.shop || '판매자 미확인'} · 주문번호 {group.orderNo}{group.trackingNo ? ` · 운송장 ${group.trackingNo}` : ''}</p>
+                  <button onClick={() => toggle(group.orderNo)} className="min-w-0 text-left">
+                    <div className="flex flex-wrap items-center gap-2"><span className={`rounded-full px-2.5 py-1 text-xs font-extrabold ring-1 ${statusStyle(group.status)}`}>{group.status}</span><span className="text-xs font-bold text-[#9a897a]">{group.orderedOn}</span></div>
+                    <p className="mt-2 line-clamp-2 text-base font-bold text-[#211c18] sm:text-lg">{lead.productKo || lead.productCn}</p>
+                    <p className="mt-1 truncate text-xs text-[#796b60]">{lead.productCn}</p>
+                    <p className="mt-1 truncate text-sm text-[#796b60]">{group.shop || '판매자 미확인'} · 주문번호 {group.orderNo}{group.trackingNo ? ` · 운송장 ${group.trackingNo}` : ''}</p>
                   </button>
                 </div>
                 <div className="mt-4 grid grid-cols-2 gap-y-3 rounded-xl border border-slate-200 bg-slate-50 py-3 text-center sm:grid-cols-4 sm:divide-x sm:divide-slate-200">

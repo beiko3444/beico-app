@@ -66,7 +66,7 @@ const filterOptions: Array<{ value: FilterMode; label: string }> = [
   { value: 'all', label: '전체' },
   { value: 'empty', label: '품절' },
   { value: 'inbound', label: '입고대기' },
-  { value: 'unlinked', label: '미연결' },
+  { value: 'unlinked', label: '채널 연결 없는 관리 상품' },
   { value: 'linked', label: '연결상품 있음' },
 ]
 
@@ -437,6 +437,54 @@ function MasterTable({
   )
 }
 
+function MasterCards({ rows, allRows, favoriteIds, onToggleFavorite, onReorder, onSelect, coupangStale }: {
+  coupangStale: boolean
+  rows: SmartInventoryMasterRow[]
+  allRows: SmartInventoryMasterRow[]
+  favoriteIds: number[]
+  onToggleFavorite: (id: number) => void
+  onReorder: (ids: number[]) => void
+  onSelect: (row: SmartInventoryMasterRow) => void
+}) {
+  function move(id: number, offset: number) {
+    const ids = allRows.map(row => row.id)
+    const index = ids.indexOf(id)
+    const target = index + offset
+    if (index < 0 || target < 0 || target >= ids.length) return
+    ;[ids[index], ids[target]] = [ids[target], ids[index]]
+    onReorder(ids)
+  }
+  return <div className="space-y-3 lg:hidden">
+    {!rows.length && <div className="ux-empty-state ux-panel">조건에 맞는 관리 상품이 없습니다.</div>}
+    {rows.map(row => {
+      const index = allRows.findIndex(item => item.id === row.id)
+      const favorite = favoriteIds.includes(row.id)
+      return <article key={row.id} className="ux-panel p-4">
+        <div className="flex items-start gap-3">
+          <button onClick={() => onSelect(row)} className="flex min-h-12 min-w-0 flex-1 items-center gap-3 text-left" aria-label={`${row.name} 재고 이력 보기`}>
+            <ProductImage src={row.imageUrl} alt={row.name} />
+            <span className="min-w-0"><span className="block text-base font-bold text-slate-900">{row.name}</span><span className="mt-1 block text-xs text-slate-500">재고 이력·차감 추이 보기</span></span>
+          </button>
+          <button onClick={() => onToggleFavorite(row.id)} aria-label={`${row.name} 즐겨찾기 ${favorite ? '해제' : '추가'}`} aria-pressed={favorite} className="ux-icon-button shrink-0"><Star size={18} fill={favorite ? 'currentColor' : 'none'} className={favorite ? 'text-amber-500' : 'text-slate-400'} /></button>
+        </div>
+        <dl className="mt-4 grid grid-cols-3 gap-2 rounded-lg bg-slate-50 p-3 text-center">
+          <div><dt className="text-xs text-slate-500">네이버</dt><dd className="mt-1 text-lg font-bold tabular-nums">{formatNumber(row.naverStock)}</dd></div>
+          <div><dt className="text-xs text-slate-500">쿠팡</dt><dd className="mt-1 text-lg font-bold tabular-nums">{coupangStale ? '확인 불가' : formatNumber(row.coupangStock)}</dd></div>
+          <div><dt className="text-xs text-slate-500">합계</dt><dd className="mt-1 text-lg font-bold tabular-nums">{coupangStale ? '확인 불가' : formatNumber(row.totalStock)}</dd></div>
+        </dl>
+        <div className="mt-3 flex flex-wrap justify-between gap-2 text-xs text-slate-600"><span>입고대기 {formatNumber(row.totalInboundPending)}개</span><span>원가 {formatMoney(row.unitCost)}</span><span>{row.linkCount ? `${row.linkCount}개 SKU 연결` : '채널 연결 없음'}</span></div>
+        <details className="mt-3 border-t border-slate-100 pt-2"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">연결 상품·목록 순서</summary>
+          <div className="space-y-2">{row.linked.map(link => {
+            const href = externalProductHref(link.productUrl, link.channel)
+            return <div key={`${link.channel}:${link.productKey}`} className="text-sm">{href ? <a href={href} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-2">{channelLabel[link.channel]} · {link.name}<ExternalLink size={14} /></a> : <span>{channelLabel[link.channel]} · {link.name}</span>}</div>
+          })}{!row.linked.length && <p className="text-sm text-slate-500">연결된 채널 상품이 없습니다.</p>}</div>
+          <div className="mt-2 flex gap-2"><button className="ux-button" disabled={index <= 0} onClick={() => move(row.id, -1)}>위로</button><button className="ux-button" disabled={index === allRows.length - 1} onClick={() => move(row.id, 1)}>아래로</button></div>
+        </details>
+      </article>
+    })}
+  </div>
+}
+
 function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventoryChannelRow[]; rankOffset: number; coupangStale: boolean }) {
   return (
     <div className="max-h-[calc(100dvh-310px)] min-h-[360px] overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -758,9 +806,9 @@ export default function InventoryClient() {
   return (
     <div className="mx-auto w-full min-w-0 max-w-[1540px] space-y-4 pb-6">
       <PageHeader
-        title="재고관리"
+        title="채널 재고관리"
         count={summary ? `${formatNumber(summary.masterCount)}개` : undefined}
-        description="채널별 재고, 입고 예정 수량과 재고가치를 한곳에서 확인합니다."
+        description="네이버·쿠팡 판매 재고입니다. 실물 창고 재고와 별도로 집계합니다."
         actions={(
           <>
             <div className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[11px] font-black text-slate-600">
@@ -772,11 +820,11 @@ export default function InventoryClient() {
               type="button"
               onClick={() => loadDashboard(true)}
               disabled={loading || syncing}
-              className={buttonClass('secondary', 'md', 'w-10 px-0')}
+              className={buttonClass('secondary', 'md')}
               title="화면 데이터 새로고침"
               aria-label="화면 데이터 새로고침"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}화면 갱신
             </button>
             <button
               type="button"
@@ -785,7 +833,7 @@ export default function InventoryClient() {
               className={buttonClass('primary', 'md')}
             >
               {syncing ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
-              재고 동기화
+              채널 재고 수집
             </button>
           </>
         )}
@@ -817,9 +865,10 @@ export default function InventoryClient() {
             tone="blue"
           />
           <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(summary?.totalInboundPending)} sub="입고 예정 수량" tone="orange" />
-          <StatCard icon={<AlertCircle size={20} />} label="미연결" value={formatNumber(summary?.unlinkedProducts)} sub="채널 연결 필요" tone="red" />
+          <StatCard icon={<AlertCircle size={20} />} label="미연결 채널 SKU" value={formatNumber(summary?.unlinkedProducts)} sub="관리 상품과 연결하지 않은 채널 SKU 수" tone="red" />
           <StatCard icon={<WalletCards size={20} />} label="재고가치" value={monitorUnavailable || coupangStale ? '확인 불가' : formatMoney(summary?.stockCost)} sub="현재 재고 원가 기준" tone="green" />
         </div>
+        <p className="mt-2 text-xs text-slate-500">조회 시각과 채널 수집 시각은 다를 수 있습니다. 최신 재고는 채널 재고 수집 후 확인하세요.</p>
       </section>
 
       <section className="flex min-w-0 flex-col gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm xl:flex-row xl:items-center">
@@ -838,11 +887,10 @@ export default function InventoryClient() {
           value={filter}
           onChange={(value) => {
             setFilter(value)
-            if (value !== 'unlinked') setTableMode('masters')
-            if (value === 'unlinked') setTableMode('unlinked')
+            setTableMode('masters')
           }}
         />
-        <div className="hidden h-7 w-px bg-slate-200 xl:block" />
+        <button className="ux-button" aria-pressed={tableMode === 'unlinked'} onClick={() => { setTableMode(tableMode === 'unlinked' ? 'masters' : 'unlinked'); setPage(1) }}>미연결 채널 SKU 보기</button><div className="hidden h-7 w-px bg-slate-200 xl:block" />
         <button
           type="button"
           onClick={handleDownload}
@@ -860,7 +908,7 @@ export default function InventoryClient() {
           재고를 불러오는 중입니다.
         </div>
       ) : tableMode === 'masters' ? (
-        <MasterTable
+        <><MasterCards rows={pagedMasters} allRows={orderedMasters} favoriteIds={favoriteIds} onToggleFavorite={handleToggleFavorite} onReorder={handleReorder} onSelect={setSelectedHistoryProduct} coupangStale={coupangStale} /><div className="hidden lg:block"><MasterTable
           rows={pagedMasters}
           allRows={orderedMasters}
           rankOffset={pageOffset}
@@ -869,7 +917,7 @@ export default function InventoryClient() {
           onReorder={handleReorder}
           onSelect={setSelectedHistoryProduct}
           coupangStale={coupangStale}
-        />
+        /></div></>
       ) : (
         <UnlinkedTable rows={pagedUnlinkedRows} rankOffset={pageOffset} coupangStale={coupangStale} />
       )}

@@ -1,8 +1,9 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import Modal from '@/components/Modal'
 import { useRouter } from 'next/navigation'
-import { Minus, Plus, Search, X } from 'lucide-react'
+import { Minus, Plus, Search, ShoppingCart, X } from 'lucide-react'
 
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import { resolvePartnerOrderTerms, type PartnerOrderPricingProduct } from '@/lib/partnerOrderPricing'
@@ -152,11 +153,15 @@ export default function AdminOrderCreateModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm md:p-6" onMouseDown={handleClose}>
-      <div className="flex max-h-[94vh] w-full min-w-0 max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-4 py-4 sm:px-6 sm:py-5">
-          <div className="min-w-0">
-            <h2 className="text-[20px] font-black tracking-tight text-slate-900">업체 발주서 생성</h2>
+    <Modal label="업체 발주서 생성" onClose={handleClose} className="flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm md:p-6">
+      <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-5">
+          <div>
+            <div className="flex items-center gap-2 text-blue-600">
+              <ShoppingCart className="h-5 w-5" />
+              <span className="text-[12px] font-black uppercase tracking-wider">Admin Order</span>
+            </div>
+            <h2 className="mt-2 text-[24px] font-black tracking-tight text-slate-950">업체 발주서 생성</h2>
             <p className="mt-1 text-[13px] text-slate-500">업체를 선택하면 해당 국가와 등급에 맞는 발주 단가가 적용됩니다.</p>
           </div>
           <button
@@ -274,7 +279,7 @@ export default function AdminOrderCreateModal({
           </div>
         </div>
       </div>
-    </div>
+    </Modal>
   )
 }
 

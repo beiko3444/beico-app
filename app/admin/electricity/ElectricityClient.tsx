@@ -1147,7 +1147,7 @@ export default function ElectricityClient() {
                 )}
 
                 {activeTab === 'analysis' && (
-                    <div className="pt-3 mt-4 border-t border-gray-100 dark:border-[#2a2a2a]">
+                    <details className="pt-3 mt-4 border-t border-gray-100 dark:border-[#2a2a2a]"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">{selectedYear}년 {selectedMonth}월 계량기 사진 · {landlordData?.photo ? '등록됨' : '미등록'}</summary>
                         <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                             <div className="min-w-0">
                                 <h2 className="text-sm font-black text-gray-900 break-keep dark:text-white">선택 월 단자함/계량기 사진</h2>
@@ -1174,7 +1174,7 @@ export default function ElectricityClient() {
                                 description="선택한 월의 계량기 사진을 업로드하세요."
                             />
                         )}
-                    </div>
+                    </details>
                 )}
             </div>
 

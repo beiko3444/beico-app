@@ -2,13 +2,13 @@ export const PRODUCT_TABLE_COLUMNS_STORAGE_KEY = 'admin-product-table-visible-co
 
 export const PRODUCT_TABLE_COLUMN_OPTIONS = [
     { key: 'barcode', label: '바코드번호', width: 160 },
-    { key: 'stock', label: '재고', width: 104 },
+    { key: 'stock', label: '관리용 재고', width: 104 },
     { key: 'safetyStock', label: '안전재고', width: 92 },
-    { key: 'stockStatus', label: '재고상태', width: 104 },
+    { key: 'stockStatus', label: '수량 상태', width: 104 },
     { key: 'cnyCost', label: '외화 매입가', width: 124 },
     { key: 'cost', label: '한화 매입가', width: 124 },
     { key: 'retail', label: '판매가', width: 112 },
-    { key: 'availability', label: '파트너 상태', width: 112 },
+    { key: 'availability', label: '파트너 판매 상태', width: 112 },
     { key: 'moq', label: '최소수량', width: 90 },
     { key: 'orderUnit', label: '주문단위', width: 90 },
     { key: 'wholesale', label: '도매가', width: 112 },

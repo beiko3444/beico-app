@@ -84,11 +84,16 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
     const safeOrders = Array.isArray(orders) ? orders : []
     const isKorean = userCountry === 'Korea'
 
+    const [historyFilter, setHistoryFilter] = useState<'active' | 'all'>('active')
+    const activeOrders = safeOrders.filter(order => !['COMPLETED', 'CANCELED'].includes(safeText(order.status)))
+    const displayedOrders = historyFilter === 'active' ? activeOrders : safeOrders
+
     if (safeOrders.length === 0) {
         return (
             <div className="flex items-center justify-center py-20 bg-white dark:bg-[#1e1e1e] rounded-2xl shadow-sm dark:shadow-none border border-gray-100 dark:border-[#2a2a2a]">
                 <div className="text-center">
                     <p className="text-xl font-bold text-gray-400 dark:text-gray-500">{isKorean ? '주문내역이 없습니다.' : '注文履歴がありません。'}</p>
+                    <Link href="/order" className="ux-button-primary mt-5">{isKorean ? '상품 주문하러 가기' : '商品を注文する'}</Link>
                 </div>
             </div>
         )
@@ -146,7 +151,12 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                 </div>
             </div>
 
-            {safeOrders.map((order, orderIndex) => {
+            <div className="ux-tabs" role="tablist" aria-label={isKorean ? '주문 조회' : '注文表示'}>
+                <button role="tab" aria-selected={historyFilter === 'active'} onClick={() => setHistoryFilter('active')}>{isKorean ? '진행 중' : '進行中'} {activeOrders.length}</button>
+                <button role="tab" aria-selected={historyFilter === 'all'} onClick={() => setHistoryFilter('all')}>{isKorean ? '전체 주문' : 'すべて'} {safeOrders.length}</button>
+            </div>
+            {displayedOrders.length === 0 && <div className="ux-context">{isKorean ? '진행 중인 주문이 없습니다. 전체 주문에서 지난 거래를 확인하세요.' : '進行中の注文はありません。すべての注文から履歴をご確認ください。'}</div>}
+            {displayedOrders.map((order, orderIndex) => {
                 const safeOrder = order || {}
                 const orderId = safeText(safeOrder.id) || `missing-order-${orderIndex}`
                 const status = safeText(safeOrder.status)
@@ -174,7 +184,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                 if (status === 'PENDING_DEPOSIT') activeStep = 1;
                 if (status === 'DEPOSIT_COMPLETED') activeStep = 2; // Paid
                 if (status === 'SHIPPED') activeStep = 3; // Shipped
-                if (safeOrder.taxInvoiceIssued) activeStep = 4; // Invoice
+                if (status === 'COMPLETED') activeStep = 3;
 
                 // If cancelled (not in standard flow), handle gracefully (maybe show as step 0 or error state)
 
@@ -183,17 +193,21 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                     { label: '입금 대기', sub: '입금대기중', icon: Banknote },
                     { label: '입금 확인', sub: '입금완료', icon: Check },
                     { label: '배송', sub: '배송중', icon: Truck },
-                    { label: '계산서 발급', sub: '발급완료', icon: FileText },
+
                 ] : [
                     { label: '注文完了', sub: isUSD ? 'Order Placed' : '注文済み', icon: Check },
                     { label: '入金待ち', sub: isUSD ? 'Awaiting Payment' : '確認待ち', icon: Banknote },
                     { label: '入金完了', sub: isUSD ? 'Payment Confirmed' : '確認済み', icon: Check },
                     { label: '出荷完了', sub: isUSD ? 'Shipped' : '配送中', icon: Truck },
-                    { label: '請求書発行完了', sub: isUSD ? 'Invoice Issued' : '発行済み', icon: FileText },
+
                 ]
 
                 return (
-                    <div key={orderId} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${isOrderCompleted ? 'opacity-80 brightness-[0.92] grayscale-[0.1]' : ''}`}>
+                    <div key={orderId} className={`bg-white dark:bg-[#1e1e1e] rounded-xl md:rounded-2xl p-2 md:p-4 pb-6 md:pb-8 shadow-md dark:shadow-none border border-gray-100 dark:border-[#2a2a2a] mb-8 mx-4 md:mx-0 last:mb-0 transition-all duration-300 ${isOrderCompleted ? 'border-emerald-200' : ''}`}>
+                        <div className="mb-3 flex flex-wrap gap-2 px-2 text-xs font-semibold">
+                            <span className={`rounded-md border px-3 py-2 ${safeOrder.taxInvoiceIssued ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-gray-200 text-gray-500'}`}>{isKorean ? '계산서' : '請求書'} · {safeOrder.taxInvoiceIssued ? (isKorean ? '발급 완료' : '発行済み') : (isKorean ? '미발급' : '未発行')}</span>
+                            {status === 'CANCELED' && <span className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-red-700">{isKorean ? '주문 취소' : 'キャンセル済み'}</span>}
+                        </div>
                         {/* Order No & Date Box */}
                         <div className="bg-white dark:bg-[#1e1e1e] rounded-xl py-2 px-2 flex flex-row justify-between items-center gap-4 mb-0">
                             <div className="flex flex-col text-sm">
@@ -219,7 +233,7 @@ export default function OrderHistory({ orders, userCountry }: { orders?: OrderHi
                         <div className="border-t border-gray-100 dark:border-[#2a2a2a] mx-5 my-0.5" />
 
                         {/* Progress Stepper moved under Order No */}
-                        <div className="bg-white dark:bg-[#1e1e1e] rounded-xl py-1 px-1 mb-1">
+                        <div hidden={status === 'CANCELED'} className="bg-white dark:bg-[#1e1e1e] rounded-xl py-1 px-1 mb-1">
                             <div className="relative flex justify-between items-start overflow-hidden pt-2">
                                 {/* Connecting Line Container (Grey Background) */}
                                 <div className="absolute top-[26px] left-[10%] right-[10%] h-[2px] bg-gray-100 dark:bg-[#2a2a2a] z-0">

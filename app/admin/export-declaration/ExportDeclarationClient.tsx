@@ -1468,27 +1468,27 @@ export default function ExportDeclarationClient({
     <div className="min-w-0 space-y-5">
       <PageHeader
         title="수출신고"
-        description="Commercial Invoice와 Packing List를 작성하고 유니패스 수출신고 입력값을 준비합니다."
+        description="내부 문서 작성 도구입니다. 문서 생성 후 UNI-PASS에서 수출신고를 별도로 제출하세요."
         count={savedDeclarations.length}
         actions={
           <>
             <Button variant="ghost" onClick={resetForm}>
               초기화
             </Button>
-            <Button variant="secondary" icon={<FileText size={15} />} onClick={() => printDocuments('commercial')}>
+            <Button variant="secondary" icon={<FileText size={15} />} disabled={!selectedDeclarationId} onClick={() => printDocuments('commercial')}>
               Commercial Invoice 인쇄
             </Button>
-            <Button variant="secondary" icon={<PackageCheck size={15} />} onClick={() => printDocuments('packing')}>
+            <Button variant="secondary" icon={<PackageCheck size={15} />} disabled={!selectedDeclarationId} onClick={() => printDocuments('packing')}>
               Packing List 인쇄
             </Button>
-            <Button variant="secondary" icon={<Printer size={15} />} onClick={() => printDocuments('both')}>
+            <Button variant="secondary" icon={<Printer size={15} />} disabled={!selectedDeclarationId} onClick={() => printDocuments('both')}>
               두 문서 연속 인쇄
             </Button>
             <Button variant="secondary" icon={<Save size={15} />} onClick={saveDraftDeclaration} loading={isUpdatingDeclaration}>
               {isUpdatingDeclaration ? '저장 중' : '임시저장'}
             </Button>
             <Button variant="primary" icon={<Plus size={15} />} onClick={createDeclaration} loading={isCreating}>
-              {isCreating ? '생성 중' : '신청서 생성'}
+              {isCreating ? '생성 중' : '내부 문서 생성'}
             </Button>
           </>
         }

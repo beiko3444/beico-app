@@ -355,7 +355,7 @@ export default function SeasonRadarClient() {
     <div className="min-w-0 text-slate-900">
       <PageHeader
         title="시즌레이더"
-        description="어종별 월별 수요 흐름과 출조 지역을 함께 확인합니다."
+        description="월·지역별 조황 게시글 언급 빈도입니다. 판매 수요나 실제 어획량을 뜻하지 않습니다."
         actions={(
           <label className="flex min-w-0 items-center gap-2">
             <span className="flex shrink-0 items-center gap-1 whitespace-nowrap text-[12px] font-black text-slate-600">
@@ -373,7 +373,8 @@ export default function SeasonRadarClient() {
         )}
       />
 
-      <div className="space-y-4">
+      <div className="space-y-4 p-3 sm:p-5 lg:p-6">
+        <p className="ux-context"><strong>{selectedFish} · {selectedMonth}월</strong> 선택 중 · 2015.01~2026.09 누적 게시글의 계절 패턴이며 실시간 전망이 아닙니다.</p>
         <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
           <MetricCard
             label="피크 시즌"

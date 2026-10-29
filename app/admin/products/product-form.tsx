@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
+import Modal from '@/components/Modal'
 import { ImagePlus, Plus, X } from 'lucide-react'
 import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 import Button, { buttonClass } from '@/components/ui/Button'
@@ -399,7 +400,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
     const submitLabel = loading ? '저장 중…' : isCopy ? '복사 저장' : '저장'
 
     const modalContent = (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-hidden bg-slate-950/45 p-0 sm:p-4" role="dialog" aria-modal="true" aria-label={modalTitle}>
+        <Modal label={modalTitle} onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-slate-950/45 p-0 sm:p-4">
             <div
                 className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[95vh] sm:rounded-2xl sm:border sm:border-slate-200"
                 onClick={(e) => e.stopPropagation()}
@@ -811,7 +812,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                     </div>
                 </form>
             </div>
-        </div>
+        </Modal>
     )
 
     return (

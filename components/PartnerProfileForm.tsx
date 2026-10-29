@@ -39,6 +39,7 @@ export default function PartnerProfileForm({ initial, isKorean }: { initial: Det
             {fields.map(field => <label key={field.key} className={`block space-y-2 ${field.key === 'address' ? 'sm:col-span-2' : ''}`}>
                 <span className="text-base font-semibold">{field.label}{field.key === 'name' ? ' *' : ''}</span>
                 <input className="w-full rounded-xl border px-4 py-3 text-base" type={field.type} autoComplete={field.auto} maxLength={field.max} required={field.key === 'name'} value={values[field.key]} onChange={event => { setValues({ ...values, [field.key]: event.target.value }); setMessage('') }} />
+                {field.key === 'address' && <span className="block text-sm text-[var(--muted-foreground)]">{isKorean ? '저장하면 프로필·기존 거래명세서에 반영됩니다. 진행 중 주문의 배송지 변경은 관리자에게 별도로 요청해 주세요.' : '保存するとプロフィール・既存明細書に反映されます。進行中の注文の配送先変更は管理者にご連絡ください。'}</span>}
             </label>)}
         </fieldset>
         <p role="status" aria-live="polite" className="text-sm">{message || (dirty ? (isKorean ? '저장하지 않은 변경사항이 있습니다.' : '未保存の変更があります。') : '')}</p>

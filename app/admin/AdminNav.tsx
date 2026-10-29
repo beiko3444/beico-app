@@ -495,7 +495,7 @@ export default function AdminNav({
 
             <FavoriteInventoryPanel onNavigate={() => setIsMobileMenuOpen(false)} />
 
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E9EF] pt-3">
+            {pathname.startsWith('/admin/orders') && (            <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[#E5E9EF] pt-3">
               <div className="flex items-center gap-1.5">
                 <label htmlFor="admin-pickup-count-mobile" className="text-[13px] font-bold text-[#344054]">
                   집하 요청
@@ -529,7 +529,7 @@ export default function AdminNav({
                   <LogOut size={18} />
                 </button>
               </div>
-            </div>
+            </div>)}
           </aside>
         </>
       ) : null}
@@ -566,7 +566,7 @@ export default function AdminNav({
           <span className="truncate font-extrabold text-[#172033]">{activeItem?.name || '관리자'}</span>
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
-          {pickupControl}
+          {pathname.startsWith('/admin/orders') && pickupControl}
           <a
             href="/translator"
             target="_blank"

@@ -34,6 +34,7 @@ export default async function ProfilePage() {
         <section className="rounded-2xl border border-[var(--border)] bg-[var(--card)] p-5 sm:p-7">
             <h2 className="text-xl font-bold">{isKorean ? '계정 및 사업자 정보' : 'アカウント・事業者情報'}</h2>
             <p className="mt-2 text-sm text-[var(--muted-foreground)]">{isKorean ? '아래 정보의 변경은 관리자에게 요청해 주세요. 연락용 이메일을 바꿔도 로그인 아이디는 유지됩니다.' : '以下の情報の変更は管理者にご依頼ください。連絡先メールを変更してもログインIDは変わりません。'}</p>
+            <a href="mailto:contact@beiko.co.kr?subject=BEIKO%20partner%20information" className="ux-button mt-4">{isKorean ? '사업자 정보 변경 문의' : '事業者情報の変更について問い合わせ'}</a>
             <dl className="mt-5 grid gap-5 sm:grid-cols-2">
                 {accountFields.map(([label, value]) => <div key={label}><dt className="text-sm text-[var(--muted-foreground)]">{label}</dt><dd className="mt-1 break-words text-base font-semibold">{value || '—'}</dd></div>)}
             </dl>

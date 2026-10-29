@@ -68,9 +68,10 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
                 <input
                     type="password"
                     required
+                    autoComplete="current-password"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
+                    className="w-full h-12 px-4 bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--input-border)] rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     placeholder={isKorean ? '현재 비밀번호를 입력해주세요.' : '現在のパスワードを入力してください。'}
                 />
             </div>
@@ -80,9 +81,10 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
                 <input
                     type="password"
                     required
+                    autoComplete="new-password"
                     value={newPassword}
                     onChange={(e) => setNewPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
+                    className="w-full h-12 px-4 bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--input-border)] rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     minLength={6}
                     placeholder={isKorean ? '새 비밀번호(6자 이상)' : '新しいパスワード（6文字以上）'}
                 />
@@ -93,9 +95,10 @@ export default function ChangePasswordForm({ isKorean = false }: { isKorean?: bo
                 <input
                     type="password"
                     required
+                    autoComplete="new-password"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
-                    className="w-full h-12 px-4 bg-white border border-gray-200 rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
+                    className="w-full h-12 px-4 bg-[var(--input-bg)] text-[var(--foreground)] border border-[var(--input-border)] rounded-lg outline-none focus:border-gray-300 transition-all text-[14px] font-medium placeholder:text-gray-300 placeholder:text-[12px] shadow-sm"
                     minLength={6}
                     placeholder={isKorean ? '새 비밀번호를 다시 입력해주세요.' : '新しいパスワードをもう一度入力してください。'}
                 />

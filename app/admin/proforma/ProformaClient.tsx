@@ -113,6 +113,8 @@ export default function ProformaClient({
     const [draftState, setDraftState] = useState<DraftState>(() => makeInitialDraftState(products))
     const [issuedInvoices, setIssuedInvoices] = useState<IssuedInvoice[]>(initialIssuedInvoices)
     const [activeIssuedId, setActiveIssuedId] = useState<string | null>(initialIssuedInvoices[0]?.id || null)
+    const [productSearch, setProductSearch] = useState('')
+    const [selectedOnly, setSelectedOnly] = useState(false)
     const [leftTab, setLeftTab] = useState<'write' | 'issued'>('write')
     const [isIssuing, setIsIssuing] = useState(false)
     const [deletingInvoiceId, setDeletingInvoiceId] = useState<string | null>(null)
@@ -234,7 +236,9 @@ export default function ProformaClient({
     const shippingUsd = 0
     const grandTotalUsd = subtotalUsd + taxUsd + shippingUsd
 
+    const visibleProducts = products.filter(product => (!selectedOnly || draftState[product.id]?.checked) && [product.name, product.nameJP, product.nameEN, product.productCode].some(value => value?.toLocaleLowerCase().includes(productSearch.trim().toLocaleLowerCase())))
     const toggleProduct = (productId: string) => {
+        if (!(Number(products.find(product => product.id === productId)?.usBuyPrice) > 0)) return
         setDraftState((prev) => ({
             ...prev,
             [productId]: {
@@ -278,6 +282,10 @@ export default function ProformaClient({
             return
         }
 
+        if (draftItems.some(item => !Number.isFinite(item.unitPriceUsd) || item.unitPriceUsd <= 0)) {
+            alert('미국 거래 단가가 미설정된 상품이 있습니다. 상품관리에서 단가를 확인해 주세요.')
+            return
+        }
         setIsIssuing(true)
         try {
             const response = await fetch('/api/admin/proforma', {
@@ -662,7 +670,7 @@ ${rowsHtml}
         <div className="min-w-0 space-y-6">
             <PageHeader
                 title="PI발급"
-                description="상품을 선택해 Proforma Invoice를 발행하고, 발급된 PI를 인쇄합니다."
+                description="작성 후 발행하면 발급리스트에 저장됩니다. 출력만으로는 발행 기록이 생성되지 않습니다."
                 count={issuedInvoices.length}
                 actions={
                     <>
@@ -683,7 +691,7 @@ ${rowsHtml}
                 }
             />
 
-            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_210mm] gap-8 items-start">
+            <div className="grid grid-cols-1 2xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-8 items-start">
                 <div className="pi-no-print min-w-0 space-y-6">
                     <section className="bg-white dark:bg-[#1e1e1e] rounded-2xl border border-gray-100 dark:border-[#2a2a2a] shadow-sm dark:shadow-none p-5 space-y-4 min-w-0">
                         <Tabs
@@ -716,7 +724,7 @@ ${rowsHtml}
                                             </option>
                                         ))}
                                     </select>
-                                    <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">단가는 상품관리의 미국 매입가(USD)를 사용합니다.</p>
+                                    <p className="mt-2 text-[11px] text-gray-500 dark:text-gray-400">상품관리의 미국 거래 단가(USD)가 적용됩니다. 단가 미설정 상품은 선택할 수 없습니다.</p>
                                     <div className="mt-3">
                                         <label className="text-xs font-bold text-gray-700 dark:text-gray-400">생산 소요기간</label>
                                         <input
@@ -729,6 +737,7 @@ ${rowsHtml}
                                     </div>
                                 </div>
 
+                                <div className="flex flex-wrap items-center gap-3"><label className="min-w-0 flex-1"><span className="sr-only">PI 상품 검색</span><input type="search" className="ux-input" value={productSearch} onChange={event => setProductSearch(event.target.value)} placeholder="상품명·코드 검색" /></label><label className="flex min-h-11 items-center gap-2 text-sm"><input type="checkbox" checked={selectedOnly} onChange={event => setSelectedOnly(event.target.checked)} className="h-5 w-5" />선택 상품만</label></div>
                                 <div className="overflow-x-auto border border-gray-100 dark:border-[#2a2a2a] rounded-xl">
                                     <table className="w-full min-w-[560px] text-sm">
                                         <thead className="ux-thead">
@@ -743,7 +752,7 @@ ${rowsHtml}
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-[#2a2a2a]">
-                                            {products.map((product) => {
+                                            {visibleProducts.map((product) => {
                                                 const rowState = draftState[product.id] || { checked: false, quantity: 1 }
                                                 const amount = rowState.quantity * Number(product.usBuyPrice || 0)
                                                 return (
@@ -751,6 +760,7 @@ ${rowsHtml}
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="checkbox"
+                                                                disabled={!(Number(product.usBuyPrice) > 0)}
                                                                 checked={rowState.checked}
                                                                 onChange={() => toggleProduct(product.id)}
                                                                 className="h-4 w-4 accent-brand-orange"
@@ -771,7 +781,7 @@ ${rowsHtml}
                                                             <div className="text-[11px] text-gray-500 dark:text-gray-400 font-mono">{product.productCode ? product.productCode.toUpperCase() : '-'}</div>
                                                         </td>
                                                         <td className="px-3 py-2 text-center text-gray-600 dark:text-gray-400 whitespace-nowrap">{product.stock.toLocaleString()}</td>
-                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">{usdFormatter.format(Number(product.usBuyPrice || 0))}</td>
+                                                        <td className="px-3 py-2 text-right font-black text-slate-900 dark:text-white whitespace-nowrap">{Number(product.usBuyPrice) > 0 ? usdFormatter.format(Number(product.usBuyPrice)) : '단가 미설정'}</td>
                                                         <td className="px-3 py-2 text-center">
                                                             <input
                                                                 type="number"
@@ -852,7 +862,7 @@ ${rowsHtml}
 
                 <section
                     id="pi-print-sheet"
-                    className="bg-[#f6f3f1] border border-gray-200 dark:border-[#2a2a2a] shadow-lg dark:shadow-none p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] 2xl:sticky 2xl:top-24 2xl:w-[210mm] 2xl:max-w-none 2xl:min-w-[210mm] 2xl:h-[297mm] 2xl:min-h-[297mm] 2xl:aspect-auto"
+                    className="bg-[#f6f3f1] border border-gray-200 dark:border-[#2a2a2a] shadow-lg dark:shadow-none p-4 w-full max-w-[560px] aspect-[210/297] overflow-auto mx-auto text-[#22253f] 2xl:sticky 2xl:top-24 2xl:w-full 2xl:max-w-[794px] 2xl:h-[297mm] 2xl:min-h-[297mm] 2xl:aspect-auto"
                 >
                     <div className="pi-no-print mb-3">
                         <div className="text-[13px] font-bold text-slate-900">인쇄 미리보기</div>

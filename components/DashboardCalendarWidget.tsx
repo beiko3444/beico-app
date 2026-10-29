@@ -197,15 +197,15 @@ export default function DashboardCalendarWidget({ tasks }: { tasks: any[] }) {
                     <div className="flex items-center gap-6">
                         <div className="flex items-center gap-3">
                             <div className="flex flex-col items-center">
-                                <button onClick={() => changeYear(1)} className="hover:text-blue-500 transition-colors"><ChevronUp className="w-3 h-3" /></button>
+                                <button onClick={() => changeYear(1)} aria-label="다음 연도" className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100 hover:text-blue-500"><ChevronUp className="w-3 h-3" /></button>
                                 <span className="text-xl font-black tracking-tighter leading-none">{currentMonth.getFullYear()}</span>
-                                <button onClick={() => changeYear(-1)} className="hover:text-blue-500 transition-colors"><ChevronDown className="w-3 h-3" /></button>
+                                <button onClick={() => changeYear(-1)} aria-label="이전 연도" className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100 hover:text-blue-500"><ChevronDown className="w-3 h-3" /></button>
                             </div>
                             <div className="w-px h-6 bg-gray-200 dark:bg-[#2a2a2a]"></div>
                             <div className="flex flex-col items-center">
-                                <button onClick={() => changeMonth(1)} className="hover:text-blue-500 transition-colors"><ChevronUp className="w-3 h-3" /></button>
+                                <button onClick={() => changeMonth(1)} aria-label="다음 달" className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100 hover:text-blue-500"><ChevronUp className="w-3 h-3" /></button>
                                 <span className="text-xl font-black tracking-tighter leading-none">{currentMonth.getMonth() + 1}</span>
-                                <button onClick={() => changeMonth(-1)} className="hover:text-blue-500 transition-colors"><ChevronDown className="w-3 h-3" /></button>
+                                <button onClick={() => changeMonth(-1)} aria-label="이전 달" className="flex h-9 w-9 items-center justify-center rounded-lg transition-colors hover:bg-slate-100 hover:text-blue-500"><ChevronDown className="w-3 h-3" /></button>
                             </div>
                         </div>
                     </div>

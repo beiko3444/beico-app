@@ -391,6 +391,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 </div>
               </div>
 
+              <details className="rounded-lg border border-slate-200 p-3"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">사이트·계정 정보 (선택)</summary><div className="space-y-3 pt-3">
               <label className="block">
                 <span className="mb-1 block text-xs font-black text-slate-600">사이트 링크</span>
                 <div className="relative">
@@ -441,6 +442,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                 </label>
               </div>
 
+              </div></details>
               <label className="block">
                 <span className="mb-1 block text-xs font-black text-slate-600">내용</span>
                 <textarea
@@ -636,7 +638,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                         </div>
                       </div>
 
-                      <p className="mt-3 whitespace-pre-wrap break-words text-sm font-bold leading-6 text-slate-700">{memo.content || '-'}</p>
+                      <details className="mt-3"><summary className="min-h-11 cursor-pointer py-2 text-sm font-medium text-slate-600"><span className="line-clamp-3 whitespace-pre-wrap">{memo.content || '본문 보기'}</span></summary><p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{memo.content || '-'}</p></details>
 
                       {(memo.siteUrl || memo.username || memo.password) ? (
                         <div className="mt-3 grid gap-2 rounded-xl bg-white/75 p-3 text-xs font-bold text-slate-700">
@@ -688,7 +690,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                       ) : null}
 
                       {memo.attachments.length > 0 ? (
-                        <div className="mt-3 space-y-1.5">
+                        <details className="mt-3 rounded-lg border border-black/10 p-2"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold">첨부 문서 {memo.attachments.length}개 보기</summary><div className="space-y-1.5">
                           {memo.attachments.map((attachment) => (
                             <a
                               key={attachment.id}
@@ -701,7 +703,7 @@ export default function MemosClient({ initialMemos }: { initialMemos: AdminMemoI
                               <Download size={14} className="shrink-0 text-brand-orange" />
                             </a>
                           ))}
-                        </div>
+                        </div></details>
                       ) : null}
 
                       <div className="mt-4 flex items-center justify-between gap-3 border-t border-black/5 pt-3 text-[11px] font-black text-slate-500">

@@ -106,7 +106,8 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                 .print\\:p-0 { padding: 0 !important; }
             `}</style>
 
-            <div id="invoice-content" className="w-[210mm] h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[5mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
+            <InvoiceButtons orderNumber={displayOrderNumber} />
+            <div className="w-full overflow-x-auto print:overflow-visible"><div id="invoice-content" className="w-[210mm] h-[280mm] mx-auto bg-white pt-[30mm] px-[15mm] pb-[5mm] shadow-xl print:shadow-none relative overflow-hidden flex flex-col text-black font-sans">
 
                 {/* Formal Header */}
                 <div className="text-center mb-4 border-b-4 border-black pb-2">
@@ -322,10 +323,10 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
                     </div>
                 </div>
 
-            </div>
+            </div></div>
 
             {/* Interactive Buttons - Outside A4 container */}
-            <InvoiceButtons orderNumber={displayOrderNumber} />
+
         </InvoiceWrapper>
     )
 }

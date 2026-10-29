@@ -20,7 +20,10 @@ test('uses responsive navigation shells for admin and partner areas', () => {
     const partnerLayout = read('../app/order/layout.tsx')
     const partnerNav = read('../components/UserNavbar.tsx')
 
-    assert.match(adminLayout, /lg:ml-\[248px\]/)
+    const contentOffset = adminLayout.match(/lg:ml-\[(\d+)px\]/)?.[1]
+    const sidebarWidth = adminNav.match(/w-\[(\d+)px\] flex-col/)?.[1]
+    assert.ok(contentOffset, 'desktop content must reserve space for the sidebar')
+    assert.equal(contentOffset, sidebarWidth, 'sidebar width and desktop content offset must agree')
     assert.match(adminNav, /aria-label="관리자 메뉴"/)
     assert.match(partnerLayout, /max-w-\[1440px\]/)
     assert.match(partnerNav, /aria-current=/)

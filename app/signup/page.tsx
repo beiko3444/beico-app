@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
     User, Lock, Building2, Mail, Phone, Printer, MapPin, Home, ArrowRight, Eye, EyeOff, Globe, ArrowLeft
@@ -89,7 +88,6 @@ const TRANSLATIONS: Record<string, any> = {
 }
 
 export default function SignupPage() {
-    const router = useRouter()
     const [step, setStep] = useState(1)
     const [formData, setFormData] = useState({
         businessName: '',
@@ -108,6 +106,7 @@ export default function SignupPage() {
     })
     const [showPassword, setShowPassword] = useState(false)
     const [loading, setLoading] = useState(false)
+    const [submitted, setSubmitted] = useState(false)
     const [error, setError] = useState('')
 
     const t = TRANSLATIONS[formData.country] || TRANSLATIONS['Default'];
@@ -202,8 +201,7 @@ export default function SignupPage() {
                 throw new Error(data.error || t.errorPrefix)
             }
 
-            alert(t.successMsg)
-            router.push('/login')
+            setSubmitted(true)
         } catch (err: any) {
             setError(err.message)
         } finally {
@@ -238,7 +236,14 @@ export default function SignupPage() {
                     </div>
                 )}
 
-                {step === 1 ? (
+                {submitted ? (
+                    <section className="ux-panel space-y-4 p-6 text-center" role="status">
+                        <h2 className="text-xl font-bold">{formData.country === 'Korea' ? '가입 신청이 접수되었습니다' : formData.country === 'Japan' ? '申請を受け付けました' : 'Application received'}</h2>
+                        <p className="text-sm leading-7 text-[var(--muted-foreground)]">{t.successMsg}</p>
+                        <p className="ux-context">{formData.country === 'Korea' ? '현재 관리자 승인 대기 중입니다. 승인 후 신청한 아이디로 로그인해 주세요.' : formData.country === 'Japan' ? '現在、管理者の承認待ちです。承認後にログインしてください。' : 'Your account is awaiting administrator approval. Please sign in once approved.'}</p>
+                        <Link href="/login" className="ux-button-primary w-full">{t.loginLink}</Link>
+                    </section>
+                ) : step === 1 ? (
                     <form onSubmit={handleNextStep} className="ux-panel space-y-5 p-5 sm:p-7">
                         <div className="space-y-1.5">
                             <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
@@ -298,9 +303,10 @@ export default function SignupPage() {
                             </div>
                         </div>
 
+                        <fieldset className="space-y-5"><legend className="mb-4 text-base font-bold">{formData.country === 'Korea' ? '1. 로그인 정보' : formData.country === 'Japan' ? '1. ログイン情報' : '1. Account details'}</legend>
                         {/* User ID */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-username" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.userId}
                             </label>
                             <div className="relative group">
@@ -309,7 +315,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type="text"
-                                    name="username"
+                                    id="signup-username" name="username" autoComplete="username" autoCapitalize="none"
                                     value={formData.username}
                                     onChange={handleChange as any}
                                     required
@@ -321,7 +327,7 @@ export default function SignupPage() {
 
                         {/* Password */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-password" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.password}
                             </label>
                             <div className="relative group">
@@ -330,7 +336,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type={showPassword ? "text" : "password"}
-                                    name="password"
+                                    id="signup-password" name="password" autoComplete="new-password"
                                     value={formData.password}
                                     onChange={handleChange as any}
                                     required
@@ -340,7 +346,8 @@ export default function SignupPage() {
                                 <button
                                     type="button"
                                     onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-300 hover:text-gray-500 transition-colors"
+                                    aria-label={showPassword ? 'Hide password / 비밀번호 숨기기' : 'Show password / 비밀번호 표시'} aria-pressed={showPassword}
+                                    className="absolute right-1 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-lg text-gray-500 transition-colors hover:bg-gray-50"
                                 >
                                     {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                                 </button>
@@ -349,7 +356,7 @@ export default function SignupPage() {
 
                         {/* Confirm Password */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-confirmPassword" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.confirmPassword}
                             </label>
                             <div className="relative group">
@@ -358,7 +365,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type={showPassword ? "text" : "password"}
-                                    name="confirmPassword"
+                                    id="signup-confirmPassword" name="confirmPassword" autoComplete="new-password"
                                     value={formData.confirmPassword}
                                     onChange={handleChange as any}
                                     required
@@ -376,9 +383,11 @@ export default function SignupPage() {
                             )}
                         </div>
 
+                        </fieldset>
+                        <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{formData.country === 'Korea' ? '2. 사업자 정보 및 증빙' : formData.country === 'Japan' ? '2. 事業者情報・書類' : '2. Business details'}</legend>
                         {/* Company Name */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-businessName" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.companyName}
                             </label>
                             <div className="relative group">
@@ -387,7 +396,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type="text"
-                                    name="businessName"
+                                    id="signup-businessName" name="businessName"
                                     value={formData.businessName}
                                     onChange={handleChange as any}
                                     required
@@ -399,7 +408,7 @@ export default function SignupPage() {
 
                         {/* Contact Person */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-representativeName" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.contactPerson}
                             </label>
                             <div className="relative group">
@@ -408,7 +417,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type="text"
-                                    name="representativeName"
+                                    id="signup-representativeName" name="representativeName"
                                     value={formData.representativeName}
                                     onChange={handleChange as any}
                                     required
@@ -420,7 +429,7 @@ export default function SignupPage() {
 
                         {/* Business Reg Number */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-businessRegNumber" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.registrationNumber}
                             </label>
                             <div className="relative group">
@@ -429,7 +438,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type="text"
-                                    name="businessRegNumber"
+                                    id="signup-businessRegNumber" name="businessRegNumber"
                                     value={formData.businessRegNumber}
                                     onChange={handleChange as any}
                                     required
@@ -442,15 +451,15 @@ export default function SignupPage() {
                         {/* Business Registration Document */}
                         <div className="space-y-1.5">
                             <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
-                                <span className="text-[#e34219]">*</span> 事業者登録証 / Business Registration Document / 사업자등록증
+                                <span className="text-[#e34219]">*</span> {formData.country === 'Korea' ? '사업자등록증' : formData.country === 'Japan' ? '事業者登録証' : 'Business registration document'}
                             </label>
                             <label className="flex items-center justify-center w-full h-12 px-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] border-dashed rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-[#252525] focus:border-gray-400 transition-all shadow-sm dark:shadow-none">
                                 <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-gray-400">
                                     <Printer size={18} strokeWidth={1.5} />
                                     <span>
                                         {formData.businessRegistrationDocument ?
-                                            'ファイル選択済み / File Selected / 파일 선택됨' :
-                                            'アップロード / Upload / 업로드'
+                                            formData.businessRegistrationDocument.name :
+                                            (formData.country === 'Korea' ? '파일 선택 (이미지 또는 PDF)' : formData.country === 'Japan' ? '画像・PDFを選択' : 'Choose an image or PDF')
                                         }
                                     </span>
                                 </div>
@@ -459,19 +468,21 @@ export default function SignupPage() {
                                     accept="image/*,.pdf"
                                     onChange={handleFileChange}
                                     required
-                                    className="hidden"
+                                    className="sr-only"
                                 />
                             </label>
                             {formData.businessRegistrationDocument && (
                                 <p className="text-[10px] text-green-600 font-bold ml-1">
-                                    アップロード完了 / Upload Completed / 업로드 완료
+                                    {formData.country === 'Korea' ? '파일 선택됨 · 가입 신청 시 함께 전송됩니다.' : formData.country === 'Japan' ? '選択済み · 申請時に送信されます。' : 'Selected · uploaded when you submit your application.'}
                                 </p>
                             )}
                         </div>
 
+                        </fieldset>
+                        <fieldset className="space-y-5 border-t border-[var(--border)] pt-5"><legend className="pr-3 text-base font-bold">{formData.country === 'Korea' ? '3. 연락처 및 배송 주소' : formData.country === 'Japan' ? '3. 連絡先・配送先' : '3. Contact and delivery'}</legend>
                         {/* Email */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-email" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.email}
                             </label>
                             <p className="ml-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
@@ -483,7 +494,7 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type="email"
-                                    name="email"
+                                    id="signup-email" name="email"
                                     value={formData.email}
                                     onChange={handleChange as any}
                                     required
@@ -497,7 +508,7 @@ export default function SignupPage() {
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {/* Phone */}
                             <div className="space-y-1.5">
-                                <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                                <label htmlFor="signup-contact" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                     <span className="text-[#e34219]">*</span> {t.phone}
                                 </label>
                                 <div className="relative group">
@@ -506,27 +517,27 @@ export default function SignupPage() {
                                     </div>
                                     <input
                                         type="text"
-                                        name="contact"
+                                        id="signup-contact" name="contact"
                                         value={formData.contact}
                                         onChange={handleChange as any}
                                         required
                                         maxLength={13}
                                         className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                        placeholder="03-1234-5678"
+                                        placeholder={formData.country === 'Korea' ? '010-1234-5678' : formData.country === 'Japan' ? '03-1234-5678' : '+1 555 123 4567'}
                                     />
                                 </div>
                             </div>
 
                             {/* Fax */}
                             <div className="space-y-1.5">
-                                <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.fax}</label>
+                                <label htmlFor="signup-fax" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.fax}</label>
                                 <div className="relative group">
                                     <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                         <Printer size={18} strokeWidth={1.5} />
                                     </div>
                                     <input
                                         type="text"
-                                        name="fax"
+                                        id="signup-fax" name="fax"
                                         value={formData.fax}
                                         onChange={handleChange as any}
                                         className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
@@ -538,7 +549,7 @@ export default function SignupPage() {
 
                         {/* Address 1 */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
+                            <label htmlFor="signup-address" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">
                                 <span className="text-[#e34219]">*</span> {t.address1}
                             </label>
                             <p className="ml-1 text-[11px] font-medium text-gray-500 dark:text-gray-400">
@@ -550,34 +561,35 @@ export default function SignupPage() {
                                 </div>
                                 <input
                                     type="text"
-                                    name="address"
+                                    id="signup-address" name="address"
                                     value={formData.address}
                                     onChange={handleChange as any}
                                     required
                                     className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder="Prefecture, City, District"
+                                    placeholder={formData.country === 'Korea' ? '도로명 주소 및 건물번호' : formData.country === 'Japan' ? '都道府県・市区町村・番地' : 'Street address, city and region'}
                                 />
                             </div>
                         </div>
 
                         {/* Address 2 */}
                         <div className="space-y-1.5">
-                            <label className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.address2}</label>
+                            <label htmlFor="signup-addressDetail" className="text-[12px] font-semibold text-[#1e293b] dark:text-gray-300 tracking-tight ml-1 block">{t.address2}</label>
                             <div className="relative group">
                                 <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gray-600 transition-colors">
                                     <Home size={18} strokeWidth={1.5} />
                                 </div>
                                 <input
                                     type="text"
-                                    name="addressDetail"
+                                    id="signup-addressDetail" name="addressDetail"
                                     value={formData.addressDetail}
                                     onChange={handleChange as any}
                                     className="w-full h-12 pl-11 pr-4 bg-white dark:bg-[#1e1e1e] border border-gray-200 dark:border-[#333] rounded-lg outline-none focus:border-gray-400 dark:focus:border-[#555] transition-all text-sm font-medium placeholder:text-gray-300 dark:placeholder:text-gray-600 dark:text-white shadow-sm dark:shadow-none"
-                                    placeholder="Building, Apt, Suite"
+                                    placeholder={formData.country === 'Korea' ? '건물명, 층, 호수 (선택)' : formData.country === 'Japan' ? '建物名・部屋番号' : 'Building, apartment or suite'}
                                 />
                             </div>
                         </div>
 
+                        </fieldset>
                         {/* Submit Button */}
                         <div className="pt-6">
                             <button

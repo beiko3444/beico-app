@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { Download, ExternalLink, FileText, Plus, X, ZoomIn } from 'lucide-react'
+import Modal from '@/components/Modal'
 import { getPartnerBusinessRegistrationUrl } from '@/lib/partner-business-registration-url'
 import Button, { buttonClass } from '@/components/ui/Button'
 
@@ -210,7 +211,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
             : formData.businessRegistrationUrl
 
     const modalContent = (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-hidden bg-slate-950/55 p-4 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+        <Modal label="파트너 정보" onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-black/50 p-3 sm:p-4">
             <div
                 className="relative flex max-h-[95vh] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
@@ -222,8 +223,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                     <button
                         type="button"
                         onClick={() => setIsOpen(false)}
-                        aria-label="닫기"
-                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-slate-200 text-slate-500 transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                        aria-label="파트너 정보 닫기" className="ux-icon-button"
                     >
                         <X className="h-5 w-5" />
                     </button>
@@ -407,7 +407,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                     </div>
                 </form>
             </div>
-        </div>
+        </Modal>
     )
 
     return (
@@ -419,12 +419,9 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
 
             {/* Image Enlargement Modal */}
             {enlargedImage && mounted && createPortal(
-                <div
-                    className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-sm animate-in fade-in duration-200"
-                    onClick={() => setEnlargedImage(null)}
-                >
-                    <div className="relative flex max-h-[90vh] w-full max-w-5xl flex-col items-center">
-                        <div className="absolute right-0 top-0 mb-4 -translate-y-full">
+                <Modal label="사업자등록증 미리보기" onClose={() => setEnlargedImage(null)} className="flex flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+                    <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col items-center">
+                        <div className="absolute top-0 right-0 -translate-y-full mb-4">
                             <button
                                 type="button"
                                 onClick={() => setEnlargedImage(null)}
@@ -441,10 +438,10 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                             onClick={(e) => e.stopPropagation()}
                         />
                         <div className="mt-6 text-white/70 text-sm font-medium">
-                            아무 곳이나 클릭하여 닫기
+                            닫기 버튼 또는 Esc 키로 돌아갑니다.
                         </div>
                     </div>
-                </div>,
+                </Modal>,
                 document.body
             )}
         </>

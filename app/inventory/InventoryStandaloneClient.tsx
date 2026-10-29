@@ -1,5 +1,7 @@
 'use client'
 
+import Modal from '@/components/Modal'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   AlertTriangle,
@@ -278,6 +280,8 @@ export default function InventoryStandaloneClient() {
   }
 
   async function deleteInbound(id: string) {
+    const item = inbounds.items.find(item => item.id === id)
+    if (!confirm(`${item?.productName || '선택 기록'} · ${selectedDate} · ${item?.quantity || 0}개 입고 기록을 삭제하시겠습니까?`)) return
     setSaving(true)
     try {
       const response = await fetch(`/api/admin/inventory/inbounds/${id}`, { method: 'DELETE' })
@@ -301,7 +305,7 @@ export default function InventoryStandaloneClient() {
                 <PackagePlus size={22} />
               </div>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-black tracking-normal text-slate-950 sm:text-2xl">재고관리</h1>
+                <h1 className="truncate text-xl font-black tracking-normal text-slate-950 sm:text-2xl">창고 입고 등록</h1>
                 <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold text-slate-500">
                   <span>창고재고 {formatNumber(warehouseStockTotal)}</span>
                   <span>오늘입고 {formatNumber(inbounds.totalQuantity)}</span>
@@ -364,6 +368,7 @@ export default function InventoryStandaloneClient() {
       {selectedProduct && (
         <KeypadModal
           product={selectedProduct}
+          inboundDate={selectedDate}
           value={keypadValue}
           saving={saving}
           onPress={pressKey}
@@ -567,6 +572,7 @@ function InboundCalendar({
 
 function KeypadModal({
   product,
+  inboundDate,
   value,
   saving,
   onPress,
@@ -574,6 +580,7 @@ function KeypadModal({
   onSubmit,
 }: {
   product: ProductCandidate
+  inboundDate: string
   value: string
   saving: boolean
   onPress: (value: string) => void
@@ -583,14 +590,14 @@ function KeypadModal({
   const keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'clear', '0', 'back']
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
+    <Modal label={`${product.name} 입고 수량 입력`} onClose={() => { if (!saving) onClose() }} className="flex items-end justify-center bg-slate-950/50 p-0 sm:items-center sm:p-4">
       <div className="w-full max-w-md rounded-t-2xl bg-white p-4 shadow-2xl sm:rounded-2xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div className="flex min-w-0 items-center gap-3">
             <ProductImage src={product.imageUrl} alt={product.name} />
             <div className="min-w-0">
               <div className="truncate text-lg font-black text-slate-950">{product.name}</div>
-              <div className="mt-1 text-xs font-bold text-slate-500">오늘 입고 수량 입력</div>
+              <div className="mt-1 text-xs font-bold text-slate-500">입고 수량 입력 · {inboundDate}</div>
             </div>
           </div>
           <button type="button" onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-md bg-slate-100 text-slate-600">
@@ -625,7 +632,7 @@ function KeypadModal({
           입력완료
         </button>
       </div>
-    </div>
+    </Modal>
   )
 }
 
