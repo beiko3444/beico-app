@@ -1,4 +1,5 @@
-export const PRODUCT_TABLE_COLUMNS_STORAGE_KEY = 'admin-product-table-visible-columns-v5'
+// v6: the default view gained the pinned 관리 column, so saved v5 selections (which all stored the old default) are dropped.
+export const PRODUCT_TABLE_COLUMNS_STORAGE_KEY = 'admin-product-table-visible-columns-v6'
 
 // This order is the on-screen column order: the table draws headers and cells from it,
 // so any saved or preset selection lines up. Numbers are right-aligned.
@@ -18,20 +19,21 @@ export const PRODUCT_TABLE_COLUMN_OPTIONS = [
     { key: 'productCode', label: '상품코드', width: 128, align: 'left' },
     { key: 'hsCode', label: 'HS Code', width: 96, align: 'left' },
     { key: 'japanHsCode', label: 'JP HS', width: 96, align: 'left' },
-    { key: 'actions', label: '관리', width: 140, align: 'center' },
+    { key: 'actions', label: '관리', width: 152, align: 'center' },
 ] as const
 
 export type ProductTableColumnKey = typeof PRODUCT_TABLE_COLUMN_OPTIONS[number]['key']
 
+// Foreign purchase cost is left to the 가격·마진 preset so 도매가·판매가 fit, and 관리 keeps row actions in reach.
 export const DEFAULT_PRODUCT_TABLE_COLUMNS: ProductTableColumnKey[] = [
     'stock',
     'safetyStock',
     'stockStatus',
     'availability',
-    'cnyCost',
     'cost',
     'wholesale',
     'retail',
+    'actions',
 ]
 
 const PRODUCT_TABLE_COLUMN_KEYS = new Set<ProductTableColumnKey>(

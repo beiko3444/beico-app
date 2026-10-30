@@ -1,14 +1,17 @@
 'use client'
 
 import { Fragment, memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, Layers, Pencil, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
+import { Check, ChevronDown, ChevronRight, Copy, ExternalLink, ImageOff, Layers, Pencil, Plus, RefreshCw, RotateCcw, Search, SlidersHorizontal, Trash2, Unlink, X } from 'lucide-react'
 import ProductForm, { type Product as ProductTableProduct } from "./product-form"
 import ProductStockHistoryModal from './ProductStockHistoryModal'
 import { useRouter } from 'next/navigation'
 import PageHeader from '@/components/ui/PageHeader'
-import Tabs, { type TabItem } from '@/components/ui/Tabs'
+import Tabs from '@/components/ui/Tabs'
+import FilterChips, { type FilterChipItem } from '@/components/ui/FilterChips'
 import EmptyState from '@/components/ui/EmptyState'
+import Badge, { type BadgeTone } from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { selectClass } from '@/components/ui/field'
 import {
     PRODUCT_GRADES,
     readProductGradeOrderValue,
@@ -91,9 +94,21 @@ const COLUMN_ALIGN_CLASS = Object.fromEntries(
         option.align === 'right' ? 'text-right' : option.align === 'center' ? 'text-center' : 'text-left',
     ]),
 ) as Record<ProductTableColumnKey, string>
-const tableInputBase = 'h-9 rounded-md border border-slate-300 bg-white text-right tabular-nums text-slate-900 outline-none transition-colors focus:border-brand-orange'
-const rowIconButtonClass = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-colors hover:border-slate-400 hover:text-slate-900'
-const rowDangerIconButtonClass = 'inline-flex h-7 w-7 items-center justify-center rounded-md border border-red-200 bg-white text-red-600 transition-colors hover:bg-red-50'
+const tableInputBase = 'h-9 rounded-md border border-[var(--input-border)] bg-white text-right tabular-nums text-slate-900 outline-none transition-colors focus:border-brand-orange'
+const rowIconButtonClass = buttonClass('ghost', 'icon', 'text-slate-500 hover:text-slate-900')
+const rowDangerIconButtonClass = buttonClass('dangerGhost', 'icon')
+// The 관리 column is pinned to the right edge, so row actions stay reachable however many columns are shown.
+const STICKY_ACTIONS_CELL = 'sticky right-0 [[data-overflow-right=true]_&]:shadow-[-10px_0_10px_-8px_rgba(15,23,42,0.22)]'
+
+type StockStatus = { label: string; tone: BadgeTone; dot: string }
+const getStockStatus = (stock: number, safetyStock: number): StockStatus => stock <= 0
+    ? { label: '재고 없음', tone: 'danger', dot: 'bg-red-500' }
+    : safetyStock > 0 && stock <= safetyStock
+        ? { label: '부족', tone: 'warning', dot: 'bg-amber-500' }
+        : { label: '정상', tone: 'success', dot: 'bg-emerald-500' }
+// The editable 파트너 노출 select stays neutral; only a small dot carries its state, so it doesn't read as a status badge.
+const PARTNER_STATUS_DOT: Record<PartnerProductStatus, string> = { VISIBLE: 'bg-emerald-500', SOLD_OUT: 'bg-amber-500', HIDDEN: 'bg-slate-400' }
+const partnerSelectClass = 'rounded-md border border-[var(--input-border)] bg-white px-2 text-[12px] font-semibold text-slate-800 outline-none transition focus:border-brand-orange'
 
 type ProductTablePreset = 'default' | 'stock' | 'pricing' | 'partner'
 const PRODUCT_TABLE_PRESETS: Array<{ key: ProductTablePreset; label: string; columns: ProductTableColumnKey[] }> = [
@@ -102,7 +117,7 @@ const PRODUCT_TABLE_PRESETS: Array<{ key: ProductTablePreset; label: string; col
     { key: 'pricing', label: '가격·마진', columns: ['cnyCost', 'cost', 'wholesale', 'retail', 'margin'] },
     { key: 'partner', label: '파트너 판매', columns: ['availability', 'moq', 'orderUnit', 'wholesale'] },
 ]
-const PRODUCT_TABLE_PRESET_TABS: TabItem<ProductTablePreset | 'custom'>[] = PRODUCT_TABLE_PRESETS.map(preset => ({ key: preset.key, label: preset.label }))
+const PRODUCT_TABLE_PRESET_CHIPS: FilterChipItem<ProductTablePreset | 'custom'>[] = PRODUCT_TABLE_PRESETS.map(preset => ({ key: preset.key, label: preset.label }))
 const CNY_RATE_CACHE_KEY = 'admin-product-cny-krw-rate-v1'
 type PurchaseCurrency = 'CNY' | 'USD'
 type ProductContextMenu = { productId: string, x: number, y: number }
@@ -264,11 +279,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
     const partnerSaleStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
     const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
     const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
-    const stockStatus = stockNumber <= 0
-        ? { label: '재고 없음', className: 'border-red-200 bg-red-50 text-red-700' }
-        : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
-            ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
-            : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
+    const stockStatus = getStockStatus(stockNumber, safetyStockNumber)
 
     const handleBlur = (value: string) => {
         const val = parseInt(value)
@@ -291,7 +302,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
             case 'stock':
                 return (
                     <td key={column} className={optionalCellClass(column)}>
-                        <div className="flex items-center justify-end gap-1">
+                        <div className="flex flex-row-reverse items-center justify-start gap-1">
                             <input
                                 type="text"
                                 inputMode="numeric"
@@ -314,20 +325,21 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
             case 'stockStatus':
                 return (
                     <td key={column} className={optionalCellClass(column)}>
-                        <span className={`inline-flex min-w-[56px] items-center justify-center rounded-full border px-2.5 py-1 text-[12px] font-bold ${stockStatus.className}`}>
-                            {stockStatus.label}
-                        </span>
+                        <Badge tone={stockStatus.tone}>{stockStatus.label}</Badge>
                     </td>
                 )
             case 'availability':
                 return (
                     <td key={column} className={optionalCellClass(column)}>
-                        <PartnerStatusSelect
-                            product={product}
-                            value={partnerSaleStatus}
-                            onChange={onPartnerSaleStatusChange}
-                            className={`h-9 min-w-[82px] rounded-md border px-2 text-[12px] font-bold outline-none transition focus:border-brand-orange ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
-                        />
+                        <div className="inline-flex items-start gap-1.5">
+                            <span aria-hidden="true" className={`mt-[15px] h-1.5 w-1.5 shrink-0 rounded-full ${PARTNER_STATUS_DOT[partnerSaleStatus]}`} />
+                            <PartnerStatusSelect
+                                product={product}
+                                value={partnerSaleStatus}
+                                onChange={onPartnerSaleStatusChange}
+                                className={`h-9 min-w-[76px] ${partnerSelectClass}`}
+                            />
+                        </div>
                     </td>
                 )
             case 'moq':
@@ -399,12 +411,12 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
                 return <td key={column} className={optionalCellClass(column, 'font-mono text-[12px] font-semibold text-slate-600')}>{product.japanHsCode || '-'}</td>
             case 'actions':
                 return (
-                    <td key={column} className={optionalCellClass(column)}>
-                        <div className="flex items-center justify-center gap-1">
-                            <ProductForm initialData={product} trigger={<button type="button" className={rowIconButtonClass} title="수정" aria-label={`${product.name} 수정`}><Pencil size={13} /></button>} />
-                            <ProductForm initialData={product} isCopy={true} trigger={<button type="button" className={rowIconButtonClass} title="복사" aria-label={`${product.name} 복사 등록`}><Copy size={13} /></button>} />
-                            <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className={rowIconButtonClass} title={ungrouped ? '자동 그룹 복귀' : '그룹 해제'} aria-label={ungrouped ? '자동 그룹 복귀' : '그룹 해제'}>{ungrouped ? <RotateCcw size={13} /> : <Unlink size={13} />}</button>
-                            <button type="button" onClick={() => onDelete(product.id)} className={rowDangerIconButtonClass} title="삭제" aria-label={`${product.name} 삭제`}><Trash2 size={13} /></button>
+                    <td key={column} className={`px-2 py-2.5 whitespace-nowrap text-center bg-inherit ${STICKY_ACTIONS_CELL}`}>
+                        <div className="flex items-center justify-center gap-0.5">
+                            <ProductForm initialData={product} trigger={<button type="button" className={rowIconButtonClass} title="수정" aria-label={`${product.name} 수정`}><Pencil size={15} /></button>} />
+                            <ProductForm initialData={product} isCopy={true} trigger={<button type="button" className={rowIconButtonClass} title="복사" aria-label={`${product.name} 복사 등록`}><Copy size={15} /></button>} />
+                            <button type="button" onClick={(event) => { event.stopPropagation(); if (ungrouped) onRestoreAutoGroup(product.id); else onUngroup(product.id) }} className={rowIconButtonClass} title={ungrouped ? '자동 그룹 복귀' : '그룹 해제'} aria-label={ungrouped ? '자동 그룹 복귀' : '그룹 해제'}>{ungrouped ? <RotateCcw size={15} /> : <Unlink size={15} />}</button>
+                            <button type="button" onClick={(event) => { event.stopPropagation(); onDelete(product.id) }} className={rowDangerIconButtonClass} title="삭제" aria-label={`${product.name} 삭제`}><Trash2 size={15} /></button>
                         </div>
                     </td>
                 )
@@ -474,8 +486,8 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
                         <img src={product.imageUrl} alt={product.name} loading="lazy" className="h-full w-full object-cover pointer-events-none" />
                     </button>
                 ) : (
-                    <div className="mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white shadow-sm">
-                        <span className="text-[8px] font-bold text-slate-300">Img</span>
+                    <div className="mx-auto flex h-12 w-12 items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white" title="이미지 없음">
+                        <ImageOff size={16} className="text-slate-300" aria-label="이미지 없음" />
                     </div>
                 )}
             </td>
@@ -483,11 +495,11 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
                 <ProductForm
                     initialData={product}
                     trigger={
-                        <div className={`cursor-pointer text-left ${nested ? 'ml-1 border-l-2 border-blue-200 pl-3' : ''}`} title={product.name}>
+                        <div className={`cursor-pointer text-left ${nested ? '-ml-3 border-l-2 border-slate-200 pl-[10px]' : ''}`} title={product.name}>
                             <div className="flex min-w-0 items-center gap-2">
-                                <div className="truncate text-[14px] font-black text-slate-950 group-hover:text-blue-700">{displayName || product.name}</div>
+                                <div className="truncate text-[14px] font-extrabold text-slate-950 group-hover:underline group-hover:underline-offset-2">{displayName || product.name}</div>
                                 {ungrouped ? (
-                                    <span className="shrink-0 rounded-md border border-amber-200 bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">단일 SKU</span>
+                                    <Badge outline>단일 SKU</Badge>
                                 ) : null}
                             </div>
                             <div className="mt-0.5 flex min-w-0 items-center gap-1.5 text-[12px] font-semibold text-slate-500">
@@ -502,6 +514,7 @@ const ProductRow = memo(function ProductRow({ product, displayName, nested = fal
                 />
             </td>
             {visibleColumns.map(renderOptionalCell)}
+            <td aria-hidden="true" />
         </tr>
     )
 })
@@ -589,20 +602,16 @@ const ProductMobileCard = memo(function ProductMobileCard({
         : readProductGradePriceValue(product.regionalPrices, activeGrade, 'retail', product.onlinePrice || 0)
     const stockNumber = Math.max(0, parseIntegerDraft(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0))
     const safetyStockNumber = Math.max(0, parseIntegerDraft(product.safetyStock ?? 0))
-    const stockStatus = stockNumber <= 0
-        ? { label: '재고 없음', className: 'border-red-200 bg-red-50 text-red-700' }
-        : safetyStockNumber > 0 && stockNumber <= safetyStockNumber
-            ? { label: '부족', className: 'border-amber-200 bg-amber-50 text-amber-700' }
-            : { label: '정상', className: 'border-emerald-200 bg-emerald-50 text-emerald-700' }
+    const stockStatus = getStockStatus(stockNumber, safetyStockNumber)
     const partnerSaleStatus = normalizePartnerProductStatus(product.partnerSaleStatus, product.wholesaleAvailable)
     const ungrouped = product.autoGroupingDisabled === true
     const fieldLabelClass = 'mb-1 block text-[11px] font-bold text-slate-500'
-    const fieldInputClass = 'h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-right text-[14px] font-bold tabular-nums text-slate-900 outline-none transition focus:border-brand-orange'
+    const fieldInputClass = 'h-10 w-full rounded-lg border border-[var(--input-border)] bg-white px-3 text-right text-[14px] font-semibold tabular-nums text-slate-900 outline-none transition focus:border-brand-orange'
 
     return (
         <article
             id={`mobile-product-row-${product.id}`}
-            className={`overflow-hidden rounded-2xl border shadow-sm transition ${checked ? 'border-blue-300 bg-blue-50/40 ring-2 ring-blue-100' : ungrouped ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'}`}
+            className={`overflow-hidden rounded-[10px] border transition ${checked ? 'border-blue-300 bg-blue-50/40 ring-2 ring-blue-100' : ungrouped ? 'border-amber-200 bg-amber-50/40' : 'border-slate-200 bg-white'}`}
         >
             <div className="flex items-start gap-3 p-3">
                 <label className="flex min-h-12 shrink-0 items-center" aria-label={`${product.name} 선택`}>
@@ -613,19 +622,19 @@ const ProductMobileCard = memo(function ProductMobileCard({
                         className="h-5 w-5 cursor-pointer accent-blue-600"
                     />
                 </label>
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-slate-200 bg-white">
                     {product.imageUrl ? (
                         <img src={product.imageUrl} alt={product.name} loading="lazy" className="h-full w-full object-cover" />
                     ) : (
-                        <span className="text-[9px] font-black text-slate-300">IMG</span>
+                        <ImageOff size={16} className="text-slate-300" aria-label="이미지 없음" />
                     )}
                 </div>
                 <div className="min-w-0 flex-1 pt-0.5">
                     <div className="flex min-w-0 items-start justify-between gap-2">
                         <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-1.5">
-                                <h3 className="line-clamp-2 text-[14px] font-black leading-5 text-slate-950">{displayName || product.name}</h3>
-                                {ungrouped ? <span className="rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-bold text-amber-800">단일 SKU</span> : null}
+                                <h3 className="line-clamp-2 text-[14px] font-extrabold leading-5 text-slate-950">{displayName || product.name}</h3>
+                                {ungrouped ? <Badge outline>단일 SKU</Badge> : null}
                             </div>
                             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold tabular-nums text-slate-500">
                                 <span>상품 #{formatInteger(product.productNumber)}</span>
@@ -636,8 +645,8 @@ const ProductMobileCard = memo(function ProductMobileCard({
                         <ProductForm
                             initialData={product}
                             trigger={(
-                                <button type="button" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 hover:text-slate-900" aria-label={`${product.name} 상품 수정`} title="상품 수정">
-                                    <Pencil size={15} />
+                                <button type="button" className={buttonClass('secondary', 'iconMd', 'text-slate-600 hover:text-slate-900')} aria-label={`${product.name} 상품 수정`} title="상품 수정">
+                                    <Pencil size={16} />
                                 </button>
                             )}
                         />
@@ -646,20 +655,25 @@ const ProductMobileCard = memo(function ProductMobileCard({
                 </div>
             </div>
 
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 border-t border-slate-100 bg-slate-50/70 p-3">
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 border-t border-slate-100 p-3">
                 <div className="min-w-0">
                     <span className={fieldLabelClass}>파트너 노출</span>
-                    <PartnerStatusSelect
-                        product={product}
-                        value={partnerSaleStatus}
-                        onChange={onPartnerSaleStatusChange}
-                        className={`h-10 w-full rounded-lg border px-2 text-center text-[12px] font-bold outline-none transition focus:border-brand-orange ${partnerSaleStatus === 'VISIBLE' ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-slate-300 bg-slate-100 text-slate-600'}`}
-                    />
+                    <div className="flex items-start gap-1.5">
+                        <span aria-hidden="true" className={`mt-[17px] h-1.5 w-1.5 shrink-0 rounded-full ${PARTNER_STATUS_DOT[partnerSaleStatus]}`} />
+                        <div className="min-w-0 flex-1">
+                            <PartnerStatusSelect
+                                product={product}
+                                value={partnerSaleStatus}
+                                onChange={onPartnerSaleStatusChange}
+                                className={`h-10 w-full ${partnerSelectClass}`}
+                            />
+                        </div>
+                    </div>
                 </div>
                 <div className="min-w-0">
                     <div className="mb-1 flex items-center gap-1.5">
                         <span className="text-[11px] font-bold text-slate-500">관리용 재고</span>
-                        <span className={`rounded-full border px-1.5 py-0.5 text-[10px] font-bold leading-none ${stockStatus.className}`}>{stockStatus.label}</span>
+                        <Badge tone={stockStatus.tone}>{stockStatus.label}</Badge>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <input
@@ -667,7 +681,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                             inputMode="numeric"
                             value={formatNumberInput(modifiedStock !== undefined ? modifiedStock : product.stock ?? 0)}
                             onChange={(event) => onStockChange(product.id, normalizeNumericDraft(event.target.value))}
-                            className="h-10 min-w-0 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-right text-[15px] font-black tabular-nums text-slate-900 outline-none focus:border-brand-orange"
+                            className="h-10 min-w-0 flex-1 rounded-lg border border-[var(--input-border)] bg-white px-3 text-right text-[15px] font-bold tabular-nums text-slate-900 outline-none focus:border-brand-orange"
                             aria-label={`${product.name} 관리용 재고`}
                         />
                         <ProductStockHistoryModal productId={product.id} productName={product.name} compact />
@@ -676,8 +690,8 @@ const ProductMobileCard = memo(function ProductMobileCard({
             </div>
 
             <details className="group/mobile border-t border-slate-100">
-                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 text-[12px] font-black text-slate-800 [&::-webkit-details-marker]:hidden">
-                    <span>{activeGrade}등급 가격·발주 설정</span>
+                <summary className="flex min-h-12 cursor-pointer list-none items-center justify-between gap-3 px-3 text-[12px] font-bold text-slate-800 [&::-webkit-details-marker]:hidden">
+                    <span>{activeGrade}등급 가격·발주 설정 · 상품 관리</span>
                     <ChevronDown size={16} className="shrink-0 text-slate-500 transition-transform group-open/mobile:rotate-180" />
                 </summary>
                 <div className="grid grid-cols-2 gap-2 border-t border-slate-100 bg-white p-3">
@@ -687,7 +701,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                             <select
                                 value={purchaseCurrency}
                                 onChange={(event) => onPurchaseCurrencyChange(product.id, event.target.value as PurchaseCurrency)}
-                                className="h-10 w-[82px] shrink-0 rounded-lg border border-slate-300 bg-slate-50 px-2 text-[12px] font-bold text-slate-700 outline-none focus:border-brand-orange"
+                                className="h-10 w-[82px] shrink-0 rounded-lg border border-[var(--input-border)] bg-white px-2 text-[12px] font-semibold text-slate-700 outline-none focus:border-brand-orange"
                                 aria-label={`${product.name} 매입 통화`}
                             >
                                 <option value="CNY">CN¥</option>
@@ -718,7 +732,7 @@ const ProductMobileCard = memo(function ProductMobileCard({
                     </label>
                     <label className="min-w-0">
                         <span className={fieldLabelClass}>안전재고</span>
-                        <div className="flex h-10 items-center justify-end rounded-lg border border-slate-200 bg-slate-50 px-3 text-[14px] font-black tabular-nums text-slate-600">{safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}</div>
+                        <div className="flex h-10 items-center justify-end px-3 text-[14px] font-semibold tabular-nums text-slate-600">{safetyStockNumber > 0 ? formatInteger(safetyStockNumber) : '-'}</div>
                     </label>
                     <label className="min-w-0">
                         <span className={fieldLabelClass}>최소수량</span>
@@ -728,19 +742,12 @@ const ProductMobileCard = memo(function ProductMobileCard({
                         <span className={fieldLabelClass}>주문단위</span>
                         <input type="text" inputMode="numeric" value={modifiedOrderUnit !== undefined ? formatNumberInput(modifiedOrderUnit) : formatNumberInput(readProductGradeOrderValue(product.regionalPrices, activeGrade, 'orderUnit', product.orderUnit || 1))} onChange={(event) => onOrderUnitChange(product.id, normalizeNumericDraft(event.target.value))} className={fieldInputClass} />
                     </label>
-                </div>
-            </details>
-
-            <details className="group/manage border-t border-slate-100">
-                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-3 text-[12px] font-bold text-slate-600 [&::-webkit-details-marker]:hidden">
-                    <span>상품 관리</span>
-                    <ChevronDown size={15} className="transition-transform group-open/manage:rotate-180" />
-                </summary>
-                {/* Editing opens from the pencil above; this menu keeps the less common actions. */}
-                <div className="grid grid-cols-3 gap-2 border-t border-slate-100 bg-slate-50 p-3">
-                    <ProductForm initialData={product} isCopy trigger={<button type="button" className="flex h-10 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 text-[12px] font-bold text-slate-700"><Copy size={14} />복사 등록</button>} />
-                    <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2 text-[12px] font-bold text-slate-700">{ungrouped ? <RotateCcw size={14} /> : <Unlink size={14} />}{ungrouped ? '자동 그룹 복귀' : '그룹 해제'}</button>
-                    <button type="button" onClick={() => onDelete(product.id)} className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-2 text-[12px] font-bold text-red-700"><Trash2 size={14} />삭제</button>
+                    {/* Editing opens from the pencil above; the less common actions share this one disclosure. */}
+                    <div className="col-span-2 mt-1 grid grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+                        <ProductForm initialData={product} isCopy trigger={<button type="button" className={buttonClass('secondary', 'md', 'w-full px-2 text-[12px]')}><Copy size={14} />복사 등록</button>} />
+                        <button type="button" onClick={() => ungrouped ? onRestoreAutoGroup(product.id) : onUngroup(product.id)} className={buttonClass('secondary', 'md', 'px-2 text-[12px]')}>{ungrouped ? <RotateCcw size={14} /> : <Unlink size={14} />}{ungrouped ? '자동 그룹 복귀' : '그룹 해제'}</button>
+                        <button type="button" onClick={() => onDelete(product.id)} className={buttonClass('danger', 'md', 'px-2 text-[12px]')}><Trash2 size={14} />삭제</button>
+                    </div>
                 </div>
             </details>
         </article>
@@ -796,8 +803,8 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
     )
 
     return (
-        <div className="overflow-hidden rounded-2xl border border-blue-100 bg-blue-50 shadow-sm">
-            <div className="flex items-start gap-2.5 p-3">
+        <div className="rounded-lg bg-slate-50">
+            <div className="flex items-start gap-2.5 px-2 py-2.5">
                 <label className="flex min-h-11 shrink-0 items-center" aria-label={`${group.name} 그룹 전체 선택`}>
                     <input
                         type="checkbox"
@@ -809,7 +816,7 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
                 <button
                     type="button"
                     onClick={onToggle}
-                    className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 shadow-sm"
+                    className={buttonClass('secondary', 'iconMd', 'rounded-full text-slate-600')}
                     aria-expanded={expanded}
                     aria-label={`${group.name} SKU 목록 ${expanded ? '접기' : '펼치기'}`}
                 >
@@ -818,12 +825,12 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
                 {representative?.imageUrl ? (
                     <img src={representative.imageUrl} alt="" loading="lazy" className="h-11 w-11 shrink-0 rounded-lg border border-slate-200 bg-white object-cover" />
                 ) : (
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-300"><Layers size={17} /></div>
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-300"><Layers size={17} /></div>
                 )}
                 <button type="button" onClick={onToggle} className="min-w-0 flex-1 text-left">
                     <span className="flex min-w-0 flex-wrap items-center gap-1.5">
-                        <span className="line-clamp-2 text-[13px] font-black leading-5 text-slate-950">{group.name}</span>
-                        <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-600">{group.products.length} SKU</span>
+                        <span className="line-clamp-2 text-[13px] font-extrabold leading-5 text-slate-950">{group.name}</span>
+                        <span className="shrink-0 text-[11px] font-semibold tabular-nums text-slate-500">{group.products.length} SKU</span>
                     </span>
                     <span className="mt-1 flex flex-wrap gap-x-3 gap-y-1 text-[11px] font-semibold tabular-nums text-slate-600">
                         <span>파트너 노출 {availableCount}</span>
@@ -835,7 +842,7 @@ const ProductMobileGroupHeader = memo(function ProductMobileGroupHeader({
                         href={naverProductUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-emerald-200 bg-white text-emerald-700"
+                        className={buttonClass('ghost', 'iconMd', 'text-slate-500 hover:text-slate-900')}
                         aria-label={`${group.name} 네이버 상품 열기`}
                     >
                         <ExternalLink size={15} />
@@ -930,7 +937,7 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                                 event.stopPropagation()
                                 onToggle()
                             }}
-                            className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-blue-200 bg-white text-blue-700 shadow-sm transition hover:bg-blue-50"
+                            className={buttonClass('secondary', 'icon', 'rounded-full text-slate-600')}
                             title={expanded ? 'SKU 목록 접기' : 'SKU 목록 펼치기'}
                             aria-label={`${group.name} SKU 목록 ${expanded ? '접기' : '펼치기'}`}
                             aria-expanded={expanded}
@@ -946,7 +953,7 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                         )}
                         <div className="min-w-0">
                             <div className="flex min-w-0 items-center gap-2">
-                                <span className="max-w-[420px] truncate text-[13px] font-black text-slate-950">{group.name}</span>
+                                <span className="max-w-[420px] truncate text-[13px] font-extrabold text-slate-950">{group.name}</span>
                                 {naverProductUrl ? (
                                     <a
                                         href={naverProductUrl}
@@ -961,23 +968,17 @@ const ProductGroupHeader = memo(function ProductGroupHeader({
                                         <ExternalLink size={13} />
                                     </a>
                                 ) : null}
-                                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-600 ring-1 ring-slate-200">{group.products.length} SKU</span>
-                                <span className="shrink-0 rounded-full bg-white px-2 py-0.5 text-[11px] font-bold text-slate-500 ring-1 ring-slate-200">{group.source}</span>
+                                <span className="shrink-0 text-[11px] font-semibold tabular-nums text-slate-500">{group.products.length} SKU · {group.source}</span>
                             </div>
                             {canDrop ? (
                                 <div className="mt-0.5 text-[11px] font-bold text-blue-700">여기에 놓으면 이 그룹으로 이동합니다.</div>
                             ) : null}
                         </div>
                     </div>
-                    <div className="flex shrink-0 items-center gap-2 text-[11px] font-bold text-slate-500">
-                        <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5">
-                            재고 부족 SKU
-                            <strong className={`text-[12px] font-black tabular-nums ${lowStockCount > 0 ? 'text-amber-700' : 'text-slate-900'}`}>{formatInteger(lowStockCount)}</strong>
-                        </span>
-                        <span className="inline-flex h-7 items-center gap-1.5 rounded-md border border-slate-200 bg-white px-2.5">
-                            관리용 재고 합계
-                            <strong className="text-[12px] font-black tabular-nums text-slate-900">{formatInteger(totalStock)}</strong>
-                        </span>
+                    {/* Meta is plain text, the total is a figure, and only a real shortage gets a status badge. */}
+                    <div className="flex shrink-0 items-center gap-3 text-[12px] font-semibold text-slate-500">
+                        <span>재고 합계 <strong className="font-extrabold tabular-nums text-slate-900">{formatInteger(totalStock)}</strong></span>
+                        {lowStockCount > 0 ? <Badge tone="warning">부족 {formatInteger(lowStockCount)}</Badge> : null}
                     </div>
                 </div>
             </td>
@@ -1390,7 +1391,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
     const visibleColumnKeys = useMemo(() => visibleColumnOptions.map(option => option.key), [visibleColumnOptions])
     const activeColumnPreset = PRODUCT_TABLE_PRESETS.find(preset => sameProductTableColumns(preset.columns, visibleColumns))?.key ?? 'custom'
     const allNamedGroupsCollapsed = namedGroupKeys.length > 0 && collapsedNamedGroupCount === namedGroupKeys.length
-    const productTableColumnCount = 4 + visibleColumnOptions.length
+    // +1 for the trailing filler column that takes up any spare width, so header and row lines run to the panel edge.
+    const productTableColumnCount = 4 + visibleColumnOptions.length + 1
+    const actionsPinned = visibleColumnKeys.includes('actions')
     const productTableWidth = Math.max(
         920,
         FIXED_PRODUCT_TABLE_WIDTH + visibleColumnOptions.reduce((sum, option) => sum + option.width, 0),
@@ -1941,7 +1944,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         />
     )
 
-    const filterSelectClass = 'h-10 min-w-0 flex-1 rounded-[10px] border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none focus:border-brand-orange sm:flex-none'
+    // Two selects share a phone row half-and-half; the result count drops to its own line instead of squeezing them.
+    const filterSelectClass = (hasValue: boolean) => selectClass(hasValue, 'w-auto min-w-0 grow basis-[calc(50%-4px)] sm:w-auto sm:grow-0 sm:basis-auto')
     const rateTextClass = cnyRateError ? 'tabular-nums text-amber-700' : 'tabular-nums text-slate-900'
     const showGroupToggle = viewMode === 'group' && namedGroupKeys.length > 0
     const emptyListAction = hasActiveFilters
@@ -1949,7 +1953,8 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         : undefined
 
     return (
-        <div className="w-full space-y-4" style={{ maxWidth: productTableWidth + (selectedGroup ? 310 : 0) + 24 }}>
+        // Fixed to the page width: switching 작업 보기 changes the table's columns, never the header or panel width.
+        <div className="w-full space-y-4">
             <PageHeader
                 title="상품 관리"
                 count={products.length}
@@ -1982,7 +1987,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                 <RefreshCw size={13} className={isCnyRateLoading ? 'animate-spin' : ''} />
                             </button>
                         </div>
-                        <ProductForm trigger={<button type="button" className={buttonClass('primary', 'md')}><Plus size={15} />새 상품 추가</button>} />
+                        <div data-primary className="max-sm:[&_button]:w-full">
+                            <ProductForm trigger={<button type="button" className={buttonClass('primary', 'md')}><Plus size={15} />새 상품 추가</button>} />
+                        </div>
                     </>
                 )}
             />
@@ -1991,35 +1998,28 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                 {/* Sticks under the 60px top bar and below the shell's z-40. Kept to one row so it
                     never covers the table head when the page is scrolled to the bottom. */}
                 <header className="rounded-t-[10px] border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur-xl sm:px-5 lg:sticky lg:top-[60px] lg:z-30">
-                    <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-                        <Tabs
-                            aria-label="상품 분류"
-                            items={PRODUCT_CATALOG_CATEGORIES.map(category => ({
-                                key: category,
-                                label: PRODUCT_CATALOG_CATEGORY_LABELS[category],
-                                count: categoryCounts[category],
-                            }))}
-                            value={activeCategory}
-                            onChange={handleCategoryChange}
-                        />
-                        <Tabs
-                            aria-label="보기 단위"
-                            items={[{ key: 'group', label: '그룹' }, { key: 'sku', label: 'SKU' }]}
-                            value={viewMode}
-                            onChange={setViewMode}
-                        />
-                    </div>
+                    {/* The one Tabs row of this panel; how the list is grouped and which columns show are chips below. */}
+                    <Tabs
+                        aria-label="상품 분류"
+                        items={PRODUCT_CATALOG_CATEGORIES.map(category => ({
+                            key: category,
+                            label: PRODUCT_CATALOG_CATEGORY_LABELS[category],
+                            count: categoryCounts[category],
+                        }))}
+                        value={activeCategory}
+                        onChange={handleCategoryChange}
+                    />
                 </header>
 
                 <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 px-4 py-2.5 sm:px-5">
-                    <label className="flex h-10 w-full items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3 text-slate-500 focus-within:border-brand-orange sm:w-[320px]">
+                    <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-lg border border-[var(--input-border)] bg-white px-3 text-slate-500 focus-within:border-brand-orange sm:w-[320px] sm:flex-none">
                         <Search size={15} className="shrink-0 text-slate-400" />
                         <input
                             value={productQuery}
                             onChange={(event) => setProductQuery(event.target.value)}
                             placeholder="상품명, 상품코드, 바코드 검색"
                             aria-label="상품 검색"
-                            className="h-full min-w-0 flex-1 border-0 bg-transparent text-[13px] font-semibold text-slate-800 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
+                            className="h-full min-w-0 flex-1 border-0 bg-transparent text-[13px] font-normal text-slate-800 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
                         />
                         {productQuery ? (
                             <button type="button" onClick={() => setProductQuery('')} className="text-slate-400 hover:text-slate-700" title="검색어 지우기" aria-label="검색어 지우기">
@@ -2027,10 +2027,17 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             </button>
                         ) : null}
                     </label>
+                    <FilterChips
+                        aria-label="보기 단위"
+                        items={[{ key: 'group', label: '그룹' }, { key: 'sku', label: 'SKU' }]}
+                        value={viewMode}
+                        onChange={setViewMode}
+                        className="shrink-0 flex-nowrap"
+                    />
                     <select
                         value={stockFilter}
                         onChange={(event) => setStockFilter(event.target.value as ProductStockFilter)}
-                        className={filterSelectClass}
+                        className={filterSelectClass(stockFilter !== 'all')}
                         aria-label="재고 상태 필터"
                     >
                         <option value="all">재고 상태 전체</option>
@@ -2040,7 +2047,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     <select
                         value={availabilityFilter}
                         onChange={(event) => setAvailabilityFilter(event.target.value as ProductAvailabilityFilter)}
-                        className={filterSelectClass}
+                        className={filterSelectClass(availabilityFilter !== 'all')}
                         aria-label="파트너 노출 필터"
                     >
                         <option value="all">파트너 노출 전체</option>
@@ -2053,19 +2060,19 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             필터 초기화
                         </button>
                     ) : null}
-                    <span className="ml-auto whitespace-nowrap text-[12px] font-semibold tabular-nums text-slate-500">
+                    <span className="basis-full whitespace-nowrap text-right text-[12px] font-semibold tabular-nums text-slate-500 sm:ml-auto sm:basis-auto">
                         {PRODUCT_CATALOG_CATEGORY_LABELS[activeCategory]} {formatInteger(filteredProducts.length)}개 표시
                     </span>
                 </div>
 
-                <div className={`${showGroupToggle ? 'flex' : 'hidden lg:flex'} flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2.5 sm:px-5`}>
+                <div className="hidden flex-wrap items-center gap-2 border-b border-slate-200 px-4 py-2.5 sm:px-5 lg:flex">
                     {/* Presets and the column picker both change the visible columns, so they share one row.
                         They only affect the desktop table; the mobile cards show a fixed set of fields. */}
                     <div className="hidden min-w-0 flex-wrap items-center gap-2 lg:flex">
                         <span className="text-[12px] font-bold text-slate-500">작업 보기</span>
-                        <Tabs
+                        <FilterChips
                             aria-label="작업별 표시 열"
-                            items={PRODUCT_TABLE_PRESET_TABS}
+                            items={PRODUCT_TABLE_PRESET_CHIPS}
                             value={activeColumnPreset}
                             onChange={applyColumnPreset}
                         />
@@ -2131,7 +2138,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     </div>
                 )}
                 {isCompactViewport ? (
-                    <div className="rounded-b-[10px] px-3 pb-24 pt-3" data-testid="product-mobile-cards">
+                    <div className={`rounded-b-[10px] px-3 pt-3 ${checkedIds.size > 0 ? 'pb-24' : 'pb-4'}`} data-testid="product-mobile-cards">
                         <div className="mb-3 flex items-center justify-between gap-3 border-b border-slate-100 pb-3">
                             <label className="flex min-h-8 cursor-pointer items-center gap-2 text-[13px] font-bold text-slate-700">
                                 <input
@@ -2142,7 +2149,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                 />
                                 현재 목록 전체 선택
                             </label>
-                            <span className="shrink-0 text-[12px] font-semibold tabular-nums text-slate-500">{activeGrade}등급 가격</span>
+                            <span className="flex shrink-0 items-center gap-2">
+                                <span className="text-[12px] font-semibold text-slate-500">가격 기준 {activeGrade}등급</span>
+                                {showGroupToggle ? (
+                                    <button
+                                        type="button"
+                                        onClick={allNamedGroupsCollapsed ? handleExpandAllGroups : handleCollapseAllGroups}
+                                        className={buttonClass('ghost', 'sm', 'px-2')}
+                                    >
+                                        {allNamedGroupsCollapsed ? '전체 펼치기' : '전체 접기'}
+                                    </button>
+                                ) : null}
+                            </span>
                         </div>
 
                         {filteredProducts.length === 0 ? (
@@ -2179,7 +2197,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                                                     />
                                                 ) : null}
                                                 {expanded ? (
-                                                    <div className={group.isNamed ? 'ml-3 space-y-2 border-l-2 border-blue-100 pl-2' : 'space-y-2'}>
+                                                    <div className={group.isNamed ? 'ml-3 space-y-2 border-l-2 border-slate-200 pl-2' : 'space-y-2'}>
                                                         {group.products.map((product, groupOrder) => renderMobileProductCard(
                                                             product,
                                                             groupOrder + 1,
@@ -2207,16 +2225,18 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             ref={tableScrollRef}
                             onScroll={syncTableEdges}
                             data-scrolled={tableEdges.left}
+                            data-overflow-right={tableEdges.right}
                             className="max-h-[calc(100vh-190px)] w-full overflow-auto pb-2"
                             data-testid="product-table-scroll"
                         >
-                <table className="table-fixed border-collapse" style={{ width: productTableWidth, minWidth: productTableWidth }}>
+                <table className="table-fixed border-collapse" style={{ width: '100%', minWidth: productTableWidth }}>
                     <colgroup>
                         <col className="w-[40px]" />
                         <col className="w-[78px]" />
                         <col className="w-[72px]" />
                         <col className="w-[260px]" />
                         {visibleColumnOptions.map(option => <col key={option.key} style={{ width: option.width }} />)}
+                        <col />
                     </colgroup>
                     <thead className="ux-thead sticky top-0 z-30">
                         <tr>
@@ -2233,8 +2253,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                             <th className={`text-center ${stickyHeadCell(2)}`}>이미지</th>
                             <th className={`text-left ${stickyHeadCell(3)} ${STICKY_EDGE_SHADOW}`}>상품명</th>
                             {visibleColumnOptions.map(option => (
-                                <th key={option.key} className={COLUMN_ALIGN_CLASS[option.key]}>{option.label}</th>
+                                <th key={option.key} className={`${COLUMN_ALIGN_CLASS[option.key]} ${option.key === 'actions' ? `${STICKY_ACTIONS_CELL} z-[2]` : ''}`}>{option.label}</th>
                             ))}
+                            <th aria-hidden="true" />
                         </tr>
                     </thead>
                     {filteredProducts.length === 0 ? (
@@ -2381,8 +2402,9 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
                     )}
                     </table>
                         </div>
-                        {tableEdges.right ? (
-                            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-[35] w-10 bg-gradient-to-l from-slate-900/12 to-transparent" />
+                        {/* With 관리 pinned right, its edge shadow is the cue; otherwise the fade shows columns continue. */}
+                        {tableEdges.right && !actionsPinned ? (
+                            <div aria-hidden="true" className="pointer-events-none absolute inset-y-0 right-0 z-[35] w-12 bg-gradient-to-l from-slate-900/20 to-transparent" />
                         ) : null}
                     </div>
                     {selectedGroup ? (

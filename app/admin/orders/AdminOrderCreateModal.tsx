@@ -3,16 +3,15 @@
 import { useMemo, useState } from 'react'
 import Modal from '@/components/Modal'
 import { useRouter } from 'next/navigation'
-import { Minus, Plus, Search, X } from 'lucide-react'
+import { Minus, Plus, Search } from 'lucide-react'
 
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
 import { resolvePartnerOrderTerms, type PartnerOrderPricingProduct } from '@/lib/partnerOrderPricing'
 import Button from '@/components/ui/Button'
 import EmptyState from '@/components/ui/EmptyState'
-
-const fieldClass =
-  'w-full rounded-xl border border-slate-200 bg-white font-bold text-slate-900 transition ' +
-  'focus:border-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
+import { formatWon } from '@/lib/format'
 
 export type AdminOrderPartnerOption = {
   id: string
@@ -153,35 +152,28 @@ export default function AdminOrderCreateModal({
   }
 
   return (
-    <Modal label="업체 발주서 생성" onClose={handleClose} className="flex items-center justify-center bg-slate-950/55 p-3 backdrop-blur-sm md:p-6">
+    <Modal label="업체 발주서 생성" onClose={handleClose} className="flex items-center justify-center bg-slate-950/50 p-3 md:p-6">
       <div className="flex max-h-[94vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-start justify-between gap-4 border-b border-slate-200 px-6 py-4">
           <div>
-            <h2 className="text-lg font-black text-slate-950">업체 발주서 생성</h2>
+            <h2 className="text-lg font-extrabold text-slate-950">업체 발주서 생성</h2>
             <p className="mt-1 break-keep text-[13px] text-slate-500">업체를 선택하면 해당 국가와 등급에 맞는 발주 단가가 적용됩니다.</p>
           </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-            aria-label="닫기"
-          >
-            <X size={18} />
-          </button>
+          <ModalCloseButton onClick={handleClose} className="-mr-2 -mt-1" />
         </div>
 
         <div className="min-w-0 flex-1 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
           {/* The partner summary appears only once a partner is chosen; before that the empty state below explains the next step. */}
           <div className={`grid gap-4 ${selectedPartner ? 'md:grid-cols-[minmax(0,1fr)_240px]' : ''}`}>
             <label className="block min-w-0">
-              <span className="mb-2 block text-[12px] font-black text-slate-600">발주 업체</span>
+              <span className={labelClass}>발주 업체</span>
               <select
                 value={partnerId}
                 onChange={(event) => {
                   setPartnerId(event.target.value)
                   setQuantities({})
                 }}
-                className={`h-11 px-4 text-[14px] ${fieldClass}`}
+                className={selectClass(Boolean(partnerId))}
               >
                 <option value="">업체를 선택해 주세요</option>
                 {partners.map((partner) => (
@@ -192,9 +184,9 @@ export default function AdminOrderCreateModal({
               </select>
             </label>
             {selectedPartner ? (
-              <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
+              <div className="min-w-0 rounded-lg bg-[var(--surface)] px-4 py-3">
                 <div className="text-[11px] font-bold text-slate-500">선택 업체 정보</div>
-                <div className="mt-1 truncate text-[14px] font-black text-slate-900">
+                <div className="mt-1 truncate text-[14px] font-bold text-slate-900">
                   {selectedPartner.partnerProfile?.representativeName || selectedPartner.name}
                 </div>
                 <div className="mt-1 text-[12px] font-semibold text-slate-600">
@@ -207,16 +199,18 @@ export default function AdminOrderCreateModal({
           {selectedPartner ? (
             <>
               <div className="relative mt-5">
-                <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
                 <input
+                  type="search"
+                  aria-label="상품명 또는 상품코드 검색"
                   value={search}
                   onChange={(event) => setSearch(event.target.value)}
                   placeholder="상품명 또는 상품코드 검색"
-                  className={`h-10 pl-11 pr-4 text-[13px] ${fieldClass}`}
+                  className={fieldClass('pl-10')}
                 />
               </div>
 
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
+              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
                 <div className="hidden grid-cols-[minmax(0,1fr)_120px_150px_160px] border-b border-slate-200 bg-[var(--surface)] px-5 py-2.5 text-[12px] font-bold text-[var(--muted-foreground)] md:grid">
                   <span className="whitespace-nowrap">상품</span><span className="whitespace-nowrap text-right">적용 단가</span><span className="whitespace-nowrap text-center">발주 조건</span><span className="whitespace-nowrap text-center">수량</span>
                 </div>
@@ -227,17 +221,17 @@ export default function AdminOrderCreateModal({
                     return (
                       <div key={product.id} className={`grid gap-3 px-5 py-4 md:grid-cols-[minmax(0,1fr)_120px_150px_160px] md:items-center ${quantity > 0 ? 'bg-orange-50/50' : 'bg-white'}`}>
                         <div className="min-w-0">
-                          <div className="truncate text-[14px] font-black text-slate-900">{product.name}</div>
+                          <div className="truncate text-[14px] font-bold text-slate-900">{product.name}</div>
                           <div className="mt-1 text-[11px] font-bold text-slate-500">{product.productCode || '상품코드 없음'}</div>
                         </div>
-                        <div className="whitespace-nowrap text-left text-[14px] font-black tabular-nums text-slate-900 md:text-right">{formatCurrency(product.terms.unitPrice)}</div>
+                        <div className="whitespace-nowrap text-left text-[14px] font-bold tabular-nums text-slate-900 md:text-right">{formatCurrency(product.terms.unitPrice)}</div>
                         <div className="text-left text-[12px] font-semibold tabular-nums text-slate-500 md:text-center">
                           최소 {product.terms.minimumQuantity.toLocaleString('ko-KR')} · 단위 {product.terms.orderUnit.toLocaleString('ko-KR')}
                         </div>
                         <div>
-                          <div className={`flex h-10 items-center overflow-hidden rounded-xl border ${invalid ? 'border-red-300 bg-red-50' : 'border-slate-200 bg-white'}`}>
+                          <div className={`flex h-10 items-center overflow-hidden rounded-lg border ${invalid ? 'border-red-300 bg-red-50' : 'border-[var(--input-border)] bg-white'}`}>
                             <button type="button" onClick={() => stepQuantity(product, -1)} aria-label="수량 감소" className="flex h-full w-10 items-center justify-center text-slate-500 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40"><Minus className="h-4 w-4" /></button>
-                            <input type="number" min="0" value={quantity || ''} onChange={(event) => setQuantity(product.id, Number(event.target.value))} placeholder="0" aria-label="수량" className="min-w-0 flex-1 bg-transparent text-center text-[14px] font-black text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40" />
+                            <input type="number" min="0" value={quantity || ''} onChange={(event) => setQuantity(product.id, Number(event.target.value))} placeholder="0" aria-label="수량" className="min-w-0 flex-1 bg-transparent text-center text-[14px] font-bold tabular-nums text-slate-900 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40" />
                             <button type="button" onClick={() => stepQuantity(product, 1)} aria-label="수량 증가" className="flex h-full w-10 items-center justify-center text-slate-700 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand-orange/40"><Plus className="h-4 w-4" /></button>
                           </div>
                           {invalid ? <div className="mt-1 text-center text-[11px] font-bold text-red-500">발주 조건을 확인하세요</div> : null}
@@ -251,13 +245,14 @@ export default function AdminOrderCreateModal({
               </div>
             </>
           ) : (
-            <EmptyState className="mt-5" title="발주할 업체를 선택하면 상품 목록과 적용 단가가 표시됩니다." />
+            <EmptyState bare compact className="mt-2" title="발주할 업체를 선택하면 상품 목록과 적용 단가가 표시됩니다." />
           )}
         </div>
 
         <div className="border-t border-slate-200 bg-slate-50 px-4 py-4 sm:px-6 sm:py-5">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div className="grid grid-cols-3 gap-4 text-[12px]">
+          {/* Totals sit right next to the button they lead to; only the VAT-inclusive total is enlarged. */}
+          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-end md:gap-8">
+            <div className="grid grid-cols-3 gap-4 text-[12px] md:flex md:items-end md:gap-6">
               <AmountSummary label="상품 공급가" value={formatCurrency(amount.productSupplyPrice)} />
               <AmountSummary label="배송비" value={formatCurrency(amount.shippingFee)} />
               <AmountSummary label="부가세 포함 합계" value={formatCurrency(amount.finalAmount)} highlight={amount.finalAmount > 0} />
@@ -284,11 +279,9 @@ function AmountSummary({ label, value, highlight = false }: { label: string; val
   return (
     <div className="min-w-0">
       <div className="whitespace-nowrap font-bold text-slate-500">{label}</div>
-      <div className={`mt-1 whitespace-nowrap font-black tabular-nums ${highlight ? 'text-[18px] text-slate-950' : 'text-[14px] text-slate-900'}`}>{value}</div>
+      <div className={`mt-1 whitespace-nowrap tabular-nums ${highlight ? 'text-[16px] font-extrabold text-slate-950' : 'text-[14px] font-bold text-slate-700'}`}>{value}</div>
     </div>
   )
 }
 
-function formatCurrency(value: number) {
-  return `${Math.round(value).toLocaleString('ko-KR')}원`
-}
+const formatCurrency = formatWon

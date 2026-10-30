@@ -2,13 +2,9 @@
 
 import { ChevronDown } from 'lucide-react'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
-import OrderDetailPage, {
-  formatCurrency,
-  formatDateTime,
-  getOrderStatusMeta,
-  toneClasses,
-  type OrderRecord,
-} from './OrderDetailPage'
+import { formatDateTime, formatWon } from '@/lib/format'
+import Badge from '@/components/ui/Badge'
+import OrderDetailPage, { getOrderStatusMeta, type OrderRecord } from './OrderDetailPage'
 
 export default function AdminOrderCard({
   order,
@@ -41,11 +37,9 @@ export default function AdminOrderCard({
           <span className="block truncate text-[14px] font-black text-slate-900">{company}</span>
           <span className="mt-0.5 block whitespace-nowrap text-[11px] font-bold text-slate-500">주문 #{orderNumber}</span>
         </span>
-        <span className={`inline-flex h-6 shrink-0 items-center whitespace-nowrap rounded-full border px-2.5 text-[11px] font-bold ${toneClasses(status.tone)}`}>
-          {status.label}
-        </span>
+        <Badge tone={status.tone}>{status.label}</Badge>
         <span className="shrink-0 whitespace-nowrap text-[12px] text-slate-500">{formatDateTime(order.createdAt)}</span>
-        <span className="ml-auto shrink-0 whitespace-nowrap text-[15px] font-black text-slate-900">{formatCurrency(finalAmount)}</span>
+        <span className="ml-auto shrink-0 whitespace-nowrap text-[15px] font-black text-slate-900">{formatWon(finalAmount)}</span>
         <ChevronDown
           className={`h-4 w-4 shrink-0 text-slate-500 transition-transform ${expanded ? 'rotate-180' : ''}`}
           aria-hidden="true"

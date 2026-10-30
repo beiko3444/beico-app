@@ -2,9 +2,10 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Trash2, X } from 'lucide-react'
+import { Trash2 } from 'lucide-react'
 import Modal from '@/components/Modal'
 import { buttonClass } from '@/components/ui/buttonClass'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
 import RestorePartnerButton from './RestorePartnerButton'
 
 export default function PartnerTrashbin({ deletedPartners }: { deletedPartners: any[] }) {
@@ -47,18 +48,11 @@ export default function PartnerTrashbin({ deletedPartners }: { deletedPartners: 
                 <Modal labelledBy="partner-trash-title" onClose={() => { if (!isEmptying) setIsOpen(false) }} className="flex items-center justify-center bg-slate-950/50 p-4">
                     <div className="flex max-h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                         <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4">
-                            <h2 id="partner-trash-title" className="flex items-center gap-2 text-lg font-black text-slate-900">
+                            <h2 id="partner-trash-title" className="flex items-center gap-2 text-lg font-extrabold text-slate-900">
                                 삭제된 파트너
                                 <span className="text-[13px] font-bold tabular-nums text-slate-500">{deletedPartners.length}명</span>
                             </h2>
-                            <button
-                                type="button"
-                                onClick={() => setIsOpen(false)}
-                                aria-label="휴지통 닫기"
-                                className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
-                            >
-                                <X size={18} />
-                            </button>
+                            <ModalCloseButton onClick={() => setIsOpen(false)} label="휴지통 닫기" className="-mr-2" />
                         </div>
 
                         <div className="flex-1 overflow-y-auto p-4">

@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma'
 import PartnerNoticesClient, { type PartnerNoticeItem } from './PartnerNoticesClient'
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: '파트너 공지' }
 
 export default async function PartnerNoticesPage() {
   let notices: PartnerNoticeItem[] = []

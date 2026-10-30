@@ -6,6 +6,7 @@ import { redirect } from "next/navigation"
 import OrdersClient from "./OrdersClient"
 
 export const dynamic = 'force-dynamic'
+export const metadata = { title: '주문 관리' }
 
 const orderListSelect = {
     id: true,

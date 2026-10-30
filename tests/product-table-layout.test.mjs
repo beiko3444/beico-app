@@ -8,7 +8,7 @@ import {
 } from '../lib/productTableColumns.ts'
 
 test('uses the approved business columns by default', () => {
-    assert.deepEqual(DEFAULT_PRODUCT_TABLE_COLUMNS, ['stock', 'safetyStock', 'stockStatus', 'availability', 'cnyCost', 'cost', 'wholesale', 'retail'])
+    assert.deepEqual(DEFAULT_PRODUCT_TABLE_COLUMNS, ['stock', 'safetyStock', 'stockStatus', 'availability', 'cost', 'wholesale', 'retail', 'actions'])
 })
 
 test('normalizes saved columns and removes duplicates or unknown values', () => {
@@ -45,7 +45,9 @@ test('connects permanent product numbers and the configurable table UI', () => {
 test('keeps the product table and optional summary in one compact workspace', () => {
     const table = readFileSync(new URL('../app/admin/products/ProductTable.tsx', import.meta.url), 'utf8')
 
-    assert.match(table, /maxWidth: productTableWidth \+ \(selectedGroup \? 310 : 0\)/)
+    // The page keeps one width; the table fills the panel and only its minimum width follows the columns.
+    assert.doesNotMatch(table, /maxWidth: productTableWidth/)
+    assert.match(table, /style=\{\{ width: '100%', minWidth: productTableWidth \}\}/)
     assert.match(table, /selectedGroupKey \? productGroups\.find/)
     assert.match(table, /onClose=\{\(\) => setSelectedGroupKey\(null\)\}/)
     assert.doesNotMatch(table, /productGroups\[0\] \|\| null/)

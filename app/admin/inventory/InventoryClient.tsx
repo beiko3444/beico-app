@@ -52,8 +52,11 @@ import { resolveInventoryRowSyncedAt } from '@/lib/smartInventoryDates'
 import { buttonClass } from '@/components/ui/Button'
 import PageHeader from '@/components/ui/PageHeader'
 import Tabs from '@/components/ui/Tabs'
+import FilterChips from '@/components/ui/FilterChips'
 import EmptyState from '@/components/ui/EmptyState'
 import Badge from '@/components/ui/Badge'
+import StatCard from '@/components/ui/StatCard'
+import { selectClass } from '@/components/ui/field'
 import ProductInventoryHistoryModal from './ProductInventoryHistoryModal'
 
 type FilterMode = 'all' | 'empty' | 'inbound' | 'unlinked' | 'linked'
@@ -68,7 +71,7 @@ const filterOptions: Array<{ value: FilterMode; label: string }> = [
   { value: 'all', label: '전체' },
   { value: 'empty', label: '품절' },
   { value: 'inbound', label: '입고대기' },
-  { value: 'unlinked', label: '채널 미연결' },
+  { value: 'unlinked', label: '판매 채널 없음' },
   { value: 'linked', label: '연결상품 있음' },
 ]
 
@@ -76,7 +79,7 @@ const pageSizeOptions = [20, 50, 100] as const
 
 const tableModeTabs: Array<{ key: TableMode; label: string }> = [
   { key: 'masters', label: '관리 상품' },
-  { key: 'unlinked', label: '미연결 채널 SKU' },
+  { key: 'unlinked', label: '매칭 안 된 채널 SKU' },
 ]
 
 const pageButtonBase = 'inline-flex h-8 min-w-8 items-center justify-center rounded-lg border px-2 text-xs font-bold tabular-nums transition-colors'
@@ -134,39 +137,6 @@ function orderRows(rows: SmartInventoryMasterRow[], order: number[]) {
 
 function representativePrice(row: SmartInventoryMasterRow) {
   return row.naverPrice ?? row.coupangPrice ?? null
-}
-
-// Icons stay neutral; red is used only when the number itself needs attention.
-function StatCard({
-  icon,
-  label,
-  value,
-  sub,
-  alert = false,
-  unknown = false,
-  className = '',
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  sub: ReactNode
-  alert?: boolean
-  /** The source failed to load, so the number is not shown as if it were real. */
-  unknown?: boolean
-  className?: string
-}) {
-  return (
-    <div className={`flex min-w-0 items-start gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-sm ${className}`}>
-      <span className={`hidden h-11 w-11 shrink-0 items-center justify-center rounded-xl sm:inline-flex ${alert ? 'bg-red-50 text-red-600' : 'bg-slate-100 text-slate-600'}`}>
-        {icon}
-      </span>
-      <div className="min-w-0">
-        <div className="text-[12px] font-extrabold text-slate-500">{label}</div>
-        <div className={`mt-0.5 break-words text-[20px] font-black leading-tight tabular-nums sm:text-[24px] ${unknown ? 'text-slate-400' : alert ? 'text-red-700' : 'text-slate-900'}`}>{unknown ? '—' : value}</div>
-        <div className="mt-0.5 line-clamp-1 text-[11px] font-bold text-slate-500">{sub}</div>
-      </div>
-    </div>
-  )
 }
 
 /** Groups failures that share a cause ("A를 불러오지 못했습니다: <원인>") into one line with the cause shown once. */
@@ -340,7 +310,7 @@ function SortableMasterRow({
       className="h-[68px] bg-white transition-colors hover:bg-slate-50"
     >
       <td className="px-3 py-2">
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <button
             type="button"
             className="inline-flex h-8 w-8 cursor-grab items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40 active:cursor-grabbing"
@@ -397,10 +367,10 @@ function SortableMasterRow({
         {coupangStale ? <span className="text-red-700" title="쿠팡 API 인증 오류로 현재 재고를 확인할 수 없습니다.">연동 오류</span> : formatNumber(row.coupangStock)}
       </td>
       <td className="px-3 py-2 text-right text-[15px] font-black tabular-nums text-slate-950">{coupangStale ? '-' : formatNumber(row.totalStock)}</td>
-      <td className="hidden px-3 py-2 text-right text-[13px] font-bold tabular-nums text-slate-800 xl:table-cell">{formatNumber(row.totalInboundPending)}</td>
-      <td className="hidden px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900 2xl:table-cell">{coupangStale ? '-' : formatMoney(row.stockCost)}</td>
+      <td className="px-3 py-2 text-right text-[13px] font-bold tabular-nums text-slate-800">{formatNumber(row.totalInboundPending)}</td>
+      <td className="px-3 py-2 text-right text-[13px] font-black tabular-nums text-slate-900">{coupangStale ? '-' : formatMoney(row.stockCost)}</td>
       <td className="px-3 py-2"><LinkedProducts links={row.linked} /></td>
-      <td className="hidden px-3 py-2 text-[12px] font-bold text-slate-500 2xl:table-cell">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
+      <td className="px-3 py-2 text-[12px] font-bold text-slate-500">{formatDateTime(resolveInventoryRowSyncedAt(row))}</td>
     </tr>
   )
 }
@@ -446,49 +416,50 @@ function MasterTable({
     onReorder(nextOrder)
   }
 
+  // Every column is always drawn (no breakpoint-hidden cells), so the header band runs the full table width;
+  // narrow screens scroll the table sideways, and 연결상태 (no fixed width) absorbs any spare room.
   return (
-    <div className="max-h-[calc(100dvh-310px)] overflow-x-auto overflow-y-auto">
-      <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalDrag]} onDragEnd={handleDragEnd}>
-        <table className="w-full min-w-[1100px] table-fixed border-collapse text-left text-[13px]">
-          {/* The row carries the header colour too, so it reaches the edge whichever columns this breakpoint hides. */}
-          <thead className="ux-thead sticky top-0 z-20">
-            <tr className="bg-[var(--surface)]">
-              <th className="w-[88px] whitespace-nowrap">순번</th>
-              <th className="w-[310px] whitespace-nowrap">상품</th>
-              <th className="w-[100px] whitespace-nowrap text-right">판매가</th>
-              <th className="w-[78px] whitespace-nowrap text-right">네이버</th>
-              <th className="w-[78px] whitespace-nowrap text-right">쿠팡</th>
-              <th className="w-[82px] whitespace-nowrap text-right">총재고</th>
-              <th className="hidden w-[90px] whitespace-nowrap text-right xl:table-cell">입고대기</th>
-              <th className="hidden w-[125px] whitespace-nowrap text-right 2xl:table-cell">재고가치</th>
-              <th className="w-[250px] whitespace-nowrap">연결상태</th>
-              <th className="hidden w-[120px] whitespace-nowrap 2xl:table-cell">최근갱신</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {rows.length ? (
-              <SortableContext items={rows.map((row) => row.id)} strategy={verticalListSortingStrategy}>
-                {rows.map((row, index) => (
-                  <SortableMasterRow
-                    key={row.id}
-                    row={row}
-                    rank={rankOffset + index + 1}
-                    favorite={favoriteIds.includes(row.id)}
-                    onToggleFavorite={onToggleFavorite}
-                    onSelect={onSelect}
-                    coupangStale={coupangStale}
-                  />
-                ))}
-              </SortableContext>
-            ) : (
+    <>
+      <div className="max-h-[calc(100dvh-310px)] overflow-x-auto overflow-y-auto">
+        <DndContext sensors={sensors} collisionDetection={closestCenter} modifiers={[restrictToVerticalDrag]} onDragEnd={handleDragEnd}>
+          <table className="w-full min-w-[1320px] table-fixed border-collapse text-left text-[13px]">
+            <thead className="ux-thead sticky top-0 z-20">
               <tr>
-                <td colSpan={10} className="p-0">{emptyState}</td>
+                <th className="w-[88px] whitespace-nowrap text-right">순번</th>
+                <th className="w-[310px] whitespace-nowrap">상품</th>
+                <th className="w-[100px] whitespace-nowrap text-right">판매가</th>
+                <th className="w-[78px] whitespace-nowrap text-right">네이버</th>
+                <th className="w-[78px] whitespace-nowrap text-right">쿠팡</th>
+                <th className="w-[82px] whitespace-nowrap text-right">총재고</th>
+                <th className="w-[90px] whitespace-nowrap text-right">입고대기</th>
+                <th className="w-[125px] whitespace-nowrap text-right">재고가치</th>
+                <th className="whitespace-nowrap">연결상태</th>
+                <th className="w-[120px] whitespace-nowrap">최근갱신</th>
               </tr>
-            )}
-          </tbody>
-        </table>
-      </DndContext>
-    </div>
+            </thead>
+            {rows.length ? (
+              <tbody className="divide-y divide-slate-100">
+                <SortableContext items={rows.map((row) => row.id)} strategy={verticalListSortingStrategy}>
+                  {rows.map((row, index) => (
+                    <SortableMasterRow
+                      key={row.id}
+                      row={row}
+                      rank={rankOffset + index + 1}
+                      favorite={favoriteIds.includes(row.id)}
+                      onToggleFavorite={onToggleFavorite}
+                      onSelect={onSelect}
+                      coupangStale={coupangStale}
+                    />
+                  ))}
+                </SortableContext>
+              </tbody>
+            ) : null}
+          </table>
+        </DndContext>
+      </div>
+      {/* Outside the table, so an empty list doesn't stretch a phantom row across hidden columns. */}
+      {rows.length ? null : emptyState}
+    </>
   )
 }
 
@@ -546,7 +517,7 @@ function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventor
     <div className="max-h-[calc(100dvh-310px)] overflow-x-auto overflow-y-auto">
       <table className="w-full min-w-[900px] table-fixed border-collapse text-left text-[13px]">
         <thead className="ux-thead sticky top-0 z-20">
-          <tr className="bg-[var(--surface)]">
+          <tr>
             <th className="w-[70px] whitespace-nowrap text-right">순번</th>
             <th className="w-[90px] whitespace-nowrap">채널</th>
             <th className="w-[360px] whitespace-nowrap">상품</th>
@@ -600,7 +571,7 @@ function UnlinkedTable({ rows, rankOffset, coupangStale }: { rows: SmartInventor
           ) : (
             <tr>
               <td colSpan={7} className="p-0">
-                <EmptyState bare compact icon={<AlertCircle size={20} />} title="미연결 상품이 없습니다." />
+                <EmptyState bare compact icon={<AlertCircle size={20} />} title="매칭 안 된 채널 SKU가 없습니다." />
               </td>
             </tr>
           )}
@@ -854,8 +825,12 @@ export default function InventoryClient() {
   const pageNumbers = Array.from({ length: Math.min(5, totalPages) }, (_, index) => pageNumberStart + index)
 
   const { failedCount } = summarizeWarnings(data?.warnings || [])
-  // When a source failed, zeros would look like real stock, so the cards show "—" instead.
   const summaryUnknown = failedCount > 0
+  // When a source failed, zeros would look like real stock, so the cards show "—" (never 0).
+  const statValue = (text: string, alert = false) => summaryUnknown
+    ? <span className="text-slate-400">—</span>
+    : <span className={alert ? 'text-red-700' : undefined}>{text}</span>
+  const statCardClass = 'max-sm:gap-0.5 max-sm:p-3 max-sm:[&>div:nth-child(2)]:text-[18px] max-sm:[&>div:nth-child(3)]:hidden'
   const activeFilterLabel = filterOptions.find((option) => option.value === filter)?.label || '전체'
   const filtersApplied = filter !== 'all' || Boolean(normalizedQuery)
   const masterEmptyState = (
@@ -874,32 +849,35 @@ export default function InventoryClient() {
     <div className="mx-auto w-full min-w-0 max-w-[1540px] space-y-4 pb-6">
       <PageHeader
         title="재고 관리"
-        count={summary ? summary.masterCount : undefined}
+        count={summary && !summaryUnknown ? summary.masterCount : undefined}
         description="네이버·쿠팡 판매 재고입니다. 실물 창고 재고와 별도로 집계합니다."
         actions={(
           <>
             <div
-              className="inline-flex h-10 items-center gap-2 whitespace-nowrap rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-bold text-slate-600 max-sm:basis-full"
+              className="inline-flex h-10 min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap rounded-[10px] border border-[var(--border)] bg-white px-3 text-[12px] font-bold text-slate-600"
               title="조회 시각과 채널 수집 시각은 다를 수 있습니다. 최신 재고는 채널 재고 수집 후 확인하세요."
             >
-              <span className={`h-2 w-2 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+              <span className={`h-2 w-2 shrink-0 rounded-full ${coupangStale ? 'bg-red-500' : healthStatus ? 'bg-emerald-500' : 'bg-slate-300'}`} />
               <span>{monitorUnavailable ? '수집기 연결 실패' : coupangStale ? '쿠팡 연동 오류' : healthStatus ? '수집기 연결됨' : '연결 확인 중'}</span>
-              <span className="border-l border-slate-200 pl-2 text-slate-500">{cacheLabel}</span>
+              <span className="truncate border-l border-slate-200 pl-2 text-slate-500">{cacheLabel}</span>
             </div>
+            {/* Icon-only on phones so it shares the second row with the status chip. */}
             <button
               type="button"
               onClick={() => loadDashboard(true)}
               disabled={loading || syncing}
-              className={buttonClass('secondary', 'md')}
+              className={buttonClass('secondary', 'md', 'max-sm:w-10 max-sm:flex-none max-sm:px-0')}
               title="화면 데이터 새로고침"
+              aria-label="화면 갱신"
             >
-              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}화면 갱신
+              {loading ? <Loader2 size={16} className="animate-spin" /> : <RefreshCw size={16} />}<span className="max-sm:hidden">화면 갱신</span>
             </button>
             <button
               type="button"
+              data-primary
               onClick={handleSync}
               disabled={loading || syncing || data?.configured === false}
-              className={buttonClass('primary', 'md', 'max-sm:flex-1')}
+              className={buttonClass('primary', 'md')}
             >
               {syncing ? <Loader2 size={15} className="animate-spin" /> : <PackageCheck size={15} />}
               채널 재고 수집
@@ -918,48 +896,39 @@ export default function InventoryClient() {
       {/* The warning sits directly on the numbers it affects. */}
       <section aria-label="재고 요약" className="space-y-2">
         {data?.warnings?.length ? <InventoryWarnings warnings={data.warnings} /> : null}
-        <div className="grid min-w-0 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
-          <StatCard icon={<Boxes size={20} />} label="전체상품" value={formatNumber(summary?.masterCount)} sub="등록된 관리 상품" unknown={summaryUnknown} />
+        {/* Phones: values only in a compact 3-column grid, so the list starts on the first screen. */}
+        <div className="grid min-w-0 grid-cols-3 gap-2 sm:gap-3 lg:grid-cols-5">
+          <StatCard className={statCardClass} icon={<Boxes />} label="전체상품" value={statValue(formatNumber(summary?.masterCount))} caption="등록된 관리 상품" />
           <StatCard
-            icon={<Database size={20} />}
+            className={statCardClass}
+            icon={<Database />}
             label="총 재고"
-            value={monitorUnavailable || coupangStale ? '확인 불가' : formatNumber(summary?.totalStock)}
-            sub={<InventoryStockSub naver={summary?.naverStock} coupang={summary?.coupangStock} coupangStale={coupangStale} />}
-            unknown={summaryUnknown}
+            value={statValue(monitorUnavailable || coupangStale ? '확인 불가' : formatNumber(summary?.totalStock))}
+            caption={summaryUnknown ? '확인 불가' : <InventoryStockSub naver={summary?.naverStock} coupang={summary?.coupangStock} coupangStale={coupangStale} />}
           />
-          <StatCard icon={<PackageCheck size={20} />} label="입고대기" value={formatNumber(summary?.totalInboundPending)} sub="입고 예정 수량" unknown={summaryUnknown} />
+          <StatCard className={statCardClass} icon={<PackageCheck />} label="입고대기" value={statValue(formatNumber(summary?.totalInboundPending))} caption={summaryUnknown ? '확인 불가' : '입고 예정 수량'} />
           <StatCard
-            icon={<AlertCircle size={20} />}
-            label="미연결 채널 SKU"
-            value={formatNumber(summary?.unlinkedProducts)}
-            sub="관리 상품과 연결 안 됨"
-            alert={(summary?.unlinkedProducts ?? 0) > 0}
-            unknown={summaryUnknown}
+            className={statCardClass}
+            icon={<AlertCircle />}
+            label="미매칭 SKU"
+            value={statValue(formatNumber(summary?.unlinkedProducts), (summary?.unlinkedProducts ?? 0) > 0)}
+            caption={summaryUnknown ? '확인 불가' : '관리 상품과 매칭 안 된 채널 SKU'}
           />
           <StatCard
-            icon={<WalletCards size={20} />}
+            className={`${statCardClass} col-span-2 sm:col-span-2 lg:col-span-1`}
+            icon={<WalletCards />}
             label="재고가치"
-            value={monitorUnavailable || coupangStale ? '확인 불가' : formatMoney(summary?.stockCost)}
-            sub="현재 재고 원가 기준"
-            unknown={summaryUnknown}
-            className="col-span-2 sm:col-span-1"
+            value={statValue(monitorUnavailable || coupangStale ? '확인 불가' : summary?.stockCost === null || summary?.stockCost === undefined ? '-' : formatNumber(summary.stockCost))}
+            unit={summaryUnknown || monitorUnavailable || coupangStale || summary?.stockCost === null || summary?.stockCost === undefined ? undefined : '원'}
+            caption={summaryUnknown ? '확인 불가' : '현재 재고 원가 기준'}
           />
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-label="재고 목록">
-        <div className="space-y-2 border-b border-slate-200 p-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-2">
-            <div className="flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/40 sm:basis-auto sm:min-w-[300px]">
-              <Search size={17} className="shrink-0 text-slate-400" />
-              <input
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-                placeholder="상품명, 링크상품, 키워드 검색"
-                aria-label="재고 검색"
-                className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] font-bold text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
-              />
-            </div>
+      <section className="ux-panel overflow-hidden" aria-label="재고 목록">
+        {/* One Tabs row switches what the list is; the status filter below it is a row of outline chips. */}
+        <div className="space-y-3 border-b border-slate-200 p-3">
+          <div className="flex min-w-0 items-center gap-2">
             <Tabs
               aria-label="목록 종류"
               items={tableModeTabs.map((tab) => ({
@@ -976,7 +945,7 @@ export default function InventoryClient() {
               type="button"
               onClick={handleDownload}
               disabled={!activeRowsCount}
-              className={buttonClass('secondary', 'md', 'ml-auto')}
+              className={buttonClass('secondary', 'md', 'ml-auto max-sm:w-10 max-sm:px-0')}
               aria-label="CSV 다운로드"
               title="CSV 다운로드"
             >
@@ -984,14 +953,26 @@ export default function InventoryClient() {
               <span className="hidden sm:inline">CSV 다운로드</span>
             </button>
           </div>
-          {tableMode === 'masters' ? (
-            <Tabs
-              aria-label="재고 필터"
-              items={filterOptions.map((option) => ({ key: option.value, label: option.label, count: filterCounts[option.value] }))}
-              value={filter}
-              onChange={setFilter}
-            />
-          ) : null}
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <div className="flex h-10 min-w-0 flex-1 basis-full items-center gap-2 rounded-lg border border-[var(--input-border)] bg-white px-3 focus-within:border-brand-orange focus-within:ring-2 focus-within:ring-brand-orange/15 sm:basis-auto sm:min-w-[300px] sm:max-w-[420px]">
+              <Search size={17} className="shrink-0 text-slate-400" />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="상품명, 링크상품, 키워드 검색"
+                aria-label="재고 검색"
+                className="h-10 min-w-0 flex-1 border-0 bg-transparent text-[13px] font-normal text-slate-900 shadow-none outline-none placeholder:text-slate-400 focus:shadow-none"
+              />
+            </div>
+            {tableMode === 'masters' ? (
+              <FilterChips
+                aria-label="재고 필터"
+                items={filterOptions.map((option) => ({ key: option.value, label: option.label, count: filterCounts[option.value] }))}
+                value={filter}
+                onChange={setFilter}
+              />
+            ) : null}
+          </div>
         </div>
 
         {loading && !data ? (
@@ -1016,7 +997,7 @@ export default function InventoryClient() {
         )}
 
         {!loading && data ? (
-          <footer className="flex flex-col gap-3 border-t border-slate-200 px-4 py-3 text-[12px] font-bold text-slate-500 sm:flex-row sm:items-center sm:justify-between">
+          <footer className="flex flex-row flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-[12px] font-bold text-slate-500">
             <div className="flex flex-wrap items-center gap-3">
               <span className="tabular-nums">
                 총 <strong className="text-slate-900">{formatNumber(activeRowsCount)}</strong>개 중{' '}
@@ -1027,13 +1008,13 @@ export default function InventoryClient() {
                 <select
                   value={pageSize}
                   onChange={(event) => setPageSize(Number(event.target.value) as (typeof pageSizeOptions)[number])}
-                  className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-[12px] font-black text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
+                  className={selectClass(true, 'h-9 w-auto text-[12px]')}
                 >
                   {pageSizeOptions.map((size) => <option key={size} value={size}>{size}개씩 보기</option>)}
                 </select>
               </label>
             </div>
-            <nav className="flex flex-wrap items-center gap-1" aria-label="재고 목록 페이지">
+            <nav className="ml-auto flex flex-wrap items-center gap-1" aria-label="재고 목록 페이지">
               <button
                 type="button"
                 onClick={() => setPage((current) => Math.max(1, current - 1))}

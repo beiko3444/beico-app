@@ -7,17 +7,20 @@ import { Download, ExternalLink, FileText, Paperclip, Plus, X, ZoomIn } from 'lu
 import Modal from '@/components/Modal'
 import { getPartnerBusinessRegistrationUrl } from '@/lib/partner-business-registration-url'
 import Button, { buttonClass } from '@/components/ui/Button'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
 
 interface PartnerFormProps {
     initialData?: any
     trigger?: React.ReactNode
 }
 
-const inputClass =
-    'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-[13px] text-slate-900 transition ' +
-    'focus:border-brand-orange focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
-const labelClass = 'mb-1.5 block text-[12px] font-bold text-slate-600'
-const legendClass = 'mb-3 text-[14px] font-black text-slate-900'
+const inputClass = fieldClass()
+const legendClass = 'mb-3 text-[14px] font-extrabold text-slate-900'
+
+function Required() {
+    return <span className="ml-0.5 text-red-600" aria-hidden="true">*</span>
+}
 
 function TriggerButton() {
     return (
@@ -195,7 +198,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
 
     if (!isOpen) {
         return (
-            <div onClick={() => setIsOpen(true)} className="inline-block">
+            <div onClick={() => setIsOpen(true)} className="inline-block max-sm:[&>button]:w-full" data-primary={trigger ? undefined : ''}>
                 {trigger || <TriggerButton />}
             </div>
         )
@@ -218,23 +221,16 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
             : formData.businessRegistrationUrl
 
     const modalContent = (
-        <Modal label="파트너 정보" onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-black/50 p-3 sm:p-4">
+        <Modal label="파트너 정보" onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-slate-950/50 p-3 sm:p-4">
             <div
                 className="relative flex max-h-[95vh] w-full min-w-0 max-w-2xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 px-5 py-4 sm:px-6">
-                    <h3 className="text-lg font-black text-slate-900">
+                    <h3 className="text-lg font-extrabold text-slate-900">
                         {initialData ? '파트너 정보 수정' : '새 파트너 계정 등록'}
                     </h3>
-                    <button
-                        type="button"
-                        onClick={() => setIsOpen(false)}
-                        aria-label="파트너 정보 닫기"
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-                    >
-                        <X size={18} />
-                    </button>
+                    <ModalCloseButton onClick={() => setIsOpen(false)} label="파트너 정보 닫기" className="-mr-2" />
                 </div>
                 <form
                     id={formId}
@@ -255,16 +251,16 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                         <legend className={legendClass}>계정</legend>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                             <div>
-                                <label className={labelClass}>로그인 아이디</label>
-                                <input name="username" type="text" value={formData.username} onChange={handleChange} className={inputClass} required />
+                                <label className={labelClass}>로그인 아이디<Required /></label>
+                                <input name="username" type="text" value={formData.username} onChange={handleChange} className={inputClass} required placeholder="예: outlet01" autoComplete="off" />
                             </div>
                             <div>
-                                <label className={labelClass}>비밀번호 {initialData && '(변경 시에만 입력)'}</label>
+                                <label className={labelClass}>비밀번호{initialData ? ' (변경 시에만 입력)' : <Required />}</label>
                                 <input name="password" type="password" value={formData.password} onChange={handleChange} className={inputClass} required={!initialData} placeholder={initialData ? '••••••••' : '비밀번호 입력'} />
                             </div>
                             <div>
                                 <label className={labelClass}>파트너 등급</label>
-                                <select name="grade" value={formData.grade} onChange={handleChange} className={`${inputClass} font-bold`}>
+                                <select name="grade" value={formData.grade} onChange={handleChange} className={selectClass(Boolean(formData.grade))}>
                                     <option value="A">A 등급 (최적가)</option>
                                     <option value="B">B 등급</option>
                                     <option value="C">C 등급 (기본)</option>
@@ -273,7 +269,7 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                             </div>
                             <div>
                                 <label className={labelClass}>계정 권한</label>
-                                <select name="role" value={formData.role} onChange={handleChange} className={`${inputClass} font-bold`}>
+                                <select name="role" value={formData.role} onChange={handleChange} className={selectClass(Boolean(formData.role))}>
                                     <option value="PARTNER">일반 파트너</option>
                                     <option value="ADMIN">최고 관리자</option>
                                 </select>
@@ -285,20 +281,20 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                         <legend className={`${legendClass} float-left w-full`}>사업자</legend>
                         <div className="clear-both grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                             <div>
-                                <label className={labelClass}>상호명</label>
-                                <input name="name" type="text" value={formData.name} onChange={handleChange} className={inputClass} required />
+                                <label className={labelClass}>상호명<Required /></label>
+                                <input name="name" type="text" value={formData.name} onChange={handleChange} className={inputClass} required placeholder="예: 아웃렛피싱 주식회사" />
                             </div>
                             <div>
                                 <label className={labelClass}>담당자명</label>
-                                <input name="representativeName" type="text" value={formData.representativeName} onChange={handleChange} className={inputClass} placeholder="성함 입력" />
+                                <input name="representativeName" type="text" value={formData.representativeName} onChange={handleChange} className={inputClass} placeholder="예: 홍길동" />
                             </div>
                             <div>
                                 <label className={labelClass}>사업자 등록 번호</label>
-                                <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className={`${inputClass} tabular-nums`} placeholder="숫자만 입력" />
+                                <input name="businessRegNumber" type="text" value={formData.businessRegNumber} onChange={handleChange} className={fieldClass('tabular-nums')} placeholder="예: 1234567890 (숫자만)" />
                             </div>
                             <div>
-                                <label className={labelClass}>국적</label>
-                                <select name="country" value={formData.country} onChange={handleChange} className={`${inputClass} font-bold`} required>
+                                <label className={labelClass}>국적<Required /></label>
+                                <select name="country" value={formData.country} onChange={handleChange} className={selectClass(Boolean(formData.country))} required>
                                     <option value="">국적 선택</option>
                                     <option value="Japan">일본</option>
                                     <option value="Korea">한국</option>
@@ -400,16 +396,16 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
                         <div className="clear-both grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-4">
                             <div>
                                 <label className={labelClass}>전화번호</label>
-                                <input name="contact" type="text" value={formData.contact} onChange={handleChange} className={`${inputClass} tabular-nums`} placeholder="010-0000-0000" />
+                                <input name="contact" type="text" value={formData.contact} onChange={handleChange} className={fieldClass('tabular-nums')} placeholder="예: 010-0000-0000" />
                             </div>
                             <div>
                                 <label className={labelClass}>이메일 주소</label>
-                                <input name="email" type="email" value={formData.email} onChange={handleChange} className={inputClass} placeholder="example@email.com" />
+                                <input name="email" type="email" value={formData.email} onChange={handleChange} className={inputClass} placeholder="예: name@example.com" />
                             </div>
                         </div>
                         <div>
                             <label className={labelClass}>배송지 주소</label>
-                            <input name="address" type="text" value={formData.address} onChange={handleChange} className={inputClass} placeholder="상세 주소 입력" />
+                            <input name="address" type="text" value={formData.address} onChange={handleChange} className={inputClass} placeholder="예: 서울시 관악구 호암로 453 1층" />
                         </div>
                     </fieldset>
                 </form>
@@ -435,14 +431,14 @@ export default function PartnerForm({ initialData, trigger }: PartnerFormProps) 
 
     return (
         <>
-            <div onClick={() => setIsOpen(true)} className="inline-block">
+            <div onClick={() => setIsOpen(true)} className="inline-block max-sm:[&>button]:w-full" data-primary={trigger ? undefined : ''}>
                 {trigger || <TriggerButton />}
             </div>
             {isOpen && mounted && createPortal(modalContent, document.body)}
 
             {/* Image Enlargement Modal */}
             {enlargedImage && mounted && createPortal(
-                <Modal label="사업자등록증 미리보기" onClose={() => setEnlargedImage(null)} className="flex flex-col items-center justify-center bg-black/90 p-4 backdrop-blur-sm">
+                <Modal label="사업자등록증 미리보기" onClose={() => setEnlargedImage(null)} className="flex flex-col items-center justify-center bg-slate-950/90 p-4">
                     <div className="relative w-full max-w-5xl max-h-[90vh] flex flex-col items-center">
                         <div className="absolute top-0 right-0 -translate-y-full mb-4">
                             <button

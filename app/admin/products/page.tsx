@@ -5,6 +5,7 @@ import ProductTable from "./ProductTable"
 
 // Force dynamic to ensure we get fresh data
 export const dynamic = 'force-dynamic'
+export const metadata = { title: '상품 관리' }
 
 const productSelect = Prisma.validator<Prisma.ProductSelect>()({
     id: true,

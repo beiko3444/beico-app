@@ -3,11 +3,16 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { calculateOrderFinalAmount } from '@/lib/orderAmount'
+import { orderStatusMeta } from '@/lib/orderStatus'
+import { formatDateTime, formatWon } from '@/lib/format'
 import Modal from '@/components/Modal'
+import Badge from '@/components/ui/Badge'
 import { buttonClass } from '@/components/ui/buttonClass'
+import { fieldClass, labelClass, selectClass } from '@/components/ui/field'
 import {
   AlertTriangle,
   Check,
+  ChevronDown,
   CircleCheckBig,
   Copy,
   FileText,
@@ -17,7 +22,7 @@ import {
   Truck,
 } from 'lucide-react'
 
-type Tone = 'blue' | 'green' | 'orange' | 'red' | 'gray'
+const formatCurrency = formatWon
 
 interface OrderDetailPageProps {
   order?: OrderRecord | null
@@ -80,10 +85,7 @@ interface NormalizedOrderDetail {
   orderNumber: string
   createdAtText: string
   createdAtRaw: string
-  statusLabel: string
-  statusTone: Tone
   channelLabel: string
-  channelStatus: string
   taxInvoiceIssued: boolean
   customer: {
     company: string
@@ -121,12 +123,9 @@ const sampleOrderData: NormalizedOrderDetail = {
   id: '20260504001',
   orderId: 'sample-order-id',
   orderNumber: '20260504001',
-  createdAtText: '2026-05-04 10:29',
+  createdAtText: '2026.05.04 10:29',
   createdAtRaw: '2026-05-04T10:29:00+09:00',
-  statusLabel: '입금확인',
-  statusTone: 'green',
   channelLabel: '주문 프로세스',
-  channelStatus: '입금확인',
   taxInvoiceIssued: false,
   customer: {
     company: '아울렛낚시',
@@ -169,22 +168,6 @@ const sampleOrderData: NormalizedOrderDetail = {
   rawStatus: 'DEPOSIT_COMPLETED',
 }
 
-export function formatCurrency(value: number) {
-  return `${Math.round(value).toLocaleString('ko-KR')}원`
-}
-
-export function formatDateTime(value: string | Date | null | undefined) {
-  if (!value) return '-'
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) return '-'
-  const yyyy = date.getFullYear()
-  const mm = String(date.getMonth() + 1).padStart(2, '0')
-  const dd = String(date.getDate()).padStart(2, '0')
-  const hh = String(date.getHours()).padStart(2, '0')
-  const min = String(date.getMinutes()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd} ${hh}:${min}`
-}
-
 function toIsoString(value: string | Date | null | undefined) {
   if (!value) return sampleOrderData.createdAtRaw
   const date = value instanceof Date ? value : new Date(value)
@@ -200,18 +183,9 @@ function parseTrackingNumbers(value: string | null | undefined) {
     .filter(Boolean)
 }
 
-function mapStatusMeta(status: string, hasTracking: boolean, taxInvoiceIssued: boolean): { label: string; tone: Tone } {
-  if (status === 'CANCELED') return { label: '주문취소', tone: 'red' }
-  if (status === 'COMPLETED') return { label: '거래완료', tone: 'green' }
-  if (hasTracking || status === 'SHIPPED') return { label: taxInvoiceIssued ? '배송완료' : '배송진행', tone: 'blue' }
-  if (status === 'DEPOSIT_COMPLETED') return { label: '입금확인', tone: 'green' }
-  if (status === 'APPROVED' || status === 'PENDING_DEPOSIT' || status === 'PENDING') return { label: '입금대기', tone: 'orange' }
-  return { label: '주문접수', tone: 'gray' }
-}
-
-/** Status label/tone for a raw order record — used by the collapsed summary row. */
-export function getOrderStatusMeta(order: OrderRecord): { label: string; tone: Tone } {
-  return mapStatusMeta(order.status, parseTrackingNumbers(order.trackingNumber).length > 0, Boolean(order.taxInvoiceIssued))
+/** Status for a raw order record — the same lib/orderStatus vocabulary the order list uses. */
+export function getOrderStatusMeta(order: OrderRecord) {
+  return orderStatusMeta(order.status, parseTrackingNumbers(order.trackingNumber).length > 0)
 }
 
 function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail {
@@ -239,7 +213,6 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
   })
 
   const payment = calculateOrderFinalAmount(order.items || [], order.shippingFeeOverride)
-  const statusMeta = mapStatusMeta(order.status, trackingNumbers.length > 0, Boolean(order.taxInvoiceIssued))
 
   return {
     id: orderNumber,
@@ -247,10 +220,7 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
     orderNumber,
     createdAtText,
     createdAtRaw,
-    statusLabel: statusMeta.label,
-    statusTone: statusMeta.tone,
     channelLabel: '주문 프로세스',
-    channelStatus: statusMeta.label,
     taxInvoiceIssued: Boolean(order.taxInvoiceIssued),
     customer: {
       company: partnerProfile?.businessName || order.user?.name || '거래처 정보 없음',
@@ -282,36 +252,6 @@ function buildOrderDetailData(order?: OrderRecord | null): NormalizedOrderDetail
   }
 }
 
-export function toneClasses(tone: Tone) {
-  switch (tone) {
-    case 'blue':
-      return 'border-blue-200 bg-blue-50 text-blue-700'
-    case 'green':
-      return 'border-emerald-200 bg-emerald-50 text-emerald-700'
-    case 'orange':
-      return 'border-orange-200 bg-orange-50 text-orange-700'
-    case 'red':
-      return 'border-red-200 bg-red-50 text-red-700'
-    default:
-      return 'border-slate-200 bg-slate-50 text-slate-700'
-  }
-}
-
-function toneAccentClasses(tone: Tone) {
-  switch (tone) {
-    case 'blue':
-      return 'bg-blue-500'
-    case 'green':
-      return 'bg-emerald-500'
-    case 'orange':
-      return 'bg-orange-500'
-    case 'red':
-      return 'bg-red-500'
-    default:
-      return 'bg-slate-400'
-  }
-}
-
 function DetailCard({
   title,
   icon,
@@ -328,21 +268,15 @@ function DetailCard({
   children: React.ReactNode
 }) {
   return (
-    <section className={`overflow-hidden rounded-2xl border ${
-      muted
-        ? 'border-slate-300 bg-slate-50 shadow-[0_8px_22px_rgba(15,23,42,0.04)]'
-        : 'border-[#E6EAF2] bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)]'
-    } ${className}`}>
-      <div className={`flex items-center justify-between gap-3 border-b px-6 py-5 ${
-        muted ? 'border-slate-300 bg-slate-100/70' : 'border-[#E6EAF2]'
-      }`}>
-        <div className="flex items-center gap-2">
-          {icon ? <span className="text-[#64748B]">{icon}</span> : null}
-          <h3 className="text-[17px] font-extrabold tracking-tight text-[#0F172A]">{title}</h3>
+    <section className={`ux-panel overflow-hidden ${muted ? 'bg-slate-50' : ''} ${className}`}>
+      <div className="flex items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3.5 md:px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          {icon ? <span className="text-slate-400">{icon}</span> : null}
+          <h3 className="text-[15px] font-extrabold text-slate-900">{title}</h3>
         </div>
         {actions}
       </div>
-      <div className="p-6">{children}</div>
+      <div className="p-4 md:p-5">{children}</div>
     </section>
   )
 }
@@ -352,24 +286,25 @@ function CopyButton({ copied, onClick }: { copied: boolean; onClick: () => void 
     <button
       type="button"
       onClick={onClick}
-      className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-400 transition hover:border-slate-300 hover:text-slate-700"
+      aria-label="복사"
+      title="복사"
+      className={buttonClass('ghost', 'icon', 'text-slate-400 hover:text-slate-700')}
     >
       {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
     </button>
   )
 }
 
+// Plain label/value pairs on the summary card — no box of their own, the total stands out by size and weight only.
 function SummaryMetric({ label, value, highlight = false }: { label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`min-w-0 border-slate-200 px-4 py-4 text-center sm:border-l first:sm:border-l-0 ${
-      highlight ? 'bg-blue-50/70' : 'bg-white'
-    }`}>
-      <div className="truncate text-[12px] font-bold text-slate-500">{label}</div>
-      <div className={`mt-2 whitespace-nowrap font-black tracking-tight ${
-        highlight ? 'text-[22px] text-blue-600' : 'text-[17px] text-slate-950'
+    <div className={`min-w-0 ${highlight ? 'col-span-2 @xl:col-span-1' : ''}`}>
+      <dt className="truncate text-[12px] font-semibold text-slate-500">{label}</dt>
+      <dd className={`mt-1 whitespace-nowrap tabular-nums text-slate-950 ${
+        highlight ? 'text-[20px] font-extrabold' : 'text-[15px] font-bold'
       }`}>
         {value}
-      </div>
+      </dd>
     </div>
   )
 }
@@ -390,12 +325,12 @@ function InfoField({
   wide?: boolean
 }) {
   return (
-    <div className={`min-h-[86px] rounded-xl border border-[#E6EAF2] bg-[#F8FAFC] px-4 py-4 ${wide ? 'xl:col-span-2' : ''}`}>
-      <div className="flex items-center justify-between gap-3">
-        <div className="text-[11px] font-bold text-slate-500">{label}</div>
+    <div className={`min-w-0 rounded-lg bg-[var(--surface)] px-3 py-2.5 ${wide ? '@3xl:col-span-2' : ''}`}>
+      <div className="flex min-h-8 items-center justify-between gap-3">
+        <div className="text-[12px] font-semibold text-slate-500">{label}</div>
         {copyKey ? <CopyButton copied={copiedField === copyKey} onClick={() => onCopy(copyKey, value)} /> : null}
       </div>
-      <div className="mt-2 break-words text-[15px] font-black leading-6 text-slate-900">{value}</div>
+      <div className="break-words text-[14px] font-bold leading-6 text-slate-900">{value}</div>
     </div>
   )
 }
@@ -453,19 +388,8 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
   }, [toastMessage])
 
   const isCompletedOrder = currentStatus === 'COMPLETED'
-  const currentStatusMeta = useMemo(
-    () => (isCompletedOrder
-      ? { label: '거래완료', tone: 'green' as Tone }
-      : mapStatusMeta(currentStatus, trackingNumber.trim().length > 0, taxInvoiceIssued)),
-    [currentStatus, trackingNumber, taxInvoiceIssued, isCompletedOrder]
-  )
-  const orderAccentClass = isCompletedOrder ? 'bg-slate-500' : toneAccentClasses(currentStatusMeta.tone)
-  const orderShellClass = isCompletedOrder
-    ? 'relative overflow-hidden rounded-[24px] border border-slate-300 bg-slate-100 px-4 py-5 shadow-[0_10px_28px_rgba(15,23,42,0.07)] md:px-6'
-    : 'relative overflow-hidden rounded-[24px] border border-blue-100 bg-white px-4 py-5 shadow-[0_16px_36px_rgba(15,23,42,0.08)] ring-1 ring-blue-50 md:px-6'
-  const summaryCardClass = isCompletedOrder
-    ? 'rounded-2xl border border-slate-300 bg-white/80 p-5 shadow-[0_8px_22px_rgba(15,23,42,0.04)] lg:p-6'
-    : 'rounded-2xl border border-[#E6EAF2] bg-[#FAFCFF] p-5 shadow-[0_10px_28px_rgba(15,23,42,0.05)] lg:p-6'
+  // Same words and colours as the order list: read from the saved tracking number, not the one being typed.
+  const currentStatusMeta = orderStatusMeta(currentStatus, detail.shipping.trackingNumber.length > 0)
   const canIssueDocuments = currentStatus !== 'CANCELED'
   const showCopyToast = (fieldKey: string, value: string) => {
     if (!value || value === '-') return
@@ -542,7 +466,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           <div className="flex items-center justify-end gap-1">
             <input type="number" min="1" max="1000000" step="1"
               aria-label={`${product.name} 주문 수량`}
-              className="h-9 w-24 rounded-lg border border-slate-300 bg-white px-2 text-right text-sm"
+              className={fieldClass('h-9 w-24 px-2 text-right')}
               value={quantityInput} disabled={Boolean(loadingAction)}
               onChange={(event) => setQuantityInput(event.target.value)}
               onKeyDown={(event) => {
@@ -551,13 +475,13 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
               }} />
             <span>개</span>
           </div>
-          <div className="flex justify-end gap-2 text-xs">
+          <div className="flex justify-end gap-2">
+            <button type="button" disabled={Boolean(loadingAction)} onClick={() => setEditingQuantityId(null)}
+              className={buttonClass('secondary', 'sm')}>취소</button>
             <button type="button" disabled={Boolean(loadingAction)} onClick={() => void handleQuantitySave()}
-              className="rounded-md bg-slate-950 px-2 py-1 text-white disabled:opacity-50">
+              className={buttonClass('primary', 'sm')}>
               {loadingAction === 'quantity' ? '저장 중…' : '저장'}
             </button>
-            <button type="button" disabled={Boolean(loadingAction)} onClick={() => setEditingQuantityId(null)}
-              className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-50">취소</button>
           </div>
         </div>
       )
@@ -567,7 +491,7 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         <span>{product.quantity.toLocaleString('ko-KR')}개</span>
         {order && !taxInvoiceIssued ? (
           <button type="button" aria-label={`${product.name} 수량 수정`} disabled={Boolean(loadingAction)}
-            className="ml-2 inline-flex min-h-11 min-w-11 items-center justify-center rounded-lg px-2 text-xs font-bold text-blue-600 hover:bg-blue-50 disabled:opacity-50" onClick={() => {
+            className={buttonClass('ghost', 'sm', 'ml-1 min-h-11 min-w-11 px-2 text-slate-700 underline underline-offset-2')} onClick={() => {
               setEditingQuantityId(product.id)
               setQuantityInput(String(product.quantity))
             }}>수정</button>
@@ -669,25 +593,10 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
 
 
   return (
-    <div
-      className={orderShellClass}
-      style={{
-        ['--page-bg' as string]: '#F5F7FB',
-        ['--card-bg' as string]: '#FFFFFF',
-        ['--card-border' as string]: '#E6EAF2',
-        ['--text-primary' as string]: '#0F172A',
-        ['--text-secondary' as string]: '#475569',
-        ['--text-muted' as string]: '#8492A6',
-        ['--primary' as string]: '#2563EB',
-        ['--primary-dark' as string]: '#1054E8',
-        ['--success' as string]: '#10B981',
-        ['--danger' as string]: '#EF4444',
-      }}
-    >
-      <div className={`absolute inset-y-0 left-0 w-2 ${orderAccentClass}`} aria-hidden="true" />
-      <div className="mx-auto max-w-[1440px] space-y-6">
+    // A plain stack: no outer shell, accent bar or local blue palette — status lives in the Badge only.
+    <div className="@container space-y-4 p-4 md:space-y-6 md:p-6">
       {toastMessage ? (
-        <div className="fixed right-6 top-24 z-50 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-bold text-white shadow-2xl">
+        <div className="fixed right-6 top-24 z-50 rounded-xl bg-slate-900 px-4 py-2 text-[12px] font-bold text-white shadow-2xl" role="status">
           {toastMessage}
         </div>
       ) : null}
@@ -704,11 +613,11 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         >
           <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-6 shadow-2xl">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-10 w-10 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-50 text-red-600">
                 <AlertTriangle className="h-5 w-5" />
               </div>
               <div>
-                <h4 className="text-lg font-black text-slate-900">주문을 삭제하시겠습니까?</h4>
+                <h4 className="text-lg font-extrabold text-slate-900">주문을 삭제하시겠습니까?</h4>
                 <p className="mt-2 text-[13px] leading-6 text-slate-500">
                   삭제된 주문은 복구할 수 없습니다. 정말 삭제하려면 주문번호 <strong className="text-slate-900">{detail.orderNumber}</strong> 를 입력하세요.
                 </p>
@@ -716,9 +625,10 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
             <input
               type="text"
+              aria-label="삭제할 주문번호"
               value={deleteConfirmText}
               onChange={(event) => setDeleteConfirmText(event.target.value)}
-              className="mt-5 w-full rounded-xl border border-slate-200 px-4 py-3 text-[14px] font-bold text-slate-900 outline-none transition focus:border-red-400"
+              className={fieldClass('mt-5')}
               placeholder={detail.orderNumber}
             />
             <div className="mt-5 flex justify-end gap-2">
@@ -745,73 +655,61 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
         </Modal>
       ) : null}
 
-      <div className={summaryCardClass}>
-        <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 space-y-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex min-w-0 items-center gap-3">
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${
-                    isCompletedOrder ? 'bg-slate-200 text-slate-500' : 'bg-[#DCFCEB] text-[#10B981]'
-                  }`}>
-                    <Package className="h-6 w-6" />
-                  </div>
-                  <div className="min-w-0">
-                    <h2 className={`break-keep text-[24px] font-black leading-tight tracking-tight md:text-[28px] ${
-                      isCompletedOrder ? 'text-slate-700' : 'text-[#0F172A]'
-                    }`}>{detail.customer.company}</h2>
-                    <div className={`mt-1 whitespace-nowrap text-[18px] font-black tracking-tight md:text-[21px] ${
-                      isCompletedOrder ? 'text-slate-600' : 'text-[#0B63E5]'
-                    }`}>주문 #{detail.orderNumber}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-wrap items-center gap-2">
-                <span className={`inline-flex h-9 items-center rounded-xl border px-4 text-[14px] font-black ${toneClasses(currentStatusMeta.tone)}`}>{currentStatusMeta.label}</span>
-                <span className="inline-flex h-9 items-center rounded-xl border border-slate-200 bg-white px-4 text-[13px] font-bold text-[#64748B]">
-                  주문일시 {detail.createdAtText}
-                </span>
-              </div>
-            </div>
-
-            <div className="grid overflow-x-auto rounded-2xl border border-[#DCE5F0] bg-white shadow-[0_8px_22px_rgba(15,23,42,0.04)] sm:grid-cols-3 xl:grid-cols-[repeat(5,220px)]">
-              <SummaryMetric label="상품 공급가" value={formatCurrency(detail.payment.productSupplyPrice)} />
-              <SummaryMetric label="배송비" value={formatCurrency(detail.payment.shippingFee)} />
-              <SummaryMetric label="부가세" value={formatCurrency(detail.payment.vat)} />
-              <SummaryMetric label="수량" value={`${detail.payment.totalQuantity.toLocaleString('ko-KR')}개`} />
-              <SummaryMetric label="최종 결제금액" value={formatCurrency(detail.payment.finalAmount)} highlight />
-            </div>
+      <section className={`ux-panel space-y-4 p-4 md:p-5 ${isCompletedOrder ? 'bg-slate-50' : ''}`}>
+        {/* The drawer title already names the order number, so the card leads with the business. */}
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <h2 className={`break-keep text-[20px] font-extrabold leading-tight ${isCompletedOrder ? 'text-slate-600' : 'text-slate-900'}`}>{detail.customer.company}</h2>
+            <Badge tone={currentStatusMeta.tone}>{currentStatusMeta.label}</Badge>
           </div>
-
-          <div className="grid content-start gap-3 sm:grid-cols-2 2xl:grid-cols-1">
-            <button type="button" onClick={handlePrintStatement} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50">
-              <FileText className="h-4 w-4 shrink-0" /> 거래명세표 출력
-            </button>
-            <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-[#D8DEE9] bg-white px-4 text-[13px] font-extrabold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50">
-              <ReceiptText className="h-4 w-4 shrink-0" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
-            </button>
-            <details className="rounded-xl border border-slate-200 p-3 sm:col-span-2 2xl:col-span-1"><summary className="min-h-11 cursor-pointer py-3 text-sm font-semibold text-slate-600">주문 마감·삭제</summary><p className="mb-3 text-xs leading-5 text-slate-500">배송·계산서 처리 여부와 별도로 주문을 마감할 수 있습니다. 삭제는 복구할 수 없습니다.</p><div className="grid gap-2">            <button
-              type="button"
-              onClick={handleCompleteOrder}
-              disabled={currentStatus === 'CANCELED' || currentStatus === 'COMPLETED' || loadingAction === 'complete'}
-              className="inline-flex h-12 items-center justify-center gap-2 whitespace-nowrap rounded-xl border border-emerald-200 bg-emerald-50 px-4 text-[13px] font-extrabold text-emerald-700 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <CircleCheckBig className="h-4 w-4 shrink-0" /> {currentStatus === 'COMPLETED' ? '주문 마감됨' : loadingAction === 'complete' ? '마감 처리 중...' : '주문 마감 처리'}
-            </button>
-            <button
-              type="button"
-              onClick={() => setDeleteModalOpen(true)}
-              className="h-12 rounded-xl border border-red-200 bg-[#FFF7F7] px-4 text-[13px] font-extrabold text-red-500 transition hover:bg-red-50"
-            >
-              주문 삭제
-            </button>
-            </div></details>
-          </div>
+          <span className="whitespace-nowrap text-[13px] tabular-nums text-slate-500">주문일시 {detail.createdAtText}</span>
         </div>
-      </div>
 
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start">
-        <div className="min-w-0 space-y-6" style={{ containerType: 'inline-size', containerName: 'order-lines' }}>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[var(--border)] pt-4 @xl:grid-cols-3 @3xl:grid-cols-5">
+          <SummaryMetric label="상품 공급가" value={formatCurrency(detail.payment.productSupplyPrice)} />
+          <SummaryMetric label="배송비" value={formatCurrency(detail.payment.shippingFee)} />
+          <SummaryMetric label="부가세" value={formatCurrency(detail.payment.vat)} />
+          <SummaryMetric label="수량" value={`${detail.payment.totalQuantity.toLocaleString('ko-KR')}개`} />
+          <SummaryMetric label="최종 결제금액" value={formatCurrency(detail.payment.finalAmount)} highlight />
+        </dl>
+
+        <div className="grid grid-cols-2 gap-2 border-t border-[var(--border)] pt-4 @3xl:grid-cols-3">
+          <button type="button" onClick={handlePrintStatement} className={buttonClass('secondary', 'md', 'h-11 w-full')}>
+            <FileText className="h-4 w-4" /> 거래명세표 출력
+          </button>
+          <button type="button" onClick={handleIssueTaxInvoice} disabled={!canIssueDocuments || taxInvoiceIssued || loadingAction === 'tax-invoice'} className={buttonClass('secondary', 'md', 'h-11 w-full')}>
+            <ReceiptText className="h-4 w-4" /> {taxInvoiceIssued ? '계산서 발행완료' : '세금계산서 발행'}
+          </button>
+          <details className="group col-span-2 rounded-lg border border-[var(--border)] @3xl:col-span-1">
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 text-[13px] font-bold text-slate-600 [&::-webkit-details-marker]:hidden">
+              주문 마감·삭제
+              <ChevronDown className="h-4 w-4 shrink-0 text-slate-400 transition-transform group-open:rotate-180" aria-hidden="true" />
+            </summary>
+            <div className="space-y-2 px-3 pb-3">
+              <p className="text-xs leading-5 text-slate-500">배송·계산서 처리 여부와 별도로 주문을 마감할 수 있습니다. 삭제는 복구할 수 없습니다.</p>
+              <button
+                type="button"
+                onClick={handleCompleteOrder}
+                disabled={currentStatus === 'CANCELED' || currentStatus === 'COMPLETED' || loadingAction === 'complete'}
+                className={buttonClass('secondary', 'md', 'h-11 w-full')}
+              >
+                <CircleCheckBig className="h-4 w-4" /> {currentStatus === 'COMPLETED' ? '주문 마감됨' : loadingAction === 'complete' ? '마감 처리 중...' : '주문 마감 처리'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setDeleteModalOpen(true)}
+                className={buttonClass('danger', 'md', 'h-11 w-full')}
+              >
+                주문 삭제
+              </button>
+            </div>
+          </details>
+        </div>
+      </section>
+
+      {/* Phones: 배송 처리 (the one primary action) comes right after the summary, before the line items. */}
+      <div className="grid gap-4 md:gap-6 @4xl:grid-cols-[minmax(0,1fr)_320px] @4xl:items-start">
+        <div className="min-w-0 space-y-4 md:space-y-6" style={{ containerType: 'inline-size', containerName: 'order-lines' }}>
           <DetailCard
             title={`주문 상품 (총 ${detail.products.length}종 / ${detail.payment.totalQuantity.toLocaleString('ko-KR')}개${detail.payment.shippingFee > 0 ? ', 배송비 포함' : ''})`}
             icon={<Package className="h-4 w-4" />}
@@ -822,16 +720,16 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 ? '세금계산서를 취소한 뒤 수량과 배송비를 수정할 수 있습니다.'
                 : '품목별 수량 옆의 수정 버튼으로 변경하세요. 단가는 유지되며 상품금액·부가세·총액과 자동 배송비가 다시 계산됩니다. 직접 지정한 배송비는 유지됩니다.'}
             </p>
-            <div className="ux-order-line-table overflow-x-auto rounded-2xl border border-[#E6EAF2]">
+            <div className="ux-order-line-table overflow-x-auto rounded-lg border border-[var(--border)]">
               <table className="w-full min-w-[900px] border-collapse">
-                <thead className="bg-slate-50 text-left text-[12px] font-black text-slate-500">
+                <thead className="ux-thead text-left">
                   <tr>
-                    <th className="h-14 min-w-[320px] px-5 py-3">상품 정보</th>
-                    <th className="min-w-[150px] px-4 py-3 text-right">수량</th>
-                    <th className="w-[130px] px-4 py-3 text-right">단가</th>
-                    <th className="w-[140px] px-4 py-3 text-right">공급가</th>
-                    <th className="w-[130px] px-4 py-3 text-right">부가세</th>
-                    <th className="w-[150px] px-5 py-3 text-right">합계</th>
+                    <th className="min-w-[320px] px-5">상품 정보</th>
+                    <th className="min-w-[150px] px-4 text-right">수량</th>
+                    <th className="w-[130px] px-4 text-right">단가</th>
+                    <th className="w-[140px] px-4 text-right">공급가</th>
+                    <th className="w-[130px] px-4 text-right">부가세</th>
+                    <th className="w-[150px] px-5 text-right">합계</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -849,29 +747,29 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                             )}
                           </div>
                           <div className="min-w-0">
-                            <div className="line-clamp-2 break-keep text-[15px] font-black leading-5 text-slate-900">{product.name}</div>
-                            <div className={`mt-1.5 inline-flex rounded-full border px-2 py-0.5 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-[#FFF1E8] text-orange-600'}`}>{product.option}</div>
+                            <div className="line-clamp-2 break-keep text-[14px] font-bold leading-5 text-slate-900">{product.name}</div>
+                            <Badge outline className="mt-1.5">{product.option}</Badge>
                           </div>
                         </div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{renderQuantity(product)}</td>
-                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.unitPrice)}</td>
-                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.supplyPrice)}</td>
-                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-bold text-slate-800">{formatCurrency(product.vat)}</td>
-                      <td className="whitespace-nowrap px-5 py-4 text-right text-[15px] font-black text-slate-950">{formatCurrency(product.total)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-semibold tabular-nums text-slate-800">{renderQuantity(product)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-semibold tabular-nums text-slate-800">{formatCurrency(product.unitPrice)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-semibold tabular-nums text-slate-800">{formatCurrency(product.supplyPrice)}</td>
+                      <td className="whitespace-nowrap px-4 py-4 text-right text-[14px] font-semibold tabular-nums text-slate-800">{formatCurrency(product.vat)}</td>
+                      <td className="whitespace-nowrap px-5 py-4 text-right text-[14px] font-extrabold tabular-nums text-slate-950">{formatCurrency(product.total)}</td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
 
-            <div className="ux-order-line-cards space-y-3">
+            <ul className="ux-order-line-cards divide-y divide-[var(--border)] rounded-lg border border-[var(--border)]">
               {productRows.map((product) => (
-                <div key={product.id} className={`rounded-2xl border border-slate-200 p-4 ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
-                  <div className="flex gap-4">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+                <li key={product.id} className={`p-4 ${product.kind === 'shipping' ? 'bg-slate-50/70' : ''}`}>
+                  <div className="flex gap-3">
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[10px] border border-slate-200 bg-slate-50">
                       {product.kind === 'shipping' ? (
-                        <Truck className="h-7 w-7 text-slate-400" />
+                        <Truck className="h-6 w-6 text-slate-400" />
                       ) : product.imageUrl ? (
                         <img src={product.imageUrl} alt={product.name} className="h-full w-full object-cover" />
                       ) : (
@@ -879,70 +777,72 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                       )}
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="break-keep text-[15px] font-black leading-5 text-slate-900">{product.name}</div>
-                      <div className={`mt-2 inline-flex rounded-full border px-2.5 py-1 text-[11px] font-bold ${product.kind === 'shipping' ? 'border-blue-200 bg-blue-50 text-blue-700' : 'border-orange-200 bg-orange-50 text-orange-700'}`}>{product.option}</div>
+                      <div className="break-keep text-[14px] font-bold leading-5 text-slate-900">{product.name}</div>
+                      <Badge outline className="mt-1.5">{product.option}</Badge>
                     </div>
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-2 text-[12px]">
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">수량</span><div className="mt-1 font-bold text-slate-900">{renderQuantity(product)}</div></div>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">단가</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.unitPrice)}</div></div>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">공급가</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.supplyPrice)}</div></div>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">부가세</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.vat)}</div></div>
-                    <div className="rounded-xl bg-slate-50 px-3 py-2"><span className="text-slate-500">합계</span><div className="mt-1 whitespace-nowrap font-bold text-slate-900">{formatCurrency(product.total)}</div></div>
-                  </div>
-                </div>
+                  <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
+                    <div><dt className="text-slate-500">수량</dt><dd className="mt-0.5 font-bold tabular-nums text-slate-900">{renderQuantity(product)}</dd></div>
+                    <div><dt className="text-slate-500">단가</dt><dd className="mt-0.5 whitespace-nowrap font-bold tabular-nums text-slate-900">{formatCurrency(product.unitPrice)}</dd></div>
+                    <div><dt className="text-slate-500">공급가</dt><dd className="mt-0.5 whitespace-nowrap font-bold tabular-nums text-slate-900">{formatCurrency(product.supplyPrice)}</dd></div>
+                    <div><dt className="text-slate-500">부가세</dt><dd className="mt-0.5 whitespace-nowrap font-bold tabular-nums text-slate-900">{formatCurrency(product.vat)}</dd></div>
+                    <div><dt className="text-slate-500">합계</dt><dd className="mt-0.5 whitespace-nowrap font-extrabold tabular-nums text-slate-950">{formatCurrency(product.total)}</dd></div>
+                  </dl>
+                </li>
               ))}
-            </div>
+            </ul>
 
-            <div className="mt-4 grid gap-3 overflow-x-auto rounded-xl border border-[#E6EAF2] bg-[#F8FAFC] px-5 py-4 text-[14px] font-black text-slate-900 sm:grid-cols-2 xl:grid-cols-[repeat(5,180px)]">
-              <div className="flex items-center justify-between gap-3 xl:block">
-                <span className="text-slate-500">총 수량</span>
-                <div className="whitespace-nowrap xl:mt-1">{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</div>
+            <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[var(--border)] pt-4 text-[14px] font-bold text-slate-900 @2xl:grid-cols-5">
+              <div>
+                <dt className="text-[12px] font-semibold text-slate-500">총 수량</dt>
+                <dd className="mt-1 whitespace-nowrap tabular-nums">{detail.payment.totalQuantity.toLocaleString('ko-KR')}개</dd>
               </div>
-              <div className="flex items-center justify-between gap-3 xl:block">
-                <span className="text-slate-500">공급가</span>
-                <div className="whitespace-nowrap xl:mt-1">{formatCurrency(detail.payment.productSupplyPrice)}</div>
+              <div>
+                <dt className="text-[12px] font-semibold text-slate-500">공급가</dt>
+                <dd className="mt-1 whitespace-nowrap tabular-nums">{formatCurrency(detail.payment.productSupplyPrice)}</dd>
               </div>
-              <div className="flex items-center justify-between gap-3 xl:block">
-                <span className="text-slate-500">부가세</span>
-                <div className="whitespace-nowrap xl:mt-1">{formatCurrency(detail.payment.vat)}</div>
+              <div>
+                <dt className="text-[12px] font-semibold text-slate-500">부가세</dt>
+                <dd className="mt-1 whitespace-nowrap tabular-nums">{formatCurrency(detail.payment.vat)}</dd>
               </div>
-              <div className="flex items-center justify-between gap-3 xl:block">
-                <span className="text-slate-500">배송비</span>
-                <div className="whitespace-nowrap xl:mt-1">{formatCurrency(detail.payment.shippingFee)}</div>
-                <div className="mt-1 text-[10px] font-medium text-slate-500">
+              <div>
+                <dt className="text-[12px] font-semibold text-slate-500">배송비</dt>
+                <dd className="mt-1 whitespace-nowrap tabular-nums">{formatCurrency(detail.payment.shippingFee)}</dd>
+                <dd className="mt-1 text-[11px] font-medium text-slate-500">
                   {order?.shippingFeeOverride != null ? '관리자 지정 · VAT 별도' : '자동 책정 · VAT 별도'}
-                </div>
+                </dd>
                 {!taxInvoiceIssued && !editingShippingFee ? (
-                  <button type="button" disabled={Boolean(loadingAction)} className="mt-2 text-xs font-bold text-blue-600 disabled:opacity-50" onClick={() => {
-                    setShippingFeeInput(String(detail.payment.shippingFee))
-                    setEditingShippingFee(true)
-                  }}>배송비 수정</button>
+                  <dd>
+                    <button type="button" disabled={Boolean(loadingAction)} className={buttonClass('ghost', 'sm', 'mt-1 -ml-2 px-2 text-slate-700 underline underline-offset-2')} onClick={() => {
+                      setShippingFeeInput(String(detail.payment.shippingFee))
+                      setEditingShippingFee(true)
+                    }}>배송비 수정</button>
+                  </dd>
                 ) : null}
                 {editingShippingFee ? (
-                  <div className="mt-2 space-y-2">
+                  <dd className="mt-2 space-y-2">
                     <input aria-label="배송비 (VAT 별도)" type="number" min="0" max="100000000" step="1"
-                      className="h-9 w-full rounded-lg border border-slate-300 bg-white px-2 text-sm"
+                      className={fieldClass('h-9 px-2')}
                       value={shippingFeeInput} onChange={(event) => setShippingFeeInput(event.target.value)} />
-                    <div className="flex flex-wrap gap-2 text-xs">
+                    <div className="flex flex-wrap gap-1.5">
                       <button type="button" disabled={Boolean(loadingAction)} onClick={() => void handleShippingFee()}
-                        className="rounded-md bg-slate-950 px-2 py-1 text-white disabled:opacity-50">저장</button>
+                        className={buttonClass('primary', 'sm')}>저장</button>
                       <button type="button" disabled={Boolean(loadingAction)} onClick={() => void handleShippingFee(true)}
-                        className="rounded-md border border-slate-300 px-2 py-1 disabled:opacity-50">자동 책정</button>
-                      <button type="button" onClick={() => setEditingShippingFee(false)}>취소</button>
+                        className={buttonClass('secondary', 'sm')}>자동 책정</button>
+                      <button type="button" onClick={() => setEditingShippingFee(false)} className={buttonClass('ghost', 'sm')}>취소</button>
                     </div>
-                  </div>
+                  </dd>
                 ) : null}
               </div>
-              <div className="flex items-center justify-between gap-3 sm:col-span-2 xl:col-span-1 xl:block">
-                <span className="text-slate-500">최종 결제금액</span>
-                <div className="whitespace-nowrap text-[22px] text-[#0B63E5] xl:mt-1">{formatCurrency(detail.payment.finalAmount)}</div>
+              <div className="col-span-2 @2xl:col-span-1">
+                <dt className="text-[12px] font-semibold text-slate-500">최종 결제금액</dt>
+                <dd className="mt-1 whitespace-nowrap text-[20px] font-extrabold tabular-nums text-slate-950">{formatCurrency(detail.payment.finalAmount)}</dd>
               </div>
-            </div>
+            </dl>
           </DetailCard>
 
           <DetailCard title="거래처 정보" icon={<Store className="h-4 w-4" />} muted={isCompletedOrder}>
-            <div className="grid gap-[14px] md:grid-cols-2 xl:grid-cols-3">
+            <div className="grid gap-3 @xl:grid-cols-2 @3xl:grid-cols-3">
               {[
                 { label: '거래처', value: detail.customer.company },
                 { label: '사업자번호', value: detail.customer.businessNumber, copyKey: 'business-number' },
@@ -964,24 +864,20 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
           </DetailCard>
         </div>
 
-        <aside id={`order-${detail.orderId}-shipping`} className="order-first scroll-mt-4 space-y-5 xl:order-none xl:sticky xl:top-24">
+        <aside id={`order-${detail.orderId}-shipping`} className="order-first scroll-mt-4 @4xl:order-none @4xl:sticky @4xl:top-4">
           <DetailCard
             title="배송 처리"
             icon={<Truck className="h-4 w-4" />}
             muted={isCompletedOrder}
-            actions={(
-              <span className={`inline-flex h-8 items-center whitespace-nowrap rounded-full border px-3 text-[11px] font-bold ${toneClasses(currentStatusMeta.tone)}`}>
-                {currentStatusMeta.label}
-              </span>
-            )}
           >
             <div className="space-y-4">
               <div>
-                <label className="mb-2 block text-[12px] font-bold text-slate-500">택배사</label>
+                <label htmlFor={`order-${detail.orderId}-carrier`} className={labelClass}>택배사</label>
                 <select
+                  id={`order-${detail.orderId}-carrier`}
                   value={carrier}
                   onChange={(event) => setCarrier(event.target.value)}
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 outline-none transition focus:border-blue-400"
+                  className={selectClass(Boolean(carrier))}
                 >
                   {CARRIER_OPTIONS.map((item) => (
                     <option key={item} value={item}>{item}</option>
@@ -989,13 +885,15 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
                 </select>
               </div>
               <div>
-                <label className="mb-2 block text-[12px] font-bold text-slate-500">송장번호</label>
+                <label htmlFor={`order-${detail.orderId}-tracking`} className={labelClass}>송장번호</label>
                 <input
+                  id={`order-${detail.orderId}-tracking`}
                   type="text"
+                  inputMode="numeric"
                   value={trackingNumber}
                   onChange={(event) => setTrackingNumber(event.target.value)}
                   placeholder="숫자와 하이픈만 입력해주세요"
-                  className="h-11 w-full rounded-xl border border-slate-200 bg-white px-4 text-[14px] font-bold text-slate-900 outline-none transition focus:border-blue-400"
+                  className={fieldClass()}
                 />
               </div>
 
@@ -1010,7 +908,6 @@ export default function OrderDetailPage({ order }: OrderDetailPageProps) {
             </div>
           </DetailCard>
         </aside>
-      </div>
       </div>
     </div>
   )

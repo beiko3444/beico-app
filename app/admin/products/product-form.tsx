@@ -4,10 +4,12 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import Modal from '@/components/Modal'
-import { ImagePlus, Plus, X } from 'lucide-react'
+import { ImagePlus, Plus } from 'lucide-react'
 import { normalizePartnerProductStatus, type PartnerProductStatus } from '@/lib/partnerProductStatus'
 import Button from '@/components/ui/Button'
 import Tabs from '@/components/ui/Tabs'
+import ModalCloseButton from '@/components/ui/ModalCloseButton'
+import { fieldClass, selectClass } from '@/components/ui/field'
 
 type ExchangeRates = { USD: number, JPY: number, CNY: number }
 type CountryPrice = { cost: string, wholesale: string, retail: string, moq: string, orderUnit: string }
@@ -392,34 +394,29 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
         }
     }
 
-    const inputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
-    const numberInputClass = `${inputClass} text-right font-bold tabular-nums`
-    const priceInputClass = 'h-10 w-full rounded-xl border border-slate-200 bg-white pl-7 pr-2 text-right text-xs font-bold tabular-nums text-slate-900 transition focus:border-brand-orange focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40'
-    const labelClass = 'text-[12px] font-bold text-slate-600'
-    const sectionTitleClass = 'mb-4 border-b border-slate-200 pb-2 text-[14px] font-black text-slate-900'
+    const inputClass = fieldClass()
+    // Codes are typed in monospace, but their placeholders stay in the form's normal face.
+    const codeInputClass = fieldClass('font-mono placeholder:font-sans')
+    const numberInputClass = fieldClass('text-right tabular-nums')
+    const priceInputClass = fieldClass('pl-7 pr-2 text-right text-xs tabular-nums')
+    const labelClass = 'text-[12px] font-bold text-slate-700'
+    const sectionTitleClass = 'mb-4 border-b border-slate-200 pb-2 text-[14px] font-extrabold text-slate-900'
     const conversionClass = 'mt-0.5 text-right text-[11px] font-bold leading-tight text-slate-500'
     const modalTitle = isCopy ? '상품 복사 등록' : initialData ? '상품 수정' : '상품 등록'
     const submitLabel = loading ? '저장 중…' : isCopy ? '복사 저장' : '저장'
 
     const modalContent = (
-        <Modal label={modalTitle} onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-slate-950/45 p-0 sm:p-6">
+        <Modal label={modalTitle} onClose={() => { if (!loading) setIsOpen(false) }} className="flex items-center justify-center overflow-hidden bg-slate-950/50 p-0 sm:p-6">
             <div
                 className="relative flex h-[100dvh] max-h-[100dvh] w-full max-w-5xl flex-col overflow-hidden bg-white shadow-2xl sm:h-auto sm:max-h-[calc(100dvh-48px)] sm:rounded-2xl sm:border sm:border-slate-200"
                 onClick={(e) => e.stopPropagation()}
             >
                 <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
                     <div className="min-w-0">
-                        <h3 className="truncate text-lg font-black text-slate-950">{modalTitle}</h3>
+                        <h3 className="truncate text-lg font-extrabold text-slate-950">{modalTitle}</h3>
                         {initialData ? <p className="truncate text-[12px] font-semibold text-slate-500">{initialData.name}</p> : null}
                     </div>
-                    <button
-                        type="button"
-                        onClick={() => setIsOpen(false)}
-                        className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-orange/40"
-                        aria-label="닫기"
-                    >
-                        <X size={18} />
-                    </button>
+                    <ModalCloseButton onClick={() => setIsOpen(false)} className="-mr-2" />
                 </div>
 
                 <form
@@ -520,7 +517,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         type="text"
                                         value={productCode}
                                         onChange={e => setProductCode(normalizeProductCode(e.target.value))}
-                                        className={`${inputClass} font-mono uppercase`}
+                                        className={`${codeInputClass} uppercase placeholder:normal-case`}
                                         placeholder="예: QB-V3-01"
                                     />
                                 </div>
@@ -540,7 +537,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         type="text"
                                         value={barcode}
                                         onChange={e => setBarcode(e.target.value)}
-                                        className={`${inputClass} font-mono`}
+                                        className={codeInputClass}
                                         placeholder="바코드 번호"
                                     />
                                 </div>
@@ -550,7 +547,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         type="text"
                                         value={coupangSku}
                                         onChange={e => setCoupangSku(e.target.value)}
-                                        className={`${inputClass} font-bold`}
+                                        className={codeInputClass}
                                         placeholder="쿠팡 판매자상품코드 (숫자)"
                                     />
                                 </div>
@@ -560,7 +557,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         type="text"
                                         value={hsCode}
                                         onChange={e => setHsCode(normalizeHsCode(e.target.value))}
-                                        className={`${inputClass} font-mono`}
+                                        className={codeInputClass}
                                         placeholder="예: 9507.90"
                                     />
                                 </div>
@@ -570,7 +567,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         type="text"
                                         value={japanHsCode}
                                         onChange={e => setJapanHsCode(normalizeHsCode(e.target.value))}
-                                        className={`${inputClass} font-mono`}
+                                        className={codeInputClass}
                                         placeholder="예: 9507.90"
                                     />
                                 </div>
@@ -587,7 +584,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                         inputMode="numeric"
                                         value={stock}
                                         onChange={e => setStock(formatNumber(e.target.value))}
-                                        className={`${numberInputClass} font-black`}
+                                        className={fieldClass('text-right font-semibold tabular-nums')}
                                         placeholder="도매 발주와 무관"
                                     />
                                 </div>
@@ -596,7 +593,7 @@ export default function ProductForm({ initialData, trigger, isCopy }: ProductFor
                                     <select
                                         value={partnerSaleStatus}
                                         onChange={e => setPartnerSaleStatus(e.target.value as PartnerProductStatus)}
-                                        className={`${inputClass} font-bold ${partnerSaleStatus === 'VISIBLE' ? 'text-emerald-700' : partnerSaleStatus === 'SOLD_OUT' ? 'text-amber-700' : 'text-slate-500'}`}
+                                        className={selectClass(true)}
                                     >
                                         <option value="VISIBLE">노출</option>
                                         <option value="HIDDEN">비노출</option>
