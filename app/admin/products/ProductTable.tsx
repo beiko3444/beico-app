@@ -1952,7 +1952,7 @@ export default function ProductTable({ initialProducts }: { initialProducts: Pro
         <div className="w-full space-y-4" style={{ maxWidth: productTableWidth + (selectedGroup ? 310 : 0) + 24 }}>
             <PageHeader
                 title="상품 관리"
-                count={`${formatInteger(products.length)}개`}
+                count={products.length}
                 description={<>관리용 재고는 실물 수량 기록이며 파트너 주문 가능 여부와 별개입니다. <strong className="font-bold text-slate-700">판매 상태·순서·그룹은 즉시 반영</strong>되고, <strong className="font-bold text-slate-700">가격·수량·발주 조건은 수정사항 저장</strong>을 눌러야 반영됩니다.</>}
                 actions={(
                     <>

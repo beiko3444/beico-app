@@ -240,7 +240,7 @@ export default function MaterialSuppliesClient({ initialItems }: { initialItems:
     <div className="min-w-0 space-y-3">
       <PageHeader
         title="부자재 주문"
-        count={`${items.length}개`}
+        count={items.length}
         description="자주 구매하는 품목을 빠르게 찾고 재주문합니다."
         actions={<Button variant="primary" onClick={openNewForm} icon={<Plus size={15} />}>새 부자재</Button>}
       />

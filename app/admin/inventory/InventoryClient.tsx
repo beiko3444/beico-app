@@ -874,7 +874,7 @@ export default function InventoryClient() {
     <div className="mx-auto w-full min-w-0 max-w-[1540px] space-y-4 pb-6">
       <PageHeader
         title="재고 관리"
-        count={summary ? `${formatNumber(summary.masterCount)}개` : undefined}
+        count={summary ? summary.masterCount : undefined}
         description="네이버·쿠팡 판매 재고입니다. 실물 창고 재고와 별도로 집계합니다."
         actions={(
           <>

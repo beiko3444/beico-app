@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 
-export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
+export type BadgeTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'progress'
 
 const tones: Record<BadgeTone, string> = {
   neutral: 'bg-slate-100 text-slate-700',
@@ -8,6 +8,8 @@ const tones: Record<BadgeTone, string> = {
   success: 'bg-emerald-50 text-emerald-700',
   warning: 'bg-amber-50 text-amber-800',
   danger: 'bg-red-50 text-red-700',
+  // Under way (e.g. shipping) — between waiting and done.
+  progress: 'bg-violet-50 text-violet-700',
 }
 
 /**

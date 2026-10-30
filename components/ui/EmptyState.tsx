@@ -23,8 +23,8 @@ export default function EmptyState({ icon, title, description, action, compact =
       <div className="mb-3 inline-flex h-11 w-11 items-center justify-center rounded-full bg-white text-slate-300 shadow-sm">
         {icon ?? <Inbox size={20} />}
       </div>
-      <p className="text-sm font-bold text-slate-800">{title}</p>
-      {description ? <p className="mt-1 max-w-md break-keep text-[12px] text-slate-500">{description}</p> : null}
+      <p className="text-sm font-bold text-slate-800 [text-wrap:balance]">{title}</p>
+      {description ? <p className="mt-1 max-w-md break-keep text-[12px] text-slate-500 [text-wrap:balance]">{description}</p> : null}
       {action ? <div className="mt-4">{action}</div> : null}
     </div>
   )

@@ -180,7 +180,7 @@ export default function Purchase1688Client({ initialItems, initialRate, loadErro
     <div className="w-full min-w-0 max-w-[1180px] space-y-3">
       <PageHeader
         title="1688 구매내역"
-        count={`${money(groups.length, 0)}건`}
+        count={groups.length}
         description="구매·배송 내역을 한곳에서 관리하세요"
         actions={(
           <>
