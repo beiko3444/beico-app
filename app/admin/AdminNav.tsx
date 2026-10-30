@@ -124,9 +124,9 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
   if (!favoriteRows.length && !loading) return null
 
   return (
-    <div className="mt-2 shrink-0 border-t border-[#E5E7EB] pt-3">
+    <div className="mt-2 shrink-0 border-t border-[#E5E9EF] pt-3">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-1.5 text-[12px] font-black text-[#111827]">
+        <div className="flex items-center gap-1.5 text-[12px] font-bold text-[#344054]">
           <Star size={14} className="text-amber-500" fill="currentColor" />
           즐겨찾기 재고
         </div>
@@ -148,18 +148,18 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
             >
               <SidebarProductImage src={row.imageUrl} alt={row.name} />
               <div className="min-w-0 flex-1">
-                <div className="truncate text-[12px] font-black leading-tight text-slate-900" title={row.name}>
+                <div className="truncate text-[12px] font-semibold leading-tight text-slate-800" title={row.name}>
                   {row.name}
                 </div>
-                <table className="mt-1.5 w-full table-fixed border-collapse text-[12px] font-black tabular-nums">
+                <table className="mt-1.5 w-full table-fixed border-collapse text-[12px] font-semibold tabular-nums">
                   <tbody>
                     <tr>
                       <td className="w-[38%] overflow-hidden whitespace-nowrap pr-1 text-left text-slate-700">
-                        <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-emerald-600 px-1 text-[10px] font-black leading-none text-white">N</span>
+                        <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] border border-slate-300 px-1 text-[10px] font-bold leading-none text-slate-600">N</span>
                         <span>{formatSidebarStock(row.naverStock)}</span>
                       </td>
                       <td className="w-[34%] overflow-hidden whitespace-nowrap px-1 text-left text-slate-700">
-                        <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] bg-red-600 px-1 text-[10px] font-black leading-none text-white">C</span>
+                        <span className="mr-1 inline-flex h-4 min-w-4 items-center justify-center rounded-[3px] border border-slate-300 px-1 text-[10px] font-bold leading-none text-slate-600">C</span>
                         <span className={coupangStale ? 'text-red-700' : undefined}>{coupangStale ? '오류' : formatSidebarStock(row.coupangStock)}</span>
                       </td>
                       <td
@@ -184,15 +184,30 @@ function FavoriteInventoryPanel({ onNavigate }: { onNavigate?: () => void }) {
 type NavItem = { name: string; path: string; icon: LucideIcon; subPages?: { href: string; name: string }[] }
 type NavGroup = { label: string; items: NavItem[] }
 
+// Grouped by the kind of work: sales, export paperwork, purchasing/production, catalogue, back office, notes.
 const NAV_GROUPS: NavGroup[] = [
   {
-    label: '주문·거래',
+    label: '판매',
     items: [
       { name: '주문 관리', path: '/admin/orders', icon: ShoppingCart },
       { name: '파트너 관리', path: '/admin/partners', icon: Handshake, subPages: [{ href: '/admin/notices', name: '파트너 공지' }] },
+    ],
+  },
+  {
+    label: '수출입 서류',
+    items: [
       { name: 'PI 발급', path: '/admin/proforma', icon: FileText },
       { name: '수출신고', path: '/admin/export-declaration', icon: Ship },
       { name: '인도 위임장', path: '/admin/cargo-delivery', icon: Truck },
+    ],
+  },
+  {
+    label: '구매·생산',
+    items: [
+      { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
+      { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
+      { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
+      { name: '생산 관리', path: '/admin/production', icon: Factory },
     ],
   },
   {
@@ -200,26 +215,22 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { name: '상품 관리', path: '/admin/products', icon: Package },
       { name: '재고 관리', path: '/admin/inventory', icon: Warehouse },
-      { name: '부자재 주문', path: '/admin/material-supplies', icon: PackagePlus },
-      { name: '1688 구매내역', path: '/admin/1688', icon: Globe2 },
-      { name: '지렁이 발주', path: '/admin/worm-order', icon: Send },
     ],
   },
   {
-    label: '운영',
+    label: '경영지원',
     items: [
-      { name: '생산 관리', path: '/admin/production', icon: Factory },
       { name: '근태 관리', path: '/admin/tasks', icon: Clock3 },
       { name: '카드 사용내역', path: '/admin/card-usage', icon: CreditCard },
       { name: '전력 관리', path: '/admin/electricity', icon: PlugZap },
     ],
   },
   {
-    label: '도구',
+    label: '분석·메모',
     items: [
+      { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
       { name: '메모', path: '/admin/memos', icon: StickyNote },
       { name: '마인드보드', path: '/admin/mindboard', icon: LayoutGrid },
-      { name: '시즌레이더', path: '/admin/season-radar', icon: Fish },
     ],
   },
 ]
@@ -373,9 +384,7 @@ export default function AdminNav({
     if (count <= 0) return null
     return (
       <span
-        className={`ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[11px] font-extrabold leading-none ${
-          active ? 'bg-white text-brand-orange-strong ring-1 ring-[#ffd5cc]' : 'bg-brand-orange text-white'
-        }`}
+        className="ml-2 inline-flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full bg-[#172033] px-1.5 text-[11px] font-extrabold leading-none text-white"
         aria-label={`${count}건 알림`}
       >
         {count > 99 ? '99+' : count}
@@ -464,7 +473,7 @@ export default function AdminNav({
         <button
           type="button"
           onClick={() => setIsMobileMenuOpen((open) => !open)}
-          className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] bg-[#f4f6f8] text-[#172033] transition-colors hover:bg-[#eef2f6]"
+          className="inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-[#172033] transition-colors hover:bg-[#F4F6F8]"
           aria-label={isMobileMenuOpen ? '관리자 메뉴 닫기' : '관리자 메뉴 열기'}
           aria-expanded={isMobileMenuOpen}
           aria-controls="admin-mobile-menu"
@@ -585,7 +594,7 @@ export default function AdminNav({
           {activeGroup ? (
             <>
               <span className="whitespace-nowrap font-bold text-[#667085]">{activeGroup.label}</span>
-              <ChevronRight size={14} className="shrink-0 text-[#98a2b3]" aria-hidden="true" />
+              {activeSubPage ? <ChevronRight size={14} className="shrink-0 text-[#98a2b3]" aria-hidden="true" /> : null}
             </>
           ) : null}
           {activeSubPage && activeItem ? (
@@ -594,9 +603,11 @@ export default function AdminNav({
                 {activeItem.name}
               </Link>
               <ChevronRight size={14} className="shrink-0 text-[#98a2b3]" aria-hidden="true" />
+              <span className="truncate font-extrabold text-[#172033]">{activeSubPage.name}</span>
             </>
-          ) : null}
-          <span className="truncate font-extrabold text-[#172033]">{activeSubPage?.name || activeItem?.name || '관리자'}</span>
+          ) : activeGroup ? null : (
+            <span className="truncate font-extrabold text-[#172033]">관리자</span>
+          )}
         </div>
         <div className="flex shrink-0 items-center gap-2.5">
           {isOrdersPage ? pickupError : null}
@@ -614,7 +625,7 @@ export default function AdminNav({
           <div className="h-6 w-px bg-[#E5E9EF]" aria-hidden="true" />
           <div className="flex items-center gap-2">
             <span
-              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#172033] text-[12px] font-extrabold text-white"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-[#eef2f6] text-[12px] font-extrabold text-[#344054]"
               aria-hidden="true"
             >
               {displayName.slice(0, 1)}

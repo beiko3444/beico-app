@@ -196,103 +196,10 @@ body * {
 }
 
 @layer components {
-  .apple-page {
-    background: var(--background);
-    color: var(--foreground);
-  }
 
   .apple-admin-shell {
     min-height: 100vh;
     background: var(--background);
-  }
-
-  .apple-panel {
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-panel);
-  }
-
-  .apple-panel-dark {
-    background: var(--surface-dark);
-    color: #fff;
-    border: 1px solid transparent;
-    border-radius: 0;
-  }
-
-  .apple-hero-title {
-    font-family: var(--font-sans);
-    font-size: clamp(2.5rem, 4vw, 3.5rem);
-    font-weight: 600;
-    line-height: 1.07;
-    letter-spacing: 0;
-  }
-
-  .apple-section-title {
-    font-size: clamp(2rem, 3vw, 2.5rem);
-    font-weight: 600;
-    line-height: 1.1;
-    letter-spacing: 0;
-  }
-
-  .apple-lead {
-    font-size: clamp(1.125rem, 1.8vw, 1.5rem);
-    line-height: 1.45;
-    color: var(--muted-foreground);
-  }
-
-  .apple-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 44px;
-    padding: 11px 22px;
-    border-radius: var(--radius-md);
-    background: var(--primary);
-    color: #fff;
-    border: 1px solid transparent;
-    font-size: 17px;
-    font-weight: 400;
-    line-height: 1.2;
-    letter-spacing: 0;
-  }
-
-  .apple-button:hover {
-    background: var(--primary-focus);
-    color: #fff;
-  }
-
-  .apple-button-secondary {
-    background: var(--background);
-    color: var(--primary);
-    border-color: var(--hairline);
-  }
-
-  .apple-input {
-    min-height: 44px;
-    border-radius: var(--radius-md);
-    border: 1px solid var(--input-border);
-    background: var(--input-bg);
-    padding: 12px 20px;
-  }
-
-  .apple-tile-light {
-    background: var(--background);
-    color: var(--foreground);
-  }
-
-  .apple-tile-parchment {
-    background: var(--surface-parchment);
-    color: var(--foreground);
-  }
-
-  .apple-tile-dark {
-    background: var(--surface-dark);
-    color: #fff;
-  }
-
-  .apple-product-shadow {
-    box-shadow: var(--shadow-product);
   }
 
   .glass-panel {
@@ -305,37 +212,6 @@ body * {
     background: var(--card);
     border-color: var(--border);
     box-shadow: var(--shadow-panel);
-  }
-
-  .glass-button {
-    background: var(--primary);
-    color: white;
-    border-radius: var(--radius-md);
-  }
-
-  .glass-button:hover {
-    background: var(--primary-focus);
-    box-shadow: none;
-  }
-
-  @keyframes gradient-move {
-    0% {
-      background-position: 0% 50%;
-    }
-
-    50% {
-      background-position: 100% 50%;
-    }
-
-    100% {
-      background-position: 0% 50%;
-    }
-  }
-
-  .bg-gradient-green-animated {
-    background: linear-gradient(-45deg, #059669, #10b981, #34d399, #059669);
-    background-size: 400% 400%;
-    animation: gradient-move 3s ease infinite;
   }
 
   .ux-page {
@@ -361,12 +237,6 @@ body * {
   .ux-nav-scroll {
     mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
     -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
-  }
-
-  .ux-page-stack {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
   }
 
   .ux-tabs {
@@ -429,23 +299,6 @@ body * {
     border-radius: var(--radius-lg);
     background: var(--card);
     box-shadow: var(--shadow-panel);
-  }
-
-  .ux-toolbar {
-    display: flex;
-    min-height: 52px;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: 8px;
-    border-bottom: 1px solid var(--border);
-    padding: 10px 12px;
-  }
-
-  .ux-page-title {
-    color: var(--foreground);
-    font-size: clamp(1.125rem, 1.8vw, 1.5rem);
-    font-weight: 800;
-    line-height: 1.25;
   }
 
   .ux-section-title {
@@ -528,18 +381,6 @@ body * {
     font-size: 0.875rem;
   }
 
-  .ux-empty-state {
-    display: flex;
-    min-height: 180px;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 24px;
-    color: var(--muted-foreground);
-    text-align: center;
-  }
-
   .ux-scrollbar {
     scrollbar-color: var(--border-strong) transparent;
     scrollbar-width: thin;
@@ -558,9 +399,6 @@ body * {
   }
 
   @media (max-width: 639px) {
-    .ux-toolbar {
-      align-items: stretch;
-    }
 
     .ux-button,
     .ux-button-primary,
